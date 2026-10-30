@@ -525,9 +525,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             K.Block(b.root, "Screen", b.Local(-1.7f, 3.6f, 11.65f), new Vector3(14f, 4.6f, 0.15f), new Color(0.2f, 0.18f, 0.2f), GameLayers.DEFAULT, true, Quaternion.Euler(0, b.Yaw, 0));
             Neon(b.root, b.Local(-1.7f, 3.6f, 11.55f), new Vector3(13.4f, 4.2f, 0.04f), new Color(1.1f, 1.1f, 1.25f), b.Yaw);
             for (int s = -1; s <= 1; s += 2) K.Block(b.root, "Curtain", b.Local(-1.7f + s * 7.6f, 3.2f, 11.4f), new Vector3(1.2f, 6.2f, 0.3f), new Color(0.55f, 0.08f, 0.1f), GameLayers.DEFAULT, true, Quaternion.Euler(0, b.Yaw, 0));
-            for (int r = 0; r < 8; r++)
+            for (int row = 0; row < 8; row++)
             {
-                float z = 7.8f - r * 1.3f, y = r * 0.12f;
+                float z = 7.8f - row * 1.3f, y = row * 0.12f;
                 K.Block(b.root, "SeatRow", b.Local(-2.3f, 0.25f + y, z), new Vector3(13f, 0.5f, 0.7f), new Color(0.55f, 0.1f, 0.14f), GameLayers.DEFAULT, true, Quaternion.Euler(0, b.Yaw, 0));
                 K.Block(b.root, "SeatBack", b.Local(-2.3f, 0.75f + y, z - 0.38f), new Vector3(13f, 1f, 0.12f), new Color(0.45f, 0.08f, 0.12f), GameLayers.DEFAULT, false, Quaternion.Euler(0, b.Yaw, 0));
             }

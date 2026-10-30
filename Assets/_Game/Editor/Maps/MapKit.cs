@@ -1131,10 +1131,30 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         // ---------------------------------------------------------------- finish
 
+        /// <summary>
+        /// Opt-in: the minimum distance between two generated cover points. A candidate closer than
+        /// this to one already placed is skipped (furniture clusters, stacked wrecks and hedges
+        /// otherwise produce dozens of near-identical points, and every point weighs on the saved
+        /// scene). 0, the default, keeps every candidate.
+        /// </summary>
+        public float CoverSpacing;
+
         /// <summary>Cover points around every registered cover source, where there is floor and room.</summary>
         private void GenerateCover()
         {
             int lCount = 0;
+            Dictionary<Vector3Int, List<Vector3>> lPlaced = CoverSpacing > 0f ? new Dictionary<Vector3Int, List<Vector3>>() : null;
+            Vector3Int Key(Vector3 p) => new Vector3Int(Mathf.FloorToInt(p.x / CoverSpacing), Mathf.FloorToInt(p.y / CoverSpacing), Mathf.FloorToInt(p.z / CoverSpacing));
+            bool Crowded(Vector3 p)
+            {
+                Vector3Int k = Key(p);
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dz = -1; dz <= 1; dz++)
+                            if (lPlaced.TryGetValue(k + new Vector3Int(dx, dy, dz), out List<Vector3> lCell))
+                                foreach (Vector3 q in lCell) if ((q - p).sqrMagnitude < CoverSpacing * CoverSpacing) return true;
+                return false;
+            }
             foreach ((Vector3 lCenter, Vector3 lSize, Quaternion lRot) in _coverSources)
             {
                 bool lLow = lSize.y < 1.6f;
@@ -1146,6 +1166,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     if (!Physics.Raycast(lPos + Vector3.up * 1.5f, Vector3.down, out RaycastHit lFloor, 4f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore)) continue;
                     lPos = lFloor.point;
                     if (Physics.CheckCapsule(lPos + Vector3.up * 0.4f, lPos + Vector3.up * 1.6f, 0.3f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore)) continue;
+                    if (lPlaced != null)
+                    {
+                        if (Crowded(lPos)) continue;
+                        Vector3Int lKey = Key(lPos);
+                        if (!lPlaced.TryGetValue(lKey, out List<Vector3> lCell)) lPlaced[lKey] = lCell = new List<Vector3>();
+                        lCell.Add(lPos);
+                    }
                     Cover(lPos, Quaternion.LookRotation(-lNormal).eulerAngles.y, lLow);
                     lCount++;
                 }

@@ -1095,6 +1095,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Volume lV = lVolume.AddComponent<Volume>();
             lV.isGlobal = true;
             lV.priority = 1;
+            lV.sharedProfile = ArtBuilder.VolumeProfileFor(Map);
         }
 
         private void BakeNavMesh()

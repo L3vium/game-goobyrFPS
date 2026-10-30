@@ -35,7 +35,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private float _aberrationPulse;
         private float _bloomPulse;
         private float _vignettePulse;
-        private float _vignetteBase = 0.22f;
+        private float _vignetteBase = 0.2f;
         private Color _vignetteColor = Color.black;
         private float _desaturate;
         private float _exposurePulse;
@@ -103,21 +103,14 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             VolumeProfile lProfile = ScriptableObject.CreateInstance<VolumeProfile>();
             _volume.sharedProfile = lProfile;
 
-            _bloom = lProfile.Add<Bloom>(true);
-            _bloom.threshold.Override(0.95f);
-            _bloom.intensity.Override(0.9f);
-            _bloom.scatter.Override(0.7f);
+            _bloom = lProfile.Add<Bloom>(false);
+            _bloom.intensity.overrideState = true;
             _aberration = lProfile.Add<ChromaticAberration>(true);
             _aberration.intensity.Override(0.04f);
             _vignette = lProfile.Add<Vignette>(true);
             _vignette.intensity.Override(_vignetteBase);
             _vignette.smoothness.Override(0.45f);
-            _color = lProfile.Add<ColorAdjustments>(true);
-            _color.saturation.Override(12f);
-            _color.contrast.Override(8f);
-            _color.postExposure.Override(0f);
-            Tonemapping lTone = lProfile.Add<Tonemapping>(true);
-            lTone.mode.Override(TonemappingMode.Neutral);
+            _color = lProfile.Add<ColorAdjustments>(false);
         }
 
         /// <summary>The pose of the eye this frame, before juice.</summary>
@@ -153,11 +146,14 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _vignettePulse = Mathf.MoveTowards(_vignettePulse, 0f, dt * 1.5f);
             _exposurePulse = Mathf.MoveTowards(_exposurePulse, 0f, dt * 4f);
 
-            _aberration.intensity.value = Mathf.Clamp01(0.04f + _aberrationPulse);
-            _bloom.intensity.value = 0.9f + _bloomPulse;
+            _aberration.intensity.value = Mathf.Clamp01(0.03f + _aberrationPulse);
+            _bloom.intensity.overrideState = _bloomPulse > 0.01f;
+            _bloom.intensity.value = 0.8f + _bloomPulse;
             _vignette.intensity.value = Mathf.Clamp01(_vignetteBase + _vignettePulse);
             _vignette.color.value = Color.Lerp(_vignetteColor, new Color(0.7f, 0f, 0.05f), Mathf.Clamp01(_vignettePulse * 2f));
-            _color.saturation.value = Mathf.Lerp(12f, -80f, _desaturate);
+            _color.saturation.overrideState = _desaturate > 0.01f;
+            _color.saturation.value = Mathf.Lerp(0f, -80f, _desaturate);
+            _color.postExposure.overrideState = _exposurePulse > 0.01f;
             _color.postExposure.value = _exposurePulse;
         }
 

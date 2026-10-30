@@ -20,14 +20,29 @@ MonoBehaviour:
   - Downtown Strip
   - Junkyard Bowl
   - Hilltop Mansion
-  skyTop: {r: 0.55, g: 0.75, b: 0.95, a: 1}
-  skyHorizon: {r: 1, g: 0.8, b: 0.7, a: 1}
-  fog: {r: 0.95, g: 0.82, b: 0.75, a: 1}
-  sun: {r: 1, g: 0.85, b: 0.7, a: 1}
-  ambient: {r: 0.55, g: 0.5, b: 0.6, a: 1}
-  sunIntensity: 1.35
-  sunEuler: {x: 30, y: 120, z: 0}
-  fogDensity: 0.0022
+  skyTop: {r: 0.34, g: 0.42, b: 0.72, a: 1}
+  skyHorizon: {r: 1, g: 0.74, b: 0.62, a: 1}
+  fog: {r: 0.72, g: 0.544, b: 0.492, a: 1}
+  sun: {r: 1, g: 0.78, b: 0.62, a: 1}
+  ambient: {r: 0.5025, g: 0.435, b: 0.5025, a: 0.75}
+  sunIntensity: 1.5
+  sunEuler: {x: 14, y: 120, z: 0}
+  fogDensity: 0.0012
+  hazeColor: {r: 1, g: 0.6, b: 0.45, a: 1}
+  cloudShade: {r: 0.58, g: 0.64, b: 0.74, a: 1}
+  cloudCoverage: 0.5
+  volumetricDensity: 0.0045
+  volumetricHeight: 0
+  volumetricFalloff: 20
+  volumetricAmbient: {r: 0.3, g: 0.25, b: 0.3, a: 1}
+  sunScattering: 1
+  temperature: 18
+  tint: 0
+  saturation: 14
+  contrast: 16
+  postExposure: -0.15
+  shadowsTint: {r: 0.9, g: 0.95, b: 1.08, a: 1}
+  highlightsTint: {r: 1.06, g: 1.02, b: 0.94, a: 1}
   targets:
   - displayName: Chet Malloy
     dossier: Car dealer. Every sale is a scam.

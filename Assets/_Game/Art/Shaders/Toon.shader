@@ -109,7 +109,9 @@ Shader "Goobyr/Toon"
             {
                 UNITY_SETUP_INSTANCE_ID(i);
                 half3 normalWS = normalize(i.normalWS);
-                half3 albedo = _BaseColor.rgb * i.color.rgb;
+                // Vertex alpha is the tint mask: 1 = recoloured by _BaseColor, 0 = authored colour kept.
+                // Vertex colours are authored in sRGB (Blender kit, code colours): convert for the linear pipeline.
+                half3 albedo = SRGBToLinear(i.color.rgb) * lerp(half3(1, 1, 1), _BaseColor.rgb, i.color.a);
                 float4 shadowCoord = TransformWorldToShadowCoord(i.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
 

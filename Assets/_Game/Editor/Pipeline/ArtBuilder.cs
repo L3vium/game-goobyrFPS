@@ -41,18 +41,102 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
             foreach (MapDefinition lMap in GameDatabase.Instance.maps)
             {
-                Material lSky = EditorAssets.Material(EditorAssets.ROOT + "/Art/Generated/Sky_" + lMap.sceneName + ".mat", Shader.Find("Goobyr/SkyGradient"));
-                lSky.SetColor("_TopColor", lMap.skyTop);
+                Material lSky = EditorAssets.Material(EditorAssets.ROOT + "/Art/Generated/Sky_" + lMap.sceneName + ".mat", Shader.Find("Goobyr/Sky"));
+                lSky.SetColor("_ZenithColor", lMap.skyTop);
                 lSky.SetColor("_HorizonColor", lMap.skyHorizon);
-                lSky.SetColor("_BottomColor", Color.Lerp(lMap.fog, lMap.ambient, 0.5f));
-                lSky.SetColor("_SunColor", lMap.sun * 0.8f);
-                lSky.SetFloat("_SunSize", 0.012f);
+                lSky.SetColor("_GroundColor", Color.Lerp(lMap.fog, lMap.ambient, 0.5f));
+                lSky.SetColor("_HazeColor", lMap.hazeColor);
+                lSky.SetColor("_SunColor", lMap.sun);
+                lSky.SetColor("_CloudShade", lMap.cloudShade);
+                lSky.SetFloat("_CloudCoverage", lMap.cloudCoverage);
                 EditorUtility.SetDirty(lSky);
+                VolumeProfileFor(lMap);
             }
 
             foreach (Material lMaterial in new[] { lToon, lTransparent, lWater, lGlow, lAdd, lAlpha }) EditorUtility.SetDirty(lMaterial);
             AssetDatabase.SaveAssets();
             Debug.Log("[Build] materials");
+        }
+
+        /// <summary>The map's post stack: atmosphere (volumetric fog), white balance, grading, bloom, vignette.</summary>
+        public static VolumeProfile VolumeProfileFor(MapDefinition pMap)
+        {
+            string lPath = EditorAssets.ROOT + "/Art/Generated/Volume_" + pMap.sceneName + ".asset";
+            AssetDatabase.DeleteAsset(lPath);
+            VolumeProfile lProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+            AssetDatabase.CreateAsset(lProfile, lPath);
+
+            FX.Rendering.GoobyrAtmosphere lAtmosphere = Add<FX.Rendering.GoobyrAtmosphere>(lProfile);
+            lAtmosphere.density.Override(pMap.volumetricDensity);
+            lAtmosphere.baseHeight.Override(pMap.volumetricHeight);
+            lAtmosphere.falloff.Override(pMap.volumetricFalloff);
+            lAtmosphere.ambientColor.Override(pMap.volumetricAmbient);
+            lAtmosphere.sunScattering.Override(pMap.sunScattering);
+            lAtmosphere.maxDistance.Override(260f);
+
+            UnityEngine.Rendering.Universal.WhiteBalance lBalance = Add<UnityEngine.Rendering.Universal.WhiteBalance>(lProfile);
+            lBalance.temperature.Override(pMap.temperature);
+            lBalance.tint.Override(pMap.tint);
+            UnityEngine.Rendering.Universal.ColorAdjustments lColor = Add<UnityEngine.Rendering.Universal.ColorAdjustments>(lProfile);
+            lColor.saturation.Override(pMap.saturation);
+            lColor.contrast.Override(pMap.contrast);
+            lColor.postExposure.Override(pMap.postExposure);
+            UnityEngine.Rendering.Universal.ShadowsMidtonesHighlights lSmh = Add<UnityEngine.Rendering.Universal.ShadowsMidtonesHighlights>(lProfile);
+            lSmh.shadows.Override(new Vector4(pMap.shadowsTint.r, pMap.shadowsTint.g, pMap.shadowsTint.b, 0f));
+            lSmh.highlights.Override(new Vector4(pMap.highlightsTint.r, pMap.highlightsTint.g, pMap.highlightsTint.b, 0f));
+            UnityEngine.Rendering.Universal.Bloom lBloom = Add<UnityEngine.Rendering.Universal.Bloom>(lProfile);
+            lBloom.threshold.Override(1.05f);
+            lBloom.intensity.Override(0.8f);
+            lBloom.scatter.Override(0.72f);
+            UnityEngine.Rendering.Universal.Vignette lVignette = Add<UnityEngine.Rendering.Universal.Vignette>(lProfile);
+            lVignette.intensity.Override(0.22f);
+            lVignette.smoothness.Override(0.5f);
+            UnityEngine.Rendering.Universal.Tonemapping lTone = Add<UnityEngine.Rendering.Universal.Tonemapping>(lProfile);
+            lTone.mode.Override(UnityEngine.Rendering.Universal.TonemappingMode.ACES);
+            EditorUtility.SetDirty(lProfile);
+            return lProfile;
+        }
+
+        private static T Add<T>(VolumeProfile pProfile) where T : VolumeComponent
+        {
+            T lComponent = pProfile.Add<T>(true);
+            lComponent.name = typeof(T).Name;
+            AssetDatabase.AddObjectToAsset(lComponent, pProfile);
+            return lComponent;
+        }
+
+        public static VolumeProfile Volume(MapDefinition pMap) => AssetDatabase.LoadAssetAtPath<VolumeProfile>(EditorAssets.ROOT + "/Art/Generated/Volume_" + pMap.sceneName + ".asset");
+
+        /// <summary>Installs the volumetric fog feature on the PC renderer (once).</summary>
+        [MenuItem("Goobyr/Build/Rendering Features")]
+        public static void InstallFeatures()
+        {
+            UnityEngine.Rendering.Universal.UniversalRendererData lRenderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.UniversalRendererData>(EditorAssets.ROOT + "/Settings/PC_Renderer.asset");
+            if (lRenderer == null) { Debug.LogError("[Build] PC_Renderer not found"); return; }
+            if (!lRenderer.rendererFeatures.Exists(f => f is FX.Rendering.VolumetricFogFeature))
+            {
+                FX.Rendering.VolumetricFogFeature lFeature = ScriptableObject.CreateInstance<FX.Rendering.VolumetricFogFeature>();
+                lFeature.name = "Goobyr Volumetric Fog";
+                AssetDatabase.AddObjectToAsset(lFeature, lRenderer);
+                lRenderer.rendererFeatures.Add(lFeature);
+                SerializedObject lSerialized = new SerializedObject(lRenderer);
+                SerializedProperty lMap = lSerialized.FindProperty("m_RendererFeatureMap");
+                lMap.arraySize++;
+                lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = lFeature.GetInstanceID();
+                lSerialized.ApplyModifiedPropertiesWithoutUndo();
+                lRenderer.SetDirty();
+            }
+            // Softer, longer shadows for the bigger maps.
+            UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset lAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset>(EditorAssets.ROOT + "/Settings/PC_RPAsset.asset");
+            if (lAsset != null)
+            {
+                lAsset.shadowDistance = 140f;
+                lAsset.shadowCascadeCount = 4;
+                lAsset.supportsCameraDepthTexture = true;
+                EditorUtility.SetDirty(lAsset);
+            }
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Build] rendering features");
         }
 
         private static void SetBlend(Material pMaterial, BlendMode pSrc, BlendMode pDst, bool pZWrite, int pQueue)

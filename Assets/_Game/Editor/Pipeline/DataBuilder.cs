@@ -73,6 +73,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     new Color(0.55f, 0.75f, 0.95f), new Color(1f, 0.8f, 0.7f), new Color(0.95f, 0.82f, 0.75f), new Color(1f, 0.85f, 0.7f), new Color(0.55f, 0.5f, 0.6f), 1.35f, new Vector3(30f, 120f, 0), 0.0022f, pResetTuning, SuburbTargets())
             };
 
+            // Ambiance per map: a misty pine morning, a hazy golden Gulf afternoon, a pink suburban dusk.
+            Atmosphere(lMaps[0], new Color(0.3f, 0.52f, 0.78f), new Color(0.78f, 0.84f, 0.86f), new Color(1f, 0.82f, 0.6f), new Color(1f, 0.9f, 0.76f), 1.6f, new Vector3(22f, -40f, 0), 0.55f, 0.0065f, -1f, 14f, new Color(0.22f, 0.28f, 0.34f), 0.9f, 2f, 14f);
+            Atmosphere(lMaps[1], new Color(0.22f, 0.48f, 0.86f), new Color(0.96f, 0.86f, 0.7f), new Color(1f, 0.75f, 0.45f), new Color(1f, 0.88f, 0.7f), 1.9f, new Vector3(28f, 60f, 0), 0.32f, 0.0035f, 0f, 40f, new Color(0.36f, 0.32f, 0.27f), 0.7f, 14f, 12f);
+            Atmosphere(lMaps[2], new Color(0.34f, 0.42f, 0.72f), new Color(1f, 0.74f, 0.62f), new Color(1f, 0.6f, 0.45f), new Color(1f, 0.78f, 0.62f), 1.5f, new Vector3(14f, 120f, 0), 0.5f, 0.0045f, 0f, 20f, new Color(0.3f, 0.25f, 0.3f), 1.0f, 18f, 16f);
+
             GameDatabase lDatabase = EditorAssets.LoadOrCreate<GameDatabase>(EditorAssets.RESOURCES + "/GameDatabase.asset");
             lDatabase.rules = lRules;
             lDatabase.items = lItems;
@@ -118,6 +123,30 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (lNew || pReset || lMap.targets.Count != 15) lMap.targets = pTargets;
             EditorUtility.SetDirty(lMap);
             return lMap;
+        }
+
+        private static void Atmosphere(MapDefinition pMap, Color pZenith, Color pHorizon, Color pHaze, Color pSun, float pSunIntensity, Vector3 pSunEuler, float pClouds, float pVolumetric, float pFogHeight, float pFalloff, Color pFogAmbient, float pScatter, float pTemperature, float pContrast)
+        {
+            pMap.skyTop = pZenith;
+            pMap.skyHorizon = pHorizon;
+            pMap.hazeColor = pHaze;
+            pMap.sun = pSun;
+            pMap.sunIntensity = pSunIntensity;
+            pMap.sunEuler = pSunEuler;
+            pMap.cloudCoverage = pClouds;
+            pMap.volumetricDensity = pVolumetric;
+            pMap.volumetricHeight = pFogHeight;
+            pMap.volumetricFalloff = pFalloff;
+            pMap.volumetricAmbient = pFogAmbient;
+            pMap.sunScattering = pScatter;
+            pMap.temperature = pTemperature;
+            pMap.contrast = pContrast;
+            pMap.fog = Color.Lerp(pHorizon, pFogAmbient, 0.4f);
+            pMap.fogDensity = 0.0012f;
+            pMap.postExposure = -0.15f;
+            pMap.saturation = 14f;
+            pMap.ambient = Color.Lerp(pZenith, pHorizon, 0.5f) * 0.75f;
+            EditorUtility.SetDirty(pMap);
         }
 
         // ---------------------------------------------------------------- targets (all original)

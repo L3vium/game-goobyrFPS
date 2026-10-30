@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Sky_Map_Suburb
-  m_Shader: {fileID: 4800000, guid: aae136de7031b524c932729c52beb810, type: 3}
+  m_Shader: {fileID: 4800000, guid: 241c5fb2f7f4c9649a52a799e4a1ef01, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -25,13 +25,24 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _CloudBottom: 1
+    - _CloudCoverage: 0.5
+    - _CloudDensity: 1.4
+    - _CloudScale: 0.55
+    - _CloudSpeed: 0.25
+    - _CloudTop: 1.6
     - _Exponent: 1.2
+    - _SunHalo: 1.2
     - _SunSize: 0.012
     m_Colors:
     - _BottomColor: {r: 0.75, g: 0.65999997, b: 0.675, a: 1}
     - _CloudColor: {r: 1, g: 1, b: 1, a: 0.5}
-    - _HorizonColor: {r: 1, g: 0.8, b: 0.7, a: 1}
-    - _SunColor: {r: 0.8, g: 0.68, b: 0.56, a: 0.8}
+    - _CloudShade: {r: 0.58, g: 0.64, b: 0.74, a: 1}
+    - _GroundColor: {r: 0.61125004, g: 0.48950002, b: 0.49725002, a: 0.875}
+    - _HazeColor: {r: 1, g: 0.6, b: 0.45, a: 1}
+    - _HorizonColor: {r: 1, g: 0.74, b: 0.62, a: 1}
+    - _SunColor: {r: 1, g: 0.78, b: 0.62, a: 1}
     - _TopColor: {r: 0.55, g: 0.75, b: 0.95, a: 1}
+    - _ZenithColor: {r: 0.34, g: 0.42, b: 0.72, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

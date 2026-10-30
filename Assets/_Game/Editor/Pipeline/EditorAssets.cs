@@ -54,9 +54,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             EnsureFolder(MESHES);
             string lPath = MESHES + "/" + pName + ".asset";
             Mesh lExisting = AssetDatabase.LoadAssetAtPath<Mesh>(lPath);
+            pMesh.name = pName;
             if (lExisting != null)
             {
                 EditorUtility.CopySerialized(pMesh, lExisting);
+                lExisting.name = pName;
                 return lExisting;
             }
             pMesh.name = pName;

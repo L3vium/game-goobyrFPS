@@ -62,15 +62,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Map("Map_Forest", "Pinecrest Hollow", "Map_Forest",
                     "A logging town on a cold river, a fortified commune hidden in the pines with a military outpost next door, and a lakeside timber lodge.",
                     new[] { "Millbrook Town", "The Grove & Outpost", "Lakeside Lodge" },
-                    new Color(0.45f, 0.72f, 0.82f), new Color(0.92f, 0.86f, 0.74f), new Color(0.78f, 0.8f, 0.72f), new Color(1f, 0.9f, 0.75f), new Color(0.5f, 0.55f, 0.55f), 1.25f, new Vector3(38f, -40f, 0), 0.006f, pResetTuning, ForestTargets()),
+                    new Color(0.45f, 0.72f, 0.82f), new Color(0.92f, 0.86f, 0.74f), new Color(0.78f, 0.8f, 0.72f), new Color(1f, 0.9f, 0.75f), new Color(0.5f, 0.55f, 0.55f), 1.25f, new Vector3(38f, -40f, 0), 0.0028f, pResetTuning, ForestTargets()),
                 Map("Map_Gulf", "Mirage Bay", "Map_Gulf",
                     "A sun-bleached Gulf city: a dense souk, smugglers working the docks under the highway, and the Zenith, a luxury hotel tower with a helipad.",
                     new[] { "Old Souk", "Smugglers' Docks", "The Zenith Tower" },
-                    new Color(0.35f, 0.65f, 0.95f), new Color(1f, 0.88f, 0.7f), new Color(0.98f, 0.85f, 0.7f), new Color(1f, 0.93f, 0.8f), new Color(0.6f, 0.55f, 0.5f), 1.5f, new Vector3(55f, 30f, 0), 0.0035f, pResetTuning, GulfTargets()),
+                    new Color(0.35f, 0.65f, 0.95f), new Color(1f, 0.88f, 0.7f), new Color(0.98f, 0.85f, 0.7f), new Color(1f, 0.93f, 0.8f), new Color(0.6f, 0.55f, 0.5f), 1.5f, new Vector3(55f, 30f, 0), 0.0018f, pResetTuning, GulfTargets()),
                 Map("Map_Suburb", "Elmridge", "Map_Suburb",
                     "A tidy American suburb: the downtown strip, a biker hideout in the old junkyard and bowling alley, and the colonial mansion on the hill.",
                     new[] { "Downtown Strip", "Junkyard Bowl", "Hilltop Mansion" },
-                    new Color(0.55f, 0.75f, 0.95f), new Color(1f, 0.8f, 0.7f), new Color(0.95f, 0.82f, 0.75f), new Color(1f, 0.85f, 0.7f), new Color(0.55f, 0.5f, 0.6f), 1.35f, new Vector3(30f, 120f, 0), 0.0045f, pResetTuning, SuburbTargets())
+                    new Color(0.55f, 0.75f, 0.95f), new Color(1f, 0.8f, 0.7f), new Color(0.95f, 0.82f, 0.75f), new Color(1f, 0.85f, 0.7f), new Color(0.55f, 0.5f, 0.6f), 1.35f, new Vector3(30f, 120f, 0), 0.0022f, pResetTuning, SuburbTargets())
             };
 
             GameDatabase lDatabase = EditorAssets.LoadOrCreate<GameDatabase>(EditorAssets.RESOURCES + "/GameDatabase.asset");

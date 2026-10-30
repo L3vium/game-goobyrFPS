@@ -27,7 +27,7 @@ MonoBehaviour:
   ambient: {r: 0.6, g: 0.55, b: 0.5, a: 1}
   sunIntensity: 1.5
   sunEuler: {x: 55, y: 30, z: 0}
-  fogDensity: 0.0035
+  fogDensity: 0.0018
   targets:
   - displayName: Faisal Amberline
     dossier: Spice merchant. The spice is not the product.

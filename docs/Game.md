@@ -40,7 +40,9 @@ terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert 
   the *last known position* of each player, hand out suppress / flank / push roles over scored
   cover points, then search around that position. NPCs never track a player they cannot see —
   the hunted player sees their own "shadow" at the believed position. Fights warm up (wild
-  first shots). One NPC per zone radios for reinforcements (icon + countdown): kill it before it
+  first shots). Patrols walk slowly (1.15 m/s) and come in groups of up to five on one route: the
+  first still on its round leads, the others follow in a column of twos. Crowds (unarmed `Worker`
+  NPCs around a scene) report trouble and run from it. One NPC per zone radios for reinforcements (icon + countdown): kill it before it
   finishes. The alarm flare alerts the whole map. Patrol cars spot players with their headlights,
   brake and drop two guards.
 - **Systemic props** (`Systems/`): fire spreads between flammables and is put out by sprinkler

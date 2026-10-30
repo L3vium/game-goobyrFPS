@@ -1067,11 +1067,51 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         /// <summary>A patrol walking a loop, spawned at the first waypoint.</summary>
-        public void Patrol(int pZone, ItemKind pWeapon, float pPause, params Vector3[] pPoints)
+        public void Patrol(int pZone, ItemKind pWeapon, float pPause, params Vector3[] pPoints) => Patrol(pZone, pWeapon, pPause, 1, pPoints);
+
+        /// <summary>
+        /// A patrol group of <paramref name="pSize"/> (up to 5) on one loop: the first leads, the
+        /// others spawn in a column behind it and follow it in formation.
+        /// </summary>
+        public void Patrol(int pZone, ItemKind pWeapon, float pPause, int pSize, params Vector3[] pPoints)
         {
             PatrolRoute lRoute = Route(pPause, pPoints);
-            Npc(NpcRole.Patrol, pPoints[0], 0f, pZone, pWeapon, lRoute);
+            Vector3 lBack = pPoints.Length > 1 ? (pPoints[0] - pPoints[1]).normalized : Vector3.back;
+            lBack.y = 0f;
+            Vector3 lSide = Vector3.Cross(Vector3.up, lBack).normalized;
+            float lYaw = Quaternion.LookRotation(-lBack).eulerAngles.y;
+            for (int i = 0; i < Mathf.Clamp(pSize, 1, 5); i++)
+            {
+                Vector3 p = pPoints[0] + lBack * (1.5f * ((i + 1) / 2)) + lSide * (i == 0 ? 0f : i % 2 == 1 ? -0.9f : 0.9f);
+                Npc(NpcRole.Patrol, i == 0 ? pPoints[0] : OnFloor(p, pPoints[0].y), lYaw, pZone, i == 0 ? pWeapon : (i % 2 == 0 ? ItemKind.Smg : pWeapon), lRoute);
+            }
             ExplosiveTrap(pPoints);
+        }
+
+        /// <summary>
+        /// A crowd around a scene (a speech, a party, a market): unarmed people facing its centre,
+        /// scattered in a ring. They report trouble and run from it; they never fight.
+        /// </summary>
+        public void Crowd(Vector3 pCenter, float pInner, float pOuter, int pCount, int pZone)
+        {
+            for (int i = 0; i < pCount; i++)
+            {
+                float lAngle = (i + (float)Rng.NextDouble() * 0.6f) / pCount * Mathf.PI * 2f;
+                float lRadius = Mathf.Lerp(pInner, pOuter, (float)Rng.NextDouble());
+                Vector3 p = OnFloor(pCenter + new Vector3(Mathf.Cos(lAngle), 0, Mathf.Sin(lAngle)) * lRadius, pCenter.y);
+                Vector3 lFace = pCenter - p;
+                lFace.y = 0f;
+                Npc(NpcRole.Worker, p, Quaternion.LookRotation(lFace.sqrMagnitude > 0.01f ? lFace : Vector3.forward).eulerAngles.y + ((float)Rng.NextDouble() - 0.5f) * 30f, pZone, ItemKind.Fists);
+            }
+        }
+
+        /// <summary>The floor under a point (raycast from above, near the reference height), else the point.</summary>
+        private Vector3 OnFloor(Vector3 pPoint, float pNearY)
+        {
+            Physics.SyncTransforms();
+            if (Physics.Raycast(new Vector3(pPoint.x, pNearY + 2f, pPoint.z), Vector3.down, out RaycastHit lHit, 5f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore))
+                return lHit.point + Vector3.up * 0.1f;
+            return pPoint;
         }
 
         /// <summary>

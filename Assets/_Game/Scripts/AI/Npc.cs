@@ -61,6 +61,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public NpcRole Role => RoleVar.Value;
         public bool InCombat => State.Value == NpcState.Combat || State.Value == NpcState.Calling || State.Value == NpcState.Search;
         public bool IsTarget => Role == NpcRole.Target;
+        /// <summary>Unarmed crowd members (guests, staff, spectators): they run away instead of fighting.</summary>
+        public bool IsCrowd => Role == NpcRole.Worker;
+        private bool Flees => IsTarget || IsCrowd;
         public LevelZone Zone { get; private set; }
         public ItemDefinition Weapon => GameDatabase.Item(WeaponItem.Value);
         public Vector3 Eye => transform.position + Vector3.up * 1.55f * transform.localScale.y;
@@ -75,6 +78,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private Vector3 _home;
         private Quaternion _homeRotation;
         private PatrolRoute _route;
+        private Vector3? _fleePoint;
         private int _routeIndex;
         private float _waitUntil;
         private float _awareness;
@@ -106,6 +110,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private float _combatStart;
 
         private const float WALK = 1.9f, RUN = 4.9f;
+        /// <summary>Unhurried paces: a patrol on its round, a target going about its routine.</summary>
+        private const float PATROL = 1.15f, STROLL = 1.3f;
 
         private void Awake()
         {
@@ -126,6 +132,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             WeaponItem.Value = pWeapon != null ? pWeapon.Index : -1;
             TargetProfile.Value = pTargetProfile;
             _route = pRoute;
+            _route?.Join(this);
             _principal = pPrincipal;
             _routine = pRoutine;
             _home = transform.position;
@@ -391,7 +398,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 _reactionUntil = Time.time + GameDatabase.Rules.npcReactionTime + Random.value * 0.25f;
                 SpottedRpc();
-                if (IsTarget) { SetState(NpcState.Flee); return; }
+                if (Flees) { SetState(NpcState.Flee); return; }
                 EnterCombat();
                 // A spotter in a zone with a flare launcher may go fire it.
                 _wantsAlarm = Random.value < 0.3f && WorldRegistry.Nearest<AlarmTrigger>(transform.position, 45f, a => a.State == 0) != null;
@@ -424,7 +431,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             switch (pNoise.kind)
             {
                 case NoiseKind.Alarming:
-                    if (IsTarget) { SetState(NpcState.Flee); return; }
+                    if (Flees) { SetState(NpcState.Flee); return; }
                     if (State.Value == NpcState.Sick) return;
                     AlertToPoint(pNoise.position, true);
                     PlayerAvatar lShooter = PlayerAvatar.ForClient(pNoise.source);
@@ -468,7 +475,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public void AlertToPoint(Vector3 pPoint, bool pAlarmed)
         {
             if (!Health.IsAlive || State.Value == NpcState.KnockedOut || State.Value == NpcState.Sick) return;
-            if (IsTarget) { SetState(NpcState.Flee); return; }
+            if (Flees) { SetState(NpcState.Flee); return; }
             if (InCombat) { if (_combatTarget == null) _searchCenter = pPoint; return; }
             _awareness = Mathf.Max(_awareness, 0.7f);
             _searchCenter = pPoint;
@@ -479,7 +486,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private void Investigate(Vector3 pPoint, bool pAlarmed)
         {
-            if (IsTarget && pAlarmed) { SetState(NpcState.Flee); return; }
+            if (Flees && pAlarmed) { SetState(NpcState.Flee); return; }
             _investigatePoint = pPoint;
             _investigateAlarmed = pAlarmed;
             _awareness = Mathf.Max(_awareness, 0.3f);
@@ -493,7 +500,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             if (Vector3.Distance(transform.position, _home) > 1.2f)
             {
-                MoveTo(_home, WALK);
+                MoveTo(_home, PATROL);
                 return;
             }
             Stop();
@@ -505,8 +512,20 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             if (_route == null || _route.Count == 0) { SetState(NpcState.Idle); return; }
             if (Time.time < _waitUntil) { Stop(); return; }
+            // Groups walk in a column of twos behind whoever leads (the first one still on the round).
+            Npc lLeader = _route.Leader;
+            if (lLeader != null && lLeader != this)
+            {
+                int lSlot = _route.SlotOf(this);
+                Vector3 lOffset = new Vector3(lSlot % 2 == 1 ? -0.9f : 0.9f, 0f, -1.5f * ((lSlot + 1) / 2));
+                Vector3 lSpot = lLeader.transform.position + lLeader.transform.rotation * lOffset;
+                if (Vector3.Distance(transform.position, lSpot) > 0.6f) MoveTo(lSpot, PATROL * 1.25f);
+                else { Stop(); transform.rotation = Quaternion.RotateTowards(transform.rotation, lLeader.transform.rotation, 120f * Time.deltaTime); }
+                _routeIndex = lLeader._routeIndex;
+                return;
+            }
             Vector3 lPoint = _route.Point(_routeIndex);
-            MoveTo(lPoint, WALK);
+            MoveTo(lPoint, PATROL);
             if (Arrived(0.8f))
             {
                 _routeIndex++;
@@ -527,7 +546,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
             if (_waitUntil <= 0f)
             {
-                MoveTo(_activityNode.transform.position, WALK);
+                MoveTo(_activityNode.transform.position, STROLL);
                 if (!Arrived(0.9f)) return;
                 _waitUntil = Time.time + _activityNode.Duration * Random.Range(0.8f, 1.3f);
                 transform.rotation = _activityNode.transform.rotation;
@@ -641,6 +660,22 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void UpdateFlee()
         {
             // The target bolts to its zone's safe room and hides there; it fights only if cornered.
+            // A crowd member just runs away from the trouble.
+            if (IsCrowd)
+            {
+                if (_fleePoint == null)
+                {
+                    Vector3 lFrom = _combatTarget != null ? _combatTarget.transform.position : _investigatePoint;
+                    Vector3 lAway = transform.position - lFrom;
+                    lAway.y = 0f;
+                    Vector3 lWish = transform.position + (lAway.sqrMagnitude > 0.01f ? lAway.normalized : -transform.forward) * 22f;
+                    _fleePoint = UnityEngine.AI.NavMesh.SamplePosition(lWish, out UnityEngine.AI.NavMeshHit lHit, 8f, UnityEngine.AI.NavMesh.AllAreas) ? lHit.position : _home;
+                }
+                MoveTo(_fleePoint.Value, RUN);
+                if (Arrived(1.5f)) Stop();
+                if (_stateTime > 45f && (Zone == null || !Zone.InCombat)) { _fleePoint = null; ReturnToDuty(); }
+                return;
+            }
             Vector3 lSafe = Zone != null ? Zone.SafeRoom : _home;
             MoveTo(lSafe, RUN * 0.9f);
             if (Arrived(1.5f))
@@ -895,7 +930,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             _lastAttacker = pInfo.attacker;
             PlayerAvatar lAttacker = PlayerAvatar.ForClient(pInfo.attacker);
-            if (IsTarget) { SetState(NpcState.Flee); return; }
+            if (Flees) { SetState(NpcState.Flee); return; }
             if (lAttacker != null)
             {
                 _awareness = 1f;
@@ -916,7 +951,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
             // Guards drop their gun: clearing a room arms you.
             ItemDefinition lWeapon = Weapon;
-            if (lWeapon != null && !IsTarget) ItemPickup.SpawnServer(lWeapon, transform.position + Vector3.up * 1.1f, Random.Range(lWeapon.magazine / 3, lWeapon.magazine + 1), lWeapon.reserveAmmo / 3, Random.insideUnitSphere + Vector3.up * 2f);
+            if (lWeapon != null && lWeapon.IsGun && !IsTarget) ItemPickup.SpawnServer(lWeapon, transform.position + Vector3.up * 1.1f, Random.Range(lWeapon.magazine / 3, lWeapon.magazine + 1), lWeapon.reserveAmmo / 3, Random.insideUnitSphere + Vector3.up * 2f);
             Match.MatchDirector.Instance?.HandleNpcDeath(this, pInfo);
         }
 

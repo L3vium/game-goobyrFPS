@@ -155,6 +155,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             /// <summary>Doors on the ground floor: (side, module). Sides: 0 front (-Z), 1 right (+X), 2 back (+Z), 3 left (-X).</summary>
             public List<Vector2Int> doors = new List<Vector2Int>();
             public List<Vector2Int> arches = new List<Vector2Int>();
+            /// <summary>Doors in the basement walls (side, module), for a service ramp or a cellar door.</summary>
+            public List<Vector2Int> basementDoors = new List<Vector2Int>();
+            /// <summary>Doors on upper floors (side, module, floor), onto a deck, a fire escape or a bridge.</summary>
+            public List<Vector3Int> upperDoors = new List<Vector3Int>();
+            /// <summary>
+            /// Sized for the NavMesh agent (radius 0.5): every door is a double door, partitions open
+            /// with arches and the stair flights are 1.6x wider (2.2 m), so NPCs walk in and between floors.
+            /// </summary>
+            public bool navigable;
             public float windowChance = 0.7f;
             public float balconyChance = 0.15f;
             public bool tallWindows;
@@ -228,7 +237,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
 
             // Slabs (with a stairwell near the back-right corner) and stairs.
-            Vector2 lWell = new Vector2(W * 0.5f - 1.3f, D * 0.5f - 3.6f);
+            float lStairScale = pSpec.navigable ? 1.6f : 1f;
+            // Navigable: a wider flight, shifted forward so the top landing is deep enough for the agent.
+            Vector2 lWell = pSpec.navigable ? new Vector2(W * 0.5f - 1.5f, D * 0.5f - 4.6f) : new Vector2(W * 0.5f - 1.3f, D * 0.5f - 3.6f);
             for (int f = lFirst; f <= pSpec.floors; f++)
             {
                 bool lRoofLevel = f == pSpec.floors;
@@ -236,13 +247,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 float y = f * STOREY - 0.12f;
                 Color lColor = lRoofLevel ? pSpec.roofTint : pSpec.floorColor;
                 if (f == 0 && !pSpec.basement) lCut = false;
-                KitSlab(lRoot, W - 0.3f, D - 0.3f, y, lColor, lCut, lWell);
+                KitSlab(lRoot, W - 0.3f, D - 0.3f, y, lColor, lCut, lWell, 0.75f * lStairScale);
             }
             if (pSpec.stairs)
                 for (int f = lFirst; f < pSpec.floors; f++)
                 {
                     if (f == pSpec.floors - 1 && !(pSpec.roofAccess && pSpec.roof == Roof.Flat)) break;
-                    Piece(S, "Stairs", lRoot.TransformPoint(new Vector3(lWell.x, f * STOREY, lWell.y)), pSpec.yaw + 180f, pSpec.floorColor * 1.1f, lRoot);
+                    GameObject lFlight = Piece(S, "Stairs", lRoot.TransformPoint(new Vector3(lWell.x, f * STOREY, lWell.y)), pSpec.yaw + 180f, pSpec.floorColor * 1.1f, lRoot);
+                    if (lFlight != null && lStairScale != 1f) lFlight.transform.localScale = new Vector3(lStairScale, 1f, 1f);
                 }
 
             // Roof.
@@ -281,13 +293,19 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 int lIndex = f - lFirst;
                 Room[] lRooms = lIndex < pSpec.rooms.Count ? pSpec.rooms[lIndex] : null;
                 if (lRooms == null || lRooms.Length == 0) continue;
+                // Navigable: furniture keeps an aisle along the partition (its doorway stays open) and
+                // stays clear of the stair column, its approach and its landing.
+                float lAisle = pSpec.navigable ? 1.1f : 0f;
+                float lColumn = pSpec.navigable ? 4.4f : 0f;
                 if (lRooms.Length > 1 && pSpec.depth >= 3)
                 {
-                    PartitionKit(lBuilding, f, new Vector3(-W * 0.5f, 0, 0), new Vector3(W * 0.5f - 3f, 0, 0));
-                    Furnish(lBuilding, f, lRooms[0], new Rect(-W * 0.5f + 0.5f, -D * 0.5f + 0.5f, W - 1f, D * 0.5f - 1f), lRandom);
-                    Furnish(lBuilding, f, lRooms[1], new Rect(-W * 0.5f + 0.5f, 0.5f, W - 4f, D * 0.5f - 1f), lRandom);
+                    // Navigable: the doorway is the module next to the stair column, outside the furnished area.
+                    float lRoomsColumn = pSpec.navigable ? 6f : 0f;
+                    PartitionKit(lBuilding, f, new Vector3(-W * 0.5f, 0, 0), new Vector3(W * 0.5f - 3f, 0, 0), pSpec.navigable ? int.MaxValue : -1);
+                    Furnish(lBuilding, f, lRooms[0], new Rect(-W * 0.5f + 0.5f, -D * 0.5f + 0.5f, W - 0.5f - Mathf.Max(0.5f, lRoomsColumn), D * 0.5f - 1f - lAisle), lRandom);
+                    Furnish(lBuilding, f, lRooms[1], new Rect(-W * 0.5f + 0.5f, 0.5f + lAisle, W - 0.5f - Mathf.Max(3.5f, lRoomsColumn), D * 0.5f - 1f - lAisle), lRandom);
                 }
-                else Furnish(lBuilding, f, lRooms[0], new Rect(-W * 0.5f + 0.8f, -D * 0.5f + 0.8f, W - 4f, D - 1.6f), lRandom);
+                else Furnish(lBuilding, f, lRooms[0], new Rect(-W * 0.5f + 0.8f, -D * 0.5f + 0.8f, W - 0.8f - Mathf.Max(3.2f, lColumn), D - 1.6f), lRandom);
                 Lamp(lBuilding.Local(-W * 0.2f, f * STOREY + STOREY - 0.45f, 0), new Color(1f, 0.86f, 0.66f), 9f, 1.2f, false);
             }
             lBuilding.volume = BuildingVolume(pSpec.name, lRoot.position, new Vector3(W, (pSpec.floors + 1) * STOREY, D), pSpec.yaw);
@@ -297,9 +315,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private static string FacadePiece(KitSpec pSpec, int pFloor, int pSide, int pModule, System.Random pRandom)
         {
             Vector2Int lKey = new Vector2Int(pSide, pModule);
-            if (pFloor == 0 && pSpec.doors.Contains(lKey)) return pSpec.brick && pSpec.style == "Suburb" ? "WallBrickDoor" : (pModule % 2 == 0 ? "WallDoor" : "WallDoorDouble");
+            if (pFloor == 0 && pSpec.doors.Contains(lKey)) return pSpec.navigable ? "WallDoorDouble" : pSpec.brick && pSpec.style == "Suburb" ? "WallBrickDoor" : (pModule % 2 == 0 ? "WallDoor" : "WallDoorDouble");
             if (pFloor == 0 && pSpec.arches.Contains(lKey)) return "WallArch";
-            if (pFloor < 0) return "Wall";
+            string lDoor = pSpec.navigable ? "WallDoorDouble" : "WallDoor";
+            if (pFloor > 0 && pSpec.upperDoors.Contains(new Vector3Int(pSide, pModule, pFloor))) return lDoor;
+            if (pFloor < 0) return pSpec.basementDoors.Contains(lKey) ? lDoor : "Wall";
             double r = pRandom.NextDouble();
             if (pFloor > 0 && r < pSpec.balconyChance) return "WallWindowBalcony";
             if (r < pSpec.balconyChance + pSpec.windowChance)
@@ -310,7 +330,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return pSpec.brick && pSpec.style == "Suburb" ? "WallBrick" : "Wall";
         }
 
-        private void KitSlab(Transform pRoot, float W, float D, float y, Color pColor, bool pWell, Vector2 pWellCenter)
+        private void KitSlab(Transform pRoot, float W, float D, float y, Color pColor, bool pWell, Vector2 pWellCenter, float pWellHalfWidth = 0.75f)
         {
             void Part(float x0, float x1, float z0, float z1)
             {
@@ -318,15 +338,17 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Block(pRoot, "Slab", pRoot.TransformPoint(new Vector3((x0 + x1) * 0.5f, y, (z0 + z1) * 0.5f)), new Vector3(x1 - x0, 0.24f, z1 - z0), pColor, GameLayers.DEFAULT, true, pRoot.rotation);
             }
             if (!pWell) { Part(-W * 0.5f, W * 0.5f, -D * 0.5f, D * 0.5f); return; }
-            float hx0 = pWellCenter.x - 0.9f, hx1 = pWellCenter.x + 0.9f, hz0 = pWellCenter.y - 3f, hz1 = pWellCenter.y + 3f;
+            // The hole is the flight's footprint (1.4 x 5.4 m): the flight below arrives flush with the
+            // slab's edge and the flight above starts flush with it (no gap to step over at either end).
+            float hx0 = pWellCenter.x - pWellHalfWidth, hx1 = pWellCenter.x + pWellHalfWidth, hz0 = pWellCenter.y - 2.7f, hz1 = pWellCenter.y + 2.7f;
             Part(-W * 0.5f, hx0, -D * 0.5f, D * 0.5f);
             Part(hx1, W * 0.5f, -D * 0.5f, D * 0.5f);
             Part(hx0, hx1, -D * 0.5f, hz0);
             Part(hx0, hx1, hz1, D * 0.5f);
         }
 
-        /// <summary>An interior wall line of kit walls (one doorway in the middle) on a floor.</summary>
-        public void PartitionKit(KitBuilding pBuilding, int pFloor, Vector3 pFromLocal, Vector3 pToLocal)
+        /// <summary>An interior wall line of kit walls on a floor, with one doorway (the middle module unless given).</summary>
+        public void PartitionKit(KitBuilding pBuilding, int pFloor, Vector3 pFromLocal, Vector3 pToLocal, int pDoorModule = -1)
         {
             Vector3 lDir = pToLocal - pFromLocal;
             int lModules = Mathf.Max(1, Mathf.RoundToInt(lDir.magnitude / MODULE));
@@ -335,7 +357,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             for (int i = 0; i < lModules; i++)
             {
                 Vector3 lLocal = pFromLocal + lUnit * (MODULE * (i + 0.5f)) + Vector3.up * (pFloor * STOREY);
-                string lPiece = i == lModules / 2 ? "WallDoor" : "Wall";
+                int lDoor = pDoorModule < 0 ? lModules / 2 : Mathf.Min(pDoorModule, lModules - 1);
+                string lPiece = i == lDoor ? (pBuilding.spec.navigable ? "WallArch" : "WallDoor") : "Wall";
                 Piece(pBuilding.spec.style, lPiece, pBuilding.root.TransformPoint(lLocal), lYaw, pBuilding.spec.interiorWall, pBuilding.root);
             }
         }
@@ -359,7 +382,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     Prop("PlantBig", P(0.95f, 0.05f), lYaw, null);
                     Prop("FloorLamp", P(0.1f, 0.1f), lYaw, null);
                     DistractionKit(P(0.5f, 0.95f), lYaw + 180, "tv");
-                    Activities(P(0.5f, 0.35f), lYaw, Z, ActivityType.Idle, ActivityType.Phone);
+                    // Navigable: the nodes stand clear of the sofa / table / armchair group.
+                    Activities(pBuilding.spec.navigable ? P(0.82f, 0.32f) : P(0.5f, 0.35f), lYaw, Z, ActivityType.Idle, ActivityType.Phone);
                     break;
                 case Room.Bar:
                     Prop("BarCounter", P(0.5f, 0.75f), lYaw + 180, lWood, Collide.Box, true);

@@ -654,7 +654,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lTrigger.AddComponent<TallGrass>();
         }
 
-        public void Water(Vector3 pCenter, Vector2 pSize)
+        /// <summary>A flat water surface (returned so a builder can tilt it into a cascade).</summary>
+        public GameObject Water(Vector3 pCenter, Vector2 pSize)
         {
             GameObject lWater = new GameObject("Water") { layer = GameLayers.WATER };
             lWater.transform.SetParent(Env, false);
@@ -662,6 +663,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lWater.transform.localScale = new Vector3(pSize.x, 1f, pSize.y);
             lWater.AddComponent<MeshFilter>().sharedMesh = EditorAssets.SaveMesh(WaterMesh(), "Kit_WaterPlane");
             lWater.AddComponent<MeshRenderer>().sharedMaterial = _water;
+            return lWater;
         }
 
         private static Mesh WaterMesh()
@@ -1184,20 +1186,33 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lV.sharedProfile = ArtBuilder.VolumeProfileFor(Map);
         }
 
+        /// <summary>
+        /// Writes the Goob agent (matches the NPC NavMeshAgent) into the project's Humanoid agent type:
+        /// <c>NavMesh.GetSettingsByIndex</c> returns a copy, so the bake reads the asset.
+        /// </summary>
+        private static void ConfigureAgent()
+        {
+            Object lAsset = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/NavMeshAreas.asset")[0];
+            SerializedObject lNav = new SerializedObject(lAsset);
+            SerializedProperty lAgent = lNav.FindProperty("m_Settings").GetArrayElementAtIndex(0);
+            lAgent.FindPropertyRelative("agentRadius").floatValue = 0.35f;
+            lAgent.FindPropertyRelative("agentHeight").floatValue = 1.8f;
+            lAgent.FindPropertyRelative("agentSlope").floatValue = 42f;
+            lAgent.FindPropertyRelative("agentClimb").floatValue = 0.45f;
+            lNav.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private void BakeNavMesh()
         {
             NavMeshSurface lSurface = Root.gameObject.AddComponent<NavMeshSurface>();
             lSurface.collectObjects = CollectObjects.All;
             lSurface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
             lSurface.layerMask = (1 << GameLayers.DEFAULT) | (1 << GameLayers.INTERACTABLE) | (1 << GameLayers.CLIMBABLE);
-            NavMeshBuildSettings lSettings = NavMesh.GetSettingsByIndex(0);
-            lSettings.agentRadius = 0.35f;
-            lSettings.agentHeight = 1.8f;
-            lSettings.agentSlope = 42f;
-            lSettings.agentClimb = 0.45f;
-            lSurface.agentTypeID = lSettings.agentTypeID;
+            ConfigureAgent();
+            lSurface.agentTypeID = NavMesh.GetSettingsByIndex(0).agentTypeID;
+            // Two voxels per agent radius, so the 0.35 m radius is not rounded up to 0.5 m.
             lSurface.overrideVoxelSize = true;
-            lSurface.voxelSize = _w * Cell > 600f ? 0.25f : 0.15f;
+            lSurface.voxelSize = 0.175f;
             lSurface.BuildNavMesh();
             string lPath = EditorAssets.SCENES + "/" + Map.sceneName + "_NavMesh.asset";
             AssetDatabase.DeleteAsset(lPath);

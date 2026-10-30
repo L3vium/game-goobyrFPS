@@ -145,7 +145,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
 
             // Contract, top left.
-            Image lDossierPanel = UIFactory.Panel(_root, "Dossier", UIFactory.PanelColor, new Vector2(0, 1), new Vector2(30, -30), new Vector2(660, 200));
+            Image lDossierPanel = UIFactory.Panel(_root, "Dossier", UIFactory.PanelColor, new Vector2(0, 1), new Vector2(40, -40), new Vector2(660, 200));
             lDossierPanel.rectTransform.pivot = new Vector2(0, 1);
             _dossier = UIFactory.Text(lDossierPanel.transform, "Text", "", 21, UIFactory.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(330, -78), new Vector2(620, 140));
             _status = UIFactory.Text(lDossierPanel.transform, "Status", "", 24, UIFactory.Accent, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(330, 22), new Vector2(620, 34));
@@ -167,6 +167,21 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _flash = UIFactory.Stretch(_root, "Flash").gameObject.AddComponent<Image>();
             _flash.raycastTarget = false;
             _flash.color = new Color(1, 1, 1, 0);
+
+            // Typography: condensed capitals for numbers and titles, the accent as a thin rule.
+            foreach (TextMeshProUGUI lText in new[] { _health, _ammo, _clock, _bannerTitle, _bannerSub, _weaponName, _status, _stealth, _spectating, _prompt })
+            {
+                lText.font = UIFactory.Heading;
+                lText.characterSpacing = 4f;
+            }
+            _bannerTitle.font = UIFactory.HeadingBold;
+            _bannerTitle.characterSpacing = 14f;
+            _bannerTitle.color = UIFactory.Paper;
+            _health.font = _ammo.font = _clock.font = UIFactory.HeadingBold;
+            foreach (TextMeshProUGUI lSlot in _slots) { lSlot.font = UIFactory.Heading; lSlot.characterSpacing = 3f; }
+            UIFactory.Rule(lDossierPanel.transform, new Vector2(0, 1), new Vector2(3, -100), 200, true, UIFactory.Accent, 4f);
+            UIFactory.Rule(_root, new Vector2(0.5f, 0.72f), new Vector2(0, -36), 160, false, UIFactory.Accent, 3f).name = "BannerRule";
+            _crosshair.fontSize = 34;
 
             Juice.OnScreenFlash += HandleFlash;
         }
@@ -231,7 +246,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 float lRatio = Mathf.Clamp01(lHp / Mathf.Max(1f, lMe.Health.MaxHealth));
                 _health.text = Mathf.CeilToInt(lHp).ToString();
                 _healthFill.rectTransform.sizeDelta = new Vector2(320 * lRatio, 22);
-                _healthFill.color = Color.Lerp(UIFactory.Accent, UIFactory.Good, lRatio);
+                _healthFill.color = Color.Lerp(UIFactory.Accent, UIFactory.Paper, Mathf.Clamp01(lRatio * 2f - 0.3f));
                 if (lRatio < 0.3f && lAlive && CameraRig.Instance != null) CameraRig.Instance.PulseHurt(0.15f + Mathf.Sin(Time.time * 6f) * 0.05f);
                 bool lConcealed = lMe.Hidden.Value || (lMe.Crouched.Value && lMe.InGrass.Value);
                 _stealth.text = lMe.Hidden.Value ? "HIDDEN" : lConcealed ? "CONCEALED" : lMe.Crouched.Value ? "CROUCHED" : lMe.Sprinting.Value ? "<color=#FFB13B>LOUD</color>" : "";
@@ -251,8 +266,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                     if (lItem != null && lItem.slot == ItemSlot.Gadget) lName += " x" + s.reserve;
                     _slots[i].text = "<size=70%>" + (i + 1) + "</size>\n" + lName;
                     bool lSelected = lWeapons.Selected.Value == i;
-                    _slotBacks[i].color = lSelected ? new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, 0.9f) : UIFactory.PanelColor;
-                    _slotBacks[i].rectTransform.localScale = Vector3.one * (lSelected ? 1.08f : 1f);
+                    _slotBacks[i].color = lSelected ? new Color(1, 1, 1, 0.16f) : UIFactory.PanelColor;
+                    _slots[i].color = lSelected ? UIFactory.Paper : UIFactory.Muted;
                 }
             }
 
@@ -262,7 +277,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 TargetProfile lTarget = lDirector.Target;
                 MapDefinition lMap = lDirector.Map;
                 string lZone = lTarget != null && lMap != null && lTarget.zone < lMap.zoneNames.Length ? lMap.zoneNames[lTarget.zone] : "";
-                _dossier.text = lTarget == null ? "" : "<size=120%><color=#FF6B73>" + lTarget.displayName.ToUpperInvariant() + "</color></size>\n<size=85%>" + lTarget.dossier + "\nSEEN AROUND: " + lZone.ToUpperInvariant() + "  -  PROOF: " + lTarget.proof.ToString().ToUpperInvariant() + "</size>";
+                _dossier.text = lTarget == null ? "" : "<size=120%><color=#FFFFFF>" + lTarget.displayName.ToUpperInvariant() + "</color></size>\n<size=85%>" + lTarget.dossier + "\nSEEN AROUND: " + lZone.ToUpperInvariant() + "  -  PROOF: " + lTarget.proof.ToString().ToUpperInvariant() + "</size>";
                 string lCarrier = "";
                 if (lDirector.Proof.Value == ProofState.Carried)
                 {
@@ -297,7 +312,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _bannerTime -= dt;
             float lBanner = Mathf.Clamp01(_bannerTime);
             _bannerTitle.alpha = _bannerSub.alpha = lBanner;
-            _bannerTitle.rectTransform.localScale = Vector3.one * (1f + Mathf.Max(0f, _bannerTime - 4f) * 0.8f);
+            _bannerTitle.characterSpacing = 14f + Mathf.Max(0f, _bannerTime - 3.8f) * 40f;
             _flashAlpha = Mathf.MoveTowards(_flashAlpha, 0f, dt * 2.5f);
             _flash.color = new Color(_flashColor.r, _flashColor.g, _flashColor.b, _flashAlpha);
 

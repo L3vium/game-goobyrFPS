@@ -13,7 +13,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public static void Play(GoobBody pBody, float pStrength = 1f)
         {
             if (pBody == null) return;
-            HitFlash lFlash = pBody.GetComponent<HitFlash>() ?? pBody.gameObject.AddComponent<HitFlash>();
+            HitFlash lFlash = pBody.GetComponent<HitFlash>();
+            if (lFlash == null) lFlash = pBody.gameObject.AddComponent<HitFlash>();
             lFlash._body = pBody;
             lFlash._value = Mathf.Max(lFlash._value, pStrength);
             lFlash.enabled = true;
@@ -22,7 +23,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public static void Play(GameObject pObject, float pStrength = 1f)
         {
             if (pObject == null) return;
-            HitFlash lFlash = pObject.GetComponent<HitFlash>() ?? pObject.AddComponent<HitFlash>();
+            HitFlash lFlash = (pObject.GetComponent<HitFlash>() is HitFlash lFoundHitFlash && lFoundHitFlash != null ? lFoundHitFlash : pObject.AddComponent<HitFlash>());
             lFlash._renderers ??= pObject.GetComponentsInChildren<Renderer>();
             lFlash._value = Mathf.Max(lFlash._value, pStrength);
             lFlash.enabled = true;

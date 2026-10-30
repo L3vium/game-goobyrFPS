@@ -11,22 +11,24 @@ using UnityEngine.UI;
 namespace Com.IsartDigital.GoobyrFPS.UI
 {
     /// <summary>
-    /// The title scene's screens: main menu (play online through Steam, LAN, solo, settings,
-    /// quit), join, and the lobby where the host picks the map, the mode, the team count and the
-    /// options, players pick their team and get ready. A slow camera flyover over a Goob diorama
-    /// plays behind everything.
+    /// The title scene's screens, in the game's sober dossier style: the main menu (online through
+    /// Steam, friends, join, solo, settings, quit), the join screen, and the lobby - roster on the
+    /// left, the contract (map, mode, teams, options) on the right. A cinematic flyover of a map
+    /// plays behind, under a dark vignette.
     /// </summary>
     public class MenuUI : MonoBehaviour
     {
         private enum Screen { Main, Join, Lobby, Settings }
 
+        private const string VERSION = "0.2.0";
+
         private RectTransform _root;
         private GameObject _main, _join, _lobby, _settings;
-        private TextMeshProUGUI _status, _lobbyPlayers, _lobbyInfo, _code, _modeLabel, _mapLabel, _teamsLabel, _mapDescription;
+        private TextMeshProUGUI _status, _lobbyPlayers, _lobbyInfo, _code, _modeLabel, _mapLabel, _teamsLabel, _mapDescription, _playerCount;
         private TMP_InputField _joinCode, _joinIp, _name;
         private Button _startButton, _readyButton;
         private RectTransform _teamButtons, _hostControls;
-        private Transform _title;
+        private Screen _current;
 
         private void Start()
         {
@@ -39,14 +41,23 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             Canvas lCanvas = UIFactory.Canvas("MenuCanvas", 20);
             lCanvas.transform.SetParent(transform, false);
             _root = (RectTransform)lCanvas.transform;
+
+            // Cinematic framing: dark gradient on the left where the text sits, letterbox bars.
+            Image lShade = UIFactory.Stretch(_root, "Shade").gameObject.AddComponent<Image>();
+            lShade.sprite = GradientSprite();
+            lShade.color = new Color(0, 0, 0, 0.85f);
+            lShade.raycastTarget = false;
+            UIFactory.Panel(_root, "BarTop", Color.black, new Vector2(0.5f, 1), new Vector2(0, -24), new Vector2(4000, 48));
+            UIFactory.Panel(_root, "BarBottom", Color.black, new Vector2(0.5f, 0), new Vector2(0, 24), new Vector2(4000, 48));
+
             BuildMain();
             BuildJoin();
             BuildLobby();
             BuildSettings();
-            _status = UIFactory.Text(_root, "Status", "", 28, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 50), new Vector2(1600, 44));
+            _status = UIFactory.Title(_root, "Status", "", 20, UIFactory.Muted, TextAlignmentOptions.Right, new Vector2(1, 0), new Vector2(-560, 24), new Vector2(1000, 40), false, 3f);
+            UIFactory.Title(_root, "Version", "GOOBYR FPS  ·  " + VERSION, 18, new Color(1, 1, 1, 0.35f), TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(260, 24), new Vector2(440, 40), false, 4f);
 
-            bool lInRoom = NetworkManagerListening();
-            Show(lInRoom ? Screen.Lobby : Screen.Main);
+            Show(NetworkManagerListening() ? Screen.Lobby : Screen.Main);
             NetSession.OnStatus += HandleStatus;
             if (NetSession.Instance != null) NetSession.Instance.EnsureSteam();
         }
@@ -62,10 +73,33 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
         private void Show(Screen pScreen)
         {
+            _current = pScreen;
             _main.SetActive(pScreen == Screen.Main);
             _join.SetActive(pScreen == Screen.Join);
             _lobby.SetActive(pScreen == Screen.Lobby);
             _settings.SetActive(pScreen == Screen.Settings);
+            GameObject lShown = pScreen switch { Screen.Main => _main, Screen.Join => _join, Screen.Lobby => _lobby, _ => _settings };
+            UIFactory.FadeIn(lShown, 0.3f, new Vector2(-24, 0));
+        }
+
+        private static Sprite GradientSprite()
+        {
+            Texture2D lTexture = new Texture2D(256, 1, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            for (int x = 0; x < 256; x++)
+            {
+                float t = x / 255f;
+                lTexture.SetPixel(x, 0, new Color(1, 1, 1, Mathf.Clamp01(1.05f - t * 1.6f)));
+            }
+            lTexture.Apply();
+            return Sprite.Create(lTexture, new Rect(0, 0, 256, 1), new Vector2(0.5f, 0.5f));
+        }
+
+        /// <summary>A section header: small caps label with a short red rule above it.</summary>
+        private static void Header(Transform pParent, string pText, Vector2 pAnchor, Vector2 pPosition, float pWidth = 600f)
+        {
+            // Left-anchored elements pivot on their left edge, right-anchored ones on their right edge.
+            UIFactory.Rule(pParent, pAnchor, pPosition + new Vector2(pAnchor.x > 0.9f ? -pWidth + 40 : 0, 24), 40, false, UIFactory.Accent, 3f);
+            UIFactory.Title(pParent, "Header", pText, 22, UIFactory.Muted, TextAlignmentOptions.Left, pAnchor, pPosition, new Vector2(pWidth, 34), false, 6f);
         }
 
         // ---------------------------------------------------------------- main
@@ -75,44 +109,50 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _main = UIFactory.Stretch(_root, "Main").gameObject;
             Transform p = _main.transform;
             Vector2 L = new Vector2(0, 0.5f);
-            _title = UIFactory.Text(p, "Title", "GOOBYR", 170, UIFactory.Accent, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(560, 330), new Vector2(1000, 200)).transform;
-            UIFactory.Text(p, "Subtitle", "CONTRACTS FOR UP TO 8 GOOBS", 34, UIFactory.Paper, TextAlignmentOptions.Left, L, new Vector2(560, 210), new Vector2(1000, 50));
-            _name = UIFactory.Input(p, "YOUR NAME", L, new Vector2(330, 120), new Vector2(520, 64));
+            UIFactory.Title(p, "Title", "GOOBYR FPS", 128, UIFactory.Paper, TextAlignmentOptions.Left, L, new Vector2(170, 300), new Vector2(1100, 150), true, 10f);
+            UIFactory.Rule(p, L, new Vector2(170, 222), 220, false, UIFactory.Accent, 4f);
+            UIFactory.Title(p, "Subtitle", "CONTRACTS  ·  UP TO 8 PLAYERS  ·  EVERYONE IS A TARGET", 22, UIFactory.Muted, TextAlignmentOptions.Left, L, new Vector2(170, 190), new Vector2(1100, 36), false, 6f);
+
+            Header(p, "AGENT", L, new Vector2(170, 120), 520);
+            _name = UIFactory.Input(p, "YOUR NAME", L, new Vector2(170, 76), new Vector2(520, 52));
             _name.text = PlayerIdentity.LocalName;
             _name.onEndEdit.AddListener(v => PlayerIdentity.LocalName = v);
 
-            UIFactory.Button(p, "HOST ON STEAM", L, new Vector2(330, 30), new Vector2(520, 78), UIFactory.Accent, () => { NetSession.Instance.HostSteam(false); Show(Screen.Lobby); });
-            UIFactory.Button(p, "HOST FOR FRIENDS", L, new Vector2(330, -60), new Vector2(520, 78), UIFactory.Accent, () => { NetSession.Instance.HostSteam(true); Show(Screen.Lobby); });
-            UIFactory.Button(p, "JOIN", L, new Vector2(330, -150), new Vector2(520, 78), UIFactory.Accent2, () => Show(Screen.Join));
-            UIFactory.Button(p, "SOLO VS AI", L, new Vector2(330, -240), new Vector2(520, 78), UIFactory.Accent2, () => { NetSession.Instance.HostLocal(); Show(Screen.Lobby); });
-            UIFactory.Button(p, "SETTINGS", L, new Vector2(195, -330), new Vector2(250, 70), new Color(0.4f, 0.4f, 0.5f), () => Show(Screen.Settings), 28);
-            UIFactory.Button(p, "QUIT", L, new Vector2(465, -330), new Vector2(250, 70), new Color(0.4f, 0.4f, 0.5f), Application.Quit, 28);
+            Header(p, "PLAY", L, new Vector2(170, 6), 520);
+            float y = -40;
+            void Item(string pLabel, System.Action pAction) { UIFactory.Button(p, pLabel, L, new Vector2(170, y), new Vector2(520, 56), UIFactory.Accent2, pAction, 32); y -= 58; }
+            Item("HOST ONLINE", () => { NetSession.Instance.HostSteam(false); Show(Screen.Lobby); });
+            Item("HOST FOR FRIENDS", () => { NetSession.Instance.HostSteam(true); Show(Screen.Lobby); });
+            Item("JOIN A CONTRACT", () => Show(Screen.Join));
+            Item("SOLO AGAINST THE AI", () => { NetSession.Instance.HostLocal(); Show(Screen.Lobby); });
+            Item("OPTIONS", () => Show(Screen.Settings));
+            Item("QUIT", Application.Quit);
         }
 
         private void BuildJoin()
         {
             _join = UIFactory.Stretch(_root, "Join").gameObject;
             Transform p = _join.transform;
-            Vector2 C = new Vector2(0.5f, 0.5f);
-            UIFactory.Panel(p, "Back", UIFactory.PanelColor, C, Vector2.zero, new Vector2(900, 620));
-            UIFactory.Text(p, "Title", "JOIN A ROOM", 64, UIFactory.Accent, TextAlignmentOptions.Center, C, new Vector2(0, 230), new Vector2(800, 80));
-            _joinCode = UIFactory.Input(p, "STEAM ROOM CODE (ABC-DEF)", C, new Vector2(-110, 110), new Vector2(520, 70));
-            UIFactory.Button(p, "JOIN CODE", C, new Vector2(290, 110), new Vector2(240, 70), UIFactory.Accent, () => { NetSession.Instance.JoinSteamCode(_joinCode.text); Show(Screen.Lobby); }, 28);
-            UIFactory.Text(p, "Friends", "OR ACCEPT A STEAM INVITE (SHIFT+TAB)", 26, UIFactory.Paper, TextAlignmentOptions.Center, C, new Vector2(0, 30), new Vector2(800, 40));
-            _joinIp = UIFactory.Input(p, "LAN / IP ADDRESS (127.0.0.1)", C, new Vector2(-110, -60), new Vector2(520, 70));
-            UIFactory.Button(p, "JOIN IP", C, new Vector2(290, -60), new Vector2(240, 70), UIFactory.Accent2, () => { NetSession.Instance.JoinLocal(_joinIp.text); Show(Screen.Lobby); }, 28);
-            UIFactory.Button(p, "BACK", C, new Vector2(0, -220), new Vector2(300, 70), new Color(0.4f, 0.4f, 0.5f), () => Show(Screen.Main), 28);
+            Vector2 L = new Vector2(0, 0.5f);
+            UIFactory.Title(p, "Title", "JOIN", 96, UIFactory.Paper, TextAlignmentOptions.Left, L, new Vector2(170, 260), new Vector2(1100, 120), true, 10f);
+            Header(p, "STEAM ROOM CODE", L, new Vector2(170, 140), 600);
+            _joinCode = UIFactory.Input(p, "ABC-DEF", L, new Vector2(170, 96), new Vector2(400, 52));
+            UIFactory.Button(p, "JOIN", L, new Vector2(590, 96), new Vector2(200, 52), UIFactory.Accent, () => { NetSession.Instance.JoinSteamCode(_joinCode.text); Show(Screen.Lobby); }, 28);
+            UIFactory.Title(p, "Friends", "OR ACCEPT A STEAM INVITE  (SHIFT + TAB)", 20, UIFactory.Muted, TextAlignmentOptions.Left, L, new Vector2(170, 40), new Vector2(600, 30), false, 4f);
+            Header(p, "LAN / DIRECT IP", L, new Vector2(170, -40), 600);
+            _joinIp = UIFactory.Input(p, "127.0.0.1", L, new Vector2(170, -84), new Vector2(400, 52));
+            UIFactory.Button(p, "CONNECT", L, new Vector2(590, -84), new Vector2(200, 52), UIFactory.Accent, () => { NetSession.Instance.JoinLocal(_joinIp.text); Show(Screen.Lobby); }, 28);
+            UIFactory.Button(p, "BACK", L, new Vector2(170, -200), new Vector2(400, 52), UIFactory.Accent2, () => Show(Screen.Main), 28);
         }
 
         private void BuildSettings()
         {
             _settings = UIFactory.Stretch(_root, "Settings").gameObject;
             Transform p = _settings.transform;
-            Vector2 C = new Vector2(0.5f, 0.5f);
-            UIFactory.Panel(p, "Back", UIFactory.PanelColor, C, Vector2.zero, new Vector2(900, 620));
-            UIFactory.Text(p, "Title", "SETTINGS", 64, UIFactory.Accent, TextAlignmentOptions.Center, C, new Vector2(0, 240), new Vector2(800, 80));
-            SettingsPanel.Build(p, new Vector2(0, 30));
-            UIFactory.Button(p, "BACK", C, new Vector2(0, -240), new Vector2(300, 70), new Color(0.4f, 0.4f, 0.5f), () => Show(Screen.Main), 28);
+            Vector2 L = new Vector2(0, 0.5f);
+            UIFactory.Title(p, "Title", "OPTIONS", 96, UIFactory.Paper, TextAlignmentOptions.Left, L, new Vector2(170, 280), new Vector2(1100, 120), true, 10f);
+            SettingsPanel.Build(p, new Vector2(-560, 30));
+            UIFactory.Button(p, "BACK", L, new Vector2(170, -260), new Vector2(400, 52), UIFactory.Accent2, () => Show(Screen.Main), 28);
         }
 
         // ---------------------------------------------------------------- lobby
@@ -121,40 +161,47 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             _lobby = UIFactory.Stretch(_root, "Lobby").gameObject;
             Transform p = _lobby.transform;
-            Vector2 C = new Vector2(0.5f, 0.5f);
-            UIFactory.Panel(p, "PlayersBack", UIFactory.PanelColor, C, new Vector2(-470, 20), new Vector2(760, 820));
-            UIFactory.Text(p, "PlayersTitle", "PLAYERS", 48, UIFactory.Accent, TextAlignmentOptions.Left, C, new Vector2(-470, 370), new Vector2(680, 60));
-            _code = UIFactory.Text(p, "Code", "", 30, UIFactory.Good, TextAlignmentOptions.Right, C, new Vector2(-470, 370), new Vector2(680, 60));
-            _lobbyPlayers = UIFactory.Text(p, "Players", "", 32, UIFactory.Paper, TextAlignmentOptions.TopLeft, C, new Vector2(-470, 40), new Vector2(680, 580));
-            _teamButtons = UIFactory.Rect(p, "TeamButtons", C, C, C, new Vector2(-470, -290), new Vector2(700, 80));
+            Vector2 L = new Vector2(0, 0.5f), Rt = new Vector2(1, 0.5f);
+
+            UIFactory.Title(p, "Title", "BRIEFING", 96, UIFactory.Paper, TextAlignmentOptions.Left, L, new Vector2(170, 380), new Vector2(1100, 120), true, 10f);
+            Header(p, "AGENTS", L, new Vector2(170, 290), 600);
+            _code = UIFactory.Title(p, "Code", "", 22, UIFactory.Paper, TextAlignmentOptions.Right, L, new Vector2(170, 290), new Vector2(600, 34), false, 5f);
+            _lobbyPlayers = UIFactory.Text(p, "Players", "", 28, UIFactory.Paper, TextAlignmentOptions.TopLeft, L, new Vector2(170, 40), new Vector2(600, 460));
+            _lobbyPlayers.lineSpacing = 22f;
+            _playerCount = UIFactory.Title(p, "Count", "", 20, UIFactory.Muted, TextAlignmentOptions.Left, L, new Vector2(170, -200), new Vector2(600, 30), false, 4f);
+            _teamButtons = UIFactory.Rect(p, "TeamButtons", L, L, L, new Vector2(170, -250), new Vector2(600, 52));
             for (int i = 0; i < MatchRulesLogic.MAX_TEAMS; i++)
             {
                 int lTeam = i;
-                UIFactory.Button(_teamButtons, "TEAM " + (i + 1), C, new Vector2((i - 1.5f) * 170f, 0), new Vector2(160, 66), LobbyPlayer.TeamColor(i), () => LobbyPlayer.Local?.ChooseTeamRpc(lTeam), 26);
+                Button lButton = UIFactory.Button(_teamButtons, "TEAM " + (i + 1), new Vector2(0.5f, 0.5f), new Vector2((i - 1.5f) * 150f, 0), new Vector2(140, 48), UIFactory.Accent2, () => LobbyPlayer.Local?.ChooseTeamRpc(lTeam), 24);
+                UIFactory.Rule(lButton.transform, new Vector2(0.5f, 0), new Vector2(0, 2), 140, false, LobbyPlayer.TeamColor(i), 4f);
             }
+            UIFactory.Button(p, "LEAVE", L, new Vector2(170, -380), new Vector2(400, 52), UIFactory.Accent2, () => { NetSession.Instance.Leave(); Show(Screen.Main); }, 28);
 
-            UIFactory.Panel(p, "SetupBack", UIFactory.PanelColor, C, new Vector2(420, 20), new Vector2(900, 820));
-            _mapLabel = UIFactory.Text(p, "Map", "", 50, UIFactory.Accent2, TextAlignmentOptions.Center, C, new Vector2(420, 350), new Vector2(560, 70));
-            _mapDescription = UIFactory.Text(p, "MapDesc", "", 24, UIFactory.Paper, TextAlignmentOptions.Top, C, new Vector2(420, 250), new Vector2(820, 120));
-            _modeLabel = UIFactory.Text(p, "Mode", "", 40, UIFactory.Paper, TextAlignmentOptions.Center, C, new Vector2(420, 130), new Vector2(560, 60));
-            _teamsLabel = UIFactory.Text(p, "Teams", "", 34, UIFactory.Paper, TextAlignmentOptions.Center, C, new Vector2(420, 40), new Vector2(560, 60));
-            _lobbyInfo = UIFactory.Text(p, "Info", "", 26, UIFactory.Paper, TextAlignmentOptions.Center, C, new Vector2(420, -60), new Vector2(820, 80));
+            // Contract column.
+            UIFactory.Panel(p, "ContractBack", new Color(0, 0, 0, 0.55f), Rt, new Vector2(-90, -10), new Vector2(760, 820));
+            Header(p, "CONTRACT", Rt, new Vector2(-130, 370), 680);
+            _mapLabel = UIFactory.Title(p, "Map", "", 64, UIFactory.Paper, TextAlignmentOptions.Left, Rt, new Vector2(-130, 310), new Vector2(680, 80), true, 6f);
+            _mapDescription = UIFactory.Text(p, "MapDesc", "", 24, UIFactory.Muted, TextAlignmentOptions.TopLeft, Rt, new Vector2(-130, 220), new Vector2(680, 100));
+            UIFactory.Rule(p, Rt, new Vector2(-130, 160), 680);
+            _modeLabel = UIFactory.Title(p, "Mode", "", 34, UIFactory.Paper, TextAlignmentOptions.Left, Rt, new Vector2(-130, 120), new Vector2(680, 50), true, 5f);
+            _teamsLabel = UIFactory.Title(p, "Teams", "", 26, UIFactory.Paper, TextAlignmentOptions.Left, Rt, new Vector2(-130, 66), new Vector2(680, 40), false, 4f);
+            _lobbyInfo = UIFactory.Title(p, "Info", "", 22, UIFactory.Muted, TextAlignmentOptions.Left, Rt, new Vector2(-130, 20), new Vector2(680, 40), false, 4f);
 
-            _hostControls = UIFactory.Rect(p, "HostControls", C, C, C, new Vector2(420, 0), new Vector2(900, 800));
+            _hostControls = UIFactory.Rect(p, "HostControls", Rt, Rt, Rt, new Vector2(-90, 0), new Vector2(760, 820));
             Transform h = _hostControls;
-            UIFactory.Button(h, "<", C, new Vector2(-340, 350), new Vector2(80, 70), UIFactory.Accent2, () => ChangeMap(-1));
-            UIFactory.Button(h, ">", C, new Vector2(340, 350), new Vector2(80, 70), UIFactory.Accent2, () => ChangeMap(1));
-            UIFactory.Button(h, "<", C, new Vector2(-340, 130), new Vector2(80, 64), UIFactory.Accent2, () => ChangeMode(-1));
-            UIFactory.Button(h, ">", C, new Vector2(340, 130), new Vector2(80, 64), UIFactory.Accent2, () => ChangeMode(1));
-            UIFactory.Button(h, "-", C, new Vector2(-340, 40), new Vector2(80, 60), UIFactory.Accent2, () => ChangeTeams(-1));
-            UIFactory.Button(h, "+", C, new Vector2(340, 40), new Vector2(80, 60), UIFactory.Accent2, () => ChangeTeams(1));
-            UIFactory.Toggle(h, "PROXIMITY VOICE CHAT", true, C, new Vector2(-40, -140), v => { if (LobbyState.Instance != null) LobbyState.Instance.ProximityChat.Value = v; });
-            UIFactory.Button(h, "SHUFFLE TEAMS", C, new Vector2(-200, -220), new Vector2(330, 66), new Color(0.45f, 0.45f, 0.55f), ShuffleTeams, 26);
-            UIFactory.Button(h, "INVITE FRIENDS", C, new Vector2(200, -220), new Vector2(330, 66), new Color(0.45f, 0.45f, 0.55f), () => SteamLobby.Instance?.Invite(), 26);
-            _startButton = UIFactory.Button(h, "START CONTRACT", C, new Vector2(0, -320), new Vector2(560, 90), UIFactory.Good, () => LobbyState.Instance?.StartMatch(), 40);
-
-            _readyButton = UIFactory.Button(p, "READY", C, new Vector2(420, -320), new Vector2(560, 90), UIFactory.Good, () => { if (LobbyPlayer.Local != null) LobbyPlayer.Local.Ready.Value = !LobbyPlayer.Local.Ready.Value; }, 40);
-            UIFactory.Button(p, "LEAVE", C, new Vector2(-470, -390), new Vector2(300, 64), UIFactory.Accent, () => { NetSession.Instance.Leave(); Show(Screen.Main); }, 28);
+            Vector2 C = new Vector2(0.5f, 0.5f);
+            UIFactory.Button(h, "‹", C, new Vector2(220, 310), new Vector2(60, 60), UIFactory.Accent2, () => ChangeMap(-1), 44);
+            UIFactory.Button(h, "›", C, new Vector2(300, 310), new Vector2(60, 60), UIFactory.Accent2, () => ChangeMap(1), 44);
+            UIFactory.Button(h, "‹", C, new Vector2(220, 120), new Vector2(60, 50), UIFactory.Accent2, () => ChangeMode(-1), 40);
+            UIFactory.Button(h, "›", C, new Vector2(300, 120), new Vector2(60, 50), UIFactory.Accent2, () => ChangeMode(1), 40);
+            UIFactory.Button(h, "−", C, new Vector2(220, 66), new Vector2(60, 44), UIFactory.Accent2, () => ChangeTeams(-1), 34);
+            UIFactory.Button(h, "+", C, new Vector2(300, 66), new Vector2(60, 44), UIFactory.Accent2, () => ChangeTeams(1), 34);
+            UIFactory.Toggle(h, "PROXIMITY VOICE CHAT", true, C, new Vector2(-60, -60), v => { if (LobbyState.Instance != null) LobbyState.Instance.ProximityChat.Value = v; });
+            UIFactory.Button(h, "SHUFFLE TEAMS", C, new Vector2(-170, -150), new Vector2(330, 52), UIFactory.Accent2, ShuffleTeams, 26);
+            UIFactory.Button(h, "INVITE FRIENDS", C, new Vector2(170, -150), new Vector2(330, 52), UIFactory.Accent2, () => SteamLobby.Instance?.Invite(), 26);
+            _startButton = UIFactory.Button(h, "START CONTRACT", C, new Vector2(0, -330), new Vector2(680, 76), UIFactory.Accent, () => LobbyState.Instance?.StartMatch(), 36);
+            _readyButton = UIFactory.Button(p, "READY", Rt, new Vector2(-130, -330), new Vector2(680, 76), UIFactory.Accent, () => { if (LobbyPlayer.Local != null) LobbyPlayer.Local.Ready.Value = !LobbyPlayer.Local.Ready.Value; }, 36);
         }
 
         private void ChangeMap(int pDelta)
@@ -194,16 +241,14 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
         private void Update()
         {
-            if (_title != null) _title.localRotation = Quaternion.Euler(0, 0, Mathf.Sin(Time.time * 1.3f) * 2.5f);
-
-            if (_lobby.activeSelf && !NetworkManagerListening() && Time.timeSinceLevelLoad > 1f && (NetSession.Instance == null || NetSession.Instance.Kind == SessionKind.None)) Show(Screen.Main);
-            if (!_lobby.activeSelf) return;
+            if (_current == Screen.Lobby && !NetworkManagerListening() && Time.timeSinceLevelLoad > 1f && (NetSession.Instance == null || NetSession.Instance.Kind == SessionKind.None)) Show(Screen.Main);
+            if (_current != Screen.Lobby) return;
 
             LobbyState lState = LobbyState.Instance;
             bool lHost = lState != null && lState.IsServer;
             _hostControls.gameObject.SetActive(lHost);
             _readyButton.gameObject.SetActive(!lHost);
-            if (lState == null) { _lobbyPlayers.text = "CONNECTING..."; return; }
+            if (lState == null) { _lobbyPlayers.text = "<color=#9EA0A6>ESTABLISHING CONNECTION...</color>"; return; }
 
             if (lHost) lState.ResolveTeams();
             MapDefinition lMap = lState.Map;
@@ -211,15 +256,15 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _mapDescription.text = lMap != null ? lMap.description : "";
             _modeLabel.text = lState.Mode.Value switch
             {
-                MatchMode.FreeForAll => "EVERY GOOB FOR THEMSELF",
+                MatchMode.FreeForAll => "FREE FOR ALL",
                 MatchMode.Teams => "TEAMS",
-                _ => "CO-OP: ONE TEAM VS THE AI"
+                _ => "CO-OP  ·  ONE TEAM AGAINST THE AI"
             };
             _teamsLabel.text = lState.Mode.Value == MatchMode.Teams ? lState.TeamCount.Value + " TEAMS" : "";
             _teamButtons.gameObject.SetActive(lState.Mode.Value == MatchMode.Teams);
             for (int i = 0; i < _teamButtons.childCount; i++) _teamButtons.GetChild(i).gameObject.SetActive(i < lState.TeamCount.Value);
-            _lobbyInfo.text = "PROXIMITY CHAT " + (lState.ProximityChat.Value ? "ON" : "OFF") + "   -   " + Mathf.RoundToInt(lState.TimeLimitMinutes.Value) + " MIN";
-            _code.text = SteamLobby.Instance != null && !string.IsNullOrEmpty(SteamLobby.Instance.Code) ? "CODE " + SteamLobby.Instance.Code : NetSession.Instance != null && NetSession.Instance.Kind == SessionKind.Local ? "LAN" : "";
+            _lobbyInfo.text = "PROXIMITY VOICE " + (lState.ProximityChat.Value ? "ON" : "OFF") + "   ·   " + Mathf.RoundToInt(lState.TimeLimitMinutes.Value) + " MINUTES";
+            _code.text = SteamLobby.Instance != null && !string.IsNullOrEmpty(SteamLobby.Instance.Code) ? "ROOM  <color=#FFFFFF>" + SteamLobby.Instance.Code + "</color>" : NetSession.Instance != null && NetSession.Instance.Kind == SessionKind.Local ? "LOCAL" : "";
 
             System.Text.StringBuilder lText = new System.Text.StringBuilder();
             bool lAllReady = true;
@@ -227,17 +272,18 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             {
                 bool lIsHost = lPlayer.OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId;
                 if (!lIsHost && !lPlayer.Ready.Value) lAllReady = false;
-                lText.Append("<color=#").Append(ColorUtility.ToHtmlStringRGB(LobbyPlayer.TeamColor(lPlayer.Team.Value))).Append(">●</color> ")
-                    .Append(lPlayer.Name.ToUpperInvariant())
-                    .Append(lIsHost ? "  <size=70%><color=#FFE066>HOST</color></size>" : lPlayer.Ready.Value ? "  <size=70%><color=#7CF29A>READY</color></size>" : "  <size=70%><color=#999>NOT READY</color></size>")
-                    .Append(lState.Mode.Value == MatchMode.Teams ? "  <size=70%>TEAM " + (lPlayer.Team.Value + 1) + "</size>" : "")
-                    .Append('\n');
+                string lTeam = ColorUtility.ToHtmlStringRGB(LobbyPlayer.TeamColor(lPlayer.Team.Value));
+                lText.Append("<color=#").Append(lTeam).Append(">|</color>  ").Append(lPlayer.Name.ToUpperInvariant())
+                    .Append("<pos=62%><size=70%>")
+                    .Append(lState.Mode.Value == MatchMode.Teams ? "TEAM " + (lPlayer.Team.Value + 1) + "   " : "")
+                    .Append(lIsHost ? "<color=#DC2229>HOST</color>" : lPlayer.Ready.Value ? "<color=#73D18C>READY</color>" : "<color=#9EA0A6>WAITING</color>")
+                    .Append("</size>\n");
             }
-            lText.Append("\n<size=70%>").Append(LobbyPlayer.All.Count).Append(" / ").Append(GameDatabase.Rules.maxPlayers).Append("</size>");
             _lobbyPlayers.text = lText.ToString();
+            _playerCount.text = LobbyPlayer.All.Count + " / " + GameDatabase.Rules.maxPlayers + " AGENTS";
             _startButton.interactable = lAllReady;
             TextMeshProUGUI lReadyLabel = _readyButton.GetComponentInChildren<TextMeshProUGUI>();
-            if (LobbyPlayer.Local != null) lReadyLabel.text = LobbyPlayer.Local.Ready.Value ? "NOT READY" : "READY";
+            if (LobbyPlayer.Local != null) lReadyLabel.text = LobbyPlayer.Local.Ready.Value ? "STAND DOWN" : "READY";
         }
     }
 }

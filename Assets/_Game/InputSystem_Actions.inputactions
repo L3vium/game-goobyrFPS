@@ -87,24 +87,6 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "SlideLeft",
-                    "type": "Button",
-                    "id": "b271476d-d957-4de8-9fae-cb676715aa96",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "SlideRight",
-                    "type": "Button",
-                    "id": "c7589b9f-4295-44f6-b298-f77dcd6d24c0",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
                     "name": "Melee",
                     "type": "Button",
                     "id": "416c1e8d-d82e-4c27-a48c-cb976866df7f",
@@ -500,50 +482,6 @@
                     "processors": "",
                     "groups": "Gamepad",
                     "action": "Sprint",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "9cff4b07-689c-4c7e-b1af-1c4bb2c46b00",
-                    "path": "<Keyboard>/q",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Keyboard&Mouse",
-                    "action": "SlideLeft",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "f8f352e8-3c78-49be-a83b-a2c43668b910",
-                    "path": "<Keyboard>/e",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Keyboard&Mouse",
-                    "action": "SlideRight",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "d541a936-0be4-41af-8c63-6bfae8c77fce",
-                    "path": "<Gamepad>/leftShoulder",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Gamepad",
-                    "action": "SlideLeft",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "3b3d7f68-6553-479c-8a6f-4a6b76a6c2ae",
-                    "path": "<Gamepad>/rightShoulder",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Gamepad",
-                    "action": "SlideRight",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

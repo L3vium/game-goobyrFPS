@@ -75,8 +75,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 if (CameraRig.Instance != null) CameraRig.Instance.BaseFov = v;
             });
             UIFactory.Slider(pParent, "VOLUME", 0f, 1f, Audio.Sfx.Volume, C, pCenter + new Vector2(0, -30), v => { Audio.Sfx.Volume = v; AudioListener.volume = v; });
-            UIFactory.Toggle(pParent, "TOGGLE CROUCH", GameInput.ToggleCrouch, C, pCenter + new Vector2(-60, -100), v => GameInput.ToggleCrouch = v);
-            UIFactory.Toggle(pParent, "PUSH TO TALK (B)", Audio.VoiceChat.PushToTalk, C, pCenter + new Vector2(-60, -160), v => Audio.VoiceChat.PushToTalk = v);
+            UIFactory.Toggle(pParent, "PUSH TO TALK (B)", Audio.VoiceChat.PushToTalk, C, pCenter + new Vector2(-60, -100), v => Audio.VoiceChat.PushToTalk = v);
         }
     }
 }

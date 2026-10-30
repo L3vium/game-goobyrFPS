@@ -40,10 +40,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         [SerializeField] private float _eyeOffset = 0.16f;
 
         [Header("Slides")]
-        [SerializeField] private float _sideSlideSpeed = 11f;
-        [SerializeField] private float _sideSlideTime = 0.28f;
         [SerializeField] private float _slideCooldown = 0.55f;
-        [SerializeField] private float _crouchSlideBoost = 9.5f;
+        /// <summary>Slide speed out of a sprint, and out of a walk.</summary>
+        [SerializeField] private float _crouchSlideBoost = 10.5f;
+        [SerializeField] private float _walkSlideBoost = 6.2f;
 
         [Header("Traversal")]
         [SerializeField] private float _climbSpeed = 3.2f;
@@ -54,8 +54,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public bool Grounded { get; private set; }
         public bool Crouched { get; private set; }
         public bool Sprinting { get; private set; }
-        public bool Sliding => _slideTimer > 0f || _crouchSliding;
-        public float SlideSide { get; private set; }
+        public bool Sliding => _crouchSliding;
         public Vector3 Velocity => _velocity;
         public float PlanarSpeed => new Vector3(_velocity.x, 0, _velocity.z).magnitude;
         public float EyeHeight => _controller.height - _eyeOffset;
@@ -74,7 +73,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         private CharacterController _controller;
         private Vector3 _velocity;
         private float _coyote, _jumpBuffer;
-        private float _slideTimer, _slideCooldownTimer;
+        private float _slideCooldownTimer, _slideFriction = 7f;
         private Vector3 _slideDirection;
         private bool _crouchSliding;
         private bool _wantCrouch;
@@ -205,52 +204,37 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 _airStartY = Mathf.Max(_airStartY, transform.position.y);
             }
 
-            // Crouch: toggle or hold.
-            if (GameInput.ToggleCrouch) { if (GameInput.CrouchPressed) _wantCrouch = !_wantCrouch; }
-            else _wantCrouch = GameInput.CrouchHeld;
-
-            // Sprinting stands a toggled crouch back up.
-            if (GameInput.Sprint && _wantCrouch && !_crouchSliding && pInput.y > 0.3f && GameInput.ToggleCrouch && !GameInput.CrouchPressed && CanStand()) _wantCrouch = false;
+            // Crouch and sprint are held. Crouching while moving slides; from a sprint, further.
+            bool lHeld = GameInput.CrouchHeld;
+            bool lCrouchStarted = lHeld && !_wantCrouch;
+            _wantCrouch = lHeld;
             Sprinting = GameInput.Sprint && pInput.y > 0.3f && !Aiming && !_wantCrouch && Grounded;
 
-            // Sprint + crouch press = forward slide.
-            if (GameInput.CrouchPressed && PlanarSpeed > _walkSpeed + 0.5f && Grounded && _slideCooldownTimer <= 0f)
-            {
-                _crouchSliding = true;
-                _wantCrouch = true;
-                _slideDirection = new Vector3(_velocity.x, 0, _velocity.z).normalized;
-                _velocity += _slideDirection * (_crouchSlideBoost - PlanarSpeed * 0.5f);
-                _slideCooldownTimer = _slideCooldown;
-                OnSlide?.Invoke(0f);
-            }
-
-            // Lateral slide (Q/E): a quick low dash sideways, cover to cover.
             _slideCooldownTimer -= dt;
-            if (_slideCooldownTimer <= 0f && Grounded && (GameInput.SlideLeft || GameInput.SlideRight))
+            if (lCrouchStarted && Grounded && PlanarSpeed > _crouchSpeed + 0.6f && _slideCooldownTimer <= 0f)
             {
-                SlideSide = GameInput.SlideLeft ? -1f : 1f;
-                _slideDirection = transform.right * SlideSide;
-                _slideTimer = _sideSlideTime;
+                bool lFromSprint = PlanarSpeed > _walkSpeed + 0.5f;
+                _crouchSliding = true;
+                _slideDirection = new Vector3(_velocity.x, 0, _velocity.z).normalized;
+                float lTarget = lFromSprint ? _crouchSlideBoost : _walkSlideBoost;
+                _velocity += _slideDirection * Mathf.Max(0f, lTarget - PlanarSpeed);
+                _slideFriction = lFromSprint ? 5.5f : 9f;
                 _slideCooldownTimer = _slideCooldown;
-                OnSlide?.Invoke(SlideSide);
+                OnSlide?.Invoke(lFromSprint ? 1f : 0.5f);
             }
 
-            Crouched = _wantCrouch || _slideTimer > 0f || !CanStand();
+            Crouched = _wantCrouch || _crouchSliding || !CanStand();
 
             float lSpeed = (Crouched ? _crouchSpeed : Sprinting ? _sprintSpeed : _walkSpeed) * SpeedMultiplier;
             if (Aiming) lSpeed *= 0.65f;
             Vector3 lWish = (transform.forward * pInput.y + transform.right * pInput.x) * lSpeed;
             Vector3 lPlanar = new Vector3(_velocity.x, 0, _velocity.z);
 
-            if (_slideTimer > 0f)
+            if (_crouchSliding)
             {
-                _slideTimer -= dt;
-                lPlanar = _slideDirection * _sideSlideSpeed * Mathf.Lerp(0.4f, 1f, _slideTimer / _sideSlideTime);
-            }
-            else if (_crouchSliding)
-            {
-                lPlanar = Vector3.MoveTowards(lPlanar, Vector3.zero, 7f * dt);
-                if (lPlanar.magnitude < _crouchSpeed + 0.3f || !Grounded) _crouchSliding = false;
+                // A slide keeps its direction and bleeds speed; releasing crouch ends it.
+                lPlanar = Vector3.MoveTowards(lPlanar, Vector3.zero, _slideFriction * dt);
+                if (lPlanar.magnitude < _crouchSpeed + 0.3f || !Grounded || !_wantCrouch) _crouchSliding = false;
             }
             else
             {
@@ -273,7 +257,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                     Grounded = false;
                     OnJumped?.Invoke();
                 }
-                else if (_wantCrouch && _coyote > 0f) { _wantCrouch = false; _jumpBuffer = 0f; }
             }
 
             if (Grounded && _velocity.y < 0f) _velocity.y = -3f;

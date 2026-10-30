@@ -171,7 +171,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
             float lStrafe = Vector3.Dot(Motor.Velocity, transform.right);
             _tilt = Mathf.Lerp(_tilt, -lStrafe * 0.45f, 1f - Mathf.Exp(-8f * dt));
-            _slideTilt = Mathf.Lerp(_slideTilt, Motor.Sliding ? -Motor.SlideSide * 9f + (Motor.SlideSide == 0f ? 0f : 0f) : 0f, 1f - Mathf.Exp(-12f * dt));
+            _slideTilt = Mathf.Lerp(_slideTilt, Motor.Sliding ? -4f : 0f, 1f - Mathf.Exp(-12f * dt));
 
             Vector3 lEye;
             Quaternion lRotation;

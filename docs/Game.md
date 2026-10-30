@@ -48,7 +48,7 @@ terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert 
   their chain is shot; poisonable drinks (lethal, or emetic → the drinker runs to a toilet,
   alone); the basement air handler gasses the whole building; distractions (radio, TV, phone,
   generator, car alarm); hiding spots; ziplines; jump pads; climbable surfaces; tall grass.
-- **Player**: walk, sprint, crouch (toggle), jump, Q/E lateral cover slides, sprint-crouch slide,
+- **Player**: walk, sprint (held), crouch (held; crouching while moving slides, further out of a sprint), jump,
   mantle, climb, zipline, hide; head bob, sway, tilt, landing dip, FOV kicks; 6-slot inventory;
   guns, rocket launcher, flamethrower, coin / brick / smoke / C4 + remote (T), poisons, punches and
   takedowns from behind.
@@ -82,7 +82,7 @@ terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert 
 
 ## Controls (physical keys, AZERTY-safe)
 Move WASD/ZQSD · look mouse · fire LMB · aim RMB · reload R · interact F · crouch Ctrl/C · jump Space ·
-sprint Shift · slide Q/E · punch V/MMB · throw G · detonate T · slots 1-6 / wheel · map M ·
+sprint Shift (hold) · crouch-slide Ctrl/C while moving · punch V/MMB · throw G · detonate T · slots 1-6 / wheel · map M ·
 instinct Tab (hold) · scoreboard ` (key left of 1, ² on AZERTY) · push-to-talk B · pause Esc.
 
 ## Tests and tools

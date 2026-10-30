@@ -147,8 +147,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             // Contract, top left.
             Image lDossierPanel = UIFactory.Panel(_root, "Dossier", UIFactory.PanelColor, new Vector2(0, 1), new Vector2(40, -40), new Vector2(660, 200));
             lDossierPanel.rectTransform.pivot = new Vector2(0, 1);
-            _dossier = UIFactory.Text(lDossierPanel.transform, "Text", "", 21, UIFactory.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(330, -78), new Vector2(620, 140));
-            _status = UIFactory.Text(lDossierPanel.transform, "Status", "", 24, UIFactory.Accent, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(330, 22), new Vector2(620, 34));
+            _dossier = UIFactory.Text(lDossierPanel.transform, "Text", "", 21, UIFactory.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(30, -24), new Vector2(610, 130));
+            _status = UIFactory.Text(lDossierPanel.transform, "Status", "", 24, UIFactory.Accent, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(30, 16), new Vector2(610, 34));
 
             _clock = UIFactory.Text(_root, "Clock", "20:00", 40, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(240, 60));
             _bannerTitle = UIFactory.Text(_root, "BannerTitle", "", 72, UIFactory.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0.72f), Vector2.zero, new Vector2(1600, 90));
@@ -179,7 +179,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _bannerTitle.color = UIFactory.Paper;
             _health.font = _ammo.font = _clock.font = UIFactory.HeadingBold;
             foreach (TextMeshProUGUI lSlot in _slots) { lSlot.font = UIFactory.Heading; lSlot.characterSpacing = 3f; }
-            UIFactory.Rule(lDossierPanel.transform, new Vector2(0, 1), new Vector2(3, -100), 200, true, UIFactory.Accent, 4f);
+            UIFactory.Rule(lDossierPanel.transform, new Vector2(0, 1), Vector2.zero, 200, true, UIFactory.Accent, 4f);
             UIFactory.Rule(_root, new Vector2(0.5f, 0.72f), new Vector2(0, -36), 160, false, UIFactory.Accent, 3f).name = "BannerRule";
             _crosshair.fontSize = 34;
 

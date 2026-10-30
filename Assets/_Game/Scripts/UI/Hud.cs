@@ -30,6 +30,12 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private RectTransform _extractBar, _scoreboardPanel, _markers;
         private readonly TextMeshProUGUI[] _slots = new TextMeshProUGUI[WeaponHolder.SLOT_COUNT];
         private readonly Image[] _slotBacks = new Image[WeaponHolder.SLOT_COUNT];
+        private CanvasGroup _healthGroup, _ammoGroup, _wheelGroup;
+        private Image _bannerRule;
+        private float _healthShowUntil, _ammoShowUntil, _wheelShowUntil, _lastHp = -1f;
+        private string _lastAmmo = "";
+        private int _lastSelected = -1, _wheelPick = -1;
+        private Vector2 _wheelAim;
         private readonly List<(TextMeshProUGUI text, float until)> _toasts = new List<(TextMeshProUGUI, float)>();
         private readonly List<(TextMeshProUGUI text, float until)> _feed = new List<(TextMeshProUGUI, float)>();
         private readonly List<(Image arc, Vector3 from, float until)> _damageArcs = new List<(Image, Vector3, float)>();
@@ -122,35 +128,39 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _prompt = UIFactory.Text(_root, "Prompt", "", 30, UIFactory.Paper, TextAlignmentOptions.Center, C, new Vector2(0, -90), new Vector2(900, 50));
 
             // Health, bottom left.
-            Image lHealthPanel = UIFactory.Panel(_root, "HealthPanel", UIFactory.PanelColor, new Vector2(0, 0), new Vector2(40, 40), new Vector2(360, 90));
-            lHealthPanel.rectTransform.pivot = Vector2.zero;
-            Image lHealthTrack = UIFactory.Panel(lHealthPanel.transform, "Track", new Color(1, 1, 1, 0.15f), new Vector2(0, 0.5f), new Vector2(180, -14), new Vector2(320, 22));
-            _healthFill = UIFactory.Panel(lHealthTrack.transform, "Fill", UIFactory.Good, new Vector2(0, 0.5f), Vector2.zero, new Vector2(320, 22));
+            Image lHealthPanel = UIFactory.Panel(_root, "HealthPanel", new Color(0, 0, 0, 0), new Vector2(0.5f, 0), new Vector2(0, 38), new Vector2(360, 60));
+            _healthGroup = lHealthPanel.gameObject.AddComponent<CanvasGroup>();
+            lHealthPanel.rectTransform.pivot = new Vector2(0.5f, 0);
+            Image lHealthTrack = UIFactory.Panel(lHealthPanel.transform, "Track", new Color(1, 1, 1, 0.12f), new Vector2(0.5f, 0.5f), new Vector2(0, -8), new Vector2(320, 4));
+            _healthFill = UIFactory.Panel(lHealthTrack.transform, "Fill", UIFactory.Good, new Vector2(0, 0.5f), Vector2.zero, new Vector2(320, 4));
             _healthFill.rectTransform.pivot = new Vector2(0, 0.5f);
-            _health = UIFactory.Text(lHealthPanel.transform, "Health", "100", 40, UIFactory.Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(110, 18), new Vector2(200, 50));
-            _stealth = UIFactory.Text(lHealthPanel.transform, "Stealth", "", 24, new Color(0.6f, 1f, 0.7f), TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-90, 18), new Vector2(200, 40));
+            _health = UIFactory.Text(lHealthPanel.transform, "Health", "100", 22, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 12), new Vector2(200, 30));
+            _stealth = UIFactory.Text(lHealthPanel.transform, "Stealth", "", 18, new Color(0.6f, 1f, 0.7f), TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 36), new Vector2(200, 26));
 
             // Ammo, bottom right.
-            Image lAmmoPanel = UIFactory.Panel(_root, "AmmoPanel", UIFactory.PanelColor, new Vector2(1, 0), new Vector2(-40, 40), new Vector2(360, 90));
+            Image lAmmoPanel = UIFactory.Panel(_root, "AmmoPanel", new Color(0, 0, 0, 0), new Vector2(1, 0), new Vector2(-40, 36), new Vector2(320, 70));
             lAmmoPanel.rectTransform.pivot = new Vector2(1, 0);
-            _ammo = UIFactory.Text(lAmmoPanel.transform, "Ammo", "", 40, UIFactory.Paper, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-125, -14), new Vector2(220, 52));
-            _weaponName = UIFactory.Text(lAmmoPanel.transform, "Weapon", "", 20, new Color(1, 1, 1, 0.75f), TextAlignmentOptions.Right, new Vector2(1, 1), new Vector2(-175, -16), new Vector2(320, 26));
+            _ammoGroup = lAmmoPanel.gameObject.AddComponent<CanvasGroup>();
+            _ammo = UIFactory.Text(lAmmoPanel.transform, "Ammo", "", 30, UIFactory.Paper, TextAlignmentOptions.BottomRight, new Vector2(1, 0), new Vector2(-160, 18), new Vector2(320, 40));
+            _weaponName = UIFactory.Text(lAmmoPanel.transform, "Weapon", "", 15, new Color(1, 1, 1, 0.7f), TextAlignmentOptions.BottomRight, new Vector2(1, 0), new Vector2(-160, 54), new Vector2(320, 22));
 
-            // Inventory slots, bottom centre.
+            // The weapon wheel: the slots in a ring around the crosshair, shown on a switch or while the wheel is held.
+            RectTransform lWheel = UIFactory.Rect(_root, "Wheel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(10, 10));
+            _wheelGroup = lWheel.gameObject.AddComponent<CanvasGroup>();
+            _wheelGroup.alpha = 0f;
             for (int i = 0; i < WeaponHolder.SLOT_COUNT; i++)
             {
-                float x = (i - 2.5f) * 132f;
-                _slotBacks[i] = UIFactory.Panel(_root, "Slot" + i, UIFactory.PanelColor, new Vector2(0.5f, 0), new Vector2(x, 70), new Vector2(124, 70));
-                _slots[i] = UIFactory.Text(_slotBacks[i].transform, "Label", "", 18, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(118, 66));
+                float a = (90f - i * 60f) * Mathf.Deg2Rad;
+                _slotBacks[i] = UIFactory.Panel(lWheel, "Slot" + i, new Color(0.05f, 0.05f, 0.07f, 0.72f), new Vector2(0.5f, 0.5f), new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 190f, new Vector2(150, 64));
+                _slots[i] = UIFactory.Text(_slotBacks[i].transform, "Label", "", 16, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(144, 60));
             }
 
-            // Contract, top left.
-            Image lDossierPanel = UIFactory.Panel(_root, "Dossier", UIFactory.PanelColor, new Vector2(0, 1), new Vector2(40, -40), new Vector2(660, 200));
-            lDossierPanel.rectTransform.pivot = new Vector2(0, 1);
-            _dossier = UIFactory.Text(lDossierPanel.transform, "Text", "", 21, UIFactory.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(30, -24), new Vector2(610, 130));
-            _status = UIFactory.Text(lDossierPanel.transform, "Status", "", 24, UIFactory.Accent, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(30, 16), new Vector2(610, 34));
+            // No contract panel: the contract is on the map screen. Only the proof, once in play, gets a quiet line.
+            _dossier = UIFactory.Text(_root, "Dossier", "", 1, UIFactory.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(-4000, 0), new Vector2(10, 10));
+            _status = UIFactory.Text(_root, "Status", "", 20, UIFactory.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(40, -36), new Vector2(700, 30));
 
-            _clock = UIFactory.Text(_root, "Clock", "20:00", 40, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(240, 60));
+            _clock = UIFactory.Text(_root, "Clock", "", 26, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(240, 40));
+            gameObject.AddComponent<Minimap>().Build(_root);
             _bannerTitle = UIFactory.Text(_root, "BannerTitle", "", 72, UIFactory.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0.72f), Vector2.zero, new Vector2(1600, 90));
             _bannerSub = UIFactory.Text(_root, "BannerSub", "", 32, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.72f), new Vector2(0, -70), new Vector2(1600, 50));
 
@@ -179,9 +189,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _bannerTitle.color = UIFactory.Paper;
             _health.font = _ammo.font = _clock.font = UIFactory.HeadingBold;
             foreach (TextMeshProUGUI lSlot in _slots) { lSlot.font = UIFactory.Heading; lSlot.characterSpacing = 3f; }
-            UIFactory.Rule(lDossierPanel.transform, new Vector2(0, 1), Vector2.zero, 200, true, UIFactory.Accent, 4f);
-            UIFactory.Rule(_root, new Vector2(0.5f, 0.72f), new Vector2(0, -36), 160, false, UIFactory.Accent, 3f).name = "BannerRule";
-            _crosshair.fontSize = 34;
+            _bannerRule = UIFactory.Rule(_root, new Vector2(0.5f, 0.72f), new Vector2(0, -36), 160, false, UIFactory.Accent, 3f);
+            _bannerRule.name = "BannerRule";
+            _crosshair.fontSize = 26;
+            _health.font = _ammo.font = UIFactory.Heading;
 
             Juice.OnScreenFlash += HandleFlash;
         }
@@ -245,11 +256,16 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 float lHp = lMe.Health.Health.Value;
                 float lRatio = Mathf.Clamp01(lHp / Mathf.Max(1f, lMe.Health.MaxHealth));
                 _health.text = Mathf.CeilToInt(lHp).ToString();
-                _healthFill.rectTransform.sizeDelta = new Vector2(320 * lRatio, 22);
+                _healthFill.rectTransform.sizeDelta = new Vector2(320 * lRatio, 4);
+                // Health shows only when it changes, and stays while low.
+                if (_lastHp >= 0f && Mathf.Abs(lHp - _lastHp) > 0.5f) _healthShowUntil = Time.time + 4f;
+                _lastHp = lHp;
+                bool lShowHealth = lAlive && (Time.time < _healthShowUntil || lRatio < 0.35f || lMe.Hidden.Value || (lMe.Crouched.Value && lMe.InGrass.Value));
+                _healthGroup.alpha = Mathf.MoveTowards(_healthGroup.alpha, lShowHealth ? 1f : 0f, dt * (lShowHealth ? 6f : 1.5f));
                 _healthFill.color = Color.Lerp(UIFactory.Accent, UIFactory.Paper, Mathf.Clamp01(lRatio * 2f - 0.3f));
                 if (lRatio < 0.3f && lAlive && CameraRig.Instance != null) CameraRig.Instance.PulseHurt(0.15f + Mathf.Sin(Time.time * 6f) * 0.05f);
                 bool lConcealed = lMe.Hidden.Value || (lMe.Crouched.Value && lMe.InGrass.Value);
-                _stealth.text = lMe.Hidden.Value ? "HIDDEN" : lConcealed ? "CONCEALED" : lMe.Crouched.Value ? "CROUCHED" : lMe.Sprinting.Value ? "<color=#FFB13B>LOUD</color>" : "";
+                _stealth.text = lMe.Hidden.Value ? "HIDDEN" : lConcealed ? "CONCEALED" : "";
             }
 
             // Ammo and slots.
@@ -258,6 +274,30 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 InventorySlot lSlot = lWeapons.SlotAt(lWeapons.Selected.Value);
                 _weaponName.text = lHeld != null ? lHeld.displayName.ToUpperInvariant() : "FISTS";
                 _ammo.text = lHeld == null ? "" : lHeld.UsesAmmo ? (lWeapons.Reloading.Value ? "<size=60%>RELOADING</size>" : lSlot.magazine + "<size=60%> / " + lSlot.reserve + "</size>") : "x" + lSlot.reserve;
+                // Weapon and ammo show when they change (a shot, a reload, a switch) or while aiming, then fade.
+                string lAmmoKey = _weaponName.text + _ammo.text;
+                if (lAmmoKey != _lastAmmo || GameInput.Aim) _ammoShowUntil = Time.time + 3f;
+                _lastAmmo = lAmmoKey;
+                _ammoGroup.alpha = Mathf.MoveTowards(_ammoGroup.alpha, Time.time < _ammoShowUntil ? 1f : 0f, dt * (Time.time < _ammoShowUntil ? 6f : 1.2f));
+
+                // The wheel: held, the look picks a slot and releasing selects it; a switch flashes it.
+                if (lWeapons.Selected.Value != _lastSelected) { if (_lastSelected >= 0) _wheelShowUntil = Time.time + 1.2f; _lastSelected = lWeapons.Selected.Value; }
+                bool lWheel = GameInput.WheelHeld;
+                if (lWheel)
+                {
+                    if (!GameInput.WheelOpen) { _wheelAim = Vector2.zero; _wheelPick = -1; }
+                    _wheelAim = Vector2.ClampMagnitude(_wheelAim + GameInput.RawLook * 0.02f, 1f);
+                    if (_wheelAim.magnitude > 0.45f)
+                    {
+                        float lAngle = Mathf.Atan2(_wheelAim.y, _wheelAim.x) * Mathf.Rad2Deg;
+                        _wheelPick = Mathf.RoundToInt(Mathf.Repeat(90f - lAngle, 360f) / 60f) % WeaponHolder.SLOT_COUNT;
+                    }
+                    _wheelShowUntil = Time.time + 0.3f;
+                }
+                else if (GameInput.WheelOpen && _wheelPick >= 0) lWeapons.Select(_wheelPick);
+                GameInput.WheelOpen = lWheel;
+                bool lShowWheel = Time.time < _wheelShowUntil;
+                _wheelGroup.alpha = Mathf.MoveTowards(_wheelGroup.alpha, lShowWheel ? 1f : 0f, dt * (lShowWheel ? 10f : 3f));
                 for (int i = 0; i < WeaponHolder.SLOT_COUNT; i++)
                 {
                     InventorySlot s = lWeapons.SlotAt(i);
@@ -265,8 +305,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                     string lName = lItem != null ? lItem.displayName.ToUpperInvariant() : (i < WeaponHolder.WEAPON_SLOTS ? "FISTS" : "-");
                     if (lItem != null && lItem.slot == ItemSlot.Gadget) lName += " x" + s.reserve;
                     _slots[i].text = "<size=70%>" + (i + 1) + "</size>\n" + lName;
-                    bool lSelected = lWeapons.Selected.Value == i;
-                    _slotBacks[i].color = lSelected ? new Color(1, 1, 1, 0.16f) : UIFactory.PanelColor;
+                    bool lSelected = GameInput.WheelOpen && _wheelPick >= 0 ? _wheelPick == i : lWeapons.Selected.Value == i;
+                    _slotBacks[i].color = lSelected ? new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, 0.85f) : new Color(0.05f, 0.05f, 0.07f, 0.72f);
                     _slots[i].color = lSelected ? UIFactory.Paper : UIFactory.Muted;
                 }
             }
@@ -277,7 +317,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 TargetProfile lTarget = lDirector.Target;
                 MapDefinition lMap = lDirector.Map;
                 string lZone = lTarget != null && lMap != null && lTarget.zone < lMap.zoneNames.Length ? lMap.zoneNames[lTarget.zone] : "";
-                _dossier.text = lTarget == null ? "" : "<size=120%><color=#FFFFFF>" + lTarget.displayName.ToUpperInvariant() + "</color></size>\n<size=85%>" + lTarget.dossier + "\nSEEN AROUND: " + lZone.ToUpperInvariant() + "  -  PROOF: " + lTarget.proof.ToString().ToUpperInvariant() + "</size>";
+                _dossier.text = "";
                 string lCarrier = "";
                 if (lDirector.Proof.Value == ProofState.Carried)
                 {
@@ -286,13 +326,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 }
                 _status.text = lDirector.Proof.Value switch
                 {
-                    ProofState.TargetAlive => "TARGET ALIVE",
+                    ProofState.TargetAlive => "",
                     ProofState.Dropped => "<color=#FFE066>PROOF ON THE GROUND</color>",
                     ProofState.Carried => lMe != null && lMe.CarriesProof.Value ? "<color=#7CF29A>YOU HAVE THE PROOF - EXTRACT!</color>" : "<color=#FFB13B>" + lCarrier + " HAS THE PROOF</color>",
                     _ => "EXTRACTED"
                 };
                 int lSeconds = Mathf.CeilToInt(lDirector.TimeLeft.Value);
-                _clock.text = (lSeconds / 60).ToString("00") + ":" + (lSeconds % 60).ToString("00");
+                _clock.text = lSeconds <= 180 ? (lSeconds / 60).ToString("00") + ":" + (lSeconds % 60).ToString("00") : "";
                 _clock.color = lSeconds < 60 ? UIFactory.Accent : UIFactory.Paper;
 
                 bool lExtracting = lMe != null && lMe.CarriesProof.Value && lDirector.ExtractProgress.Value > 0f;
@@ -312,6 +352,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _bannerTime -= dt;
             float lBanner = Mathf.Clamp01(_bannerTime);
             _bannerTitle.alpha = _bannerSub.alpha = lBanner;
+            _bannerRule.color = new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, lBanner);
             _bannerTitle.characterSpacing = 14f + Mathf.Max(0f, _bannerTime - 3.8f) * 40f;
             _flashAlpha = Mathf.MoveTowards(_flashAlpha, 0f, dt * 2.5f);
             _flash.color = new Color(_flashColor.r, _flashColor.g, _flashColor.b, _flashAlpha);

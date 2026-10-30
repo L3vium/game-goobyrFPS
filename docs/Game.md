@@ -56,11 +56,16 @@ terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert 
   takedowns from behind.
 - **Instinct** (`FX/InstinctVision`, `FX/Rendering/InstinctFeature`, hold Tab): the world dims
   to a cold grey with a scan wave rolling out from the eye, and what matters glows through the
-  walls: the target and the proof (or whoever carries it) in red at any distance, teammates in
-  blue, NPCs within 35 m in white (amber when they are hunting you), everything usable or
-  pickable within 30 m in white. Purely local and visual. Hidden parts are a solid silhouette,
+  walls: the target and the proof (or whoever carries it) in red within 60 m, teammates in
+  blue, NPCs within 25 m in white (amber when they are hunting you), everything usable or
+  pickable within 20 m in white. Purely local and visual. Hidden parts are a solid silhouette,
   visible parts a rim of light; a stencil bit gives each pixel to the first colour drawn, so red
   wins.
+- **HUD** (`UI/Hud`, `UI/Minimap`): minimal, nothing by default. A round minimap bottom left (a
+  floor plan cut at head height, NPCs hunting you, teammates, revealed extractions); weapon and
+  ammo fade in on a change or while aiming; health only when it changes or runs low; the weapon
+  wheel around the crosshair on a switch or while Q / LB is held (the look picks, release selects).
+  No objective panel: the contract (target portrait, name, one line, proof) is on the map screen (M).
 - **Juice**: trauma screen shake, hit flash, chromatic aberration / bloom / exposure pulses,
   hurt vignette, squash and stretch, fluff puffs on hits, explosions with fireball, shockwave,
   debris and light flash, smoke clouds, hitmarkers, damage arcs, kill feed, banners.

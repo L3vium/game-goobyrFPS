@@ -41,8 +41,10 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             new Color(2.4f, 2.4f, 2.4f, 1f),
         };
 
-        public const float NPC_RANGE = 35f;
-        public const float USE_RANGE = 30f;
+        /// <summary>Instinct reads the surroundings only: the target within 60 m, people within 25 m, objects within 20 m.</summary>
+        public const float TARGET_RANGE = 60f;
+        public const float NPC_RANGE = 25f;
+        public const float USE_RANGE = 20f;
         private const float REFRESH = 0.12f;
         private const float WAVE_SPEED = 85f;
         private const float WAVE_REACH = 140f;
@@ -101,11 +103,12 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             if (pLocal == null) return;
             Vector3 lEye = pLocal.Eye;
 
-            // The target and the proof, wherever they are.
+            // The target and the proof, when close enough to sense.
+            float lTargetRange = TARGET_RANGE * TARGET_RANGE;
             foreach (Npc lNpc in Npc.All)
-                if (lNpc != null && lNpc.IsTarget && lNpc.Health.IsAlive) AddTree(lNpc.transform, Slot.Target);
+                if (lNpc != null && lNpc.IsTarget && lNpc.Health.IsAlive && (lNpc.transform.position - lEye).sqrMagnitude < lTargetRange) AddTree(lNpc.transform, Slot.Target);
             ProofPickup lProof = ProofPickup.Current;
-            if (lProof != null)
+            if (lProof != null && (lProof.transform.position - lEye).sqrMagnitude < lTargetRange)
             {
                 PlayerAvatar lCarrier = lProof.Carried ? PlayerAvatar.ForClient(lProof.Carrier.Value) : null;
                 if (lCarrier == null) AddTree(lProof.transform, Slot.Target);

@@ -39,7 +39,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX.Rendering
         public override void AddRenderPasses(ScriptableRenderer pRenderer, ref RenderingData pData)
         {
             if (_grade == null || !InstinctVision.Active) return;
-            if (pData.cameraData.cameraType != CameraType.Game || pData.cameraData.renderType == CameraRenderType.Overlay) return;
+            if (pData.cameraData.cameraType != CameraType.Game || pData.cameraData.renderType == CameraRenderType.Overlay || pData.cameraData.targetTexture != null) return;
             Shader.SetGlobalFloat(AMOUNT, InstinctVision.Amount);
             Shader.SetGlobalFloat(WAVE, InstinctVision.Wave);
             Shader.SetGlobalFloat(WAVE_FADE, InstinctVision.WaveFade);

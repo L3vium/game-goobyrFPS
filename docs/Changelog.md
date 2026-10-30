@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Minimal Hitman-style HUD: minimap, transient weapon/ammo and health, weapon wheel (Q / LB),
+  no objective panel; the map screen gets a contract column with a live portrait of the target.
+- Instinct senses the surroundings only (target 60 m, people 25 m, objects 20 m).
+- Crouch and sprint are held; crouching while moving slides (further out of a sprint); Q/E slides
+  removed. Patrols walk slowly and in groups of up to five; crowds flee from trouble.
+- Unity Terrain for the maps (LandShape stamps, eight painted ground layers, forests, grass).
 - Instinct vision (hold Tab, D-pad left): the world dims and what matters shows through the walls,
   the target and the proof in red, teammates in blue, nearby NPCs in white or amber when hunting,
   interactables and pickups around you in white. The scoreboard moves to the key left of 1

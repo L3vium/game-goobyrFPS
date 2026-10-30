@@ -168,6 +168,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Wheel",
+                    "type": "Button",
+                    "id": "8ee52fab-b450-4b02-a1e9-0fbb0ad83c84",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Instinct",
                     "type": "Button",
                     "id": "938e7633-aadd-472c-99c1-e903edb23cf5",
@@ -757,6 +766,28 @@
                     "processors": "",
                     "groups": "Gamepad",
                     "action": "Scoreboard",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2ef3542e-78bf-4efd-aa19-e9f4f6a89e94",
+                    "path": "<Keyboard>/q",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Wheel",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e4f028f8-6cf4-414d-a77d-384a4ab716c8",
+                    "path": "<Gamepad>/leftShoulder",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Gamepad",
+                    "action": "Wheel",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

@@ -34,7 +34,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX.Rendering
             if (_material == null) return;
             CameraType lType = pData.cameraData.cameraType;
             if (lType != CameraType.Game && lType != CameraType.SceneView) return;
-            if (pData.cameraData.renderType == CameraRenderType.Overlay) return;
+            if (pData.cameraData.renderType == CameraRenderType.Overlay || pData.cameraData.targetTexture != null) return;
             GoobyrAtmosphere lAtmosphere = VolumeManager.instance.stack.GetComponent<GoobyrAtmosphere>();
             if (lAtmosphere == null || !lAtmosphere.IsActive()) return;
             _pass.Setup(_material, lAtmosphere, _steps);

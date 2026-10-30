@@ -1,0 +1,229 @@
+# Normalize all text files to LF in the repo
+* text=auto
+
+# Git config files
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+
+# Code
+*.cs      text eol=lf diff=csharp
+*.shader  text eol=lf
+*.hlsl    text eol=lf
+*.cginc   text eol=lf
+*.compute text eol=lf
+*.uss     text eol=lf
+*.uxml    text eol=lf
+*.json    text eol=lf
+*.asmdef  text eol=lf
+*.asmref  text eol=lf
+
+# Unity YAML files
+# Unity always writes these with LF. Forcing eol=lf (instead of -text) means
+# both computers get the exact same bytes, so no more "phantom" line-ending changes.
+*.meta               text eol=lf merge=unityyamlmerge diff
+*.unity              text eol=lf merge=unityyamlmerge diff
+*.asset              text eol=lf merge=unityyamlmerge diff
+*.prefab             text eol=lf merge=unityyamlmerge diff
+*.mat                text eol=lf merge=unityyamlmerge diff
+*.anim               text eol=lf merge=unityyamlmerge diff
+*.controller         text eol=lf merge=unityyamlmerge diff
+*.overrideController text eol=lf merge=unityyamlmerge diff
+*.physicMaterial     text eol=lf merge=unityyamlmerge diff
+*.physicsMaterial2D  text eol=lf merge=unityyamlmerge diff
+*.playable           text eol=lf merge=unityyamlmerge diff
+*.mask               text eol=lf merge=unityyamlmerge diff
+*.brush              text eol=lf merge=unityyamlmerge diff
+*.flare              text eol=lf merge=unityyamlmerge diff
+*.fontsettings       text eol=lf merge=unityyamlmerge diff
+*.guiskin            text eol=lf merge=unityyamlmerge diff
+*.giparams           text eol=lf merge=unityyamlmerge diff
+*.renderTexture      text eol=lf merge=unityyamlmerge diff
+*.spriteatlas        text eol=lf merge=unityyamlmerge diff
+*.spriteatlasv2      text eol=lf merge=unityyamlmerge diff
+*.terrainlayer       text eol=lf merge=unityyamlmerge diff
+*.mixer              text eol=lf merge=unityyamlmerge diff
+*.shadervariants     text eol=lf merge=unityyamlmerge diff
+*.preset             text eol=lf merge=unityyamlmerge diff
+*.signal             text eol=lf merge=unityyamlmerge diff
+*.lighting           text eol=lf merge=unityyamlmerge diff
+*.dwlt               text eol=lf
+
+# Binary Unity data that happens to use the .asset extension
+LightingData.asset   filter=lfs diff=lfs merge=lfs -text
+*.cubemap            filter=lfs diff=lfs merge=lfs -text
+
+# Builds: everything inside the Builds/Build folders goes through LFS
+/[Bb]uild/**   filter=lfs diff=lfs merge=lfs -text
+/[Bb]uilds/**  filter=lfs diff=lfs merge=lfs -text
+
+# Build / binary formats (anywhere)
+*.apk   filter=lfs diff=lfs merge=lfs -text
+*.aab   filter=lfs diff=lfs merge=lfs -text
+*.ipa   filter=lfs diff=lfs merge=lfs -text
+*.exe   filter=lfs diff=lfs merge=lfs -text
+*.dll   filter=lfs diff=lfs merge=lfs -text
+*.so    filter=lfs diff=lfs merge=lfs -text
+*.a     filter=lfs diff=lfs merge=lfs -text
+*.dylib filter=lfs diff=lfs merge=lfs -text
+*.bundle filter=lfs diff=lfs merge=lfs -text
+*.wasm  filter=lfs diff=lfs merge=lfs -text
+*.unitypackage filter=lfs diff=lfs merge=lfs -text
+
+# Extra asset formats that were missing
+*.tga  filter=lfs diff=lfs merge=lfs -text
+*.TGA  filter=lfs diff=lfs merge=lfs -text
+*.ogg  filter=lfs diff=lfs merge=lfs -text
+*.OGG  filter=lfs diff=lfs merge=lfs -text
+*.aiff filter=lfs diff=lfs merge=lfs -text
+*.AIFF filter=lfs diff=lfs merge=lfs -text
+*.flac filter=lfs diff=lfs merge=lfs -text
+*.ttf  filter=lfs diff=lfs merge=lfs -text
+*.TTF  filter=lfs diff=lfs merge=lfs -text
+*.otf  filter=lfs diff=lfs merge=lfs -text
+*.OTF  filter=lfs diff=lfs merge=lfs -text
+*.webp filter=lfs diff=lfs merge=lfs -text
+*.7z   filter=lfs diff=lfs merge=lfs -text
+*.rar  filter=lfs diff=lfs merge=lfs -text
+
+# Your existing LFS list (kept identical so nothing already in LFS moves out)
+*.ico filter=lfs diff=lfs merge=lfs -text
+*.locres filter=lfs diff=lfs merge=lfs -text
+*.locmeta filter=lfs diff=lfs merge=lfs -text
+*.uasset filter=lfs diff=lfs merge=lfs -text
+*.umap filter=lfs diff=lfs merge=lfs -text
+*.3DS filter=lfs diff=lfs merge=lfs -text
+*.3ds filter=lfs diff=lfs merge=lfs -text
+*.ABC filter=lfs diff=lfs merge=lfs -text
+*.AEP filter=lfs diff=lfs merge=lfs -text
+*.AFDESIGN filter=lfs diff=lfs merge=lfs -text
+*.AFPHOTO filter=lfs diff=lfs merge=lfs -text
+*.AI filter=lfs diff=lfs merge=lfs -text
+*.AIF filter=lfs diff=lfs merge=lfs -text
+*.AVI filter=lfs diff=lfs merge=lfs -text
+*.BGEO filter=lfs diff=lfs merge=lfs -text
+*.BIN filter=lfs diff=lfs merge=lfs -text
+*.BLEND filter=lfs diff=lfs merge=lfs -text
+*.BMP filter=lfs diff=lfs merge=lfs -text
+*.BPOLY filter=lfs diff=lfs merge=lfs -text
+*.C4D filter=lfs diff=lfs merge=lfs -text
+*.DOC filter=lfs diff=lfs merge=lfs -text
+*.DOCX filter=lfs diff=lfs merge=lfs -text
+*.DWG filter=lfs diff=lfs merge=lfs -text
+*.DXF filter=lfs diff=lfs merge=lfs -text
+*.EXR filter=lfs diff=lfs merge=lfs -text
+*.FBX filter=lfs diff=lfs merge=lfs -text
+*.GEO filter=lfs diff=lfs merge=lfs -text
+*.GI filter=lfs diff=lfs merge=lfs -text
+*.GI2 filter=lfs diff=lfs merge=lfs -text
+*.GIF filter=lfs diff=lfs merge=lfs -text
+*.GLB filter=lfs diff=lfs merge=lfs -text
+*.GLTF filter=lfs diff=lfs merge=lfs -text
+*.HDR filter=lfs diff=lfs merge=lfs -text
+*.HIP filter=lfs diff=lfs merge=lfs -text
+*.HIPLC filter=lfs diff=lfs merge=lfs -text
+*.HIPNC filter=lfs diff=lfs merge=lfs -text
+*.JPEG filter=lfs diff=lfs merge=lfs -text
+*.JPG filter=lfs diff=lfs merge=lfs -text
+*.MA filter=lfs diff=lfs merge=lfs -text
+*.MAX filter=lfs diff=lfs merge=lfs -text
+*.MB filter=lfs diff=lfs merge=lfs -text
+*.MOV filter=lfs diff=lfs merge=lfs -text
+*.MP3 filter=lfs diff=lfs merge=lfs -text
+*.MP4 filter=lfs diff=lfs merge=lfs -text
+*.MPEG filter=lfs diff=lfs merge=lfs -text
+*.MPG filter=lfs diff=lfs merge=lfs -text
+*.OBJ filter=lfs diff=lfs merge=lfs -text
+*.PDF filter=lfs diff=lfs merge=lfs -text
+*.PFM filter=lfs diff=lfs merge=lfs -text
+*.PIC filter=lfs diff=lfs merge=lfs -text
+*.PMB filter=lfs diff=lfs merge=lfs -text
+*.PNG filter=lfs diff=lfs merge=lfs -text
+*.POLY filter=lfs diff=lfs merge=lfs -text
+*.PPT filter=lfs diff=lfs merge=lfs -text
+*.PPTX filter=lfs diff=lfs merge=lfs -text
+*.PROFRAW filter=lfs diff=lfs merge=lfs -text
+*.PRPROJ filter=lfs diff=lfs merge=lfs -text
+*.PSB filter=lfs diff=lfs merge=lfs -text
+*.PSD filter=lfs diff=lfs merge=lfs -text
+*.RAT filter=lfs diff=lfs merge=lfs -text
+*.RIB filter=lfs diff=lfs merge=lfs -text
+*.SKETCH filter=lfs diff=lfs merge=lfs -text
+*.STL filter=lfs diff=lfs merge=lfs -text
+*.TAR filter=lfs diff=lfs merge=lfs -text
+*.TIF filter=lfs diff=lfs merge=lfs -text
+*.TIFF filter=lfs diff=lfs merge=lfs -text
+*.USD filter=lfs diff=lfs merge=lfs -text
+*.USDC filter=lfs diff=lfs merge=lfs -text
+*.USDZ filter=lfs diff=lfs merge=lfs -text
+*.VDB filter=lfs diff=lfs merge=lfs -text
+*.WAV filter=lfs diff=lfs merge=lfs -text
+*.XLS filter=lfs diff=lfs merge=lfs -text
+*.XLSX filter=lfs diff=lfs merge=lfs -text
+*.ZIP filter=lfs diff=lfs merge=lfs -text
+*.abc filter=lfs diff=lfs merge=lfs -text
+*.aep filter=lfs diff=lfs merge=lfs -text
+*.afdesign filter=lfs diff=lfs merge=lfs -text
+*.afphoto filter=lfs diff=lfs merge=lfs -text
+*.ai filter=lfs diff=lfs merge=lfs -text
+*.aif filter=lfs diff=lfs merge=lfs -text
+*.avi filter=lfs diff=lfs merge=lfs -text
+*.bgeo filter=lfs diff=lfs merge=lfs -text
+*.bin filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+*.bmp filter=lfs diff=lfs merge=lfs -text
+*.bpoly filter=lfs diff=lfs merge=lfs -text
+*.c4d filter=lfs diff=lfs merge=lfs -text
+*.doc filter=lfs diff=lfs merge=lfs -text
+*.docx filter=lfs diff=lfs merge=lfs -text
+*.dwg filter=lfs diff=lfs merge=lfs -text
+*.dxf filter=lfs diff=lfs merge=lfs -text
+*.exr filter=lfs diff=lfs merge=lfs -text
+*.fbx filter=lfs diff=lfs merge=lfs -text
+*.geo filter=lfs diff=lfs merge=lfs -text
+*.gi filter=lfs diff=lfs merge=lfs -text
+*.gi2 filter=lfs diff=lfs merge=lfs -text
+*.gif filter=lfs diff=lfs merge=lfs -text
+*.glb filter=lfs diff=lfs merge=lfs -text
+*.gltf filter=lfs diff=lfs merge=lfs -text
+*.hdr filter=lfs diff=lfs merge=lfs -text
+*.hip filter=lfs diff=lfs merge=lfs -text
+*.hiplc filter=lfs diff=lfs merge=lfs -text
+*.hipnc filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.ma filter=lfs diff=lfs merge=lfs -text
+*.max filter=lfs diff=lfs merge=lfs -text
+*.mb filter=lfs diff=lfs merge=lfs -text
+*.mov filter=lfs diff=lfs merge=lfs -text
+*.mp3 filter=lfs diff=lfs merge=lfs -text
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.mpeg filter=lfs diff=lfs merge=lfs -text
+*.mpg filter=lfs diff=lfs merge=lfs -text
+*.obj filter=lfs diff=lfs merge=lfs -text
+*.pdf filter=lfs diff=lfs merge=lfs -text
+*.pfm filter=lfs diff=lfs merge=lfs -text
+*.pic filter=lfs diff=lfs merge=lfs -text
+*.pmb filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
+*.poly filter=lfs diff=lfs merge=lfs -text
+*.ppt filter=lfs diff=lfs merge=lfs -text
+*.pptx filter=lfs diff=lfs merge=lfs -text
+*.profraw filter=lfs diff=lfs merge=lfs -text
+*.prproj filter=lfs diff=lfs merge=lfs -text
+*.psb filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
+*.rat filter=lfs diff=lfs merge=lfs -text
+*.rib filter=lfs diff=lfs merge=lfs -text
+*.sketch filter=lfs diff=lfs merge=lfs -text
+*.stl filter=lfs diff=lfs merge=lfs -text
+*.tar filter=lfs diff=lfs merge=lfs -text
+*.tif filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.usd filter=lfs diff=lfs merge=lfs -text
+*.usdc filter=lfs diff=lfs merge=lfs -text
+*.usdz filter=lfs diff=lfs merge=lfs -text
+*.vdb filter=lfs diff=lfs merge=lfs -text
+*.wav filter=lfs diff=lfs merge=lfs -text
+*.xls filter=lfs diff=lfs merge=lfs -text
+*.xlsx filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text

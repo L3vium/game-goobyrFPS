@@ -35,3 +35,21 @@ Rules I write for myself after a correction. Read at the start of every session.
 - **Work in the main thread, visibly.** Background subagents are opaque to the user and slow.
   Do the work myself with short progress lines, and finish the whole request in the same turn
   instead of stopping to wait on something.
+
+## 2026-10-30 — level 1 judged flat, empty, ugly; HUD too big
+- **Verticality is the master word.** Every map is hills, slopes, terraces, cliffs, ravines and
+  towns on slopes, with buildings above and below each other (Far Cry-like terrain). Use Unity
+  Terrain (heightmap, splat layers, tree instances, details) at full potential, never a flat grid.
+- **Size 500 × 500 m, concise like Hitman.** Rooms, partitions, low walls, obstacles: every metre
+  is designed. No empty space; an open area exists only for a scene (a helicopter landing, a speech
+  with a crowd). Enemies everywhere: 150-220 markers per map, patrols of up to 5, static guards in
+  rooms, crowds at the scenes. Forests are huge and dense.
+- **Look: stylized but AAA finish** (Hitman / Sea of Thieves level), realistic proportioned humans,
+  not goofy mascots.
+- **HUD minimal like Hitman:** nothing by default, small minimap, weapon/ammo only when relevant,
+  health only when hurt, weapon wheel, no mission/objective panel. Everything is discovered.
+  Gamepad playable everywhere. Instinct shows the surroundings only.
+- **Controls:** crouch and sprint are held, not toggled; crouch while moving slides, sprint +
+  crouch slides further; no separate slide buttons. Patrols walk slowly.
+- **Title screen:** key art like Hitman (one detailed character, close, posed, simple building
+  backdrop) and a tiled tab menu; contracts must be minimal and instantly understandable.

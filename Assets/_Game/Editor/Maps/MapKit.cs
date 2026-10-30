@@ -23,7 +23,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// AI / match markers. <see cref="Finish"/> generates cover points, lights the scene, bakes
     /// the NavMesh and saves.
     /// </summary>
-    public class MapKit
+    public partial class MapKit
     {
         public readonly MapDefinition Map;
         public readonly Transform Root, Env, Props, Markers, Lights;
@@ -110,48 +110,98 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (int z = Mathf.Max(0, a.y); z <= Mathf.Min(_h - 1, b.y); z++) pAction(x, z);
         }
 
-        /// <summary>Builds the ground: one column per cell down to -6 m, merged per row of equal cells; vertical cliffs between levels.</summary>
+        /// <summary>Rolls the ground in a rectangle with layered noise (hills, dunes, banks).</summary>
+        public void Noise(Rect pRect, float pAmplitude, float pScale, int pSeed = 0)
+        {
+            ForCells(pRect, (x, z) =>
+            {
+                float wx = _origin.x + x * Cell, wz = _origin.y + z * Cell;
+                float n = Mathf.PerlinNoise(wx * pScale + pSeed * 17.3f, wz * pScale) * 0.65f + Mathf.PerlinNoise(wx * pScale * 2.7f, wz * pScale * 2.7f + pSeed) * 0.35f;
+                _height[x, z] += (n - 0.5f) * 2f * pAmplitude;
+            });
+        }
+
+        /// <summary>Blurs the heights in a rectangle: plateaus get walkable slopes, cliffs soften.</summary>
+        public void Smooth(Rect pRect, int pIterations)
+        {
+            for (int it = 0; it < pIterations; it++)
+            {
+                float[,] lCopy = (float[,])_height.Clone();
+                ForCells(pRect, (x, z) =>
+                {
+                    float lSum = 0f; int lCount = 0;
+                    for (int dx = -1; dx <= 1; dx++)
+                        for (int dz = -1; dz <= 1; dz++)
+                        {
+                            int nx = x + dx, nz = z + dz;
+                            if (nx < 0 || nz < 0 || nx >= _w || nz >= _h) continue;
+                            lSum += lCopy[nx, nz];
+                            lCount++;
+                        }
+                    _height[x, z] = lSum / lCount;
+                });
+            }
+        }
+
+        /// <summary>
+        /// Builds the ground as a faceted heightfield: corner heights average the cells around
+        /// them, so levels meet in slopes (steep ones read as banks and cliffs), coloured per cell,
+        /// cut where there are holes (basements), in 50-cell chunks with mesh colliders.
+        /// </summary>
         private void BuildGround()
         {
             Transform lGround = Group("Ground", Env);
-            List<(Mesh, Matrix4x4, Color)> lParts = new List<(Mesh, Matrix4x4, Color)>();
-            Mesh lBox = LowPolyMesh.Box();
-            const float BOTTOM = -8f;
-            for (int z = 0; z < _h; z++)
-            {
-                int x = 0;
-                while (x < _w)
+            float[,] lCorner = new float[_w + 1, _h + 1];
+            for (int x = 0; x <= _w; x++)
+                for (int z = 0; z <= _h; z++)
                 {
-                    if (_hole[x, z]) { x++; continue; }
-                    int lStart = x;
-                    float lHeight = _height[x, z];
-                    while (x + 1 < _w && !_hole[x + 1, z] && Mathf.Approximately(_height[x + 1, z], lHeight)) x++;
-                    float lMinX = _origin.x + lStart * Cell, lMaxX = _origin.x + (x + 1) * Cell;
-                    Vector3 lCenter = new Vector3((lMinX + lMaxX) * 0.5f, (lHeight + BOTTOM) * 0.5f, _origin.y + (z + 0.5f) * Cell);
-                    Vector3 lSize = new Vector3(lMaxX - lMinX, lHeight - BOTTOM, Cell);
-                    GameObject lCollider = new GameObject("G");
-                    lCollider.transform.SetParent(lGround, false);
-                    lCollider.transform.position = lCenter;
-                    lCollider.AddComponent<BoxCollider>().size = lSize;
-                    lCollider.isStatic = true;
-                    for (int c = lStart; c <= x; c++)
-                    {
-                        Vector3 lCellCenter = new Vector3(_origin.x + (c + 0.5f) * Cell, (lHeight + BOTTOM) * 0.5f, lCenter.z);
-                        lParts.Add((lBox, Matrix4x4.TRS(lCellCenter, Quaternion.identity, new Vector3(Cell, lHeight - BOTTOM, Cell)), _color[c, z]));
-                    }
-                    x++;
+                    float lSum = 0f; int lCount = 0;
+                    for (int dx = -1; dx <= 0; dx++)
+                        for (int dz = -1; dz <= 0; dz++)
+                        {
+                            int cx = x + dx, cz = z + dz;
+                            if (cx < 0 || cz < 0 || cx >= _w || cz >= _h || _hole[cx, cz]) continue;
+                            lSum += _height[cx, cz];
+                            lCount++;
+                        }
+                    lCorner[x, z] = lCount > 0 ? lSum / lCount : 0f;
                 }
-            }
-            for (int i = 0; i < lParts.Count; i += 2500)
-            {
-                Mesh lMesh = LowPolyMesh.Combine(lParts.GetRange(i, Mathf.Min(2500, lParts.Count - i)));
-                lMesh = EditorAssets.SaveMesh(lMesh, Map.sceneName + "_Ground" + i / 2500);
-                GameObject lVisual = new GameObject("GroundMesh" + i / 2500);
-                lVisual.transform.SetParent(lGround, false);
-                lVisual.AddComponent<MeshFilter>().sharedMesh = lMesh;
-                lVisual.AddComponent<MeshRenderer>().sharedMaterial = _toon;
-                lVisual.isStatic = true;
-            }
+
+            const int CHUNK = 50;
+            for (int cx0 = 0; cx0 < _w; cx0 += CHUNK)
+                for (int cz0 = 0; cz0 < _h; cz0 += CHUNK)
+                {
+                    List<Vector3> lVerts = new List<Vector3>();
+                    List<int> lTris = new List<int>();
+                    List<Color> lColors = new List<Color>();
+                    for (int x = cx0; x < Mathf.Min(_w, cx0 + CHUNK); x++)
+                        for (int z = cz0; z < Mathf.Min(_h, cz0 + CHUNK); z++)
+                        {
+                            if (_hole[x, z]) continue;
+                            float x0 = _origin.x + x * Cell, x1 = x0 + Cell, z0 = _origin.y + z * Cell, z1 = z0 + Cell;
+                            Vector3 a = new Vector3(x0, lCorner[x, z], z0), b = new Vector3(x0, lCorner[x, z + 1], z1);
+                            Vector3 c = new Vector3(x1, lCorner[x + 1, z + 1], z1), d = new Vector3(x1, lCorner[x + 1, z], z0);
+                            // Alternate the diagonal for a less regular faceting.
+                            int lStart = lVerts.Count;
+                            if (((x + z) & 1) == 0) { lVerts.AddRange(new[] { a, b, c, a, c, d }); }
+                            else { lVerts.AddRange(new[] { a, b, d, b, c, d }); }
+                            for (int i = 0; i < 6; i++) { lTris.Add(lStart + i); lColors.Add(_color[x, z]); }
+                        }
+                    if (lVerts.Count == 0) continue;
+                    Mesh lMesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+                    lMesh.SetVertices(lVerts);
+                    lMesh.SetTriangles(lTris, 0);
+                    lMesh.SetColors(lColors);
+                    lMesh.RecalculateNormals();
+                    lMesh.RecalculateBounds();
+                    lMesh = EditorAssets.SaveMesh(lMesh, Map.sceneName + "_Ground_" + cx0 + "_" + cz0);
+                    GameObject lChunk = new GameObject("Ground_" + cx0 + "_" + cz0);
+                    lChunk.transform.SetParent(lGround, false);
+                    lChunk.AddComponent<MeshFilter>().sharedMesh = lMesh;
+                    lChunk.AddComponent<MeshRenderer>().sharedMaterial = _toon;
+                    lChunk.AddComponent<MeshCollider>().sharedMesh = lMesh;
+                    lChunk.isStatic = true;
+                }
         }
 
         // ---------------------------------------------------------------- primitives
@@ -632,6 +682,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         public GameObject Crate(Vector3 pPosition, float pSize = 1.1f, bool pFlammable = true, Transform pParent = null)
         {
+            if (HasKit("Props", "Crate"))
+            {
+                GameObject lKit = Prop(pSize > 1.3f ? "CrateLarge" : "Crate", pPosition, (float)Rng.NextDouble() * 20f - 10f, null, Collide.Box, true, pParent);
+                lKit.isStatic = false;
+                lKit.layer = GameLayers.INTERACTABLE;
+                if (pFlammable) lKit.AddComponent<Flammable>().Setup(12f, 2.6f, false, pSize);
+                return lKit;
+            }
             GameObject lCrate = Block(pParent ?? Props, "Crate", pPosition + Vector3.up * pSize * 0.5f, Vector3.one * pSize, new Color(0.72f, 0.52f, 0.32f), GameLayers.DEFAULT, true, Quaternion.Euler(0, (float)Rng.NextDouble() * 20f - 10f, 0), true);
             lCrate.isStatic = false;
             if (pFlammable) lCrate.AddComponent<Flammable>().Setup(12f, 2.6f, false, pSize);
@@ -646,6 +704,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         public GameObject Barrel(Vector3 pPosition, bool pExplosive)
         {
+            if (HasKit("Props", "Barrel"))
+            {
+                GameObject lKit = Prop("Barrel", pPosition, (float)Rng.NextDouble() * 360f, pExplosive ? new Color(0.85f, 0.12f, 0.1f) : new Color(0.3f, 0.45f, 0.55f), Collide.Box, true);
+                lKit.isStatic = false;
+                lKit.layer = GameLayers.INTERACTABLE;
+                if (pExplosive) lKit.AddComponent<ExplosiveProp>();
+                else lKit.AddComponent<Flammable>().Setup(10f, 2.5f, true, 0.8f);
+                return lKit;
+            }
             GameObject lBarrel = Mesh(Props, pExplosive ? "RedBarrel" : "Barrel", EditorAssets.SaveMesh(LowPolyMesh.Cylinder(8), "Kit_Cyl8"), pPosition + Vector3.up * 0.55f, new Vector3(0.7f, 1.1f, 0.7f), pExplosive ? new Color(0.9f, 0.25f, 0.2f) : new Color(0.35f, 0.5f, 0.6f));
             lBarrel.AddComponent<CapsuleCollider>().height = 1f;
             if (pExplosive) lBarrel.AddComponent<ExplosiveProp>();
@@ -658,8 +725,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             Transform lCar = Group("Car", pParent ?? Props);
             lCar.SetPositionAndRotation(pPosition, Quaternion.Euler(0, pYaw, 0));
+            string lKitCar = new[] { "Sedan", "Pickup", "Van", "Sedan" }[Mathf.Abs(Mathf.RoundToInt(pPosition.x * 7 + pPosition.z * 3)) % 4];
             GameObject lPrefab = Resources.Load<GameObject>("Models/Car");
-            if (lPrefab != null)
+            if (HasKit("Props", lKitCar))
+            {
+                GameObject lModel = Piece("Props", lKitCar, pPosition, pYaw, pColor, lCar, Collide.None);
+                lModel.isStatic = false;
+            }
+            else if (lPrefab != null)
             {
                 GameObject lModel = (GameObject)PrefabUtility.InstantiatePrefab(lPrefab, lCar);
                 lModel.transform.localPosition = Vector3.zero;
@@ -896,6 +969,19 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         public void Lamp(Vector3 pPosition, Color pColor, float pRange = 12f, float pIntensity = 2.2f, bool pPost = true)
         {
+            if (pPost && HasKit("Props", "StreetLamp"))
+            {
+                Prop("StreetLamp", pPosition, (float)Rng.NextDouble() * 360f, null, Collide.Box);
+                Light lStreet = new GameObject("Light").AddComponent<Light>();
+                lStreet.transform.SetParent(Lights, false);
+                lStreet.transform.position = pPosition + Vector3.up * 4.2f;
+                lStreet.type = LightType.Point;
+                lStreet.range = pRange;
+                lStreet.intensity = pIntensity;
+                lStreet.color = pColor;
+                lStreet.shadows = LightShadows.None;
+                return;
+            }
             if (pPost) Block(Props, "LampPost", pPosition + Vector3.up * 2f, new Vector3(0.15f, 4f, 0.15f), new Color(0.25f, 0.25f, 0.3f), GameLayers.DEFAULT, true);
             GameObject lBulb = Mesh(Props, "Bulb", EditorAssets.SaveMesh(LowPolyMesh.Icosphere(0), "Kit_Ico0"), pPosition + Vector3.up * (pPost ? 4.1f : 0f), Vector3.one * 0.35f, pColor * 2.2f, null, false, _glow);
             lBulb.AddComponent<PoweredLight>();
@@ -1111,7 +1197,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lSettings.agentClimb = 0.45f;
             lSurface.agentTypeID = lSettings.agentTypeID;
             lSurface.overrideVoxelSize = true;
-            lSurface.voxelSize = 0.15f;
+            lSurface.voxelSize = _w * Cell > 600f ? 0.25f : 0.15f;
             lSurface.BuildNavMesh();
             string lPath = EditorAssets.SCENES + "/" + Map.sceneName + "_NavMesh.asset";
             AssetDatabase.DeleteAsset(lPath);

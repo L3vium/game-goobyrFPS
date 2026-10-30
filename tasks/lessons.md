@@ -19,3 +19,12 @@ Rules I write for myself after a correction. Read at the start of every session.
   thin rules, subtle fades and slides — no squash-and-stretch on UI elements. Keep the juice for the
   game world, not the menus.
 - **Name.** The game is "Goobyr FPS" (with a space) everywhere, including the title screen.
+
+## 2026-10-30 — ended prompts without building and pushing
+- **Every prompt ends with a player build, pushed, and merged to main.** No exceptions, even when
+  a background agent still works, even for a small feature. Order: commit + push each change →
+  `Goobyr/Build/Player` → commit + push the build → `git checkout main && git merge --ff-only dev
+  && git push origin main && git checkout dev`. A turn that changed code and stops before this is
+  not finished.
+- **Background agents don't block the build.** Ask them to pause editor use, build from what is
+  on disk, and say in the report which in-progress work the build does or does not contain.

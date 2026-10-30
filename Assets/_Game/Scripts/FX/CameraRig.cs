@@ -86,6 +86,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             ViewmodelRoot.SetParent(lWorld.transform, false);
 
             BuildVolume();
+            gameObject.AddComponent<InstinctVision>();
         }
 
         private void OnDestroy()

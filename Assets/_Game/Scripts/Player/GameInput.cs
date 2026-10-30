@@ -11,7 +11,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
     public static class GameInput
     {
         private static InputActionMap _map;
-        private static InputAction _move, _look, _fire, _aim, _reload, _interact, _crouch, _jump, _sprint, _slideL, _slideR, _melee, _throw, _scroll, _map_, _ptt, _pause, _detonate, _score, _nextSpectate;
+        private static InputAction _move, _look, _fire, _aim, _reload, _interact, _crouch, _jump, _sprint, _slideL, _slideR, _melee, _throw, _scroll, _map_, _ptt, _pause, _detonate, _score, _nextSpectate, _instinct;
         private static readonly InputAction[] _slots = new InputAction[6];
 
         /// <summary>Menus (pause, map screen, chat) switch gameplay input off.</summary>
@@ -38,6 +38,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             _sprint = _map.FindAction("Sprint"); _slideL = _map.FindAction("SlideLeft"); _slideR = _map.FindAction("SlideRight"); _melee = _map.FindAction("Melee");
             _throw = _map.FindAction("Throw"); _scroll = _map.FindAction("Scroll"); _map_ = _map.FindAction("Map"); _ptt = _map.FindAction("PushToTalk");
             _pause = _map.FindAction("Pause"); _detonate = _map.FindAction("Detonate"); _score = _map.FindAction("Scoreboard"); _nextSpectate = _map.FindAction("NextSpectate");
+            _instinct = _map.FindAction("Instinct");
             for (int i = 0; i < 6; i++) _slots[i] = _map.FindAction("Slot" + (i + 1));
             _map.Enable();
         }
@@ -63,6 +64,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public static bool Throw { get { Ensure(); return On && _throw.WasPressedThisFrame(); } }
         public static float Scroll { get { Ensure(); return On ? _scroll.ReadValue<Vector2>().y : 0f; } }
         public static bool Detonate { get { Ensure(); return On && _detonate.WasPressedThisFrame(); } }
+        public static bool InstinctHeld { get { Ensure(); return On && _instinct.IsPressed(); } }
         public static bool NextSpectate { get { Ensure(); return On && _nextSpectate.WasPressedThisFrame(); } }
 
         // Menu keys work whatever the gameplay lock.

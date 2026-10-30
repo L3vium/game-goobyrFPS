@@ -21,12 +21,21 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
         public bool Carried => Carrier.Value != ulong.MaxValue;
 
+        /// <summary>The proof lying in the world or carried (instinct vision shows it in red).</summary>
+        public static ProofPickup Current { get; private set; }
+
         private Transform _visual;
         private Light _light;
         private float _phase;
 
+        public override void OnNetworkDespawn()
+        {
+            if (Current == this) Current = null;
+        }
+
         public override void OnNetworkSpawn()
         {
+            Current = this;
             Kind.OnValueChanged += (_, __) => Build();
             Profile.OnValueChanged += (_, __) => Build();
             Build();

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Com.IsartDigital.GoobyrFPS.Core;
 using Com.IsartDigital.GoobyrFPS.Data;
 using Com.IsartDigital.GoobyrFPS.FX;
@@ -20,6 +21,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public readonly NetworkVariable<bool> Resting = new NetworkVariable<bool>(true);
 
         public ItemDefinition Item => GameDatabase.Item(ItemIndex.Value);
+
+        /// <summary>Every spawned pickup (instinct vision highlights the nearby ones).</summary>
+        public static readonly List<ItemPickup> All = new List<ItemPickup>();
 
         private Transform _visual;
         private float _phase;
@@ -44,8 +48,11 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             return lPickup;
         }
 
+        public override void OnNetworkDespawn() => All.Remove(this);
+
         public override void OnNetworkSpawn()
         {
+            All.Add(this);
             _body = GetComponent<Rigidbody>();
             if (!IsServer && _body != null) _body.isKinematic = true;
             ItemIndex.OnValueChanged += (_, __) => BuildVisual();

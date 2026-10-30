@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Instinct vision (hold Tab, D-pad left): the world dims and what matters shows through the walls,
+  the target and the proof in red, teammates in blue, nearby NPCs in white or amber when hunting,
+  interactables and pickups around you in white. The scoreboard moves to the key left of 1
+  (D-pad right).
 - Mirage Bay rebuilt as a 1 km² sandbox (`MapGulf` partials: terrain, souk, docks, Zenith, between):
   sea on two sides, dunes and a sandstone ridge on the others, 105 NPCs, 62 weapon spawns, four
   hidden spots each for the rocket launcher and the flamethrower, four edge starts, four

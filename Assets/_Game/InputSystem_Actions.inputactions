@@ -186,6 +186,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Instinct",
+                    "type": "Button",
+                    "id": "938e7633-aadd-472c-99c1-e903edb23cf5",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Map",
                     "type": "Button",
                     "id": "0fb5dcfd-ed06-4c47-acad-b62557bf31f9",
@@ -750,7 +759,7 @@
                 {
                     "name": "",
                     "id": "da2001db-2e2a-43ee-a74f-a052683d834f",
-                    "path": "<Keyboard>/tab",
+                    "path": "<Keyboard>/backquote",
                     "interactions": "",
                     "processors": "",
                     "groups": "Keyboard&Mouse",
@@ -777,6 +786,39 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "NextSpectate",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "22fd6db7-9833-4453-b34a-bc51d078b27e",
+                    "path": "<Keyboard>/tab",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Instinct",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "475ba6e2-34ff-4ec1-b00b-123e45ad9992",
+                    "path": "<Gamepad>/dpad/left",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Gamepad",
+                    "action": "Instinct",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "76fb6fb7-9502-40e9-a4f9-87d959642d45",
+                    "path": "<Gamepad>/dpad/right",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Gamepad",
+                    "action": "Scoreboard",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

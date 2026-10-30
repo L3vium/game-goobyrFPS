@@ -113,19 +113,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             UnityEngine.Rendering.Universal.UniversalRendererData lRenderer = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.UniversalRendererData>(EditorAssets.ROOT + "/Settings/PC_Renderer.asset");
             if (lRenderer == null) { Debug.LogError("[Build] PC_Renderer not found"); return; }
-            if (!lRenderer.rendererFeatures.Exists(f => f is FX.Rendering.VolumetricFogFeature))
-            {
-                FX.Rendering.VolumetricFogFeature lFeature = ScriptableObject.CreateInstance<FX.Rendering.VolumetricFogFeature>();
-                lFeature.name = "Goobyr Volumetric Fog";
-                AssetDatabase.AddObjectToAsset(lFeature, lRenderer);
-                lRenderer.rendererFeatures.Add(lFeature);
-                SerializedObject lSerialized = new SerializedObject(lRenderer);
-                SerializedProperty lMap = lSerialized.FindProperty("m_RendererFeatureMap");
-                lMap.arraySize++;
-                lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = lFeature.GetInstanceID();
-                lSerialized.ApplyModifiedPropertiesWithoutUndo();
-                lRenderer.SetDirty();
-            }
+            // Order matters: the instinct grade runs after the fog, both before post-processing.
+            InstallFeature<FX.Rendering.VolumetricFogFeature>(lRenderer, "Goobyr Volumetric Fog", "Hidden/Goobyr/VolumetricFog");
+            InstallFeature<FX.Rendering.InstinctFeature>(lRenderer, "Goobyr Instinct", "Hidden/Goobyr/Instinct");
             // Softer, longer shadows for the bigger maps.
             UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset lAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset>(EditorAssets.ROOT + "/Settings/PC_RPAsset.asset");
             if (lAsset != null)
@@ -137,6 +127,33 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             AssetDatabase.SaveAssets();
             Debug.Log("[Build] rendering features");
+        }
+
+        /// <summary>
+        /// Adds a renderer feature once and points it at its shader, so the player build includes
+        /// the hidden shader (Shader.Find alone would not).
+        /// </summary>
+        private static void InstallFeature<T>(UnityEngine.Rendering.Universal.UniversalRendererData pRenderer, string pName, string pShader) where T : UnityEngine.Rendering.Universal.ScriptableRendererFeature
+        {
+            T lFeature = (T)pRenderer.rendererFeatures.Find(f => f is T);
+            if (lFeature == null)
+            {
+                lFeature = ScriptableObject.CreateInstance<T>();
+                lFeature.name = pName;
+                AssetDatabase.AddObjectToAsset(lFeature, pRenderer);
+                pRenderer.rendererFeatures.Add(lFeature);
+                SerializedObject lRendererData = new SerializedObject(pRenderer);
+                SerializedProperty lMap = lRendererData.FindProperty("m_RendererFeatureMap");
+                lMap.arraySize++;
+                lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = lFeature.GetInstanceID();
+                lRendererData.ApplyModifiedPropertiesWithoutUndo();
+            }
+            SerializedObject lSerialized = new SerializedObject(lFeature);
+            lSerialized.FindProperty("_shader").objectReferenceValue = Shader.Find(pShader);
+            lSerialized.ApplyModifiedPropertiesWithoutUndo();
+            lFeature.Create();
+            pRenderer.SetDirty();
+            EditorUtility.SetDirty(pRenderer);
         }
 
         private static void SetBlend(Material pMaterial, BlendMode pSrc, BlendMode pDst, bool pZWrite, int pQueue)

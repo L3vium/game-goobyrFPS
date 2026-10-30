@@ -52,6 +52,13 @@ terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert 
   mantle, climb, zipline, hide; head bob, sway, tilt, landing dip, FOV kicks; 6-slot inventory;
   guns, rocket launcher, flamethrower, coin / brick / smoke / C4 + remote (T), poisons, punches and
   takedowns from behind.
+- **Instinct** (`FX/InstinctVision`, `FX/Rendering/InstinctFeature`, hold Tab): the world dims
+  to a cold grey with a scan wave rolling out from the eye, and what matters glows through the
+  walls: the target and the proof (or whoever carries it) in red at any distance, teammates in
+  blue, NPCs within 35 m in white (amber when they are hunting you), everything usable or
+  pickable within 30 m in white. Purely local and visual. Hidden parts are a solid silhouette,
+  visible parts a rim of light; a stencil bit gives each pixel to the first colour drawn, so red
+  wins.
 - **Juice**: trauma screen shake, hit flash, chromatic aberration / bloom / exposure pulses,
   hurt vignette, squash and stretch, fluff puffs on hits, explosions with fireball, shockwave,
   debris and light flash, smoke clouds, hitmarkers, damage arcs, kill feed, banners.
@@ -76,7 +83,7 @@ terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert 
 ## Controls (physical keys, AZERTY-safe)
 Move WASD/ZQSD · look mouse · fire LMB · aim RMB · reload R · interact F · crouch Ctrl/C · jump Space ·
 sprint Shift · slide Q/E · punch V/MMB · throw G · detonate T · slots 1-6 / wheel · map M ·
-scoreboard Tab · push-to-talk B · pause Esc.
+instinct Tab (hold) · scoreboard ` (key left of 1, ² on AZERTY) · push-to-talk B · pause Esc.
 
 ## Tests and tools
 - `Goobyr → GD Tool` (Ctrl+Shift+G) for tuning, `Goobyr → Validate Maps`, EditMode tests in

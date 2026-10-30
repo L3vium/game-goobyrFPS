@@ -299,10 +299,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             K.Block(K.Props, "Helipad", c + new Vector3(-30f, 0.05f, 40f), new Vector3(12f, 0.1f, 12f), new Color(0.3f, 0.3f, 0.32f));
             K.Point(MatchPoint.Kind.Extraction, c + new Vector3(-30f, 0.2f, 40f), 0, "Whitlock helipad");
             Routines(Z, MANSION + new Vector2(30, -34), 8f);
-            Squad(Z, 4, ItemKind.Smg, 3f, MANSION + new Vector2(-48, -48), MANSION + new Vector2(48, -48), MANSION + new Vector2(48, 48), MANSION + new Vector2(-48, 48));
+            Squad(Z, 4, ItemKind.Smg, 3f, MANSION + new Vector2(-40, -42), MANSION + new Vector2(40, -42), MANSION + new Vector2(40, 40), MANSION + new Vector2(-40, 40));
             Squad(Z, 3, ItemKind.Smg, 4f, MANSION + new Vector2(-40, -20), MANSION + new Vector2(40, -20));
-            Guard(Z, MANSION.x + 4f, MANSION.y - 54f, 180f, ItemKind.Smg);
-            Guard(Z, MANSION.x - 4f, MANSION.y - 54f, 180f, ItemKind.Shotgun);
+            Guard(Z, MANSION.x + 4f, MANSION.y - 47f, 180f, ItemKind.Smg);
+            Guard(Z, MANSION.x - 4f, MANSION.y - 47f, 180f, ItemKind.Shotgun);
             K.Zone(Z, K.Map.zoneNames[2], new Vector3(MANSION.x, 40, MANSION.y), new Vector3(120, 70, 120), G(-95, 118), new Color(0.2f, 0.22f, 0.32f), HatStyle.TopHat, In(_mansion, 6f, 2, 3f));
         }
 

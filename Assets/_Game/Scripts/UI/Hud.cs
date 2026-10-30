@@ -133,8 +133,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             // Ammo, bottom right.
             Image lAmmoPanel = UIFactory.Panel(_root, "AmmoPanel", UIFactory.PanelColor, new Vector2(1, 0), new Vector2(-40, 40), new Vector2(360, 90));
             lAmmoPanel.rectTransform.pivot = new Vector2(1, 0);
-            _ammo = UIFactory.Text(lAmmoPanel.transform, "Ammo", "", 44, UIFactory.Paper, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-110, -10), new Vector2(200, 56));
-            _weaponName = UIFactory.Text(lAmmoPanel.transform, "Weapon", "", 22, new Color(1, 1, 1, 0.75f), TextAlignmentOptions.Right, new Vector2(1, 1), new Vector2(-170, -20), new Vector2(320, 30));
+            _ammo = UIFactory.Text(lAmmoPanel.transform, "Ammo", "", 40, UIFactory.Paper, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-125, -14), new Vector2(220, 52));
+            _weaponName = UIFactory.Text(lAmmoPanel.transform, "Weapon", "", 20, new Color(1, 1, 1, 0.75f), TextAlignmentOptions.Right, new Vector2(1, 1), new Vector2(-175, -16), new Vector2(320, 26));
 
             // Inventory slots, bottom centre.
             for (int i = 0; i < WeaponHolder.SLOT_COUNT; i++)
@@ -145,10 +145,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
 
             // Contract, top left.
-            Image lDossierPanel = UIFactory.Panel(_root, "Dossier", UIFactory.PanelColor, new Vector2(0, 1), new Vector2(30, -30), new Vector2(520, 170));
+            Image lDossierPanel = UIFactory.Panel(_root, "Dossier", UIFactory.PanelColor, new Vector2(0, 1), new Vector2(30, -30), new Vector2(660, 200));
             lDossierPanel.rectTransform.pivot = new Vector2(0, 1);
-            _dossier = UIFactory.Text(lDossierPanel.transform, "Text", "", 22, UIFactory.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(260, -70), new Vector2(490, 130));
-            _status = UIFactory.Text(lDossierPanel.transform, "Status", "", 26, UIFactory.Accent, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(260, -20), new Vector2(490, 36));
+            _dossier = UIFactory.Text(lDossierPanel.transform, "Text", "", 21, UIFactory.Paper, TextAlignmentOptions.TopLeft, new Vector2(0, 1), new Vector2(330, -78), new Vector2(620, 140));
+            _status = UIFactory.Text(lDossierPanel.transform, "Status", "", 24, UIFactory.Accent, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(330, 22), new Vector2(620, 34));
 
             _clock = UIFactory.Text(_root, "Clock", "20:00", 40, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(240, 60));
             _bannerTitle = UIFactory.Text(_root, "BannerTitle", "", 72, UIFactory.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0.72f), Vector2.zero, new Vector2(1600, 90));

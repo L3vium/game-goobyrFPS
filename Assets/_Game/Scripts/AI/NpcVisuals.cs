@@ -30,6 +30,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _iconRoot.SetParent(transform, false);
             _iconRoot.localPosition = new Vector3(0, 2.35f, 0);
             _icon = _iconRoot.gameObject.AddComponent<TextMeshPro>();
+            // TextMeshPro swaps the Transform for a RectTransform: take the new one.
+            _iconRoot = _icon.transform;
             _icon.alignment = TextAlignmentOptions.Center;
             _icon.fontSize = 6f;
             _icon.fontStyle = FontStyles.Bold;
@@ -99,7 +101,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                     break;
             }
             if (_npc.State.Value != NpcState.Calling) _callProgress = 0f;
-            if (_npc.IsTarget && lText == "") lText = "<size=70%><color=#FF5E7A>★</color></size>";
+            if (_npc.IsTarget && lText == "") lText = "<size=45%><color=#FF5E7A>TARGET</color></size>";
             _icon.text = lText;
 
             _pop = Mathf.MoveTowards(_pop, 0f, Time.deltaTime * 3f);

@@ -249,6 +249,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
         private void HandlePlayerDeath(PlayerAvatar pAvatar, DamageInfo pInfo)
         {
             if (pAvatar == null) return;
+            Debug.Log($"[Match] player {pAvatar.DisplayName} died: {pInfo.type} {pInfo.amount:0} at {pAvatar.transform.position} by {pInfo.attacker}");
             LobbyPlayer lVictim = pAvatar.Player;
             LobbyPlayer lKiller = LobbyPlayer.ForClient(pInfo.attacker);
             if (lVictim != null) lVictim.Alive.Value = false;

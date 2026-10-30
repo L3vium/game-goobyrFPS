@@ -48,6 +48,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             lView._holder = pHolder;
             lView._pivot = new GameObject("Pivot").transform;
             lView._pivot.SetParent(lRoot.transform, false);
+            lRoot.transform.localScale = Vector3.one * 0.62f;
 
             Mesh lMitten = LowPolyMesh.Cached("goob.hand", () => LowPolyMesh.Icosphere(0, 0.08f, 7));
             Color lSkin = new Color(1f, 0.83f, 0.7f);
@@ -113,8 +114,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             float lBobScale = Mathf.Lerp(1f, 0.2f, _ads) * Mathf.Clamp01(lSpeed / 6f);
             Vector3 lBob = new Vector3(Mathf.Cos(_bob) * 0.012f, Mathf.Abs(Mathf.Sin(_bob)) * 0.012f, 0) * lBobScale;
 
-            Vector3 lHip = new Vector3(0.17f, -0.17f, 0.36f);
-            Vector3 lAds = new Vector3(0f, -0.105f, 0.3f);
+            Vector3 lHip = new Vector3(0.2f, -0.2f, 0.42f);
+            Vector3 lAds = new Vector3(0f, -0.085f, 0.36f);
             Vector3 lPos = Vector3.Lerp(lHip, lAds, _ads) + _sway * (1f - _ads * 0.7f) + lBob + _kickPos;
             Quaternion lRot = Quaternion.Euler(_kickRot + new Vector3(-_sway.y * 200f, _sway.x * 200f, _sway.x * 300f) * (1f - _ads * 0.7f));
 

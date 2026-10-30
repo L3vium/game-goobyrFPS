@@ -37,8 +37,8 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         public float npcVisionRange = 38f;
         public float npcVisionAngle = 110f;
         [Tooltip("Seconds of full exposure before an NPC is sure it saw a player.")]
-        public float npcDetectTime = 0.9f;
-        public float npcReactionTime = 0.35f;
+        public float npcDetectTime = 1.3f;
+        public float npcReactionTime = 0.7f;
         [Tooltip("Seconds of radio an NPC needs to call reinforcements. Kill it before.")]
         public float callDuration = 3f;
         public int reinforcementsPerCall = 4;
@@ -46,7 +46,7 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         [Tooltip("Seconds an NPC searches around the last known position before giving up.")]
         public float searchDuration = 18f;
         [Tooltip("Hit chance of an NPC at 10 m against a standing, moving target.")]
-        [Range(0f, 1f)] public float npcAccuracy = 0.45f;
+        [Range(0f, 1f)] public float npcAccuracy = 0.32f;
 
         [Header("Systems")]
         public float ventGasDelay = 6f;

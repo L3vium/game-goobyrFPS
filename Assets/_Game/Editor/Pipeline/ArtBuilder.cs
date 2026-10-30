@@ -45,7 +45,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lSky.SetColor("_TopColor", lMap.skyTop);
                 lSky.SetColor("_HorizonColor", lMap.skyHorizon);
                 lSky.SetColor("_BottomColor", Color.Lerp(lMap.fog, lMap.ambient, 0.5f));
-                lSky.SetColor("_SunColor", lMap.sun);
+                lSky.SetColor("_SunColor", lMap.sun * 0.8f);
+                lSky.SetFloat("_SunSize", 0.012f);
                 EditorUtility.SetDirty(lSky);
             }
 

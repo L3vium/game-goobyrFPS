@@ -132,8 +132,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lController.skinWidth = 0.04f;
             lObject.AddComponent<Damageable>();
             lObject.AddComponent<FpsMotor>();
-            lObject.AddComponent<WeaponHolder>();
+            // PlayerAvatar before WeaponHolder: WeaponHolder's RequireComponent would add a second one.
             lObject.AddComponent<PlayerAvatar>();
+            lObject.AddComponent<WeaponHolder>();
             lObject.AddComponent<PlayerInteractor>();
             AddGoob(lObject, GameLayers.PLAYER);
             return lObject;

@@ -209,6 +209,16 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         {
             NetworkObject lState = Instantiate(_lobbyStatePrefab);
             lState.Spawn(false);
+            _networkManager.SceneManager.OnLoadEventCompleted -= HandleSceneLoaded;
+            _networkManager.SceneManager.OnLoadEventCompleted += HandleSceneLoaded;
+        }
+
+        /// <summary>Host: a map is loaded on every machine - the match session comes to life.</summary>
+        private void HandleSceneLoaded(string pScene, UnityEngine.SceneManagement.LoadSceneMode pMode, System.Collections.Generic.List<ulong> pCompleted, System.Collections.Generic.List<ulong> pTimedOut)
+        {
+            if (pScene == GameScenes.TITLE) return;
+            NetworkObject lSession = Instantiate(NetPrefabs.Instance.mapSession);
+            lSession.Spawn(true);
         }
 
         private void HandleClientConnected(ulong pClientId)

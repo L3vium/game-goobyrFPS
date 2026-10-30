@@ -28,13 +28,13 @@ MonoBehaviour:
   npcDamageMultiplier: 1
   npcVisionRange: 38
   npcVisionAngle: 110
-  npcDetectTime: 0.9
-  npcReactionTime: 0.35
+  npcDetectTime: 1.3
+  npcReactionTime: 0.7
   callDuration: 3
   reinforcementsPerCall: 4
   maxCallsPerZone: 2
   searchDuration: 18
-  npcAccuracy: 0.45
+  npcAccuracy: 0.32
   ventGasDelay: 6
   ventGasDuration: 10
   fireSpreadInterval: 1.2

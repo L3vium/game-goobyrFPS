@@ -103,6 +103,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private ulong _lastAttacker = DamageInfo.NO_PLAYER;
         private readonly HashSet<ulong> _seenBodies = new HashSet<ulong>();
         private bool _wantsAlarm;
+        private float _combatStart;
 
         private const float WALK = 1.9f, RUN = 4.9f;
 
@@ -639,6 +640,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void EnterCombat()
         {
             SetState(NpcState.Combat);
+            _combatStart = Time.time;
             _repositionTime = 0f;
             _burstLeft = 0;
         }
@@ -792,6 +794,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 if (_combatTarget.Motor != null && _combatTarget.Sprinting.Value) lChance *= 0.6f;
             }
             if (!_targetVisible) lChance *= 0.25f;
+            // Warm-up: the first seconds of a fight are wild - time to dive into cover.
+            lChance *= Mathf.Lerp(0.15f, 1f, Mathf.Clamp01((Time.time - _combatStart) / 3f));
             if (lWeapon.kind == ItemKind.Sniper) lChance *= 1.8f;
 
             Vector3 lDir = (lAim - lMuzzle).normalized;

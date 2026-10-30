@@ -50,6 +50,8 @@
 
 # Binary Unity data that happens to use the .asset extension
 LightingData.asset   filter=lfs diff=lfs merge=lfs -text
+*_NavMesh.asset      filter=lfs diff=lfs merge=lfs -text
+*_Terrain.asset      filter=lfs diff=lfs merge=lfs -text
 *.cubemap            filter=lfs diff=lfs merge=lfs -text
 
 # Builds: everything inside the Builds/Build folders goes through LFS

@@ -1,0 +1,3094 @@
+{
+ "version": 1,
+ "units": "metres; size = Unity axes [x width, y height, z depth]",
+ "conventions": "Front faces Unity +Z after the 180 deg import turn. Origin at bottom centre (buildings: on the wall centre line). Vertex colour Col: rgb = colour, alpha = tint mask (1 = recolourable).",
+ "pieces": [
+  {
+   "style": "Classic",
+   "name": "Awning",
+   "size": [
+    3.0,
+    1.02,
+    1.345
+   ],
+   "kind": "awning",
+   "notes": "3 m fabric awning on the wall centre line: sticks out to +Z, origin at its lowest point (valance), top mount at ~0.9 m. Fabric tintable.",
+   "tris": 1004,
+   "tint": [
+    0.8,
+    0.25,
+    0.22
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Balustrade",
+   "size": [
+    3.0,
+    1.0,
+    0.4
+   ],
+   "kind": "railing",
+   "notes": "3 m balustrade 1 m high, origin bottom centre.",
+   "tris": 1624,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Chimney",
+   "size": [
+    1.2,
+    2.88,
+    0.8
+   ],
+   "kind": "chimney",
+   "notes": "Roof chimney / stack, origin bottom centre.",
+   "tris": 612,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Column",
+   "size": [
+    0.712,
+    3.4,
+    0.68
+   ],
+   "kind": "column",
+   "notes": "Free-standing column, floor height.",
+   "tris": 740,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Corner",
+   "size": [
+    0.56,
+    3.4,
+    0.56
+   ],
+   "kind": "corner",
+   "notes": "Corner pillar centred on the origin, full floor height.",
+   "tris": 440,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Cornice",
+   "size": [
+    3.0,
+    0.5,
+    0.57
+   ],
+   "kind": "trim",
+   "notes": "Top trim: sits on top of a wall (origin on wall centre line), overhangs the front.",
+   "tris": 1544,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Drainpipe",
+   "size": [
+    0.3,
+    3.384,
+    0.381
+   ],
+   "kind": "climb",
+   "notes": "Climbable drainpipe, floor height, on the wall centre line (pipe sits in front of the wall face).",
+   "tris": 344
+  },
+  {
+   "style": "Classic",
+   "name": "FloorBand",
+   "size": [
+    3.0,
+    0.26,
+    0.14
+   ],
+   "kind": "trim",
+   "notes": "Band between floors, vertically centred on the origin: place at the floor seam.",
+   "tris": 116,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Ladder",
+   "size": [
+    0.56,
+    3.956,
+    0.315
+   ],
+   "kind": "climb",
+   "notes": "Metal ladder floor height; origin bottom centre, brackets at -Z go against the wall.",
+   "tris": 468
+  },
+  {
+   "style": "Classic",
+   "name": "Parapet",
+   "size": [
+    3.0,
+    1.0,
+    0.44
+   ],
+   "kind": "parapet",
+   "notes": "Flat-roof edge wall 3x1 m with coping, on the wall centre line.",
+   "tris": 308,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Railing",
+   "size": [
+    3.02,
+    1.13,
+    0.12
+   ],
+   "kind": "railing",
+   "notes": "3 m railing, 1 m high, origin bottom centre.",
+   "tris": 988,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "RoofGable",
+   "size": [
+    1.14,
+    1.231,
+    1.276
+   ],
+   "kind": "roof",
+   "notes": "Unit gable roof 1x1x1 (ridge along x) + eaves; scale to fit. Roof tintable, gables fixed.",
+   "tris": 756,
+   "tint": [
+    0.36,
+    0.42,
+    0.48
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "RoofHip",
+   "size": [
+    1.216,
+    1.095,
+    1.21
+   ],
+   "kind": "roof",
+   "notes": "Unit hip roof 1x1x1 (ridge along x) + eaves; scale to fit.",
+   "tris": 492,
+   "tint": [
+    0.36,
+    0.42,
+    0.48
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "RoofSlab",
+   "size": [
+    3.12,
+    0.26,
+    3.12
+   ],
+   "kind": "roof",
+   "notes": "3x3 flat roof tile, origin bottom centre, lip on the edges.",
+   "tris": 264,
+   "tint": [
+    0.75,
+    0.74,
+    0.72
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Scaffold",
+   "size": [
+    3.06,
+    3.956,
+    1.26
+   ],
+   "kind": "climb",
+   "notes": "Scaffold bay 3 x 3.4 x 1.2 with deck on top and inner ladder; stackable.",
+   "tris": 1588
+  },
+  {
+   "style": "Classic",
+   "name": "Stairs",
+   "size": [
+    1.43,
+    4.48,
+    5.43
+   ],
+   "kind": "stairs",
+   "notes": "Interior flight 1.4 m wide rising 3.4 m; bottom step at +Z (front), climbs toward -Z.",
+   "tris": 1452,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "StairsOutdoor",
+   "size": [
+    3.1,
+    2.123,
+    3.47
+   ],
+   "kind": "stairs",
+   "notes": "Outdoor steps 3 m wide rising 1.7 m; bottom at +Z, climbs toward -Z.",
+   "tris": 1012,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "Wall",
+   "size": [
+    3.0,
+    3.4,
+    0.395
+   ],
+   "kind": "wall",
+   "notes": "3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1200,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "WallArch",
+   "size": [
+    3.0,
+    3.4,
+    0.5
+   ],
+   "kind": "wall",
+   "notes": "2.2 m wide open archway / wide opening. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 2112,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "WallDoor",
+   "size": [
+    3.0,
+    3.4,
+    0.93
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 door hole (no leaf), step in front. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 2068,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "WallDoorDouble",
+   "size": [
+    3.06,
+    3.4,
+    0.93
+   ],
+   "kind": "wall",
+   "notes": "2.4x2.4 double door hole (no leaf). 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 2432,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "WallHalf",
+   "size": [
+    1.5,
+    3.4,
+    0.395
+   ],
+   "kind": "wall",
+   "notes": "1.5 m filler wall. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 760,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "WallWindow",
+   "size": [
+    3.0,
+    3.4,
+    0.57
+   ],
+   "kind": "wall",
+   "notes": "1.2x1.5 window hole at 0.9 m, no glass. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1828,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "WallWindowBalcony",
+   "size": [
+    3.0,
+    4.139,
+    1.27
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 french opening at floor level + 2.4x0.9 balcony (floor at y=0) with railing, brackets hang below 0. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 3940,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Classic",
+   "name": "WallWindowTall",
+   "size": [
+    3.0,
+    3.4,
+    0.56
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 tall window hole at 0.5 m. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 2512,
+   "tint": [
+    0.93,
+    0.88,
+    0.78
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "BirchA",
+   "size": [
+    4.435,
+    8.919,
+    3.97
+   ],
+   "kind": "tree",
+   "notes": "Twin-stem birch 8 m, white bark.",
+   "tris": 1268,
+   "tint": [
+    0.55,
+    0.72,
+    0.3
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "BroadleafA",
+   "size": [
+    8.483,
+    9.368,
+    8.616
+   ],
+   "kind": "tree",
+   "notes": "Round puffy broadleaf 7 m.",
+   "tris": 1644,
+   "tint": [
+    0.36,
+    0.6,
+    0.26
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "BroadleafB",
+   "size": [
+    11.621,
+    11.095,
+    9.842
+   ],
+   "kind": "tree",
+   "notes": "Round puffy broadleaf 9 m.",
+   "tris": 1804,
+   "tint": [
+    0.42,
+    0.62,
+    0.25
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "BroadleafC",
+   "size": [
+    7.305,
+    7.369,
+    7.262
+   ],
+   "kind": "tree",
+   "notes": "Small broadleaf 5.5 m.",
+   "tris": 1484,
+   "tint": [
+    0.5,
+    0.65,
+    0.28
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "BushA",
+   "size": [
+    1.773,
+    1.094,
+    1.775
+   ],
+   "kind": "bush",
+   "notes": "Bush 1.2 m.",
+   "tris": 720,
+   "tint": [
+    0.32,
+    0.55,
+    0.25
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "BushB",
+   "size": [
+    2.365,
+    1.749,
+    2.509
+   ],
+   "kind": "bush",
+   "notes": "Bush 1.8 m.",
+   "tris": 800,
+   "tint": [
+    0.28,
+    0.5,
+    0.24
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "BushC",
+   "size": [
+    1.339,
+    0.973,
+    1.475
+   ],
+   "kind": "bush",
+   "notes": "Flowering bush 1 m.",
+   "tris": 1000,
+   "tint": [
+    0.35,
+    0.58,
+    0.28
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "CliffChunk",
+   "size": [
+    8.124,
+    6.092,
+    6.829
+   ],
+   "kind": "rock",
+   "notes": "Cliff face chunk ~8 x 6 x 6 m with ledges and grass tufts on top (fixed green); rock tintable.",
+   "tris": 1240,
+   "tint": [
+    0.6,
+    0.56,
+    0.5
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "CypressA",
+   "size": [
+    3.505,
+    10.8,
+    3.349
+   ],
+   "kind": "tree",
+   "notes": "Columnar cypress 11 m.",
+   "tris": 1266,
+   "tint": [
+    0.2,
+    0.4,
+    0.24
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "DeadTree",
+   "size": [
+    3.677,
+    5.906,
+    3.644
+   ],
+   "kind": "tree",
+   "notes": "Leafless dead tree 6.5 m (all fixed colour).",
+   "tris": 576
+  },
+  {
+   "style": "Nature",
+   "name": "FlowerBed",
+   "size": [
+    2.0,
+    0.586,
+    1.0
+   ],
+   "kind": "bush",
+   "notes": "Raised flower bed 2x1 with stone border.",
+   "tris": 1868,
+   "tint": [
+    0.32,
+    0.55,
+    0.25
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "GrassTuft",
+   "size": [
+    0.499,
+    0.435,
+    0.388
+   ],
+   "kind": "grass",
+   "notes": "Grass tuft 0.45 m.",
+   "tris": 112,
+   "tint": [
+    0.45,
+    0.7,
+    0.3
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "HedgeBlock",
+   "size": [
+    2.331,
+    2.237,
+    1.29
+   ],
+   "kind": "bush",
+   "notes": "Clipped hedge block 2 x 2.2 x 1 (tileable along x).",
+   "tris": 1736,
+   "tint": [
+    0.26,
+    0.48,
+    0.22
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "Log",
+   "size": [
+    4.053,
+    1.026,
+    0.847
+   ],
+   "kind": "rock",
+   "notes": "Fallen log 4 m along x with a branch stub and moss.",
+   "tris": 580
+  },
+  {
+   "style": "Nature",
+   "name": "PalmA",
+   "size": [
+    5.925,
+    8.504,
+    5.273
+   ],
+   "kind": "tree",
+   "notes": "Curved palm 8.5 m.",
+   "tris": 1584,
+   "tint": [
+    0.4,
+    0.66,
+    0.27
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "PalmB",
+   "size": [
+    7.643,
+    11.032,
+    7.245
+   ],
+   "kind": "tree",
+   "notes": "Tall curved palm 11 m.",
+   "tris": 1580,
+   "tint": [
+    0.42,
+    0.66,
+    0.28
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "PineA",
+   "size": [
+    3.778,
+    8.21,
+    3.975
+   ],
+   "kind": "tree",
+   "notes": "Layered pine 8 m, foliage tintable.",
+   "tris": 562,
+   "tint": [
+    0.22,
+    0.42,
+    0.26
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "PineB",
+   "size": [
+    5.282,
+    11.288,
+    5.589
+   ],
+   "kind": "tree",
+   "notes": "Layered pine 11 m.",
+   "tris": 638,
+   "tint": [
+    0.22,
+    0.42,
+    0.26
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "PineC",
+   "size": [
+    7.031,
+    14.365,
+    7.274
+   ],
+   "kind": "tree",
+   "notes": "Layered pine 14 m.",
+   "tris": 722,
+   "tint": [
+    0.22,
+    0.42,
+    0.26
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "ReedsClump",
+   "size": [
+    1.006,
+    1.713,
+    0.887
+   ],
+   "kind": "grass",
+   "notes": "Reeds with cattails 1.7 m (shore).",
+   "tris": 360,
+   "tint": [
+    0.5,
+    0.62,
+    0.3
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "RockA",
+   "size": [
+    0.823,
+    0.631,
+    0.759
+   ],
+   "kind": "rock",
+   "notes": "Faceted rock ~1 m, tintable.",
+   "tris": 88,
+   "tint": [
+    0.58,
+    0.57,
+    0.55
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "RockB",
+   "size": [
+    1.946,
+    1.394,
+    1.431
+   ],
+   "kind": "rock",
+   "notes": "Faceted rock ~1.8 m.",
+   "tris": 194,
+   "tint": [
+    0.58,
+    0.57,
+    0.55
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "RockC",
+   "size": [
+    2.623,
+    2.09,
+    3.303
+   ],
+   "kind": "rock",
+   "notes": "Faceted rock ~2.8 m.",
+   "tris": 280,
+   "tint": [
+    0.55,
+    0.54,
+    0.52
+   ]
+  },
+  {
+   "style": "Nature",
+   "name": "RockD",
+   "size": [
+    4.789,
+    2.799,
+    3.32
+   ],
+   "kind": "rock",
+   "notes": "Faceted boulder ~4 m.",
+   "tris": 280,
+   "tint": [
+    0.55,
+    0.54,
+    0.52
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "AirHandler",
+   "size": [
+    3.294,
+    2.89,
+    2.665
+   ],
+   "kind": "utility",
+   "notes": "Basement HVAC unit 3x1.6x2 with ducts rising and bending to -Z.",
+   "tris": 1112
+  },
+  {
+   "style": "Props",
+   "name": "Armchair",
+   "size": [
+    1.0,
+    0.93,
+    0.87
+   ],
+   "kind": "furniture",
+   "notes": "Armchair, fabric tintable.",
+   "tris": 504,
+   "tint": [
+    0.6,
+    0.3,
+    0.25
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "BarCounter",
+   "size": [
+    3.12,
+    1.25,
+    0.79
+   ],
+   "kind": "furniture",
+   "notes": "3 m bar counter: customer side +Z, glasses/bottles on the back shelf. Body tintable.",
+   "tris": 1356,
+   "tint": [
+    0.45,
+    0.25,
+    0.18
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "BarShelf",
+   "size": [
+    2.48,
+    2.33,
+    0.48
+   ],
+   "kind": "furniture",
+   "notes": "2.4 m back-bar shelf with mirror and ~27 bottles.",
+   "tris": 3140
+  },
+  {
+   "style": "Props",
+   "name": "Barrel",
+   "size": [
+    0.62,
+    0.895,
+    0.62
+   ],
+   "kind": "cover",
+   "notes": "Oil drum, tintable.",
+   "tris": 656,
+   "tint": [
+    0.2,
+    0.4,
+    0.65
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Barrier",
+   "size": [
+    2.0,
+    0.81,
+    0.62
+   ],
+   "kind": "cover",
+   "notes": "Concrete jersey barrier 2 m (cover).",
+   "tris": 172
+  },
+  {
+   "style": "Props",
+   "name": "Bed",
+   "size": [
+    1.7,
+    1.24,
+    2.19
+   ],
+   "kind": "furniture",
+   "notes": "Double bed 1.6x2.1, headboard at -Z, duvet tintable.",
+   "tris": 632,
+   "tint": [
+    0.4,
+    0.55,
+    0.7
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Bench",
+   "size": [
+    1.8,
+    0.906,
+    0.622
+   ],
+   "kind": "furniture",
+   "notes": "Park bench 1.8 m, cast iron + slats.",
+   "tris": 836
+  },
+  {
+   "style": "Props",
+   "name": "Boat",
+   "size": [
+    2.063,
+    1.24,
+    4.762
+   ],
+   "kind": "vehicle",
+   "notes": "Small motor boat 4.7 m, bow +Z, hollow cockpit, hull tintable.",
+   "tris": 1002,
+   "tint": [
+    0.95,
+    0.95,
+    0.95
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Bollard",
+   "size": [
+    0.26,
+    0.92,
+    0.26
+   ],
+   "kind": "street",
+   "notes": "Steel bollard.",
+   "tris": 214
+  },
+  {
+   "style": "Props",
+   "name": "Bookshelf",
+   "size": [
+    1.04,
+    2.05,
+    0.37
+   ],
+   "kind": "furniture",
+   "notes": "Bookshelf 1.0x0.35x2.0 full of books.",
+   "tris": 3004
+  },
+  {
+   "style": "Props",
+   "name": "BreakerBox",
+   "size": [
+    0.685,
+    1.5,
+    0.384
+   ],
+   "kind": "utility",
+   "notes": "Utility breaker panel with big main lever on +X side; back on the origin plane (mount on a wall).",
+   "tris": 412
+  },
+  {
+   "style": "Props",
+   "name": "Cabinet",
+   "size": [
+    1.24,
+    0.89,
+    0.515
+   ],
+   "kind": "furniture",
+   "notes": "Sideboard 1.2x0.45x0.9, painted body tintable.",
+   "tris": 528,
+   "tint": [
+    0.55,
+    0.65,
+    0.6
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Chair",
+   "size": [
+    0.44,
+    0.981,
+    0.472
+   ],
+   "kind": "furniture",
+   "notes": "Wooden chair, cushion tintable.",
+   "tris": 440,
+   "tint": [
+    0.7,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Chandelier",
+   "size": [
+    2.21,
+    1.7,
+    2.21
+   ],
+   "kind": "light",
+   "notes": "Crystal chandelier d=2.2 m; ORIGIN AT THE TOP HOOK, hangs down 1.7 m. Glow companion: Chandelier_Glow.fbx (same pivot).",
+   "tris": 2888
+  },
+  {
+   "style": "Props",
+   "name": "Crate",
+   "size": [
+    1.02,
+    1.0,
+    1.053
+   ],
+   "kind": "cover",
+   "notes": "Wooden crate 1 m (cover).",
+   "tris": 832
+  },
+  {
+   "style": "Props",
+   "name": "CrateLarge",
+   "size": [
+    1.62,
+    1.6,
+    1.691
+   ],
+   "kind": "cover",
+   "notes": "Wooden crate 1.6 m (cover).",
+   "tris": 832
+  },
+  {
+   "style": "Props",
+   "name": "Desk",
+   "size": [
+    1.4,
+    0.835,
+    0.725
+   ],
+   "kind": "furniture",
+   "notes": "Desk 1.4x0.7 with drawer pedestal, papers, cup.",
+   "tris": 556
+  },
+  {
+   "style": "Props",
+   "name": "Dumpster",
+   "size": [
+    2.0,
+    1.369,
+    1.449
+   ],
+   "kind": "hiding",
+   "notes": "Dumpster 2x1.4x1.3 (hiding spot), body tintable.",
+   "tris": 1200,
+   "tint": [
+    0.2,
+    0.45,
+    0.3
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Fireplace",
+   "size": [
+    2.04,
+    1.59,
+    0.72
+   ],
+   "kind": "furniture",
+   "notes": "Marble fireplace 1.9 m wide, back on -Z against the wall, fire inside.",
+   "tris": 612
+  },
+  {
+   "style": "Props",
+   "name": "FloorLamp",
+   "size": [
+    0.48,
+    1.68,
+    0.468
+   ],
+   "kind": "light",
+   "notes": "Floor lamp 1.7 m, shade tintable. Glow companion: FloorLamp_Glow.fbx (same pivot).",
+   "tris": 348,
+   "tint": [
+    0.95,
+    0.88,
+    0.7
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Fountain",
+   "size": [
+    4.12,
+    2.7,
+    4.12
+   ],
+   "kind": "landmark",
+   "notes": "Two-tier stone fountain d=4.1 m with water.",
+   "tris": 1246
+  },
+  {
+   "style": "Props",
+   "name": "Fridge",
+   "size": [
+    0.78,
+    1.845,
+    0.77
+   ],
+   "kind": "furniture",
+   "notes": "Retro fridge, tintable.",
+   "tris": 332,
+   "tint": [
+    0.75,
+    0.88,
+    0.85
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "GasBottle",
+   "size": [
+    0.3,
+    1.252,
+    0.3
+   ],
+   "kind": "prop",
+   "notes": "Gas cylinder 1.25 m, tintable.",
+   "tris": 464,
+   "tint": [
+    0.85,
+    0.2,
+    0.15
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Generator",
+   "size": [
+    1.243,
+    0.947,
+    0.775
+   ],
+   "kind": "utility",
+   "notes": "Portable generator in a tube frame, tank tintable.",
+   "tris": 560,
+   "tint": [
+    0.95,
+    0.75,
+    0.15
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Haystack",
+   "size": [
+    2.435,
+    2.09,
+    2.133
+   ],
+   "kind": "hiding",
+   "notes": "Haystack mound (hiding spot) 2.3 m wide.",
+   "tris": 832
+  },
+  {
+   "style": "Props",
+   "name": "Hydrant",
+   "size": [
+    0.445,
+    0.72,
+    0.38
+   ],
+   "kind": "street",
+   "notes": "Fire hydrant, tintable.",
+   "tris": 508,
+   "tint": [
+    0.85,
+    0.15,
+    0.12
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Jeep",
+   "size": [
+    2.13,
+    1.919,
+    3.95
+   ],
+   "kind": "vehicle",
+   "notes": "Open off-road jeep, front +Z, body tintable.",
+   "tris": 2076,
+   "tint": [
+    0.38,
+    0.45,
+    0.28
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "LampPostOrnate",
+   "size": [
+    0.536,
+    4.2,
+    0.48
+   ],
+   "kind": "light",
+   "notes": "Cast-iron ornate lamp post 4.2 m with lantern. Glow companion: LampPostOrnate_Glow.fbx (same pivot).",
+   "tris": 682
+  },
+  {
+   "style": "Props",
+   "name": "Mailbox",
+   "size": [
+    0.275,
+    1.44,
+    0.525
+   ],
+   "kind": "street",
+   "notes": "Curbside mailbox on a post, box tintable, red flag.",
+   "tris": 404,
+   "tint": [
+    0.25,
+    0.27,
+    0.3
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "MarketStall",
+   "size": [
+    2.6,
+    2.733,
+    1.912
+   ],
+   "kind": "street",
+   "notes": "Market stall with fruit crates and striped fabric roof (tintable stripes); counter on +Z.",
+   "tris": 3672,
+   "tint": [
+    0.85,
+    0.3,
+    0.25
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "OfficeChair",
+   "size": [
+    0.611,
+    1.199,
+    0.67
+   ],
+   "kind": "furniture",
+   "notes": "Swivel office chair, upholstery tintable.",
+   "tris": 852,
+   "tint": [
+    0.2,
+    0.22,
+    0.25
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Pallet",
+   "size": [
+    1.2,
+    0.144,
+    1.0
+   ],
+   "kind": "prop",
+   "notes": "Euro pallet 1.2x1.0.",
+   "tris": 968
+  },
+  {
+   "style": "Props",
+   "name": "Parasol",
+   "size": [
+    2.614,
+    2.55,
+    2.614
+   ],
+   "kind": "street",
+   "notes": "Cafe parasol 2.6 m wide, tintable stripes.",
+   "tris": 378,
+   "tint": [
+    0.2,
+    0.5,
+    0.75
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Phone",
+   "size": [
+    0.327,
+    0.135,
+    0.207
+   ],
+   "kind": "prop",
+   "notes": "Desk phone, tintable.",
+   "tris": 340,
+   "tint": [
+    0.8,
+    0.15,
+    0.15
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Piano",
+   "size": [
+    1.49,
+    1.881,
+    2.28
+   ],
+   "kind": "furniture",
+   "notes": "Grand piano, keyboard on +Z, lid propped open.",
+   "tris": 1540
+  },
+  {
+   "style": "Props",
+   "name": "Pickup",
+   "size": [
+    2.11,
+    1.809,
+    5.14
+   ],
+   "kind": "vehicle",
+   "notes": "Pickup truck with bed, front +Z, body tintable.",
+   "tris": 2048,
+   "tint": [
+    0.25,
+    0.4,
+    0.65
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "PierSegment",
+   "size": [
+    3.0,
+    1.8,
+    2.47
+   ],
+   "kind": "structure",
+   "notes": "Pier segment 3 m along x, 2.4 wide; deck top at 1.5 m, piles to the origin.",
+   "tris": 1300
+  },
+  {
+   "style": "Props",
+   "name": "PlantBig",
+   "size": [
+    0.993,
+    1.935,
+    0.904
+   ],
+   "kind": "furniture",
+   "notes": "Big indoor tree in a planter 1.9 m, foliage tintable.",
+   "tris": 616,
+   "tint": [
+    0.3,
+    0.55,
+    0.25
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "PlantPot",
+   "size": [
+    0.462,
+    0.566,
+    0.486
+   ],
+   "kind": "furniture",
+   "notes": "Small potted plant, leaves tintable.",
+   "tris": 1092,
+   "tint": [
+    0.35,
+    0.6,
+    0.28
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "PoliceCar",
+   "size": [
+    2.01,
+    1.73,
+    4.4
+   ],
+   "kind": "vehicle",
+   "notes": "Police sedan with light bar and push bar, body tintable (doors white).",
+   "tris": 2340,
+   "tint": [
+    0.1,
+    0.12,
+    0.18
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "PowerPole",
+   "size": [
+    2.2,
+    9.0,
+    3.201
+   ],
+   "kind": "utility",
+   "notes": "Wooden power pole 9 m, crossarms along x, wire stubs along z, transformer.",
+   "tris": 1130
+  },
+  {
+   "style": "Props",
+   "name": "Radio",
+   "size": [
+    0.458,
+    0.508,
+    0.205
+   ],
+   "kind": "prop",
+   "notes": "Retro tabletop radio.",
+   "tris": 384
+  },
+  {
+   "style": "Props",
+   "name": "Rug",
+   "size": [
+    2.56,
+    0.024,
+    1.6
+   ],
+   "kind": "furniture",
+   "notes": "Rug 2.4x1.6, field tintable, border fixed.",
+   "tris": 436,
+   "tint": [
+    0.7,
+    0.25,
+    0.2
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Sandbags",
+   "size": [
+    2.042,
+    0.546,
+    0.631
+   ],
+   "kind": "cover",
+   "notes": "Sandbag wall 2 m x 0.55 m (cover).",
+   "tris": 1520
+  },
+  {
+   "style": "Props",
+   "name": "Sedan",
+   "size": [
+    2.01,
+    1.56,
+    4.34
+   ],
+   "kind": "vehicle",
+   "notes": "Chunky toy sedan, front +Z, body tintable.",
+   "tris": 1932,
+   "tint": [
+    0.8,
+    0.25,
+    0.22
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "ShippingContainer",
+   "size": [
+    6.2,
+    2.61,
+    2.53
+   ],
+   "kind": "cover",
+   "notes": "Corrugated container 6.1 x 2.6 x 2.5, doors on +X end, tintable.",
+   "tris": 2848,
+   "tint": [
+    0.75,
+    0.3,
+    0.2
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Sink",
+   "size": [
+    0.58,
+    1.045,
+    0.46
+   ],
+   "kind": "furniture",
+   "notes": "Pedestal sink, taps at -Z.",
+   "tris": 638
+  },
+  {
+   "style": "Props",
+   "name": "Sofa",
+   "size": [
+    2.1,
+    0.93,
+    0.87
+   ],
+   "kind": "furniture",
+   "notes": "3-seat sofa 2.1 m, fabric tintable.",
+   "tris": 680,
+   "tint": [
+    0.35,
+    0.45,
+    0.6
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Sprinkler",
+   "size": [
+    0.057,
+    0.09,
+    0.06
+   ],
+   "kind": "utility",
+   "notes": "Ceiling sprinkler head; ORIGIN AT THE CEILING, hangs down 9 cm.",
+   "tris": 196
+  },
+  {
+   "style": "Props",
+   "name": "Statue",
+   "size": [
+    1.4,
+    4.09,
+    1.4
+   ],
+   "kind": "landmark",
+   "notes": "Original abstract bronze figure holding a ring, on a stone plinth, 4.3 m.",
+   "tris": 1180
+  },
+  {
+   "style": "Props",
+   "name": "Stool",
+   "size": [
+    0.39,
+    0.782,
+    0.4
+   ],
+   "kind": "furniture",
+   "notes": "Bar stool, seat tintable.",
+   "tris": 392,
+   "tint": [
+    0.65,
+    0.2,
+    0.18
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Stove",
+   "size": [
+    0.76,
+    1.15,
+    0.735
+   ],
+   "kind": "furniture",
+   "notes": "Kitchen range with oven, knobs on +Z.",
+   "tris": 1076
+  },
+  {
+   "style": "Props",
+   "name": "StreetLamp",
+   "size": [
+    0.32,
+    4.559,
+    1.477
+   ],
+   "kind": "light",
+   "notes": "Modern street lamp 4.5 m, arm toward +Z. Glow companion: StreetLamp_Glow.fbx (same pivot).",
+   "tris": 288
+  },
+  {
+   "style": "Props",
+   "name": "StreetSign",
+   "size": [
+    1.175,
+    3.14,
+    0.915
+   ],
+   "kind": "street",
+   "notes": "Pole with street blades, stop sign, parking sign.",
+   "tris": 428
+  },
+  {
+   "style": "Props",
+   "name": "TV",
+   "size": [
+    1.2,
+    0.98,
+    0.25
+   ],
+   "kind": "furniture",
+   "notes": "Flat TV 1.2 m on a stand.",
+   "tris": 156
+  },
+  {
+   "style": "Props",
+   "name": "Table",
+   "size": [
+    1.6,
+    0.76,
+    0.9
+   ],
+   "kind": "furniture",
+   "notes": "Rectangular table 1.6x0.9, turned legs.",
+   "tris": 520
+  },
+  {
+   "style": "Props",
+   "name": "TableRound",
+   "size": [
+    1.2,
+    0.765,
+    1.2
+   ],
+   "kind": "furniture",
+   "notes": "Round pedestal table d=1.2.",
+   "tris": 320
+  },
+  {
+   "style": "Props",
+   "name": "TentMilitary",
+   "size": [
+    5.44,
+    2.52,
+    4.9
+   ],
+   "kind": "structure",
+   "notes": "Hollow ridge tent 3.6x4.6, door on +Z, canvas tintable.",
+   "tris": 336,
+   "tint": [
+    0.42,
+    0.47,
+    0.3
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Toilet",
+   "size": [
+    0.45,
+    0.82,
+    0.691
+   ],
+   "kind": "furniture",
+   "notes": "Toilet, tank at -Z.",
+   "tris": 440
+  },
+  {
+   "style": "Props",
+   "name": "TrafficCone",
+   "size": [
+    0.38,
+    0.71,
+    0.38
+   ],
+   "kind": "street",
+   "notes": "Traffic cone.",
+   "tris": 230
+  },
+  {
+   "style": "Props",
+   "name": "TrashBin",
+   "size": [
+    0.62,
+    1.05,
+    0.612
+   ],
+   "kind": "street",
+   "notes": "Street bin, body tintable.",
+   "tris": 486,
+   "tint": [
+    0.25,
+    0.45,
+    0.3
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "UmbrellaTable",
+   "size": [
+    2.514,
+    2.456,
+    2.514
+   ],
+   "kind": "street",
+   "notes": "Round cafe table with parasol, tintable stripes.",
+   "tris": 586,
+   "tint": [
+    0.85,
+    0.55,
+    0.2
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "Van",
+   "size": [
+    2.15,
+    2.14,
+    4.94
+   ],
+   "kind": "vehicle",
+   "notes": "Panel van, front +Z, body tintable.",
+   "tris": 1680,
+   "tint": [
+    0.92,
+    0.92,
+    0.9
+   ]
+  },
+  {
+   "style": "Props",
+   "name": "VentGrill",
+   "size": [
+    0.6,
+    0.4,
+    0.046
+   ],
+   "kind": "utility",
+   "notes": "Wall vent grille 0.6x0.4, back on the origin plane.",
+   "tris": 208
+  },
+  {
+   "style": "Props",
+   "name": "WallLamp",
+   "size": [
+    0.22,
+    0.35,
+    0.305
+   ],
+   "kind": "light",
+   "notes": "Wall sconce: back plate on the origin plane, sticks out to +Z. Glow companion: WallLamp_Glow.fbx (same pivot).",
+   "tris": 166
+  },
+  {
+   "style": "Props",
+   "name": "Wardrobe",
+   "size": [
+    1.32,
+    2.2,
+    0.88
+   ],
+   "kind": "hiding",
+   "notes": "Hiding closet 1.2 wide x 2.2 high x 0.8 deep, double doors on +Z (closed, solid mesh).",
+   "tris": 528
+  },
+  {
+   "style": "Props",
+   "name": "Watchtower",
+   "size": [
+    4.25,
+    10.206,
+    4.415
+   ],
+   "kind": "structure",
+   "notes": "Wooden military watchtower 3.6x3.6, platform at 7 m, ladder on +Z, roof tintable.",
+   "tris": 3646,
+   "tint": [
+    0.45,
+    0.5,
+    0.35
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Awning",
+   "size": [
+    3.0,
+    1.02,
+    1.345
+   ],
+   "kind": "awning",
+   "notes": "3 m fabric awning on the wall centre line: sticks out to +Z, origin at its lowest point (valance), top mount at ~0.9 m. Fabric tintable.",
+   "tris": 1004,
+   "tint": [
+    0.8,
+    0.25,
+    0.22
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Balustrade",
+   "size": [
+    3.0,
+    1.0,
+    0.4
+   ],
+   "kind": "railing",
+   "notes": "3 m balustrade 1 m high, origin bottom centre.",
+   "tris": 1624,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Chimney",
+   "size": [
+    1.24,
+    2.5,
+    1.24
+   ],
+   "kind": "chimney",
+   "notes": "Roof chimney / stack, origin bottom centre.",
+   "tris": 968,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Column",
+   "size": [
+    0.6,
+    3.4,
+    0.6
+   ],
+   "kind": "column",
+   "notes": "Free-standing column, floor height.",
+   "tris": 412,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Corner",
+   "size": [
+    0.46,
+    3.4,
+    0.46
+   ],
+   "kind": "corner",
+   "notes": "Corner pillar centred on the origin, full floor height.",
+   "tris": 176,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Cornice",
+   "size": [
+    3.0,
+    0.42,
+    0.55
+   ],
+   "kind": "trim",
+   "notes": "Top trim: sits on top of a wall (origin on wall centre line), overhangs the front.",
+   "tris": 1012,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Drainpipe",
+   "size": [
+    0.3,
+    3.384,
+    0.381
+   ],
+   "kind": "climb",
+   "notes": "Climbable drainpipe, floor height, on the wall centre line (pipe sits in front of the wall face).",
+   "tris": 344
+  },
+  {
+   "style": "Stucco",
+   "name": "FloorBand",
+   "size": [
+    3.0,
+    0.24,
+    0.11
+   ],
+   "kind": "trim",
+   "notes": "Band between floors, vertically centred on the origin: place at the floor seam.",
+   "tris": 660,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Ladder",
+   "size": [
+    0.56,
+    3.956,
+    0.315
+   ],
+   "kind": "climb",
+   "notes": "Metal ladder floor height; origin bottom centre, brackets at -Z go against the wall.",
+   "tris": 468
+  },
+  {
+   "style": "Stucco",
+   "name": "Parapet",
+   "size": [
+    3.0,
+    1.0,
+    0.4
+   ],
+   "kind": "parapet",
+   "notes": "Flat-roof edge wall 3x1 m with coping, on the wall centre line.",
+   "tris": 1508,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Railing",
+   "size": [
+    3.04,
+    1.08,
+    0.18
+   ],
+   "kind": "railing",
+   "notes": "3 m railing, 1 m high, origin bottom centre.",
+   "tris": 956,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "RoofGable",
+   "size": [
+    1.14,
+    1.231,
+    1.276
+   ],
+   "kind": "roof",
+   "notes": "Unit gable roof 1x1x1 (ridge along x) + eaves; scale to fit. Roof tintable, gables fixed.",
+   "tris": 756,
+   "tint": [
+    0.78,
+    0.45,
+    0.32
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "RoofHip",
+   "size": [
+    1.216,
+    1.095,
+    1.21
+   ],
+   "kind": "roof",
+   "notes": "Unit hip roof 1x1x1 (ridge along x) + eaves; scale to fit.",
+   "tris": 492,
+   "tint": [
+    0.78,
+    0.45,
+    0.32
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "RoofSlab",
+   "size": [
+    3.0,
+    0.175,
+    3.0
+   ],
+   "kind": "roof",
+   "notes": "3x3 flat roof tile, origin bottom centre, lip on the edges.",
+   "tris": 440,
+   "tint": [
+    0.75,
+    0.74,
+    0.72
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Scaffold",
+   "size": [
+    3.06,
+    3.956,
+    1.26
+   ],
+   "kind": "climb",
+   "notes": "Scaffold bay 3 x 3.4 x 1.2 with deck on top and inner ladder; stackable.",
+   "tris": 1588
+  },
+  {
+   "style": "Stucco",
+   "name": "Stairs",
+   "size": [
+    1.43,
+    4.48,
+    5.43
+   ],
+   "kind": "stairs",
+   "notes": "Interior flight 1.4 m wide rising 3.4 m; bottom step at +Z (front), climbs toward -Z.",
+   "tris": 1452,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "StairsOutdoor",
+   "size": [
+    3.08,
+    2.123,
+    3.38
+   ],
+   "kind": "stairs",
+   "notes": "Outdoor steps 3 m wide rising 1.7 m; bottom at +Z, climbs toward -Z.",
+   "tris": 728,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "Wall",
+   "size": [
+    3.0,
+    3.4,
+    0.385
+   ],
+   "kind": "wall",
+   "notes": "3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 716,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "WallArch",
+   "size": [
+    3.0,
+    3.4,
+    0.46
+   ],
+   "kind": "wall",
+   "notes": "2.2 m wide open archway / wide opening. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1760,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "WallDoor",
+   "size": [
+    3.0,
+    3.4,
+    0.83
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 door hole (no leaf), step in front. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 2024,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "WallDoorDouble",
+   "size": [
+    3.0,
+    3.4,
+    0.83
+   ],
+   "kind": "wall",
+   "notes": "2.4x2.4 double door hole (no leaf). 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1568,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "WallHalf",
+   "size": [
+    1.5,
+    3.4,
+    0.385
+   ],
+   "kind": "wall",
+   "notes": "1.5 m filler wall. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 452,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "WallWindow",
+   "size": [
+    3.0,
+    3.4,
+    0.51
+   ],
+   "kind": "wall",
+   "notes": "1.2x1.5 window hole at 0.9 m, no glass. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 3032,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "WallWindowBalcony",
+   "size": [
+    3.0,
+    3.944,
+    1.25
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 french opening at floor level + 2.4x0.9 balcony (floor at y=0) with railing, brackets hang below 0. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 2792,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Stucco",
+   "name": "WallWindowTall",
+   "size": [
+    3.0,
+    3.4,
+    0.88
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 tall window hole at 0.5 m. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 3256,
+   "tint": [
+    0.95,
+    0.88,
+    0.76
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Awning",
+   "size": [
+    3.0,
+    1.02,
+    1.345
+   ],
+   "kind": "awning",
+   "notes": "3 m fabric awning on the wall centre line: sticks out to +Z, origin at its lowest point (valance), top mount at ~0.9 m. Fabric tintable.",
+   "tris": 1004,
+   "tint": [
+    0.8,
+    0.25,
+    0.22
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Balustrade",
+   "size": [
+    3.0,
+    1.0,
+    0.4
+   ],
+   "kind": "railing",
+   "notes": "3 m balustrade 1 m high, origin bottom centre.",
+   "tris": 1624,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Chimney",
+   "size": [
+    1.0,
+    2.75,
+    0.7
+   ],
+   "kind": "chimney",
+   "notes": "Roof chimney / stack, origin bottom centre.",
+   "tris": 2084,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Column",
+   "size": [
+    0.46,
+    3.4,
+    0.46
+   ],
+   "kind": "column",
+   "notes": "Free-standing column, floor height.",
+   "tris": 328,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Corner",
+   "size": [
+    0.44,
+    3.4,
+    0.44
+   ],
+   "kind": "corner",
+   "notes": "Corner pillar centred on the origin, full floor height.",
+   "tris": 264,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Cornice",
+   "size": [
+    3.0,
+    0.48,
+    0.939
+   ],
+   "kind": "trim",
+   "notes": "Top trim: sits on top of a wall (origin on wall centre line), overhangs the front.",
+   "tris": 288,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Drainpipe",
+   "size": [
+    0.3,
+    3.384,
+    0.381
+   ],
+   "kind": "climb",
+   "notes": "Climbable drainpipe, floor height, on the wall centre line (pipe sits in front of the wall face).",
+   "tris": 344
+  },
+  {
+   "style": "Suburb",
+   "name": "FloorBand",
+   "size": [
+    3.0,
+    0.26,
+    0.1
+   ],
+   "kind": "trim",
+   "notes": "Band between floors, vertically centred on the origin: place at the floor seam.",
+   "tris": 88,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Ladder",
+   "size": [
+    0.56,
+    3.956,
+    0.315
+   ],
+   "kind": "climb",
+   "notes": "Metal ladder floor height; origin bottom centre, brackets at -Z go against the wall.",
+   "tris": 468
+  },
+  {
+   "style": "Suburb",
+   "name": "Parapet",
+   "size": [
+    3.0,
+    1.003,
+    0.45
+   ],
+   "kind": "parapet",
+   "notes": "Flat-roof edge wall 3x1 m with coping, on the wall centre line.",
+   "tris": 364,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Railing",
+   "size": [
+    3.03,
+    1.06,
+    0.15
+   ],
+   "kind": "railing",
+   "notes": "3 m railing, 1 m high, origin bottom centre.",
+   "tris": 716,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "RoofGable",
+   "size": [
+    1.14,
+    1.231,
+    1.276
+   ],
+   "kind": "roof",
+   "notes": "Unit gable roof 1x1x1 (ridge along x) + eaves; scale to fit. Roof tintable, gables fixed.",
+   "tris": 756,
+   "tint": [
+    0.38,
+    0.38,
+    0.42
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "RoofHip",
+   "size": [
+    1.216,
+    1.095,
+    1.21
+   ],
+   "kind": "roof",
+   "notes": "Unit hip roof 1x1x1 (ridge along x) + eaves; scale to fit.",
+   "tris": 492,
+   "tint": [
+    0.38,
+    0.38,
+    0.42
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "RoofSlab",
+   "size": [
+    3.12,
+    0.26,
+    3.12
+   ],
+   "kind": "roof",
+   "notes": "3x3 flat roof tile, origin bottom centre, lip on the edges.",
+   "tris": 264,
+   "tint": [
+    0.75,
+    0.74,
+    0.72
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Scaffold",
+   "size": [
+    3.06,
+    3.956,
+    1.26
+   ],
+   "kind": "climb",
+   "notes": "Scaffold bay 3 x 3.4 x 1.2 with deck on top and inner ladder; stackable.",
+   "tris": 1588
+  },
+  {
+   "style": "Suburb",
+   "name": "Stairs",
+   "size": [
+    1.43,
+    4.48,
+    5.43
+   ],
+   "kind": "stairs",
+   "notes": "Interior flight 1.4 m wide rising 3.4 m; bottom step at +Z (front), climbs toward -Z.",
+   "tris": 1452,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "StairsOutdoor",
+   "size": [
+    3.08,
+    2.123,
+    3.38
+   ],
+   "kind": "stairs",
+   "notes": "Outdoor steps 3 m wide rising 1.7 m; bottom at +Z, climbs toward -Z.",
+   "tris": 728,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "Wall",
+   "size": [
+    3.0,
+    3.401,
+    0.385
+   ],
+   "kind": "wall",
+   "notes": "3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 848,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallArch",
+   "size": [
+    3.0,
+    3.401,
+    0.45
+   ],
+   "kind": "wall",
+   "notes": "2.2 m wide open archway / wide opening. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1744,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallBrick",
+   "size": [
+    3.0,
+    3.4,
+    0.385
+   ],
+   "kind": "wall",
+   "notes": "Plain brick wall. Brick variant (bricks tintable, mortar fixed). 3x3.4 module, origin bottom centre of the wall centre line.",
+   "tris": 1780,
+   "tint": [
+    0.78,
+    0.38,
+    0.3
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallBrickDoor",
+   "size": [
+    3.0,
+    3.4,
+    0.93
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 door hole. Brick variant (bricks tintable, mortar fixed). 3x3.4 module, origin bottom centre of the wall centre line.",
+   "tris": 1972,
+   "tint": [
+    0.78,
+    0.38,
+    0.3
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallBrickHalf",
+   "size": [
+    1.5,
+    3.4,
+    0.385
+   ],
+   "kind": "wall",
+   "notes": "1.5 m filler. Brick variant (bricks tintable, mortar fixed). 3x3.4 module, origin bottom centre of the wall centre line.",
+   "tris": 1060,
+   "tint": [
+    0.78,
+    0.38,
+    0.3
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallBrickWindow",
+   "size": [
+    3.0,
+    3.4,
+    0.51
+   ],
+   "kind": "wall",
+   "notes": "1.2x1.5 window hole at 0.9 m. Brick variant (bricks tintable, mortar fixed). 3x3.4 module, origin bottom centre of the wall centre line.",
+   "tris": 2200,
+   "tint": [
+    0.78,
+    0.38,
+    0.3
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallDoor",
+   "size": [
+    3.0,
+    3.401,
+    0.93
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 door hole (no leaf), step in front. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1904,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallDoorDouble",
+   "size": [
+    3.0,
+    3.401,
+    0.93
+   ],
+   "kind": "wall",
+   "notes": "2.4x2.4 double door hole (no leaf). 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1876,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallHalf",
+   "size": [
+    1.5,
+    3.401,
+    0.385
+   ],
+   "kind": "wall",
+   "notes": "1.5 m filler wall. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 848,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallWindow",
+   "size": [
+    3.0,
+    3.401,
+    0.51
+   ],
+   "kind": "wall",
+   "notes": "1.2x1.5 window hole at 0.9 m, no glass. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 2524,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallWindowBalcony",
+   "size": [
+    3.0,
+    4.044,
+    1.25
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 french opening at floor level + 2.4x0.9 balcony (floor at y=0) with railing, brackets hang below 0. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 3356,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Suburb",
+   "name": "WallWindowTall",
+   "size": [
+    3.0,
+    3.401,
+    0.51
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 tall window hole at 0.5 m. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 3076,
+   "tint": [
+    0.62,
+    0.74,
+    0.82
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Awning",
+   "size": [
+    3.0,
+    1.02,
+    1.345
+   ],
+   "kind": "awning",
+   "notes": "3 m fabric awning on the wall centre line: sticks out to +Z, origin at its lowest point (valance), top mount at ~0.9 m. Fabric tintable.",
+   "tris": 1004,
+   "tint": [
+    0.8,
+    0.25,
+    0.22
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Balustrade",
+   "size": [
+    3.0,
+    1.0,
+    0.4
+   ],
+   "kind": "railing",
+   "notes": "3 m balustrade 1 m high, origin bottom centre.",
+   "tris": 1624,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Chimney",
+   "size": [
+    1.16,
+    2.61,
+    0.86
+   ],
+   "kind": "chimney",
+   "notes": "Roof chimney / stack, origin bottom centre.",
+   "tris": 1276,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Column",
+   "size": [
+    1.156,
+    3.4,
+    0.52
+   ],
+   "kind": "column",
+   "notes": "Free-standing column, floor height.",
+   "tris": 236,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Corner",
+   "size": [
+    0.56,
+    3.402,
+    0.56
+   ],
+   "kind": "corner",
+   "notes": "Corner pillar centred on the origin, full floor height.",
+   "tris": 824,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Cornice",
+   "size": [
+    3.0,
+    0.468,
+    0.654
+   ],
+   "kind": "trim",
+   "notes": "Top trim: sits on top of a wall (origin on wall centre line), overhangs the front.",
+   "tris": 1476,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Drainpipe",
+   "size": [
+    0.3,
+    3.384,
+    0.381
+   ],
+   "kind": "climb",
+   "notes": "Climbable drainpipe, floor height, on the wall centre line (pipe sits in front of the wall face).",
+   "tris": 344
+  },
+  {
+   "style": "Timber",
+   "name": "FloorBand",
+   "size": [
+    3.0,
+    0.234,
+    0.295
+   ],
+   "kind": "trim",
+   "notes": "Band between floors, vertically centred on the origin: place at the floor seam.",
+   "tris": 540,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Ladder",
+   "size": [
+    0.56,
+    3.956,
+    0.315
+   ],
+   "kind": "climb",
+   "notes": "Metal ladder floor height; origin bottom centre, brackets at -Z go against the wall.",
+   "tris": 468
+  },
+  {
+   "style": "Timber",
+   "name": "Parapet",
+   "size": [
+    3.0,
+    1.0,
+    0.6
+   ],
+   "kind": "parapet",
+   "notes": "Flat-roof edge wall 3x1 m with coping, on the wall centre line.",
+   "tris": 472,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Railing",
+   "size": [
+    3.0,
+    1.06,
+    0.14
+   ],
+   "kind": "railing",
+   "notes": "3 m railing, 1 m high, origin bottom centre.",
+   "tris": 624,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "RoofGable",
+   "size": [
+    1.14,
+    1.231,
+    1.276
+   ],
+   "kind": "roof",
+   "notes": "Unit gable roof 1x1x1 (ridge along x) + eaves; scale to fit. Roof tintable, gables fixed.",
+   "tris": 756,
+   "tint": [
+    0.42,
+    0.36,
+    0.33
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "RoofHip",
+   "size": [
+    1.216,
+    1.095,
+    1.21
+   ],
+   "kind": "roof",
+   "notes": "Unit hip roof 1x1x1 (ridge along x) + eaves; scale to fit.",
+   "tris": 492,
+   "tint": [
+    0.42,
+    0.36,
+    0.33
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "RoofSlab",
+   "size": [
+    3.0,
+    0.3,
+    3.14
+   ],
+   "kind": "roof",
+   "notes": "3x3 flat roof tile, origin bottom centre, lip on the edges.",
+   "tris": 572,
+   "tint": [
+    0.75,
+    0.74,
+    0.72
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Scaffold",
+   "size": [
+    3.06,
+    3.956,
+    1.26
+   ],
+   "kind": "climb",
+   "notes": "Scaffold bay 3 x 3.4 x 1.2 with deck on top and inner ladder; stackable.",
+   "tris": 1588
+  },
+  {
+   "style": "Timber",
+   "name": "Stairs",
+   "size": [
+    1.43,
+    4.48,
+    5.43
+   ],
+   "kind": "stairs",
+   "notes": "Interior flight 1.4 m wide rising 3.4 m; bottom step at +Z (front), climbs toward -Z.",
+   "tris": 1452,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "StairsOutdoor",
+   "size": [
+    3.0,
+    2.7,
+    3.29
+   ],
+   "kind": "stairs",
+   "notes": "Outdoor steps 3 m wide rising 1.7 m; bottom at +Z, climbs toward -Z.",
+   "tris": 1712,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "Wall",
+   "size": [
+    3.0,
+    3.4,
+    0.42
+   ],
+   "kind": "wall",
+   "notes": "3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1452,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "WallArch",
+   "size": [
+    3.0,
+    3.4,
+    0.48
+   ],
+   "kind": "wall",
+   "notes": "2.2 m wide open archway / wide opening. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 2024,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "WallDoor",
+   "size": [
+    3.0,
+    3.4,
+    1.226
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 door hole (no leaf), step in front. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 2492,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "WallDoorDouble",
+   "size": [
+    3.0,
+    3.4,
+    0.88
+   ],
+   "kind": "wall",
+   "notes": "2.4x2.4 double door hole (no leaf). 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1964,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "WallHalf",
+   "size": [
+    1.5,
+    3.4,
+    0.42
+   ],
+   "kind": "wall",
+   "notes": "1.5 m filler wall. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 1144,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "WallWindow",
+   "size": [
+    3.0,
+    3.4,
+    0.76
+   ],
+   "kind": "wall",
+   "notes": "1.2x1.5 window hole at 0.9 m, no glass. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 3724,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "WallWindowBalcony",
+   "size": [
+    3.0,
+    4.323,
+    1.24
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 french opening at floor level + 2.4x0.9 balcony (floor at y=0) with railing, brackets hang below 0. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 3472,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  },
+  {
+   "style": "Timber",
+   "name": "WallWindowTall",
+   "size": [
+    3.0,
+    3.4,
+    0.61
+   ],
+   "kind": "wall",
+   "notes": "1.2x2.4 tall window hole at 0.5 m. 3x3.4 wall module; origin bottom centre of the wall centre line; exterior +Z.",
+   "tris": 3012,
+   "tint": [
+    0.62,
+    0.42,
+    0.27
+   ]
+  }
+ ]
+}

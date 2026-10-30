@@ -1,0 +1,415 @@
+{
+  "units": "metres; size is the mesh bounding box in Unity axes [x, y, z]",
+  "front": "every part faces Blender +Y (Unity forward once the FBX root is turned 180 deg, as for the props)",
+  "colour": "vertex colour 'Col' (bytes = authored values): rgb; alpha = tint mask, 1 = tinted by the game (albedo = rgb * lerp(1, tint, alpha)), 0 = fixed detail colour. Skin on Head/Hand_Mitten is tintable.",
+  "sockets": {
+    "torso": "Torso pivot at y 0.78 (mesh y -0.55..+0.40 around it, top stays under the head)",
+    "head": "Head pivot at y 1.42 (no eyeballs: the game keeps its eye spheres at (+-0.1, 0.07, 0.2))",
+    "hat/hair": "origin = head top = Head pivot + (0, 0.24, 0)",
+    "facial/acc": "origin = Head pivot (head centre)",
+    "hand": "origin = palm centre, fingers forward, thumb up, symmetric: same mesh for HandL/HandR",
+    "foot": "origin = bottom-centre of the sole (on the ground), toe forward"
+  },
+  "notes": [
+    "Hair_Bald not made: a bald Goob is simply a Head without hair.",
+    "Hand_Glove is fully fixed colour (alpha 0)."
+  ],
+  "parts": [
+    {
+      "name": "Torso_Suit",
+      "kind": "torso",
+      "pivot": "torso pivot (game Torso y 0.78); mesh spans -0.55..+0.40",
+      "size": [
+        0.728,
+        0.94,
+        0.611
+      ],
+      "triangles": 2148
+    },
+    {
+      "name": "Torso_Guard",
+      "kind": "torso",
+      "pivot": "torso pivot (game Torso y 0.78); mesh spans -0.55..+0.40",
+      "size": [
+        0.764,
+        0.951,
+        0.662
+      ],
+      "triangles": 2734
+    },
+    {
+      "name": "Torso_Military",
+      "kind": "torso",
+      "pivot": "torso pivot (game Torso y 0.78); mesh spans -0.55..+0.40",
+      "size": [
+        0.828,
+        0.978,
+        0.676
+      ],
+      "triangles": 3248
+    },
+    {
+      "name": "Torso_Casual",
+      "kind": "torso",
+      "pivot": "torso pivot (game Torso y 0.78); mesh spans -0.55..+0.40",
+      "size": [
+        0.748,
+        0.95,
+        0.623
+      ],
+      "triangles": 2286
+    },
+    {
+      "name": "Torso_Worker",
+      "kind": "torso",
+      "pivot": "torso pivot (game Torso y 0.78); mesh spans -0.55..+0.40",
+      "size": [
+        0.807,
+        0.95,
+        0.619
+      ],
+      "triangles": 2786
+    },
+    {
+      "name": "Torso_Fancy",
+      "kind": "torso",
+      "pivot": "torso pivot (game Torso y 0.78); mesh spans -0.55..+0.40",
+      "size": [
+        0.794,
+        0.95,
+        0.665
+      ],
+      "triangles": 2990
+    },
+    {
+      "name": "Torso_Biker",
+      "kind": "torso",
+      "pivot": "torso pivot (game Torso y 0.78); mesh spans -0.55..+0.40",
+      "size": [
+        0.753,
+        0.95,
+        0.627
+      ],
+      "triangles": 2828
+    },
+    {
+      "name": "Torso_Chef",
+      "kind": "torso",
+      "pivot": "torso pivot (game Torso y 0.78); mesh spans -0.55..+0.40",
+      "size": [
+        0.73,
+        0.955,
+        0.63
+      ],
+      "triangles": 2496
+    },
+    {
+      "name": "Torso_Doctor",
+      "kind": "torso",
+      "pivot": "torso pivot (game Torso y 0.78); mesh spans -0.55..+0.40",
+      "size": [
+        0.74,
+        0.938,
+        0.608
+      ],
+      "triangles": 2284
+    },
+    {
+      "name": "Head_A",
+      "kind": "head",
+      "pivot": "head centre (game Head y 1.42)",
+      "size": [
+        0.527,
+        0.48,
+        0.531
+      ],
+      "triangles": 1280
+    },
+    {
+      "name": "Head_B",
+      "kind": "head",
+      "pivot": "head centre (game Head y 1.42)",
+      "size": [
+        0.525,
+        0.464,
+        0.547
+      ],
+      "triangles": 1402
+    },
+    {
+      "name": "Head_C",
+      "kind": "head",
+      "pivot": "head centre (game Head y 1.42)",
+      "size": [
+        0.544,
+        0.49,
+        0.532
+      ],
+      "triangles": 1240
+    },
+    {
+      "name": "Hair_Short",
+      "kind": "hair",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.544,
+        0.404,
+        0.469
+      ],
+      "triangles": 600
+    },
+    {
+      "name": "Hair_Bun",
+      "kind": "hair",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.522,
+        0.416,
+        0.449
+      ],
+      "triangles": 1008
+    },
+    {
+      "name": "Hair_Long",
+      "kind": "hair",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.588,
+        0.575,
+        0.47
+      ],
+      "triangles": 1016
+    },
+    {
+      "name": "Hair_Mohawk",
+      "kind": "hair",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.512,
+        0.5,
+        0.564
+      ],
+      "triangles": 784
+    },
+    {
+      "name": "Beard_Full",
+      "kind": "facial",
+      "pivot": "head centre (same pivot as the Head)",
+      "size": [
+        0.538,
+        0.301,
+        0.436
+      ],
+      "triangles": 600
+    },
+    {
+      "name": "Mustache",
+      "kind": "facial",
+      "pivot": "head centre (same pivot as the Head)",
+      "size": [
+        0.223,
+        0.05,
+        0.065
+      ],
+      "triangles": 240
+    },
+    {
+      "name": "Hat_Fedora",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.66,
+        0.235,
+        0.607
+      ],
+      "triangles": 1036
+    },
+    {
+      "name": "Hat_Cap",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.554,
+        0.275,
+        0.591
+      ],
+      "triangles": 836
+    },
+    {
+      "name": "Hat_Beret",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.527,
+        0.175,
+        0.513
+      ],
+      "triangles": 356
+    },
+    {
+      "name": "Hat_Crown",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.408,
+        0.232,
+        0.42
+      ],
+      "triangles": 1072
+    },
+    {
+      "name": "Hat_Cowboy",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.8,
+        0.264,
+        0.72
+      ],
+      "triangles": 1056
+    },
+    {
+      "name": "Hat_Turban",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.5,
+        0.34,
+        0.507
+      ],
+      "triangles": 1360
+    },
+    {
+      "name": "Hat_Beanie",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.547,
+        0.428,
+        0.464
+      ],
+      "triangles": 700
+    },
+    {
+      "name": "Hat_TopHat",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.53,
+        0.347,
+        0.493
+      ],
+      "triangles": 940
+    },
+    {
+      "name": "Hat_Helmet",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.602,
+        0.423,
+        0.526
+      ],
+      "triangles": 1068
+    },
+    {
+      "name": "Hat_Chef",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.514,
+        0.403,
+        0.482
+      ],
+      "triangles": 550
+    },
+    {
+      "name": "Hat_Headset",
+      "kind": "hat",
+      "pivot": "head top-centre (head centre + 0.24 m up); modelled around a 0.5 m head",
+      "size": [
+        0.646,
+        0.432,
+        0.361
+      ],
+      "triangles": 864
+    },
+    {
+      "name": "Hand_Mitten",
+      "kind": "hand",
+      "pivot": "palm centre; fingers +forward, thumb up; symmetric (both hands)",
+      "size": [
+        0.09,
+        0.166,
+        0.17
+      ],
+      "triangles": 504
+    },
+    {
+      "name": "Hand_Glove",
+      "kind": "hand",
+      "pivot": "palm centre; fingers +forward, thumb up; symmetric (both hands)",
+      "size": [
+        0.117,
+        0.178,
+        0.196
+      ],
+      "triangles": 704
+    },
+    {
+      "name": "Foot_Shoe",
+      "kind": "foot",
+      "pivot": "bottom-centre of the sole; toe +forward",
+      "size": [
+        0.194,
+        0.128,
+        0.274
+      ],
+      "triangles": 600
+    },
+    {
+      "name": "Foot_Boot",
+      "kind": "foot",
+      "pivot": "bottom-centre of the sole; toe +forward",
+      "size": [
+        0.2,
+        0.192,
+        0.282
+      ],
+      "triangles": 944
+    },
+    {
+      "name": "Foot_Sneaker",
+      "kind": "foot",
+      "pivot": "bottom-centre of the sole; toe +forward",
+      "size": [
+        0.2,
+        0.134,
+        0.283
+      ],
+      "triangles": 652
+    },
+    {
+      "name": "Acc_Sunglasses",
+      "kind": "acc",
+      "pivot": "head centre (same pivot as the Head)",
+      "size": [
+        0.525,
+        0.104,
+        0.344
+      ],
+      "triangles": 458
+    },
+    {
+      "name": "Acc_Earpiece",
+      "kind": "acc",
+      "pivot": "head centre (same pivot as the Head); on the +X (Blender) ear",
+      "size": [
+        0.072,
+        0.312,
+        0.132
+      ],
+      "triangles": 648
+    }
+  ]
+}

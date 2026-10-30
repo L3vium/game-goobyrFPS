@@ -22,6 +22,49 @@ MonoBehaviour:
   gain:
     m_OverrideState: 1
     m_Value: {x: 1, y: 1, z: 1, w: 0}
+--- !u!114 &-8595046274722511248
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ecfd7ae55165f484d8f480ba3dbd1415, type: 3}
+  m_Name: GoobyrAtmosphere
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.Rendering.GoobyrAtmosphere
+  active: 1
+  density:
+    m_OverrideState: 1
+    m_Value: 0
+  baseHeight:
+    m_OverrideState: 1
+    m_Value: 0
+  falloff:
+    m_OverrideState: 1
+    m_Value: 18
+  ambientColor:
+    m_OverrideState: 1
+    m_Value: {r: 0.55, g: 0.65, b: 0.75, a: 1}
+  sunScattering:
+    m_OverrideState: 1
+    m_Value: 1.2
+  anisotropy:
+    m_OverrideState: 1
+    m_Value: 0.6
+  noiseStrength:
+    m_OverrideState: 1
+    m_Value: 0.6
+  noiseScale:
+    m_OverrideState: 1
+    m_Value: 0.03
+  wind:
+    m_OverrideState: 1
+    m_Value: {x: 1.2, y: 0.1, z: 0.6}
+  maxDistance:
+    m_OverrideState: 1
+    m_Value: 220
 --- !u!114 &-8270506406425502121
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -468,6 +511,7 @@ MonoBehaviour:
   - {fileID: -6288072647309666549}
   - {fileID: 7518938298396184218}
   - {fileID: -1410297666881709256}
+  - {fileID: -8595046274722511248}
 --- !u!114 &853819529557874667
 MonoBehaviour:
   m_ObjectHideFlags: 3

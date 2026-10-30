@@ -95,6 +95,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         public float GroundAt(float pX, float pZ)
         {
+            if (Land != null) return Land.SampleHeight(new Vector3(pX, 0f, pZ)) + Land.transform.position.y;
+            if (_height == null) return 0f;
             Vector2Int c = CellOf(pX, pZ);
             if (c.x < 0 || c.y < 0 || c.x >= _w || c.y >= _h) return 0f;
             return _height[c.x, c.y];
@@ -1330,7 +1332,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         public void Finish()
         {
-            BuildGround();
+            if (Land != null) FinishLand();
+            else BuildGround();
             Physics.SyncTransforms();
             GenerateCover();
             Light();

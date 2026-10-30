@@ -20,7 +20,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     {
         private enum Screen { Main, Join, Lobby, Settings }
 
-        private const string VERSION = "0.2.0";
+        private const string VERSION = "0.3.0";
 
         private RectTransform _root;
         private GameObject _main, _join, _lobby, _settings;
@@ -55,7 +55,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             BuildLobby();
             BuildSettings();
             _status = UIFactory.Title(_root, "Status", "", 20, UIFactory.Muted, TextAlignmentOptions.Right, new Vector2(1, 0), new Vector2(-560, 24), new Vector2(1000, 40), false, 3f);
-            UIFactory.Title(_root, "Version", "GOOBYR FPS  ·  " + VERSION, 18, new Color(1, 1, 1, 0.35f), TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(260, 24), new Vector2(440, 40), false, 4f);
+            UIFactory.Title(_root, "Version", VERSION, 14, new Color(1, 1, 1, 0.3f), TextAlignmentOptions.Right, new Vector2(1, 1), new Vector2(-90, -12), new Vector2(200, 24), false, 3f);
 
             Show(NetworkManagerListening() ? Screen.Lobby : Screen.Main);
             NetSession.OnStatus += HandleStatus;
@@ -80,6 +80,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _settings.SetActive(pScreen == Screen.Settings);
             GameObject lShown = pScreen switch { Screen.Main => _main, Screen.Join => _join, Screen.Lobby => _lobby, _ => _settings };
             UIFactory.FadeIn(lShown, 0.3f, new Vector2(-24, 0));
+            GameObject lFirst = pScreen == Screen.Main && _firstTile != null ? _firstTile : lShown.GetComponentInChildren<Selectable>()?.gameObject;
+            if (UnityEngine.EventSystems.EventSystem.current != null) UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(lFirst);
         }
 
         private static Sprite GradientSprite()
@@ -108,25 +110,63 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             _main = UIFactory.Stretch(_root, "Main").gameObject;
             Transform p = _main.transform;
-            Vector2 L = new Vector2(0, 0.5f);
-            UIFactory.Title(p, "Title", "GOOBYR FPS", 128, UIFactory.Paper, TextAlignmentOptions.Left, L, new Vector2(170, 300), new Vector2(1100, 150), true, 10f);
-            UIFactory.Rule(p, L, new Vector2(170, 222), 220, false, UIFactory.Accent, 4f);
-            UIFactory.Title(p, "Subtitle", "CONTRACTS  ·  UP TO 8 PLAYERS  ·  EVERYONE IS A TARGET", 22, UIFactory.Muted, TextAlignmentOptions.Left, L, new Vector2(170, 190), new Vector2(1100, 36), false, 6f);
 
-            Header(p, "AGENT", L, new Vector2(170, 120), 520);
-            _name = UIFactory.Input(p, "YOUR NAME", L, new Vector2(170, 76), new Vector2(520, 52));
+            // The tab bar across the top, the active tab in red.
+            RectTransform lBar = UIFactory.Rect(p, "TabBar", new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), new Vector2(0, -64), new Vector2(0, 58));
+            lBar.gameObject.AddComponent<Image>().color = new Color(0.04f, 0.04f, 0.05f, 0.72f);
+            string[] lTabs = { "PLAY", "OPTIONS", "QUIT" };
+            for (int i = 0; i < lTabs.Length; i++)
+            {
+                int lIndex = i;
+                Button lTab = UIFactory.Button(lBar, lTabs[i], new Vector2(0, 0.5f), new Vector2(90 + i * 300, 0), new Vector2(290, 58), i == 0 ? UIFactory.Accent : UIFactory.Accent2, () =>
+                {
+                    if (lIndex == 1) Show(Screen.Settings);
+                    else if (lIndex == 2) Application.Quit();
+                }, 24);
+                ((RectTransform)lTab.transform).pivot = new Vector2(0, 0.5f);
+            }
+
+            // The tiles: what to play, each over a picture of the game.
+            Header(p, "CONTRACTS", new Vector2(0, 0.5f), new Vector2(90, 250), 600);
+            _firstTile = Tile(p, "Tile_Online", "PUBLIC ROOM", "HOST ONLINE", new Vector2(90, 20), () => { NetSession.Instance.HostSteam(false); Show(Screen.Lobby); });
+            Tile(p, "Tile_Friends", "FRIENDS ONLY", "HOST FOR FRIENDS", new Vector2(400, 20), () => { NetSession.Instance.HostSteam(true); Show(Screen.Lobby); });
+            Tile(p, "Tile_Join", "ROOM CODE OR IP", "JOIN", new Vector2(710, 20), () => Show(Screen.Join));
+            Tile(p, "Tile_Solo", "AGAINST THE AI", "SOLO", new Vector2(1020, 20), () => { NetSession.Instance.HostLocal(); Show(Screen.Lobby); });
+
+            // The big title bottom left, the kicker above it.
+            UIFactory.Title(p, "Kicker", "STEALTH CONTRACTS  ·  UP TO 8 AGENTS", 20, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(90, 214), new Vector2(900, 30), false, 5f);
+            UIFactory.Title(p, "Title", "GOOBYR FPS", 112, UIFactory.Paper, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(84, 96), new Vector2(1100, 130), true, 6f);
+
+            // Footer: the controls on the left, the agent's name on the right.
+            UIFactory.Rule(p, new Vector2(0.5f, 0), new Vector2(0, 74), 1740, false, new Color(1, 1, 1, 0.12f), 1f);
+            UIFactory.Title(p, "Hints", "ENTER / A  SELECT      ESC / B  BACK", 18, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(90, 28), new Vector2(700, 30), false, 3f);
+            UIFactory.Title(p, "AgentLabel", "AGENT", 16, UIFactory.Accent, TextAlignmentOptions.Right, new Vector2(1, 0), new Vector2(-470, 30), new Vector2(200, 30), true, 4f);
+            _name = UIFactory.Input(p, "YOUR NAME", new Vector2(1, 0), new Vector2(-90, 34), new Vector2(360, 44));
+            ((RectTransform)_name.transform).pivot = new Vector2(1, 0.5f);
             _name.text = PlayerIdentity.LocalName;
             _name.onEndEdit.AddListener(v => PlayerIdentity.LocalName = v);
+        }
 
-            Header(p, "PLAY", L, new Vector2(170, 6), 520);
-            float y = -40;
-            void Item(string pLabel, System.Action pAction) { UIFactory.Button(p, pLabel, L, new Vector2(170, y), new Vector2(520, 56), UIFactory.Accent2, pAction, 32); y -= 58; }
-            Item("HOST ONLINE", () => { NetSession.Instance.HostSteam(false); Show(Screen.Lobby); });
-            Item("HOST FOR FRIENDS", () => { NetSession.Instance.HostSteam(true); Show(Screen.Lobby); });
-            Item("JOIN A CONTRACT", () => Show(Screen.Join));
-            Item("SOLO AGAINST THE AI", () => { NetSession.Instance.HostLocal(); Show(Screen.Lobby); });
-            Item("OPTIONS", () => Show(Screen.Settings));
-            Item("QUIT", Application.Quit);
+        private GameObject _firstTile;
+
+        /// <summary>A menu tile: a picture, a small kicker and a big label on a dark strip that turns red when chosen.</summary>
+        private GameObject Tile(Transform pParent, string pImage, string pKicker, string pLabel, Vector2 pPosition, System.Action pAction)
+        {
+            Button lButton = UIFactory.Button(pParent, "", new Vector2(0, 0.5f), pPosition, new Vector2(296, 360), UIFactory.Accent2, pAction, 1);
+            RectTransform lRoot = (RectTransform)lButton.transform;
+            lRoot.pivot = new Vector2(0, 0.5f);
+            lRoot.name = "Tile_" + pLabel;
+            RawImage lPicture = UIFactory.Stretch(lRoot, "Picture").gameObject.AddComponent<RawImage>();
+            lPicture.texture = Resources.Load<Texture2D>("UI/Tiles/" + pImage);
+            lPicture.uvRect = new Rect(0.22f, 0.05f, 0.56f, 0.9f);
+            lPicture.color = new Color(0.82f, 0.82f, 0.82f);
+            lPicture.raycastTarget = false;
+            Image lStrip = UIFactory.Panel(lRoot, "Strip", new Color(0.06f, 0.06f, 0.07f, 0.9f), new Vector2(0.5f, 0), new Vector2(0, 0), new Vector2(296, 86));
+            lStrip.rectTransform.pivot = new Vector2(0.5f, 0);
+            UIFactory.Title(lStrip.transform, "Kicker", pKicker, 14, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(18, -12), new Vector2(270, 22), false, 3f);
+            UIFactory.Title(lStrip.transform, "Label", pLabel, 30, UIFactory.Paper, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(16, 16), new Vector2(276, 40), true, 1f);
+            lRoot.gameObject.AddComponent<TileFx>().Init(lStrip, lPicture);
+            return lRoot.gameObject;
         }
 
         private void BuildJoin()
@@ -284,6 +324,34 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _startButton.interactable = lAllReady;
             TextMeshProUGUI lReadyLabel = _readyButton.GetComponentInChildren<TextMeshProUGUI>();
             if (LobbyPlayer.Local != null) lReadyLabel.text = LobbyPlayer.Local.Ready.Value ? "STAND DOWN" : "READY";
+        }
+    }
+
+    /// <summary>A tile's highlight: the strip turns red, the picture brightens and the tile lifts.</summary>
+    public class TileFx : MonoBehaviour, UnityEngine.EventSystems.IPointerEnterHandler, UnityEngine.EventSystems.IPointerExitHandler, UnityEngine.EventSystems.ISelectHandler, UnityEngine.EventSystems.IDeselectHandler
+    {
+        private Image _strip;
+        private RawImage _picture;
+        private bool _on;
+        private float _t;
+
+        public void Init(Image pStrip, RawImage pPicture)
+        {
+            _strip = pStrip;
+            _picture = pPicture;
+        }
+
+        public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData pData) => _on = true;
+        public void OnPointerExit(UnityEngine.EventSystems.PointerEventData pData) => _on = false;
+        public void OnSelect(UnityEngine.EventSystems.BaseEventData pData) => _on = true;
+        public void OnDeselect(UnityEngine.EventSystems.BaseEventData pData) => _on = false;
+
+        private void Update()
+        {
+            _t = Mathf.MoveTowards(_t, _on ? 1f : 0f, Time.unscaledDeltaTime * 8f);
+            _strip.color = Color.Lerp(new Color(0.06f, 0.06f, 0.07f, 0.9f), new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, 0.95f), _t);
+            _picture.color = Color.Lerp(new Color(0.82f, 0.82f, 0.82f), Color.white, _t);
+            transform.localScale = Vector3.one * (1f + 0.03f * _t);
         }
     }
 }

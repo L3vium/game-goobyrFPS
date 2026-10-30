@@ -33,6 +33,13 @@ its bridges, the Palm Interchange, the Sandgate apartments, the caravanserai, em
 terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert road petrol station
 (car extraction); two patrol-car loops (corniche / Gulf Road, souk ring).
 
+## Map recipe (500 m, `Editor/Maps/HillMap`)
+A relief function shaped by `LandShape` stamps (graded roads that climb, building pads cut at their
+street's height, plateaus, terraces, carved rivers), painted ground layers, terrain trees and
+grass, stone retaining walls where pads meet the slope, and dressing helpers (`Frontage` rows,
+`Staff` guards per room, `Squad` patrol groups, `Crowd`s, `Routines`). The validator wants 150+ NPC
+markers, 40+ weapon spots and three spots per unique weapon.
+
 ## Systems
 - **AI** (`AI/Npc`): vision cone weighed by distance, light (power cut), stance, grass, smoke and
   walls, filling an awareness gauge ("?" then "!"); hearing (shots, explosions, distractions,

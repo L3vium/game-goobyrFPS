@@ -218,7 +218,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     }
 
     /// <summary>Quiet hover feedback: background wash, accent bar, 8 px slide of the label.</summary>
-    public class ButtonFx : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
+    public class ButtonFx : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler, ISelectHandler, IDeselectHandler
     {
         private Image _back, _bar;
         private TextMeshProUGUI _label;
@@ -239,6 +239,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
         public void OnPointerEnter(PointerEventData pData) { _hover = true; Audio.Sfx.Play2D("hover", 0.15f); }
         public void OnPointerExit(PointerEventData pData) { _hover = false; _down = false; }
+        public void OnSelect(BaseEventData pData) { _hover = true; Audio.Sfx.Play2D("hover", 0.15f); }
+        public void OnDeselect(BaseEventData pData) { _hover = false; _down = false; }
         public void OnPointerDown(PointerEventData pData) => _down = true;
         public void OnPointerUp(PointerEventData pData) => _down = false;
 

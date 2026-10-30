@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Maps rebuilt at 500 m on Unity Terrain (HillMap): valleys, terraces, cliffs, graded streets,
+  buildings stepping down the slopes on retaining walls, dense forests; 210-230 NPCs per map with
+  patrol groups, room guards and crowds around staged scenes.
+- Title screen: key art (an agent against a stone facade, depth of field) and a Hitman-style menu
+  (tab bar, picture tiles, big title, footer); gamepad selection highlights buttons and tiles.
+- Stylized shading: painterly light ramp, soft specular, colour drift and grain, lit chamfers.
 - Minimal Hitman-style HUD: minimap, transient weapon/ammo and health, weapon wheel (Q / LB),
   no objective panel; the map screen gets a contract column with a live portrait of the target.
 - Instinct senses the surroundings only (target 60 m, people 25 m, objects 20 m).

@@ -111,7 +111,13 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             Health.Team = pTeam;
             if (Body == null) return;
-            Body.Configure(LobbyPlayer.TeamColor(pTeam), new Color(1f, 0.83f, 0.7f), HatStyle.Beanie, LobbyPlayer.TeamColor(pTeam) * 0.6f, 1f);
+            // Agents wear a suit in their team's colour; the face and hair vary with the seat.
+            int lSeat = Player != null ? Player.Seat.Value : (int)OwnerClientId;
+            GoobLook lLook = GoobLook.Random(new System.Random(lSeat * 977 + 11), Outfit.Suit, LobbyPlayer.TeamColor(pTeam) * 0.85f);
+            lLook.facial = Facial.None;
+            lLook.earpiece = true;
+            lLook.scale = 1f;
+            Body.Configure(lLook);
             if (IsOwner) Body.SetShadowOnly(true);
         }
 

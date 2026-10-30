@@ -76,8 +76,11 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             // Feet.
             float lStride = Mathf.Clamp(lSpeed * 0.07f, 0f, 0.35f);
             Vector3 lFwd = lSpeed > 0.1f ? lLocalVel.normalized : Vector3.forward;
-            _body.FootL.localPosition = new Vector3(-0.16f, 0.07f + Mathf.Max(0, s) * _stepHeight * lMoving, 0.03f) + lFwd * (s * lStride);
-            _body.FootR.localPosition = new Vector3(0.16f, 0.07f + Mathf.Max(0, -s) * _stepHeight * lMoving, 0.03f) - lFwd * (s * lStride);
+            float lFootY = _body.FootBaseY;
+            _body.FootL.localPosition = new Vector3(-0.16f, lFootY + Mathf.Max(0, s) * _stepHeight * lMoving, 0.03f) + lFwd * (s * lStride);
+            _body.FootR.localPosition = new Vector3(0.16f, lFootY + Mathf.Max(0, -s) * _stepHeight * lMoving, 0.03f) - lFwd * (s * lStride);
+            Quaternion lFootYaw = lSpeed > 0.3f ? Quaternion.LookRotation(new Vector3(lLocalVel.x, 0, Mathf.Abs(lLocalVel.z) + 0.01f)) : Quaternion.identity;
+            _body.FootL.localRotation = _body.FootR.localRotation = Quaternion.Slerp(Quaternion.identity, lFootYaw, 0.5f);
             if (!lGrounded)
             {
                 _body.FootL.localPosition += new Vector3(0, 0.15f, 0.1f);
@@ -97,7 +100,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
             _body.Torso.localPosition = new Vector3(0, 0.78f + lBob - lCrouchDrop, 0);
             _body.Torso.localRotation = Quaternion.Euler(-_torsoSpring.x, s * 6f * lMoving, -_torsoSpring.z + Panic * Mathf.Sin(Time.time * 30f) * 4f);
-            _body.Torso.localScale = new Vector3(0.72f / Mathf.Sqrt(_squash), 0.75f * _squash, 0.6f / Mathf.Sqrt(_squash));
+            Vector3 lRest = _body.TorsoRestScale;
+            _body.Torso.localScale = new Vector3(lRest.x / Mathf.Sqrt(_squash), lRest.y * _squash, lRest.z / Mathf.Sqrt(_squash));
 
             // Head lags the body's turn and looks along the aim pitch.
             float lYaw = transform.eulerAngles.y;

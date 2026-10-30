@@ -191,15 +191,31 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 MapDefinition lMap = Net.LobbyState.Instance != null ? Net.LobbyState.Instance.Map : null;
                 TargetProfile lProfile = lMap != null && TargetProfile.Value >= 0 && TargetProfile.Value < lMap.targets.Count ? lMap.targets[TargetProfile.Value] : null;
-                if (lProfile != null) _body.Configure(lProfile.bodyColor, lSkin, lProfile.hat, lProfile.bodyColor * 0.4f, lProfile.scale);
-                else _body.Configure(new Color(0.9f, 0.8f, 0.2f), lSkin, HatStyle.Crown, Color.yellow, 1.15f);
+                Color lColor = lProfile != null ? lProfile.bodyColor : new Color(0.9f, 0.8f, 0.2f);
+                Outfit lOutfit = lProfile == null ? Outfit.Suit : lProfile.zone == 2 ? (TargetProfile.Value % 2 == 0 ? Outfit.Fancy : Outfit.Suit) : lProfile.zone == 1 ? (TargetProfile.Value % 2 == 0 ? Outfit.Biker : Outfit.Military) : (TargetProfile.Value % 3 == 0 ? Outfit.Worker : Outfit.Suit);
+                GoobLook lLook = GoobLook.Random(lRandom, lOutfit, lColor);
+                lLook.skin = lSkin;
+                lLook.hat = lProfile != null ? lProfile.hat : HatStyle.Crown;
+                lLook.hatColor = lColor * 0.45f;
+                lLook.hair = lLook.hat == HatStyle.None ? lLook.hair : Hair.None;
+                lLook.scale = lProfile != null ? lProfile.scale : 1.15f;
+                _body.Configure(lLook);
             }
             else
             {
                 Color lFaction = Zone != null ? Zone.Faction : new Color(0.3f, 0.3f, 0.35f);
-                Color lBody = GameArt.Vary(lFaction, 0.15f, lRandom);
-                HatStyle lHat = Role == NpcRole.Bodyguard ? HatStyle.None : Role == NpcRole.Lookout ? HatStyle.Beret : Zone != null ? Zone.FactionHat : HatStyle.Cap;
-                _body.Configure(lBody, lSkin, lHat, lFaction * 0.5f, Role == NpcRole.Bodyguard ? 1.12f : 0.95f + (float)lRandom.NextDouble() * 0.12f);
+                Outfit lOutfit = Role == NpcRole.Bodyguard ? Outfit.Suit : Role == NpcRole.Lookout ? Outfit.Military : Zone != null ? Zone.FactionOutfit : Outfit.Guard;
+                GoobLook lLook = GoobLook.Random(lRandom, lOutfit, GameArt.Vary(Role == NpcRole.Bodyguard ? new Color(0.16f, 0.16f, 0.2f) : lFaction, 0.12f, lRandom));
+                lLook.skin = lSkin;
+                lLook.hat = Role == NpcRole.Bodyguard ? HatStyle.None : Zone != null ? Zone.FactionHat : HatStyle.Cap;
+                lLook.hatColor = lFaction * 0.55f;
+                lLook.helmet = Role == NpcRole.Lookout;
+                lLook.sunglasses = Role == NpcRole.Bodyguard;
+                lLook.earpiece = Role == NpcRole.Bodyguard || Role == NpcRole.Reinforcement;
+                lLook.hands = Role == NpcRole.Bodyguard || lOutfit == Outfit.Military ? HandStyle.Glove : HandStyle.Mitten;
+                if (lLook.hat != HatStyle.None || lLook.helmet) lLook.hair = Hair.None;
+                lLook.scale = Role == NpcRole.Bodyguard ? 1.12f : lLook.scale;
+                _body.Configure(lLook);
             }
             _visuals?.RefreshWeapon();
         }

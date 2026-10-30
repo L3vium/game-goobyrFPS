@@ -24,6 +24,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         [SerializeField] private Color _faction = new Color(0.3f, 0.3f, 0.35f);
         [SerializeField] private HatStyle _factionHat = HatStyle.Cap;
         [SerializeField] private Transform _safeRoom;
+        [SerializeField] private FX.Outfit _factionOutfit = FX.Outfit.Guard;
 
         private static readonly List<LevelZone> _all = new List<LevelZone>();
         public static IReadOnlyList<LevelZone> All => _all;
@@ -32,6 +33,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public string ZoneName => _zoneName;
         public Color Faction => _faction;
         public HatStyle FactionHat => _factionHat;
+        public FX.Outfit FactionOutfit => _factionOutfit;
+        public void SetOutfit(FX.Outfit pOutfit) => _factionOutfit = pOutfit;
         public Vector3 SafeRoom => _safeRoom != null ? _safeRoom.position : transform.position;
         public Transform ReinforcementEntry => _reinforcementEntry;
 

@@ -103,6 +103,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             Scenes();
             PlayerSettings.SplashScreen.show = false;
+            // Static batching would copy every kit mesh into combined meshes (1.5 GB per map):
+            // the SRP batcher and the distance culling handle the draw calls instead.
+            PlayerSettings.SetStaticBatchingForPlatform(BuildTarget.StandaloneWindows64, false);
             BuildPlayerOptions lOptions = new BuildPlayerOptions
             {
                 scenes = System.Array.ConvertAll(EditorBuildSettings.scenes, s => s.path),

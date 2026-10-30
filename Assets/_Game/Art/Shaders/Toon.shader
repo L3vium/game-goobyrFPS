@@ -1,6 +1,7 @@
 // Author : Baptiste Vu Liem
-// Goobyr toon: flat facets, a soft two-step light ramp, coloured shadows, rim light, fog,
-// vertex colours times _BaseColor, and a white hit flash (_HitFlash) for the juice.
+// Goobyr stylized: a soft painterly light ramp with coloured shadows, a soft specular, world-space
+// colour variation and grain so no surface reads flat, lit chamfers and darker creases, rim light,
+// fog, vertex colours times _BaseColor, and a white hit flash (_HitFlash) for the juice.
 Shader "Goobyr/Toon"
 {
     Properties
@@ -92,17 +93,38 @@ Shader "Goobyr/Toon"
                 return o;
             }
 
+            // A painterly ramp: a wide soft terminator blended with a wrapped diffuse.
             half Ramp(half nl)
             {
-                return smoothstep(_RampThreshold - _RampSmooth, _RampThreshold + _RampSmooth, nl);
+                half lSmooth = max(_RampSmooth, 0.22);
+                half lBand = smoothstep(_RampThreshold - lSmooth, _RampThreshold + lSmooth, nl);
+                return lerp(saturate(nl * 0.5 + 0.5), lBand, 0.7);
             }
 
-            half3 Shade(Light light, half3 normalWS, half3 albedo)
+            float Hash3(float3 p)
+            {
+                p = frac(p * 0.3183099 + 0.1);
+                p *= 17.0;
+                return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
+            }
+
+            float Noise3(float3 x)
+            {
+                float3 i = floor(x), f = frac(x);
+                f = f * f * (3.0 - 2.0 * f);
+                return lerp(lerp(lerp(Hash3(i), Hash3(i + float3(1, 0, 0)), f.x), lerp(Hash3(i + float3(0, 1, 0)), Hash3(i + float3(1, 1, 0)), f.x), f.y),
+                            lerp(lerp(Hash3(i + float3(0, 0, 1)), Hash3(i + float3(1, 0, 1)), f.x), lerp(Hash3(i + float3(0, 1, 1)), Hash3(i + float3(1, 1, 1)), f.x), f.y), f.z);
+            }
+
+            half3 Shade(Light light, half3 normalWS, half3 viewDir, half3 albedo)
             {
                 half nl = dot(normalWS, light.direction);
                 half lit = Ramp(nl) * light.shadowAttenuation;
                 half3 shadowCol = albedo * _ShadowTint.rgb;
-                return lerp(shadowCol * 0.55, albedo, lit) * light.color * light.distanceAttenuation;
+                half3 diffuse = lerp(shadowCol * 0.55, albedo, lit);
+                half3 h = normalize(light.direction + viewDir);
+                half spec = pow(saturate(dot(normalWS, h)), 40.0) * 0.18 * lit;
+                return (diffuse + spec) * light.color * light.distanceAttenuation;
             }
 
             half4 Frag(Varyings i) : SV_Target
@@ -112,10 +134,19 @@ Shader "Goobyr/Toon"
                 // Vertex alpha is the tint mask: 1 = recoloured by _BaseColor, 0 = authored colour kept.
                 // Vertex colours are authored in sRGB (Blender kit, code colours): convert for the linear pipeline.
                 half3 albedo = SRGBToLinear(i.color.rgb) * lerp(half3(1, 1, 1), _BaseColor.rgb, i.color.a);
+                // No flat surface: broad colour drift across the world, and a fine grain.
+                float3 wp = i.positionWS;
+                half macro = Noise3(wp * 0.11) * 0.6 + Noise3(wp * 0.37) * 0.4;
+                half grain = Noise3(wp * 3.7);
+                albedo *= 0.9 + 0.17 * macro + 0.07 * (grain - 0.5);
+                // Chamfers and creases: where the normal turns fast, edges catch light and creases darken.
+                half curve = saturate(length(fwidth(normalWS)) * 5.0);
+                half3 viewDir = normalize(GetWorldSpaceViewDir(i.positionWS));
                 float4 shadowCoord = TransformWorldToShadowCoord(i.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
 
-                half3 col = Shade(mainLight, normalWS, albedo);
+                half3 col = Shade(mainLight, normalWS, viewDir, albedo);
+                col *= 1.0 + curve * (dot(normalWS, viewDir) > 0.55 ? 0.18 : -0.12);
                 col += albedo * SampleSH(normalWS) * 0.65;
 
                 #if defined(_ADDITIONAL_LIGHTS)
@@ -127,7 +158,7 @@ Shader "Goobyr/Toon"
                 for (uint lightIndex = 0; lightIndex < min(URP_FP_DIRECTIONAL_LIGHTS_COUNT, MAX_VISIBLE_LIGHTS); lightIndex++)
                 {
                     Light dl = GetAdditionalLight(lightIndex, i.positionWS, half4(1, 1, 1, 1));
-                    col += Shade(dl, normalWS, albedo) * 0.6;
+                    col += Shade(dl, normalWS, viewDir, albedo) * 0.6;
                 }
                 #endif
                 LIGHT_LOOP_BEGIN(count)
@@ -139,10 +170,9 @@ Shader "Goobyr/Toon"
 
                 #if defined(_SCREEN_SPACE_OCCLUSION)
                 AmbientOcclusionFactor ao = GetScreenSpaceAmbientOcclusion(GetNormalizedScreenSpaceUV(i.positionCS));
-                col *= lerp(1, ao.directAmbientOcclusion, 0.8);
+                col *= lerp(1, ao.directAmbientOcclusion * ao.indirectAmbientOcclusion, 0.9);
                 #endif
 
-                half3 viewDir = normalize(GetWorldSpaceViewDir(i.positionWS));
                 half rim = pow(1 - saturate(dot(viewDir, normalWS)), _RimPower) * _RimStrength;
                 col += _RimColor.rgb * rim * (0.5 + 0.5 * Ramp(dot(normalWS, mainLight.direction)));
 

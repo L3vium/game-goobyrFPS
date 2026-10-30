@@ -175,11 +175,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             int lCovers = Object.FindObjectsByType<CoverPoint>(FindObjectsSortMode.None).Length;
             if (lStarts < 3) lFails.Add($"{lStarts} start points (< 3)");
             if (lExtractions < 3) lFails.Add($"{lExtractions} extractions (< 3)");
-            if (lWeapons < 20) lFails.Add($"{lWeapons} weapon spawns (< 20)");
-            if (lRockets < 1) lFails.Add("no rocket launcher spot");
-            if (lFlames < 1) lFails.Add("no flamethrower spot");
+            if (lWeapons < 40) lFails.Add($"{lWeapons} weapon spawns (< 40)");
+            if (lRockets < 3) lFails.Add($"{lRockets} rocket launcher spots (< 3)");
+            if (lFlames < 3) lFails.Add($"{lFlames} flamethrower spots (< 3)");
             if (lZones != 3) lFails.Add($"{lZones} zones (!= 3)");
-            if (lNpcs < 40) lFails.Add($"{lNpcs} NPCs (< 40)");
+            if (lNpcs < 150) lFails.Add($"{lNpcs} NPCs (< 150)");
             if (pMap.targets.Count != 15) lFails.Add($"{pMap.targets.Count} targets (!= 15)");
             foreach (TargetProfile lTarget in pMap.targets)
                 foreach (ActivityType lActivity in lTarget.routine)

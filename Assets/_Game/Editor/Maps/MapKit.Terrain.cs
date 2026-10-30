@@ -28,6 +28,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private System.Func<float, float, float> _grassDensity;
 
         public const int LAND_RESOLUTION = 1025;
+        private string LandPath => EditorAssets.SCENES + "/" + Map.sceneName + "_Terrain.asset";
         private const int ALPHA_RESOLUTION = 1024, DETAIL_RESOLUTION = 1024;
 
         /// <summary>Builds the terrain, centred on the origin, from a world height function (metres).</summary>
@@ -36,7 +37,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             _landSize = pSize;
             _landOrigin = new Vector3(-pSize * 0.5f, pMinY, -pSize * 0.5f);
             float lRange = pMaxY - pMinY;
-            _landData = new TerrainData { heightmapResolution = LAND_RESOLUTION };
+            // Rebuilt in place: the asset keeps its GUID, and what is painted on it later is saved with it.
+            _landData = AssetDatabase.LoadAssetAtPath<TerrainData>(LandPath);
+            if (_landData == null)
+            {
+                _landData = new TerrainData();
+                AssetDatabase.CreateAsset(_landData, LandPath);
+            }
+            _landData.heightmapResolution = LAND_RESOLUTION;
             _landData.size = new Vector3(pSize, lRange, pSize);
             float[,] lHeights = new float[LAND_RESOLUTION, LAND_RESOLUTION];
             float lStep = pSize / (LAND_RESOLUTION - 1);
@@ -46,10 +54,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             _landData.SetHeights(0, 0, lHeights);
             _landData.terrainLayers = TextureBuilder.Layers();
             _landData.alphamapResolution = ALPHA_RESOLUTION;
-
-            string lPath = EditorAssets.SCENES + "/" + Map.sceneName + "_Terrain.asset";
-            AssetDatabase.DeleteAsset(lPath);
-            AssetDatabase.CreateAsset(_landData, lPath);
+            _landData.SetTreeInstances(new TreeInstance[0], false);
+            _landData.detailPrototypes = new DetailPrototype[0];
 
             GameObject lObject = Terrain.CreateTerrainGameObject(_landData);
             lObject.name = "Land";
@@ -202,9 +208,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     }
                 _landData.SetDetailLayer(0, 0, 0, lLayer);
             }
-            Land.Flush();
+            Land.terrainData = _landData;
             Land.GetComponent<TerrainCollider>().terrainData = _landData;
+            Land.Flush();
             EditorUtility.SetDirty(_landData);
+            AssetDatabase.SaveAssetIfDirty(_landData);
             Debug.Log($"[Build] {Map.sceneName} land: {_treeInstances.Count} trees");
         }
     }

@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c8f7e51f3b3ee944b9e257aa40147e3, type: 3}
+  m_Name: Pistol
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.ItemDefinition
+  displayName: Bark Pistol
+  kind: 1
+  slot: 0
+  color: {r: 0.9, g: 0.6, b: 0.3, a: 1}
+  unique: 0
+  damage: 62
+  headMultiplier: 3
+  fireRate: 4
+  automatic: 0
+  pellets: 1
+  spread: 1.4
+  adsSpreadFactor: 0.3
+  range: 100
+  magazine: 12
+  reserveAmmo: 36
+  reloadTime: 1.2
+  recoil: 1.8
+  adsFov: 62
+  shake: 0.12
+  noiseRadius: 45
+  projectileSpeed: 0
+  explosionRadius: 0
+  throwForce: 18
+  stack: 1

@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c8f7e51f3b3ee944b9e257aa40147e3, type: 3}
+  m_Name: Shotgun
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.ItemDefinition
+  displayName: Thumper
+  kind: 4
+  slot: 0
+  color: {r: 0.85, g: 0.35, b: 0.3, a: 1}
+  unique: 0
+  damage: 150
+  headMultiplier: 1.5
+  fireRate: 1.2
+  automatic: 0
+  pellets: 8
+  spread: 6.5
+  adsSpreadFactor: 0.7
+  range: 32
+  magazine: 6
+  reserveAmmo: 18
+  reloadTime: 2.4
+  recoil: 4.5
+  adsFov: 68
+  shake: 0.45
+  noiseRadius: 60
+  projectileSpeed: 0
+  explosionRadius: 0
+  throwForce: 18
+  stack: 1

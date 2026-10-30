@@ -1,0 +1,181 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20a0cbba64d121042a7eac77e6a42e9a, type: 3}
+  m_Name: Map_Gulf
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.MapDefinition
+  displayName: Mirage Bay
+  sceneName: Map_Gulf
+  description: 'A sun-bleached Gulf city: a dense souk, smugglers working the docks
+    under the highway, and the Zenith, a luxury hotel tower with a helipad.'
+  zoneNames:
+  - Old Souk
+  - Smugglers' Docks
+  - The Zenith Tower
+  skyTop: {r: 0.35, g: 0.65, b: 0.95, a: 1}
+  skyHorizon: {r: 1, g: 0.88, b: 0.7, a: 1}
+  fog: {r: 0.98, g: 0.85, b: 0.7, a: 1}
+  sun: {r: 1, g: 0.93, b: 0.8, a: 1}
+  ambient: {r: 0.6, g: 0.55, b: 0.5, a: 1}
+  sunIntensity: 1.5
+  sunEuler: {x: 55, y: 30, z: 0}
+  fogDensity: 0.0035
+  targets:
+  - displayName: Faisal Amberline
+    dossier: Spice merchant. The spice is not the product.
+    zone: 0
+    bodyColor: {r: 0.8784314, g: 0.47843137, b: 0.37254903, a: 1}
+    hat: 6
+    scale: 1.15
+    bodyguards: 2
+    proof: 5
+    routine: 08000000010000000600000002000000
+    enabled: 1
+  - displayName: Noor Halcyon
+    dossier: Gold dealer. Weighs everything twice.
+    zone: 0
+    bodyColor: {r: 0.9490196, g: 0.8, b: 0.56078434, a: 1}
+    hat: 0
+    scale: 1.05
+    bodyguards: 2
+    proof: 1
+    routine: 03000000010000000500000006000000
+    enabled: 1
+  - displayName: Karim 'Kite' Saleh
+    dossier: Rooftop courier. Hard to catch, easy to spot.
+    zone: 0
+    bodyColor: {r: 0.5058824, g: 0.69803923, b: 0.6039216, a: 1}
+    hat: 2
+    scale: 1
+    bodyguards: 1
+    proof: 0
+    routine: 09000000070000000100000002000000
+    enabled: 1
+  - displayName: Madame Ysolde
+    dossier: Carpet seller and information broker.
+    zone: 0
+    bodyColor: {r: 0.6039216, g: 0.20392157, b: 0.5568628, a: 1}
+    hat: 3
+    scale: 1.05
+    bodyguards: 2
+    proof: 3
+    routine: 0b000000050000000100000006000000
+    enabled: 1
+  - displayName: Inspector Rahal
+    dossier: Customs inspector with very full pockets.
+    zone: 0
+    bodyColor: {r: 0.23921569, g: 0.3529412, b: 0.5019608, a: 1}
+    hat: 2
+    scale: 1.2
+    bodyguards: 2
+    proof: 4
+    routine: 08000000030000000700000001000000
+    enabled: 1
+  - displayName: Captain Brine
+    dossier: Runs the dock crews and the night boats.
+    zone: 1
+    bodyColor: {r: 0.14901961, g: 0.27450982, b: 0.3254902, a: 1}
+    hat: 2
+    scale: 1.25
+    bodyguards: 3
+    proof: 0
+    routine: 08000000090000000100000007000000
+    enabled: 1
+  - displayName: Ziva Rook
+    dossier: Forger. Her studio hides in a container.
+    zone: 1
+    bodyColor: {r: 0.90588236, g: 0.43529412, b: 0.31764707, a: 1}
+    hat: 7
+    scale: 1
+    bodyguards: 2
+    proof: 2
+    routine: 03000000010000000600000002000000
+    enabled: 1
+  - displayName: Old Man Tarek
+    dossier: Owns the cargo ship. And the harbour master.
+    zone: 1
+    bodyColor: {r: 0.6901961, g: 0.5372549, b: 0.40784314, a: 1}
+    hat: 6
+    scale: 1.1
+    bodyguards: 3
+    proof: 5
+    routine: 05000000010000000b00000002000000
+    enabled: 1
+  - displayName: Dex Marlowe
+    dossier: Arms broker. Tests every crate personally.
+    zone: 1
+    bodyColor: {r: 0.42745098, g: 0.40784314, b: 0.45882353, a: 1}
+    hat: 1
+    scale: 1.15
+    bodyguards: 2
+    proof: 0
+    routine: 080000000a0000000700000001000000
+    enabled: 1
+  - displayName: The Twins' Mother
+    dossier: Matriarch of the docks. Feared and fed.
+    zone: 1
+    bodyColor: {r: 1, g: 0.7058824, b: 0.63529414, a: 1}
+    hat: 0
+    scale: 1.2
+    bodyguards: 3
+    proof: 1
+    routine: 050000000b0000000100000002000000
+    enabled: 1
+  - displayName: Sultana Varela
+    dossier: Hotel owner. The penthouse is her throne.
+    zone: 2
+    bodyColor: {r: 0.83137256, g: 0.6392157, b: 0.4509804, a: 1}
+    hat: 4
+    scale: 1.1
+    bodyguards: 3
+    proof: 1
+    routine: 0b00000001000000050000000200000004000000
+    enabled: 1
+  - displayName: Hugo Spade
+    dossier: Crypto prince. Lives at the pool bar.
+    zone: 2
+    bodyColor: {r: 0, g: 0.7058824, b: 0.84705883, a: 1}
+    hat: 2
+    scale: 1.05
+    bodyguards: 2
+    proof: 3
+    routine: 010000000a0000000600000002000000
+    enabled: 1
+  - displayName: General Okafor
+    dossier: Retired, rich, and planning a coup from suite 40.
+    zone: 2
+    bodyColor: {r: 0.16470589, g: 0.6156863, b: 0.56078434, a: 1}
+    hat: 3
+    scale: 1.25
+    bodyguards: 3
+    proof: 0
+    routine: 03000000060000000100000007000000
+    enabled: 1
+  - displayName: Celeste Moreau
+    dossier: Star architect of the Zenith. Knows every vent.
+    zone: 2
+    bodyColor: {r: 0.95686275, g: 0.63529414, b: 0.38039216, a: 1}
+    hat: 3
+    scale: 1
+    bodyguards: 2
+    proof: 2
+    routine: 08000000030000000100000002000000
+    enabled: 1
+  - displayName: Mr. Velvet
+    dossier: The hotel's head of security. Smiles at cameras.
+    zone: 2
+    bodyColor: {r: 0.36862746, g: 0.32941177, b: 0.5568628, a: 1}
+    hat: 1
+    scale: 1.2
+    bodyguards: 2
+    proof: 4
+    routine: 09000000080000000100000007000000
+    enabled: 1

@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 729fd2e9f92b71f4aabce1d64d081e03, type: 3}
+  m_Name: GameDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.GameDatabase
+  rules: {fileID: 11400000, guid: 57e3138cd999a17498fe8861e851bce2, type: 2}
+  items:
+  - {fileID: 11400000, guid: c153c4d88632d434b8e19dcbb9c23a4b, type: 2}
+  - {fileID: 11400000, guid: 1d941f151a3473048808769df1b0233d, type: 2}
+  - {fileID: 11400000, guid: 5543552cf9686044d9e1c42edc3d50f6, type: 2}
+  - {fileID: 11400000, guid: 446d68449bf5421489c87dba1e406cf8, type: 2}
+  - {fileID: 11400000, guid: 8703064010a65a6498278e5ee5db0aa3, type: 2}
+  - {fileID: 11400000, guid: 71485b35ac02ff846a460d149d07f0dc, type: 2}
+  - {fileID: 11400000, guid: 91b8796792cc9694c82929015899873d, type: 2}
+  - {fileID: 11400000, guid: b45ff664f1f229045b79b77f17d1f45e, type: 2}
+  - {fileID: 11400000, guid: 92493fd4ea9cbad41bfeeea2ccaf9b35, type: 2}
+  - {fileID: 11400000, guid: 09a2b4449522e1a4ab3bdbe2b96bbed1, type: 2}
+  - {fileID: 11400000, guid: d145048783964eb4183483b731ec2158, type: 2}
+  - {fileID: 11400000, guid: bd89fe3bec442ad44b93b4ed43c49976, type: 2}
+  - {fileID: 11400000, guid: 805c85d1f18342649905c4117f4a1d4a, type: 2}
+  maps:
+  - {fileID: 11400000, guid: 22b35e54c16a55e4d974bac12cf24d46, type: 2}
+  - {fileID: 11400000, guid: e30783e857db32e4eab84810a71578cb, type: 2}
+  - {fileID: 11400000, guid: 8def4115545719e4f84c91462a8a3c60, type: 2}

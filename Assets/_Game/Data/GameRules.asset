@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 037e3eed5c56afc4ca842871a142e618, type: 3}
+  m_Name: GameRules
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.GameRules
+  startingLoadout:
+  - {fileID: 11400000, guid: c153c4d88632d434b8e19dcbb9c23a4b, type: 2}
+  - {fileID: 11400000, guid: b45ff664f1f229045b79b77f17d1f45e, type: 2}
+  playerHealth: 100
+  playerDamageMultiplier: 1
+  maxPlayers: 8
+  timeLimitMinutes: 20
+  proximityChatByDefault: 1
+  proximityChatRange: 30
+  proofRevealInterval: 10
+  extractionTime: 3
+  activeExtractions: 2
+  npcHealth: 100
+  npcDamageMultiplier: 1
+  npcVisionRange: 38
+  npcVisionAngle: 110
+  npcDetectTime: 0.9
+  npcReactionTime: 0.35
+  callDuration: 3
+  reinforcementsPerCall: 4
+  maxCallsPerZone: 2
+  searchDuration: 18
+  npcAccuracy: 0.45
+  ventGasDelay: 6
+  ventGasDuration: 10
+  fireSpreadInterval: 1.2

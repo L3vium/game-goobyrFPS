@@ -20,11 +20,11 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public static Material Toon => _toon != null ? _toon : _toon = Load("Art/M_Toon", "Goobyr/Toon");
         public static Material Transparent => _transparent != null ? _transparent : _transparent = Load("Art/M_ToonTransparent", "Goobyr/ToonTransparent");
         /// <summary>Unlit, emissive: muzzle flashes, tracers, fire, lights' bulbs.</summary>
-        public static Material Glow => _glow != null ? _glow : _glow = Load("Art/M_Glow", "Universal Render Pipeline/Unlit");
+        public static Material Glow => _glow != null ? _glow : _glow = Load("Art/M_Glow", "Goobyr/Glow");
         /// <summary>Additive particles (fire, sparks, flashes).</summary>
-        public static Material ParticleAdd => _particle != null ? _particle : _particle = Load("Art/M_ParticleAdd", "Universal Render Pipeline/Particles/Unlit");
+        public static Material ParticleAdd => _particle != null ? _particle : _particle = Load("Art/M_ParticleAdd", "Goobyr/Glow");
         /// <summary>Alpha-blended particles (smoke, dust, gas).</summary>
-        public static Material ParticleAlpha => _particleAlpha != null ? _particleAlpha : _particleAlpha = Load("Art/M_ParticleAlpha", "Universal Render Pipeline/Particles/Unlit");
+        public static Material ParticleAlpha => _particleAlpha != null ? _particleAlpha : _particleAlpha = Load("Art/M_ParticleAlpha", "Goobyr/Glow");
 
         private static Material Load(string pPath, string pFallbackShader)
         {

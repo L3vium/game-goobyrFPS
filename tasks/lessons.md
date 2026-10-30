@@ -28,3 +28,10 @@ Rules I write for myself after a correction. Read at the start of every session.
   not finished.
 - **Background agents don't block the build.** Ask them to pause editor use, build from what is
   on disk, and say in the report which in-progress work the build does or does not contain.
+
+## 2026-10-30 — opened Unity myself, slow opaque subagents
+- **Never launch, close or restart the Unity editor.** If MCP is unreachable, say so and ask the
+  user; they open it. The MCP port can change (8084 → 8080): ask, don't guess.
+- **Work in the main thread, visibly.** Background subagents are opaque to the user and slow.
+  Do the work myself with short progress lines, and finish the whole request in the same turn
+  instead of stopping to wait on something.

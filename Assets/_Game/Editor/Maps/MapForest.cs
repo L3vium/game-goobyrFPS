@@ -78,7 +78,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Vegetation();
             MatchPoints();
             MapEdges();
-            DistanceCulling();
+            // Trees at ~250 m, a chair at ~40 m, a building at ~300 m (the fog hides the rest).
+            K.DistanceCulling();
         }
 
         // ================================================================ terrain
@@ -616,42 +617,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
             // The lake.
             K.Water(new Vector3(318, RIVER_WATER, -330), new Vector2(380, 340));
-        }
-
-        /// <summary>
-        /// The kit is detailed (a timber window module is ~3.7k triangles) and the valley holds
-        /// ~20M triangles, while the fog hides everything past ~300 m: every tree, rock, building
-        /// and prop gets a one-level LODGroup that culls it once it is small on screen (trees at
-        /// ~250 m, a chair at ~40 m, a building at ~300 m). Moving and falling things are skipped.
-        /// </summary>
-        private void DistanceCulling()
-        {
-            int lCount = 0;
-            void Cull(GameObject pObject, float pScreen)
-            {
-                if (pObject.GetComponent<LODGroup>() != null) return;
-                Renderer[] lRenderers = pObject.GetComponentsInChildren<Renderer>();
-                if (lRenderers.Length == 0) return;
-                // Small things (bushes, reeds, furniture, clutter) cast no sun shadows: the shadow map keeps the big shapes.
-                foreach (Renderer lRenderer in lRenderers)
-                    if (lRenderer.bounds.size.magnitude < 2.6f || lRenderer.name.StartsWith("Bush") || lRenderer.name.StartsWith("Reeds") || lRenderer.name.StartsWith("FlowerBed"))
-                        lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                LODGroup lGroup = pObject.AddComponent<LODGroup>();
-                lGroup.SetLODs(new[] { new LOD(pScreen, lRenderers) });
-                lGroup.RecalculateBounds();
-                lCount++;
-            }
-            foreach (Transform lChild in K.Env)
-            {
-                if (lChild.name == "TreesAll") { foreach (Transform lTree in lChild) Cull(lTree.gameObject, 0.035f); continue; }
-                Cull(lChild.gameObject, lChild.name == "TallGrass" ? 0.03f : 0.05f);
-            }
-            foreach (Transform lChild in K.Props)
-            {
-                if (lChild.name == "PatrolCar" || lChild.name == "Chandelier") continue;
-                Cull(lChild.gameObject, 0.025f);
-            }
-            Debug.Log($"[Build] Map_Forest: {lCount} culling groups");
         }
 
         /// <summary>Invisible walls on the map edges, behind the ridges.</summary>

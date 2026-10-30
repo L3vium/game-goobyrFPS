@@ -1219,6 +1219,48 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             AssetDatabase.CreateAsset(lSurface.navMeshData, lPath);
         }
 
+        /// <summary>
+        /// Opt-in step a map calls at the end of its composition, before <see cref="Finish"/> (the
+        /// ground is built later and is never culled). Kit pieces are detailed (a window module is
+        /// ~3k triangles) and a 1 km² map holds tens of millions of triangles while the fog hides
+        /// everything far away: every tree, rock, building and prop gets a one-level LODGroup that
+        /// culls it once it is small on screen. Small things (bushes, reeds, furniture, clutter)
+        /// also stop casting sun shadows: the shadow map keeps the big shapes. Moving things (patrol
+        /// cars, chandeliers) are skipped.
+        /// </summary>
+        /// <param name="pTreeScreen">Screen height under which a tree disappears (one group per tree).</param>
+        /// <param name="pEnvScreen">The same for every other environment group (a building, a rock, a deck).</param>
+        /// <param name="pGrassScreen">The same for tall grass patches.</param>
+        /// <param name="pPropScreen">The same for props (furniture, clutter, systemic props).</param>
+        public void DistanceCulling(float pTreeScreen = 0.035f, float pEnvScreen = 0.05f, float pGrassScreen = 0.03f, float pPropScreen = 0.025f)
+        {
+            int lCount = 0;
+            void Cull(GameObject pObject, float pScreen)
+            {
+                if (pObject.GetComponent<LODGroup>() != null) return;
+                Renderer[] lRenderers = pObject.GetComponentsInChildren<Renderer>();
+                if (lRenderers.Length == 0) return;
+                foreach (Renderer lRenderer in lRenderers)
+                    if (lRenderer.bounds.size.magnitude < 2.6f || lRenderer.name.StartsWith("Bush") || lRenderer.name.StartsWith("Reeds") || lRenderer.name.StartsWith("FlowerBed"))
+                        lRenderer.shadowCastingMode = ShadowCastingMode.Off;
+                LODGroup lGroup = pObject.AddComponent<LODGroup>();
+                lGroup.SetLODs(new[] { new LOD(pScreen, lRenderers) });
+                lGroup.RecalculateBounds();
+                lCount++;
+            }
+            foreach (Transform lChild in Env)
+            {
+                if (lChild.name == "TreesAll") { foreach (Transform lTree in lChild) Cull(lTree.gameObject, pTreeScreen); continue; }
+                Cull(lChild.gameObject, lChild.name == "TallGrass" ? pGrassScreen : pEnvScreen);
+            }
+            foreach (Transform lChild in Props)
+            {
+                if (lChild.name == "PatrolCar" || lChild.name == "Chandelier") continue;
+                Cull(lChild.gameObject, pPropScreen);
+            }
+            Debug.Log($"[Build] {Map.sceneName}: {lCount} culling groups");
+        }
+
         public void Finish()
         {
             BuildGround();

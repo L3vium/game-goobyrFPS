@@ -663,6 +663,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 GameObject lModel = (GameObject)PrefabUtility.InstantiatePrefab(lPrefab, lCar);
                 lModel.transform.localPosition = Vector3.zero;
+                lModel.transform.localRotation = Quaternion.Euler(0, 180f, 0);
                 foreach (MeshRenderer lRenderer in lModel.GetComponentsInChildren<MeshRenderer>()) lRenderer.sharedMaterial = _toon;
             }
             else

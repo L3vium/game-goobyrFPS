@@ -21,6 +21,10 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (lPrefab != null)
             {
                 lModel = Object.Instantiate(lPrefab, pParent, false);
+                // Exported facing -Z: turn around (the muzzle child turns with it).
+                lModel.transform.localRotation = Quaternion.Euler(0, 180f, 0);
+                // Blender props carry their colours as vertex colours: the toon material does the rest.
+                foreach (Renderer lRenderer in lModel.GetComponentsInChildren<Renderer>()) lRenderer.sharedMaterial = GameArt.Toon;
                 if (lModel.transform.Find("Muzzle") == null)
                 {
                     Transform lMuzzle = new GameObject("Muzzle").transform;

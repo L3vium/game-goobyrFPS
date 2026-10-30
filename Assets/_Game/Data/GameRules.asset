@@ -25,7 +25,7 @@ MonoBehaviour:
   extractionTime: 3
   activeExtractions: 2
   npcHealth: 100
-  npcDamageMultiplier: 1
+  npcDamageMultiplier: 0.7
   npcVisionRange: 38
   npcVisionAngle: 110
   npcDetectTime: 1.3

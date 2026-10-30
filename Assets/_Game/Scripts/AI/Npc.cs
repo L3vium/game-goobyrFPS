@@ -771,6 +771,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             ItemDefinition lWeapon = Weapon;
             if (lWeapon == null || Time.time < _reactionUntil || Time.time < _nextShot) return;
+            if (!HasFireToken()) return;
             if (_agent.velocity.magnitude > 3.5f && lWeapon.kind == ItemKind.Sniper) return;
 
             if (_burstLeft <= 0)
@@ -795,7 +796,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
             if (!_targetVisible) lChance *= 0.25f;
             // Warm-up: the first seconds of a fight are wild - time to dive into cover.
-            lChance *= Mathf.Lerp(0.15f, 1f, Mathf.Clamp01((Time.time - _combatStart) / 3f));
+            lChance *= Mathf.Lerp(0.15f, 1f, Mathf.Clamp01((Time.time - _combatStart) / 4f));
             if (lWeapon.kind == ItemKind.Sniper) lChance *= 1.8f;
 
             Vector3 lDir = (lAim - lMuzzle).normalized;
@@ -806,11 +807,36 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Vector3 lEnd = lMuzzle + lDir * lWeapon.range;
             for (int i = 0; i < lPellets; i++)
             {
-                Vector3 lPelletDir = lPellets > 1 ? Quaternion.Euler(Random.Range(-3f, 3f), Random.Range(-3f, 3f), 0) * lDir : lDir;
+                // Each pellet rolls its own spread: deadly up close, a scatter at range.
+                Vector3 lPelletDir = lPellets > 1 ? Quaternion.Euler(Random.Range(-6.5f, 6.5f), Random.Range(-6.5f, 6.5f), 0) * lDir : lDir;
                 lEnd = Ballistics.TraceServer(lMuzzle, lPelletDir, lWeapon, lWeapon.damage * GameDatabase.Rules.npcDamageMultiplier / lPellets * (lPellets > 1 ? 1.4f : 1f) * 0.75f, DamageInfo.NO_PLAYER, Match.MatchRulesLogic.NO_TEAM, transform);
             }
             ShotRpc(lMuzzle, lEnd, WeaponItem.Value);
         }
+
+        /// <summary>
+        /// Fire discipline: only the three closest NPCs that see a player shoot at them; the others
+        /// keep moving (flank, push) - a firefight stays readable and survivable for the few seconds
+        /// a player needs to dive into cover.
+        /// </summary>
+        private bool HasFireToken()
+        {
+            if (_combatTarget == null || !_targetVisible) return true;
+            float lMine = (transform.position - _combatTarget.transform.position).sqrMagnitude;
+            int lCloser = 0;
+            foreach (Npc lOther in All)
+            {
+                if (lOther == this || !lOther.Health.IsAlive || lOther._combatTarget != _combatTarget || !lOther._targetVisible) continue;
+                if ((lOther.transform.position - _combatTarget.transform.position).sqrMagnitude < lMine && ++lCloser >= MAX_SHOOTERS)
+                {
+                    _repositionTime = Mathf.Min(_repositionTime, 0.5f);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private const int MAX_SHOOTERS = 3;
 
         private void UpdateSearch()
         {

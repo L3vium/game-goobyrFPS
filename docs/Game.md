@@ -22,13 +22,16 @@ time limit (draw). The proof carrier is revealed to everyone every 10 s.
 | Map | Town | Lair | Mansion / building |
 |---|---|---|---|
 | **Pinecrest Hollow** (forest) | Millbrook: main street, sawmill, saloon, water tower + zipline, bridges over the river | The Grove (palisade, marsh with stilt walkways, tall grass) + military outpost (watchtowers, bunker, alarm flare) | Lakeside Lodge on a plinth: chandelier hall, bar, basement breaker + air handler, sprinklers, boathouse |
-| **Mirage Bay** (Gulf city) | Old Souk: rooftop-linked houses, market, clock tower sniper nest + zipline | Smugglers' Docks: container stacks, raised highway, cargo ship, crane + zipline | The Zenith: podium (lobby chandelier, basement), pool deck, six-floor tower, helipad, jump pads, crane zipline |
+| **Mirage Bay** (Gulf city, 1 km²) | Old Souk on a walled plateau over its harbour: ~70 flat-roofed houses joined by roof planks and ladders, two covered market streets meeting at the Spice Crossing, Wind Clock tower (sniper nest, zipline to the customs house), Seven Lamps tea house (storytelling evening), hammam, spice warehouse, customs house, riads | Smugglers' Docks under the elevated Gulf Highway (walkable deck, maintenance stair): container lanes and vantage stacks, three gantry cranes (one ziplines onto the deal warehouse), the cargo ship with holds and bridge, the Bluewater deal, canteen and crew talk, forger's container, dockers' gym, fuel depot, storm drain under the quay (tunnel extraction), alarm flare | The Zenith: podium (lobby chandelier, lobby bar, restaurant, kitchen, spa and offices, basement parking with breaker and air handler, ramp), pool deck, 18-floor tower (Sky Lounge, penthouse, helipad), west-face scaffold and gondola, construction site and tower crane zipline, gardens, marina with yachts (boat extraction), Azure beach club with jump pads |
 | **Elmridge** (suburb) | Downtown strip: diner, mall, police, cinema roof, gas station, patrol cars | Junkyard Bowl: wreck walls, bowling alley, drive-in screen, tall grass, canal culverts | Hilltop Mansion: gate, hedge maze, pool house, greenhouse, ballroom chandelier, basement vault |
 
 Every patrol route has a pair of red explosive barrels next to a leg it walks (shoot them as the
 patrol passes; one blast sets off the other). Weapons lie everywhere (~35-95 spawns per map, and
 every dead guard drops his gun); one rocket launcher and one flamethrower per map, each at one of
-several hidden spots drawn per match.
+several hidden spots drawn per match. Between the Mirage Bay zones: the corniche, the dry wadi and
+its bridges, the Palm Interchange, the Sandgate apartments, the caravanserai, embassy villas, the bus
+terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert road petrol station
+(car extraction); two patrol-car loops (corniche / Gulf Road, souk ring).
 
 ## Systems
 - **AI** (`AI/Npc`): vision cone weighed by distance, light (power cut), stance, grass, smoke and

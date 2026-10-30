@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+- Mirage Bay rebuilt as a 1 km² sandbox (`MapGulf` partials: terrain, souk, docks, Zenith, between):
+  sea on two sides, dunes and a sandstone ridge on the others, 105 NPCs, 62 weapon spawns, four
+  hidden spots each for the rocket launcher and the flamethrower, four edge starts, four
+  extractions (marina speedboat, Zenith helipad, desert road pickup, quay storm drain).
+- `MapKit.DistanceCulling()`: the forest's distance culling and small-item shadow cut-off, now a
+  shared opt-in step a map calls before `Finish` (Pinecrest Hollow uses it, output unchanged).
+
 ## 0.1.0 — first playable
 - Steam / LAN / solo sessions, lobby with mode, map, teams, proximity voice option.
 - Three modes (free-for-all, teams up to 4, co-op), elimination and spectating.

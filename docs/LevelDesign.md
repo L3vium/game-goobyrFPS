@@ -68,6 +68,9 @@ never reproduce an existing game's layout, landmark or name.
   `Lamp`, `PatrolCar`, `Grass`, `Barrel`, `Crate`, `Car`.
 - Ambiance (sky, volumetric fog, grading) comes from the `MapDefinition` and is applied by
   `Finish()`.
+- Performance: call `K.DistanceCulling()` at the end of `Compose()` (one-level LODGroups per tree,
+  building and prop; small items stop casting sun shadows). Keep the saved scene under 90 MB:
+  every kit piece is a GameObject, so prefer fewer, larger buildings.
 
 ## Verification loop (mandatory)
 Build from the map's menu item, then:

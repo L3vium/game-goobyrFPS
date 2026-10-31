@@ -31,7 +31,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 _ => "TIME IS UP"
             };
             _instance._title.text = lTitle;
-            _instance._title.color = pWon ? UIFactory.Good : UIFactory.Accent;
+            _instance._title.color = pWon ? UIFactory.Good : UIFactory.Danger;
             string lBody = pOutcome == MatchOutcome.Extracted ? "EXTRACTED BY " + pWinners : "NOBODY EXTRACTED THE PROOF";
             if (!string.IsNullOrEmpty(pMethod)) lBody += "\nTARGET: " + pMethod;
             lBody += "\n\n";

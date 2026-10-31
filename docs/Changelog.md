@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- Menus rebuilt for playing with friends: the main menu is a clear list (create a room, join a room
+  with its code, solo, options, quit) with icons and a line on what each does; the briefing shows
+  the map card with its plan, the mode as explicit cards (free-for-all 1v1v1v1, teams, co-op), teams
+  and options as rows, the agents in aligned columns, the room code with a copy button. Settings are
+  rows with the label left and the control right (switches, sliders with values) and cannot overlap.
+  The pause menu holds the map (floors, zoom, pan), the contract and the options. The accent is now
+  signal amber.
 - HUD: a heading strip across the top with the target's marker and distance always on it; the
   minimap becomes the map's baked stylized plan of your current floor, north up and still, with N
   marked, the target always shown, and a rim that turns amber (suspected, searched for), red

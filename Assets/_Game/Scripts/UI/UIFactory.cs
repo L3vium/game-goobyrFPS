@@ -19,7 +19,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         public static readonly Color Ink = new Color(0.04f, 0.04f, 0.05f);
         public static readonly Color Paper = new Color(0.95f, 0.95f, 0.94f);
         public static readonly Color Muted = new Color(0.62f, 0.63f, 0.65f);
-        public static readonly Color Accent = new Color(0.86f, 0.13f, 0.16f);
+        /// <summary>Signal amber: the one accent of the interface (red is kept for the target and danger).</summary>
+        public static readonly Color Accent = new Color(0.96f, 0.63f, 0.17f);
+        public static readonly Color Danger = new Color(0.9f, 0.2f, 0.18f);
         public static readonly Color Accent2 = new Color(0.95f, 0.95f, 0.94f);
         public static readonly Color Good = new Color(0.45f, 0.82f, 0.55f);
         public static readonly Color PanelColor = new Color(0.03f, 0.03f, 0.04f, 0.78f);
@@ -263,7 +265,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 _bar.rectTransform.localScale = new Vector3(1, e, 1);
                 _label.rectTransform.anchoredPosition = _labelRest + new Vector2(8f * e, 0);
             }
-            _label.color = lEnabled ? Color.Lerp(_primary ? UIFactory.Paper : new Color(0.86f, 0.86f, 0.86f), Color.white, e) : UIFactory.Muted;
+            // Dark ink on the amber fill, light text on the transparent rows.
+            _label.color = !lEnabled ? UIFactory.Muted : _primary ? UIFactory.Ink : Color.Lerp(new Color(0.86f, 0.86f, 0.86f), Color.white, e);
         }
     }
 

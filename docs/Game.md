@@ -77,7 +77,8 @@ markers, 40+ weapon spots and three spots per unique weapon.
   hurt vignette, squash and stretch, fluff puffs on hits, explosions with fireball, shockwave,
   debris and light flash, smoke clouds, hitmarkers, damage arcs, kill feed, banners.
 - **Online**: Steam (Facepunch transport, App ID 480 for now) with room codes, friends rooms and
-  invites; LAN/IP and solo through Unity Transport. Proximity voice chat on Steam Voice, relayed by
+  invites; LAN/IP and solo through Unity Transport. The agent name is the typed nickname, else the
+  Steam persona. Proximity voice chat on Steam Voice, relayed by
   the host to players within 30 m (host toggle in the lobby; push-to-talk B or open mic).
 
 ## Architecture invariants

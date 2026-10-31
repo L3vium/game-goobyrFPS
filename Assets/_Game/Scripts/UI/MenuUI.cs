@@ -281,6 +281,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
         private void Update()
         {
+            // Steam comes up after the menu: show its persona until the player types a nickname.
+            if (_name != null && !_name.isFocused && !PlayerIdentity.HasCustomName && _name.text != PlayerIdentity.LocalName) _name.SetTextWithoutNotify(PlayerIdentity.LocalName);
             if (_current == Screen.Lobby && !NetworkManagerListening() && Time.timeSinceLevelLoad > 1f && (NetSession.Instance == null || NetSession.Instance.Kind == SessionKind.None)) Show(Screen.Main);
             if (_current != Screen.Lobby) return;
 

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Agent name: the nickname typed in the menu wins over the Steam persona, is saved, and updates live
+  for everyone already in the room; until one is typed the field follows the Steam persona as soon
+  as Steam comes up.
 - No more screen vignette when crouching or hiding (concealment will show on the HUD). The camera
   sits higher: eyes at 1.74 m standing, 0.98 m crouched (NPC sight uses the same heights).
 - The cursor stays locked in the game window during a match: the lock is re-applied every frame the

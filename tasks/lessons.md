@@ -76,3 +76,18 @@ Rules I write for myself after a correction. Read at the start of every session.
 - **A new script Unity never imported stays out of the compile.** When the run shows fewer tests
   than written, check `CompilationPipeline.GetAssemblies(...).sourceFiles`; renaming the file (and
   its .meta) on disk forces a clean import. Count the tests after every new test file.
+
+## 2026-11-01 — 0.5 judged ugly, buggy, dumb AI, bad LD; "not merged to main"
+- **main must look like its own branch.** A fast-forward merge leaves main and dev on the same
+  commit, so Fork draws one line and the user believes nothing was merged. Merge with
+  `git merge --no-ff dev -m "Release x.y.z"`; never `--ff-only`.
+- **Realistic means real PBR sources.** Stylized/low-poly is rejected. Art comes from Poly Haven
+  (CC0 textures, models, HDRIs, via its API), MakeHuman/MPFB (CC0 humans) and CMU mocap,
+  processed by scripts in `Tools/` and credited in `docs/Credits.md`. Still no store packs and no
+  accounts. This replaces "generated only".
+- **Sound: tune hearing to the sight range.** A noise radius several times the vision range with no
+  wall occlusion and no responder cap makes every NPC on the map converge. Hearing is graded,
+  occluded, and only the 1-2 nearest respond.
+- **Parkour probes must handle thin geometry.** Probe ledges at several depths past the face
+  (walls and sills are 0.3 m), and grab ledges in the air.
+- **No isolated NPCs.** Every guard belongs to a bastion, a perimeter, a scene or a patrol.

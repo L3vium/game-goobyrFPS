@@ -9,11 +9,13 @@ validate through Unity MCP, `tasks/lessons.md` after every correction).
 - **Commit and push every change, one change at a time** to `origin dev`.
 - **End of every prompt:** player build (`Goobyr/Build/Player`, output `Builds/Windows/GoobyrFPS.exe`,
   versioned through LFS), commit + push it, then
-  `git checkout main && git merge --ff-only dev && git push origin main && git checkout dev`.
+  `git checkout main && git merge --no-ff dev -m "Release x.y.z" && git push origin main && git checkout dev`
+  (`--no-ff`, so main gets its own merge commits and stays a distinct line in Fork).
 
 ## Unity access
 
-The editor stays open with MCP for Unity on `http://localhost:8084/mcp`, so batchmode is not
+The editor stays open with MCP for Unity on `http://localhost:8082/mcp` (driven over HTTP with
+`python Tools/unity_mcp.py <tool> '<json>'`), so batchmode is not
 available (the project is locked). Compile, console, tests, builders and the player build all go
 through MCP (`refresh_unity`, `read_console`, `run_tests`, `execute_menu_item`).
 

@@ -20,7 +20,8 @@ namespace Com.IsartDigital.GoobyrFPS.Net
 
     /// <summary>
     /// Starts and stops a session, whichever transport it rides on, and runs the host side of the
-    /// room: approval (8 players, lobby only), seats, and the <see cref="LobbyState"/> object.
+    /// room: approval (8 agents in the lobby, plus casters who may also join a running match), seats,
+    /// and the <see cref="LobbyState"/> object.
     /// Lives on the persistent GameRoot prefab next to the NetworkManager.
     /// <para>
     /// The Steam transport sits on its own child, switched off until a Steam option is picked:
@@ -31,6 +32,9 @@ namespace Com.IsartDigital.GoobyrFPS.Net
     public class NetSession : MonoBehaviour
     {
         public const ushort PORT = 7787;
+        /// <summary>Casters a room takes on top of its agents.</summary>
+        public const int MAX_CASTERS = 4;
+        private const byte PAYLOAD_CASTER = 1;
 
         public static NetSession Instance { get; private set; }
         public static event Action<string> OnStatus;
@@ -101,6 +105,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
 
         public void HostLocal()
         {
+            PlayerIdentity.JoinAsCaster = false;
             UseUnityTransport();
             _unityTransport.SetConnectionData("0.0.0.0", PORT, "0.0.0.0");
             Kind = SessionKind.Local;
@@ -113,6 +118,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             UseUnityTransport();
             _unityTransport.SetConnectionData(string.IsNullOrWhiteSpace(pAddress) ? "127.0.0.1" : pAddress.Trim(), PORT);
             Kind = SessionKind.Local;
+            SetJoinPayload();
             if (_networkManager.StartClient()) Status("CONNECTING TO " + pAddress + "...");
             else Status("COULD NOT CONNECT");
         }
@@ -122,6 +128,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         {
             _soloMap = pMapIndex;
             _soloMode = pMode;
+            PlayerIdentity.JoinAsCaster = false;
             UseUnityTransport();
             _unityTransport.SetConnectionData("127.0.0.1", PORT, "127.0.0.1");
             Kind = SessionKind.Local;
@@ -130,6 +137,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
 
         public void HostSteam(bool pFriendsOnly)
         {
+            PlayerIdentity.JoinAsCaster = false;
             UseSteamTransport();
             Kind = SessionKind.Steam;
             if (_networkManager.StartHost())
@@ -154,6 +162,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             UseSteamTransport();
             _steamTransport.targetSteamId = pOwner;
             Kind = SessionKind.Steam;
+            SetJoinPayload();
             if (_networkManager.StartClient()) Status("CONNECTING THROUGH STEAM...");
             else Status("COULD NOT CONNECT THROUGH STEAM");
         }
@@ -181,6 +190,12 @@ namespace Com.IsartDigital.GoobyrFPS.Net
                 UnityEngine.SceneManagement.SceneManager.LoadScene(GameScenes.TITLE);
         }
 
+        /// <summary>The connection request says whether we come to play or to cast.</summary>
+        private void SetJoinPayload()
+        {
+            _networkManager.NetworkConfig.ConnectionData = new[] { PlayerIdentity.JoinAsCaster ? PAYLOAD_CASTER : (byte)0 };
+        }
+
         private void UseUnityTransport()
         {
             _networkManager.NetworkConfig.NetworkTransport = _unityTransport;
@@ -197,12 +212,15 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         private void Approve(NetworkManager.ConnectionApprovalRequest pRequest, NetworkManager.ConnectionApprovalResponse pResponse)
         {
             bool lHostItself = pRequest.ClientNetworkId == NetworkManager.ServerClientId;
-            bool lFull = _networkManager.ConnectedClientsIds.Count >= GameDatabase.Rules.maxPlayers;
-            bool lInMatch = LobbyState.Instance != null && LobbyState.Instance.Phase.Value != MatchPhase.Lobby;
+            bool lCaster = pRequest.Payload != null && pRequest.Payload.Length > 0 && pRequest.Payload[0] == PAYLOAD_CASTER;
+            int lCasters = LobbyPlayer.CasterCount();
+            bool lFull = lCaster ? lCasters >= MAX_CASTERS : _networkManager.ConnectedClientsIds.Count - lCasters >= GameDatabase.Rules.maxPlayers;
+            // Agents join in the lobby only; casters may come in at any time to watch.
+            bool lInMatch = !lCaster && LobbyState.Instance != null && LobbyState.Instance.Phase.Value != MatchPhase.Lobby;
 
             pResponse.Approved = lHostItself || (!lFull && !lInMatch);
             pResponse.CreatePlayerObject = pResponse.Approved;
-            pResponse.Reason = lFull ? "ROOM FULL" : lInMatch ? "MATCH IN PROGRESS" : "";
+            pResponse.Reason = lFull ? (lCaster ? "NO CASTER SEAT LEFT" : "ROOM FULL") : lInMatch ? "MATCH IN PROGRESS - JOIN AS A CASTER TO WATCH" : "";
         }
 
         private void HandleServerStarted()

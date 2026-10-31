@@ -36,6 +36,21 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             }
         }
 
+        /// <summary>
+        /// Join (or stay in) rooms as a caster: watch every agent from the multi-feed view, never play.
+        /// Sent with the connection request, so a caster may also join a match already running.
+        /// </summary>
+        public static bool JoinAsCaster
+        {
+            get => _joinAsCaster;
+            set
+            {
+                _joinAsCaster = value;
+                if (LobbyPlayer.Local != null && LobbyPlayer.Local.IsSpawned) LobbyPlayer.Local.Caster.Value = value;
+            }
+        }
+        private static bool _joinAsCaster;
+
         public static ulong LocalSteamId => SteamLobby.Instance != null && SteamLobby.Instance.IsReady ? SteamLobby.Instance.SteamId : 0;
     }
 }

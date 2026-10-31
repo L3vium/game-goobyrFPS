@@ -26,18 +26,20 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         public static void Show(MatchOutcome pOutcome, bool pWon, string pWinners, string pMethod)
         {
             if (_instance == null) _instance = new GameObject("EndScreen").AddComponent<EndScreen>();
+            bool lCaster = LobbyPlayer.Local != null && LobbyPlayer.Local.Caster.Value;
             string lTitle = pOutcome switch
             {
-                MatchOutcome.Extracted => pWon ? "CONTRACT COMPLETE" : "CONTRACT LOST",
+                MatchOutcome.Extracted => pWon || lCaster ? "CONTRACT COMPLETE" : "CONTRACT LOST",
                 MatchOutcome.AllEliminated => "EVERYONE IS DOWN",
                 _ => "TIME IS UP"
             };
             _instance._title.text = lTitle;
-            _instance._title.color = pWon ? UIFactory.Good : UIFactory.Danger;
+            // A caster won nothing and lost nothing: the result reads neutral.
+            _instance._title.color = lCaster ? UIFactory.Paper : pWon ? UIFactory.Good : UIFactory.Danger;
             string lBody = pOutcome == MatchOutcome.Extracted ? "EXTRACTED BY " + pWinners : "NOBODY EXTRACTED THE PROOF";
             if (!string.IsNullOrEmpty(pMethod)) lBody += "\nTARGET: " + pMethod;
             lBody += "\n\n";
-            foreach (LobbyPlayer lPlayer in LobbyPlayer.All)
+            foreach (LobbyPlayer lPlayer in LobbyPlayer.Agents())
                 lBody += "<color=#" + ColorUtility.ToHtmlStringRGB(LobbyPlayer.TeamColor(lPlayer.Team.Value)) + ">" + lPlayer.Name.ToUpperInvariant() + "</color>   " + lPlayer.Kills.Value + " PLAYERS  -  " + lPlayer.NpcKills.Value + " NPC\n";
             _instance._body.text = lBody;
             _instance._time = 0f;
@@ -45,7 +47,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             bool lHost = LobbyState.Instance != null && LobbyState.Instance.IsServer;
             _instance._lobby.gameObject.SetActive(lHost);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject((lHost ? _instance._lobby : _instance._leave).gameObject);
-            Audio.Sfx.Play2D(pWon ? "win" : "lose", 1f);
+            Audio.Sfx.Play2D(pWon || lCaster ? "win" : "lose", 1f);
         }
 
         private void Awake()

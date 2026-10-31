@@ -36,6 +36,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private TextMeshProUGUI _status, _menuHint, _code, _mapName, _mapDescription, _playerCount, _startHint;
         private TMP_InputField _joinCode, _joinIp, _name;
         private Button _startButton, _readyButton, _copyButton, _firstMain, _shuffle, _invite;
+        private Toggle _casterSwitch;
         private RawImage _mapPicture;
         private GameObject _mapArrows, _teamsRow, _teamPicker;
         private System.Action<string> _setTeamCount;
@@ -48,6 +49,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             GameInput.GameplayEnabled = false;
             GameInput.LockCursor(false);
             Hud.Remove();
+            CasterView.Stop();
             Spectator.Stop();
             GoobRagdoll.ClearAll();
 
@@ -206,11 +208,16 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             UIFactory.Button(p, "JOIN", TL, new Vector2(110 + 420 + 20, -390), new Vector2(220, 72), UIFactory.Accent, JoinByCode, 30);
             Label(p, "A STEAM INVITE (SHIFT + TAB) JOINS DIRECTLY.", 16, UIFactory.Muted, 110, 490, 900, 24, false, 3f);
 
-            Header(p, "DIRECT IP  ·  SAME NETWORK", 110, 570);
-            _joinIp = UIFactory.Input(p, "192.168.1.20", TL, new Vector2(110, -620), new Vector2(420, 52));
-            UIFactory.Button(p, "CONNECT", TL, new Vector2(110 + 420 + 20, -620), new Vector2(220, 52), UIFactory.Accent2, () => { NetSession.Instance.JoinLocal(_joinIp.text); Show(Screen.Lobby); }, 24);
+            // Casters watch every agent at once (tournament view) and may join a contract already running.
+            RectTransform lCaster = UIWidgets.List(p, "Caster", TL, new Vector2(110 + 330, -540), 660f);
+            UIWidgets.Switch(lCaster, "Join as a caster  ·  watch, don't play", PlayerIdentity.JoinAsCaster, v => PlayerIdentity.JoinAsCaster = v);
+            Label(p, "UP TO FOUR LIVE FEEDS, FREE CAMERA AND TACTICAL MAP. WORKS DURING A CONTRACT TOO.", 14, UIFactory.Muted, 110, 606, 900, 22, false, 3f);
 
-            UIFactory.Button(p, "BACK", TL, new Vector2(110, -780), new Vector2(300, 56), UIFactory.Accent2, () => Show(Screen.Main), 26);
+            Header(p, "DIRECT IP  ·  SAME NETWORK", 110, 670);
+            _joinIp = UIFactory.Input(p, "192.168.1.20", TL, new Vector2(110, -720), new Vector2(420, 52));
+            UIFactory.Button(p, "CONNECT", TL, new Vector2(110 + 420 + 20, -720), new Vector2(220, 52), UIFactory.Accent2, () => { NetSession.Instance.JoinLocal(_joinIp.text); Show(Screen.Lobby); }, 24);
+
+            UIFactory.Button(p, "BACK", TL, new Vector2(110, -860), new Vector2(300, 56), UIFactory.Accent2, () => Show(Screen.Main), 26);
         }
 
         private void JoinByCode()
@@ -285,6 +292,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 UIFactory.Rule(lTeamButton.transform, new Vector2(0.5f, 0), new Vector2(0, 2), 50, false, LobbyPlayer.TeamColor(i), 4f);
             }
             UIWidgets.Switch(lOptions, "Proximity voice chat", true, v => { if (LobbyState.Instance != null) LobbyState.Instance.ProximityChat.Value = v; });
+            _casterSwitch = UIWidgets.Switch(lOptions, "Watch as a caster", PlayerIdentity.JoinAsCaster, v => PlayerIdentity.JoinAsCaster = v);
             RectTransform lShuffleRow = UIWidgets.Row(lOptions, "Shuffle the teams");
             _shuffle = UIFactory.Button(lShuffleRow, "SHUFFLE", new Vector2(1, 0.5f), new Vector2(-22, 0), new Vector2(160, 40), UIFactory.Accent2, ShuffleTeams, 20);
             RectTransform lInviteRow = UIWidgets.Row(lOptions, "Invite Steam friends");
@@ -293,7 +301,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             // Column 3: the agents and the start.
             Header(p, "AGENTS", 1430, 180);
             _playerCount = Label(p, "", 15, UIFactory.Muted, 1430, 180, 380, 22, true, 4f, TextAlignmentOptions.TopRight);
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 12; i++)
             {
                 RectTransform lRow = Box(p, "Agent" + i, 1430, 230 + i * 50, 380, 44);
                 lRow.gameObject.AddComponent<Image>().color = new Color(1, 1, 1, 0.04f);
@@ -381,8 +389,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             LobbyState lState = LobbyState.Instance;
             if (lState == null || !lState.IsServer) return;
-            List<int> lTeams = MatchRulesLogic.AutoBalance(LobbyPlayer.All.Count, lState.TeamCount.Value);
-            List<LobbyPlayer> lShuffled = new List<LobbyPlayer>(LobbyPlayer.All);
+            List<LobbyPlayer> lShuffled = LobbyPlayer.Agents();
+            List<int> lTeams = MatchRulesLogic.AutoBalance(lShuffled.Count, lState.TeamCount.Value);
             for (int i = 0; i < lShuffled.Count; i++) { int j = Random.Range(i, lShuffled.Count); (lShuffled[i], lShuffled[j]) = (lShuffled[j], lShuffled[i]); }
             for (int i = 0; i < lShuffled.Count; i++) lShuffled[i].ChooseTeamRpc(lTeams[i]);
             lState.Invoke(nameof(LobbyState.ResolveTeams), 0.3f);
@@ -398,7 +406,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             LobbyState lState = LobbyState.Instance;
             bool lHost = lState != null && lState.IsServer;
             _startButton.gameObject.SetActive(lHost);
-            _readyButton.gameObject.SetActive(!lHost);
+            _readyButton.gameObject.SetActive(!lHost && (LobbyPlayer.Local == null || !LobbyPlayer.Local.Caster.Value));
             _mapArrows.SetActive(lHost);
             if (lState == null)
             {
@@ -433,25 +441,34 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _code.text = lSteamRoom ? "ROOM CODE   <color=#F5A12B>" + SteamLobby.Instance.Code + "</color>" : NetSession.Instance != null && NetSession.Instance.Kind == SessionKind.Local ? (LobbyPlayer.All.Count <= 1 ? "SOLO" : "LOCAL NETWORK") : "";
             _copyButton.gameObject.SetActive(lSteamRoom);
 
+            if (LobbyPlayer.Local != null && _casterSwitch.isOn != LobbyPlayer.Local.Caster.Value) _casterSwitch.isOn = LobbyPlayer.Local.Caster.Value;
+
+            // Agents first, then the casters (they watch: no team, no ready check).
+            List<LobbyPlayer> lRoster = LobbyPlayer.Agents();
+            int lAgentCount = lRoster.Count;
+            foreach (LobbyPlayer lPlayer in LobbyPlayer.All) if (lPlayer.Caster.Value) lRoster.Add(lPlayer);
             int lWaiting = 0;
             for (int i = 0; i < _agents.Count; i++)
             {
                 (RectTransform lRow, Image lBar, TextMeshProUGUI lName, TextMeshProUGUI lTeam, TextMeshProUGUI lStateText) = _agents[i];
-                LobbyPlayer lPlayer = i < LobbyPlayer.All.Count ? LobbyPlayer.All[i] : null;
+                LobbyPlayer lPlayer = i < lRoster.Count ? lRoster[i] : null;
                 lRow.gameObject.SetActive(lPlayer != null);
                 if (lPlayer == null) continue;
                 bool lIsHost = lPlayer.OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId;
-                if (!lIsHost && !lPlayer.Ready.Value) lWaiting++;
-                lBar.color = LobbyPlayer.TeamColor(lPlayer.Team.Value);
+                bool lCaster = lPlayer.Caster.Value;
+                if (!lIsHost && !lCaster && !lPlayer.Ready.Value) lWaiting++;
+                lBar.color = lCaster ? new Color(1, 1, 1, 0.25f) : LobbyPlayer.TeamColor(lPlayer.Team.Value);
                 lName.text = lPlayer.Name.ToUpperInvariant() + (lPlayer == LobbyPlayer.Local ? "  <color=#9EA0A6><size=70%>YOU</size></color>" : "");
-                lTeam.text = lTeams ? "TEAM " + (lPlayer.Team.Value + 1) : "";
-                lStateText.text = lIsHost ? "HOST" : lPlayer.Ready.Value ? "READY" : "WAITING";
-                lStateText.color = lIsHost ? UIFactory.Accent : lPlayer.Ready.Value ? UIFactory.Good : UIFactory.Muted;
+                lTeam.text = lTeams && !lCaster ? "TEAM " + (lPlayer.Team.Value + 1) : "";
+                lStateText.text = lCaster ? (lIsHost ? "HOST · CASTER" : "CASTER") : lIsHost ? "HOST" : lPlayer.Ready.Value ? "READY" : "WAITING";
+                lStateText.color = lCaster ? ThreatMarkers.Blue : lIsHost ? UIFactory.Accent : lPlayer.Ready.Value ? UIFactory.Good : UIFactory.Muted;
             }
-            _playerCount.text = LobbyPlayer.All.Count + " / " + GameDatabase.Rules.maxPlayers;
-            _startButton.interactable = lWaiting == 0;
+            int lCasters = lRoster.Count - lAgentCount;
+            _playerCount.text = lAgentCount + " / " + GameDatabase.Rules.maxPlayers + (lCasters > 0 ? "  ·  " + lCasters + " CASTER" + (lCasters > 1 ? "S" : "") : "");
+            _startButton.interactable = lWaiting == 0 && lAgentCount > 0;
             _startHint.text = lHost
-                ? lWaiting > 0 ? "WAITING FOR " + lWaiting + " AGENT" + (lWaiting > 1 ? "S" : "") + " TO BE READY" : "EVERYONE IS READY"
+                ? lAgentCount == 0 ? "AT LEAST ONE AGENT MUST PLAY"
+                : lWaiting > 0 ? "WAITING FOR " + lWaiting + " AGENT" + (lWaiting > 1 ? "S" : "") + " TO BE READY" : "EVERYONE IS READY"
                 : "THE HOST STARTS THE CONTRACT";
             TextMeshProUGUI lReadyLabel = _readyButton.GetComponentInChildren<TextMeshProUGUI>();
             if (LobbyPlayer.Local != null) lReadyLabel.text = LobbyPlayer.Local.Ready.Value ? "NOT READY" : "READY";

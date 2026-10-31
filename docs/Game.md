@@ -15,8 +15,9 @@ it goes loud, everyone is lethal both ways.
 
 Every player starts together at one of the map's start points (drawn per match among those with no
 NPC post or patrol point within 50 m) with the starting
-loadout (GD Tool; hush pistol + coins by default). Death = eliminated, then spectate (teammates,
-or anyone in FFA). The match ends on an extraction, when every player is eliminated, or at the
+loadout (GD Tool; hush pistol + coins by default). Death = eliminated: a 1.2 s look at your body,
+then the caster view restricted to whom you may watch (teammates in Teams, anyone in FFA and co-op;
+no free camera or map in Teams). The match ends on an extraction, when every player is eliminated, or at the
 time limit (draw); the end screen's buttons go back to the lobby (host) or leave the room at once. The proof carrier is revealed to everyone every 10 s.
 
 ## Maps (three zones each, each with its own reinforcements)
@@ -115,6 +116,33 @@ grass fields, NPC posts on the NavMesh and no prop floating over the terrain. Wa
   Steam persona. Proximity voice chat on Steam Voice, relayed by
   the host to players within 30 m (host toggle in the lobby; push-to-talk B or open mic).
 
+## Casters (tournament spectators)
+A player can join a room as a **caster**: no avatar, no team, never counted by the rules, the
+voice never recorded (it needs a living avatar). Up to 4 casters on top of the 8 agents; casters
+(not agents) may also join a contract already running (`NetSession` approval reads a one-byte
+connection payload, `PlayerIdentity.JoinAsCaster`). Join screen switch "Join as a caster", or the
+briefing switch "Watch as a caster" (the host can cast its own room; at least one agent must play).
+
+The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
+`Player/CasterLayoutLogic`, tested):
+- up to **4 live feeds at once**, each its own camera; layouts single, duo (two 16:9 side by side),
+  2x2, and main + 3 small ones with the agent cards in the band below;
+- a feed shows an agent from behind the shoulder (orbit with right-drag or the right stick, zoom
+  with the wheel) or through their eyes (their head hidden for that camera only), flies freely
+  (WASD/ZQSD, E/Q or triggers up and down, Shift fast), or shows the tactical map (agents, NPCs
+  coloured by state, target, proof, extractions);
+- **focus**: the selected feed full screen (F, double-click, D-pad down), or it and the main feed
+  side by side (Shift+F); again to go back;
+- the **8 agent cards** (number, team, health, state, kills, which feeds show them): 1-8 or a click
+  puts the agent on the selected feed; Enter promotes the selected feed to main;
+- the **auto-director** (P) keeps the agent worth watching on the main feed (proof carrier, fights,
+  spotted, hit, close to the target), holds a pick 5 s and switches only for clearly better; a
+  manual change of the main feed pauses it 15 s. A feed whose agent dies stays 3 s, then takes the
+  next agent nobody watches;
+- names over every agent and the target in each feed, a plate per feed (team, health, weapon,
+  hidden / in the grass / underwater / spotted / combat / proof), the top bar (map, mode, clock,
+  contract), H hides everything for a clean stream. The audio follows the selected feed.
+
 ## Architecture invariants
 - Host-authoritative: AI, damage, match state, inventory, pickups, proof, fire, systems. Player
   movement is owner-authoritative (NetworkTransform owner mode); shots are predicted by the owner
@@ -133,6 +161,10 @@ grass fields, NPC posts on the NavMesh and no prop floating over the terrain. Wa
 Move WASD/ZQSD · look mouse · fire LMB · aim RMB · reload R · interact F · crouch Ctrl/C · jump Space ·
 sprint Shift (hold) · crouch-slide Ctrl/C while moving · punch V/MMB · throw G · detonate T · slots 1-6 / wheel · map M ·
 instinct Tab (hold) · scoreboard ` (key left of 1, ² on AZERTY) · push-to-talk B · pause Esc.
+
+Caster view: agents 1-8 · next agent arrows / LB RB · feed Tab / D-pad left right · layouts F1-F4 /
+D-pad up · focus F (Shift+F: with the main feed) / D-pad down · to main Enter / A · eyes-chase V / X ·
+free camera C / Y · tactical map T / B · auto-director P / R3 · hide overlays H · reset camera R.
 
 ## Interface
 Restrained and typographic (Barlow), dark panels, thin rules, one accent: signal amber (red only for

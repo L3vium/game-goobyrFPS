@@ -122,7 +122,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _open = pOpen;
             _panel.SetActive(pOpen);
             GameInput.GameplayEnabled = !pOpen;
-            GameInput.LockCursor(!pOpen);
+            // The caster view keeps the cursor free (it clicks feeds and cards).
+            GameInput.LockCursor(!pOpen && !CasterView.Active);
             Audio.Sfx.Play2D("map", 0.5f);
             if (pOpen)
             {

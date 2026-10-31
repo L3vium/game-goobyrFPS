@@ -381,10 +381,12 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 bool lExtracting = lMe != null && lMe.CarriesProof.Value && lDirector.ExtractProgress.Value > 0f;
                 _extractBar.gameObject.SetActive(lExtracting);
                 if (lExtracting) _extractFill.rectTransform.sizeDelta = new Vector2(420 * Mathf.Clamp01(lDirector.ExtractProgress.Value), 26);
-                UpdateWorldMarkers(lDirector, lMe);
+                if (!CasterView.Active) UpdateWorldMarkers(lDirector, lMe);
+                else ClearWorldMarkers();
             }
 
-            _spectating.text = EndScreen.IsShown ? "" : Spectator.Active && Spectator.Instance.Watched != null ? "SPECTATING " + Spectator.Instance.Watched.DisplayName.ToUpperInvariant() + "   <size=70%>[SPACE] NEXT   [ESC] LEAVE</size>" : Spectator.Active ? "ELIMINATED   <size=70%>[ESC] LEAVE</size>" : "";
+            // The caster view (casters, and agents once eliminated) draws its own read-out.
+            _spectating.text = EndScreen.IsShown || CasterView.Active ? "" : Spectator.Active ? "ELIMINATED   <size=70%>[ESC] LEAVE</size>" : "";
 
             // Voice.
             string lTalking = "";
@@ -406,7 +408,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             UpdateDamageArcs(lMe);
 
             bool lBoard = GameInput.ScoreboardHeld || (lDirector != null && lDirector.Phase.Value == MatchPhase.Ended);
-            _scoreboardPanel.gameObject.SetActive(GameInput.ScoreboardHeld);
+            _scoreboardPanel.gameObject.SetActive(GameInput.ScoreboardHeld && !CasterView.Active);
             if (lBoard) _scoreboard.text = Scoreboard();
         }
 
@@ -467,6 +469,12 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             foreach (string lKey in lRemove) { Destroy(_worldMarkers[lKey].gameObject); _worldMarkers.Remove(lKey); }
         }
 
+        private void ClearWorldMarkers()
+        {
+            foreach (TextMeshProUGUI lText in _worldMarkers.Values) Destroy(lText.gameObject);
+            _worldMarkers.Clear();
+        }
+
         private void Marker(HashSet<string> pUsed, Camera pCamera, string pKey, Vector3 pWorld, string pText)
         {
             pUsed.Add(pKey);
@@ -489,7 +497,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             System.Text.StringBuilder lBuilder = new System.Text.StringBuilder();
             lBuilder.Append("<size=120%>PLAYERS</size>\n\n");
-            foreach (LobbyPlayer lPlayer in LobbyPlayer.All)
+            foreach (LobbyPlayer lPlayer in LobbyPlayer.Agents())
             {
                 string lColor = ColorUtility.ToHtmlStringRGB(LobbyPlayer.TeamColor(lPlayer.Team.Value));
                 lBuilder.Append("<color=#").Append(lColor).Append(">").Append(lPlayer.Name).Append("</color>")

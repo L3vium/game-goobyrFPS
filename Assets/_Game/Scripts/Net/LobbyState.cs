@@ -63,8 +63,9 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         public void ResolveTeams()
         {
             if (!IsServer) return;
-            foreach (LobbyPlayer lPlayer in LobbyPlayer.All)
-                lPlayer.Team.Value = MatchRulesLogic.ResolveTeam(Mode.Value, lPlayer.Seat.Value, lPlayer.ChosenTeam.Value, TeamCount.Value);
+            // A copy: each team change re-sorts LobbyPlayer.All.
+            foreach (LobbyPlayer lPlayer in new System.Collections.Generic.List<LobbyPlayer>(LobbyPlayer.All))
+                lPlayer.Team.Value = lPlayer.Caster.Value ? MatchRulesLogic.NO_TEAM : MatchRulesLogic.ResolveTeam(Mode.Value, lPlayer.Seat.Value, lPlayer.ChosenTeam.Value, TeamCount.Value);
         }
 
         /// <summary>Host side: starts the match on the chosen map.</summary>
@@ -72,7 +73,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         {
             if (!IsServer || Phase.Value != MatchPhase.Lobby) return;
             MapDefinition lMap = Map;
-            if (lMap == null) return;
+            if (lMap == null || LobbyPlayer.Agents().Count == 0) return;
 
             ResolveTeams();
             Phase.Value = MatchPhase.Loading;

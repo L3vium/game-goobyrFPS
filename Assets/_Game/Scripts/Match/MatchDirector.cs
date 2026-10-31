@@ -32,6 +32,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
     /// <item>the target dies: the proof drops; whoever carries it is revealed to all every few seconds
     /// and must hold an active extraction point for a moment to win - for their team;</item>
     /// <item>players who die are out and spectate. The match ends on extraction, wipe-out or time.</item>
+    /// <item>casters get no avatar and watch every agent from the <see cref="CasterView"/>.</item>
     /// </list>
     /// Clients read the state from the network variables (HUD, map screen, end screen).
     /// </summary>
@@ -90,6 +91,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             GoobRagdoll.ClearAll();
             LkpGhost.Clear();
             Spectator.Stop();
+            CasterView.Stop();
         }
 
         public static void RegisterTargetRagdoll(GoobRagdoll pRagdoll) => _targetRagdoll = pRagdoll;
@@ -120,11 +122,13 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             List<MatchPoint> lStarts = MatchPoint.OfKind(MatchPoint.Kind.Start);
             int lStartIndex = MatchRulesLogic.PickSafeStart(lStarts.ConvertAll(pPoint => pPoint.transform.position), ThreatPositions(), lRandom);
             Transform lStart = lStartIndex >= 0 ? lStarts[lStartIndex].transform : transform;
+            // Casters only watch: no avatar for them.
+            List<LobbyPlayer> lAgents = LobbyPlayer.Agents();
             int lIndex = 0;
-            foreach (LobbyPlayer lPlayer in LobbyPlayer.All)
+            foreach (LobbyPlayer lPlayer in lAgents)
             {
-                float lAngle = lIndex * Mathf.PI * 2f / Mathf.Max(1, LobbyPlayer.All.Count);
-                Vector3 lPosition = lStart.position + new Vector3(Mathf.Cos(lAngle), 0, Mathf.Sin(lAngle)) * (LobbyPlayer.All.Count > 1 ? 2.2f : 0f) + Vector3.up * 0.2f;
+                float lAngle = lIndex * Mathf.PI * 2f / Mathf.Max(1, lAgents.Count);
+                Vector3 lPosition = lStart.position + new Vector3(Mathf.Cos(lAngle), 0, Mathf.Sin(lAngle)) * (lAgents.Count > 1 ? 2.2f : 0f) + Vector3.up * 0.2f;
                 NetworkObject lAvatar = Instantiate(NetPrefabs.Instance.playerAvatar, lPosition, lStart.rotation);
                 lAvatar.SpawnWithOwnership(lPlayer.OwnerClientId, true);
                 lAvatar.GetComponent<PlayerAvatar>().TeleportOwnerRpc(lPosition, lStart.eulerAngles.y);
@@ -319,6 +323,8 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
         private void Update()
         {
+            // A caster (from the lobby, or joining mid-match) watches from the multi-feed view.
+            if (IsSpawned && Phase.Value != MatchPhase.Loading && !CasterView.Active && LobbyPlayer.Local != null && LobbyPlayer.Local.Caster.Value) CasterView.Begin(false);
             if (!IsServer || !IsSpawned) return;
 
             if (Phase.Value == MatchPhase.Ended)
@@ -354,7 +360,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             else if (ExtractProgress.Value > 0f) ExtractProgress.Value = 0f;
 
             List<RulesPlayer> lPlayers = new List<RulesPlayer>();
-            foreach (LobbyPlayer lPlayer in LobbyPlayer.All) lPlayers.Add(new RulesPlayer { clientId = lPlayer.OwnerClientId, team = lPlayer.Team.Value, alive = lPlayer.Alive.Value });
+            foreach (LobbyPlayer lPlayer in LobbyPlayer.Agents()) lPlayers.Add(new RulesPlayer { clientId = lPlayer.OwnerClientId, team = lPlayer.Team.Value, alive = lPlayer.Alive.Value });
             MatchOutcome lOutcome = MatchRulesLogic.Evaluate(lPlayers, WinnerTeam.Value, TimeLeft.Value);
             if (lOutcome != MatchOutcome.None) EndMatchServer(lOutcome);
         }
@@ -383,7 +389,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             if (pOutcome == MatchOutcome.Extracted)
             {
                 List<string> lNames = new List<string>();
-                foreach (LobbyPlayer lPlayer in LobbyPlayer.All) if (lPlayer.Team.Value == WinnerTeam.Value) lNames.Add(lPlayer.Name);
+                foreach (LobbyPlayer lPlayer in LobbyPlayer.Agents()) if (lPlayer.Team.Value == WinnerTeam.Value) lNames.Add(lPlayer.Name);
                 lWinner = string.Join(", ", lNames);
             }
             EndRpc(pOutcome, WinnerTeam.Value, lWinner.ToUpperInvariant(), _killMethod);

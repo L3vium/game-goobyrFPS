@@ -11,7 +11,8 @@ namespace Com.IsartDigital.GoobyrFPS.Net
     /// <summary>
     /// One connected player, from the lobby to the end screen: NGO's player object. It survives
     /// scene loads (spawned with <c>destroyWithScene: false</c>) and carries what the menus and the
-    /// match need - name, seat, chosen team, ready flag, alive flag, score.
+    /// match need - name, seat, chosen team, ready flag, alive flag, score, and whether they play
+    /// (an agent) or only watch (a caster, see <c>CasterView</c>).
     /// The avatar walking on the map is a different object (<c>PlayerAvatar</c>), spawned per match.
     /// </summary>
     public class LobbyPlayer : NetworkBehaviour
@@ -29,9 +30,27 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         public readonly NetworkVariable<bool> Alive = new NetworkVariable<bool>(false);
         public readonly NetworkVariable<int> Kills = new NetworkVariable<int>(0);
         public readonly NetworkVariable<int> NpcKills = new NetworkVariable<int>(0);
+        /// <summary>Watches the match from the caster view instead of playing: no avatar, no seat among the agents.</summary>
+        public readonly NetworkVariable<bool> Caster = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> TalkingNow = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         public string Name => DisplayName.Value.ToString();
+        public bool IsAgent => !Caster.Value;
+
+        /// <summary>The players who play, in seat order (casters left out).</summary>
+        public static List<LobbyPlayer> Agents()
+        {
+            List<LobbyPlayer> lAgents = new List<LobbyPlayer>(All.Count);
+            foreach (LobbyPlayer lPlayer in All) if (lPlayer.IsAgent) lAgents.Add(lPlayer);
+            return lAgents;
+        }
+
+        public static int CasterCount()
+        {
+            int lCount = 0;
+            foreach (LobbyPlayer lPlayer in All) if (lPlayer.Caster.Value) lCount++;
+            return lCount;
+        }
 
         public override void OnNetworkSpawn()
         {
@@ -42,10 +61,12 @@ namespace Com.IsartDigital.GoobyrFPS.Net
                 Local = this;
                 DisplayName.Value = PlayerIdentity.LocalName;
                 SteamId.Value = PlayerIdentity.LocalSteamId;
+                Caster.Value = PlayerIdentity.JoinAsCaster;
             }
 
             DisplayName.OnValueChanged += Changed;
             Ready.OnValueChanged += Changed;
+            Caster.OnValueChanged += Changed;
             ChosenTeam.OnValueChanged += Changed;
             Team.OnValueChanged += Changed;
             Seat.OnValueChanged += Changed;
@@ -58,6 +79,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             if (Local == this) Local = null;
             DisplayName.OnValueChanged -= Changed;
             Ready.OnValueChanged -= Changed;
+            Caster.OnValueChanged -= Changed;
             ChosenTeam.OnValueChanged -= Changed;
             Team.OnValueChanged -= Changed;
             Seat.OnValueChanged -= Changed;

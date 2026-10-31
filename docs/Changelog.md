@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+- Caster mode, tournament style: join a room (even a contract already running) as a caster to watch
+  instead of playing. Up to four live feeds at once (one, two side by side, 2x2, or a main feed with
+  three small ones), each following an agent from behind (orbit and zoom) or through their eyes, a
+  free camera, or the tactical map with every agent, NPC and objective. Focus one feed or two full
+  screen and back, switch feeds and agents with the keys, the mouse or a gamepad, put any of the 8
+  agents on a feed from their cards (health, state, kills), and let the auto-director keep the
+  action on the main feed. Names over agents, a plate per feed, a contract bar on top; H for a
+  clean stream. Eliminated agents get the same view, limited to the agents they may watch.
 - Version 0.4.0.
 - Sound design rebuilt (still all synthesised, now layered like recorded foley): gunshots with
   crack, body, thump, mechanism and an outdoor tail; footsteps for players and NPCs that follow the

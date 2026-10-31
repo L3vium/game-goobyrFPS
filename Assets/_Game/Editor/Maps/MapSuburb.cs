@@ -317,9 +317,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Watchtower(1, 190f, 40f, 6f, 270f, new Color(0.5f, 0.42f, 0.32f));
             Watchtower(2, -200f, 150f, 6f, 90f, new Color(0.5f, 0.42f, 0.32f));
             K.Point(MatchPoint.Kind.Start, G(-236f, 58f, 0.2f), 100, "West woods trail");
-            K.Point(MatchPoint.Kind.Start, G(236f, -42f, 0.2f), 260, "East trail");
+            K.Point(MatchPoint.Kind.Start, G(236f, -10f, 0.2f), 270, "East trail");
             K.Point(MatchPoint.Kind.Start, G(58f, 236f, 0.2f), 190, "North trail");
-            K.Point(MatchPoint.Kind.Start, G(-130f, -234f, 0.2f), 0, "Ash Avenue south");
+            K.Point(MatchPoint.Kind.Start, G(0f, -236f, 0.2f), 0, "South fields");
             K.Point(MatchPoint.Kind.Extraction, G(-238f, -150f, 0.2f), 270, "Main Street car");
             K.Point(MatchPoint.Kind.Extraction, G(56f, 230f, 0.2f), 0, "North trail truck");
         }

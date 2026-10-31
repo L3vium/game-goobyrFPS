@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Elmridge: the south and east starts move away from the guards (the south one was 3 m from a door
+  guard). The security room's three monitors stand on a three-desk console instead of overlapping in
+  mid-air, and vent grilles sit flush under the ceilings. The validator counts a prop touching a
+  wall or furniture as supported.
 - Map builds snap every NPC post and patrol point that sits a little off the baked NavMesh onto the
   closest walkable point within 4 m (the Elmridge door guard and cinema crowd member included); the
   validator fails NPC posts off the NavMesh.

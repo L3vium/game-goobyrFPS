@@ -492,8 +492,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     Activity(ActivityType.Workout, P(0.5f, 0.5f), lYaw, Z);
                     break;
                 case Room.Security:
-                    Prop("Desk", P(0.5f, 0.8f), lYaw + 180, null, Collide.Box, true);
-                    for (int i = 0; i < 3; i++) Prop("TV", P(0.3f + i * 0.2f, 0.98f) + Vector3.up * 1.4f, lYaw + 180, null, Collide.None);
+                    // A console of three desks, a screen standing on each (the kit TV is 1.2 m wide, the desk 1.4 m).
+                    Vector3 lConsole = P(0.5f, 0.8f), lAlong = Quaternion.Euler(0, lYaw, 0) * Vector3.right;
+                    for (int i = -1; i <= 1; i++)
+                    {
+                        Prop("Desk", lConsole + lAlong * (i * 1.45f), lYaw + 180, null, Collide.Box, i == 0);
+                        Prop("TV", lConsole + lAlong * (i * 1.45f) + Vector3.up * 0.835f, lYaw + 180, null, Collide.None);
+                    }
                     Prop("OfficeChair", P(0.5f, 0.65f), lYaw + 180, null);
                     Activity(ActivityType.Lookout, P(0.5f, 0.6f), lYaw + 180, Z);
                     break;
@@ -578,8 +583,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             List<Transform> lGrills = new List<Transform>();
             for (int f = 0; f < pBuilding.spec.floors; f++)
             {
-                Vector3 lGrill = pBuilding.Local(0, f * STOREY + STOREY - 0.2f, -pBuilding.D * 0.2f);
+                // Flush under the ceiling slab, facing down (the kit grille is a wall piece, back on its origin plane).
+                Vector3 lGrill = pBuilding.Local(0, f * STOREY + STOREY - 0.32f, -pBuilding.D * 0.2f);
                 GameObject lGrillObject = Prop("VentGrill", lGrill, pBuilding.Yaw, null, Collide.None);
+                if (lGrillObject != null) lGrillObject.transform.rotation = Quaternion.Euler(-90f, pBuilding.Yaw + 180f, 0);
                 lGrills.Add(lGrillObject != null ? lGrillObject.transform : VentGrill(lGrill));
             }
             BuildingVolume lVolume = pBuilding.volume;

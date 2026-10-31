@@ -213,9 +213,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Vector3 lFoot = new Vector3(lBounds.center.x, lBounds.min.y, lBounds.center.z);
                 float lGround = lLand.SampleHeight(lFoot) + lLand.transform.position.y;
                 if (lFoot.y - lGround < 0.3f) continue;
+                // Held by anything it touches: a floor under it, a table, or a wall it hangs on (TVs, grilles).
                 bool lSupported = false;
-                foreach (RaycastHit lHit in Physics.RaycastAll(lFoot + Vector3.up * 0.05f, Vector3.down, 0.45f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore))
-                    if (lHit.collider.gameObject != lRenderer.gameObject) { lSupported = true; break; }
+                foreach (Collider lTouch in Physics.OverlapBox(lBounds.center, lBounds.extents + Vector3.one * 0.12f, Quaternion.identity, GameLayers.WorldMask, QueryTriggerInteraction.Ignore))
+                    if (lTouch.gameObject != lRenderer.gameObject) { lSupported = true; break; }
                 if (lSupported) continue;
                 lFloating++;
                 if (lFloatingExample.Length == 0) lFloatingExample = $" e.g. {lRenderer.name} at {lFoot:F0} +{lFoot.y - lGround:0.0} m";

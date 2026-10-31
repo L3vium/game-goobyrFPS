@@ -54,6 +54,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private readonly Dictionary<Npc, Marker> _markers = new Dictionary<Npc, Marker>();
         private readonly List<Image> _arcPool = new List<Image>();
         private readonly List<Npc> _gone = new List<Npc>();
+        private AudioSource _tension;
+        private ThreatStatus _heard;
 
         public void Build(RectTransform pRoot)
         {
@@ -158,6 +160,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
             Status = lMe != null && lMe.Health.IsAlive ? lStatus : ThreatStatus.None;
             UpdateChip();
+            UpdateTension();
             UpdateTarget(lCamera, lTarget, lMe);
         }
 
@@ -278,6 +281,37 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             lArc.color = lColor;
             float lSize = pLevel == ThreatStatus.Suspicious ? Mathf.Lerp(0.85f, 1.05f, pGauge) : 1.08f;
             lArc.rectTransform.localScale = Vector3.one * lSize;
+        }
+
+        /// <summary>A low drone that swells with suspicion, a stinger when spotted, a hit when it turns to combat.</summary>
+        private void UpdateTension()
+        {
+            if (_tension == null)
+            {
+                AudioClip lClip = Resources.Load<AudioClip>("Sfx/tension_loop");
+                if (lClip == null) return;
+                _tension = gameObject.AddComponent<AudioSource>();
+                _tension.clip = lClip;
+                _tension.loop = true;
+                _tension.spatialBlend = 0f;
+                _tension.volume = 0f;
+                _tension.Play();
+            }
+            if (Status != _heard)
+            {
+                if (Status == ThreatStatus.Spotted && _heard < ThreatStatus.Spotted) Audio.Sfx.Play2D("spotted", 0.7f, 0f);
+                if (Status == ThreatStatus.Combat && _heard < ThreatStatus.Combat) Audio.Sfx.Play2D("combat_hit", 0.8f, 0f);
+                _heard = Status;
+            }
+            float lTarget = Status switch
+            {
+                ThreatStatus.Combat => 0.7f,
+                ThreatStatus.Spotted => 0.6f,
+                ThreatStatus.Searching => 0.35f,
+                ThreatStatus.Suspicious => 0.4f,
+                _ => 0f
+            };
+            _tension.volume = Mathf.MoveTowards(_tension.volume, lTarget * Audio.Sfx.Volume, Time.unscaledDeltaTime * (lTarget > _tension.volume ? 0.8f : 0.25f));
         }
 
         private void UpdateChip()

@@ -172,6 +172,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Health.InitHealth(GameDatabase.Rules.npcHealth * (Role == NpcRole.Target ? 1.2f : 1f));
             Health.OnDeathClient += HandleDeathClient;
             Health.OnHitClient += HandleHitClient;
+            gameObject.AddComponent<Audio.Footsteps>().Init(() => !Health.IsAlive ? 0f : State.Value == NpcState.Combat || State.Value == NpcState.Flee || State.Value == NpcState.Search ? 0.9f : 0.45f);
             if (IsServer)
             {
                 Health.OnDamagedServer += HandleDamagedServer;
@@ -1106,7 +1107,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         [Rpc(SendTo.Everyone)]
         private void SpottedRpc()
         {
-            Audio.Sfx.Play("spotted", transform.position + Vector3.up * 2f, 1f, 30f, 0f);
+            // A short alarmed intake of breath where it stands; the player's own stinger plays from the HUD.
+            Audio.Sfx.Play("whizz", transform.position + Vector3.up * 1.6f, 0.25f, 15f, 0.2f);
         }
 
         [Rpc(SendTo.Everyone)]

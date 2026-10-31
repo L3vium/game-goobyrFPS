@@ -52,7 +52,8 @@ namespace Com.IsartDigital.GoobyrFPS.Audio
                 lSource.transform.SetParent(_root);
                 lSource.playOnAwake = false;
                 lSource.spatialBlend = 1f;
-                lSource.rolloffMode = AudioRolloffMode.Linear;
+                // Logarithmic falloff (how sound fades outdoors), reaching silence at the given range.
+                lSource.rolloffMode = AudioRolloffMode.Logarithmic;
                 lSource.minDistance = 2f;
                 lSource.maxDistance = 70f;
                 lSource.dopplerLevel = 0f;
@@ -72,6 +73,7 @@ namespace Com.IsartDigital.GoobyrFPS.Audio
             lSource.clip = lClip;
             lSource.volume = pVolume * Volume;
             lSource.maxDistance = pRange;
+            lSource.minDistance = Mathf.Clamp(pRange / 14f, 0.8f, 8f);
             lSource.spatialBlend = 1f;
             lSource.pitch = 1f + Random.Range(-pPitchJitter, pPitchJitter);
             lSource.Play();

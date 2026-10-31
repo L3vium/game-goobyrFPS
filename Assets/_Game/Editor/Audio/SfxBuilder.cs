@@ -9,9 +9,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// <summary>
     /// Synthesises every sound effect of the game (no audio was delivered): noise bursts and
     /// pitched blips shaped by envelopes and filters, written as WAV files in
-    /// <c>Audio/Resources/Sfx</c>. Cartoonish on purpose - pops, thumps and boings fit the Goobs.
+    /// <c>Audio/Resources/Sfx</c>. The gameplay sounds are layered realistically
+    /// (<c>SfxBuilder.Realistic</c>); the systemic props keep these simpler recipes.
     /// </summary>
-    public static class SfxBuilder
+    public static partial class SfxBuilder
     {
         private const int RATE = 44100;
         private const string DIR = "Assets/_Game/Audio/Resources/Sfx";
@@ -80,6 +81,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Write("slide", Noise(0.45f, 0.4f, 1600f, 3f));
             Write("jumppad", Mix(Tone(0.5f, 150f, 900f, 0.7f, 4f, 30f), Noise(0.2f, 0.3f, 2500f, 10f)));
             for (int i = 1; i <= 3; i++) Write("footstep_" + i, Mix(Tone(0.08f, 130f + i * 20f, 80f, 0.4f, 30f), Noise(0.07f, 0.3f, 1200f + i * 200f, 30f)));
+            // The realistic set overwrites the gameplay sounds above (guns, body, steps) and adds the rest.
+            RealisticSet();
 
             AssetDatabase.Refresh();
             Debug.Log("[Build] sound effects");

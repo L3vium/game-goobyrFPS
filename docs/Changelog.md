@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- Sound design rebuilt (still all synthesised, now layered like recorded foley): gunshots with
+  crack, body, thump, mechanism and an outdoor tail; footsteps for players and NPCs that follow the
+  surface underfoot (grass, dirt, stone, sand, wood, metal, water); swim strokes and splashes; an
+  ambience bed per map (forest morning, desert wind and surf, suburban night) that turns to a
+  muffled underwater bed when you dive; a tension drone that swells with suspicion, a stinger when
+  you are spotted and a hit when it turns to combat; new impacts, landings, slides and UI ticks.
+  Sounds now fade naturally with distance.
 - Tall grass you can hide in, on every map: 8 to 12 fields of 1.3-1.8 m grass on the approaches to
   the buildings, with hiding triggers (the validator wants at least 6). Trees are taller, their
   canopies above eye level, so the view under them stays open. New water shader: clear in the

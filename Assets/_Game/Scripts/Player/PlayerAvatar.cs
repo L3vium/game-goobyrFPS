@@ -74,6 +74,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             Health.HeadHeight = 1.3f;
             Health.InitHealth(GameDatabase.Rules.playerHealth);
             Health.OnHitClient += HandleHit;
+            gameObject.AddComponent<Audio.Footsteps>().Init(
+                () => !Health.IsAlive || Hidden.Value ? 0f : Crouched.Value ? 0.1f : Sprinting.Value ? 1f : 0.55f,
+                () => IsOwner ? Motor.Swimming : Submerged.Value);
             Health.OnDeathClient += HandleDeath;
             Team.OnValueChanged += (_, pNew) => ApplyTeam(pNew);
 

@@ -99,6 +99,13 @@ grass fields, NPC posts on the NavMesh and no prop floating over the terrain. Wa
 - **In-match menu** (`UI/PauseMenu`, Esc, or M straight to the map): MAP (the whole plan, floor tabs,
   zoom and pan, zones, target, you, teammates, proof, extractions), CONTRACT (portrait, name, one
   line, proof, status), OPTIONS; resume and leave. The game keeps running.
+- **Sound** (`Editor/Audio/SfxBuilder` + `SfxSynth`, all synthesised): guns in layers (crack,
+  body, thump, action, outdoor slap and rumble), footsteps per surface for players and NPCs
+  (`Audio/Footsteps`: terrain layer or the piece underfoot - grass, dirt, stone, sand, wood, metal,
+  water), swim strokes and splashes, an ambience bed per map (`Audio/Ambience`: forest morning,
+  desert wind and surf, suburban night; underwater bed when diving), a tension drone that follows
+  your threat status with a stinger when spotted and a hit when it turns to combat. Sounds fade
+  logarithmically with distance.
 - **Juice**: trauma screen shake, hit flash, chromatic aberration / bloom / exposure pulses,
   hurt vignette, squash and stretch, fluff puffs on hits, explosions with fireball, shockwave,
   debris and light flash, smoke clouds, hitmarkers, damage arcs, kill feed, banners.

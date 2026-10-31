@@ -1319,6 +1319,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 else { lLost++; Debug.LogWarning($"[Build] {pPoint.name} at {pPoint.position:F0} has no NavMesh within 4 m"); }
             }
             foreach (NpcSpawnPoint lSpawn in Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None)) Snap(lSpawn.transform);
+            // Starts placed before the relief was final can end up under the ground: put them back on it.
+            foreach (MatchPoint lPoint in Object.FindObjectsByType<MatchPoint>(FindObjectsSortMode.None))
+            {
+                if (lPoint.PointKind != MatchPoint.Kind.Start) continue;
+                Vector3 p = lPoint.transform.position;
+                float lGround = GroundAt(p.x, p.z);
+                if (p.y < lGround - 0.5f) lPoint.transform.position = new Vector3(p.x, lGround + 0.2f, p.z);
+                Snap(lPoint.transform);
+            }
             foreach (PatrolRoute lRoute in Object.FindObjectsByType<PatrolRoute>(FindObjectsSortMode.None))
                 for (int i = 0; i < lRoute.transform.childCount; i++) Snap(lRoute.transform.GetChild(i));
             Debug.Log($"[Build] {lMoved} NPC points snapped onto the NavMesh, {lLost} without one");

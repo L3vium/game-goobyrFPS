@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- Tall grass you can hide in, on every map: 8 to 12 fields of 1.3-1.8 m grass on the approaches to
+  the buildings, with hiding triggers (the validator wants at least 6). Trees are taller, their
+  canopies above eye level, so the view under them stays open. New water shader: clear in the
+  shallows and deep blue-green further out, the bed seen through the ripples, sun glints, the sky at
+  grazing angles, foam on the shores. Map builds put buried starts back on the ground; Mirage Bay's
+  south start (in the sea) moves to the north-west ridge. Teleports no longer count as falls; the
+  end screen layout is fixed.
 - Water: every lake, river and sea can be swum in. Crouch dives, jump rises or climbs out onto a
   ledge, rivers carry you, and breath lasts 20 s under water (the status chip counts it down). Under
   water NPCs cannot see you beyond arm's length, the view turns blue-green and the sound is muffled.

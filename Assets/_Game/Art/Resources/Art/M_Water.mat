@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: M_Water
-  m_Shader: {fileID: 4800000, guid: 8fc185624cc6428428701c8b10f2970c, type: 3}
+  m_Shader: {fileID: 4800000, guid: cc683875066a3f345975c3feddd13fe8, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -25,11 +25,24 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
+    - _Absorption: 0.45
+    - _Clarity: 0.7
+    - _FoamWidth: 0.6
+    - _Gloss: 600
+    - _Refraction: 0.03
+    - _RippleScale: 0.35
+    - _RippleSpeed: 0.6
+    - _RippleStrength: 0.55
+    - _Swell: 0.06
     - _Wave: 0.08
     - _WaveSpeed: 1
     m_Colors:
     - _BaseColor: {r: 0.3, g: 0.65, b: 0.8, a: 0.72}
+    - _DeepColor: {r: 0.04, g: 0.2, b: 0.27, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 0}
+    - _FoamColor: {r: 0.92, g: 0.95, b: 0.95, a: 1}
     - _FresnelColor: {r: 1, g: 1, b: 1, a: 1}
+    - _ShallowColor: {r: 0.32, g: 0.62, b: 0.6, a: 1}
+    - _SkyColor: {r: 0.62, g: 0.76, b: 0.86, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

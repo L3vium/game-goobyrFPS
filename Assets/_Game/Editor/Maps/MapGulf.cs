@@ -312,7 +312,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             K.Point(MatchPoint.Kind.Start, G(-234f, 180f, 0.2f), 128, "Caravan trail");
             K.Point(MatchPoint.Kind.Start, G(236f, 18f, 0.2f), 260, "Desert road");
             K.Point(MatchPoint.Kind.Start, G(-20f, 234f, 0.2f), 175, "North track");
-            K.Point(MatchPoint.Kind.Start, G(-150f, -234f, 0.2f), 33, "South dunes");
+            K.Point(MatchPoint.Kind.Start, G(-160f, 234f, 0.2f), 146, "North-west ridge");
             K.Point(MatchPoint.Kind.Extraction, G(232f, -150f, 0.2f), 90, "Corniche car");
             K.Point(MatchPoint.Kind.Extraction, G(-238f, 92f, 0.2f), 270, "Caravan trail truck");
         }

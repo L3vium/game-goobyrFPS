@@ -43,6 +43,14 @@ MonoBehaviour:
   postExposure: -0.15
   shadowsTint: {r: 0.9, g: 0.95, b: 1.08, a: 1}
   highlightsTint: {r: 1.06, g: 1.02, b: 0.94, a: 1}
+  planFloors:
+  - {fileID: 2800000, guid: 2591c92c588dcba47a2e060016c60581, type: 3}
+  - {fileID: 2800000, guid: be68f246c4e19634791efea568bb825d, type: 3}
+  - {fileID: 2800000, guid: 3a573d1dc1710804bbf8dfb7647958b1, type: 3}
+  - {fileID: 2800000, guid: 4f88986e17a3ba14e98ff0e68ab6a27b, type: 3}
+  planOrigin: {x: -250, y: -250}
+  planSize: 500
+  planStorey: 3.4
   targets:
   - displayName: Faisal Amberline
     dossier: Spice merchant. The spice is not the product.

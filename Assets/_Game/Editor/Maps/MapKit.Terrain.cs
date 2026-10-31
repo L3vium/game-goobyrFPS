@@ -26,6 +26,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private readonly List<TreePrototype> _treePrototypes = new List<TreePrototype>();
         private readonly Dictionary<string, int> _treeIndex = new Dictionary<string, int>();
         private System.Func<float, float, float> _grassDensity;
+        private readonly List<(Vector2 center, float radius)> _tallGrass = new List<(Vector2, float)>();
+
+        /// <summary>The tall grass fields planted so far (centre, radius).</summary>
+        public IReadOnlyList<(Vector2 center, float radius)> TallGrassFields => _tallGrass;
 
         public const int LAND_RESOLUTION = 1025;
         private string LandPath => EditorAssets.SCENES + "/" + Map.sceneName + "_Terrain.asset";
@@ -178,6 +182,52 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return lPrefab;
         }
 
+        /// <summary>Is a point inside a tall grass field (grown by <paramref name="pPad"/> metres)?</summary>
+        public bool InTallGrass(float pX, float pZ, float pPad = 0f)
+        {
+            foreach ((Vector2 lCenter, float lRadius) in _tallGrass)
+                if ((new Vector2(pX, pZ) - lCenter).sqrMagnitude < (lRadius + pPad) * (lRadius + pPad)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// A field of tall grass you can hide in: a dense layer of 1.3-1.8 m grass on the terrain
+        /// (ragged edges) and hiding triggers tiled over it - crouched inside, the AI barely sees you.
+        /// </summary>
+        public void TallGrassField(Vector2 pCenter, float pRadius)
+        {
+            _tallGrass.Add((pCenter, pRadius));
+            Transform lField = Group("TallGrass", Env);
+            lField.position = At(pCenter.x, pCenter.y);
+            const float TILE = 4f;
+            for (float x = -pRadius; x <= pRadius; x += TILE)
+                for (float z = -pRadius; z <= pRadius; z += TILE)
+                {
+                    Vector2 p = pCenter + new Vector2(x, z);
+                    if ((p - pCenter).magnitude > pRadius * 0.9f) continue;
+                    GameObject lTrigger = new GameObject("GrassVolume") { layer = GameLayers.GRASS };
+                    lTrigger.transform.SetParent(lField, false);
+                    lTrigger.transform.position = At(p.x, p.y, 0.9f);
+                    BoxCollider lBox = lTrigger.AddComponent<BoxCollider>();
+                    lBox.isTrigger = true;
+                    lBox.size = new Vector3(TILE + 0.2f, 2.4f, TILE + 0.2f);
+                    lTrigger.AddComponent<Systems.TallGrass>();
+                }
+        }
+
+        /// <summary>How dense the tall grass layer is at a point: full inside a field, ragged at its edge.</summary>
+        private float TallGrassDensity(float pX, float pZ)
+        {
+            float lBest = 0f;
+            foreach ((Vector2 lCenter, float lRadius) in _tallGrass)
+            {
+                float lEdge = lRadius * (0.85f + 0.3f * LandShape.Fbm(pX, pZ, 6f, 2, 3.3f));
+                float d = (new Vector2(pX, pZ) - lCenter).magnitude;
+                lBest = Mathf.Max(lBest, Mathf.Clamp01((lEdge - d) / 2.5f));
+            }
+            return lBest;
+        }
+
         /// <summary>Grass tufts over the terrain: density 0..1 per world point (0 on roads, floors, water).</summary>
         public void LandGrass(System.Func<float, float, float> pDensity) => _grassDensity = pDensity;
 
@@ -199,6 +249,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         minWidth = 0.5f, maxWidth = 0.9f, minHeight = 0.35f, maxHeight = 0.7f,
                         healthyColor = new Color(0.5f, 0.68f, 0.3f), dryColor = new Color(0.7f, 0.66f, 0.38f),
                         noiseSpread = 0.3f
+                    },
+                    // The tall grass of the hiding fields.
+                    new DetailPrototype
+                    {
+                        prototypeTexture = TextureBuilder.GrassBlades(),
+                        renderMode = DetailRenderMode.GrassBillboard,
+                        minWidth = 0.9f, maxWidth = 1.4f, minHeight = 1.3f, maxHeight = 1.8f,
+                        healthyColor = new Color(0.46f, 0.6f, 0.26f), dryColor = new Color(0.72f, 0.64f, 0.36f),
+                        noiseSpread = 0.5f
                     }
                 };
                 int[,] lLayer = new int[DETAIL_RESOLUTION, DETAIL_RESOLUTION];
@@ -209,6 +268,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         lLayer[z, x] = Mathf.RoundToInt(Mathf.Clamp01(_grassDensity(p.x, p.y)) * 6f);
                     }
                 _landData.SetDetailLayer(0, 0, 0, lLayer);
+                int[,] lTall = new int[DETAIL_RESOLUTION, DETAIL_RESOLUTION];
+                if (_tallGrass.Count > 0)
+                    for (int z = 0; z < DETAIL_RESOLUTION; z++)
+                        for (int x = 0; x < DETAIL_RESOLUTION; x++)
+                        {
+                            Vector2 p = LandPoint(x, z, DETAIL_RESOLUTION);
+                            lTall[z, x] = Mathf.RoundToInt(TallGrassDensity(p.x, p.y) * 7f);
+                        }
+                _landData.SetDetailLayer(0, 0, 1, lTall);
             }
             Land.terrainData = _landData;
             Land.GetComponent<TerrainCollider>().terrainData = _landData;

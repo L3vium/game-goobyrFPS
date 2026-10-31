@@ -36,11 +36,13 @@ terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert 
 
 ## Map recipe (500 m, `Editor/Maps/HillMap`)
 A relief function shaped by `LandShape` stamps (graded roads that climb, building pads cut at their
-street's height, plateaus, terraces, carved rivers), painted ground layers, terrain trees and
-grass, stone retaining walls where pads meet the slope, and dressing helpers (`Frontage` rows,
+street's height, plateaus, terraces, carved rivers), painted ground layers, terrain trees (tall,
+canopies above eye level) and grass, 8-12 tall grass fields to hide in on the approaches
+(`MapKit.TallGrassField`: a 1.3-1.8 m grass layer and hiding triggers), stone retaining walls where pads meet the slope, and dressing helpers (`Frontage` rows,
 `Staff` guards per room, `Squad` patrol groups, `Crowd`s, `Routines`). The validator wants 150+ NPC
-markers, 40+ weapon spots, three spots per unique weapon, starts 50 m clear of NPCs and no prop
-floating over the terrain.
+markers, 40+ weapon spots, three spots per unique weapon, starts 50 m clear of NPCs, 6+ tall
+grass fields, NPC posts on the NavMesh and no prop floating over the terrain. Water uses
+`Goobyr/Water` (depth-tinted, refracting, rippling, foam on the shores).
 
 ## Systems
 - **AI** (`AI/Npc`, rules in `AI/DetectionModel`): sight is a 90° cone out to 20 m (lookouts

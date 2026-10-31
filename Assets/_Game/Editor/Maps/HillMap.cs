@@ -76,6 +76,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 RetainingWalls(lLot);
             }
             Dress();
+            PlantTallGrass();
             Vegetate();
             Edges();
             K.CoverSpacing = 1.6f;
@@ -264,6 +265,50 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return new Color(pColor.r * v, pColor.g * v, pColor.b * v);
         }
 
+        /// <summary>
+        /// Tall grass fields on the approaches: gentle open ground 6-30 m from a building or a street,
+        /// spread out (55 m apart), 8 to 12 per map - the stealthy way in to each zone.
+        /// </summary>
+        private void PlantTallGrass()
+        {
+            System.Random lRandom = new System.Random(K.Map.sceneName.GetHashCode() + 77);
+            List<(Vector2 point, float score)> lCandidates = new List<(Vector2, float)>();
+            for (float x = -HALF + 30f; x < HALF - 30f; x += 10f)
+                for (float z = -HALF + 30f; z < HALF - 30f; z += 10f)
+                {
+                    Vector2 p = new Vector2(x + (float)lRandom.NextDouble() * 6f, z + (float)lRandom.NextDouble() * 6f);
+                    if (Built(p.x, p.y) || K.GroundAt(p.x, p.y) < WaterLevel + 0.8f || K.LandSlope(p.x, p.y) > 18f) continue;
+                    float lToBuilt = DistanceToBuilt(p, 40f);
+                    if (lToBuilt < 6f || lToBuilt > 30f) continue;
+                    lCandidates.Add((p, 1f - Mathf.Abs(lToBuilt - 14f) / 20f + (float)lRandom.NextDouble() * 0.35f));
+                }
+            lCandidates.Sort((a, b) => b.score.CompareTo(a.score));
+            List<Vector2> lPicked = new List<Vector2>();
+            foreach ((Vector2 lPoint, float _) in lCandidates)
+            {
+                if (lPicked.Count >= 12) break;
+                bool lFar = true;
+                foreach (Vector2 lOther in lPicked) if ((lOther - lPoint).sqrMagnitude < 55f * 55f) { lFar = false; break; }
+                if (!lFar) continue;
+                float lRadius = Mathf.Min(9f + (float)lRandom.NextDouble() * 6f, DistanceToBuilt(lPoint, 20f) - 2f);
+                if (lRadius < 6f) continue;
+                lPicked.Add(lPoint);
+                K.TallGrassField(lPoint, lRadius);
+            }
+        }
+
+        /// <summary>Distance from a point to the nearest built cell (rings every 2 m, 16 directions), or <paramref name="pMax"/>.</summary>
+        private float DistanceToBuilt(Vector2 pPoint, float pMax)
+        {
+            for (float r = 2f; r <= pMax; r += 2f)
+                for (int a = 0; a < 16; a++)
+                {
+                    float lAngle = a * Mathf.PI / 8f;
+                    if (Built(pPoint.x + Mathf.Cos(lAngle) * r, pPoint.y + Mathf.Sin(lAngle) * r)) return r;
+                }
+            return pMax;
+        }
+
         /// <summary>Forests on everything left wild (dense where <see cref="Woods"/> says so), bushes, grass.</summary>
         private void Vegetate()
         {
@@ -272,7 +317,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (float z = -HALF + 2f; z < HALF - 2f; z += 3.6f)
                 {
                     float px = x + (float)lRandom.NextDouble() * 3f, pz = z + (float)lRandom.NextDouble() * 3f;
-                    if (Built(px, pz)) continue;
+                    if (Built(px, pz) || K.InTallGrass(px, pz, 1.5f)) continue;
                     float h = K.GroundAt(px, pz);
                     if (h < WaterLevel + 0.6f || K.LandSlope(px, pz) > 40f) continue;
                     float lWoods = Woods(px, pz, h);
@@ -280,7 +325,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     if (lRoll < lWoods * 0.8f)
                     {
                         string[] lSet = TreeSet(h);
-                        K.LandTree(lSet[lRandom.Next(lSet.Length)], px, pz, 0.75f + (float)lRandom.NextDouble() * 0.55f);
+                        K.LandTree(lSet[lRandom.Next(lSet.Length)], px, pz, 1.35f + (float)lRandom.NextDouble() * 0.65f);
                     }
                     else if (lRoll < lWoods * 0.8f + 0.12f) K.LandTree(lRandom.NextDouble() < 0.5 ? "BushA" : "BushB", px, pz, 0.7f + (float)lRandom.NextDouble() * 0.7f);
                     else if (lRoll > 0.985) K.LandTree(lRandom.NextDouble() < 0.5 ? "RockB" : "RockC", px, pz, 0.6f + (float)lRandom.NextDouble() * 0.8f);

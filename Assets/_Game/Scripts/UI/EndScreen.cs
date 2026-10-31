@@ -16,6 +16,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     public class EndScreen : MonoBehaviour
     {
         private static EndScreen _instance;
+        /// <summary>The end screen is up (the HUD keeps its spectating line out of the way).</summary>
+        public static bool IsShown => _instance != null;
         private CanvasGroup _group;
         private TextMeshProUGUI _title, _body, _footer;
         private Button _lobby, _leave;
@@ -53,10 +55,11 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             RectTransform lRoot = (RectTransform)lCanvas.transform;
             _group = lCanvas.gameObject.AddComponent<CanvasGroup>();
             UIFactory.Stretch(lRoot, "Dim").gameObject.AddComponent<Image>().color = new Color(0.03f, 0.03f, 0.04f, 0.78f);
-            _title = UIFactory.Text(lRoot, "Title", "", 96, UIFactory.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0.78f), Vector2.zero, new Vector2(1700, 130));
-            _body = UIFactory.Text(lRoot, "Body", "", 30, UIFactory.Paper, TextAlignmentOptions.Top, new Vector2(0.5f, 0.5f), new Vector2(0, 40), new Vector2(1400, 520));
+            // Everything hangs from the top centre (UIFactory pivots on the anchor).
+            _title = UIFactory.Title(lRoot, "Title", "", 96, UIFactory.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 1f), new Vector2(0, -170), new Vector2(1700, 120), true, 4f);
+            _body = UIFactory.Text(lRoot, "Body", "", 28, UIFactory.Paper, TextAlignmentOptions.Top, new Vector2(0.5f, 1f), new Vector2(0, -320), new Vector2(1400, 440));
 
-            Vector2 lBottom = new Vector2(0.5f, 0.12f);
+            Vector2 lBottom = new Vector2(0.5f, 0.2f);
             _lobby = UIFactory.Button(lRoot, "BACK TO THE LOBBY", lBottom, new Vector2(-230, 0), new Vector2(420, 72), UIFactory.Accent, () =>
             {
                 if (LobbyState.Instance != null && LobbyState.Instance.IsServer) LobbyState.Instance.ReturnToLobby();

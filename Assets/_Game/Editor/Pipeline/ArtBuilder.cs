@@ -24,9 +24,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lTransparent.SetColor("_BaseColor", new Color(1, 1, 1, 0.5f));
             lTransparent.SetFloat("_Wave", 0f);
 
-            Material lWater = EditorAssets.Material(lDir + "/M_Water.mat", Shader.Find("Goobyr/ToonTransparent"));
-            lWater.SetColor("_BaseColor", new Color(0.3f, 0.65f, 0.8f, 0.72f));
-            lWater.SetFloat("_Wave", 0.08f);
+            // Water: depth-tinted, refracting, rippling, foaming on the shores (Goobyr/Water).
+            Material lWater = EditorAssets.Material(lDir + "/M_Water.mat", Shader.Find("Goobyr/Water"));
+            lWater.shader = Shader.Find("Goobyr/Water");
+            lWater.SetColor("_ShallowColor", new Color(0.32f, 0.62f, 0.6f));
+            lWater.SetColor("_DeepColor", new Color(0.04f, 0.2f, 0.27f));
+            lWater.SetFloat("_Swell", 0.06f);
 
             Material lGlow = EditorAssets.Material(lDir + "/M_Glow.mat", Shader.Find("Goobyr/Glow"));
             SetBlend(lGlow, BlendMode.One, BlendMode.Zero, true, 2000);

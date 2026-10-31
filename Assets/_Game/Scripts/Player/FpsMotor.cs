@@ -127,6 +127,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             transform.SetPositionAndRotation(pPosition, Quaternion.Euler(0, pYaw, 0));
             _controller.enabled = true;
             _velocity = Vector3.zero;
+            // A teleport is not a fall: measure drops from here.
+            _airStartY = pPosition.y;
             Mode = MotorMode.Walk;
         }
 

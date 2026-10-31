@@ -93,8 +93,10 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _torsoSpringVel += lForce * dt;
             _torsoSpring += _torsoSpringVel * dt;
 
-            _squashVel += ((1f - _squash) * 160f - _squashVel * 10f) * dt;
-            _squash += _squashVel * dt;
+            // A stiff spring: integrated on a capped step and clamped, so a frame hitch cannot blow it up.
+            float lSpringDt = Mathf.Min(dt, 1f / 30f);
+            _squashVel += ((1f - _squash) * 160f - _squashVel * 10f) * lSpringDt;
+            _squash = Mathf.Clamp(_squash + _squashVel * lSpringDt, 0.6f, 1.4f);
             float lBob = Mathf.Abs(c) * 0.05f * lMoving;
             float lCrouchDrop = _crouchBlend * 0.42f;
 

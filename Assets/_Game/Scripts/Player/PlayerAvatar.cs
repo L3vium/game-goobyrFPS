@@ -31,6 +31,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public readonly NetworkVariable<bool> Sprinting = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> InGrass = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> Hidden = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        /// <summary>Eyes under water: out of sight beyond arm's length.</summary>
+        public readonly NetworkVariable<bool> Submerged = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> Aiming = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<float> Pitch = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<int> Team = new NetworkVariable<int>(0);
@@ -97,6 +99,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 Motor.OnJumped += () => { Animator.Squash(-0.15f); Audio.Sfx.Play("jump", transform.position, 0.6f); };
                 Motor.OnSlide += HandleSlide;
                 Motor.OnFallDamage += pDamage => FallDamageRpc(pDamage);
+                Motor.OnSplash += pSpeed => SplashRpc(transform.position + Vector3.up * 0.9f, Mathf.Clamp01(pSpeed / 8f) + 0.5f);
             }
             else Controller.enabled = true;
         }
@@ -139,6 +142,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 Sprinting.Value = Motor.Sprinting;
                 InGrass.Value = Motor.InGrass;
                 Hidden.Value = Motor.Mode == MotorMode.Hidden;
+                Submerged.Value = Motor.Underwater;
+                CameraRig.Instance?.SetUnderwater(Motor.Underwater);
                 if (Mathf.Abs(Pitch.Value - _pitch) > 1f) Pitch.Value = _pitch;
                 Motor.SpeedMultiplier = CarriesProof.Value ? 0.92f : 1f;
             }
@@ -252,6 +257,13 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 if (CameraRig.Instance != null) CameraRig.Instance.SetDesaturate(0.8f);
                 Spectator.BeginDeathCam(transform.position + Vector3.up * 1.5f, pImpulse);
             }
+        }
+
+        [Rpc(SendTo.Everyone)]
+        private void SplashRpc(Vector3 pPoint, float pSize)
+        {
+            Effects.Splash(pPoint, pSize);
+            if (IsServer) AI.NoiseSystem.Emit(pPoint, 8f * pSize, AI.NoiseKind.Suspicious, OwnerClientId);
         }
 
         [Rpc(SendTo.Server)]

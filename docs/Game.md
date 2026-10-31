@@ -67,8 +67,11 @@ floating over the terrain.
   their chain is shot; poisonable drinks (lethal, or emetic → the drinker runs to a toilet,
   alone); the basement air handler gasses the whole building; distractions (radio, TV, phone,
   generator, car alarm); hiding spots; ziplines; jump pads; climbable surfaces; tall grass.
-- **Player** (eyes at 1.74 m, 0.98 m crouched): walk, sprint (held), crouch (held; crouching while moving slides, further out of a sprint), jump,
-  mantle, climb, zipline, hide; head bob, sway, tilt, landing dip, FOV kicks; 6-slot inventory;
+- **Player** (eyes at 1.74 m, 0.98 m crouched): walk, sprint (held), crouch (held; crouching while moving slides,
+  much further out of a sprint and faster downhill), jump, mantle, climb, zipline, hide, swim
+  (`Systems/WaterVolume`: crouch dives, jump rises or climbs out at the surface, rivers carry you,
+  20 s of breath under water; under water nobody sees you beyond arm's length, the view turns
+  blue-green and the sound muffles; splashes are heard; deep water is cut out of the NavMesh); head bob, sway, tilt, landing dip, FOV kicks; 6-slot inventory;
   guns, rocket launcher, flamethrower, coin / brick / smoke / C4 + remote (T), poisons, punches and
   takedowns from behind.
 - **Instinct** (`FX/InstinctVision`, `FX/Rendering/InstinctFeature`, hold Tab): the world dims

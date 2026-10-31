@@ -55,8 +55,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             lNorth.outlineColor = new Color32(10, 10, 12, 255);
             _floor = UIFactory.Title(lFrame, "Floor", "", 14, UIFactory.Muted, TextAlignmentOptions.Right, new Vector2(1f, 0f), new Vector2(-8, 4), new Vector2(80, 20), true, 2f);
 
-            _me = UIFactory.Panel(lDisc, "Me", Color.white, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(16, 16)).rectTransform;
-            _me.GetComponent<Image>().sprite = UIIcons.Chevron;
+            _me = UIFactory.Panel(lDisc, "Me", Color.white, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(22, 22)).rectTransform;
+            _me.GetComponent<Image>().sprite = UIIcons.Arrow;
         }
 
         private void LateUpdate()
@@ -73,15 +73,15 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             float lSpan = MapPlan.MetresToUv(RANGE * 2f);
             _plan.uvRect = new Rect(lCenter.x - lSpan * 0.5f, lCenter.y - lSpan * 0.5f, lSpan, lSpan);
             _floor.text = lFloor == 0 ? "" : "FLOOR " + lFloor;
-            // The arrow points where the player looks (the chevron sprite points down: turn it round).
-            _me.localEulerAngles = new Vector3(0, 0, 180f - lMe.LookYaw);
+            // The arrow points where the player looks (UI angles turn counter-clockwise).
+            _me.localEulerAngles = new Vector3(0, 0, -lMe.LookYaw);
 
             ThreatStatus lStatus = ThreatMarkers.Status;
             Color lRing = lStatus switch
             {
                 ThreatStatus.Combat => ThreatMarkers.Red,
                 ThreatStatus.Spotted or ThreatStatus.Searching or ThreatStatus.Suspicious => ThreatMarkers.Amber,
-                ThreatStatus.Hidden or ThreatStatus.Concealed => ThreatMarkers.Blue,
+                ThreatStatus.Hidden or ThreatStatus.Concealed or ThreatStatus.Underwater => ThreatMarkers.Blue,
                 _ => new Color(1f, 1f, 1f, 0.18f)
             };
             if (lStatus == ThreatStatus.Combat || lStatus == ThreatStatus.Spotted) lRing.a = 0.7f + Mathf.Sin(Time.time * 8f) * 0.3f;

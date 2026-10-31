@@ -44,6 +44,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             lLine.endColor = new Color(pColor.r, pColor.g, pColor.b, 0.2f);
             lLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             lTracer.AddComponent<FadeLine>().Init(0.07f);
+            // A shot crossing water throws up a column where it meets the surface.
+            Vector3 lPath = pTo - pFrom;
+            if (Systems.WaterVolume.Raycast(pFrom, lPath.normalized, lPath.magnitude, out Vector3 lWater)) Splash(lWater, 0.5f);
         }
 
         public static void Impact(Vector3 pPosition, Vector3 pNormal, Color pColor)
@@ -123,7 +126,12 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
         public static void Dust(Vector3 pPosition, float pScale = 1f) => Emit("dust", pPosition, Quaternion.identity, Mathf.RoundToInt(10 * pScale), pScale);
 
-        public static void Splash(Vector3 pPosition) => Emit("splash", pPosition, Quaternion.LookRotation(Vector3.up), 16, 1f);
+        /// <summary>Water thrown up (a body, a dive, a bullet); 1 = a person falling in.</summary>
+        public static void Splash(Vector3 pPosition, float pSize = 1f)
+        {
+            Emit("splash", pPosition, Quaternion.LookRotation(Vector3.up), Mathf.RoundToInt(16 * pSize) + 4, Mathf.Max(0.4f, pSize));
+            Audio.Sfx.Play(pSize > 0.7f ? "splash" : "splash_small", pPosition, Mathf.Clamp01(0.4f + pSize * 0.6f), 30f);
+        }
 
         public static void Puke(Vector3 pPosition, Vector3 pDirection) => Emit("puke", pPosition, Quaternion.LookRotation(pDirection), 14, 1f);
 

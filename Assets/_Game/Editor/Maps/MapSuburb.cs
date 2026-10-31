@@ -175,7 +175,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 Vector2 a = CREEK[s], b = CREEK[s + 1], d = (b - a).normalized;
                 float y = Mathf.Min(K.GroundAt(a.x, a.y), K.GroundAt(b.x, b.y)) + 0.6f;
-                GameObject lPlane = K.Water(new Vector3((a.x + b.x) * 0.5f, Mathf.Max(CREEK_WATER, y), (a.y + b.y) * 0.5f), new Vector2(8f, Vector2.Distance(a, b) + 6f));
+                GameObject lPlane = K.Water(new Vector3((a.x + b.x) * 0.5f, Mathf.Max(CREEK_WATER, y), (a.y + b.y) * 0.5f), new Vector2(8f, Vector2.Distance(a, b) + 6f), new Vector3(d.x, 0, d.y) * 0.8f);
                 lPlane.transform.rotation = Quaternion.LookRotation(new Vector3(d.x, 0, d.y));
             }
             DressDowntown();

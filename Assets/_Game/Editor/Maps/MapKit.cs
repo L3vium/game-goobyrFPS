@@ -658,8 +658,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lTrigger.AddComponent<TallGrass>();
         }
 
-        /// <summary>A flat water surface (returned so a builder can tilt it into a cascade).</summary>
-        public GameObject Water(Vector3 pCenter, Vector2 pSize)
+        /// <summary>
+        /// A flat water surface you can swim in (returned so a builder can tilt it into a cascade).
+        /// <paramref name="pCurrent"/> pushes swimmers (rivers). The bed deeper than waist height is
+        /// cut out of the NavMesh: NPCs keep to the banks and the shallows.
+        /// </summary>
+        public GameObject Water(Vector3 pCenter, Vector2 pSize, Vector3 pCurrent = default)
         {
             GameObject lWater = new GameObject("Water") { layer = GameLayers.WATER };
             lWater.transform.SetParent(Env, false);
@@ -667,6 +671,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lWater.transform.localScale = new Vector3(pSize.x, 1f, pSize.y);
             lWater.AddComponent<MeshFilter>().sharedMesh = EditorAssets.SaveMesh(WaterMesh(), "Kit_WaterPlane");
             lWater.AddComponent<MeshRenderer>().sharedMaterial = _water;
+            lWater.AddComponent<WaterVolume>().Setup(pCurrent, 40f);
+            GameObject lKeepOut = new GameObject("DeepWater");
+            lKeepOut.transform.SetParent(lWater.transform, false);
+            NavMeshModifierVolume lModifier = lKeepOut.AddComponent<NavMeshModifierVolume>();
+            lModifier.center = new Vector3(0f, -20.9f, 0f);
+            lModifier.size = new Vector3(1f, 40f, 1f);
+            lModifier.area = NavMesh.GetAreaFromName("Not Walkable");
             return lWater;
         }
 

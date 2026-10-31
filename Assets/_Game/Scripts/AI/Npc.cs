@@ -400,8 +400,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 inGrass = pPlayer.InGrass.Value,
                 sprinting = pPlayer.Sprinting.Value
             };
-            // Cheap rejections before the line casts.
+            // Cheap rejections before the line casts. Under water, only at arm's length.
             if (lSight.distance > lSight.range) return 0f;
+            if (pPlayer.Submerged.Value && lSight.distance > 3f) return 0f;
             if (lSight.angle > Mathf.Max(lSight.halfCone, DetectionModel.PERIPHERAL_ANGLE) && lSight.distance >= DetectionModel.CLOSE_RANGE) return 0f;
             if (SmokeVolume.Blocks(lEye, lTarget)) return 0f;
             lSight.chestVisible = !Physics.Linecast(lEye, lTarget, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);

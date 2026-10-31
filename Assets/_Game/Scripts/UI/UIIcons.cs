@@ -39,6 +39,14 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             return Mathf.Max(lBody, Mathf.Max(-lScreen, -lButton));
         });
 
+        /// <summary>A navigation arrow pointing up, notched at the back (you, on the maps).</summary>
+        public static Sprite Arrow => Get("arrow", (x, y) =>
+        {
+            // Inside the wedge under the tip (0, 0.85), above the notch line through (0, -0.75).
+            float lBody = (Mathf.Abs(x) * 1.6f + y - 0.85f) * 0.53f;
+            float lNotch = (Mathf.Abs(x) * 1.2f - 0.75f - y) * 0.64f;
+            return Mathf.Max(lBody, lNotch);
+        });
         /// <summary>A plus in a rounded square outline (create a room).</summary>
         public static Sprite Create => Get("create", (x, y) =>
         {

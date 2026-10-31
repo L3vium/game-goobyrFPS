@@ -77,7 +77,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
             UIFactory.Title(lSide, "LegendTitle", "LEGEND", 15, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(0, -290), new Vector2(320, 22), true, 5f);
             Legend(lSide, 0, UIIcons.Chevron, ThreatMarkers.Red, "TARGET");
-            Legend(lSide, 1, UIIcons.Chevron, UIFactory.Paper, "YOU");
+            Legend(lSide, 1, UIIcons.Arrow, UIFactory.Paper, "YOU");
             Legend(lSide, 2, UIIcons.Dot, ThreatMarkers.Blue, "TEAMMATE");
             Legend(lSide, 3, UIIcons.Diamond, ThreatMarkers.Amber, "PROOF");
             Legend(lSide, 4, UIIcons.Ring, UIFactory.Good, "EXTRACTION");
@@ -134,7 +134,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             foreach (PlayerAvatar lAvatar in PlayerAvatar.All)
             {
                 if (lAvatar == null || !lAvatar.Health.IsAlive) continue;
-                if (lAvatar == lMe) Pin(lAvatar.transform.position, UIIcons.Chevron, UIFactory.Paper, 180f - lAvatar.LookYaw, null);
+                if (lAvatar == lMe) Pin(lAvatar.transform.position, UIIcons.Arrow, UIFactory.Paper, -lAvatar.LookYaw, null);
                 else if (lMe != null && lAvatar.Team.Value == lMe.Team.Value && LobbyState.Instance != null && LobbyState.Instance.Mode.Value != MatchMode.FreeForAll)
                     Pin(lAvatar.transform.position, UIIcons.Dot, ThreatMarkers.Blue, 0f, lAvatar.DisplayName.ToUpperInvariant());
             }

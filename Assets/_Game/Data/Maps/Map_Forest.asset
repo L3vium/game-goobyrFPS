@@ -43,6 +43,14 @@ MonoBehaviour:
   postExposure: -0.15
   shadowsTint: {r: 0.9, g: 0.95, b: 1.08, a: 1}
   highlightsTint: {r: 1.06, g: 1.02, b: 0.94, a: 1}
+  planFloors:
+  - {fileID: 2800000, guid: 49643852a436a0c49ad4a864a3fb6034, type: 3}
+  - {fileID: 2800000, guid: a33aa9da9ae55de42adf2bc66e5ebea8, type: 3}
+  - {fileID: 2800000, guid: 8adc54b64efd63e459b6067d757362d2, type: 3}
+  - {fileID: 2800000, guid: 71c1181af3212d94c80979aa54804c0b, type: 3}
+  planOrigin: {x: -250, y: -250}
+  planSize: 500
+  planStorey: 3.4
   targets:
   - displayName: Barnaby Thistlewood
     dossier: Sawmill owner. Cuts corners and people.

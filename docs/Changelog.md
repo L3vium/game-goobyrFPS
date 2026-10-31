@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Water: every lake, river and sea can be swum in. Crouch dives, jump rises or climbs out onto a
+  ledge, rivers carry you, and breath lasts 20 s under water (the status chip counts it down). Under
+  water NPCs cannot see you beyond arm's length, the view turns blue-green and the sound is muffled.
+  Splashes (yours are heard by NPCs) and bullets hitting water throw up spray; NPCs keep out of deep
+  water. The slide goes much further out of a sprint and speeds up downhill. The player's arrow on
+  the maps is a proper navigation arrow.
 - Menus rebuilt for playing with friends: the main menu is a clear list (create a room, join a room
   with its code, solo, options, quit) with icons and a line on what each does; the briefing shows
   the map card with its plan, the mode as explicit cards (free-for-all 1v1v1v1, teams, co-op), teams

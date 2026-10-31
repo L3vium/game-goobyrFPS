@@ -12,7 +12,7 @@ using UnityEngine.UI;
 namespace Com.IsartDigital.GoobyrFPS.UI
 {
     /// <summary>What the local player stands as, from calm to combat (HUD chip, minimap ring).</summary>
-    public enum ThreatStatus { None, Hidden, Concealed, Suspicious, Searching, Spotted, Combat }
+    public enum ThreatStatus { None, Hidden, Concealed, Underwater, Suspicious, Searching, Spotted, Combat }
 
     /// <summary>
     /// The stealth read-out on the HUD, in screen space:
@@ -153,6 +153,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             if (lStatus == ThreatStatus.None && lMe != null)
             {
                 if (lMe.Hidden.Value) lStatus = ThreatStatus.Hidden;
+                else if (lMe.Submerged.Value) lStatus = ThreatStatus.Underwater;
                 else if (lMe.InGrass.Value && lMe.Crouched.Value) lStatus = ThreatStatus.Concealed;
             }
             Status = lMe != null && lMe.Health.IsAlive ? lStatus : ThreatStatus.None;
@@ -287,6 +288,11 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             {
                 case ThreatStatus.Hidden: lText = "HIDDEN"; lColor = Blue; break;
                 case ThreatStatus.Concealed: lText = "CONCEALED"; lColor = Blue; break;
+                case ThreatStatus.Underwater:
+                    float lBreath = PlayerAvatar.Local != null ? PlayerAvatar.Local.Motor.Breath : 1f;
+                    lText = lBreath < 0.6f ? "UNDER WATER   BREATH " + Mathf.CeilToInt(lBreath * 100f) + "%" : "UNDER WATER";
+                    lColor = lBreath < 0.25f ? Red : Blue;
+                    break;
                 case ThreatStatus.Suspicious: lText = "SUSPICIOUS"; lColor = White; break;
                 case ThreatStatus.Searching: lText = "SEARCHING"; lColor = Amber; break;
                 case ThreatStatus.Spotted: lText = "SPOTTED"; lColor = Amber; break;

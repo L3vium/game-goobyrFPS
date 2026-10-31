@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Stealth AI in three contained stages: vision shortened to 20 m in a 90° cone with a slower edge-
+  of-vision band; NPCs grow suspicious (stop and stare, walk over past half the gauge), then
+  confront you for 2 s with their weapon up (break line of sight to make them search instead, aim at
+  them and they fire), then fight. A fight no longer alerts the zone: others join only by seeing it
+  within 18 m, hearing shots, or by the phone call, which reaches the caller's zone mates within 60
+  m. Crowds scream instead of reporting. The alarm flare is fired rarely.
 - Pinecrest Hollow and Mirage Bay: starts moved 80-100 m from any guard (Pinecrest's north trail was
   6 m from one, Mirage Bay's corniche start 7 m), maps rebuilt with props seated on the ground.
   Piers and boats over water no longer count as floating.

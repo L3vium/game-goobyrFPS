@@ -19,6 +19,10 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         Routine,
         Escort,
         Investigate,
+        /// <summary>Gauge filling: stops and stares at what it half-saw.</summary>
+        Suspicious,
+        /// <summary>Gauge full: confronts the player (weapon up, walking over) before shooting.</summary>
+        Engaged,
         Combat,
         Search,
         Calling,
@@ -34,8 +38,10 @@ namespace Com.IsartDigital.GoobyrFPS.AI
     /// awareness and the shots through network variables and RPCs.
     /// <para>
     /// <b>Senses.</b> Sight is a cone weighed by distance, light (power cuts), stance, grass and
-    /// smoke; exposure fills an awareness gauge ("?" then "!") instead of detecting instantly.
-    /// Hearing comes from the <see cref="NoiseSystem"/> and from players running close by.
+    /// smoke; exposure fills an awareness gauge instead of detecting instantly, then the NPC
+    /// confronts the player before it shoots (<see cref="DetectionModel"/>). Hearing comes from the
+    /// <see cref="NoiseSystem"/> and from players running close by. A fight stays local: others
+    /// join only by seeing it, hearing it or getting the phone call.
     /// </para>
     /// <para>
     /// <b>Combat.</b> An NPC never knows where a player is unless it sees them: the squad
@@ -56,10 +62,18 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public readonly NetworkVariable<int> ZoneIndex = new NetworkVariable<int>(0);
         public readonly NetworkVariable<int> TargetProfile = new NetworkVariable<int>(-1);
         public readonly NetworkVariable<float> AimPitch = new NetworkVariable<float>(0f);
+        /// <summary>The client filling this NPC's gauge or being confronted by it (HUD arcs and status); <see cref="NO_SUSPECT"/> otherwise.</summary>
+        public readonly NetworkVariable<ulong> Suspect = new NetworkVariable<ulong>(NO_SUSPECT);
+        public const ulong NO_SUSPECT = ulong.MaxValue;
+
+        /// <summary>NPCs confronting or fighting someone: the ones others can witness.</summary>
+        private static readonly List<Npc> _hot = new List<Npc>();
 
         public Damageable Health { get; private set; }
         public NpcRole Role => RoleVar.Value;
         public bool InCombat => State.Value == NpcState.Combat || State.Value == NpcState.Calling || State.Value == NpcState.Search;
+        /// <summary>Confronting or fighting: what the minimap, instinct and HUD show as a threat.</summary>
+        public bool IsAlerted => InCombat || State.Value == NpcState.Engaged;
         public bool IsTarget => Role == NpcRole.Target;
         /// <summary>Unarmed crowd members (guests, staff, spectators): they run away instead of fighting.</summary>
         public bool IsCrowd => Role == NpcRole.Worker;
@@ -108,6 +122,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private readonly HashSet<ulong> _seenBodies = new HashSet<ulong>();
         private bool _wantsAlarm;
         private float _combatStart;
+        private float _engagedSince, _lastSawTarget;
 
         private const float WALK = 1.9f, RUN = 4.9f;
         /// <summary>Unhurried paces: a patrol on its round, a target going about its routine.</summary>
@@ -180,6 +195,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public override void OnNetworkDespawn()
         {
             All.Remove(this);
+            _hot.Remove(this);
             if (IsServer)
             {
                 NoiseSystem.OnNoise -= HandleNoise;
@@ -234,7 +250,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (_animator != null)
             {
                 _animator.AimPitch = AimPitch.Value;
-                _animator.HoldingWeapon = Weapon != null && (InCombat || State.Value == NpcState.Investigate || Role == NpcRole.Lookout);
+                _animator.HoldingWeapon = Weapon != null && (IsAlerted || State.Value == NpcState.Investigate || Role == NpcRole.Lookout);
                 _animator.Calling = State.Value == NpcState.Calling;
                 _animator.Sick = State.Value == NpcState.Sick;
                 _animator.Panic = State.Value == NpcState.Flee ? 1f : 0f;
@@ -259,6 +275,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 case NpcState.Routine: UpdateRoutine(); break;
                 case NpcState.Escort: UpdateEscort(); break;
                 case NpcState.Investigate: UpdateInvestigate(); break;
+                case NpcState.Suspicious: UpdateSuspicious(); break;
+                case NpcState.Engaged: UpdateEngaged(); break;
                 case NpcState.Combat: UpdateCombat(dt); break;
                 case NpcState.Search: UpdateSearch(); break;
                 case NpcState.Calling: UpdateCalling(dt); break;
@@ -268,6 +286,10 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
             byte lAware = (byte)Mathf.RoundToInt(Mathf.Clamp01(_awareness) * 20f);
             if (Awareness.Value != lAware) Awareness.Value = lAware;
+            bool lConfronting = State.Value == NpcState.Engaged || State.Value == NpcState.Combat || State.Value == NpcState.Calling;
+            PlayerAvatar lWho = lConfronting ? _combatTarget : _awareness > 0.02f ? _suspect : null;
+            ulong lSuspect = lWho != null ? lWho.OwnerClientId : NO_SUSPECT;
+            if (Suspect.Value != lSuspect) Suspect.Value = lSuspect;
         }
 
         private void SetState(NpcState pState)
@@ -276,6 +298,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (State.Value == NpcState.Calling && pState != NpcState.Calling) Zone?.CallFinished(this, false);
             State.Value = pState;
             _stateTime = 0f;
+            bool lHot = pState == NpcState.Engaged || pState == NpcState.Combat || pState == NpcState.Calling;
+            if (lHot && !_hot.Contains(this)) _hot.Add(this);
+            else if (!lHot) _hot.Remove(this);
             if (pState != NpcState.Combat && _cover != null) { if (_cover.Occupant == this) _cover.Occupant = null; _cover = null; }
         }
 
@@ -327,82 +352,161 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                     if (lDistance < lHear)
                     {
                         if (lCombat) Zone?.ReportContact(lPlayer, lPlayer.transform.position, false);
-                        else if (State.Value != NpcState.Investigate) Investigate(lPlayer.transform.position, false);
+                        else if (CanBecomeSuspicious && State.Value != NpcState.Investigate) Investigate(lPlayer.transform.position, false);
                     }
                 }
             }
 
+            _awareness = DetectionModel.Fill(_awareness, lBestExposure, lRules.npcDetectTime, dt, lCombat);
             if (lBest != null)
             {
-                float lRate = lBestExposure / Mathf.Max(0.1f, lRules.npcDetectTime);
-                _awareness += lRate * dt * (lCombat ? 3f : 1f);
                 _suspect = lBest;
-                if (_awareness >= 1f)
+                if (lBest == _combatTarget) _lastSawTarget = Time.time;
+                if (State.Value == NpcState.Engaged) { }
+                else if (_awareness >= 1f) Spot(lBest);
+                else if (CanBecomeSuspicious)
                 {
-                    _awareness = 1f;
-                    Spot(lBest);
+                    if (_awareness > DetectionModel.INVESTIGATE && State.Value != NpcState.Investigate) Investigate(lBest.transform.position, false);
+                    else if (State.Value != NpcState.Investigate && State.Value != NpcState.Suspicious) SetState(NpcState.Suspicious);
                 }
-                else if (_awareness > 0.35f && !lCombat && State.Value != NpcState.Investigate)
-                    Investigate(lBest.transform.position, false);
             }
-            else
-            {
-                _awareness = Mathf.Max(lCombat ? 0.6f : 0f, _awareness - dt * 0.25f);
-                if (_combatTarget != null) _targetVisible = false;
-            }
+            else if (_combatTarget != null) _targetVisible = false;
 
-            if (!lCombat) LookForBodies();
+            if (!lCombat && State.Value != NpcState.Engaged)
+            {
+                LookForBodies();
+                WatchForFights();
+            }
         }
 
-        /// <summary>0 = unseen, 1 = fully exposed. Distance, cone, light, stance, grass, smoke, walls.</summary>
+        /// <summary>States from which a glimpse of a player makes the NPC stop and stare.</summary>
+        private bool CanBecomeSuspicious => !InCombat && State.Value != NpcState.Engaged && State.Value != NpcState.Flee && State.Value != NpcState.Sick;
+
+        /// <summary>See <see cref="DetectionModel.Exposure"/>: distance, cone and edge of vision, light, stance, grass, smoke, walls.</summary>
         private float Exposure(PlayerAvatar pPlayer, GameRules pRules, bool pCombat)
         {
             if (pPlayer.Hidden.Value) return 0f;
             Vector3 lEye = Eye;
             Vector3 lTarget = pPlayer.Chest;
             Vector3 lTo = lTarget - lEye;
-            float lDistance = lTo.magnitude;
 
-            float lRange = pRules.npcVisionRange * (Role == NpcRole.Lookout ? 1.8f : 1f) * BuildingVolume.LightFactor(lTarget) * (pCombat ? 1.5f : 1f);
-            if (pPlayer.CarriesProof.Value) lRange *= 1.2f;
-            if (lDistance > lRange) return 0f;
-
-            float lAngle = Vector3.Angle(transform.forward, lTo);
-            float lHalfCone = pRules.npcVisionAngle * 0.5f * (pCombat ? 1.4f : 1f);
-            bool lPeripheral = lDistance < 2.2f;
-            if (lAngle > lHalfCone && !lPeripheral) return 0f;
-
-            float lStance = 1f;
-            if (pPlayer.Crouched.Value) lStance *= 0.55f;
-            if (pPlayer.InGrass.Value) lStance *= pPlayer.Crouched.Value ? 0.08f : 0.6f;
-            if (pPlayer.Sprinting.Value) lStance *= 1.3f;
-            if (lStance < 0.1f && lDistance > 3f) return 0f;
-
+            DetectionModel.Sight lSight = new DetectionModel.Sight
+            {
+                distance = lTo.magnitude,
+                range = pRules.npcVisionRange * (Role == NpcRole.Lookout ? 1.5f : 1f) * BuildingVolume.LightFactor(lTarget) * (pCombat ? 1.5f : 1f) * (pPlayer.CarriesProof.Value ? 1.2f : 1f),
+                angle = Vector3.Angle(transform.forward, lTo),
+                halfCone = pRules.npcVisionAngle * 0.5f * (pCombat ? 1.4f : 1f),
+                crouched = pPlayer.Crouched.Value,
+                inGrass = pPlayer.InGrass.Value,
+                sprinting = pPlayer.Sprinting.Value
+            };
+            // Cheap rejections before the line casts.
+            if (lSight.distance > lSight.range) return 0f;
+            if (lSight.angle > Mathf.Max(lSight.halfCone, DetectionModel.PERIPHERAL_ANGLE) && lSight.distance >= DetectionModel.CLOSE_RANGE) return 0f;
             if (SmokeVolume.Blocks(lEye, lTarget)) return 0f;
-            bool lChest = !Physics.Linecast(lEye, lTarget, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
-            bool lHead = !Physics.Linecast(lEye, pPlayer.Eye, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
-            if (!lChest && !lHead) return 0f;
-
-            float lCloseness = Mathf.Lerp(2.5f, 0.35f, lDistance / lRange);
-            float lCentered = Mathf.Lerp(1f, 0.45f, lAngle / Mathf.Max(1f, lHalfCone));
-            return lCloseness * lCentered * lStance * (lChest ? 1f : 0.6f);
+            lSight.chestVisible = !Physics.Linecast(lEye, lTarget, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
+            lSight.headVisible = !Physics.Linecast(lEye, pPlayer.Eye, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
+            return DetectionModel.Exposure(lSight);
         }
 
+        /// <summary>
+        /// A confrontation or a fight close by and in view pulls this NPC in: it walks over to a
+        /// confrontation ready to spot, and joins a fight outright.
+        /// </summary>
+        private void WatchForFights()
+        {
+            if (Flees || Weapon == null || State.Value == NpcState.Flee || State.Value == NpcState.Sick) return;
+            foreach (Npc lOther in _hot)
+            {
+                if (lOther == this || lOther == null || !lOther.Health.IsAlive || lOther._combatTarget == null) continue;
+                Vector3 lTo = lOther.Eye - Eye;
+                float lDistance = lTo.magnitude;
+                if (lDistance > DetectionModel.WITNESS_RANGE) continue;
+                bool lSight = !Physics.Linecast(Eye, lOther.Eye, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
+                if (!DetectionModel.Witnesses(lDistance, Vector3.Angle(transform.forward, lTo), lSight)) continue;
+
+                PlayerAvatar lPlayer = lOther._combatTarget;
+                if (lOther.State.Value == NpcState.Engaged)
+                {
+                    if (State.Value == NpcState.Investigate && _investigateAlarmed) return;
+                    _awareness = Mathf.Max(_awareness, 0.75f);
+                    _suspect = lPlayer;
+                    Investigate(lPlayer.transform.position, true);
+                }
+                else
+                {
+                    _combatTarget = lPlayer;
+                    _awareness = 1f;
+                    Zone?.ReportContact(lPlayer, lOther.Zone?.ContactFor(lPlayer)?.lastKnown ?? lPlayer.transform.position, false);
+                    _reactionUntil = Time.time + GameDatabase.Rules.npcReactionTime;
+                    EnterCombat();
+                }
+                return;
+            }
+        }
+
+        /// <summary>The gauge is full: confront the player (or run, for the unarmed). Already fighting: keep the squad informed.</summary>
         private void Spot(PlayerAvatar pPlayer)
         {
-            bool lFirst = !InCombat;
             _combatTarget = pPlayer;
             _targetVisible = true;
-            Zone?.ReportContact(pPlayer, pPlayer.transform.position, true);
-            if (lFirst)
+            _lastSawTarget = Time.time;
+            if (InCombat)
             {
-                _reactionUntil = Time.time + GameDatabase.Rules.npcReactionTime + Random.value * 0.25f;
-                SpottedRpc();
-                if (Flees) { SetState(NpcState.Flee); return; }
-                EnterCombat();
-                // A spotter in a zone with a flare launcher may go fire it.
-                _wantsAlarm = Random.value < 0.3f && WorldRegistry.Nearest<AlarmTrigger>(transform.position, 45f, a => a.State == 0) != null;
+                Zone?.ReportContact(pPlayer, pPlayer.transform.position, true);
+                return;
             }
+            SpottedRpc();
+            if (Flees)
+            {
+                // A scream: the guards close by come and look.
+                NoiseSystem.Emit(transform.position, 14f, NoiseKind.Suspicious, pPlayer.OwnerClientId);
+                SetState(NpcState.Flee);
+                return;
+            }
+            _engagedSince = Time.time;
+            SetState(NpcState.Engaged);
+        }
+
+        /// <summary>The confrontation: weapon up, walk over, shout - then a fight, or a search if the player slipped away.</summary>
+        private void UpdateEngaged()
+        {
+            if (_combatTarget == null || !_combatTarget.IsSpawned || !_combatTarget.Health.IsAlive) { ReturnToDuty(); return; }
+            Vector3 lPlayer = _combatTarget.transform.position;
+            Vector3 lAimPoint = _combatTarget.Chest;
+            FaceTowards(lAimPoint, 300f);
+            Vector3 lAimDir = lAimPoint - Eye;
+            AimPitch.Value = -Mathf.Asin(Mathf.Clamp(lAimDir.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
+            float lUnseen = Time.time - _lastSawTarget;
+            if (Vector3.Distance(transform.position, lPlayer) > 6f && lUnseen < 0.5f) MoveTo(lPlayer, WALK);
+            else Stop();
+
+            // Aiming a gun at it from close enough is a hostile act.
+            bool lHostile = _combatTarget.Aiming.Value && lUnseen < 0.4f && Vector3.Distance(transform.position, lPlayer) < 25f;
+            switch (DetectionModel.ResolveConfront(Time.time - _engagedSince, lUnseen, lHostile))
+            {
+                case DetectionModel.Confrontation.Combat:
+                    Zone?.ReportContact(_combatTarget, lPlayer, lUnseen < 0.4f);
+                    _reactionUntil = Time.time + 0.3f;
+                    EnterCombat();
+                    // A rare few go for the zone's flare launcher (a map-wide alarm).
+                    _wantsAlarm = Random.value < 0.1f && WorldRegistry.Nearest<AlarmTrigger>(transform.position, 45f, a => a.State == 0) != null;
+                    break;
+                case DetectionModel.Confrontation.LostSight:
+                    _searchCenter = lPlayer;
+                    _searchUntil = Time.time + GameDatabase.Rules.searchDuration * 0.6f;
+                    SetState(NpcState.Search);
+                    MoveTo(lPlayer, RUN * 0.6f);
+                    break;
+            }
+        }
+
+        /// <summary>Stops and stares at what it half-saw while the gauge fills; back to duty once it drains.</summary>
+        private void UpdateSuspicious()
+        {
+            Stop();
+            if (_suspect != null) FaceTowards(_suspect.transform.position, 150f);
+            if (_awareness <= 0.01f || _stateTime > 10f) ReturnToDuty();
         }
 
         private void LookForBodies()
@@ -439,7 +543,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                     break;
                 case NoiseKind.Suspicious:
                 case NoiseKind.Distraction:
-                    if (InCombat || State.Value == NpcState.Flee || State.Value == NpcState.Sick) return;
+                    if (InCombat || State.Value == NpcState.Engaged || State.Value == NpcState.Flee || State.Value == NpcState.Sick) return;
                     // Only the nearest few NPCs walk to a distraction; the rest glance.
                     if (pNoise.kind == NoiseKind.Distraction && !IsNearestTo(pNoise.position, 2)) { FaceTowards(pNoise.position, 9999f); return; }
                     if (IsTarget && pNoise.kind == NoiseKind.Distraction && !IsNearestTo(pNoise.position, 1)) return;
@@ -476,7 +580,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             if (!Health.IsAlive || State.Value == NpcState.KnockedOut || State.Value == NpcState.Sick) return;
             if (Flees) { SetState(NpcState.Flee); return; }
-            if (InCombat) { if (_combatTarget == null) _searchCenter = pPoint; return; }
+            if (InCombat || State.Value == NpcState.Engaged) { if (_combatTarget == null) _searchCenter = pPoint; return; }
             _awareness = Mathf.Max(_awareness, 0.7f);
             _searchCenter = pPoint;
             _searchUntil = Time.time + GameDatabase.Rules.searchDuration;

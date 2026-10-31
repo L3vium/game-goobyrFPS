@@ -90,7 +90,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 foreach (PlayerAvatar lOther in PlayerAvatar.All)
                     if (lOther != null && lOther != lMe && lOther.Team.Value == lMe.Team.Value && lOther.Health.IsAlive) Dot(lMe, lToMap, lOther.transform.position, new Color(0.5f, 0.75f, 1f), 7f);
             foreach (Npc lNpc in Npc.All)
-                if (lNpc != null && lNpc.Health.IsAlive && (lNpc.InCombat || lNpc.Awareness.Value >= 10)) Dot(lMe, lToMap, lNpc.transform.position, lNpc.InCombat ? UIFactory.Accent : new Color(1f, 0.7f, 0.2f), 7f);
+                if (lNpc != null && lNpc.Health.IsAlive && (lNpc.IsAlerted || lNpc.Awareness.Value >= 10)) Dot(lMe, lToMap, lNpc.transform.position, lNpc.IsAlerted ? UIFactory.Accent : new Color(1f, 0.7f, 0.2f), 7f);
             MatchDirector lDirector = MatchDirector.Instance;
             if (lDirector != null && lDirector.Proof.Value != ProofState.TargetAlive)
             {

@@ -43,17 +43,25 @@ markers, 40+ weapon spots, three spots per unique weapon, starts 50 m clear of N
 floating over the terrain.
 
 ## Systems
-- **AI** (`AI/Npc`): vision cone weighed by distance, light (power cut), stance, grass, smoke and
-  walls, filling an awareness gauge ("?" then "!"); hearing (shots, explosions, distractions,
-  footsteps of running players). Bodies found raise the alarm. Zone squads (`LevelZone`) share
-  the *last known position* of each player, hand out suppress / flank / push roles over scored
-  cover points, then search around that position. NPCs never track a player they cannot see —
-  the hunted player sees their own "shadow" at the believed position. Fights warm up (wild
-  first shots). Patrols walk slowly (1.15 m/s) and come in groups of up to five on one route: the
-  first still on its round leads, the others follow in a column of twos. Crowds (unarmed `Worker`
-  NPCs around a scene) report trouble and run from it. One NPC per zone radios for reinforcements (icon + countdown): kill it before it
-  finishes. The alarm flare alerts the whole map. Patrol cars spot players with their headlights,
-  brake and drop two guards.
+- **AI** (`AI/Npc`, rules in `AI/DetectionModel`): sight is a 90° cone out to 20 m (lookouts
+  30 m) with an edge-of-vision band out to 75° that fills three times slower, weighed by distance,
+  light (power cut), stance, grass, smoke and walls; anyone closer than 2.2 m is felt. Three stages:
+  **suspicious** (the gauge fills, the NPC stops and stares, walks over past half, forgets when it
+  drains), **engaged** (gauge full: weapon up, it walks over and shouts for 2 s - break line of sight
+  for 1.2 s and it searches instead; aim at it and it fires at once), **combat** (it shoots). A fight
+  stays contained: another NPC joins only if it sees the player, sees the confrontation or the fight
+  within 18 m, hears gunfire or an explosion, or gets the phone call. Hearing: footsteps of running
+  players, shots, explosions, distractions; bodies found make NPCs investigate. Zone squads
+  (`LevelZone`) share the *last known position* among the NPCs that joined, hand out suppress /
+  flank / push roles over scored cover points, then search around that position. NPCs never track a
+  player they cannot see - the hunted player sees their own "shadow" at the believed position.
+  Fights warm up (wild first shots). Once someone in a zone fights, one fighter phones for help
+  (icon + ring): when the call ends, the zone's NPCs within 60 m of the caller search the last known
+  position and reinforcements arrive. Kill the caller first. Patrols walk slowly (1.15 m/s) and come
+  in groups of up to five on one route: the first still on its round leads, the others follow in a
+  column of twos. Crowds (unarmed `Worker` NPCs around a scene) scream (guards close by come and
+  look) and run. The alarm flare (rarely fired, once a fight starts) alerts the whole map. Patrol
+  cars spot players with their headlights, brake and drop two guards.
 - **Systemic props** (`Systems/`): fire spreads between flammables and is put out by sprinkler
   zones; breakers cut a building's lights (and an NPC comes to fix it); chandeliers drop when
   their chain is shot; poisonable drinks (lethal, or emetic → the drinker runs to a toilet,

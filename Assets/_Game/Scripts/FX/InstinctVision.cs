@@ -127,11 +127,11 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             {
                 if (lNpc == null || lNpc.IsTarget || !lNpc.Health.IsAlive) continue;
                 if ((lNpc.transform.position - lEye).sqrMagnitude > lNpcRange) continue;
-                if (lNpc.InCombat || lNpc.Awareness.Value >= 10) AddTree(lNpc.transform, Slot.Alert);
+                if (lNpc.IsAlerted || lNpc.Awareness.Value >= 10) AddTree(lNpc.transform, Slot.Alert);
             }
             foreach (Npc lNpc in Npc.All)
             {
-                if (lNpc == null || lNpc.IsTarget || !lNpc.Health.IsAlive || lNpc.InCombat || lNpc.Awareness.Value >= 10) continue;
+                if (lNpc == null || lNpc.IsTarget || !lNpc.Health.IsAlive || lNpc.IsAlerted || lNpc.Awareness.Value >= 10) continue;
                 if ((lNpc.transform.position - lEye).sqrMagnitude > lNpcRange) continue;
                 AddTree(lNpc.transform, Slot.Npc);
             }

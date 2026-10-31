@@ -9,10 +9,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
     /// <summary>
     /// One of the three zones of a map (town, lair, mansion) and the squad that guards it.
     /// <para>
-    /// The squad is the shared brain of the zone's NPCs: it keeps the last known position of each
-    /// player it has seen, hands out combat roles (suppress, flank, push), decides who calls for
-    /// reinforcements, and brings the reinforcements in through the zone's entry. Reinforcements
-    /// are per zone: a firefight in the town never pulls the mansion's guards.
+    /// The squad is the shared brain of the zone's NPCs that have joined a fight: it keeps the last
+    /// known position of each player they have seen, hands out combat roles (suppress, flank, push),
+    /// decides who calls for reinforcements once someone actually shoots, and brings the
+    /// reinforcements in through the zone's entry. The call alerts only the members within
+    /// <see cref="DetectionModel.CALL_RADIUS"/> of the caller; a firefight in the town never pulls
+    /// the mansion's guards.
     /// </para>
     /// </summary>
     public class LevelZone : MonoBehaviour
@@ -181,7 +183,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                         if (lContact.player != null && lContact.player.IsSpawned) lContact.player.ShowGhostRpc(Vector3.zero, false, Index);
                     _contacts.Clear();
                 }
-                else if (!_callInProgress && _callsMade < GameDatabase.Rules.maxCallsPerZone && Time.time - CombatSince > 1.5f) AssignCaller();
+                else if (!_callInProgress && _callsMade < GameDatabase.Rules.maxCallsPerZone && Time.time - CombatSince > 1.5f && AnyFighting()) AssignCaller();
             }
         }
 
@@ -216,6 +218,14 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return lSum.sqrMagnitude > 0.01f ? lSum.normalized : Vector3.zero;
         }
 
+        /// <summary>Someone of the squad is actually fighting (a search alone never calls for help).</summary>
+        private bool AnyFighting()
+        {
+            foreach (Npc lMember in Members)
+                if (lMember != null && lMember.Health.IsAlive && lMember.State.Value == NpcState.Combat) return true;
+            return false;
+        }
+
         private void AssignCaller()
         {
             Npc lBest = null;
@@ -242,6 +252,10 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _callsMade++;
             Contact lThreat = BestContact(pCaller.transform.position);
             Vector3 lPoint = lThreat != null ? lThreat.lastKnown : pCaller.transform.position;
+            // The call reaches the squad around the caller, not the whole zone nor the map.
+            foreach (Npc lMember in Members)
+                if (lMember != null && lMember != pCaller && lMember.Health.IsAlive && DetectionModel.HearsCall(lMember.ZoneIndex.Value, Index, Vector3.Distance(lMember.transform.position, pCaller.transform.position)))
+                    lMember.AlertToPoint(lPoint, true);
             Match.MatchDirector.Instance?.SpawnReinforcements(this, lPoint, GameDatabase.Rules.reinforcementsPerCall);
         }
 

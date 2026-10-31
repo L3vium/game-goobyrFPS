@@ -34,10 +34,10 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         public float npcHealth = 100f;
         [Tooltip("Multiplies the damage NPCs deal.")]
         public float npcDamageMultiplier = 0.7f;
-        public float npcVisionRange = 38f;
-        public float npcVisionAngle = 110f;
+        public float npcVisionRange = 20f;
+        public float npcVisionAngle = 90f;
         [Tooltip("Seconds of full exposure before an NPC is sure it saw a player.")]
-        public float npcDetectTime = 1.3f;
+        public float npcDetectTime = 2.2f;
         public float npcReactionTime = 0.7f;
         [Tooltip("Seconds of radio an NPC needs to call reinforcements. Kill it before.")]
         public float callDuration = 3f;

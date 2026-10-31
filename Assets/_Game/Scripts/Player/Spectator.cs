@@ -18,6 +18,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         public PlayerAvatar Watched { get; private set; }
 
+        /// <summary>The short look at your own body before watching someone else.</summary>
+        private const float DEATH_CAM = 1.2f;
+
         private Vector3 _deathPoint;
         private float _deathTimer;
         private float _orbit;
@@ -27,7 +30,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             if (Instance == null) Instance = new GameObject("Spectator").AddComponent<Spectator>();
             Instance._deathPoint = pPoint;
-            Instance._deathTimer = 3.5f;
+            Instance._deathTimer = DEATH_CAM;
             Instance._orbit = Mathf.Atan2(pImpulse.x, pImpulse.z) * Mathf.Rad2Deg + 180f;
         }
 
@@ -61,7 +64,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             {
                 _deathTimer -= Time.deltaTime;
                 _orbit += Time.deltaTime * 20f;
-                Vector3 lFrom = _deathPoint + Quaternion.Euler(0, _orbit, 0) * new Vector3(0, 2.5f, -4.5f) + Vector3.up * (3.5f - _deathTimer) * 0.6f;
+                Vector3 lFrom = _deathPoint + Quaternion.Euler(0, _orbit, 0) * new Vector3(0, 2.5f, -4.5f) + Vector3.up * (DEATH_CAM - _deathTimer) * 1.6f;
                 lRig.SetPose(lFrom, Quaternion.LookRotation(_deathPoint - lFrom));
                 return;
             }

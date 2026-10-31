@@ -59,6 +59,8 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
         private ProofPickup _proof;
         private float _revealTimer;
+        /// <summary>The end screen waits for the host's button, back to the lobby after this at the latest.</summary>
+        public const float END_SCREEN_FALLBACK = 45f;
         private float _endTimer;
         private readonly List<ExtractionPoint> _extractions = new List<ExtractionPoint>();
         private static GoobRagdoll _targetRagdoll;
@@ -376,7 +378,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             Outcome.Value = pOutcome;
             Phase.Value = MatchPhase.Ended;
             if (LobbyState.Instance != null) LobbyState.Instance.Phase.Value = MatchPhase.Ended;
-            _endTimer = 14f;
+            _endTimer = END_SCREEN_FALLBACK;
             string lWinner = "";
             if (pOutcome == MatchOutcome.Extracted)
             {

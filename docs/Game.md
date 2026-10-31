@@ -17,7 +17,7 @@ Every player starts together at one of the map's start points (drawn per match a
 NPC post or patrol point within 50 m) with the starting
 loadout (GD Tool; hush pistol + coins by default). Death = eliminated, then spectate (teammates,
 or anyone in FFA). The match ends on an extraction, when every player is eliminated, or at the
-time limit (draw). The proof carrier is revealed to everyone every 10 s.
+time limit (draw); the end screen's buttons go back to the lobby (host) or leave the room at once. The proof carrier is revealed to everyone every 10 s.
 
 ## Maps (three zones each, each with its own reinforcements)
 | Map | Town | Lair | Mansion / building |

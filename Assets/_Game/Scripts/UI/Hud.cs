@@ -341,7 +341,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 UpdateWorldMarkers(lDirector, lMe);
             }
 
-            _spectating.text = Spectator.Active && Spectator.Instance.Watched != null ? "SPECTATING " + Spectator.Instance.Watched.DisplayName.ToUpperInvariant() + "   <size=70%>[SPACE] NEXT</size>" : Spectator.Active ? "ELIMINATED" : "";
+            _spectating.text = Spectator.Active && Spectator.Instance.Watched != null ? "SPECTATING " + Spectator.Instance.Watched.DisplayName.ToUpperInvariant() + "   <size=70%>[SPACE] NEXT   [ESC] LEAVE</size>" : Spectator.Active ? "ELIMINATED   <size=70%>[ESC] LEAVE</size>" : "";
 
             // Voice.
             string lTalking = "";

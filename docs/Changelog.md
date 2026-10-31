@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Death and end of match: the look at your own body lasts 1.2 s before spectating (the HUD reminds
+  that Esc leaves). The end screen has buttons: the host takes the room back to the lobby at once,
+  anyone can leave the room; without a click it goes back after 45 s.
 - Map dressing sits on the ground: props, nature pieces and terrain trees are lowered to the lowest
   ground under their footprint (rocks bed in deeper), explosive barrels stand on the patrol's floor
   (never on a roof or in the air over a dip), and crowd or patrol members off any floor stand on the

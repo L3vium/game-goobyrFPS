@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- The cursor stays locked in the game window during a match: the lock is re-applied every frame the
+  window has focus and the moment focus comes back (alt-tab, a click outside), so the mouse can no
+  longer leave the window or click other tabs.
 - Maps rebuilt at 500 m on Unity Terrain (HillMap): valleys, terraces, cliffs, graded streets,
   buildings stepping down the slopes on retaining walls, dense forests; 210-230 NPCs per map with
   patrol groups, room guards and crowds around staged scenes.

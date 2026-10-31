@@ -83,10 +83,21 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             }
         }
 
+        /// <summary>What the game wants; <see cref="CursorKeeper"/> re-applies it every frame and on focus.</summary>
+        public static bool CursorWanted { get; private set; }
+
         public static void LockCursor(bool pLocked)
         {
-            Cursor.lockState = pLocked ? CursorLockMode.Locked : CursorLockMode.None;
-            Cursor.visible = !pLocked;
+            CursorWanted = pLocked;
+            ApplyCursor();
+        }
+
+        /// <summary>Applies the wanted lock (the OS drops it on alt-tab or a click outside the window).</summary>
+        public static void ApplyCursor()
+        {
+            CursorLockMode lMode = CursorWanted ? CursorLockMode.Locked : CursorLockMode.None;
+            if (Cursor.lockState != lMode) Cursor.lockState = lMode;
+            if (Cursor.visible == CursorWanted) Cursor.visible = !CursorWanted;
         }
     }
 }

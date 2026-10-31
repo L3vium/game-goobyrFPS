@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Pinecrest Hollow and Mirage Bay: starts moved 80-100 m from any guard (Pinecrest's north trail was
+  6 m from one, Mirage Bay's corniche start 7 m), maps rebuilt with props seated on the ground.
+  Piers and boats over water no longer count as floating.
 - Elmridge: the south and east starts move away from the guards (the south one was 3 m from a door
   guard). The security room's three monitors stand on a three-desk console instead of overlapping in
   mid-air, and vent grilles sit flush under the ceilings. The validator counts a prop touching a

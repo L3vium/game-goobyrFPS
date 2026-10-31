@@ -346,10 +346,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private void Points()
         {
-            K.Point(MatchPoint.Kind.Start, G(-236f, -104f, 0.2f), 60, "West trail");
+            K.Point(MatchPoint.Kind.Start, G(-234f, 70f, 0.2f), 107, "West trail");
             K.Point(MatchPoint.Kind.Start, G(236f, -66f, 0.2f), 240, "East trail");
-            K.Point(MatchPoint.Kind.Start, G(96f, 236f, 0.2f), 200, "North trail");
-            K.Point(MatchPoint.Kind.Start, G(40f, -240f, 0.2f), 0, "Valley road");
+            K.Point(MatchPoint.Kind.Start, G(190f, 234f, 0.2f), 219, "North trail");
+            K.Point(MatchPoint.Kind.Start, G(-180f, -234f, 0.2f), 38, "South woods");
             K.Point(MatchPoint.Kind.Extraction, G(-95f, -192f, 0.2f), 180, "Logging truck");
             K.Point(MatchPoint.Kind.Extraction, G(-238f, -98f, 0.2f), 270, "Old mine trail");
         }

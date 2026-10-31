@@ -309,10 +309,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             K.Gadget(ItemKind.SmokeGrenade, G(-160f, -30f, 0.2f));
             K.Gadget(ItemKind.EmeticPoison, G(ZENITH.x - 10f, ZENITH.y - 48f, 0.2f));
             K.UniqueWeapon(ItemKind.Flamethrower, G(200f, 62f, 0.2f), "Desert road shack");
-            K.Point(MatchPoint.Kind.Start, G(-236f, 98f, 0.2f), 100, "Caravan trail");
+            K.Point(MatchPoint.Kind.Start, G(-234f, 180f, 0.2f), 128, "Caravan trail");
             K.Point(MatchPoint.Kind.Start, G(236f, 18f, 0.2f), 260, "Desert road");
-            K.Point(MatchPoint.Kind.Start, G(28f, 236f, 0.2f), 180, "North track");
-            K.Point(MatchPoint.Kind.Start, G(-238f, -150f, 0.2f), 90, "Corniche west");
+            K.Point(MatchPoint.Kind.Start, G(-20f, 234f, 0.2f), 175, "North track");
+            K.Point(MatchPoint.Kind.Start, G(-150f, -234f, 0.2f), 33, "South dunes");
             K.Point(MatchPoint.Kind.Extraction, G(232f, -150f, 0.2f), 90, "Corniche car");
             K.Point(MatchPoint.Kind.Extraction, G(-238f, 92f, 0.2f), 270, "Caravan trail truck");
         }

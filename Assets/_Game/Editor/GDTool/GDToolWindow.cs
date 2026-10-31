@@ -202,6 +202,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             int lFloating = 0;
             string lFloatingExample = "";
             Terrain lLand = Terrain.activeTerrain;
+            System.Collections.Generic.List<Bounds> lWaters = new System.Collections.Generic.List<Bounds>();
+            foreach (MeshRenderer lWater in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+                if (lWater.gameObject.layer == GameLayers.WATER) lWaters.Add(lWater.bounds);
+            // Piers and boats stand over water, not over its bed.
+            bool OverWater(Vector3 pFoot) => System.Linq.Enumerable.Any(lWaters, w => pFoot.x >= w.min.x && pFoot.x <= w.max.x && pFoot.z >= w.min.z && pFoot.z <= w.max.z && pFoot.y > w.max.y - 0.6f && pFoot.y - w.max.y < 2.5f);
             Physics.SyncTransforms();
             foreach (MeshRenderer lRenderer in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
             {
@@ -212,7 +217,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Bounds lBounds = lRenderer.bounds;
                 Vector3 lFoot = new Vector3(lBounds.center.x, lBounds.min.y, lBounds.center.z);
                 float lGround = lLand.SampleHeight(lFoot) + lLand.transform.position.y;
-                if (lFoot.y - lGround < 0.3f) continue;
+                if (lFoot.y - lGround < 0.3f || OverWater(lFoot)) continue;
                 // Held by anything it touches: a floor under it, a table, or a wall it hangs on (TVs, grilles).
                 bool lSupported = false;
                 foreach (Collider lTouch in Physics.OverlapBox(lBounds.center, lBounds.extents + Vector3.one * 0.12f, Quaternion.identity, GameLayers.WorldMask, QueryTriggerInteraction.Ignore))

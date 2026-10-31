@@ -100,10 +100,38 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return lObject;
         }
 
+        /// <summary>The lowest terrain height under a footprint (centre and eight points on a circle of <paramref name="pRadius"/>).</summary>
+        public float LowestGround(Vector3 pCenter, float pRadius)
+        {
+            float lLowest = GroundAt(pCenter.x, pCenter.z);
+            for (int i = 0; i < 8; i++)
+            {
+                float lAngle = i * Mathf.PI * 0.25f;
+                lLowest = Mathf.Min(lLowest, GroundAt(pCenter.x + Mathf.Cos(lAngle) * pRadius, pCenter.z + Mathf.Sin(lAngle) * pRadius));
+            }
+            return lLowest;
+        }
+
+        /// <summary>
+        /// A piece standing on the terrain (not on a floor or a roof) is lowered to the lowest ground under
+        /// its footprint and bedded a few centimetres in, so no edge floats over a slope.
+        /// </summary>
+        private void SeatOnLand(GameObject pPiece, Vector3 pPosition, float pScale)
+        {
+            if (pPiece == null || Land == null) return;
+            if (Mathf.Abs(pPosition.y - GroundAt(pPosition.x, pPosition.z)) > 0.35f) return;
+            Bounds lBounds = pPiece.GetComponent<MeshFilter>().sharedMesh.bounds;
+            float lRadius = Mathf.Min(3f, Mathf.Max(lBounds.extents.x, lBounds.extents.z) * pScale);
+            Vector3 lPosition = pPiece.transform.position;
+            lPosition.y = Mathf.Min(pPosition.y, LowestGround(pPosition, lRadius)) - 0.06f;
+            pPiece.transform.position = lPosition;
+        }
+
         /// <summary>A prop from the shared kit, registered as cover when it is waist-high or more.</summary>
         public GameObject Prop(string pName, Vector3 pPosition, float pYaw, Color? pTint = null, Collide pCollide = Collide.Box, bool pCover = false, Transform pParent = null)
         {
             GameObject lProp = Piece("Props", pName, pPosition, pYaw, pTint, pParent, pCollide);
+            SeatOnLand(lProp, pPosition, 1f);
             if (lProp != null && pCover)
             {
                 Bounds lBounds = lProp.GetComponent<MeshFilter>().sharedMesh.bounds;
@@ -116,6 +144,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             GameObject lPiece = Piece("Nature", pName, pPosition, pYaw, pTint, TreesGroup, Collide.None, pScale);
             if (lPiece == null) return null;
+            SeatOnLand(lPiece, pPosition, pName.StartsWith("Rock") || pName.StartsWith("Cliff") ? pScale * 1.6f : pScale);
             Bounds lBounds = lPiece.GetComponent<MeshFilter>().sharedMesh.bounds;
             bool lTree = pName.Contains("Pine") || pName.Contains("Broadleaf") || pName.Contains("Palm") || pName.Contains("Birch") || pName.Contains("Cypress") || pName.Contains("Dead");
             if (lTree)

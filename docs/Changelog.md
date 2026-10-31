@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Map dressing sits on the ground: props, nature pieces and terrain trees are lowered to the lowest
+  ground under their footprint (rocks bed in deeper), explosive barrels stand on the patrol's floor
+  (never on a roof or in the air over a dip), and crowd or patrol members off any floor stand on the
+  terrain.
 - Safe starts: the match draws its start point among those with no guard post or patrol point within
   50 m (else the roomiest). The map validator fails a start closer than that, and reports props
   floating over the terrain.

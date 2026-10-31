@@ -126,7 +126,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 _treePrototypes.Add(new TreePrototype { prefab = lPrefab, bendFactor = 0.2f });
                 _treeIndex[pPiece] = lIndex;
             }
-            float lHeight = GroundAt(pX, pZ) - 0.15f;
+            // Seat on the lowest ground under the footprint so no side floats on a slope; rocks bed in deeper.
+            bool lRock = pPiece.StartsWith("Rock");
+            float lHeight = LowestGround(new Vector3(pX, 0f, pZ), (lRock ? 0.9f : 0.45f) * pScale) - (lRock ? 0.3f * pScale : 0.15f);
             _treeInstances.Add(new TreeInstance
             {
                 position = new Vector3((pX - _landOrigin.x) / _landSize, Mathf.Clamp01((lHeight - _landOrigin.y) / _landData.size.y), (pZ - _landOrigin.z) / _landSize),

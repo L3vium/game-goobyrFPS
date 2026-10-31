@@ -625,6 +625,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Mesh lMesh = LowPolyMesh.Cached("rock" + lVariant, () => LowPolyMesh.Icosphere(1, 0.22f, 100 + lVariant));
             lMesh = EditorAssets.SaveMesh(Object.Instantiate(lMesh), "Rock" + lVariant);
             Vector3 lScale = new Vector3(pScale * (0.8f + (float)Rng.NextDouble() * 0.6f), pScale * (0.5f + (float)Rng.NextDouble() * 0.4f), pScale * (0.8f + (float)Rng.NextDouble() * 0.6f));
+            // Bedded into the lowest ground of its footprint: no rock floats over a slope.
+            if (Land != null && Mathf.Abs(pPosition.y - GroundAt(pPosition.x, pPosition.z)) < 0.5f) pPosition.y = LowestGround(pPosition, Mathf.Max(lScale.x, lScale.z) * 0.9f) - lScale.y * 0.15f;
             GameObject lRock = Mesh(Env, "Rock", lMesh, pPosition, lScale, GameArt.Vary(pColor, 0.08f, Rng), Quaternion.Euler(0, (float)Rng.NextDouble() * 360f, 0), true);
             lRock.isStatic = true;
             if (pCover && pScale > 1f) _coverSources.Add((pPosition + Vector3.up * lScale.y * 0.3f, lScale * 0.8f, Quaternion.identity));
@@ -1113,7 +1115,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Physics.SyncTransforms();
             if (Physics.Raycast(new Vector3(pPoint.x, pNearY + 2f, pPoint.z), Vector3.down, out RaycastHit lHit, 5f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore))
                 return lHit.point + Vector3.up * 0.1f;
-            return pPoint;
+            // Nothing near the reference floor: stand on the terrain rather than in the air.
+            return new Vector3(pPoint.x, GroundAt(pPoint.x, pPoint.z) + 0.1f, pPoint.z);
         }
 
         /// <summary>
@@ -1129,8 +1132,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Vector3 lSide = Vector3.Cross(Vector3.up, lDir) * (Rng.NextDouble() < 0.5 ? -2.4f : 2.4f);
             Vector3 lSpot = Vector3.Lerp(a, b, 0.35f + (float)Rng.NextDouble() * 0.3f) + lSide;
             Physics.SyncTransforms();
-            if (Physics.Raycast(lSpot + Vector3.up * 2f, Vector3.down, out RaycastHit lFloor, 6f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore)) lSpot = lFloor.point;
-            else lSpot.y = Mathf.Max(lSpot.y, GroundAt(lSpot.x, lSpot.z));
+            // The floor the patrol walks on, never a roof above it nor the air over a dip.
+            float lGround = GroundAt(lSpot.x, lSpot.z);
+            if (Physics.Raycast(lSpot + Vector3.up * 1.2f, Vector3.down, out RaycastHit lFloor, 4f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore) && lFloor.normal.y > 0.8f) lSpot = lFloor.point;
+            else lSpot.y = lGround;
+            if (lSpot.y < lGround) lSpot.y = lGround;
             lSpot.y -= 0.1f;
             Barrel(lSpot, true);
             Barrel(lSpot + lDir * 0.9f + lSide.normalized * 0.3f, true);

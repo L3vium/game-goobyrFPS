@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- No more screen vignette when crouching or hiding (concealment will show on the HUD). The camera
+  sits higher: eyes at 1.74 m standing, 0.98 m crouched (NPC sight uses the same heights).
 - The cursor stays locked in the game window during a match: the lock is re-applied every frame the
   window has focus and the moment focus comes back (alt-tab, a click outside), so the mouse can no
   longer leave the window or click other tabs.

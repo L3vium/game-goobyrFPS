@@ -57,7 +57,7 @@ markers, 40+ weapon spots and three spots per unique weapon.
   their chain is shot; poisonable drinks (lethal, or emetic → the drinker runs to a toilet,
   alone); the basement air handler gasses the whole building; distractions (radio, TV, phone,
   generator, car alarm); hiding spots; ziplines; jump pads; climbable surfaces; tall grass.
-- **Player**: walk, sprint (held), crouch (held; crouching while moving slides, further out of a sprint), jump,
+- **Player** (eyes at 1.74 m, 0.98 m crouched): walk, sprint (held), crouch (held; crouching while moving slides, further out of a sprint), jump,
   mantle, climb, zipline, hide; head bob, sway, tilt, landing dip, FOV kicks; 6-slot inventory;
   guns, rocket launcher, flamethrower, coin / brick / smoke / C4 + remote (T), poisons, punches and
   takedowns from behind.

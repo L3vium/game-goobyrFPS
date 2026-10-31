@@ -35,9 +35,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         [SerializeField] private float _gravity = -24f;
 
         [Header("Heights")]
-        [SerializeField] private float _standHeight = 1.8f;
-        [SerializeField] private float _crouchHeight = 1.05f;
-        [SerializeField] private float _eyeOffset = 0.16f;
+        [SerializeField] private float _standHeight = 1.86f;
+        [SerializeField] private float _crouchHeight = 1.1f;
+        [SerializeField] private float _eyeOffset = 0.12f;
 
         [Header("Slides")]
         [SerializeField] private float _slideCooldown = 0.55f;

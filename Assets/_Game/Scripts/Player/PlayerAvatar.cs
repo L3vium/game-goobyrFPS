@@ -46,7 +46,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public string DisplayName => Player != null ? Player.Name : "Goob";
 
         /// <summary>Eye position as the NPCs and the camera see it.</summary>
-        public Vector3 Eye => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? 0.9f : 1.62f);
+        public Vector3 Eye => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? 0.98f : 1.74f);
         public Vector3 Chest => transform.position + Vector3.up * (Crouched.Value ? 0.6f : 1.1f);
 
         private float _yaw, _pitch;
@@ -192,9 +192,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             if (Weapons != null && Weapons.AdsFov > 0f) lFov = Weapons.AdsFov;
             CameraRig.Instance.SetTargetFov(lFov);
 
-            // Feedback: crouch / concealment vignette.
-            bool lConcealed = (Motor.Crouched && Motor.InGrass) || lSpot != null;
-            CameraRig.Instance.SetVignette(lConcealed ? 0.42f : Motor.Crouched ? 0.3f : 0.2f, lConcealed ? new Color(0.05f, 0.15f, 0.08f) : Color.black);
+            // Concealment reads on the HUD status, never as a screen vignette.
+            CameraRig.Instance.SetVignette(0.18f, Color.black);
         }
 
         private void HandleLanded(float pFallSpeed)

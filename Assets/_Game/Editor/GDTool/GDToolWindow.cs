@@ -1,4 +1,5 @@
 using Com.IsartDigital.GoobyrFPS.AI;
+using Com.IsartDigital.GoobyrFPS.Core;
 using Com.IsartDigital.GoobyrFPS.Data;
 using Com.IsartDigital.GoobyrFPS.Match;
 using UnityEditor;
@@ -187,6 +188,35 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         lFails.Add($"{lTarget.displayName}: no {lActivity} node in zone {lTarget.zone}");
             foreach (MatchPoint lStart in lPoints)
                 if (lStart.PointKind == MatchPoint.Kind.Start && !UnityEngine.AI.NavMesh.SamplePosition(lStart.transform.position, out _, 3f, UnityEngine.AI.NavMesh.AllAreas)) lFails.Add($"start {lStart.Label} off the NavMesh");
+            System.Collections.Generic.List<Vector3> lThreats = MatchDirector.ThreatPositions();
+            foreach (MatchPoint lStart in lPoints)
+            {
+                if (lStart.PointKind != MatchPoint.Kind.Start) continue;
+                float lClearance = MatchRulesLogic.StartClearance(lStart.transform.position, lThreats);
+                if (lClearance < MatchRulesLogic.SAFE_START_DISTANCE) lFails.Add($"start {lStart.Label} {lClearance:0} m from an NPC (< {MatchRulesLogic.SAFE_START_DISTANCE:0})");
+            }
+            int lFloating = 0;
+            string lFloatingExample = "";
+            Terrain lLand = Terrain.activeTerrain;
+            Physics.SyncTransforms();
+            foreach (MeshRenderer lRenderer in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+            {
+                if (lLand == null || !lRenderer.gameObject.isStatic || lRenderer.transform.parent == null) continue;
+                // Pieces under a parent other than the props/env groups belong to buildings (floors, roofs).
+                string lGroup = lRenderer.transform.parent.name;
+                if (lGroup != "Props" && lGroup != "Env" && lGroup != "TreesAll") continue;
+                Bounds lBounds = lRenderer.bounds;
+                Vector3 lFoot = new Vector3(lBounds.center.x, lBounds.min.y, lBounds.center.z);
+                float lGround = lLand.SampleHeight(lFoot) + lLand.transform.position.y;
+                if (lFoot.y - lGround < 0.3f) continue;
+                bool lSupported = false;
+                foreach (RaycastHit lHit in Physics.RaycastAll(lFoot + Vector3.up * 0.05f, Vector3.down, 0.45f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore))
+                    if (lHit.collider.gameObject != lRenderer.gameObject) { lSupported = true; break; }
+                if (lSupported) continue;
+                lFloating++;
+                if (lFloatingExample.Length == 0) lFloatingExample = $" e.g. {lRenderer.name} at {lFoot:F0} +{lFoot.y - lGround:0.0} m";
+            }
+            if (lFloating > 0) lFails.Add($"{lFloating} floating props{lFloatingExample}");
             string lCounts = $"{lStarts} starts, {lExtractions} extractions, {lWeapons} weapons, {lNpcs} NPCs, {lCovers} covers";
             return lFails.Count == 0 ? $"OK   {pMap.displayName}: {lCounts}" : $"FAIL {pMap.displayName}: {string.Join("; ", lFails)}  ({lCounts})";
         }

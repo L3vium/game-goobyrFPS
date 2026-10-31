@@ -96,5 +96,16 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
             Assert.AreEqual('-', lCode[3]);
             Assert.AreEqual(RoomCode.Clean(lCode), RoomCode.Clean("  " + lCode.ToLowerInvariant() + " "));
         }
+
+        [Test]
+        public void SafeStart_NeverNextToAGuard()
+        {
+            List<UnityEngine.Vector3> lStarts = new List<UnityEngine.Vector3> { new UnityEngine.Vector3(0, 0, 0), new UnityEngine.Vector3(200, 0, 0), new UnityEngine.Vector3(0, 0, 200) };
+            List<UnityEngine.Vector3> lThreats = new List<UnityEngine.Vector3> { new UnityEngine.Vector3(10, 5, 0), new UnityEngine.Vector3(0, 0, 230) };
+            for (int lSeed = 0; lSeed < 20; lSeed++) Assert.AreEqual(1, MatchRulesLogic.PickSafeStart(lStarts, lThreats, new System.Random(lSeed)));
+            // Nothing safe: the roomiest one (30 m clear against 20 m and 10 m).
+            lThreats.Add(new UnityEngine.Vector3(220, 0, 0));
+            Assert.AreEqual(2, MatchRulesLogic.PickSafeStart(lStarts, lThreats, new System.Random(1)));
+        }
     }
 }

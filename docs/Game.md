@@ -13,7 +13,8 @@ it goes loud, everyone is lethal both ways.
   whoever extracts makes their team win. Teammates cannot hurt each other.
 - **Co-op** — one team against the AI; lost if everyone is eliminated.
 
-Every player starts together at one of the map's start points (drawn per match) with the starting
+Every player starts together at one of the map's start points (drawn per match among those with no
+NPC post or patrol point within 50 m) with the starting
 loadout (GD Tool; hush pistol + coins by default). Death = eliminated, then spectate (teammates,
 or anyone in FFA). The match ends on an extraction, when every player is eliminated, or at the
 time limit (draw). The proof carrier is revealed to everyone every 10 s.
@@ -38,7 +39,8 @@ A relief function shaped by `LandShape` stamps (graded roads that climb, buildin
 street's height, plateaus, terraces, carved rivers), painted ground layers, terrain trees and
 grass, stone retaining walls where pads meet the slope, and dressing helpers (`Frontage` rows,
 `Staff` guards per room, `Squad` patrol groups, `Crowd`s, `Routines`). The validator wants 150+ NPC
-markers, 40+ weapon spots and three spots per unique weapon.
+markers, 40+ weapon spots, three spots per unique weapon, starts 50 m clear of NPCs and no prop
+floating over the terrain.
 
 ## Systems
 - **AI** (`AI/Npc`): vision cone weighed by distance, light (power cut), stance, grass, smoke and

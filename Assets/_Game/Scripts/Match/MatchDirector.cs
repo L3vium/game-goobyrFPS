@@ -92,6 +92,18 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
         public static void RegisterTargetRagdoll(GoobRagdoll pRagdoll) => _targetRagdoll = pRagdoll;
 
+        /// <summary>Where the NPCs stand or walk at the start: their posts and every patrol point.</summary>
+        public static List<Vector3> ThreatPositions()
+        {
+            List<Vector3> lThreats = new List<Vector3>();
+            foreach (NpcSpawnPoint lSpawn in FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
+            {
+                lThreats.Add(lSpawn.transform.position);
+                if (lSpawn.Route != null) for (int i = 0; i < lSpawn.Route.Count; i++) lThreats.Add(lSpawn.Route.Point(i));
+            }
+            return lThreats;
+        }
+
         // ---------------------------------------------------------------- start
 
         private void StartMatchServer()
@@ -102,9 +114,10 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             TimeLeft.Value = (LobbyState.Instance != null ? LobbyState.Instance.TimeLimitMinutes.Value : GameDatabase.Rules.timeLimitMinutes) * 60f;
             foreach (LevelZone lZone in LevelZone.All) lZone.ResetSquad();
 
-            // Players around one start point.
+            // Players around one start point, never in sight of a guard post or a patrol.
             List<MatchPoint> lStarts = MatchPoint.OfKind(MatchPoint.Kind.Start);
-            Transform lStart = lStarts.Count > 0 ? lStarts[lRandom.Next(lStarts.Count)].transform : transform;
+            int lStartIndex = MatchRulesLogic.PickSafeStart(lStarts.ConvertAll(pPoint => pPoint.transform.position), ThreatPositions(), lRandom);
+            Transform lStart = lStartIndex >= 0 ? lStarts[lStartIndex].transform : transform;
             int lIndex = 0;
             foreach (LobbyPlayer lPlayer in LobbyPlayer.All)
             {

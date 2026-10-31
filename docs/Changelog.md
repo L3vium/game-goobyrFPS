@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Safe starts: the match draws its start point among those with no guard post or patrol point within
+  50 m (else the roomiest). The map validator fails a start closer than that, and reports props
+  floating over the terrain.
 - Agent name: the nickname typed in the menu wins over the Steam persona, is saved, and updates live
   for everyone already in the room; until one is typed the field follows the Steam persona as soon
   as Steam comes up.

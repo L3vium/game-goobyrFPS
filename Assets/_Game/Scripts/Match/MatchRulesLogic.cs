@@ -119,5 +119,39 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             if (pMode == MatchMode.FreeForAll) return true;
             return pViewerTeam == pWatchedTeam;
         }
+
+        /// <summary>Starts must be this far from any guard post or patrol point.</summary>
+        public const float SAFE_START_DISTANCE = 50f;
+
+        /// <summary>Distance from <paramref name="pStart"/> to the closest threat (NPC post, patrol point), on the ground plane.</summary>
+        public static float StartClearance(UnityEngine.Vector3 pStart, IReadOnlyList<UnityEngine.Vector3> pThreats)
+        {
+            float lBest = float.MaxValue;
+            foreach (UnityEngine.Vector3 lThreat in pThreats)
+            {
+                float lDx = lThreat.x - pStart.x, lDz = lThreat.z - pStart.z;
+                lBest = System.Math.Min(lBest, (float)System.Math.Sqrt(lDx * lDx + lDz * lDz));
+            }
+            return lBest;
+        }
+
+        /// <summary>
+        /// Draws a start point among the safe ones (no threat within <see cref="SAFE_START_DISTANCE"/>);
+        /// when none is safe, the one with the most room. -1 without starts.
+        /// </summary>
+        public static int PickSafeStart(IReadOnlyList<UnityEngine.Vector3> pStarts, IReadOnlyList<UnityEngine.Vector3> pThreats, System.Random pRandom)
+        {
+            if (pStarts.Count == 0) return -1;
+            List<int> lSafe = new List<int>();
+            int lRoomiest = 0;
+            float lMost = -1f;
+            for (int i = 0; i < pStarts.Count; i++)
+            {
+                float lClearance = StartClearance(pStarts[i], pThreats);
+                if (lClearance >= SAFE_START_DISTANCE) lSafe.Add(i);
+                if (lClearance > lMost) { lMost = lClearance; lRoomiest = i; }
+            }
+            return lSafe.Count > 0 ? lSafe[pRandom.Next(lSafe.Count)] : lRoomiest;
+        }
     }
 }

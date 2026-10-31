@@ -53,3 +53,18 @@ Rules I write for myself after a correction. Read at the start of every session.
   crouch slides further; no separate slide buttons. Patrols walk slowly.
 - **Title screen:** key art like Hitman (one detailed character, close, posed, simple building
   backdrop) and a tiled tab menu; contracts must be minimal and instantly understandable.
+
+## 2026-10-31 — 0.3 judged unreadable, unrealistic, buggy (cursor, floating props, spawns)
+- **Readability first, like Hitman but not a copy.** Detection is gradual (suspicious → engaged with
+  a confrontation window → combat) and contained (only witnesses, gunfire or a phone call spread
+  it). Every state has an indication: overhead diamond, arcs around the crosshair, status chip,
+  minimap ring, notifications, tension audio. The target is shown always (marker, compass, maps).
+- **Validate what the player sees, not only counts.** The validator now catches floating props,
+  starts near NPCs or off the NavMesh, missing tall grass; run it after every map build and look at
+  screenshots in game before calling a map done.
+- **UI pivots on the anchor in `UIFactory`.** Every element's position is its anchored corner/edge,
+  not its centre: compute positions with that, and use layout groups (`UIWidgets`) for lists so
+  nothing can overlap. Screenshot every changed screen.
+- **Generated only, realistic target.** No downloads or packs (user choice): textures, sounds,
+  props and humans come from builders, Blender scripts and `generate_3d`.
+- **Unity MCP for this machine is 8082**, not registered as a Claude MCP server: drive it over HTTP.

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Version 0.4.0.
 - Sound design rebuilt (still all synthesised, now layered like recorded foley): gunshots with
   crack, body, thump, mechanism and an outdoor tail; footsteps for players and NPCs that follow the
   surface underfoot (grass, dirt, stone, sand, wood, metal, water); swim strokes and splashes; an

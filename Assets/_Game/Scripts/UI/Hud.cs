@@ -30,7 +30,12 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private RectTransform _extractBar, _scoreboardPanel, _markers;
         private readonly TextMeshProUGUI[] _slots = new TextMeshProUGUI[WeaponHolder.SLOT_COUNT];
         private readonly Image[] _slotBacks = new Image[WeaponHolder.SLOT_COUNT];
-        private CanvasGroup _healthGroup, _ammoGroup, _wheelGroup;
+        private CanvasGroup _healthGroup, _ammoGroup, _wheelGroup, _stripGroup;
+        private readonly TextMeshProUGUI[] _stripNames = new TextMeshProUGUI[WeaponHolder.SLOT_COUNT];
+        private readonly TextMeshProUGUI[] _stripCounts = new TextMeshProUGUI[WeaponHolder.SLOT_COUNT];
+        private readonly Image[] _stripBars = new Image[WeaponHolder.SLOT_COUNT];
+        private readonly Image[] _stripBacks = new Image[WeaponHolder.SLOT_COUNT];
+        private float _stripShowUntil;
         private Image _bannerRule;
         private float _healthShowUntil, _ammoShowUntil, _wheelShowUntil, _lastHp = -1f;
         private string _lastAmmo = "";
@@ -153,7 +158,26 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _ammo = UIFactory.Text(lAmmoPanel.transform, "Ammo", "", 30, UIFactory.Paper, TextAlignmentOptions.BottomRight, new Vector2(1, 0), new Vector2(-160, 18), new Vector2(320, 40));
             _weaponName = UIFactory.Text(lAmmoPanel.transform, "Weapon", "", 15, new Color(1, 1, 1, 0.7f), TextAlignmentOptions.BottomRight, new Vector2(1, 0), new Vector2(-160, 54), new Vector2(320, 22));
 
-            // The weapon wheel: the slots in a ring around the crosshair, shown on a switch or while the wheel is held.
+            // The inventory, bottom right above the ammo: the six slots as a list, shown on a switch (wheel, keys).
+            RectTransform lStrip = UIFactory.Rect(_root, "Inventory", new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 120), new Vector2(260, WeaponHolder.SLOT_COUNT * 36f));
+            _stripGroup = lStrip.gameObject.AddComponent<CanvasGroup>();
+            _stripGroup.alpha = 0f;
+            for (int i = 0; i < WeaponHolder.SLOT_COUNT; i++)
+            {
+                RectTransform lRow = UIFactory.Rect(lStrip, "Slot" + i, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(0, -i * 36f), new Vector2(260, 32));
+                _stripBacks[i] = lRow.gameObject.AddComponent<Image>();
+                _stripBacks[i].raycastTarget = false;
+                _stripBars[i] = UIFactory.Panel(lRow, "Bar", ThreatMarkers.Amber, new Vector2(1, 0.5f), new Vector2(-1.5f, 0), new Vector2(3, 32));
+                TextMeshProUGUI lKey = UIFactory.Text(lRow, "Key", (i + 1).ToString(), 14, UIFactory.Muted, TextAlignmentOptions.Center, new Vector2(0, 0.5f), new Vector2(10, 0), new Vector2(24, 30));
+                lKey.font = UIFactory.Heading;
+                _stripNames[i] = UIFactory.Text(lRow, "Name", "", 16, UIFactory.Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(40, 0), new Vector2(135, 30));
+                _stripNames[i].overflowMode = TextOverflowModes.Ellipsis;
+                _stripNames[i].font = UIFactory.Heading;
+                _stripCounts[i] = UIFactory.Text(lRow, "Count", "", 15, UIFactory.Muted, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-14, 0), new Vector2(70, 30));
+                _stripCounts[i].font = UIFactory.Heading;
+            }
+
+            // The weapon wheel: the slots in a ring around the crosshair, only while Q / LB is held.
             RectTransform lWheel = UIFactory.Rect(_root, "Wheel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(10, 10));
             _wheelGroup = lWheel.gameObject.AddComponent<CanvasGroup>();
             _wheelGroup.alpha = 0f;
@@ -170,6 +194,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
             _clock = UIFactory.Text(_root, "Clock", "", 26, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(240, 40));
             gameObject.AddComponent<Minimap>().Build(_root);
+            gameObject.AddComponent<Compass>().Build(_root);
             _bannerTitle = UIFactory.Text(_root, "BannerTitle", "", 72, UIFactory.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0.72f), Vector2.zero, new Vector2(1600, 90));
             _bannerSub = UIFactory.Text(_root, "BannerSub", "", 32, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.72f), new Vector2(0, -70), new Vector2(1600, 50));
 
@@ -271,7 +296,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 _lastHp = lHp;
                 bool lShowHealth = lAlive && (Time.time < _healthShowUntil || lRatio < 0.35f || lMe.Hidden.Value || (lMe.Crouched.Value && lMe.InGrass.Value));
                 _healthGroup.alpha = Mathf.MoveTowards(_healthGroup.alpha, lShowHealth ? 1f : 0f, dt * (lShowHealth ? 6f : 1.5f));
-                _healthFill.color = Color.Lerp(UIFactory.Accent, UIFactory.Paper, Mathf.Clamp01(lRatio * 2f - 0.3f));
+                _healthFill.color = Color.Lerp(UIFactory.Danger, UIFactory.Paper, Mathf.Clamp01(lRatio * 2f - 0.3f));
                 if (lRatio < 0.3f && lAlive && CameraRig.Instance != null) CameraRig.Instance.PulseHurt(0.15f + Mathf.Sin(Time.time * 6f) * 0.05f);
                 bool lConcealed = lMe.Hidden.Value || (lMe.Crouched.Value && lMe.InGrass.Value);
                 _stealth.text = "";
@@ -289,8 +314,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 _lastAmmo = lAmmoKey;
                 _ammoGroup.alpha = Mathf.MoveTowards(_ammoGroup.alpha, Time.time < _ammoShowUntil ? 1f : 0f, dt * (Time.time < _ammoShowUntil ? 6f : 1.2f));
 
-                // The wheel: held, the look picks a slot and releasing selects it; a switch flashes it.
-                if (lWeapons.Selected.Value != _lastSelected) { if (_lastSelected >= 0) _wheelShowUntil = Time.time + 1.2f; _lastSelected = lWeapons.Selected.Value; }
+                // The wheel: held, the look picks a slot and releasing selects it. A switch shows the inventory list instead.
+                if (lWeapons.Selected.Value != _lastSelected) { if (_lastSelected >= 0) _stripShowUntil = Time.time + 2.5f; _lastSelected = lWeapons.Selected.Value; }
                 bool lWheel = GameInput.WheelHeld;
                 if (lWheel)
                 {
@@ -317,7 +342,16 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                     bool lSelected = GameInput.WheelOpen && _wheelPick >= 0 ? _wheelPick == i : lWeapons.Selected.Value == i;
                     _slotBacks[i].color = lSelected ? new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, 0.85f) : new Color(0.05f, 0.05f, 0.07f, 0.72f);
                     _slots[i].color = lSelected ? UIFactory.Paper : UIFactory.Muted;
+
+                    bool lCurrent = lWeapons.Selected.Value == i;
+                    _stripNames[i].text = lItem != null ? lItem.displayName.ToUpperInvariant() : (i < WeaponHolder.WEAPON_SLOTS ? "FISTS" : "EMPTY");
+                    _stripNames[i].color = lCurrent ? UIFactory.Paper : lItem != null ? new Color(0.85f, 0.85f, 0.85f) : new Color(1, 1, 1, 0.3f);
+                    _stripCounts[i].text = lItem == null ? "" : lItem.UsesAmmo ? s.magazine + "/" + s.reserve : lItem.slot == ItemSlot.Gadget ? "x" + s.reserve : "";
+                    _stripBacks[i].color = lCurrent ? new Color(0.03f, 0.03f, 0.04f, 0.82f) : new Color(0.03f, 0.03f, 0.04f, 0.5f);
+                    _stripBars[i].enabled = lCurrent;
                 }
+                bool lShowStrip = Time.time < _stripShowUntil && !lShowWheel;
+                _stripGroup.alpha = Mathf.MoveTowards(_stripGroup.alpha, lShowStrip ? 1f : 0f, dt * (lShowStrip ? 8f : 2f));
             }
 
             // Contract.
@@ -342,7 +376,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 };
                 int lSeconds = Mathf.CeilToInt(lDirector.TimeLeft.Value);
                 _clock.text = lSeconds <= 180 ? (lSeconds / 60).ToString("00") + ":" + (lSeconds % 60).ToString("00") : "";
-                _clock.color = lSeconds < 60 ? UIFactory.Accent : UIFactory.Paper;
+                _clock.color = lSeconds < 60 ? UIFactory.Danger : UIFactory.Paper;
 
                 bool lExtracting = lMe != null && lMe.CarriesProof.Value && lDirector.ExtractProgress.Value > 0f;
                 _extractBar.gameObject.SetActive(lExtracting);

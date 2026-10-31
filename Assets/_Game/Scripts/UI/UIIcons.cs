@@ -17,6 +17,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         public static Sprite Diamond => Get("diamond", (x, y) => Mathf.Abs(x) + Mathf.Abs(y) - 0.86f);
         public static Sprite DiamondOutline => Get("diamond_line", (x, y) => Mathf.Abs(Mathf.Abs(x) + Mathf.Abs(y) - 0.8f) - 0.07f);
         public static Sprite Ring => Get("ring", (x, y) => Mathf.Abs(Mathf.Sqrt(x * x + y * y) - 0.82f) - 0.1f);
+        public static Sprite ThinRing => Get("ring_thin", (x, y) => Mathf.Abs(Mathf.Sqrt(x * x + y * y) - 0.94f) - 0.025f);
+        public static Sprite Disc => Get("disc", (x, y) => Mathf.Sqrt(x * x + y * y) - 0.98f);
         public static Sprite Dot => Get("dot", (x, y) => Mathf.Sqrt(x * x + y * y) - 0.7f);
         /// <summary>A 64° slice of a thin ring, centred on "up": rotated around the crosshair toward a watcher.</summary>
         public static Sprite Arc => Get("arc", (x, y) =>
@@ -35,6 +37,43 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             float lButton = Mathf.Sqrt(x * x + (y + 0.66f) * (y + 0.66f)) - 0.07f;
             // Inside the body, outside the screen and the button.
             return Mathf.Max(lBody, Mathf.Max(-lScreen, -lButton));
+        });
+
+        /// <summary>A plus in a rounded square outline (create a room).</summary>
+        public static Sprite Create => Get("create", (x, y) =>
+        {
+            float lFrame = Mathf.Abs(RoundBox(x, y, 0.82f, 0.82f, 0.2f)) - 0.06f;
+            float lPlus = Mathf.Min(RoundBox(x, y, 0.42f, 0.07f, 0.03f), RoundBox(x, y, 0.07f, 0.42f, 0.03f));
+            return Mathf.Min(lFrame, lPlus);
+        });
+        /// <summary>A code field: a rounded frame with three dots (join with a code).</summary>
+        public static Sprite Code => Get("code", (x, y) =>
+        {
+            float lFrame = Mathf.Abs(RoundBox(x, y, 0.85f, 0.45f, 0.14f)) - 0.06f;
+            float lDots = Mathf.Min(Mathf.Sqrt((x + 0.42f) * (x + 0.42f) + y * y), Mathf.Min(Mathf.Sqrt(x * x + y * y), Mathf.Sqrt((x - 0.42f) * (x - 0.42f) + y * y))) - 0.11f;
+            return Mathf.Min(lFrame, lDots);
+        });
+        /// <summary>One person: a head over shoulders (solo).</summary>
+        public static Sprite Person => Get("person", (x, y) =>
+        {
+            float lHead = Mathf.Sqrt(x * x + (y - 0.38f) * (y - 0.38f)) - 0.3f;
+            float lBody = Mathf.Max(RoundBox(x, y + 0.55f, 0.62f, 0.38f, 0.32f), -(y + 0.82f));
+            return Mathf.Min(lHead, lBody);
+        });
+        /// <summary>A gear-like dial: a ring with a centre dot (options).</summary>
+        public static Sprite Options => Get("options", (x, y) =>
+        {
+            float lRadius = Mathf.Sqrt(x * x + y * y);
+            float lTeeth = 0.62f + 0.12f * Mathf.Clamp(Mathf.Cos(Mathf.Atan2(y, x) * 8f) * 3f, -1f, 1f);
+            return Mathf.Max(lRadius - lTeeth, 0.3f - lRadius);
+        });
+        /// <summary>An exit: a door frame with an arrow out (quit).</summary>
+        public static Sprite Exit => Get("exit", (x, y) =>
+        {
+            float lFrame = Mathf.Max(Mathf.Abs(RoundBox(x + 0.25f, y, 0.5f, 0.8f, 0.08f)) - 0.06f, x - 0.1f);
+            float lShaft = RoundBox(x - 0.2f, y, 0.45f, 0.07f, 0.03f);
+            float lHead = Mathf.Max(Mathf.Abs(y) * 1.2f + (x - 0.85f), -(x - 0.45f));
+            return Mathf.Min(lFrame, Mathf.Min(lShaft, lHead));
         });
 
         private static float RoundBox(float pX, float pY, float pHalfW, float pHalfH, float pRadius)

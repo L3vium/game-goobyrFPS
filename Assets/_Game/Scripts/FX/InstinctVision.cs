@@ -41,10 +41,10 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             new Color(2.4f, 2.4f, 2.4f, 1f),
         };
 
-        /// <summary>Instinct reads the surroundings only: the target within 60 m, people within 25 m, objects within 20 m.</summary>
-        public const float TARGET_RANGE = 60f;
-        public const float NPC_RANGE = 25f;
-        public const float USE_RANGE = 20f;
+        /// <summary>Instinct: the target wherever it is, people within 55 m, objects close by (25 m).</summary>
+        public const float TARGET_RANGE = 10000f;
+        public const float NPC_RANGE = 55f;
+        public const float USE_RANGE = 25f;
         private const float REFRESH = 0.12f;
         private const float WAVE_SPEED = 85f;
         private const float WAVE_REACH = 140f;

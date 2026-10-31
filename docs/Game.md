@@ -73,28 +73,33 @@ floating over the terrain.
   takedowns from behind.
 - **Instinct** (`FX/InstinctVision`, `FX/Rendering/InstinctFeature`, hold Tab): the world dims
   to a cold grey with a scan wave rolling out from the eye, and what matters glows through the
-  walls: the target and the proof (or whoever carries it) in red within 60 m, teammates in
-  blue, NPCs within 25 m in white (amber when they are hunting you), everything usable or
-  pickable within 20 m in white. Purely local and visual. Hidden parts are a solid silhouette,
-  visible parts a rim of light; a stencil bit gives each pixel to the first colour drawn, so red
-  wins.
-- **Threat read-out** (`UI/ThreatMarkers`, icons drawn by `UI/UIIcons`): a diamond over each NPC
-  in screen space - an outline filling white to amber with its gauge, amber "!" when it confronts,
-  red "!" in combat, amber "?" searching, a phone with a shrinking ring while it calls; the ones
-  that concern you stay pinned to the screen edge. Arcs around the crosshair point at whoever is
-  noticing you. A status chip above the minimap: hidden, concealed, suspicious, searching, spotted,
-  combat. The target has a red marker with its distance at any range, through walls. Notifications
-  on the right: body found, reinforcements called, call interrupted.
-- **HUD** (`UI/Hud`, `UI/Minimap`): minimal, nothing by default. A round minimap bottom left (a
-  floor plan cut at head height, NPCs hunting you, teammates, revealed extractions); weapon and
-  ammo fade in on a change or while aiming; health only when it changes or runs low; the weapon
-  wheel around the crosshair on a switch or while Q / LB is held (the look picks, release selects).
-  No objective panel: the contract (target portrait, name, one line, proof) is on the map screen (M).
+  walls: the target and the proof (or whoever carries it) in red at any range, teammates in blue,
+  NPCs within 55 m in white (amber when they are hunting you), everything usable or pickable within
+  25 m in white. Purely local and visual. Hidden parts are a solid silhouette, visible parts a rim
+  of light; a stencil bit gives each pixel to the first colour drawn, so red wins.
+- **HUD** (`UI/Hud`, `UI/Minimap`, `UI/Compass`): minimal, nothing by default.
+  - A heading strip across the top (cardinal letters, ticks, heading) with the target's marker and
+    distance always on it, plus extractions, teammates and the dropped proof.
+  - A round minimap bottom left: the map's baked stylized plan of the floor you stand on, north up
+    and still, your arrow turning; the target in red (pinned to the rim when far), teammates, NPCs
+    noticing or hunting you, revealed extractions; its rim takes the threat colour.
+  - Weapon and ammo fade in on a change or while aiming; health only when it changes or runs low.
+  - The inventory is a list bottom right, shown on a switch (wheel, 1-6); the weapon wheel around
+    the crosshair only while Q / LB is held (the look picks, release selects).
+  - No objective panel: the contract is in the in-match menu.
+- **Map plans** (`Editor/Maps/MapPlanBaker`, read by `UI/MapPlan`): every map build bakes one flat
+  plan per floor (ground and three storeys) from the scene - ground dark, tree crowns darker,
+  water blue-grey, paths grey, streets light, building floors mid grey with their walls as lines,
+  the outdoors faded on upper floors.
+- **In-match menu** (`UI/PauseMenu`, Esc, or M straight to the map): MAP (the whole plan, floor tabs,
+  zoom and pan, zones, target, you, teammates, proof, extractions), CONTRACT (portrait, name, one
+  line, proof, status), OPTIONS; resume and leave. The game keeps running.
 - **Juice**: trauma screen shake, hit flash, chromatic aberration / bloom / exposure pulses,
   hurt vignette, squash and stretch, fluff puffs on hits, explosions with fireball, shockwave,
   debris and light flash, smoke clouds, hitmarkers, damage arcs, kill feed, banners.
-- **Online**: Steam (Facepunch transport, App ID 480 for now) with room codes, friends rooms and
-  invites; LAN/IP and solo through Unity Transport. The agent name is the typed nickname, else the
+- **Online**: played between friends. *Create a room* opens a Steam room (found only by its
+  six-letter code; LAN when Steam is not running), *Join a room* takes the code (or a direct IP), and
+  Steam invites work too (Facepunch transport, App ID 480 for now); LAN/IP and solo through Unity Transport. The agent name is the typed nickname, else the
   Steam persona. Proximity voice chat on Steam Voice, relayed by
   the host to players within 30 m (host toggle in the lobby; push-to-talk B or open mic).
 
@@ -116,6 +121,13 @@ floating over the terrain.
 Move WASD/ZQSD · look mouse · fire LMB · aim RMB · reload R · interact F · crouch Ctrl/C · jump Space ·
 sprint Shift (hold) · crouch-slide Ctrl/C while moving · punch V/MMB · throw G · detonate T · slots 1-6 / wheel · map M ·
 instinct Tab (hold) · scoreboard ` (key left of 1, ² on AZERTY) · push-to-talk B · pause Esc.
+
+## Interface
+Restrained and typographic (Barlow), dark panels, thin rules, one accent: signal amber (red only for
+the target and danger). Settings and lobby options are layout-driven rows (`UI/UIWidgets`): label on
+the left, control on the right (switch, slider with its value, stepper, button), so nothing
+overlaps. The briefing shows the map card (its plan), the mode as explicit cards (free-for-all
+1v1v1v1, teams, co-op), the agents in aligned columns, the room code with a copy button.
 
 ## Tests and tools
 - `Goobyr → GD Tool` (Ctrl+Shift+G) for tuning, `Goobyr → Validate Maps`, EditMode tests in

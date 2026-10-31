@@ -45,6 +45,14 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         public Color shadowsTint = new Color(0.9f, 0.95f, 1.08f);
         public Color highlightsTint = new Color(1.06f, 1.02f, 0.94f);
 
+        [Header("Plan (baked by the map build)")]
+        [Tooltip("The stylized plan per floor: ground first, then a storey up each.")]
+        public Texture2D[] planFloors;
+        /// <summary>World XZ of the plan's bottom-left corner, and its side in metres.</summary>
+        public Vector2 planOrigin;
+        public float planSize = 500f;
+        public float planStorey = 3.4f;
+
         [Header("Targets")]
         public List<TargetProfile> targets = new List<TargetProfile>();
 

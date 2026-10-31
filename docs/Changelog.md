@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- HUD: a heading strip across the top with the target's marker and distance always on it; the
+  minimap becomes the map's baked stylized plan of your current floor, north up and still, with N
+  marked, the target always shown, and a rim that turns amber (suspected, searched for), red
+  (combat) or blue (hidden). The inventory is a list bottom right shown on a switch; the weapon
+  wheel only opens while Q / LB is held. Instinct shows the target at any range, NPCs within 55 m
+  and objects within 25 m. Map builds bake the plans (one per floor).
 - Threat read-out: a screen-space diamond over each NPC that fills with its gauge (white, then
   amber), turns amber with a "!" when it confronts you, red in combat, "?" while searching, and a
   phone with a countdown ring while it calls (pinned to the screen edge when off-screen). Arcs

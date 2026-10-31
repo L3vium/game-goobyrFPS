@@ -1364,6 +1364,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Light();
             BakeNavMesh();
             SnapToNavMesh();
+            if (Land != null) MapPlanBaker.Bake(Map, Land, STOREY);
             Scene lScene = SceneManager.GetActiveScene();
             EditorSceneManager.SaveScene(lScene, _scenePath);
             AssetDatabase.SaveAssets();

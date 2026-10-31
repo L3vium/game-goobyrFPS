@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Map builds snap every NPC post and patrol point that sits a little off the baked NavMesh onto the
+  closest walkable point within 4 m (the Elmridge door guard and cinema crowd member included); the
+  validator fails NPC posts off the NavMesh.
 - Death and end of match: the look at your own body lasts 1.2 s before spectating (the HUD reminds
   that Esc leaves). The end screen has buttons: the host takes the room back to the lobby at once,
   anyone can leave the room; without a click it goes back after 45 s.

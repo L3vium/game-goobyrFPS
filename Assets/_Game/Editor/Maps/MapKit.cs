@@ -1295,6 +1295,25 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         /// <summary>
+        /// NPC posts and patrol points a little off the baked NavMesh (a doorway, a crowd ring touching
+        /// a wall) move onto the closest walkable point within 4 m, so every NPC can stand and walk.
+        /// </summary>
+        private void SnapToNavMesh()
+        {
+            int lMoved = 0, lLost = 0;
+            void Snap(Transform pPoint)
+            {
+                if (NavMesh.SamplePosition(pPoint.position, out NavMeshHit lNear, 0.3f, NavMesh.AllAreas)) return;
+                if (NavMesh.SamplePosition(pPoint.position, out lNear, 4f, NavMesh.AllAreas)) { pPoint.position = lNear.position; lMoved++; }
+                else { lLost++; Debug.LogWarning($"[Build] {pPoint.name} at {pPoint.position:F0} has no NavMesh within 4 m"); }
+            }
+            foreach (NpcSpawnPoint lSpawn in Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None)) Snap(lSpawn.transform);
+            foreach (PatrolRoute lRoute in Object.FindObjectsByType<PatrolRoute>(FindObjectsSortMode.None))
+                for (int i = 0; i < lRoute.transform.childCount; i++) Snap(lRoute.transform.GetChild(i));
+            Debug.Log($"[Build] {lMoved} NPC points snapped onto the NavMesh, {lLost} without one");
+        }
+
+        /// <summary>
         /// Opt-in step a map calls at the end of its composition, before <see cref="Finish"/> (the
         /// ground is built later and is never culled). Kit pieces are detailed (a window module is
         /// ~3k triangles) and a 1 km² map holds tens of millions of triangles while the fog hides
@@ -1344,6 +1363,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             GenerateCover();
             Light();
             BakeNavMesh();
+            SnapToNavMesh();
             Scene lScene = SceneManager.GetActiveScene();
             EditorSceneManager.SaveScene(lScene, _scenePath);
             AssetDatabase.SaveAssets();

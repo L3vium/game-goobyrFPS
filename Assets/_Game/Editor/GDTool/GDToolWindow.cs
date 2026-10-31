@@ -195,6 +195,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 float lClearance = MatchRulesLogic.StartClearance(lStart.transform.position, lThreats);
                 if (lClearance < MatchRulesLogic.SAFE_START_DISTANCE) lFails.Add($"start {lStart.Label} {lClearance:0} m from an NPC (< {MatchRulesLogic.SAFE_START_DISTANCE:0})");
             }
+            int lOffMesh = 0;
+            foreach (NpcSpawnPoint lSpawn in Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
+                if (!UnityEngine.AI.NavMesh.SamplePosition(lSpawn.transform.position, out _, 1f, UnityEngine.AI.NavMesh.AllAreas)) lOffMesh++;
+            if (lOffMesh > 0) lFails.Add($"{lOffMesh} NPC posts off the NavMesh");
             int lFloating = 0;
             string lFloatingExample = "";
             Terrain lLand = Terrain.activeTerrain;

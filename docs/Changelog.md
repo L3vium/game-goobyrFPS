@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Version 0.5.0.
 - Agents' squash-and-stretch no longer breaks (NaN body scale errors) after a long frame hitch.
 - Caster mode, tournament style: join a room (even a contract already running) as a caster to watch
   instead of playing. Up to four live feeds at once (one, two side by side, 2x2, or a main feed with

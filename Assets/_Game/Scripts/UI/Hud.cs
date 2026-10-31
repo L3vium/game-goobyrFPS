@@ -76,6 +76,14 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _instance._toasts.Insert(0, (lText, Time.time + 4f));
         }
 
+        /// <summary>A notification on the right: what happened in its category colour, where in grey.</summary>
+        public static void Notify(string pWhat, string pWhere, Color pColor)
+        {
+            string lLine = "<font=\"BarlowCondensed-Bold SDF\"><color=#" + ColorUtility.ToHtmlStringRGB(pColor) + ">" + pWhat + "</color></font>";
+            if (!string.IsNullOrEmpty(pWhere)) lLine += "   <size=80%><color=#9EA0A6>" + pWhere.ToUpperInvariant() + "</color></size>";
+            Toast(lLine);
+        }
+
         public static void Announce(string pTitle, string pSubtitle)
         {
             if (_instance == null) return;
@@ -116,6 +124,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             Vector2 C = new Vector2(0.5f, 0.5f);
 
             _markers = UIFactory.Stretch(_root, "Markers");
+            gameObject.AddComponent<ThreatMarkers>().Build(_root);
 
             _scope = UIFactory.Stretch(_root, "Scope").gameObject.AddComponent<Image>();
             _scope.sprite = ScopeSprite();
@@ -265,7 +274,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 _healthFill.color = Color.Lerp(UIFactory.Accent, UIFactory.Paper, Mathf.Clamp01(lRatio * 2f - 0.3f));
                 if (lRatio < 0.3f && lAlive && CameraRig.Instance != null) CameraRig.Instance.PulseHurt(0.15f + Mathf.Sin(Time.time * 6f) * 0.05f);
                 bool lConcealed = lMe.Hidden.Value || (lMe.Crouched.Value && lMe.InGrass.Value);
-                _stealth.text = lMe.Hidden.Value ? "HIDDEN" : lConcealed ? "CONCEALED" : "";
+                _stealth.text = "";
             }
 
             // Ammo and slots.

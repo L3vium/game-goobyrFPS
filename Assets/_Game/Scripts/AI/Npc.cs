@@ -521,6 +521,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 if (Physics.Linecast(Eye, lBody, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore)) continue;
                 _seenBodies.Add(lOther.NetworkObjectId);
                 Investigate(lOther.transform.position, true);
+                BodyFoundRpc();
                 if (Zone != null) foreach (Npc lMate in Zone.Members) if (lMate != null) lMate._seenBodies.Add(lOther.NetworkObjectId);
                 return;
             }
@@ -1047,7 +1048,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private void HandleDeathServer(DamageInfo pInfo)
         {
-            if (State.Value == NpcState.Calling) Zone?.CallFinished(this, false);
+            if (State.Value == NpcState.Calling) { Zone?.CallFinished(this, false); CallCutRpc(); }
             State.Value = pInfo.knockout ? NpcState.KnockedOut : NpcState.Dead;
             if (_cover != null && _cover.Occupant == this) _cover.Occupant = null;
             _agent.enabled = false;
@@ -1104,7 +1105,6 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         [Rpc(SendTo.Everyone)]
         private void SpottedRpc()
         {
-            _visuals?.PopAlert();
             Audio.Sfx.Play("spotted", transform.position + Vector3.up * 2f, 1f, 30f, 0f);
         }
 
@@ -1112,8 +1112,14 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void CallDoneRpc()
         {
             Audio.Sfx.Play("radio", transform.position, 1f, 25f);
-            if (Zone != null) UI.Hud.Toast("REINFORCEMENTS CALLED IN " + Zone.ZoneName.ToUpperInvariant());
+            UI.Hud.Notify("REINFORCEMENTS CALLED", Zone != null ? Zone.ZoneName : "", UI.ThreatMarkers.Red);
         }
+
+        [Rpc(SendTo.Everyone)]
+        private void CallCutRpc() => UI.Hud.Notify("CALL INTERRUPTED", Zone != null ? Zone.ZoneName : "", UI.ThreatMarkers.White);
+
+        [Rpc(SendTo.Everyone)]
+        private void BodyFoundRpc() => UI.Hud.Notify("BODY FOUND", Zone != null ? Zone.ZoneName : "", UI.ThreatMarkers.Amber);
 
         [Rpc(SendTo.Everyone)]
         private void PukeRpc()

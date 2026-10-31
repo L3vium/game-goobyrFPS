@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Threat read-out: a screen-space diamond over each NPC that fills with its gauge (white, then
+  amber), turns amber with a "!" when it confronts you, red in combat, "?" while searching, and a
+  phone with a countdown ring while it calls (pinned to the screen edge when off-screen). Arcs
+  around the crosshair point at whoever is noticing you, a status chip above the minimap says hidden
+  / concealed / suspicious / searching / spotted / combat, and the target keeps a red marker with
+  its distance at any range. Notifications for bodies found, calls made and calls cut.
 - Stealth AI in three contained stages: vision shortened to 20 m in a 90° cone with a slower edge-
   of-vision band; NPCs grow suspicious (stop and stare, walk over past half the gauge), then
   confront you for 2 s with their weapon up (break line of sight to make them search instead, aim at

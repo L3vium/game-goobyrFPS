@@ -78,6 +78,13 @@ floating over the terrain.
   pickable within 20 m in white. Purely local and visual. Hidden parts are a solid silhouette,
   visible parts a rim of light; a stencil bit gives each pixel to the first colour drawn, so red
   wins.
+- **Threat read-out** (`UI/ThreatMarkers`, icons drawn by `UI/UIIcons`): a diamond over each NPC
+  in screen space - an outline filling white to amber with its gauge, amber "!" when it confronts,
+  red "!" in combat, amber "?" searching, a phone with a shrinking ring while it calls; the ones
+  that concern you stay pinned to the screen edge. Arcs around the crosshair point at whoever is
+  noticing you. A status chip above the minimap: hidden, concealed, suspicious, searching, spotted,
+  combat. The target has a red marker with its distance at any range, through walls. Notifications
+  on the right: body found, reinforcements called, call interrupted.
 - **HUD** (`UI/Hud`, `UI/Minimap`): minimal, nothing by default. A round minimap bottom left (a
   floor plan cut at head height, NPCs hunting you, teammates, revealed extractions); weapon and
   ammo fade in on a change or while aiming; health only when it changes or runs low; the weapon

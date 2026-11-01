@@ -53,17 +53,27 @@ grass fields, NPC posts on the NavMesh and no prop floating over the terrain. Wa
   drains), **engaged** (gauge full: weapon up, it walks over and shouts for 2 s - break line of sight
   for 1.2 s and it searches instead; aim at it and it fires at once), **combat** (it shoots). A fight
   stays contained: another NPC joins only if it sees the player, sees the confrontation or the fight
-  within 18 m, hears gunfire or an explosion, or gets the phone call. Hearing: footsteps of running
-  players, shots, explosions, distractions; bodies found make NPCs investigate. Zone squads
+  within 18 m, or gets the phone call. **Hearing** (`DetectionModel.Loudness`): every sound has a
+  reach in the open (silenced 9 m, pistol 45 m, explosion 90 m...), each wall or floor in between
+  cuts it to 40 %, and only the 1-3 NPCs who hear it best go and look (`Responders`) - at a walk for
+  a distraction, weapon up for gunfire - while the others only turn their heads. A sound never gives
+  a position: they head for a guess a few metres off. Footsteps follow the player's real speed and
+  stance (silent standing still, 1.5 m crouched, 5 m walking, 14 m sprinting, 8 m sliding) and are
+  muffled by walls too. A searching or alarmed NPC fills its gauge twice as fast and opens fire on
+  sight (no confrontation); a searcher that is shot fights back. Bodies: the first to find one radios
+  it in, its two nearest mates come to secure the area and the zone sees further for 90 s; later
+  finders are only wary. Guards and staff take breaks at activities near their post (smoke, phone,
+  drink, a look around), the windows a player waits for. Zone squads
   (`LevelZone`) share the *last known position* among the NPCs that joined, hand out suppress /
   flank / push roles over scored cover points, then search around that position. NPCs never track a
   player they cannot see - the hunted player sees their own "shadow" at the believed position.
   Fights warm up (wild first shots). Once someone in a zone fights, one fighter phones for help
-  (icon + ring): when the call ends, the zone's NPCs within 60 m of the caller search the last known
-  position and reinforcements arrive. Kill the caller first. Patrols walk slowly (1.15 m/s) and come
+  (icon + ring): when the call ends, the six nearest mates within 60 m of the caller search the last
+  known position and reinforcements arrive. Kill the caller first. Patrols walk slowly (1.15 m/s) and come
   in groups of up to five on one route: the first still on its round leads, the others follow in a
   column of twos. Crowds (unarmed `Worker` NPCs around a scene) scream (guards close by come and
-  look) and run. The alarm flare (rarely fired, once a fight starts) alerts the whole map. Patrol
+  look) and run. The alarm flare (rarely fired, by a guard who runs to it once a fight starts) puts every zone on
+  edge and sends its four nearest guards to the flare; the rest hold their posts. Patrol
   cars spot players with their headlights, brake and drop two guards.
 - **Systemic props** (`Systems/`): fire spreads between flammables and is put out by sprinkler
   zones; breakers cut a building's lights (and an NPC comes to fix it); chandeliers drop when

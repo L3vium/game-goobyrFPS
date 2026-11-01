@@ -81,5 +81,67 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
             Assert.IsFalse(DetectionModel.HearsCall(1, 1, DetectionModel.CALL_RADIUS + 5f));
             Assert.IsFalse(DetectionModel.HearsCall(2, 1, 10f));
         }
+
+        [Test]
+        public void Loudness_FallsWithDistanceAndWalls()
+        {
+            Assert.AreEqual(1f, DetectionModel.Loudness(0f, 30f, 0), 1e-4f);
+            Assert.Greater(DetectionModel.Loudness(10f, 30f, 0), DetectionModel.Loudness(20f, 30f, 0));
+            Assert.AreEqual(0f, DetectionModel.Loudness(30f, 30f, 0));
+            // A pistol heard at 20 m in the open is not heard through one wall at that distance.
+            Assert.Greater(DetectionModel.Loudness(20f, 30f, 0), 0f);
+            Assert.AreEqual(0f, DetectionModel.Loudness(20f, 30f, 1));
+            Assert.Greater(DetectionModel.Loudness(5f, 30f, 1), DetectionModel.Loudness(5f, 30f, 2));
+        }
+
+        [Test]
+        public void Hearing_OnlyTheFewNearestRespond()
+        {
+            Assert.AreEqual(1, DetectionModel.Responders(NoiseKind.Distraction, 0.4f));
+            Assert.LessOrEqual(DetectionModel.Responders(NoiseKind.Distraction, 0.9f), 2);
+            Assert.LessOrEqual(DetectionModel.Responders(NoiseKind.Alarming, 1f), 3);
+            Assert.AreEqual(DetectionModel.Heard.Glance, DetectionModel.React(NoiseKind.Alarming, 0.9f, false));
+            Assert.AreEqual(DetectionModel.Heard.Alarmed, DetectionModel.React(NoiseKind.Alarming, 0.9f, true));
+            Assert.AreEqual(DetectionModel.Heard.Investigate, DetectionModel.React(NoiseKind.Alarming, 0.1f, true));
+            Assert.AreEqual(DetectionModel.Heard.Investigate, DetectionModel.React(NoiseKind.Distraction, 0.1f, true));
+            Assert.AreEqual(DetectionModel.Heard.None, DetectionModel.React(NoiseKind.Alarming, 0f, true));
+        }
+
+        [Test]
+        public void Hearing_GivesAGuessNotAPosition()
+        {
+            Assert.GreaterOrEqual(DetectionModel.GuessError(1f), 1.5f);
+            Assert.Greater(DetectionModel.GuessError(30f), DetectionModel.GuessError(8f));
+            Assert.LessOrEqual(DetectionModel.GuessError(500f), 10f);
+        }
+
+        [Test]
+        public void Footsteps_SilentStillQuietCrouchedFarSprinting()
+        {
+            Assert.AreEqual(0f, DetectionModel.FootstepRadius(0f, false, false));
+            Assert.LessOrEqual(DetectionModel.FootstepRadius(2.3f, true, false), DetectionModel.STEP_CROUCH);
+            Assert.Greater(DetectionModel.FootstepRadius(4.4f, false, false), DetectionModel.FootstepRadius(2.3f, true, false));
+            Assert.AreEqual(DetectionModel.STEP_SPRINT, DetectionModel.FootstepRadius(7.2f, false, true));
+            Assert.AreEqual(DetectionModel.STEP_SLIDE, DetectionModel.FootstepRadius(10f, true, false));
+            Assert.AreEqual(0f, DetectionModel.LandingRadius(0.8f, false));
+            Assert.Greater(DetectionModel.LandingRadius(4f, false), DetectionModel.LandingRadius(4f, true));
+        }
+
+        [Test]
+        public void Takedown_OnlyFromBehindAndUnnoticed()
+        {
+            Assert.IsTrue(DetectionModel.CanTakedown(20f, 0f, false));
+            Assert.IsFalse(DetectionModel.CanTakedown(120f, 0f, false));
+            Assert.IsFalse(DetectionModel.CanTakedown(20f, 0.8f, false));
+            Assert.IsFalse(DetectionModel.CanTakedown(20f, 0f, true));
+        }
+
+        [Test]
+        public void Gauge_FillsFasterOnEdge()
+        {
+            float lCalm = DetectionModel.Fill(0f, 1f, 2f, 0.1f, false);
+            float lEdge = DetectionModel.Fill(0f, 1f, 2f, 0.1f, false, true);
+            Assert.Greater(lEdge, lCalm);
+        }
     }
 }

@@ -129,9 +129,23 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         // ---------------------------------------------------------------- owner loop
 
+        /// <summary>Host: how fast this player really moves over the ground (smoothed), for how far the NPCs hear their steps.</summary>
+        public float HostSpeed { get; private set; }
+        private Vector3 _lastHostPosition;
+
+        private void TrackHostSpeed()
+        {
+            Vector3 lDelta = transform.position - _lastHostPosition;
+            _lastHostPosition = transform.position;
+            lDelta.y = 0f;
+            float lInstant = Mathf.Min(20f, lDelta.magnitude / Mathf.Max(Time.deltaTime, 0.0001f));
+            HostSpeed = Mathf.Lerp(HostSpeed, lInstant, 1f - Mathf.Exp(-8f * Time.deltaTime));
+        }
+
         private void Update()
         {
             if (!IsSpawned) return;
+            if (IsServer) TrackHostSpeed();
 
             if (IsOwner && Health.IsAlive)
             {

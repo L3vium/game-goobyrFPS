@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- AI rewritten around hearing that makes sense: a sound carries a set distance in the open, walls and
+  floors muffle it, and only the one to three guards who hear it best go and look - the others turn
+  their heads. Nobody learns your exact position from a sound any more; a distant shot no longer
+  pulls every guard on the map. Footsteps follow how you really move: silent standing still, a
+  whisper crouched, loud sprinting. Searching guards now fight back when they see you or are shot
+  (they used to wander), reinforcements too. A body is radioed in by whoever finds it and two mates
+  come to secure it; guards on posts take breaks (a smoke, a call) you can wait for.
 - Version 0.5.0.
 - Agents' squash-and-stretch no longer breaks (NaN body scale errors) after a long frame hitch.
 - Caster mode, tournament style: join a room (even a contract already running) as a caster to watch

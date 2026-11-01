@@ -72,11 +72,15 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return lCloseness * lCone * lStance * (pSight.chestVisible ? 1f : 0.6f);
         }
 
-        /// <summary>The gauge after <paramref name="pDt"/> seconds: fills with exposure, drains without.</summary>
-        public static float Fill(float pGauge, float pExposure, float pDetectTime, float pDt, bool pCombat)
+        /// <summary>
+        /// The gauge after <paramref name="pDt"/> seconds: fills with exposure, drains without. A
+        /// fighter fills three times faster and never forgets below <see cref="COMBAT_FLOOR"/>; an
+        /// alerted NPC (searching, investigating a shot) fills twice as fast.
+        /// </summary>
+        public static float Fill(float pGauge, float pExposure, float pDetectTime, float pDt, bool pCombat, bool pAlert = false)
         {
             if (pExposure <= 0f) return Mathf.Max(pCombat ? COMBAT_FLOOR : 0f, pGauge - DECAY * pDt);
-            return Mathf.Min(1f, pGauge + pExposure / Mathf.Max(0.1f, pDetectTime) * pDt * (pCombat ? 3f : 1f));
+            return Mathf.Min(1f, pGauge + pExposure / Mathf.Max(0.1f, pDetectTime) * pDt * (pCombat ? 3f : pAlert ? 2f : 1f));
         }
 
         public enum Confrontation { Hold, Combat, LostSight }
@@ -94,5 +98,90 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         /// <summary>Does a completed call alert this NPC? Only the caller's zone, only around the caller.</summary>
         public static bool HearsCall(int pZone, int pCallerZone, float pDistance) => pZone == pCallerZone && pDistance <= CALL_RADIUS;
+
+        /// <summary>A completed call sends at most this many of the caller's mates (the nearest).</summary>
+        public const int CALL_RESPONDERS = 6;
+
+        // ---------------------------------------------------------------- hearing
+
+        /// <summary>Each wall or floor between a sound and an ear leaves it this share of its reach.</summary>
+        public const float WALL_DAMPING = 0.4f;
+        public const int MAX_WALLS = 3;
+
+        /// <summary>What an NPC does with a sound it heard.</summary>
+        public enum Heard : byte
+        {
+            None,
+            /// <summary>Turns to look for a moment, a little more wary.</summary>
+            Glance,
+            /// <summary>Walks over to look around the guessed spot.</summary>
+            Investigate,
+            /// <summary>Goes over weapon up and searches the area.</summary>
+            Alarmed
+        }
+
+        /// <summary>
+        /// How loud a sound is at an ear: 1 at the source, 0 at the edge of its reach.
+        /// <paramref name="pRadius"/> is the reach in the open; every wall or floor in between cuts it
+        /// to <see cref="WALL_DAMPING"/>, so a pistol heard 30 m away outside carries 12 m through one
+        /// wall and under 5 m through two.
+        /// </summary>
+        public static float Loudness(float pDistance, float pRadius, int pWalls)
+        {
+            float lReach = pRadius * Mathf.Pow(WALL_DAMPING, Mathf.Clamp(pWalls, 0, MAX_WALLS));
+            if (lReach <= 0.01f || pDistance >= lReach) return 0f;
+            return 1f - pDistance / lReach;
+        }
+
+        /// <summary>How many of the NPCs who hear a sound go and look: the rest only glance.</summary>
+        public static int Responders(NoiseKind pKind, float pLoudest) => pKind switch
+        {
+            NoiseKind.Distraction => pLoudest > 0.7f ? 2 : 1,
+            NoiseKind.Footstep => 1,
+            NoiseKind.Suspicious => 2,
+            _ => 3
+        };
+
+        /// <summary>The reaction to a sound, given how loud it is here and whether this NPC is one of the responders.</summary>
+        public static Heard React(NoiseKind pKind, float pLoudness, bool pResponder)
+        {
+            if (pLoudness <= 0f) return Heard.None;
+            if (!pResponder) return Heard.Glance;
+            return pKind switch
+            {
+                NoiseKind.Distraction => Heard.Investigate,
+                NoiseKind.Footstep => pLoudness > 0.5f ? Heard.Investigate : Heard.Glance,
+                NoiseKind.Suspicious => pLoudness > 0.6f ? Heard.Alarmed : Heard.Investigate,
+                _ => pLoudness > 0.35f ? Heard.Alarmed : Heard.Investigate
+            };
+        }
+
+        /// <summary>A sound gives a direction, not a position: the guess is off by this much (a few metres close by, ten far away).</summary>
+        public static float GuessError(float pDistance) => Mathf.Clamp(pDistance * 0.25f, 1.5f, 10f);
+
+        /// <summary>Reach of a player's footsteps in the open (metres).</summary>
+        public const float STEP_CROUCH = 1.5f, STEP_WALK = 5f, STEP_SPRINT = 14f, STEP_SLIDE = 8f;
+
+        /// <summary>Footsteps: silent standing still, a whisper crouched, a few metres walking, far sprinting or sliding.</summary>
+        public static float FootstepRadius(float pSpeed, bool pCrouched, bool pSprinting)
+        {
+            if (pSpeed < 0.6f) return 0f;
+            if (pCrouched) return pSpeed > 4f ? STEP_SLIDE : Mathf.Lerp(0.5f, STEP_CROUCH, Mathf.InverseLerp(0.6f, 2.5f, pSpeed));
+            if (pSprinting) return STEP_SPRINT;
+            return Mathf.Lerp(2f, STEP_WALK, Mathf.InverseLerp(0.6f, 4.4f, pSpeed));
+        }
+
+        /// <summary>A landing: a hop is free, a real drop is heard about 3 m per metre fallen (half crouched).</summary>
+        public static float LandingRadius(float pFall, bool pCrouched)
+        {
+            if (pFall < 1.2f) return 0f;
+            return Mathf.Min(20f, (pFall - 0.6f) * 3f) * (pCrouched ? 0.5f : 1f);
+        }
+
+        /// <summary>Within this angle of an NPC's back, a punch from someone it has not noticed is a silent takedown.</summary>
+        public const float TAKEDOWN_ANGLE = 70f;
+
+        /// <summary>Silent takedown: from behind, the NPC neither confronting nor fighting, its gauge under half.</summary>
+        public static bool CanTakedown(float pAngleFromBack, float pAwareness, bool pAlerted) => !pAlerted && pAwareness < INVESTIGATE && pAngleFromBack <= TAKEDOWN_ANGLE;
     }
 }

@@ -83,6 +83,26 @@ def main():
         for t in res["result"]["tools"]:
             print(t["name"], "-", (t.get("description") or "").split("\n")[0][:110])
         return
+    if sys.argv[1] in ("compile", "wait"):
+        # refresh + compile, wait until the editor is idle, then print the console errors
+        import time
+        if sys.argv[1] == "compile":
+            call("tools/call", {"name": "refresh_unity", "arguments": {"compile": "request"}})
+        time.sleep(3)
+        busy_code = "return UnityEditor.EditorApplication.isCompiling || UnityEditor.EditorApplication.isUpdating;"
+        for _ in range(240):
+            try:
+                res = call("tools/call", {"name": "execute_code", "arguments": {"action": "execute", "code": busy_code}})
+                text = json.dumps(res)
+                if '"result": false' in text.replace('\\"', '"') or "False" in text or '\\"result\\":false' in text:
+                    break
+            except Exception:
+                pass
+            time.sleep(2)
+        res = call("tools/call", {"name": "read_console", "arguments": {"types": ["error"], "count": 30}})
+        for c in res.get("result", {}).get("content", []):
+            print(c.get("text", c)[:6000])
+        return
     if sys.argv[1] == "schema":
         res = call("tools/list", {})
         for t in res["result"]["tools"]:

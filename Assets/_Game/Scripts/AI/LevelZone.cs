@@ -123,11 +123,37 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
         }
 
-        /// <summary>A point of interest with no player attached (explosion, alarm): investigate in force.</summary>
-        public void ReportThreatPoint(Vector3 pPoint)
+        /// <summary>A point of interest with no player attached (an alarm): the few nearest members go and search it.</summary>
+        public void ReportThreatPoint(Vector3 pPoint, int pCount = 4, float pRadius = 150f)
         {
-            foreach (Npc lMember in Members) if (lMember != null && lMember.Health.IsAlive) lMember.AlertToPoint(pPoint, true);
+            int lSent = 0;
+            foreach (Npc lMember in NearestMembers(pPoint, pRadius))
+            {
+                lMember.AlertToPoint(pPoint, true);
+                if (++lSent >= pCount) break;
+            }
         }
+
+        private readonly List<Npc> _nearest = new List<Npc>();
+
+        /// <summary>Living members within <paramref name="pRadius"/> of a point, nearest first (a shared list: don't keep it).</summary>
+        public List<Npc> NearestMembers(Vector3 pPoint, float pRadius)
+        {
+            _nearest.Clear();
+            float lRadiusSq = pRadius * pRadius;
+            foreach (Npc lMember in Members)
+                if (lMember != null && lMember.Health.IsAlive && (lMember.transform.position - pPoint).sqrMagnitude <= lRadiusSq) _nearest.Add(lMember);
+            _nearest.Sort((a, b) => (a.transform.position - pPoint).sqrMagnitude.CompareTo((b.transform.position - pPoint).sqrMagnitude));
+            return _nearest;
+        }
+
+        private float _alertUntil;
+
+        /// <summary>A body was found or an alarm went off: for a while the zone's NPCs see further.</summary>
+        public void RaiseAlertness(float pSeconds) => _alertUntil = Mathf.Max(_alertUntil, Time.time + pSeconds);
+
+        /// <summary>Vision range factor of the zone's NPCs (1, or 1.2 while on edge).</summary>
+        public float VisionFactor => Time.time < _alertUntil ? 1.2f : 1f;
 
         public Contact BestContact(Vector3 pFrom)
         {
@@ -252,10 +278,15 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _callsMade++;
             Contact lThreat = BestContact(pCaller.transform.position);
             Vector3 lPoint = lThreat != null ? lThreat.lastKnown : pCaller.transform.position;
-            // The call reaches the squad around the caller, not the whole zone nor the map.
-            foreach (Npc lMember in Members)
-                if (lMember != null && lMember != pCaller && lMember.Health.IsAlive && DetectionModel.HearsCall(lMember.ZoneIndex.Value, Index, Vector3.Distance(lMember.transform.position, pCaller.transform.position)))
-                    lMember.AlertToPoint(lPoint, true);
+            // The call reaches the few nearest mates around the caller, not the whole zone nor the map.
+            int lSent = 0;
+            foreach (Npc lMember in NearestMembers(pCaller.transform.position, DetectionModel.CALL_RADIUS))
+            {
+                if (lMember == pCaller || !DetectionModel.HearsCall(lMember.ZoneIndex.Value, Index, Vector3.Distance(lMember.transform.position, pCaller.transform.position))) continue;
+                lMember.AlertToPoint(lPoint + Random.insideUnitSphere * 5f, true);
+                if (++lSent >= DetectionModel.CALL_RESPONDERS) break;
+            }
+            RaiseAlertness(120f);
             Match.MatchDirector.Instance?.SpawnReinforcements(this, lPoint, GameDatabase.Rules.reinforcementsPerCall);
         }
 
@@ -270,8 +301,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
     }
 
     /// <summary>
-    /// Map-wide alarms: the flare launchers / sirens. Every zone converges toward the alarm point
-    /// and the target runs to its safe room.
+    /// Map-wide alarms: the flare launchers / sirens, fired on purpose by a guard who ran to one.
+    /// Every zone goes on edge (sharper eyes) and sends its few nearest members to the alarm point;
+    /// the rest stay at their posts, so the map never empties toward one spot.
     /// </summary>
     public static class AlertDirector
     {
@@ -282,8 +314,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             GlobalAlarm = true;
             AlarmPoint = pPoint;
-            foreach (LevelZone lZone in LevelZone.All) lZone.ReportThreatPoint(pPoint);
-            NoiseSystem.Emit(pPoint, 10000f, NoiseKind.Alarming, ulong.MaxValue, false);
+            foreach (LevelZone lZone in LevelZone.All)
+            {
+                lZone.RaiseAlertness(180f);
+                lZone.ReportThreatPoint(pPoint, 4, 150f);
+            }
+            // The siren itself: heard far, but only as a sound (the nearest few look, the rest glance).
+            NoiseSystem.Emit(pPoint, 120f, NoiseKind.Alarming, ulong.MaxValue, false);
         }
 
         public static void Reset() => GlobalAlarm = false;

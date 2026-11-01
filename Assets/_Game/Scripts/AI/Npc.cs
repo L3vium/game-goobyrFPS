@@ -71,9 +71,14 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         public Damageable Health { get; private set; }
         public NpcRole Role => RoleVar.Value;
-        public bool InCombat => State.Value == NpcState.Combat || State.Value == NpcState.Calling || State.Value == NpcState.Search;
-        /// <summary>Confronting or fighting: what the minimap, instinct and HUD show as a threat.</summary>
-        public bool IsAlerted => InCombat || State.Value == NpcState.Engaged;
+        /// <summary>Fighting (shooting, or phoning for help mid-fight). A search is not a fight: a searcher who sees you or is hit opens fire.</summary>
+        public bool InCombat => State.Value == NpcState.Combat || State.Value == NpcState.Calling;
+        /// <summary>Confronting, fighting or searching: what the minimap, instinct and HUD show as a threat.</summary>
+        public bool IsAlerted => InCombat || State.Value == NpcState.Engaged || State.Value == NpcState.Search;
+        /// <summary>Weapon up and expecting trouble (searching, or checking out a shot): sees faster and fires on sight.</summary>
+        private bool OnEdge => State.Value == NpcState.Search || (State.Value == NpcState.Investigate && _investigateAlarmed);
+        /// <summary>Going about its business: the states a sound or a glimpse can interrupt.</summary>
+        private bool OnDuty => State.Value == NpcState.Idle || State.Value == NpcState.Patrol || State.Value == NpcState.Routine || State.Value == NpcState.Escort;
         public bool IsTarget => Role == NpcRole.Target;
         /// <summary>Unarmed crowd members (guests, staff, spectators): they run away instead of fighting.</summary>
         public bool IsCrowd => Role == NpcRole.Worker;
@@ -123,6 +128,19 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private bool _wantsAlarm;
         private float _combatStart;
         private float _engagedSince, _lastSawTarget;
+        private bool _combatTargetExposed;
+        private Vector3 _glancePoint;
+        private float _glanceUntil;
+        private float _nextBreakAt;
+        private ActivityNode _break;
+        private float _breakUntil;
+        private float _nextStepHeard;
+
+        /// <summary>Bodies some NPC already reported: the next to stumble on them is wary, not a new alert.</summary>
+        private static readonly HashSet<ulong> _reportedBodies = new HashSet<ulong>();
+        private static bool _hearing;
+        private static readonly RaycastHit[] _wallHits = new RaycastHit[8];
+        private static readonly List<(Npc npc, float loudness, float distance)> _hearers = new List<(Npc, float, float)>();
 
         private const float WALK = 1.9f, RUN = 4.9f;
         /// <summary>Unhurried paces: a patrol on its round, a target going about its routine.</summary>
@@ -177,8 +195,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 Health.OnDamagedServer += HandleDamagedServer;
                 Health.OnDeathServer += HandleDeathServer;
-                NoiseSystem.OnNoise += HandleNoise;
+                if (!_hearing) { NoiseSystem.OnNoise += HearAll; _hearing = true; _reportedBodies.Clear(); }
                 BreakerAlert.OnBreaker += HandleBreaker;
+                _nextBreakAt = Time.time + Random.Range(20f, 90f);
                 _agent.enabled = true;
                 _agent.speed = WALK;
                 _agent.angularSpeed = 540f;
@@ -199,7 +218,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _hot.Remove(this);
             if (IsServer)
             {
-                NoiseSystem.OnNoise -= HandleNoise;
+                if (All.Count == 0 && _hearing) { NoiseSystem.OnNoise -= HearAll; _hearing = false; }
                 BreakerAlert.OnBreaker -= HandleBreaker;
                 if (_cover != null && _cover.Occupant == this) _cover.Occupant = null;
             }
@@ -269,7 +288,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 Perceive(0.18f);
             }
 
-            switch (State.Value)
+            // A sound made it turn and look: it stands there a moment before carrying on.
+            if (Time.time < _glanceUntil && OnDuty)
+            {
+                Stop();
+                FaceTowards(_glancePoint, 240f);
+            }
+            else switch (State.Value)
             {
                 case NpcState.Idle: UpdateIdle(); break;
                 case NpcState.Patrol: UpdatePatrol(); break;
@@ -303,6 +328,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (lHot && !_hot.Contains(this)) _hot.Add(this);
             else if (!lHot) _hot.Remove(this);
             if (pState != NpcState.Combat && _cover != null) { if (_cover.Occupant == this) _cover.Occupant = null; _cover = null; }
+            if (pState != NpcState.Idle) _break = null;
         }
 
         private bool MoveTo(Vector3 pPoint, float pSpeed)
@@ -338,27 +364,18 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             PlayerAvatar lBest = null;
             float lBestExposure = 0f;
             bool lCombat = InCombat;
+            _combatTargetExposed = false;
 
             foreach (PlayerAvatar lPlayer in PlayerAvatar.All)
             {
                 if (lPlayer == null || !lPlayer.IsSpawned || !lPlayer.Health.IsAlive) continue;
-                float lExposure = Exposure(lPlayer, lRules, lCombat);
+                float lExposure = Exposure(lPlayer, lRules, lCombat || OnEdge);
                 if (lExposure > lBestExposure) { lBestExposure = lExposure; lBest = lPlayer; }
-
-                // Hearing a player run (or walk) close by.
-                if (lExposure <= 0f && !lPlayer.Hidden.Value)
-                {
-                    float lDistance = Vector3.Distance(lPlayer.transform.position, transform.position);
-                    float lHear = lPlayer.Sprinting.Value ? 10f : lPlayer.Crouched.Value ? 0f : 3.5f;
-                    if (lDistance < lHear)
-                    {
-                        if (lCombat) Zone?.ReportContact(lPlayer, lPlayer.transform.position, false);
-                        else if (CanBecomeSuspicious && State.Value != NpcState.Investigate) Investigate(lPlayer.transform.position, false);
-                    }
-                }
+                if (lPlayer == _combatTarget && lExposure > 0f) _combatTargetExposed = true;
+                if (lExposure <= 0f && !lPlayer.Hidden.Value) ListenToSteps(lPlayer);
             }
 
-            _awareness = DetectionModel.Fill(_awareness, lBestExposure, lRules.npcDetectTime, dt, lCombat);
+            _awareness = DetectionModel.Fill(_awareness, lBestExposure, lRules.npcDetectTime, dt, lCombat, OnEdge);
             if (lBest != null)
             {
                 _suspect = lBest;
@@ -380,6 +397,57 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
         }
 
+        /// <summary>
+        /// Footsteps out of sight: their reach follows the player's real speed and stance (silent
+        /// standing still, a whisper crouched) and walls muffle them. Close and clear, the NPC comes to
+        /// look around where it thinks they were; faint, it only turns its head.
+        /// </summary>
+        private void ListenToSteps(PlayerAvatar pPlayer)
+        {
+            float lRadius = DetectionModel.FootstepRadius(pPlayer.HostSpeed, pPlayer.Crouched.Value, pPlayer.Sprinting.Value);
+            if (lRadius <= 0f) return;
+            Vector3 lFeet = pPlayer.transform.position + Vector3.up * 0.3f;
+            float lDistance = Vector3.Distance(lFeet, Eye);
+            if (lDistance >= lRadius || Time.time < _nextStepHeard) return;
+            float lLoudness = DetectionModel.Loudness(lDistance, lRadius, WallsBetween(lFeet, Eye));
+            if (lLoudness <= 0f) return;
+            _nextStepHeard = Time.time + 0.8f;
+            Vector3 lGuess = Guess(pPlayer.transform.position, lDistance);
+
+            if (InCombat) { if (lLoudness > 0.5f) Zone?.ReportContact(pPlayer, lGuess, false); return; }
+            if (State.Value == NpcState.Search) { if (lLoudness > 0.4f) { _searchCenter = lGuess; MoveTo(lGuess, RUN * 0.6f); } return; }
+            if (!CanBecomeSuspicious) return;
+            _suspect = pPlayer;
+            if (DetectionModel.React(NoiseKind.Footstep, lLoudness, true) == DetectionModel.Heard.Investigate && State.Value != NpcState.Investigate) Investigate(lGuess, false);
+            else Glance(pPlayer.transform.position, _awareness + 0.12f);
+        }
+
+        /// <summary>Turn and look toward a sound for a moment, a little more wary (never past the point of walking over).</summary>
+        private void Glance(Vector3 pPoint, float pWary)
+        {
+            _awareness = Mathf.Max(_awareness, Mathf.Min(pWary, DetectionModel.INVESTIGATE - 0.05f));
+            if (!OnDuty) return;
+            _glancePoint = pPoint;
+            _glanceUntil = Time.time + Random.Range(1.8f, 3f);
+        }
+
+        /// <summary>Where a sound seems to come from: a direction, not a position.</summary>
+        private static Vector3 Guess(Vector3 pSource, float pDistance)
+        {
+            Vector2 lOff = Random.insideUnitCircle * DetectionModel.GuessError(pDistance);
+            return pSource + new Vector3(lOff.x, 0f, lOff.y);
+        }
+
+        /// <summary>Walls and floors between two points (each one muffles a sound), up to <see cref="DetectionModel.MAX_WALLS"/>.</summary>
+        private static int WallsBetween(Vector3 pFrom, Vector3 pTo)
+        {
+            Vector3 lDir = pTo - pFrom;
+            float lLength = lDir.magnitude;
+            if (lLength < 0.05f) return 0;
+            int lHits = Physics.RaycastNonAlloc(pFrom, lDir / lLength, _wallHits, lLength, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
+            return Mathf.Min(lHits, DetectionModel.MAX_WALLS);
+        }
+
         /// <summary>States from which a glimpse of a player makes the NPC stop and stare.</summary>
         private bool CanBecomeSuspicious => !InCombat && State.Value != NpcState.Engaged && State.Value != NpcState.Flee && State.Value != NpcState.Sick;
 
@@ -394,7 +462,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             DetectionModel.Sight lSight = new DetectionModel.Sight
             {
                 distance = lTo.magnitude,
-                range = pRules.npcVisionRange * (Role == NpcRole.Lookout ? 1.5f : 1f) * BuildingVolume.LightFactor(lTarget) * (pCombat ? 1.5f : 1f) * (pPlayer.CarriesProof.Value ? 1.2f : 1f),
+                range = pRules.npcVisionRange * (Role == NpcRole.Lookout ? 1.5f : 1f) * BuildingVolume.LightFactor(lTarget) * (pCombat ? 1.5f : 1f) * (pPlayer.CarriesProof.Value ? 1.2f : 1f) * (Zone != null ? Zone.VisionFactor : 1f),
                 angle = Vector3.Angle(transform.forward, lTo),
                 halfCone = pRules.npcVisionAngle * 0.5f * (pCombat ? 1.4f : 1f),
                 crouched = pPlayer.Crouched.Value,
@@ -459,6 +527,14 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 return;
             }
             SpottedRpc();
+            if (!Flees && OnEdge)
+            {
+                // Already expecting trouble: no confrontation, it opens fire.
+                Zone?.ReportContact(pPlayer, pPlayer.transform.position, true);
+                _reactionUntil = Time.time + 0.35f;
+                EnterCombat();
+                return;
+            }
             if (Flees)
             {
                 // A scream: the guards close by come and look.
@@ -522,68 +598,125 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 if (Vector3.Angle(transform.forward, lBody - Eye) > GameDatabase.Rules.npcVisionAngle * 0.5f) continue;
                 if (Physics.Linecast(Eye, lBody, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore)) continue;
                 _seenBodies.Add(lOther.NetworkObjectId);
+                if (!_reportedBodies.Add(lOther.NetworkObjectId))
+                {
+                    // Someone already radioed this one in: wary, not a new alert.
+                    Glance(lOther.transform.position, 0.4f);
+                    return;
+                }
+                // First to find it: runs over and radios it in. The two nearest mates come to secure
+                // the area and the zone stays on edge for a while (sharper eyes).
                 Investigate(lOther.transform.position, true);
                 BodyFoundRpc();
-                if (Zone != null) foreach (Npc lMate in Zone.Members) if (lMate != null) lMate._seenBodies.Add(lOther.NetworkObjectId);
+                if (Zone == null) return;
+                Zone.RaiseAlertness(90f);
+                int lSent = 0;
+                foreach (Npc lMate in Zone.NearestMembers(lOther.transform.position, 30f))
+                {
+                    if (lMate == this || !lMate.OnDuty || lMate.Flees) continue;
+                    lMate._seenBodies.Add(lOther.NetworkObjectId);
+                    lMate.AlertToPoint(lOther.transform.position, true);
+                    if (++lSent >= 2) break;
+                }
                 return;
             }
         }
 
-        private void HandleNoise(NoiseEvent pNoise)
+        /// <summary>
+        /// Host: hand a sound out to the NPCs who can hear it. Loudness falls with distance and with
+        /// every wall or floor in between (<see cref="DetectionModel.Loudness"/>); only the few who hear
+        /// it best go and look (<see cref="DetectionModel.Responders"/>), the others turn their heads.
+        /// Nobody learns a position from a sound: they head for a guess around it.
+        /// </summary>
+        private static void HearAll(NoiseEvent pNoise)
         {
-            if (!Health.IsAlive || State.Value == NpcState.KnockedOut) return;
-            float lDistance = Vector3.Distance(pNoise.position, transform.position);
-            if (lDistance > pNoise.radius) return;
-
-            switch (pNoise.kind)
+            _hearers.Clear();
+            Vector3 lFrom = pNoise.position + Vector3.up * 0.4f;
+            foreach (Npc lNpc in All)
             {
-                case NoiseKind.Alarming:
-                    if (Flees) { SetState(NpcState.Flee); return; }
-                    if (State.Value == NpcState.Sick) return;
-                    AlertToPoint(pNoise.position, true);
-                    PlayerAvatar lShooter = PlayerAvatar.ForClient(pNoise.source);
-                    if (lShooter != null && lDistance < pNoise.radius * 0.6f) Zone?.ReportContact(lShooter, lShooter.transform.position, false);
-                    break;
-                case NoiseKind.Suspicious:
-                case NoiseKind.Distraction:
-                    if (InCombat || State.Value == NpcState.Engaged || State.Value == NpcState.Flee || State.Value == NpcState.Sick) return;
-                    // Only the nearest few NPCs walk to a distraction; the rest glance.
-                    if (pNoise.kind == NoiseKind.Distraction && !IsNearestTo(pNoise.position, 2)) { FaceTowards(pNoise.position, 9999f); return; }
-                    if (IsTarget && pNoise.kind == NoiseKind.Distraction && !IsNearestTo(pNoise.position, 1)) return;
-                    Investigate(pNoise.position, pNoise.kind == NoiseKind.Suspicious);
-                    _distraction = WorldRegistry.Nearest<Distraction>(pNoise.position, 2.5f, d => d.State == 1);
-                    break;
+                if (lNpc == null || !lNpc.IsServer || !lNpc.Health.IsAlive || lNpc.State.Value == NpcState.KnockedOut) continue;
+                float lDistance = Vector3.Distance(lFrom, lNpc.Eye);
+                if (lDistance >= pNoise.radius) continue;
+                float lLoudness = DetectionModel.Loudness(lDistance, pNoise.radius, WallsBetween(lFrom, lNpc.Eye));
+                if (lLoudness > 0f) _hearers.Add((lNpc, lLoudness, lDistance));
+            }
+            if (_hearers.Count == 0) return;
+            _hearers.Sort((a, b) => b.loudness.CompareTo(a.loudness));
+
+            int lResponders = DetectionModel.Responders(pNoise.kind, _hearers[0].loudness);
+            int lGiven = 0;
+            foreach ((Npc lNpc, float lLoudness, float lDistance) in _hearers)
+            {
+                bool lResponder = lGiven < lResponders && lNpc.CanRespond;
+                if (lResponder) lGiven++;
+                lNpc.Hear(pNoise, DetectionModel.React(pNoise.kind, lLoudness, lResponder), lDistance);
             }
         }
 
-        private bool IsNearestTo(Vector3 pPoint, int pRank)
+        /// <summary>Free to go and check a sound: not fighting, fleeing, sick or already on its way to one.</summary>
+        private bool CanRespond => !InCombat && State.Value != NpcState.Engaged && State.Value != NpcState.Flee && State.Value != NpcState.Sick && State.Value != NpcState.Investigate;
+
+        private void Hear(NoiseEvent pNoise, DetectionModel.Heard pHeard, float pDistance)
         {
-            float lMine = Vector3.Distance(pPoint, transform.position);
-            int lCloser = 0;
-            foreach (Npc lOther in All)
+            if (pHeard == DetectionModel.Heard.None) return;
+            if (Flees)
             {
-                if (lOther == this || !lOther.Health.IsAlive || lOther.InCombat || lOther.IsTarget) continue;
-                if (Vector3.Distance(pPoint, lOther.transform.position) < lMine) lCloser++;
-                if (lCloser >= pRank) return false;
+                if (pNoise.kind == NoiseKind.Alarming && pHeard == DetectionModel.Heard.Alarmed) SetState(NpcState.Flee);
+                else Glance(pNoise.position, 0.3f);
+                return;
             }
-            return true;
+            if (InCombat || State.Value == NpcState.Engaged || State.Value == NpcState.Sick) return;
+
+            Vector3 lGuess = Guess(pNoise.position, pDistance);
+            switch (pHeard)
+            {
+                case DetectionModel.Heard.Glance:
+                    Glance(pNoise.position, pNoise.kind == NoiseKind.Alarming ? 0.4f : 0.2f);
+                    break;
+                case DetectionModel.Heard.Investigate:
+                    Investigate(lGuess, false);
+                    if (pNoise.kind == NoiseKind.Distraction) _distraction = WorldRegistry.Nearest<Distraction>(pNoise.position, 2.5f, d => d.State == 1);
+                    break;
+                case DetectionModel.Heard.Alarmed:
+                    if (pNoise.kind == NoiseKind.Alarming) AlertToPoint(lGuess, true);
+                    else Investigate(lGuess, true);
+                    break;
+            }
         }
 
         private void HandleBreaker(Breaker pBreaker)
         {
             if (!Health.IsAlive || InCombat || IsTarget || pBreaker.PowerOn) return;
             if (pBreaker.Building == null || !pBreaker.Building.Contains(transform.position + Vector3.up)) return;
-            if (!IsNearestTo(pBreaker.transform.position, 1)) return;
+            // The nearest free NPC inside that building goes and flips it back.
+            float lMine = Vector3.Distance(pBreaker.transform.position, transform.position);
+            foreach (Npc lOther in All)
+            {
+                if (lOther == this || !lOther.Health.IsAlive || lOther.InCombat || lOther.IsTarget) continue;
+                if (!pBreaker.Building.Contains(lOther.transform.position + Vector3.up)) continue;
+                if (Vector3.Distance(pBreaker.transform.position, lOther.transform.position) < lMine) return;
+            }
             _breaker = pBreaker;
             Investigate(pBreaker.transform.position + pBreaker.transform.forward, false);
         }
 
-        /// <summary>Host: an explosion, gunfire, a global alarm - go there ready to fight.</summary>
+        /// <summary>Host: gunfire, an explosion, a radio call - go and search that area ready to fight.</summary>
         public void AlertToPoint(Vector3 pPoint, bool pAlarmed)
         {
             if (!Health.IsAlive || State.Value == NpcState.KnockedOut || State.Value == NpcState.Sick) return;
             if (Flees) { SetState(NpcState.Flee); return; }
             if (InCombat || State.Value == NpcState.Engaged) { if (_combatTarget == null) _searchCenter = pPoint; return; }
+            if (State.Value == NpcState.Search)
+            {
+                // Already searching: a new sound well away from the search moves it (a burst of shots doesn't).
+                if ((pPoint - _searchCenter).sqrMagnitude > 36f)
+                {
+                    _searchCenter = pPoint;
+                    _searchUntil = Mathf.Max(_searchUntil, Time.time + GameDatabase.Rules.searchDuration * 0.6f);
+                    MoveTo(pPoint, RUN * 0.8f);
+                }
+                return;
+            }
             _awareness = Mathf.Max(_awareness, 0.7f);
             _searchCenter = pPoint;
             _searchUntil = Time.time + GameDatabase.Rules.searchDuration;
@@ -605,6 +738,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private void UpdateIdle()
         {
+            if (TakeBreak()) return;
             if (Vector3.Distance(transform.position, _home) > 1.2f)
             {
                 MoveTo(_home, PATROL);
@@ -614,6 +748,36 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             float lScan = Role == NpcRole.Lookout ? Mathf.Sin(Time.time * 0.25f + NetworkObjectId) * 70f : Mathf.Sin(Time.time * 0.15f + NetworkObjectId) * 30f;
             transform.rotation = Quaternion.RotateTowards(transform.rotation, _homeRotation * Quaternion.Euler(0, lScan, 0), 40f * Time.deltaTime);
         }
+
+        /// <summary>
+        /// Guards and staff on a post don't stand still all match: now and then one strolls to an
+        /// activity close to its post (a smoke, a phone call, a look around), stays a while and comes
+        /// back - the windows a player waits for.
+        /// </summary>
+        private bool TakeBreak()
+        {
+            if (Role != NpcRole.Guard && !IsCrowd) return false;
+            if (_break == null)
+            {
+                if (Time.time < _nextBreakAt) return false;
+                _nextBreakAt = Time.time + Random.Range(45f, 120f);
+                _break = ActivityNode.Near(ZoneIndex.Value, _home, 22f, BreakActivity);
+                _breakUntil = 0f;
+                if (_break == null) return false;
+            }
+            if (_breakUntil <= 0f)
+            {
+                MoveTo(_break.transform.position, STROLL);
+                if (!Arrived(0.9f)) return true;
+                _breakUntil = Time.time + _break.Duration * Random.Range(0.8f, 1.4f);
+            }
+            Stop();
+            FaceTowards(_break.transform.position + _break.transform.forward, 120f);
+            if (Time.time > _breakUntil) _break = null;
+            return true;
+        }
+
+        private static bool BreakActivity(ActivityType pType) => pType == ActivityType.Smoke || pType == ActivityType.Phone || pType == ActivityType.Inspect || pType == ActivityType.Idle || pType == ActivityType.Drink;
 
         private void UpdatePatrol()
         {
@@ -820,7 +984,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
 
             Vector3 lKnown = lContact.lastKnown;
-            _targetVisible = lContact.visibleNow && _combatTarget != null && Exposure(_combatTarget, GameDatabase.Rules, true) > 0f;
+            // Visibility comes from the last perception tick, not raycasts every frame.
+            _targetVisible = lContact.visibleNow && _combatTarget != null && _combatTargetExposed;
             if (_targetVisible) Zone?.ReportContact(_combatTarget, _combatTarget.transform.position, true);
             float lSinceSeen = Time.time - lContact.lastSeenTime;
 

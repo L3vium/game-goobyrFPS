@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Version 0.6.0.
 - Public, restricted and hostile areas, like Hitman: walk the plaza or the market freely as long
   as you behave (no raised gun, no sprinting or climbing in front of guards); staff areas get you
   noticed more slowly and warned first; compounds and private floors are trespassing.

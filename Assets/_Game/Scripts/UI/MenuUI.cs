@@ -28,7 +28,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     {
         private enum Screen { Main, Join, Lobby, Settings }
 
-        private const string VERSION = "0.5.0";
+        private const string VERSION = "0.6.0";
         private static readonly Vector2 TL = new Vector2(0, 1);
 
         private RectTransform _root;

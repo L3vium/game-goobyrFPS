@@ -240,7 +240,10 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
 - **First person** (`Weapons/Viewmodel`): Chr_Arms (sleeves and hands) under the camera, arms-only
   mask; the gun is posed procedurally (hip, sights on the screen centre, sway, bob, recoil, sprint,
   switch) and the hands are put on it by IK with the measured grips; reload, punch and throw clips
-  lead the hands during the action; small items ride in the hand.
+  lead the hands during the action; small items ride in the hand; fists hold a guard (the punch
+  clip's first frame). The overlay camera renders with post-processing (same exposure and
+  tonemapping as the world) and the arms get their own slightly darker skin instances and white shirt
+  cuffs; shoulders sit low and back so the forearms rise from the bottom of the screen.
 - The contract portrait (`UI/PortraitStudio`), the title key art and the app icon
   (`Goobyr/Build/Icon`, a camera render) use the same bodies.
 

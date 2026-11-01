@@ -12,7 +12,9 @@
 - Bodies fall as real ragdolls built from the pose they died in, keep their momentum and take the
   blow where they were hit; a takedown victim struggles before going limp.
 - First person: your own sleeves and hands hold every weapon and item, aim down the sights, recoil,
-  reload, punch and throw.
+  reload, punch and throw. The arms are lit and graded like the world (no more white hands), the
+  suit sleeves end in white shirt cuffs, the support hand cups under the firing hand, the forearms
+  stay low in the frame, and bare hands raise a boxing guard.
 - The proof is the target's dossier (or the item it carries) instead of a head. The contract shows
   a studio portrait of the target; new key art on the title screen and a new app icon.
 - Three new maps replace Pinecrest Hollow, Mirage Bay and Elmridge, built from the map design

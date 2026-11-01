@@ -43,14 +43,16 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private float _ikRight = 1f, _ikLeft = 1f;
         private int _armsState;
         private Quaternion _rightRotation = Quaternion.identity, _leftRotation = Quaternion.identity;
+        private Vector3 _leftTarget;
 
         private static RuntimeAnimatorController _controller;
 
         // Poses of the held item in camera space (metres, degrees).
-        public static Vector3 PISTOL_HIP = new Vector3(0.12f, -0.16f, 0.42f), PISTOL_TURN = new Vector3(0f, -2f, 0f);
-        public static Vector3 RIFLE_HIP = new Vector3(0.15f, -0.19f, 0.36f), RIFLE_TURN = new Vector3(0f, -1.5f, 0f);
+        public static Vector3 PISTOL_HIP = new Vector3(0.12f, -0.17f, 0.44f), PISTOL_TURN = new Vector3(0f, -2f, 0f);
+        public static Vector3 RIFLE_HIP = new Vector3(0.13f, -0.17f, 0.34f), RIFLE_TURN = new Vector3(0f, -1.5f, 0f);
         public static Vector3 ITEM_HIP = new Vector3(0.14f, -0.13f, 0.34f), ITEM_TURN = new Vector3(-10f, -12f, 8f);
-        public static float PISTOL_ADS_Z = 0.36f, RIFLE_ADS_Z = 0.2f;
+        public static Vector3 FISTS = new Vector3(0.15f, -0.17f, 0.37f), FIST_LEFT = new Vector3(0f, 0.015f, 0.05f), FIST_TURN = new Vector3(-12f, -8f, -65f);
+        public static float PISTOL_ADS_Z = 0.36f, RIFLE_ADS_Z = 0.3f;
 
         public Transform Muzzle { get; private set; }
         public Vector3 MuzzlePosition
@@ -68,6 +70,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public static Viewmodel Create(WeaponHolder pHolder)
         {
             CameraRig lRig = CameraRig.Ensure();
+            // The arms must go through the same exposure and tonemapping as the world, or they burn white.
+            UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(lRig.ViewCamera).renderPostProcessing = true;
             GameObject lRoot = new GameObject("Viewmodel");
             lRoot.transform.SetParent(lRig.ViewmodelRoot, false);
             Viewmodel lView = lRoot.AddComponent<Viewmodel>();
@@ -103,11 +107,46 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                     _handSocket.SetLocalPositionAndRotation(HumanRig.Instance.pinchPosition, HumanRig.Instance.pistol.handRotation);
                 }
             }
+            Cuff(HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand);
+            Cuff(HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand);
             _armRenderers = lArms.GetComponentsInChildren<Renderer>();
+            // Arms half a metre from the eye catch the full sun the world around them is shaded from:
+            // their own instances, skin a little darker and less glossy, so they read as skin, not white.
+            foreach (Renderer lRenderer in _armRenderers)
+            {
+                Material[] lMaterials = lRenderer.materials;
+                foreach (Material lMaterial in lMaterials)
+                {
+                    bool lSkin = lMaterial.name.Contains("Body");
+                    lMaterial.SetColor("_BaseColor", lSkin ? new Color(0.68f, 0.62f, 0.6f) : new Color(0.8f, 0.8f, 0.82f));
+                    lMaterial.SetFloat("_Smoothness", lSkin ? 0.35f : 0.3f);
+                }
+                lRenderer.materials = lMaterials;
+            }
             foreach (Renderer lRenderer in _armRenderers)
             {
                 if (lRenderer is SkinnedMeshRenderer lSkin) { lSkin.updateWhenOffscreen = true; lSkin.skinnedMotionVectors = false; }
             }
+        }
+
+        /// <summary>A white shirt cuff showing past the suit sleeve at the wrist.</summary>
+        private void Cuff(HumanBodyBones pForearm, HumanBodyBones pHand)
+        {
+            Transform lArm = _animator != null ? _animator.GetBoneTransform(pForearm) : null, lHand = _animator != null ? _animator.GetBoneTransform(pHand) : null;
+            if (lArm == null || lHand == null) return;
+            Vector3 lAlong = lArm.InverseTransformPoint(lHand.position);
+            GameObject lCuff = new GameObject("Cuff");
+            lCuff.transform.SetParent(lArm, false);
+            lCuff.transform.localPosition = lAlong * 0.86f;
+            lCuff.transform.localRotation = Quaternion.FromToRotation(Vector3.up, lAlong.normalized);
+            lCuff.transform.localScale = new Vector3(0.068f, 0.035f, 0.058f) / Mathf.Max(0.01f, lArm.lossyScale.x);
+            lCuff.AddComponent<MeshFilter>().sharedMesh = HumanBody.BandMesh();
+            MeshRenderer lRenderer = lCuff.AddComponent<MeshRenderer>();
+            Material lMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            lMaterial.SetColor("_BaseColor", new Color(0.78f, 0.79f, 0.8f));
+            lMaterial.SetFloat("_Smoothness", 0.25f);
+            lMaterial.SetFloat("_Cull", 0f);
+            lRenderer.sharedMaterial = lMaterial;
         }
 
         public void Kick(float pAmount)
@@ -148,7 +187,14 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         }
 
         /// <summary>The idle hold of the current item.</summary>
-        private string HoldState => _held == HeldKind.Rifle ? HumanAnimator.S_AIM_RIFLE : _held == HeldKind.Pistol ? HumanAnimator.S_AIM_PISTOL : HumanAnimator.S_PISTOL_READY;
+        private string HoldState => _held == HeldKind.Rifle ? HumanAnimator.S_AIM_RIFLE : _held == HeldKind.Pistol ? HumanAnimator.S_AIM_PISTOL : _held == HeldKind.None ? HumanAnimator.S_PUNCH : HumanAnimator.S_PISTOL_READY;
+
+        /// <summary>Back to the idle hold: fists hold the punch clip's opening guard (its fingers make the fists).</summary>
+        private void PlayHold(float pFade)
+        {
+            if (_animator != null) _animator.SetFloat(HumanAnimator.PACE, _held == HeldKind.None ? 0f : 1f);
+            Play(HoldState, pFade, _held == HeldKind.None ? 0.04f : 0f);
+        }
 
         private void Rebuild(ItemDefinition pItem)
         {
@@ -170,8 +216,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 _sightHeight = SightHeight(pItem, Muzzle);
                 foreach (Renderer lRenderer in lModel.GetComponentsInChildren<Renderer>()) lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
-            if (_animator != null) _animator.SetFloat(HumanAnimator.PACE, 1f);
-            Play(HoldState, 0.15f);
+            PlayHold(0.15f);
         }
 
         /// <summary>Height of the sight line above the grip: the top of the slide for pistols, the rail for long guns.</summary>
@@ -180,7 +225,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             float lBore = pMuzzle != null ? pMuzzle.localPosition.y : 0.08f;
             return pItem.kind switch
             {
-                ItemKind.Pistol or ItemKind.SilencedPistol => lBore + 0.022f,
+                ItemKind.Pistol or ItemKind.SilencedPistol => lBore,
                 ItemKind.Smg => lBore + 0.05f,
                 ItemKind.Shotgun => lBore + 0.03f,
                 _ => lBore + 0.04f
@@ -236,7 +281,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                     lSight = new Vector3(0f, -_sightHeight, RIFLE_ADS_Z);
                     break;
                 case HeldKind.None:
-                    lHip = new Vector3(0.16f, -0.22f, 0.32f); lHipTurn = Quaternion.identity;
+                    lHip = FISTS; lHipTurn = Quaternion.Euler(FIST_TURN);
                     lSight = lHip;
                     break;
                 default:
@@ -269,17 +314,16 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             _pivot.localRotation = lRot;
 
             // Back to the hold once an action clip is done.
-            if (_punchT >= 1f && _throwT >= 1f && _reloadT >= 1f && _animator != null && _armsState != Animator.StringToHash(HoldState)
-                && _animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.9f && !_animator.IsInTransition(0))
+            if (_punchT >= 1f && _throwT >= 1f && _reloadT >= 1f && _animator != null && (_armsState != Animator.StringToHash(HoldState) || (_held == HeldKind.None && _animator.GetFloat(HumanAnimator.PACE) > 0f))
+                && (_animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.9f || _armsState != Animator.StringToHash(HumanAnimator.S_PUNCH)) && !_animator.IsInTransition(0))
             {
-                _animator.SetFloat(HumanAnimator.PACE, 1f);
-                Play(HoldState, 0.2f);
+                PlayHold(0.2f);
             }
 
             // How much the IK leads the hands: the clip takes over for the actions.
             bool lGun = _held == HeldKind.Pistol || _held == HeldKind.Rifle;
-            float lRightTarget = _punchT < 1f || _throwT < 1f ? 0f : _held == HeldKind.None ? 0f : 1f;
-            float lLeftTarget = lGun && _reloadT >= 1f && _punchT >= 1f ? 1f : 0f;
+            float lRightTarget = _punchT < 1f || _throwT < 1f ? 0f : 1f;
+            float lLeftTarget = (lGun || _held == HeldKind.None) && _reloadT >= 1f && _punchT >= 1f ? 1f : 0f;
             _ikRight = Mathf.MoveTowards(_ikRight, lRightTarget, dt * 8f);
             _ikLeft = Mathf.MoveTowards(_ikLeft, lLeftTarget, dt * 6f);
         }
@@ -301,7 +345,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         }
 
         /// <summary>Shoulders lower and further back than real: the forearms rise into the view from the bottom corners instead of hiding the hands.</summary>
-        public static Vector3 SHOULDER_DROP = new Vector3(0f, 0.12f, 0.15f);
+        public static Vector3 SHOULDER_DROP = new Vector3(0f, 0.2f, 0.24f);
+        /// <summary>Elbows down and in: the forearms rise from the bottom of the screen, not across it.</summary>
+        public static Vector3 RIGHT_ELBOW = new Vector3(0.3f, -0.62f, 0.1f), LEFT_ELBOW = new Vector3(-0.18f, -0.65f, 0.18f);
 
         /// <summary>The hands on the item (called from the arms' IK pass).</summary>
         public void OnIK()
@@ -317,6 +363,16 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 lHandRotation = _pivot.rotation * Quaternion.Inverse(lGrip.handRotation);
                 lHandPosition = _pivot.position - lHandRotation * lGrip.handPosition;
             }
+            else if (_held == HeldKind.None)
+            {
+                // Fists up: the right fist at the pivot, the left one mirrored and a little forward.
+                lHandRotation = _pivot.rotation * Quaternion.Inverse(lRig.pistol.handRotation);
+                lHandPosition = _pivot.position - lHandRotation * lRig.pistol.handPosition;
+                Vector3 lLeftPivot = transform.TransformPoint(Vector3.Scale(_pivot.localPosition, new Vector3(-1f, 1f, 1f)) + FIST_LEFT);
+                Quaternion lLeftFist = transform.rotation * Quaternion.Euler(Vector3.Scale(_pivot.localEulerAngles, new Vector3(1f, -1f, -1f))) * lRig.leftFistRotation;
+                _leftRotation = Quaternion.Inverse(transform.rotation) * lLeftFist;
+                _leftTarget = lLeftPivot - lLeftFist * lRig.leftPalm;
+            }
             else
             {
                 // A small item (or the empty hand): the palm at the pivot, item between the fingers.
@@ -326,18 +382,22 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             // Position by IK (the wrist), rotation written on the bone after the pass (LateUpdate):
             // the grips are measured on the raw bones, not in the humanoid goal space.
             _rightRotation = Quaternion.Inverse(transform.rotation) * lHandRotation;
-            _leftRotation = Quaternion.Inverse(transform.rotation) * (_pivot.rotation * lGrip.supportRotation);
+            if (_held != HeldKind.None)
+            {
+                _leftRotation = Quaternion.Inverse(transform.rotation) * (_pivot.rotation * lGrip.supportRotation);
+                _leftTarget = _pivot.position + _pivot.rotation * lRig.SupportFor(_held, Muzzle);
+            }
             _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, _ikRight);
             _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
             _animator.SetIKPosition(AvatarIKGoal.RightHand, lHandPosition);
-            _animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, _ikRight * 0.7f);
-            _animator.SetIKHintPosition(AvatarIKHint.RightElbow, transform.TransformPoint(new Vector3(0.42f, -0.5f, 0.05f)));
+            _animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, _ikRight * 0.9f);
+            _animator.SetIKHintPosition(AvatarIKHint.RightElbow, transform.TransformPoint(RIGHT_ELBOW));
 
             _animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, _ikLeft);
             _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
-            _animator.SetIKPosition(AvatarIKGoal.LeftHand, _pivot.position + _pivot.rotation * lRig.SupportFor(_held, Muzzle));
-            _animator.SetIKHintPositionWeight(AvatarIKHint.LeftElbow, _ikLeft * 0.7f);
-            _animator.SetIKHintPosition(AvatarIKHint.LeftElbow, transform.TransformPoint(new Vector3(-0.4f, -0.5f, 0.1f)));
+            _animator.SetIKPosition(AvatarIKGoal.LeftHand, _leftTarget);
+            _animator.SetIKHintPositionWeight(AvatarIKHint.LeftElbow, _ikLeft * 0.9f);
+            _animator.SetIKHintPosition(AvatarIKHint.LeftElbow, transform.TransformPoint(LEFT_ELBOW));
         }
 
         private void LateUpdate()

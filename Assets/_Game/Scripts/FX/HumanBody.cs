@@ -159,7 +159,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         {
             Transform lArm = Bone(HumanBodyBones.LeftUpperArm), lElbow = Bone(HumanBodyBones.LeftLowerArm);
             if (lArm == null || lElbow == null) return null;
-            if (_bandMesh == null) _bandMesh = BandMesh();
+            _bandMesh = BandMesh();
             GameObject lBand = new GameObject("Armband");
             lBand.layer = gameObject.layer;
             lBand.transform.SetParent(lArm, false);
@@ -179,8 +179,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         }
 
         /// <summary>An open ring (radius 0.5, height 1), smooth.</summary>
-        private static Mesh BandMesh()
+        public static Mesh BandMesh()
         {
+            if (_bandMesh != null) return _bandMesh;
             const int N = 20;
             Vector3[] lVerts = new Vector3[(N + 1) * 2];
             Vector3[] lNormals = new Vector3[lVerts.Length];
@@ -199,6 +200,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             }
             Mesh lMesh = new Mesh { name = "Armband", vertices = lVerts, normals = lNormals, triangles = lTris };
             lMesh.RecalculateBounds();
+            _bandMesh = lMesh;
             return lMesh;
         }
 

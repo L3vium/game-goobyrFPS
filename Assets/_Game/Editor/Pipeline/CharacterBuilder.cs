@@ -598,22 +598,19 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Quaternion lWeaponInHand = lRight.basis * Quaternion.Inverse(lFiring);
                 Vector3 lGripInHand = lRight.palm + lRight.palmNormal * 0.016f;
 
-                // Pistol: the support hand against the left of the handle, a little lower and forward.
-                Quaternion lCup = Quaternion.LookRotation(Quaternion.AngleAxis(25f, Vector3.up) * Vector3.ProjectOnPlane(Vector3.forward, lHandleUp), lHandleUp);
-                Quaternion lCupHand = lCup * Quaternion.Inverse(lLeft.basis);
-                Vector3 lCupPalm = new Vector3(-0.03f, -0.035f, 0.012f);
+                // Long guns and pistols alike: the support palm up, knuckle line along the barrel, fingers
+                // wrapping up the right side (a pistol: under and around the firing hand's fingers).
+                Quaternion lUnder = Quaternion.LookRotation(Quaternion.AngleAxis(35f, Vector3.forward) * Vector3.right, Vector3.forward);
+                Quaternion lUnderHand = lUnder * Quaternion.Inverse(lLeft.basis);
+                Vector3 lCupPalm = new Vector3(-0.002f, -0.05f, 0.015f);
                 lRig.pistol = new HumanRig.Grip
                 {
                     handPosition = lGripInHand,
                     handRotation = lWeaponInHand,
-                    supportRotation = lCupHand,
-                    supportPosition = lCupPalm - lCupHand * (lLeft.palm + lLeft.palmNormal * 0.012f)
+                    supportRotation = lUnderHand,
+                    supportPosition = lCupPalm - lUnderHand * (lLeft.palm + lLeft.palmNormal * 0.02f)
                 };
 
-                // Long gun: the support palm up under the fore-end, knuckle line along the barrel,
-                // fingers wrapping up its right side.
-                Quaternion lUnder = Quaternion.LookRotation(Quaternion.AngleAxis(35f, Vector3.forward) * Vector3.right, Vector3.forward);
-                Quaternion lUnderHand = lUnder * Quaternion.Inverse(lLeft.basis);
                 Vector3 lForePalm = new Vector3(0f, -0.04f, lRig.foreEnd);
                 lRig.rifle = new HumanRig.Grip
                 {
@@ -622,6 +619,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     supportRotation = lUnderHand,
                     supportPosition = lForePalm - lUnderHand * (lLeft.palm + lLeft.palmNormal * 0.02f)
                 };
+
+                // The left fist of the first-person guard: the firing frame, mirrored hand.
+                lRig.leftFistRotation = lFiring * Quaternion.Inverse(lLeft.basis);
+                lRig.leftPalm = lLeft.palm;
 
                 // A small item between the thumb and the index, lying along the fingers.
                 Transform lHand = lAnimator.GetBoneTransform(HumanBodyBones.RightHand);

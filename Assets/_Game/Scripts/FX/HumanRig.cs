@@ -33,6 +33,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         [Tooltip("A small item between the fingers (coin, card, vial), in the right hand's space.")]
         public Vector3 pinchPosition;
         public Quaternion pinchRotation = Quaternion.identity;
+        [Tooltip("The left hand bone in a forward-facing fist frame (first-person guard), and its palm point.")]
+        public Quaternion leftFistRotation = Quaternion.identity;
+        public Vector3 leftPalm;
         [Tooltip("Eye point in the head bone's space (camera of the first-person arms, look-at origin).")]
         public Vector3 eyeInHead = new Vector3(0f, 0.09f, 0.1f);
 

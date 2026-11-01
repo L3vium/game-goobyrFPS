@@ -29,7 +29,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _camera.backgroundColor = new Color(0.62f, 0.5f, 0.42f);
             UniversalAdditionalCameraData lData = _camera.GetUniversalAdditionalCameraData();
             lData.renderPostProcessing = true;
-            lData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            lData.antialiasing = AntialiasingMode.TemporalAntiAliasing;
             _camera.gameObject.AddComponent<AudioListener>();
 
             BuildSet();

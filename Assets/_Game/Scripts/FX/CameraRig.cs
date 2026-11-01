@@ -76,7 +76,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _lowPass.cutoffFrequency = 22000f;
             UniversalAdditionalCameraData lWorldData = WorldCamera.GetUniversalAdditionalCameraData();
             lWorldData.renderPostProcessing = true;
-            lWorldData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            lWorldData.antialiasing = AntialiasingMode.TemporalAntiAliasing;
 
             GameObject lView = new GameObject("ViewCamera");
             lView.transform.SetParent(lWorld.transform, false);

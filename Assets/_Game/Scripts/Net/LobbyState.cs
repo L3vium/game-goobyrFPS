@@ -24,6 +24,8 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         public readonly NetworkVariable<float> TimeLimitMinutes = new NetworkVariable<float>(20f);
         public readonly NetworkVariable<MatchPhase> Phase = new NetworkVariable<MatchPhase>(MatchPhase.Lobby);
         public readonly NetworkVariable<int> AiDifficulty = new NetworkVariable<int>(1);
+        /// <summary>Time of day of the contract (<see cref="FX.TimeOfDay"/>): 0 dawn, 1 noon, 2 dusk, 3 night.</summary>
+        public readonly NetworkVariable<int> TimeOfDay = new NetworkVariable<int>(1);
 
         public MapDefinition Map => GameDatabase.Map(MapIndex.Value);
 

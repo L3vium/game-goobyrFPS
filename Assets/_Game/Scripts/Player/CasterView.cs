@@ -124,7 +124,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 lCamera.cullingMask = ~(1 << GameLayers.LOCAL_VIEW);
                 UniversalAdditionalCameraData lData = lCamera.GetUniversalAdditionalCameraData();
                 lData.renderPostProcessing = true;
-                lData.antialiasing = AntialiasingMode.FastApproximateAntialiasing;
+                lData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
                 _feeds[i] = new Feed { camera = lCamera };
                 // Every feed starts where the eye was (the death cam, or the rig's spot for a caster).
                 if (_rig != null)

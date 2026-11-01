@@ -119,13 +119,35 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // Order matters: the instinct grade runs after the fog, both before post-processing.
             InstallFeature<FX.Rendering.VolumetricFogFeature>(lRenderer, "Goobyr Volumetric Fog", "Hidden/Goobyr/VolumetricFog");
             InstallFeature<FX.Rendering.InstinctFeature>(lRenderer, "Goobyr Instinct", "Hidden/Goobyr/Instinct");
-            // Softer, longer shadows for the bigger maps.
+            // Decals: blood, scorch marks, grime on the realistic surfaces.
+            if (!lRenderer.rendererFeatures.Exists(f => f is UnityEngine.Rendering.Universal.DecalRendererFeature))
+                AddFeature<UnityEngine.Rendering.Universal.DecalRendererFeature>(lRenderer, "Decals");
+            // Contact shadows in the corners: a deeper, wider ambient occlusion.
+            UnityEngine.Rendering.Universal.ScriptableRendererFeature lSsao = lRenderer.rendererFeatures.Find(f => f != null && f.GetType().Name == "ScreenSpaceAmbientOcclusion");
+            if (lSsao != null)
+            {
+                SerializedObject lSo = new SerializedObject(lSsao);
+                SerializedProperty lSettings = lSo.FindProperty("m_Settings");
+                if (lSettings != null)
+                {
+                    lSettings.FindPropertyRelative("Intensity").floatValue = 0.9f;
+                    lSettings.FindPropertyRelative("Radius").floatValue = 0.45f;
+                    SerializedProperty lDirect = lSettings.FindPropertyRelative("DirectLightingStrength");
+                    if (lDirect != null) lDirect.floatValue = 0.3f;
+                    lSo.ApplyModifiedPropertiesWithoutUndo();
+                }
+            }
+            // Long, crisp shadows: 4096 maps over 180 m in four cascades.
             UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset lAsset = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset>(EditorAssets.ROOT + "/Settings/PC_RPAsset.asset");
             if (lAsset != null)
             {
-                lAsset.shadowDistance = 140f;
+                lAsset.shadowDistance = 180f;
                 lAsset.shadowCascadeCount = 4;
                 lAsset.supportsCameraDepthTexture = true;
+                lAsset.supportsCameraOpaqueTexture = true;
+                lAsset.mainLightShadowmapResolution = 4096;
+                lAsset.shadowDepthBias = 0.6f;
+                lAsset.shadowNormalBias = 0.6f;
                 EditorUtility.SetDirty(lAsset);
             }
             AssetDatabase.SaveAssets();
@@ -156,6 +178,21 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lSerialized.ApplyModifiedPropertiesWithoutUndo();
             lFeature.Create();
             pRenderer.SetDirty();
+            EditorUtility.SetDirty(pRenderer);
+        }
+
+        private static void AddFeature<T>(UnityEngine.Rendering.Universal.UniversalRendererData pRenderer, string pName) where T : UnityEngine.Rendering.Universal.ScriptableRendererFeature
+        {
+            T lFeature = ScriptableObject.CreateInstance<T>();
+            lFeature.name = pName;
+            AssetDatabase.AddObjectToAsset(lFeature, pRenderer);
+            pRenderer.rendererFeatures.Add(lFeature);
+            SerializedObject lRendererData = new SerializedObject(pRenderer);
+            SerializedProperty lMap = lRendererData.FindProperty("m_RendererFeatureMap");
+            lMap.arraySize++;
+            lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = lFeature.GetInstanceID();
+            lRendererData.ApplyModifiedPropertiesWithoutUndo();
+            lFeature.Create();
             EditorUtility.SetDirty(pRenderer);
         }
 

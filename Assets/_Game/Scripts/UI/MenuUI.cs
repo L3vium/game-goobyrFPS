@@ -40,6 +40,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private RawImage _mapPicture;
         private GameObject _mapArrows, _teamsRow, _teamPicker;
         private System.Action<string> _setTeamCount;
+        private System.Action<string> _setTime;
+        private GameObject _timeRow;
         private readonly List<(Button button, Image back, Image bar, MatchMode mode)> _modeCards = new List<(Button, Image, Image, MatchMode)>();
         private readonly List<(RectTransform row, Image bar, TextMeshProUGUI name, TextMeshProUGUI team, TextMeshProUGUI state)> _agents = new List<(RectTransform, Image, TextMeshProUGUI, TextMeshProUGUI, TextMeshProUGUI)>();
         private Screen _current;
@@ -282,6 +284,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             RectTransform lOptions = UIWidgets.List(p, "Options", TL, new Vector2(790 + 290, -560), 580f);
             _teamsRow = UIWidgets.Row(lOptions, "Teams").gameObject;
             _setTeamCount = StepperInRow((RectTransform)_teamsRow.transform, "Number of teams", d => ChangeTeams(d));
+            RectTransform lTimeRow = UIWidgets.Row(lOptions, "Time of day");
+            _timeRow = lTimeRow.gameObject;
+            _setTime = StepperInRow(lTimeRow, "Time of day", d => ChangeTime(d));
             RectTransform lPicker = UIWidgets.Row(lOptions, "Your team");
             _teamPicker = lPicker.gameObject;
             for (int i = 0; i < MatchRulesLogic.MAX_TEAMS; i++)
@@ -377,6 +382,14 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             lState.ResolveTeams();
         }
 
+        private void ChangeTime(int pDelta)
+        {
+            LobbyState lState = LobbyState.Instance;
+            if (lState == null || !lState.IsServer) return;
+            int lCount = FX.TimeOfDay.Names.Length;
+            lState.TimeOfDay.Value = ((lState.TimeOfDay.Value + pDelta) % lCount + lCount) % lCount;
+        }
+
         private void ChangeTeams(int pDelta)
         {
             LobbyState lState = LobbyState.Instance;
@@ -432,6 +445,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
             _teamsRow.SetActive(lTeams && lHost);
             _setTeamCount(lState.TeamCount.Value.ToString());
+            _setTime(FX.TimeOfDay.Names[Mathf.Clamp(lState.TimeOfDay.Value, 0, FX.TimeOfDay.Names.Length - 1)]);
+            foreach (Button lButton in _timeRow.GetComponentsInChildren<Button>()) lButton.interactable = lHost;
             _teamPicker.SetActive(lTeams);
             for (int i = 0; i < MatchRulesLogic.MAX_TEAMS; i++) _teamPicker.transform.GetChild(_teamPicker.transform.childCount - MatchRulesLogic.MAX_TEAMS + i).gameObject.SetActive(i < lState.TeamCount.Value);
             _shuffle.transform.parent.gameObject.SetActive(lTeams && lHost);

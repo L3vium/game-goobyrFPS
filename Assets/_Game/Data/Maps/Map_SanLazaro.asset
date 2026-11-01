@@ -1,0 +1,221 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20a0cbba64d121042a7eac77e6a42e9a, type: 3}
+  m_Name: Map_SanLazaro
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.MapDefinition
+  displayName: "San L\xE1zaro"
+  sceneName: Map_SanLazaro
+  description: 'A Colombian river town on fiesta day: the plaza and the church, five
+    coffee terraces climbing to an airstrip on the ridge, and the white Hacienda
+    La Cumbre with its mirador over the gorge.'
+  zoneNames:
+  - Pueblo
+  - Cafetal & Airstrip
+  - Hacienda La Cumbre
+  skyTop: {r: 0.24, g: 0.48, b: 0.84, a: 1}
+  skyHorizon: {r: 0.84, g: 0.89, b: 0.9, a: 1}
+  fog: {r: 0.624, g: 0.678, b: 0.676, a: 1}
+  sun: {r: 1, g: 0.95, b: 0.86, a: 1}
+  ambient: {r: 0.40499997, g: 0.51375, b: 0.65250003, a: 0.75}
+  sunIntensity: 2.2
+  sunEuler: {x: 55, y: 30, z: 0}
+  fogDensity: 0.0012
+  hazeColor: {r: 1, g: 0.88, b: 0.72, a: 1}
+  cloudShade: {r: 0.58, g: 0.64, b: 0.74, a: 1}
+  cloudCoverage: 0.5
+  volumetricDensity: 0.006
+  volumetricHeight: 0
+  volumetricFalloff: 22
+  volumetricAmbient: {r: 0.3, g: 0.36, b: 0.34, a: 1}
+  sunScattering: 0.9
+  temperature: 4
+  tint: 0
+  saturation: 14
+  contrast: 12
+  postExposure: -0.15
+  shadowsTint: {r: 0.9, g: 0.95, b: 1.08, a: 1}
+  highlightsTint: {r: 1.06, g: 1.02, b: 0.94, a: 1}
+  planFloors:
+  - {fileID: 2800000, guid: 9eecbc57a2012544892b3b26a273c360, type: 3}
+  - {fileID: 2800000, guid: 443d4076c97691146a24ba34f701ec2a, type: 3}
+  - {fileID: 2800000, guid: 37c6268feb179c94e9b2e5dde87d3949, type: 3}
+  - {fileID: 2800000, guid: 73d6eb9e4c1f6c14aad08bfae45eaaaa, type: 3}
+  planOrigin: {x: -250, y: -250}
+  planSize: 500
+  planStorey: 3.6
+  targets:
+  - displayName: "Do\xF1a Celestina Ruiz"
+    dossier: Sponsors the fiesta, launders the cartel's coffee money. Stage, cantina,
+      bell deck, dock.
+    zone: 0
+    bodyColor: {r: 0.7529412, g: 0.22352941, b: 0.16862746, a: 1}
+    hat: 0
+    scale: 1.05
+    character: 
+    bodyguards: 2
+    proof: 1
+    routine: 0b000000010000000900000000000000
+    enabled: 1
+  - displayName: Fabio 'El Mono' Rengifo
+    dossier: Owns the cantina and the smugglers' cave under it.
+    zone: 0
+    bodyColor: {r: 0.9019608, g: 0.49411765, b: 0.13333334, a: 1}
+    hat: 2
+    scale: 1.15
+    character: 
+    bodyguards: 2
+    proof: 5
+    routine: 01000000050000000300000002000000
+    enabled: 1
+  - displayName: Inspector Gilma Pardo
+    dossier: The pueblo's police chief. Paid by everyone.
+    zone: 0
+    bodyColor: {r: 0.18039216, g: 0.2509804, b: 0.3254902, a: 1}
+    hat: 2
+    scale: 1.1
+    character: 
+    bodyguards: 2
+    proof: 4
+    routine: 03000000060000000800000007000000
+    enabled: 1
+  - displayName: "Wilber Casta\xF1o"
+    dossier: Boatman. Runs the river for whoever pays.
+    zone: 0
+    bodyColor: {r: 0.12156863, g: 0.38039216, b: 0.5529412, a: 1}
+    hat: 5
+    scale: 1.1
+    character: 
+    bodyguards: 1
+    proof: 0
+    routine: 000000000a0000000700000001000000
+    enabled: 1
+  - displayName: Mayor Hernando Lozada
+    dossier: Opens the fiesta, signs whatever the hacienda sends down.
+    zone: 0
+    bodyColor: {r: 0.95686275, g: 0.8156863, b: 0.24705882, a: 1}
+    hat: 1
+    scale: 1.15
+    character: 
+    bodyguards: 2
+    proof: 3
+    routine: 0b000000050000000600000004000000
+    enabled: 1
+  - displayName: Ilse Varga
+    dossier: The buyer. Flies in, tastes the coffee, buys the rest.
+    zone: 1
+    bodyColor: {r: 0.35686275, g: 0.17254902, b: 0.43529412, a: 1}
+    hat: 3
+    scale: 1.05
+    character: 
+    bodyguards: 2
+    proof: 2
+    routine: 08000000060000000100000005000000
+    enabled: 1
+  - displayName: Captain Rodrigo Duarte
+    dossier: Commands the airstrip's sicarios. Sees through every pass.
+    zone: 1
+    bodyColor: {r: 0.3019608, g: 0.3372549, b: 0.3372549, a: 1}
+    hat: 3
+    scale: 1.25
+    character: 
+    bodyguards: 3
+    proof: 3
+    routine: 0900000008000000070000000a000000
+    enabled: 1
+  - displayName: "Nelson Arbel\xE1ez"
+    dossier: The capataz. Every picker owes him a week.
+    zone: 1
+    bodyColor: {r: 0.49411765, g: 0.31764707, b: 0.03529412, a: 1}
+    hat: 5
+    scale: 1.15
+    character: 
+    bodyguards: 2
+    proof: 0
+    routine: 040000000b0000000700000002000000
+    enabled: 1
+  - displayName: Lucho Guerrero
+    dossier: Pilot. Never sober on the ground.
+    zone: 1
+    bodyColor: {r: 0.06666667, g: 0.47058824, b: 0.39215687, a: 1}
+    hat: 2
+    scale: 1.05
+    character: 
+    bodyguards: 1
+    proof: 0
+    routine: 0500000008000000010000000a000000
+    enabled: 1
+  - displayName: "Dra. Amparo Rinc\xF3n"
+    dossier: The chemist behind the 'fungicide'.
+    zone: 1
+    bodyColor: {r: 0.8352941, g: 0.85882354, b: 0.85882354, a: 1}
+    hat: 0
+    scale: 1
+    character: 
+    bodyguards: 2
+    proof: 5
+    routine: 03000000040000000100000002000000
+    enabled: 1
+  - displayName: Don Ramiro Elizalde
+    dossier: "The patr\xF3n. Study, toast on the loggia, chapel, dinner."
+    zone: 2
+    bodyColor: {r: 0.972549, g: 0.9764706, b: 0.9764706, a: 1}
+    hat: 1
+    scale: 1.15
+    character: 
+    bodyguards: 2
+    proof: 1
+    routine: 030000000b0000000000000005000000
+    enabled: 1
+  - displayName: Teodoro Aranda
+    dossier: The accountant. Counts the vault, drinks his coffee, checks the wine.
+    zone: 2
+    bodyColor: {r: 0.3372549, g: 0.39607844, b: 0.4509804, a: 1}
+    hat: 0
+    scale: 1
+    character: 
+    bodyguards: 1
+    proof: 5
+    routine: 03000000010000000800000002000000
+    enabled: 1
+  - displayName: Valentina Elizalde
+    dossier: The heir. Runs the reception like a campaign.
+    zone: 2
+    bodyColor: {r: 0.6627451, g: 0.19607843, b: 0.14901961, a: 1}
+    hat: 3
+    scale: 1
+    character: 
+    bodyguards: 2
+    proof: 1
+    routine: 04000000010000000500000006000000
+    enabled: 1
+  - displayName: Celso Ibarra
+    dossier: The mayordomo. Knows every door and who opens it.
+    zone: 2
+    bodyColor: {r: 0.15686275, g: 0.21568628, b: 0.2784314, a: 1}
+    hat: 0
+    scale: 1.05
+    character: 
+    bodyguards: 1
+    proof: 3
+    routine: 08000000060000000500000007000000
+    enabled: 1
+  - displayName: "Senator Octavio Pe\xF1alosa"
+    dossier: Guest of honour. Sells the valley's roads.
+    zone: 2
+    bodyColor: {r: 0.101960786, g: 0.32156864, b: 0.4627451, a: 1}
+    hat: 8
+    scale: 1.15
+    character: 
+    bodyguards: 3
+    proof: 2
+    routine: 0b000000010000000400000002000000
+    enabled: 1

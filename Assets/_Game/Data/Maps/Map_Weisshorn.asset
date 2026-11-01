@@ -1,0 +1,217 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 20a0cbba64d121042a7eac77e6a42e9a, type: 3}
+  m_Name: Map_Weisshorn
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.MapDefinition
+  displayName: Weisshorn
+  sceneName: Map_Weisshorn
+  description: 'An alpine gala night: the chalet village by the frozen lake, the
+    pistes and the chairlift, the Grand Hotel on its platform and the cold-war observatory
+    on the summit.'
+  zoneNames:
+  - Sankt Anna
+  - Ski Area & Observatory
+  - Grand Hotel Weisshorn
+  skyTop: {r: 0.3, g: 0.46, b: 0.76, a: 1}
+  skyHorizon: {r: 0.86, g: 0.9, b: 0.95, a: 1}
+  fog: {r: 0.668, g: 0.708, b: 0.77, a: 1}
+  sun: {r: 1, g: 0.97, b: 0.94, a: 1}
+  ambient: {r: 0.43500003, g: 0.51, b: 0.64125, a: 0.75}
+  sunIntensity: 2
+  sunEuler: {x: 32, y: 40, z: 0}
+  fogDensity: 0.0012
+  hazeColor: {r: 1, g: 0.92, b: 0.85, a: 1}
+  cloudShade: {r: 0.58, g: 0.64, b: 0.74, a: 1}
+  cloudCoverage: 0.45
+  volumetricDensity: 0.006
+  volumetricHeight: 0
+  volumetricFalloff: 24
+  volumetricAmbient: {r: 0.38, g: 0.42, b: 0.5, a: 1}
+  sunScattering: 0.8
+  temperature: -6
+  tint: 0
+  saturation: 14
+  contrast: 12
+  postExposure: -0.15
+  shadowsTint: {r: 0.9, g: 0.95, b: 1.08, a: 1}
+  highlightsTint: {r: 1.06, g: 1.02, b: 0.94, a: 1}
+  planFloors: []
+  planOrigin: {x: 0, y: 0}
+  planSize: 500
+  planStorey: 3.4
+  targets:
+  - displayName: Mara Lindqvist
+    dossier: The banker. Fondue at the Gasthaus before the gala, always the same
+      table.
+    zone: 0
+    bodyColor: {r: 0.12156863, g: 0.38039216, b: 0.5529412, a: 1}
+    hat: 3
+    scale: 1
+    character: 
+    bodyguards: 2
+    proof: 2
+    routine: 05000000010000000600000000000000
+    enabled: 1
+  - displayName: Mayor Gerhard Moll
+    dossier: Sold the mountain to the hotel, one permit at a time.
+    zone: 0
+    bodyColor: {r: 0.48235294, g: 0.14117648, b: 0.10980392, a: 1}
+    hat: 1
+    scale: 1.15
+    character: 
+    bodyguards: 2
+    proof: 5
+    routine: 0b000000050000000300000002000000
+    enabled: 1
+  - displayName: Lotte Brenner
+    dossier: The landlady. Hears everything the skiers say.
+    zone: 0
+    bodyColor: {r: 0.7176471, g: 0.58431375, b: 0.043137256, a: 1}
+    hat: 0
+    scale: 1.05
+    character: 
+    bodyguards: 1
+    proof: 0
+    routine: 03000000010000000700000004000000
+    enabled: 1
+  - displayName: Inspector Rainer Huber
+    dossier: The gendarme who never sees the snowcats at night.
+    zone: 0
+    bodyColor: {r: 0.18039216, g: 0.2509804, b: 0.3254902, a: 1}
+    hat: 2
+    scale: 1.15
+    character: 
+    bodyguards: 2
+    proof: 4
+    routine: 08000000070000000900000006000000
+    enabled: 1
+  - displayName: Pascal Imboden
+    dossier: Rents skis. Rents other things to the hotel's guests.
+    zone: 0
+    bodyColor: {r: 0.06666667, g: 0.47058824, b: 0.39215687, a: 1}
+    hat: 7
+    scale: 1.05
+    character: 
+    bodyguards: 1
+    proof: 0
+    routine: 0a000000000000000100000005000000
+    enabled: 1
+  - displayName: Viktor Sorel
+    dossier: Arms dealer. Cable car, bunker, the bar, a cigar on the terrace.
+    zone: 1
+    bodyColor: {r: 0.2901961, g: 0.13725491, b: 0.3529412, a: 1}
+    hat: 1
+    scale: 1.15
+    character: 
+    bodyguards: 3
+    proof: 2
+    routine: 08000000060000000700000001000000
+    enabled: 1
+  - displayName: Dr. Elias Frey
+    dossier: Runs the observatory. The telescope looks at the hotel.
+    zone: 1
+    bodyColor: {r: 0.8156863, g: 0.827451, b: 0.83137256, a: 1}
+    hat: 0
+    scale: 1
+    character: 
+    bodyguards: 1
+    proof: 0
+    routine: 03000000090000000500000002000000
+    enabled: 1
+  - displayName: Captain Lars Wenger
+    dossier: Commands the bunker for whoever pays this winter.
+    zone: 1
+    bodyColor: {r: 0.25882354, g: 0.28627452, b: 0.28627452, a: 1}
+    hat: 3
+    scale: 1.25
+    character: 
+    bodyguards: 3
+    proof: 3
+    routine: 08000000030000000a00000007000000
+    enabled: 1
+  - displayName: Annika Roth
+    dossier: Ski instructor and courier. The pistes are her office.
+    zone: 1
+    bodyColor: {r: 0.7529412, g: 0.22352941, b: 0.16862746, a: 1}
+    hat: 7
+    scale: 1
+    character: 
+    bodyguards: 1
+    proof: 0
+    routine: 0a000000010000000b00000000000000
+    enabled: 1
+  - displayName: Bruno Gasser
+    dossier: Drives the groomer. Moves crates nobody declares.
+    zone: 1
+    bodyColor: {r: 0.627451, g: 0.2509804, b: 0, a: 1}
+    hat: 2
+    scale: 1.2
+    character: 
+    bodyguards: 1
+    proof: 5
+    routine: 08000000040000000700000002000000
+    enabled: 1
+  - displayName: Konrad Aschauer
+    dossier: The host. Suite, cinema, the speech under the chandelier, the sauna.
+    zone: 2
+    bodyColor: {r: 0.09019608, g: 0.1254902, b: 0.16470589, a: 1}
+    hat: 8
+    scale: 1.15
+    character: 
+    bodyguards: 3
+    proof: 1
+    routine: 03000000000000000b0000000a000000
+    enabled: 1
+  - displayName: Chief Brandt
+    dossier: Hotel security. Inspects everything, trusts nothing.
+    zone: 2
+    bodyColor: {r: 0.15686275, g: 0.21568628, b: 0.2784314, a: 1}
+    hat: 2
+    scale: 1.2
+    character: 
+    bodyguards: 2
+    proof: 3
+    routine: 03000000080000000700000006000000
+    enabled: 1
+  - displayName: Sabine Aschauer
+    dossier: The host's wife. The real owner of the hotel.
+    zone: 2
+    bodyColor: {r: 0.57254905, g: 0.16862746, b: 0.12941177, a: 1}
+    hat: 0
+    scale: 1
+    character: 
+    bodyguards: 2
+    proof: 1
+    routine: 01000000040000000500000002000000
+    enabled: 1
+  - displayName: Dmitri Volkov
+    dossier: VIP guest. Buys the observatory's data.
+    zone: 2
+    bodyColor: {r: 0.10980392, g: 0.15686275, b: 0.2, a: 1}
+    hat: 1
+    scale: 1.2
+    character: 
+    bodyguards: 3
+    proof: 2
+    routine: 01000000060000000900000005000000
+    enabled: 1
+  - displayName: Celeste Morel
+    dossier: The gala singer. Carries messages in her songs.
+    zone: 2
+    bodyColor: {r: 0.9607843, g: 0.7176471, b: 0.69411767, a: 1}
+    hat: 0
+    scale: 1
+    character: 
+    bodyguards: 1
+    proof: 0
+    routine: 0b000000010000000200000000000000
+    enabled: 1

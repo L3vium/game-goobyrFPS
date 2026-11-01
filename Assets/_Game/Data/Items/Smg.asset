@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c8f7e51f3b3ee944b9e257aa40147e3, type: 3}
   m_Name: Smg
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.ItemDefinition
-  displayName: Buzz SMG
+  displayName: SMG
   kind: 3
   slot: 0
   color: {r: 0.95, g: 0.85, b: 0.3, a: 1}
@@ -31,7 +31,7 @@ MonoBehaviour:
   recoil: 0.9
   adsFov: 64
   shake: 0.1
-  noiseRadius: 55
+  noiseRadius: 45
   projectileSpeed: 0
   explosionRadius: 0
   throwForce: 18

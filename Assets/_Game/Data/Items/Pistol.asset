@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c8f7e51f3b3ee944b9e257aa40147e3, type: 3}
   m_Name: Pistol
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.ItemDefinition
-  displayName: Bark Pistol
+  displayName: Pistol
   kind: 1
   slot: 0
   color: {r: 0.9, g: 0.6, b: 0.3, a: 1}
@@ -31,7 +31,7 @@ MonoBehaviour:
   recoil: 1.8
   adsFov: 62
   shake: 0.12
-  noiseRadius: 45
+  noiseRadius: 40
   projectileSpeed: 0
   explosionRadius: 0
   throwForce: 18

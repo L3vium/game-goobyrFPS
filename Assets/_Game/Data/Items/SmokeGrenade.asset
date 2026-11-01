@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c8f7e51f3b3ee944b9e257aa40147e3, type: 3}
   m_Name: SmokeGrenade
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.ItemDefinition
-  displayName: Smoke Can
+  displayName: Smoke Grenade
   kind: 10
   slot: 1
   color: {r: 0.7, g: 0.75, b: 0.8, a: 1}

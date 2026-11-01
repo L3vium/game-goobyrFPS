@@ -11,6 +11,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
     /// </summary>
     public static class Effects
     {
+        /// <summary>Colour of the spray a bullet or a blow throws out of a body.</summary>
+        public static readonly Color Blood = new Color(0.42f, 0.03f, 0.03f);
+
         private static readonly Dictionary<string, Queue<ParticleSystem>> _pools = new Dictionary<string, Queue<ParticleSystem>>();
         private static Transform _root;
 

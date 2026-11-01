@@ -220,8 +220,10 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                         Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
                         if (lTarget != null && lTarget.IsAlive)
                         {
-                            UI.Hud.Hitmarker(lTarget.IsHeadshot(lHit.point));
-                            Effects.Fluff(lHit.point, -lDir, new Color(1f, 0.9f, 0.8f), false);
+                            bool lHead = lTarget.IsHeadshot(lHit.point);
+                            UI.Hud.Hitmarker(lHead);
+                            if (lHead) Juice.Kill(true);
+                            Effects.Fluff(lHit.point, -lDir, Effects.Blood, lHead);
                         }
                         else Effects.Impact(lHit.point, lHit.normal, new Color(0.75f, 0.7f, 0.6f));
                     }

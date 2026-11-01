@@ -1280,7 +1280,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             HitFlash.Play(_body);
             _animator?.Shove(pDirection * 0.6f);
-            Effects.Fluff(pPoint, -pDirection, _body != null ? _body.BodyColor : Color.white, pHeadshot);
+            Effects.Fluff(pPoint, -pDirection, Effects.Blood, pHeadshot);
         }
 
         private void HandleDeathClient(Vector3 pImpulse, Vector3 pPoint, DamageType pType)

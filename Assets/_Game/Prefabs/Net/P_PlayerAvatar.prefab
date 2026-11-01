@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &2859696296017844361
+--- !u!1 &2730118939493670283
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,23 +8,23 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1806423568730606461}
-  - component: {fileID: 7103496541806218291}
-  - component: {fileID: 1275394795117896359}
+  - component: {fileID: 1119636093357712105}
+  - component: {fileID: 8733412514950733953}
+  - component: {fileID: 7252460285987459555}
   m_Layer: 8
-  m_Name: Goob
+  m_Name: Body
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1806423568730606461
+--- !u!4 &1119636093357712105
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2859696296017844361}
+  m_GameObject: {fileID: 2730118939493670283}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -33,51 +33,33 @@ Transform:
   m_Children: []
   m_Father: {fileID: 4772706599802477155}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &7103496541806218291
+--- !u!114 &8733412514950733953
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2859696296017844361}
+  m_GameObject: {fileID: 2730118939493670283}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bac9e9ec86f71244494de5111b9bd870, type: 3}
+  m_Script: {fileID: 11500000, guid: 413b19bb3af41b448b581aa124d35e53, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.GoobBody
-  _look:
-    outfit: 0
-    head: 0
-    hair: 1
-    facial: 0
-    hat: 0
-    helmet: 0
-    chefHat: 0
-    headset: 0
-    sunglasses: 0
-    earpiece: 0
-    hands: 0
-    feet: 0
-    clothes: {r: 0.9, g: 0.35, b: 0.35, a: 1}
-    skin: {r: 1, g: 0.83, b: 0.7, a: 1}
-    hairColor: {r: 0.25, g: 0.18, b: 0.12, a: 1}
-    hatColor: {r: 0.54, g: 0.21000001, b: 0.21000001, a: 0.6}
-    scale: 1
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.HumanBody
+  _character: Chr_Agent
   _buildOnAwake: 1
---- !u!114 &1275394795117896359
+  _culling: 0
+--- !u!114 &7252460285987459555
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2859696296017844361}
+  m_GameObject: {fileID: 2730118939493670283}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 45b68840d279cca458dd4a3863c92d11, type: 3}
+  m_Script: {fileID: 11500000, guid: 5cfb59164a1044b47a2054eed55fba0a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.GoobAnimator
-  _stepLength: 0.55
-  _stepHeight: 0.16
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.HumanAnimator
 --- !u!1 &6558425513273806661
 GameObject:
   m_ObjectHideFlags: 0
@@ -115,7 +97,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1806423568730606461}
+  - {fileID: 1119636093357712105}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &6969067892809699431
@@ -244,19 +226,30 @@ MonoBehaviour:
   _walkSpeed: 4.4
   _sprintSpeed: 7.2
   _crouchSpeed: 2.3
+  _crawlSpeed: 1.6
   _acceleration: 55
   _airAcceleration: 14
   _jumpHeight: 1.15
   _gravity: -24
   _standHeight: 1.86
   _crouchHeight: 1.1
+  _crawlHeight: 0.74
   _eyeOffset: 0.12
   _slideCooldown: 0.55
-  _crouchSlideBoost: 10.5
-  _walkSlideBoost: 6.2
+  _crouchSlideBoost: 12
+  _walkSlideBoost: 7
+  _sprintSlideFriction: 2.8
+  _walkSlideFriction: 6
+  _swimSpeed: 3
+  _swimSprintSpeed: 4.5
+  _diveSpeed: 2.4
+  _breathTime: 20
   _climbSpeed: 3.2
+  _mantleMinHeight: 0.45
   _mantleMaxHeight: 2.4
-  _mantleTime: 0.32
+  _vaultMaxHeight: 1.3
+  _hangDepth: 2.05
+  _shimmySpeed: 1.3
 --- !u!114 &569474576372632224
 MonoBehaviour:
   m_ObjectHideFlags: 0

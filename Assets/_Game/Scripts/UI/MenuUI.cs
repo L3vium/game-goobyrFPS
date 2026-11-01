@@ -53,7 +53,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             Hud.Remove();
             CasterView.Stop();
             Spectator.Stop();
-            GoobRagdoll.ClearAll();
+            HumanRagdoll.ClearAll();
 
             Canvas lCanvas = UIFactory.Canvas("MenuCanvas", 20);
             lCanvas.transform.SetParent(transform, false);

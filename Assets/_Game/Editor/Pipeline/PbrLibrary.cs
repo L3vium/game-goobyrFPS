@@ -126,6 +126,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         // ---------------------------------------------------------------- textures
 
+        /// <summary>Importer settings and packed metallic maps of one folder (the character builder's entry point).</summary>
+        public static void PrepareFolder(string pDir) => PrepareTextures(pDir);
+
         private static IEnumerable<string> SubFolders(string pPath)
         {
             if (!AssetDatabase.IsValidFolder(pPath)) return Enumerable.Empty<string>();

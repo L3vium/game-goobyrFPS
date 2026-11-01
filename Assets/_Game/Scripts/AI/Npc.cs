@@ -62,6 +62,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public readonly NetworkVariable<int> ZoneIndex = new NetworkVariable<int>(0);
         public readonly NetworkVariable<int> TargetProfile = new NetworkVariable<int>(-1);
         public readonly NetworkVariable<float> AimPitch = new NetworkVariable<float>(0f);
+        /// <summary>What it is busy with while standing (phone, smoke, looking around...), for the animation.</summary>
+        public readonly NetworkVariable<BodyPose> Pose = new NetworkVariable<BodyPose>(BodyPose.None);
         /// <summary>The client filling this NPC's gauge or being confronted by it (HUD arcs and status); <see cref="NO_SUSPECT"/> otherwise.</summary>
         public readonly NetworkVariable<ulong> Suspect = new NetworkVariable<ulong>(NO_SUSPECT);
         public const ulong NO_SUSPECT = ulong.MaxValue;
@@ -88,8 +90,10 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public Vector3 Eye => transform.position + Vector3.up * 1.55f * transform.localScale.y;
 
         private NavMeshAgent _agent;
-        private GoobBody _body;
-        private GoobAnimator _animator;
+        private HumanBody _body;
+        private HumanAnimator _animator;
+        private Vector3? _castPoint;
+        private bool _takedownVictim;
         private NpcVisuals _visuals;
 
         // ---------------------------------------------------------------- host-side brain state
@@ -150,8 +154,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             Health = GetComponent<Damageable>();
             _agent = GetComponent<NavMeshAgent>();
-            _body = GetComponentInChildren<GoobBody>();
-            _animator = GetComponentInChildren<GoobAnimator>();
+            _body = GetComponentInChildren<HumanBody>();
+            _animator = GetComponentInChildren<HumanAnimator>();
             _visuals = GetComponent<NpcVisuals>();
         }
 
@@ -224,62 +228,75 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
         }
 
+        /// <summary>
+        /// Dresses the NPC: a guard in the map's climate uniform, a bodyguard in a black suit, staff or
+        /// guests for the crowd, the target as its profile says (<see cref="HumanCast"/>).
+        /// </summary>
         private void ApplyLook()
         {
             if (_body == null) return;
             Zone = LevelZone.Get(ZoneIndex.Value);
-            System.Random lRandom = new System.Random((int)NetworkObjectId * 7919 + 13);
-            Color lSkin = GameArt.Vary(new Color(1f, 0.8f, 0.66f), 0.25f, lRandom);
-            if (Role == NpcRole.Target)
-            {
-                MapDefinition lMap = Net.LobbyState.Instance != null ? Net.LobbyState.Instance.Map : null;
-                TargetProfile lProfile = lMap != null && TargetProfile.Value >= 0 && TargetProfile.Value < lMap.targets.Count ? lMap.targets[TargetProfile.Value] : null;
-                Color lColor = lProfile != null ? lProfile.bodyColor : new Color(0.9f, 0.8f, 0.2f);
-                Outfit lOutfit = lProfile == null ? Outfit.Suit : lProfile.zone == 2 ? (TargetProfile.Value % 2 == 0 ? Outfit.Fancy : Outfit.Suit) : lProfile.zone == 1 ? (TargetProfile.Value % 2 == 0 ? Outfit.Biker : Outfit.Military) : (TargetProfile.Value % 3 == 0 ? Outfit.Worker : Outfit.Suit);
-                GoobLook lLook = GoobLook.Random(lRandom, lOutfit, lColor);
-                lLook.skin = lSkin;
-                lLook.hat = lProfile != null ? lProfile.hat : HatStyle.Crown;
-                lLook.hatColor = lColor * 0.45f;
-                lLook.hair = lLook.hat == HatStyle.None ? lLook.hair : Hair.None;
-                lLook.scale = lProfile != null ? lProfile.scale : 1.15f;
-                _body.Configure(lLook);
-            }
-            else
-            {
-                Color lFaction = Zone != null ? Zone.Faction : new Color(0.3f, 0.3f, 0.35f);
-                Outfit lOutfit = Role == NpcRole.Bodyguard ? Outfit.Suit : Role == NpcRole.Lookout ? Outfit.Military : Zone != null ? Zone.FactionOutfit : Outfit.Guard;
-                GoobLook lLook = GoobLook.Random(lRandom, lOutfit, GameArt.Vary(Role == NpcRole.Bodyguard ? new Color(0.16f, 0.16f, 0.2f) : lFaction, 0.12f, lRandom));
-                lLook.skin = lSkin;
-                lLook.hat = Role == NpcRole.Bodyguard ? HatStyle.None : Zone != null ? Zone.FactionHat : HatStyle.Cap;
-                lLook.hatColor = lFaction * 0.55f;
-                lLook.helmet = Role == NpcRole.Lookout;
-                lLook.sunglasses = Role == NpcRole.Bodyguard;
-                lLook.earpiece = Role == NpcRole.Bodyguard || Role == NpcRole.Reinforcement;
-                lLook.hands = Role == NpcRole.Bodyguard || lOutfit == Outfit.Military ? HandStyle.Glove : HandStyle.Mitten;
-                if (lLook.hat != HatStyle.None || lLook.helmet) lLook.hair = Hair.None;
-                lLook.scale = Role == NpcRole.Bodyguard ? 1.12f : lLook.scale;
-                _body.Configure(lLook);
-            }
-            _visuals?.RefreshWeapon();
+            _castPoint ??= transform.position;
+            MapDefinition lMap = Net.LobbyState.Instance != null ? Net.LobbyState.Instance.Map : null;
+            TargetProfile lProfile = Role == NpcRole.Target && lMap != null && TargetProfile.Value >= 0 && TargetProfile.Value < lMap.targets.Count ? lMap.targets[TargetProfile.Value] : null;
+            string lCharacter = HumanCast.ForNpc(Role, NetworkObjectId, _castPoint.Value, lMap, lProfile);
+            // A bodyguard whose principal died turns guard but keeps his suit.
+            if (_body.Built && _body.Character == HumanCast.BODYGUARD && Role == NpcRole.Guard) lCharacter = HumanCast.BODYGUARD;
+            _body.Configure(lCharacter, Color.clear, HumanCast.ScaleFor(NetworkObjectId));
+            _visuals?.RefreshWeapon(true);
+        }
+
+        /// <summary>Host: the standing pose that goes with an activity.</summary>
+        private static BodyPose PoseFor(ActivityType pActivity) => pActivity switch
+        {
+            ActivityType.Phone => BodyPose.Phone,
+            ActivityType.Smoke => BodyPose.Smoke,
+            ActivityType.Inspect or ActivityType.Lookout => BodyPose.LookAround,
+            _ => BodyPose.None
+        };
+
+        /// <summary>Host: what the NPC is busy with while standing, sent to everyone for the animation.</summary>
+        private void UpdatePose()
+        {
+            bool lStopped = !_agent.isOnNavMesh || _agent.isStopped || _agent.velocity.sqrMagnitude < 0.04f;
+            BodyPose lPose = BodyPose.None;
+            if (State.Value == NpcState.Calling) lPose = BodyPose.Phone;
+            else if (State.Value == NpcState.Flee && IsCrowd && lStopped) lPose = BodyPose.Cower;
+            else if (State.Value == NpcState.Routine && _activityNode != null && _waitUntil > 0f && lStopped) lPose = PoseFor(_activityNode.Activity);
+            else if (State.Value == NpcState.Idle && _break != null && _breakUntil > 0f && lStopped) lPose = PoseFor(_break.Activity);
+            else if (State.Value == NpcState.Investigate && lStopped) lPose = BodyPose.LookAround;
+            if (Pose.Value != lPose) Pose.Value = lPose;
+        }
+
+        /// <summary>Every machine: feeds the animation from the networked state.</summary>
+        private void Animate()
+        {
+            if (_animator == null) return;
+            bool lArmed = Weapon != null;
+            NpcState lState = State.Value;
+            _animator.Motion = MotionState.Ground;
+            _animator.AimPitch = AimPitch.Value;
+            _animator.Held = lArmed ? WeaponModels.HeldOf(Weapon) : HeldKind.None;
+            _animator.Aiming = lArmed && (lState == NpcState.Engaged || lState == NpcState.Combat);
+            _animator.Crouched = IsServer && InCombat && _cover != null && _cover.Low && !_targetVisible;
+            _animator.Panic = lState == NpcState.Flee && IsCrowd;
+            _animator.Calling = lState == NpcState.Calling;
+            _animator.Pose = Pose.Value;
+            _animator.Velocity = IsServer && _agent.enabled ? _agent.velocity : (Vector3?)null;
+            PlayerAvatar lSuspect = (lState == NpcState.Suspicious || lState == NpcState.Engaged) && Suspect.Value != NO_SUSPECT ? PlayerAvatar.ForClient(Suspect.Value) : null;
+            _animator.LookAt = lSuspect != null ? lSuspect.Eye : (Vector3?)null;
         }
 
         // ---------------------------------------------------------------- host loop
 
         private void Update()
         {
-            if (_animator != null)
-            {
-                _animator.AimPitch = AimPitch.Value;
-                _animator.HoldingWeapon = Weapon != null && (IsAlerted || State.Value == NpcState.Investigate || Role == NpcRole.Lookout);
-                _animator.Calling = State.Value == NpcState.Calling;
-                _animator.Sick = State.Value == NpcState.Sick;
-                _animator.Panic = State.Value == NpcState.Flee ? 1f : 0f;
-                _animator.Crouched = InCombat && _cover != null && _cover.Low && !_targetVisible;
-            }
+            if (Health.IsAlive) Animate();
 
             if (!IsServer || !IsSpawned || !Health.IsAlive) return;
             float dt = Time.deltaTime;
             _stateTime += dt;
+            UpdatePose();
 
             _perceptionTimer -= dt;
             if (_perceptionTimer <= 0f)
@@ -1264,6 +1281,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             if (!Health.IsAlive) return;
             _silentDeath = true;
+            TakedownRpc();
             Health.Kill(new DamageInfo { type = DamageType.Melee, point = transform.position + Vector3.up * 1.5f, direction = pDirection, attacker = pBy, attackerTeam = pTeam });
         }
 
@@ -1279,17 +1297,42 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void HandleHitClient(float pAmount, Vector3 pPoint, Vector3 pDirection, bool pHeadshot)
         {
             HitFlash.Play(_body);
-            _animator?.Shove(pDirection * 0.6f);
+            _animator?.Hit(pDirection);
             Effects.Fluff(pPoint, -pDirection, Effects.Blood, pHeadshot);
         }
 
+        /// <summary>Everyone: the next death is a takedown (the victim struggles in the choke before going limp).</summary>
+        [Rpc(SendTo.Everyone)]
+        private void TakedownRpc() => _takedownVictim = true;
+
         private void HandleDeathClient(Vector3 pImpulse, Vector3 pPoint, DamageType pType)
         {
-            GoobRagdoll lRagdoll = GoobRagdoll.Spawn(_body, pImpulse, pPoint);
-            if (lRagdoll != null && IsTarget) Match.MatchDirector.RegisterTargetRagdoll(lRagdoll);
             _visuals?.HideAll();
             foreach (Collider lCollider in GetComponentsInChildren<Collider>()) lCollider.enabled = false;
             Audio.Sfx.Play(pType == DamageType.Melee ? "thud" : "death", transform.position, 0.9f, 25f);
+            if (_takedownVictim && pType == DamageType.Melee && _animator != null)
+            {
+                _animator.Takedown(true);
+                StartCoroutine(GoLimp(1.5f, pImpulse * 0.2f, pPoint));
+                return;
+            }
+            if (pType == DamageType.Bullet || pType == DamageType.Explosion) Effects.Fluff(pPoint, pImpulse.normalized, Effects.Blood, true);
+            GoLimpNow(pImpulse, pPoint);
+        }
+
+        private System.Collections.IEnumerator GoLimp(float pDelay, Vector3 pImpulse, Vector3 pPoint)
+        {
+            yield return new WaitForSeconds(pDelay);
+            GoLimpNow(pImpulse, pPoint);
+        }
+
+        private void GoLimpNow(Vector3 pImpulse, Vector3 pPoint)
+        {
+            Vector3 lVelocity = _animator != null ? _animator.MeasuredVelocity : Vector3.zero;
+            HumanRagdoll lRagdoll = HumanRagdoll.Spawn(_body, pImpulse, pPoint, lVelocity);
+            if (lRagdoll == null) return;
+            HitFlash.Play(lRagdoll.gameObject, 1.2f);
+            if (IsTarget) Match.MatchDirector.RegisterTargetRagdoll(lRagdoll);
         }
 
         [Rpc(SendTo.Everyone)]

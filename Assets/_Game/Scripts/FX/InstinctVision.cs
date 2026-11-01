@@ -164,7 +164,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             foreach (Renderer lRenderer in _buffer) if (!IsGlow(lRenderer)) Add(lRenderer, pSlot);
         }
 
-        private static void AddBody(GoobBody pBody, Slot pSlot)
+        private static void AddBody(HumanBody pBody, Slot pSlot)
         {
             if (pBody == null || pBody.Renderers == null) return;
             foreach (Renderer lRenderer in pBody.Renderers) Add(lRenderer, pSlot);

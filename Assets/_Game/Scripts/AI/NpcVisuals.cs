@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Com.IsartDigital.GoobyrFPS.Core;
 using Com.IsartDigital.GoobyrFPS.FX;
 using Com.IsartDigital.GoobyrFPS.Weapons;
@@ -19,17 +20,17 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private void Awake() => _npc = GetComponent<Npc>();
 
-        public void RefreshWeapon()
+        public void RefreshWeapon(bool pForce = false)
         {
-            GoobBody lBody = GetComponentInChildren<GoobBody>();
+            HumanBody lBody = GetComponentInChildren<HumanBody>();
             if (lBody == null || lBody.WeaponSocket == null) return;
             int lItem = _npc.WeaponItem.Value;
-            if (lItem == _weaponItem && _weaponModel != null) return;
+            if (lItem == _weaponItem && _weaponModel != null && !pForce) return;
             _weaponItem = lItem;
             if (_weaponModel != null) Destroy(_weaponModel);
             if (_npc.Weapon == null) return;
+            lBody.SetHeld(WeaponModels.HeldOf(_npc.Weapon));
             _weaponModel = WeaponModels.Build(_npc.Weapon, lBody.WeaponSocket, GameLayers.NPC);
-            _weaponModel.transform.localScale = Vector3.one * 1.3f;
         }
 
         public void HideAll()
@@ -39,13 +40,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private void LateUpdate()
         {
-            if (_weaponModel == null && _npc.Weapon != null && _npc.Health.IsAlive) RefreshWeapon();
+            if ((_weaponModel == null || _weaponModel.transform.parent == null) && _npc.Weapon != null && _npc.Health.IsAlive) RefreshWeapon(true);
             if (!_npc.Health.IsAlive) enabled = false;
         }
     }
 
     /// <summary>
-    /// The hunted player's "shadow": a translucent Goob standing where the NPCs believe the player
+    /// The hunted player's "shadow": a translucent agent standing where the NPCs believe the player
     /// is. Shown only to that player, only while they are out of sight - move away from it and
     /// the guards will keep shooting at an empty spot.
     /// </summary>
@@ -76,13 +77,25 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             _visual = new GameObject("Silhouette").transform;
             _visual.SetParent(transform, false);
-            Mesh lBlob = LowPolyMesh.Cached("goob.blob", () => LowPolyMesh.Blob(1.25f, 3));
-            Mesh lSphere = LowPolyMesh.Cached("goob.sphere", () => LowPolyMesh.Icosphere(1));
-            Color lColor = new Color(0.55f, 0.6f, 1f, 0.35f);
-            GameArt.Part(_visual, "Body", lBlob, new Vector3(0, 0.78f, 0), new Vector3(0.72f, 0.75f, 0.6f), lColor, GameArt.Transparent);
-            GameArt.Part(_visual, "Head", lSphere, new Vector3(0, 1.42f, 0), Vector3.one * 0.5f, lColor, GameArt.Transparent);
-            _renderers = _visual.GetComponentsInChildren<Renderer>();
-            foreach (Renderer lRenderer in _renderers) lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            // The agent's body, standing, in a flat translucent blue.
+            GameObject lSource = Data.ArtRegistry.Get(HumanCast.AGENT);
+            if (lSource != null)
+            {
+                GameObject lModel = Instantiate(lSource, _visual, false);
+                Animator lAnimator = lModel.GetComponent<Animator>();
+                if (lAnimator != null) { lAnimator.runtimeAnimatorController = HumanBody.Controller; lAnimator.applyRootMotion = false; }
+            }
+            List<Renderer> lRenderers = new List<Renderer>();
+            foreach (Renderer lRenderer in _visual.GetComponentsInChildren<Renderer>())
+            {
+                if (lRenderer.name.EndsWith("_LOD1")) { lRenderer.enabled = false; continue; }
+                Material[] lMaterials = new Material[lRenderer.sharedMaterials.Length];
+                for (int i = 0; i < lMaterials.Length; i++) lMaterials[i] = GameArt.Transparent;
+                lRenderer.sharedMaterials = lMaterials;
+                lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                lRenderers.Add(lRenderer);
+            }
+            _renderers = lRenderers.ToArray();
         }
 
         private void Update()
@@ -92,7 +105,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _visual.gameObject.SetActive(_alpha > 0.01f);
             float lPulse = 0.25f + Mathf.Sin(Time.time * 4f) * 0.08f;
             foreach (Renderer lRenderer in _renderers) GameArt.Paint(lRenderer, new Color(0.55f, 0.6f, 1f, lPulse * _alpha));
-            _visual.localScale = new Vector3(1f, 1f + Mathf.Sin(Time.time * 3f) * 0.03f, 1f);
+
         }
     }
 }

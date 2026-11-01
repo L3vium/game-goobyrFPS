@@ -1,6 +1,30 @@
 # Changelog
 
 ## Unreleased
+- Realistic people everywhere: the cartoon characters are gone. Agents wear a black suit (a man or a
+  woman) with an armband in their team's colour; guards are dressed for the map's climate,
+  bodyguards in black suits, staff in uniform, guests in civilian clothes, targets as VIPs.
+- New animation from motion capture: walking, running, sprinting, crouching, crawling, sliding,
+  jumping, falling, landing, vaulting, climbing ladders, hanging and shimmying, swimming, aiming,
+  firing, reloading, punching, throwing, phone calls, smoking, looking around, cowering. The feet no
+  longer slide (each clip plays at the speed it really covers), the feet stay on slopes and stairs,
+  and running down stairs no longer flickers into a fall. Heads follow where people look.
+- Bodies fall as real ragdolls built from the pose they died in, keep their momentum and take the
+  blow where they were hit; a takedown victim struggles before going limp.
+- First person: your own sleeves and hands hold every weapon and item, aim down the sights, recoil,
+  reload, punch and throw.
+- The proof is the target's dossier (or the item it carries) instead of a head. The contract shows
+  a studio portrait of the target; new key art on the title screen and a new app icon.
+- Three new maps replace Pinecrest Hollow, Mirage Bay and Elmridge, built from the map design
+  documents with a realistic look: **San Lázaro** (a Colombian river town on fiesta day, coffee
+  terraces, an airstrip and the white Hacienda La Cumbre with its mirador), **Qasr al-Rimal** (a
+  desert oasis souk, a palm grove and dry wadi, the governor's citadel on the Great Mesa and a
+  radar on the Little Mesa) and **Weisshorn** (an alpine gala night: chalet village, frozen lake,
+  ski area, the Grand Hotel and an observatory on the summit, with falling snow). Every building
+  is generated room by room: real walls, doors and windows with sills and shutters, stairs, roofs,
+  balconies, ledges you can hang from, drainpipes, crawlable vents, locked doors that need a
+  crowbar, a keycard, a staff key or a code, cameras and a recorder, furnished rooms. Caves,
+  qanats and mine galleries link the zones underground.
 - Version 0.6.0.
 - Public, restricted and hostile areas, like Hitman: walk the plaza or the market freely as long
   as you behave (no raised gun, no sprinting or climbing in front of guards); staff areas get you

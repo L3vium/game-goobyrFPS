@@ -73,25 +73,22 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             return lPart;
         }
 
-        /// <summary>The agent: dark suit, gloves, earpiece, the hush pistol held low.</summary>
+        /// <summary>The agent: black suit, red tie, the silenced pistol held low in both hands, breathing.</summary>
         private void BuildAgent()
         {
             GameObject lAgent = new GameObject("Agent");
             lAgent.transform.SetParent(transform, false);
             lAgent.transform.localPosition = new Vector3(0.55f, 0, 0);
             lAgent.transform.localRotation = Quaternion.Euler(0, 205f, 0);
-            GoobBody lBody = lAgent.AddComponent<GoobBody>();
-            GoobLook lLook = GoobLook.Default(new Color(0.09f, 0.09f, 0.11f));
-            lLook.hair = Hair.Short;
-            lLook.hairColor = new Color(0.12f, 0.1f, 0.08f);
-            lLook.earpiece = true;
-            lLook.hands = HandStyle.Glove;
-            lLook.scale = 1.05f;
-            lBody.Configure(lLook);
-            GoobAnimator lAnimator = lAgent.AddComponent<GoobAnimator>();
-            lAnimator.HoldingWeapon = true;
-            lAnimator.AimPitch = 8f;
-            lBody.Build();
+            HumanBody lBody = lAgent.AddComponent<HumanBody>();
+            lBody.Culling = AnimatorCullingMode.AlwaysAnimate;
+            lBody.Configure(HumanCast.AGENT, Color.clear);
+            HumanAnimator lAnimator = lAgent.AddComponent<HumanAnimator>();
+            lAnimator.Velocity = Vector3.zero;
+            lAnimator.Held = HeldKind.Pistol;
+            lAnimator.Pose = BodyPose.ArmedIdle;
+            lAnimator.AimPitch = 12f;
+            lBody.SetHeld(HeldKind.Pistol);
             ItemDefinition lPistol = GameDatabase.Instance != null ? GameDatabase.Find(ItemKind.SilencedPistol) : null;
             if (lPistol != null && lBody.WeaponSocket != null) WeaponModels.Build(lPistol, lBody.WeaponSocket, 0);
         }

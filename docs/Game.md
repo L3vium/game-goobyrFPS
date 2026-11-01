@@ -1,8 +1,8 @@
 # Goobyr FPS — design
 
-Multiplayer (1-8) stealth-assassination FPS with a wobbly low-poly look and original
-characters (the Goobs). **Every NPC is hostile to every player.** A target is drawn from the
-map's pool of 15; kill it, take the proof from its body (its plush head or the item it carries),
+Multiplayer (1-8) stealth-assassination FPS with realistic PBR art and realistic humans
+(MakeHuman bodies, CMU mocap). **Every NPC is hostile to every player.** A target is drawn from the
+map's pool of 15; kill it, take the proof from its body (its dossier or the item it carries),
 carry it to one of the active extraction points. PvP is on: killing the carrier drops the proof.
 There are no disguises — it is stealth (sight, sound, cover, grass, smoke, darkness), and when
 it goes loud, everyone is lethal both ways. Maps follow Hitman's **social ladder** instead
@@ -26,29 +26,45 @@ no free camera or map in Teams). The match ends on an extraction, when every pla
 time limit (draw); the end screen's buttons go back to the lobby (host) or leave the room at once. The proof carrier is revealed to everyone every 10 s.
 
 ## Maps (three zones each, each with its own reinforcements)
-| Map | Town | Lair | Mansion / building |
+Designed in `docs/maps/*.md` (zones, social tiers, rooms, entries, NPC tables, targets, starts),
+built by `Editor/Maps/Map<Name>` on the realistic pipeline below.
+
+| Map | Zone 0 | Zone 1 | Zone 2 (key building) |
 |---|---|---|---|
-| **Pinecrest Hollow** (forest) | Millbrook: main street, sawmill, saloon, water tower + zipline, bridges over the river | The Grove (palisade, marsh with stilt walkways, tall grass) + military outpost (watchtowers, bunker, alarm flare) | Lakeside Lodge on a plinth: chandelier hall, bar, basement breaker + air handler, sprinklers, boathouse |
-| **Mirage Bay** (Gulf city, 1 km²) | Old Souk on a walled plateau over its harbour: ~70 flat-roofed houses joined by roof planks and ladders, two covered market streets meeting at the Spice Crossing, Wind Clock tower (sniper nest, zipline to the customs house), Seven Lamps tea house (storytelling evening), hammam, spice warehouse, customs house, riads | Smugglers' Docks under the elevated Gulf Highway (walkable deck, maintenance stair): container lanes and vantage stacks, three gantry cranes (one ziplines onto the deal warehouse), the cargo ship with holds and bridge, the Bluewater deal, canteen and crew talk, forger's container, dockers' gym, fuel depot, storm drain under the quay (tunnel extraction), alarm flare | The Zenith: podium (lobby chandelier, lobby bar, restaurant, kitchen, spa and offices, basement parking with breaker and air handler, ramp), pool deck, 18-floor tower (Sky Lounge, penthouse, helipad), west-face scaffold and gondola, construction site and tower crane zipline, gardens, marina with yachts (boat extraction), Azure beach club with jump pads |
-| **Elmridge** (suburb) | Downtown strip: diner, mall, police, cinema roof, gas station, patrol cars | Junkyard Bowl: wreck walls, bowling alley, drive-in screen, tall grass, canal culverts | Hilltop Mansion: gate, hedge maze, pool house, greenhouse, ballroom chandelier, basement vault |
+| **San Lázaro** (Colombian jungle, fiesta day) | Pueblo: plaza and stage, church and bell tower (zipline to the dock), cantina and its cellar, market street, police post, 12 open houses of ~45, dock, bus stop | Cafetal and airstrip: five coffee terraces with stairs, picker huts, drying sheds, the beneficio (gas roaster, coffee chute zipline into the stable yard), water tower, quarry, banana grove, jungle chapel ruin; ridge checkpoint, hangars A/B, radio shack and mast, DC-3 wreck, fuel depot | Hacienda La Cumbre: walled grounds (frisk gate, padlocked service gate, rusted cemetery gate, vine trellis, ivy), Casa La Cumbre (vault, cellar, 3 floors round a patio, mirador tower to +22, 30 rooms), Cueva del Diablo tunnels (cantina - quarry - casa wine cellar, quarry - waterfall dock) |
+| **Qasr al-Rimal** (desert oasis, audience day) | Ain Zarqa: well plaza, two covered souk streets framing the keep, tea house, mosque and minaret, caravanserai, bus station, flat roofs and planks | Grove and wadi: date palms, irrigation channels from the spring pool, date press (screw press), rock arch, the Needle, abandoned kasbah, goods-lift base station; radar on the Little Mesa (bunker, dish, radome, motor pool, ladder face, rope bridge) | The citadel on the Great Mesa: hairpins, walls, bastions, three courts, the keep (cellar, 3 floors round a screened light well, glass penthouse, roof helipad, wind-tower duct); the qanat (two branches, well shaft) and the smugglers' cleft |
+| **Weisshorn** (alpine gala night, snow) | Sankt Anna: chalet street, rink, church and spire, Gasthaus and its cellar (lake culvert), ski rental, funicular valley station, frozen lake, boathouse | Ski area: pistes between pine bands, chairlift (bullwheel), mid-station cafe, groomer garage (tiller) and mine gallery, ski-jump; observatory and bunker on the summit (dome, mast, cable car) | Grand Hotel Weisshorn: terraces, delivery yard, spa garden, 70 x 30 m hotel (underbelly, staff tier, lobby atrium, double-height ballroom with mezzanine and chandelier, suites, VIP floor, attic, clock tower) |
 
-Every patrol route has a pair of red explosive barrels next to a leg it walks (shoot them as the
-patrol passes; one blast sets off the other). Weapons lie everywhere (~35-95 spawns per map, and
-every dead guard drops his gun); one rocket launcher and one flamethrower per map, each at one of
-several hidden spots drawn per match. Between the Mirage Bay zones: the corniche, the dry wadi and
-its bridges, the Palm Interchange, the Sandgate apartments, the caravanserai, embassy villas, the bus
-terminal, an oasis camp, a relay mast, a solar farm, a fort ruin and the desert road petrol station
-(car extraction); two patrol-car loops (corniche / Gulf Road, souk ring).
+Each map: ~116 NPC markers following its design table, 6 edge starts and 3 inside starts with a
+pass, 4 extractions, 30-50 weapon spots, 80+ throwables, 3 spots per unique weapon, cameras and a
+recorder, secure doors (crowbar, keycard, padlock, keypad), vents, drop ladders, drainpipes,
+chatter spots that reveal the opportunities, and pause-map POIs for every landmark, entrance,
+climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground outside every zone.
 
-## Map recipe (500 m, `Editor/Maps/HillMap`)
-A relief function shaped by `LandShape` stamps (graded roads that climb, building pads cut at their
-street's height, plateaus, terraces, carved rivers), painted ground layers, terrain trees (tall,
-canopies above eye level) and grass, 8-12 tall grass fields to hide in on the approaches
-(`MapKit.TallGrassField`: a 1.3-1.8 m grass layer and hiding triggers), stone retaining walls where pads meet the slope, and dressing helpers (`Frontage` rows,
-`Staff` guards per room, `Squad` patrol groups, `Crowd`s, `Routines`). The validator wants 150+ NPC
-markers, 40+ weapon spots, three spots per unique weapon, starts 50 m clear of NPCs, 6+ tall
-grass fields, NPC posts on the NavMesh and no prop floating over the terrain. Water uses
-`Goobyr/Water` (depth-tinted, refracting, rippling, foam on the shores).
+## Map recipe (500 m, `Editor/Maps/RealMap` + `Editor/Maps/Arch`)
+- **Land** (`RealMap`, `MapKit.Terrain`): a relief function shaped by `LandShape` stamps (graded
+  roads, building pads, terraces, mesas, gorges), PBR ground layers per biome (`PbrLibrary.Layer`),
+  holes cut over cellars and tunnel mouths, `Veg_*` trees, bushes and rocks as terrain trees
+  (`VegLibrary`: LOD groups, trunk colliders), instanced `Veg_*` grass details, 8-12 tall grass
+  fields with hiding triggers, invisible map edges, a `TimeOfDay` with the biome's presets.
+- **Buildings** (`ArchSpec` → `ArchBuilder`): rooms on a 0.5 m grid per floor; walls found on the
+  room boundaries (two-leaf facades: plaster outside, painted plaster inside; partitions; arcades
+  with columns and arches; parapets; balustrades over voids); doors with casings and open leaves,
+  windows with frames, glass, 0.3 m+ stone sills and shutters; slabs with stair wells; straight
+  and dogleg stairs (visible steps, smooth ramp colliders, ≤ 0.18 m risers); hip, gable and shed
+  roofs with eaves and snow; flat roofs with parapets; cornice ledges (hangable); balconies;
+  drainpipes (climbable); crawlable 1 m vent ducts with grilles; secure doors; room lights;
+  security zones per room; a building volume. One combined mesh per material
+  (`ArchMesh`, world box UVs), mesh colliders. `ArchFurnish` furnishes every room by type with
+  the `Furn_*` models and a throwable; `ArchKit` places the systemic props (drinks, toilets,
+  wardrobes and dumpsters to hide in, distractions, explosives, cameras, recorder, breaker, air
+  handler, drop ladders, chandeliers, ziplines, chatter, POIs); `ArchOutdoor` builds walls with
+  gates, stairs, retaining walls, sheds, stalls, piers, towers, masts, tanks, stages.
+- **Validation** (`Goobyr/Validate Maps`): 6+ edge starts 50 m clear of NPCs and 3+ inside starts,
+  3+ extractions, 30+ weapons, 80+ throwables, 100+ NPCs all on the NavMesh and none more than
+  25 m from another, 5+ entries into the key building (3+ into the next two), vents, climbs,
+  cameras and a recorder, 6+ tall grass fields, no floating prop, every target's routine
+  available in its zone, the scene under 90 MB. `MapShots` renders review screenshots.
 
 ## Systems
 - **AI** (`AI/Npc`, rules in `AI/DetectionModel`): sight is a 90° cone out to 20 m (lookouts
@@ -169,6 +185,42 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
 - names over every agent and the target in each feed, a plate per feed (team, health, weapon,
   hidden / in the grass / underwater / spotted / combat / proof), the top bar (map, mode, clock,
   contract), H hides everything for a clean stream. The audio follows the selected feed.
+
+## Characters and animation
+- **Bodies** (`FX/HumanBody`): ten skinned humans sharing one 53-bone skeleton (`Art/Characters/Chr_*`,
+  LOD0/LOD1), spawned from the `ArtRegistry`. Who wears what (`FX/HumanCast`, a pure function of
+  networked data): agents in the black suit (man or woman by seat) with a team-coloured armband;
+  guards dressed for the map's climate (jungle, desert, snow from the map's names); bodyguards in
+  black; the crowd as staff (where the staff pass is needed) or guests; targets as VIPs, or as their
+  profile's `character`.
+- **Pipeline** (`Goobyr/Build/Characters`, `Editor/Pipeline/CharacterBuilder`): URP Lit materials per
+  slot (skin, glossy eyes, alpha-clipped hair/brows/lashes, emission kept for the hit flash);
+  Humanoid avatars built on a real T-pose (the A-pose arms are raised to the horizontal before the
+  avatar is made) for every character, and for the clips from the reference skeleton (the clips copy
+  `Idle`'s avatar); clip settings from `clips.json` (rotation always baked, in-place clips bake
+  everything, travelling clips let their travel go: the motor moves the body); the upper-body and
+  arms masks; the `Characters/Human` and `Characters/Arms` controllers; the grips (`FX/HumanRig`,
+  measured on the aim clips: where a Grip sits in the right palm, where the left hand holds it).
+- **Animation** (`FX/HumanAnimator`): states are chosen in code and reached by cross-fades (no
+  transition graph to get stuck in). Velocity comes from the motor / NavMeshAgent or, for remote
+  bodies, from the interpolated transform over 0.15 s - never a frame delta. Locomotion is a
+  gait-space blend (walk ring 1, run 2, sprint 3, capped by intent) and the pace parameter plays the
+  clips at speed / their measured stance-foot speed (scaled by each body's human scale), so the feet
+  stay planted. The air state is debounced and checked against the ground below (stairs never flash
+  a fall); jump → fall → land. Upper body: weapon hold / aim / fire / reload / punch / throw / phone;
+  additive hit flinches; foot IK on slopes and stairs, look IK on the aim pitch (spine too when
+  aiming), left hand on long guns. Remote players read `PlayerAvatar.Motion`, crouch, sprint, aim,
+  pitch; NPCs read their state, `Npc.Pose` (phone, smoke, looking around, cowering) and weapon.
+- **Death** (`FX/HumanRagdoll`): the model leaves the character and its bones become a ragdoll built
+  from the pose it died in (realistic mass split, hinge limits from the current bend), keeping its
+  speed and taking the blow at the hit point; capped at 45. A takedown victim struggles in the choke
+  (`Takedown_Victim`) before going limp.
+- **First person** (`Weapons/Viewmodel`): Chr_Arms (sleeves and hands) under the camera, arms-only
+  mask; the gun is posed procedurally (hip, sights on the screen centre, sway, bob, recoil, sprint,
+  switch) and the hands are put on it by IK with the measured grips; reload, punch and throw clips
+  lead the hands during the action; small items ride in the hand.
+- The contract portrait (`UI/PortraitStudio`), the title key art and the app icon
+  (`Goobyr/Build/Icon`, a camera render) use the same bodies.
 
 ## Architecture invariants
 - Host-authoritative: AI, damage, match state, inventory, pickups, proof, fire, systems. Player

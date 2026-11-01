@@ -270,23 +270,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 _ => "STATUS   EXTRACTED"
             };
 
-            Npc lNpc = null;
-            foreach (Npc lCandidate in Npc.All) if (lCandidate != null && lCandidate.IsTarget) lNpc = lCandidate;
-            GameObject lCameraObject = new GameObject("PortraitCamera");
-            Camera lCamera = lCameraObject.AddComponent<Camera>();
-            lCamera.clearFlags = CameraClearFlags.SolidColor;
-            lCamera.backgroundColor = new Color(0.12f, 0.13f, 0.15f);
-            lCamera.fieldOfView = 22f;
-            lCamera.nearClipPlane = 0.3f;
-            lCamera.farClipPlane = 6f;
-            lCamera.targetTexture = _portraitTexture;
-            if (lNpc != null)
-            {
-                Vector3 lHead = lNpc.transform.position + Vector3.up * 1.6f;
-                lCamera.transform.position = lHead + lNpc.transform.forward * 3.3f + lNpc.transform.right * 0.6f + Vector3.up * 0.1f;
-                lCamera.transform.LookAt(lHead + Vector3.down * 0.15f);
-                lCamera.Render();
-            }
+            // The target's photo, shot in the portrait studio (its real body, studio lights).
+            if (lTarget != null) PortraitStudio.Shoot(FX.HumanCast.ForTarget(lTarget), _portraitTexture);
             else
             {
                 RenderTexture lActive = RenderTexture.active;
@@ -294,8 +279,6 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 GL.Clear(true, true, new Color(0.12f, 0.13f, 0.15f));
                 RenderTexture.active = lActive;
             }
-            lCamera.targetTexture = null;
-            Destroy(lCameraObject);
         }
 
         private void OnDestroy()

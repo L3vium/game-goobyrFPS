@@ -305,6 +305,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             ItemDefinition lItem = GameDatabase.Item(pItem);
             if (lItem == null) return;
             Vector3 lMuzzle = _thirdPersonModel != null ? (_thirdPersonModel.transform.Find("Muzzle")?.position ?? pOrigin) : pOrigin;
+            Avatar.Animator?.Fire();
             Effects.Muzzle(lMuzzle, Avatar.AimDirection, lItem.kind == ItemKind.SilencedPistol ? 0.5f : 1f);
             foreach (Vector3 lEnd in pEnds)
             {
@@ -342,6 +343,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private void ReloadFeedbackRpc(float pTime)
         {
             if (IsOwner) View?.PlayReload(pTime);
+            else Avatar.Animator?.Reload(pTime);
             Sfx.Play("reload", transform.position, 0.6f, 15f);
         }
 
@@ -349,6 +351,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private void MeleeRpc(Vector3 pOrigin, Vector3 pDirection)
         {
             if (!Avatar.Health.IsAlive) return;
+            SwingRpc();
             if (!Physics.SphereCast(pOrigin, 0.35f, pDirection, out RaycastHit lHit, 1.7f, GameLayers.CharacterMask, QueryTriggerInteraction.Ignore)) return;
             Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
             if (lTarget == null || lTarget == Avatar.Health) return;
@@ -373,6 +376,13 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             NoiseSystem.Emit(lHit.point, 6f, NoiseKind.Suspicious, OwnerClientId);
             PunchFeedbackRpc(lHit.point, pDirection);
         }
+
+        /// <summary>Everyone else sees the agent swing (a punch or the start of a takedown).</summary>
+        [Rpc(SendTo.NotOwner)]
+        private void SwingRpc() => Avatar.Animator?.Punch();
+
+        [Rpc(SendTo.NotOwner)]
+        private void ThrowAnimRpc() => Avatar.Animator?.Throw();
 
         [Rpc(SendTo.Everyone)]
         private void TakedownFeedbackRpc(Vector3 pPoint, Vector3 pDirection)
@@ -399,6 +409,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (Vector3.Distance(pOrigin, transform.position) > 4f) pOrigin = Avatar.Eye;
 
             NetworkObject lThrown = ThrownItem.Spawn(lItem, pOrigin, pDirection, OwnerClientId, Avatar.Team.Value);
+            ThrowAnimRpc();
             if (lItem.kind == ItemKind.C4 && lThrown != null) _charges.Add(lThrown);
             ConsumeServer(pSlot);
         }
@@ -529,24 +540,24 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             Flamethrower.TickServer(Avatar.Eye, Avatar.AimDirection, lItem, OwnerClientId, Avatar.Team.Value, Avatar.Health);
         }
 
-        private void RefreshThirdPerson()
+        /// <summary>The held item in the third-person body's right hand (the owner only sees its shadow).</summary>
+        public void RefreshThirdPerson(bool pForce = false)
         {
             ItemDefinition lItem = HeldItem;
             int lIndex = lItem != null ? lItem.Index : -1;
-            if (lIndex == _thirdPersonItem) return;
+            if (lIndex == _thirdPersonItem && !pForce && _thirdPersonModel != null) return;
             _thirdPersonItem = lIndex;
             if (_thirdPersonModel != null) Destroy(_thirdPersonModel);
             _thirdPersonModel = null;
             if (lItem == null || Avatar.Body == null || Avatar.Body.WeaponSocket == null) return;
+            Avatar.Body.SetHeld(WeaponModels.HeldOf(lItem));
             _thirdPersonModel = WeaponModels.Build(lItem, Avatar.Body.WeaponSocket, GameLayers.PLAYER);
-            _thirdPersonModel.transform.localPosition = Vector3.zero;
-            _thirdPersonModel.transform.localScale = Vector3.one * 1.3f;
             if (IsOwner) foreach (Renderer lRenderer in _thirdPersonModel.GetComponentsInChildren<Renderer>()) lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
         }
 
         private void LateUpdate()
         {
-            if (_thirdPersonItem == -2 || (_thirdPersonModel == null && HeldItem != null)) RefreshThirdPerson();
+            if (_thirdPersonItem == -2 || (_thirdPersonModel == null && HeldItem != null && Avatar.Body != null && Avatar.Body.Built)) RefreshThirdPerson();
         }
     }
 }

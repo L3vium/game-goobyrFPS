@@ -13,10 +13,11 @@ using UnityEngine;
 namespace Com.IsartDigital.GoobyrFPS.Player
 {
     /// <summary>
-    /// A player's Goob on the map, spawned by the match for each living player.
+    /// A player's agent on the map, spawned by the match for each living player.
     /// <para>
     /// The owner moves it (<see cref="FpsMotor"/>, owner-authoritative NetworkTransform) and looks
-    /// through its eyes; everyone else sees a wobbly third-person Goob in the team's colour. What the
+    /// through its eyes (first-person arms); everyone else sees the agent in a suit with the team's
+    /// armband, animated from the motion state, speed, stance and aim sent here. What the
     /// NPCs need to judge visibility - crouched, concealed, hidden, sprinting - is written by the
     /// owner into network variables; health, team and the proof stay with the host.
     /// </para>
@@ -44,10 +45,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public CharacterController Controller { get; private set; }
         public Damageable Health { get; private set; }
         public WeaponHolder Weapons { get; private set; }
-        public GoobBody Body { get; private set; }
-        public GoobAnimator Animator { get; private set; }
+        public HumanBody Body { get; private set; }
+        public HumanAnimator Animator { get; private set; }
         public LobbyPlayer Player => LobbyPlayer.ForClient(OwnerClientId);
-        public string DisplayName => Player != null ? Player.Name : "Goob";
+        public string DisplayName => Player != null ? Player.Name : "Agent";
 
         /// <summary>
         /// Behaviour that gives a player away even in a public place: a raised gun, sprinting,
@@ -72,8 +73,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             Controller = GetComponent<CharacterController>();
             Health = GetComponent<Damageable>();
             Weapons = GetComponent<WeaponHolder>();
-            Body = GetComponentInChildren<GoobBody>();
-            Animator = GetComponentInChildren<GoobAnimator>();
+            Body = GetComponentInChildren<HumanBody>();
+            Animator = GetComponentInChildren<HumanAnimator>();
             Motor.enabled = false;
         }
 
@@ -108,7 +109,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 Body.SetShadowOnly(true);
                 GameInput.LockCursor(true);
                 Motor.OnLanded += HandleLanded;
-                Motor.OnJumped += () => { Animator.Squash(-0.15f); Audio.Sfx.Play("jump", transform.position, 0.6f); };
+                Motor.OnJumped += () => { Animator?.Jumped(); Audio.Sfx.Play("jump", transform.position, 0.6f); };
                 Motor.OnSlide += HandleSlide;
                 Motor.OnDrop += HandleDrop;
                 Motor.OnTraversal += HandleTraversal;
@@ -128,14 +129,11 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             Health.Team = pTeam;
             if (Body == null) return;
-            // Agents wear a suit in their team's colour; the face and hair vary with the seat.
+            // Agents wear the black suit (a man or a woman by seat) and an armband in the team's colour.
             int lSeat = Player != null ? Player.Seat.Value : (int)OwnerClientId;
-            GoobLook lLook = GoobLook.Random(new System.Random(lSeat * 977 + 11), Outfit.Suit, LobbyPlayer.TeamColor(pTeam) * 0.85f);
-            lLook.facial = Facial.None;
-            lLook.earpiece = true;
-            lLook.scale = 1f;
-            Body.Configure(lLook);
+            Body.Configure(HumanCast.ForAgent(lSeat), LobbyPlayer.TeamColor(pTeam), 1f);
             if (IsOwner) Body.SetShadowOnly(true);
+            Weapons?.RefreshThirdPerson(true);
         }
 
         // ---------------------------------------------------------------- owner loop
@@ -180,10 +178,14 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             if (Animator != null)
             {
                 Animator.AimPitch = IsOwner ? _pitch : Pitch.Value;
+                Animator.Motion = IsOwner ? Motor.State : Motion.Value;
                 Animator.Crouched = Crouched.Value;
+                Animator.Sprinting = Sprinting.Value;
                 Animator.Aiming = Aiming.Value;
-                Animator.Talking = Player != null && Player.TalkingNow.Value;
-                Animator.HoldingWeapon = Weapons != null && Weapons.HoldsWeapon;
+                Animator.Held = Weapons != null ? WeaponModels.HeldOf(Weapons.HeldItem) : HeldKind.None;
+                // The owner knows its velocity; others measure the interpolated transform.
+                Animator.Velocity = IsOwner ? Motor.Velocity : (Vector3?)null;
+                Animator.UseIK = !IsOwner;
             }
             if (Body != null && !IsOwner) Body.SetVisible(!Hidden.Value && Health.IsAlive);
         }
@@ -234,7 +236,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             float lImpact = Mathf.Clamp01((pFallSpeed - 2f) / 14f);
             _landDipVel -= lImpact * 3.5f;
-            Animator.Squash(lImpact * 0.6f);
             if (lImpact > 0.2f)
             {
                 Juice.Shake(lImpact * 0.35f);
@@ -287,7 +288,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         private void HandleHit(float pAmount, Vector3 pPoint, Vector3 pDirection, bool pHeadshot)
         {
-            Animator?.Shove(pDirection * Mathf.Clamp01(pAmount / 40f));
+            Animator?.Hit(pDirection);
             HitFlash.Play(Body);
             if (IsOwner)
             {
@@ -298,7 +299,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         private void HandleDeath(Vector3 pImpulse, Vector3 pPoint, DamageType pType)
         {
-            GoobRagdoll.Spawn(Body, pImpulse, pPoint);
+            Vector3 lVelocity = Animator != null ? Animator.MeasuredVelocity : Vector3.zero;
+            HumanRagdoll lRagdoll = HumanRagdoll.Spawn(Body, pImpulse, pPoint, lVelocity);
+            if (lRagdoll != null) HitFlash.Play(lRagdoll.gameObject, 1.4f);
+            Effects.Fluff(pPoint, pImpulse.normalized, Effects.Blood, true);
             Controller.enabled = false;
             if (IsOwner)
             {

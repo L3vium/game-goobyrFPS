@@ -58,7 +58,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             Emit("sparks", pPosition, Quaternion.LookRotation(pNormal), 5, 1f);
         }
 
-        /// <summary>Hit on a Goob: a puff of fluffy coloured bits (no gore, it is a plush world).</summary>
+        /// <summary>Hit on a character: a spray of particles in the given colour (blood for bodies).</summary>
         public static void Fluff(Vector3 pPosition, Vector3 pDirection, Color pColor, bool pBig)
         {
             Emit("fluff", pPosition, Quaternion.LookRotation(pDirection), pBig ? 22 : 10, pBig ? 1.4f : 1f, pColor);

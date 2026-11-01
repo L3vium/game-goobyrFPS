@@ -14,6 +14,20 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
     /// </summary>
     public static class WeaponModels
     {
+        /// <summary>How a character holds an item: pistol grip, long gun, something small to throw or show.</summary>
+        public static HeldKind HeldOf(ItemDefinition pItem)
+        {
+            if (pItem == null) return HeldKind.None;
+            return pItem.kind switch
+            {
+                ItemKind.Fists => HeldKind.None,
+                ItemKind.Pistol or ItemKind.SilencedPistol => HeldKind.Pistol,
+                ItemKind.Smg or ItemKind.Shotgun or ItemKind.Sniper or ItemKind.RocketLauncher or ItemKind.Flamethrower => HeldKind.Rifle,
+                ItemKind.Crowbar or ItemKind.Wrench => HeldKind.Tool,
+                _ => HeldKind.Throwable
+            };
+        }
+
         public static GameObject Build(ItemDefinition pItem, Transform pParent, int pLayer)
         {
             GameObject lModel;
@@ -129,6 +143,22 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 case ItemKind.C4:
                     GameArt.Part(t, "Block", lBox, Vector3.zero, new Vector3(0.14f, 0.05f, 0.1f), new Color(0.85f, 0.8f, 0.6f));
                     GameArt.Part(t, "Light", lSphere, new Vector3(0.04f, 0.03f, 0.02f), Vector3.one * 0.02f, Color.red, GameArt.Glow);
+                    break;
+                case ItemKind.Invitation:
+                    GameArt.Part(t, "Card", lBox, Vector3.zero, new Vector3(0.11f, 0.004f, 0.16f), new Color(0.95f, 0.9f, 0.78f));
+                    GameArt.Part(t, "Seal", lCyl, new Vector3(0, 0.004f, -0.02f), new Vector3(0.03f, 0.004f, 0.03f), new Color(0.6f, 0.08f, 0.1f));
+                    break;
+                case ItemKind.StaffPass:
+                case ItemKind.Keycard:
+                    GameArt.Part(t, "Card", lBox, Vector3.zero, new Vector3(0.055f, 0.003f, 0.086f), pItem.kind == ItemKind.Keycard ? new Color(0.75f, 0.15f, 0.15f) : new Color(0.25f, 0.45f, 0.75f));
+                    GameArt.Part(t, "Chip", lBox, new Vector3(0, 0.002f, 0.02f), new Vector3(0.012f, 0.002f, 0.01f), new Color(0.85f, 0.75f, 0.35f));
+                    break;
+                case ItemKind.CodeNote:
+                    GameArt.Part(t, "Note", lBox, Vector3.zero, new Vector3(0.075f, 0.002f, 0.075f), new Color(1f, 0.93f, 0.55f));
+                    break;
+                case ItemKind.Crowbar:
+                    GameArt.Part(t, "Bar", lCyl, new Vector3(0, 0, 0.18f), new Vector3(0.022f, 0.3f, 0.022f), new Color(0.55f, 0.12f, 0.1f)).transform.localRotation = Quaternion.Euler(90, 0, 0);
+                    GameArt.Part(t, "Claw", lBox, new Vector3(0, 0.03f, 0.48f), new Vector3(0.02f, 0.07f, 0.03f), new Color(0.3f, 0.3f, 0.32f));
                     break;
                 case ItemKind.Poison:
                 case ItemKind.EmeticPoison:

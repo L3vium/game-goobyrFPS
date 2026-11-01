@@ -52,6 +52,35 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             CameraRig.Instance.AddTrauma(pAmount * 0.5f);
         }
 
+        /// <summary>A silent takedown: a dip of the view, a cold flash and a beat of slow motion (solo only).</summary>
+        public static void Takedown()
+        {
+            Shake(0.22f);
+            Aberration(0.45f);
+            FovKick(-7f);
+            Flash(new Color(0.85f, 0.9f, 1f), 0.18f);
+            HitStop(0.16f, 0.2f);
+        }
+
+        /// <summary>A kill landed: a short freeze frame (solo only), a punch of aberration.</summary>
+        public static void Kill(bool pHeadshot)
+        {
+            Aberration(pHeadshot ? 0.5f : 0.3f);
+            Shake(pHeadshot ? 0.18f : 0.1f);
+            HitStop(pHeadshot ? 0.08f : 0.05f, 0.05f);
+        }
+
+        /// <summary>
+        /// Freeze frame. It slows the whole game clock, so it only runs when nobody else shares it
+        /// (a solo match): in multiplayer the host's clock is everyone's simulation.
+        /// </summary>
+        public static void HitStop(float pSeconds, float pScale)
+        {
+            Unity.Netcode.NetworkManager lNet = Unity.Netcode.NetworkManager.Singleton;
+            if (lNet == null || !lNet.IsServer || lNet.ConnectedClientsIds.Count > 1) return;
+            if (CameraRig.Instance != null) CameraRig.Instance.HitStop(pSeconds, pScale);
+        }
+
         /// <summary>Squash and stretch on any transform (pickups, jump pads, props being hit).</summary>
         public static void Squash(Transform pTarget, float pAmount = 0.3f, float pDuration = 0.35f)
         {

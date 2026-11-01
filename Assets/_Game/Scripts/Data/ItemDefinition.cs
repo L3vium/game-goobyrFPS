@@ -18,7 +18,11 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         SmokeGrenade,
         C4,
         Poison,
-        EmeticPoison
+        EmeticPoison,
+        /// <summary>Found lying around: thrown, it knocks out whoever it hits and makes a noise where it lands.</summary>
+        Rock,
+        Bottle,
+        Wrench
     }
 
     public enum ItemSlot
@@ -79,7 +83,9 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         [System.NonSerialized] public int Index = -1;
 
         public bool IsGun => kind is ItemKind.Pistol or ItemKind.SilencedPistol or ItemKind.Smg or ItemKind.Shotgun or ItemKind.Sniper;
-        public bool IsThrowable => kind is ItemKind.Coin or ItemKind.Brick or ItemKind.SmokeGrenade or ItemKind.C4;
+        public bool IsThrowable => kind is ItemKind.Coin or ItemKind.Brick or ItemKind.SmokeGrenade or ItemKind.C4 or ItemKind.Rock or ItemKind.Bottle or ItemKind.Wrench;
+        /// <summary>A heavy throwable: knocks out the NPC it hits.</summary>
+        public bool KnocksOut => kind is ItemKind.Brick or ItemKind.Rock or ItemKind.Bottle or ItemKind.Wrench;
         public bool IsPoison => kind is ItemKind.Poison or ItemKind.EmeticPoison;
         public bool UsesAmmo => IsGun || kind is ItemKind.RocketLauncher or ItemKind.Flamethrower;
     }

@@ -1219,7 +1219,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             State.Value = pInfo.knockout ? NpcState.KnockedOut : NpcState.Dead;
             if (_cover != null && _cover.Occupant == this) _cover.Occupant = null;
             _agent.enabled = false;
-            NoiseSystem.Emit(transform.position, pInfo.type == DamageType.Bullet && pInfo.headshot ? 5f : 9f, NoiseKind.Suspicious, pInfo.attacker);
+            NoiseSystem.Emit(transform.position, _silentDeath ? 2.5f : pInfo.type == DamageType.Bullet && pInfo.headshot ? 5f : 9f, NoiseKind.Suspicious, pInfo.attacker);
 
             // Guards drop their gun: clearing a room arms you.
             ItemDefinition lWeapon = Weapon;
@@ -1227,7 +1227,20 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Match.MatchDirector.Instance?.HandleNpcDeath(this, pInfo);
         }
 
-        /// <summary>Host: a takedown or a brick to the head - out cold, for good.</summary>
+        /// <summary>The awareness gauge as everyone sees it (0-1).</summary>
+        public float Gauge => Awareness.Value / 20f;
+
+        private bool _silentDeath;
+
+        /// <summary>Host: a takedown from behind - dead at once, with barely a sound.</summary>
+        public void Takedown(Vector3 pDirection, ulong pBy, int pTeam)
+        {
+            if (!Health.IsAlive) return;
+            _silentDeath = true;
+            Health.Kill(new DamageInfo { type = DamageType.Melee, point = transform.position + Vector3.up * 1.5f, direction = pDirection, attacker = pBy, attackerTeam = pTeam });
+        }
+
+        /// <summary>Host: a brick to the head - out cold, for good.</summary>
         public void KnockOut(Vector3 pDirection, ulong pBy)
         {
             if (!Health.IsAlive) return;

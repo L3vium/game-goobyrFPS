@@ -86,7 +86,10 @@ grass fields, NPC posts on the NavMesh and no prop floating over the terrain. Wa
   20 s of breath under water; under water nobody sees you beyond arm's length, the view turns
   blue-green and the sound muffles; splashes are heard; deep water is cut out of the NavMesh); head bob, sway, tilt, landing dip, FOV kicks; 6-slot inventory;
   guns, rocket launcher, flamethrower, coin / brick / smoke / C4 + remote (T), poisons, punches and
-  takedowns from behind.
+  silent takedowns from behind (`DetectionModel.CanTakedown`: within 70° of its back, the NPC not
+  alerted, its gauge under half - a 2.5 m sound instead of a fall). Rocks, bottles, bricks and
+  wrenches lie around every map: picked up with F, thrown with an arc preview, they knock out whoever
+  they hit and pull the nearest guard or two to where they land.
 - **Instinct** (`FX/InstinctVision`, `FX/Rendering/InstinctFeature`, hold Tab): the world dims
   to a cold grey with a scan wave rolling out from the eye, and what matters glows through the
   walls: the target and the proof (or whoever carries it) in red at any range, teammates in blue,
@@ -168,8 +171,11 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
   in `Assets/_Game/Editor` see it.
 
 ## Controls (physical keys, AZERTY-safe)
-Move WASD/ZQSD · look mouse · fire LMB · aim RMB · reload R · interact F · crouch Ctrl/C · jump Space ·
-sprint Shift (hold) · crouch-slide Ctrl/C while moving · punch V/MMB · throw G · detonate T · slots 1-6 / wheel · map M ·
+Move WASD/ZQSD · look mouse · **LMB punches** (from behind an NPC that hasn't noticed you: a silent
+takedown, dead at once) · **RMB raises the weapon** and LMB then fires · with a throwable, RMB shows the
+arc and LMB throws · wheel cycles what you carry (fists included, empty slots skipped) · reload R ·
+interact / pick up F · crouch Ctrl/C · jump Space · sprint Shift (hold) · crouch-slide Ctrl/C while
+moving · punch also V/MMB · throw G · detonate T · slots 1-6 · map M ·
 instinct Tab (hold) · scoreboard ` (key left of 1, ² on AZERTY) · push-to-talk B · pause Esc.
 
 Caster view: agents 1-8 · next agent arrows / LB RB · feed Tab / D-pad left right · layouts F1-F4 /

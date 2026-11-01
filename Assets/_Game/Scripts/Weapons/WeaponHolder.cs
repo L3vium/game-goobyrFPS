@@ -45,6 +45,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
 
         private float _nextFire;
         private float _nextMelee;
+        private float _nextScroll;
+        private ThrowArc _arc;
         private bool _aiming;
         private int _lastGadget = 2;
         private GameObject _thirdPersonModel;
@@ -78,6 +80,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public override void OnNetworkDespawn()
         {
             if (View != null) Destroy(View.gameObject);
+            if (_arc != null) Destroy(_arc.gameObject);
             if (_flameFx != null) Destroy(_flameFx);
         }
 
@@ -90,16 +93,21 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         {
             if (!IsSpawned) return;
             UpdateThirdPersonFlame();
-            if (!IsOwner || !Avatar.Health.IsAlive) return;
-            if (Avatar.Motor.Mode == MotorMode.Hidden || Avatar.Motor.Mode == MotorMode.Zipline) { _aiming = false; return; }
+            if (!IsOwner || !Avatar.Health.IsAlive) { if (_arc != null) _arc.Hide(); return; }
+            if (Avatar.Motor.Mode == MotorMode.Hidden || Avatar.Motor.Mode == MotorMode.Zipline) { _aiming = false; if (_arc != null) _arc.Hide(); return; }
 
             int lSlot = GameInput.SlotPressed;
             if (lSlot >= 0) Select(lSlot);
             float lScroll = GameInput.Scroll;
-            if (Mathf.Abs(lScroll) > 0.1f) Select((Selected.Value + (lScroll < 0 ? 1 : SLOT_COUNT - 1)) % SLOT_COUNT);
+            if (Mathf.Abs(lScroll) > 0.1f && Time.time >= _nextScroll)
+            {
+                _nextScroll = Time.time + 0.12f;
+                Cycle(lScroll < 0 ? 1 : -1);
+            }
 
+            // Right click raises the weapon (aims); only then does left click fire. Lowered, left click punches.
             ItemDefinition lHeld = HeldItem;
-            _aiming = GameInput.Aim && lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher);
+            _aiming = GameInput.Aim && lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher || lHeld.kind == ItemKind.Flamethrower);
             Avatar.Motor.Aiming = _aiming;
             if (Avatar.Aiming.Value != _aiming) Avatar.Aiming.Value = _aiming;
 
@@ -109,22 +117,46 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (GameInput.Detonate) DetonateRpc();
 
             bool lFlaming = false;
-            if (lHeld == null)
+            bool lArc = lHeld != null && lHeld.IsThrowable && GameInput.Aim;
+            if (lArc)
+            {
+                if (_arc == null) _arc = ThrowArc.Create();
+                Vector3 lDir = Avatar.AimDirection;
+                _arc.Show(Avatar.AimOrigin + lDir * 0.5f, lDir.normalized * lHeld.throwForce + Vector3.up * 2.5f);
+            }
+            else if (_arc != null) _arc.Hide();
+
+            if (lHeld != null && lHeld.slot == ItemSlot.Gadget)
+            {
+                // Throwables: right click shows the arc, left click throws.
+                if (GameInput.FirePressed) ThrowGadget(Selected.Value);
+            }
+            else if (lHeld == null || !_aiming)
             {
                 if (GameInput.FirePressed) TryMelee();
             }
             else if (lHeld.kind == ItemKind.Flamethrower)
             {
                 lFlaming = GameInput.Fire && SlotAt(Selected.Value).magazine > 0 && !Reloading.Value;
-                if (lFlaming) Avatar.Motor.Aiming = true;
-            }
-            else if (lHeld.slot == ItemSlot.Gadget)
-            {
-                if (GameInput.FirePressed) ThrowGadget(Selected.Value);
             }
             else if (lHeld.automatic ? GameInput.Fire : GameInput.FirePressed) TryFire(lHeld);
 
             if (Flaming.Value != lFlaming) Flaming.Value = lFlaming;
+        }
+
+        /// <summary>
+        /// The mouse wheel: next / previous slot that holds something, plus the fists (an empty
+        /// weapon slot). Empty gadget slots are skipped, and it wraps round.
+        /// </summary>
+        private void Cycle(int pStep)
+        {
+            int lFists = -1;
+            for (int i = 0; i < WEAPON_SLOTS; i++) if (SlotAt(i).IsEmpty) { lFists = i; break; }
+            for (int n = 1; n <= SLOT_COUNT; n++)
+            {
+                int lSlot = ((Selected.Value + pStep * n) % SLOT_COUNT + SLOT_COUNT) % SLOT_COUNT;
+                if (!SlotAt(lSlot).IsEmpty || lSlot == lFists) { Select(lSlot); return; }
+            }
         }
 
         public void Select(int pSlot)
@@ -304,19 +336,32 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
             if (lTarget == null || lTarget == Avatar.Health) return;
 
-            // From behind, unaware: a takedown (knock out). Otherwise a solid punch.
+            // From behind, on an NPC that hasn't noticed you: a silent takedown, dead at once.
+            // Otherwise a solid punch (and a scuffle the guards close by hear).
             Npc lNpc = lTarget.GetComponent<Npc>();
-            bool lFromBehind = Vector3.Dot(lTarget.transform.forward, pDirection) > 0.35f;
-            bool lTakedown = lNpc != null && lFromBehind && !lNpc.InCombat;
-            DamageInfo lInfo = new DamageInfo
+            Vector3 lFlat = Vector3.ProjectOnPlane(pDirection, Vector3.up);
+            float lFromBack = Vector3.Angle(lTarget.transform.forward, lFlat);
+            bool lTakedown = lNpc != null && DetectionModel.CanTakedown(lFromBack, lNpc.Gauge, lNpc.IsAlerted);
+            if (lTakedown)
             {
-                amount = lTakedown ? 0f : 34f, type = DamageType.Melee, point = lHit.point, direction = pDirection,
-                attacker = OwnerClientId, attackerTeam = Avatar.Team.Value, knockout = lTakedown
-            };
-            if (lTakedown) lNpc.KnockOut(pDirection, OwnerClientId);
-            else lTarget.ApplyDamage(lInfo);
+                lNpc.Takedown(pDirection, OwnerClientId, Avatar.Team.Value);
+                TakedownFeedbackRpc(lHit.point, pDirection);
+                return;
+            }
+            lTarget.ApplyDamage(new DamageInfo
+            {
+                amount = 34f, type = DamageType.Melee, point = lHit.point, direction = pDirection,
+                attacker = OwnerClientId, attackerTeam = Avatar.Team.Value
+            });
             NoiseSystem.Emit(lHit.point, 6f, NoiseKind.Suspicious, OwnerClientId);
             PunchFeedbackRpc(lHit.point, pDirection);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        private void TakedownFeedbackRpc(Vector3 pPoint, Vector3 pDirection)
+        {
+            Sfx.Play("takedown", pPoint, 0.8f, 8f);
+            if (IsOwner) { Juice.Takedown(); UI.Hud.Hitmarker(true); }
         }
 
         [Rpc(SendTo.Everyone)]

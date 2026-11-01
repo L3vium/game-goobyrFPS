@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Controls: left click punches; right click raises your gun and left click then fires; the mouse wheel
+  cycles everything you carry, fists included, without getting stuck on empty slots. A punch from
+  behind on a guard who hasn't noticed you is a silent takedown that kills at once (with a beat of
+  slow motion in solo). Rocks, bottles and wrenches join the coins and bricks: hold right click to see
+  the throw's arc, they knock out whoever they hit and draw the nearest guard to where they land.
+  Weapons have plain names now (Silenced Pistol, SMG, Sniper Rifle...).
 - AI rewritten around hearing that makes sense: a sound carries a set distance in the open, walls and
   floors muffle it, and only the one to three guards who hear it best go and look - the others turn
   their heads. Nobody learns your exact position from a sound any more; a distant shot no longer

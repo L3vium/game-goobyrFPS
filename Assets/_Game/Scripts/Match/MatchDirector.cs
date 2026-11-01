@@ -120,8 +120,19 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
             // Players around one start point, never in sight of a guard post or a patrol.
             List<MatchPoint> lStarts = MatchPoint.OfKind(MatchPoint.Kind.Start);
-            int lStartIndex = MatchRulesLogic.PickSafeStart(lStarts.ConvertAll(pPoint => pPoint.transform.position), ThreatPositions(), lRandom);
-            Transform lStart = lStartIndex >= 0 ? lStarts[lStartIndex].transform : transform;
+            // Edge starts must be clear of guards; "inside" starts (a picker, a waiter, a petitioner)
+            // come with the pass of their tier and are drawn now and then instead.
+            List<MatchPoint> lEdge = lStarts.FindAll(p => !IsKit(p.Item));
+            List<MatchPoint> lInside = lStarts.FindAll(p => IsKit(p.Item));
+            MatchPoint lPoint = null;
+            if (lInside.Count > 0 && (lEdge.Count == 0 || lRandom.NextDouble() < 0.35)) lPoint = lInside[lRandom.Next(lInside.Count)];
+            else if (lEdge.Count > 0)
+            {
+                int lStartIndex = MatchRulesLogic.PickSafeStart(lEdge.ConvertAll(pPoint => pPoint.transform.position), ThreatPositions(), lRandom);
+                lPoint = lStartIndex >= 0 ? lEdge[lStartIndex] : null;
+            }
+            Transform lStart = lPoint != null ? lPoint.transform : transform;
+            ItemDefinition lKit = lPoint != null && IsKit(lPoint.Item) ? GameDatabase.Find(lPoint.Item) : null;
             // Casters only watch: no avatar for them.
             List<LobbyPlayer> lAgents = LobbyPlayer.Agents();
             int lIndex = 0;
@@ -133,6 +144,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
                 lAvatar.SpawnWithOwnership(lPlayer.OwnerClientId, true);
                 lAvatar.GetComponent<PlayerAvatar>().TeleportOwnerRpc(lPosition, lStart.eulerAngles.y);
                 lAvatar.GetComponent<Damageable>().OnDeathServer += pInfo => HandlePlayerDeath(lAvatar.GetComponent<PlayerAvatar>(), pInfo);
+                if (lKit != null) StartCoroutine(GiveKit(lAvatar.GetComponent<Weapons.WeaponHolder>(), lKit));
                 lPlayer.Alive.Value = true;
                 lPlayer.Kills.Value = 0;
                 lPlayer.NpcKills.Value = 0;
@@ -141,7 +153,11 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
             // NPCs from the map's spawn points.
             foreach (NpcSpawnPoint lSpawn in FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
-                SpawnNpc(lSpawn.transform.position, lSpawn.transform.rotation, lSpawn.Role, lSpawn.Zone, GameDatabase.Find(lSpawn.Weapon), lSpawn.Route, null, -1, null);
+            {
+                Npc lSpawned = SpawnNpc(lSpawn.transform.position, lSpawn.transform.rotation, lSpawn.Role, lSpawn.Zone, GameDatabase.Find(lSpawn.Weapon), lSpawn.Route, null, -1, null);
+                if (lSpawn.Carries != ItemKind.Fists) lSpawned.SetCarried(GameDatabase.Find(lSpawn.Carries));
+                lSpawned.SetEnforcer(lSpawn.Enforcer);
+            }
 
             // The target and its bodyguards.
             if (lMap != null && lMap.targets.Count > 0)
@@ -179,6 +195,15 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             Phase.Value = MatchPhase.Playing;
             if (LobbyState.Instance != null) LobbyState.Instance.Phase.Value = MatchPhase.Playing;
             AnnounceRpc("NEW CONTRACT", Target != null ? Target.displayName.ToUpperInvariant() : "");
+        }
+
+        private static bool IsKit(ItemKind pKind) => pKind is ItemKind.Invitation or ItemKind.StaffPass or ItemKind.Keycard;
+
+        /// <summary>The pass of an inside start, once the starting loadout is in (next frame).</summary>
+        private System.Collections.IEnumerator GiveKit(Weapons.WeaponHolder pHolder, ItemDefinition pKit)
+        {
+            yield return null;
+            if (pHolder != null && pHolder.IsSpawned) pHolder.GiveServer(pKit, -1, -1);
         }
 
         private void SpawnItems(System.Random pRandom)

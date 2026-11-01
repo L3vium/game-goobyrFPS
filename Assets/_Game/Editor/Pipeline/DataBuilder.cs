@@ -50,7 +50,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Item("EmeticPoison", "Emetic Poison", ItemKind.EmeticPoison, ItemSlot.Gadget, new Color(1f, 0.85f, 0.3f), pResetTuning, i => { i.stack = 1; }),
                 Item("Rock", "Rock", ItemKind.Rock, ItemSlot.Gadget, new Color(0.55f, 0.53f, 0.5f), pResetTuning, i => { i.stack = 2; i.throwForce = 19; }),
                 Item("Bottle", "Bottle", ItemKind.Bottle, ItemSlot.Gadget, new Color(0.35f, 0.55f, 0.35f), pResetTuning, i => { i.stack = 1; i.throwForce = 18; }),
-                Item("Wrench", "Wrench", ItemKind.Wrench, ItemSlot.Gadget, new Color(0.6f, 0.6f, 0.62f), pResetTuning, i => { i.stack = 1; i.throwForce = 19; })
+                Item("Wrench", "Wrench", ItemKind.Wrench, ItemSlot.Gadget, new Color(0.6f, 0.6f, 0.62f), pResetTuning, i => { i.stack = 1; i.throwForce = 19; }),
+                Item("Invitation", "Invitation", ItemKind.Invitation, ItemSlot.Gadget, new Color(0.95f, 0.88f, 0.7f), pResetTuning, i => { i.stack = 1; }),
+                Item("StaffPass", "Staff Pass", ItemKind.StaffPass, ItemSlot.Gadget, new Color(0.5f, 0.75f, 0.95f), pResetTuning, i => { i.stack = 1; }),
+                Item("Keycard", "Keycard", ItemKind.Keycard, ItemSlot.Gadget, new Color(0.9f, 0.3f, 0.3f), pResetTuning, i => { i.stack = 1; }),
+                Item("Crowbar", "Crowbar", ItemKind.Crowbar, ItemSlot.Gadget, new Color(0.7f, 0.2f, 0.15f), pResetTuning, i => { i.stack = 1; }),
+                Item("CodeNote", "Code Note", ItemKind.CodeNote, ItemSlot.Gadget, new Color(0.95f, 0.95f, 0.85f), pResetTuning, i => { i.stack = 1; })
             };
 
             // How far each item is heard in the open (walls muffle it, DetectionModel.Loudness): kept in

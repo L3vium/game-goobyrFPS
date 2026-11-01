@@ -15,6 +15,10 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         Hostile
     }
 
+    /// <summary>Who belongs in a zone: carrying the matching pass makes it public for you.</summary>
+    /// <remarks>Private = personal rooms (study, suite, vault): no pass ever makes them legal.</remarks>
+    public enum AccessLevel : byte { None, Guest, Staff, Security, Private }
+
     /// <summary>
     /// A box that sets the security tier of everything inside it (the highest tier wins where boxes
     /// overlap; outside every box a map is <see cref="SecurityTier.Hostile"/>). Placed by the map
@@ -24,6 +28,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
     {
         [SerializeField] private SecurityTier _tier;
         [SerializeField] private Vector3 _size = new Vector3(20, 10, 20);
+        [SerializeField] private AccessLevel _access;
 
         private static readonly List<SecurityZone> _all = new List<SecurityZone>();
         public static IReadOnlyList<SecurityZone> All => _all;
@@ -33,10 +38,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public SecurityTier Tier => _tier;
         public Vector3 Size => _size;
 
-        public void Setup(SecurityTier pTier, Vector3 pSize)
+        public AccessLevel Access => _access;
+
+        public void Setup(SecurityTier pTier, Vector3 pSize, AccessLevel pAccess = AccessLevel.None)
         {
             _tier = pTier;
             _size = pSize;
+            _access = pAccess;
         }
 
         private void OnEnable() => _all.Add(this);
@@ -49,17 +57,31 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         }
 
         /// <summary>The tier at a point: the most guarded zone containing it, else <see cref="Outside"/>.</summary>
-        public static SecurityTier At(Vector3 pPoint)
+        public static SecurityTier At(Vector3 pPoint) => At(pPoint, out _);
+
+        /// <summary>The tier at a point and the access that legitimises it there.</summary>
+        public static SecurityTier At(Vector3 pPoint, out AccessLevel pAccess)
         {
             bool lInside = false;
             SecurityTier lTier = SecurityTier.Public;
+            pAccess = AccessLevel.None;
             foreach (SecurityZone lZone in _all)
             {
                 if (!lZone.Contains(pPoint)) continue;
-                if (!lInside || lZone._tier > lTier) lTier = lZone._tier;
+                if (!lInside || lZone._tier > lTier || (lZone._tier == lTier && lZone._access > pAccess)) { lTier = lZone._tier; pAccess = lZone._access; }
                 lInside = true;
             }
             return lInside ? lTier : Outside;
+        }
+
+        /// <summary>
+        /// The tier that counts for a player: a zone whose access they carry (or better) is public
+        /// to them - unless the NPC looking is an enforcer, who sees through passes.
+        /// </summary>
+        public static SecurityTier ForPlayer(SecurityTier pTier, AccessLevel pRequired, AccessLevel pCarried, bool pEnforcer)
+        {
+            if (pRequired == AccessLevel.None || pEnforcer || pCarried < pRequired) return pTier;
+            return SecurityTier.Public;
         }
 
         private void OnDrawGizmos()

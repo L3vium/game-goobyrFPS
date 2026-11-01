@@ -86,12 +86,15 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public enum Confrontation { Hold, Combat, LostSight }
 
         /// <summary>How a confrontation ends: a hostile act or a full window in sight is combat, a broken line of sight a search.</summary>
-        public static Confrontation ResolveConfront(float pEngagedFor, float pUnseenFor, bool pHostileAct)
+        public static Confrontation ResolveConfront(float pEngagedFor, float pUnseenFor, bool pHostileAct, float pWindow = CONFRONT_TIME)
         {
             if (pHostileAct) return Confrontation.Combat;
             if (pUnseenFor >= CONFRONT_LOST) return Confrontation.LostSight;
-            return pEngagedFor >= CONFRONT_TIME ? Confrontation.Combat : Confrontation.Hold;
+            return pEngagedFor >= pWindow ? Confrontation.Combat : Confrontation.Hold;
         }
+
+        /// <summary>Seconds a guard escorts a trespasser out of a restricted area before it fires.</summary>
+        public const float ESCORT_TIME = 4f;
 
         /// <summary>Does an NPC notice a confrontation or a fight (close, roughly in front of it, nothing in between)?</summary>
         public static bool Witnesses(float pDistance, float pAngle, bool pLineOfSight) => pLineOfSight && pDistance <= WITNESS_RANGE && pAngle <= PERIPHERAL_ANGLE;

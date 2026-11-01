@@ -475,7 +475,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (lSight.angle > Mathf.Max(lSight.halfCone, DetectionModel.PERIPHERAL_ANGLE) && lSight.distance >= DetectionModel.CLOSE_RANGE) return 0f;
             if (SmokeVolume.Blocks(lEye, lTarget)) return 0f;
             // The social ladder: a behaving player on the plaza is just another passer-by.
-            float lTier = pCombat ? 1f : DetectionModel.TierFactor(SecurityZone.At(pPlayer.transform.position), pPlayer.ActsSuspicious);
+            SecurityTier lZoneTier = SecurityZone.At(pPlayer.transform.position, out AccessLevel lRequired);
+            SecurityTier lFor = SecurityZone.ForPlayer(lZoneTier, lRequired, pPlayer.Weapons != null ? pPlayer.Weapons.Access : AccessLevel.None, IsEnforcer);
+            float lTier = pCombat ? 1f : DetectionModel.TierFactor(lFor, pPlayer.ActsSuspicious);
             if (lTier <= 0f) return 0f;
             lSight.chestVisible = !Physics.Linecast(lEye, lTarget, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
             lSight.headVisible = !Physics.Linecast(lEye, pPlayer.Eye, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
@@ -564,7 +566,16 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
             // Aiming a gun at it from close enough is a hostile act.
             bool lHostile = _combatTarget.Aiming.Value && lUnseen < 0.4f && Vector3.Distance(transform.position, lPlayer) < 25f;
-            switch (DetectionModel.ResolveConfront(Time.time - _engagedSince, lUnseen, lHostile))
+            // In a restricted area it is an escort: "get out" - leaving ends it, staying 4 s turns it into a fight.
+            SecurityTier lWhere = SecurityZone.ForPlayer(SecurityZone.At(lPlayer, out AccessLevel lNeed), lNeed, _combatTarget.Weapons != null ? _combatTarget.Weapons.Access : AccessLevel.None, IsEnforcer);
+            if (lWhere == SecurityTier.Public && !lHostile && !_combatTarget.ActsSuspicious)
+            {
+                _awareness = 0.4f;
+                ReturnToDuty();
+                return;
+            }
+            float lWindow = lWhere == SecurityTier.Restricted ? DetectionModel.ESCORT_TIME : DetectionModel.CONFRONT_TIME;
+            switch (DetectionModel.ResolveConfront(Time.time - _engagedSince, lUnseen, lHostile, lWindow))
             {
                 case DetectionModel.Confrontation.Combat:
                     Zone?.ReportContact(_combatTarget, lPlayer, lUnseen < 0.4f);
@@ -1225,10 +1236,23 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             NoiseSystem.Emit(transform.position, _silentDeath ? 2.5f : pInfo.type == DamageType.Bullet && pInfo.headshot ? 5f : 9f, NoiseKind.Suspicious, pInfo.attacker);
 
             // Guards drop their gun: clearing a room arms you.
+            if (_carried != null) ItemPickup.SpawnServer(_carried, transform.position + Vector3.up * 0.6f, -1, -1, Random.insideUnitSphere + Vector3.up);
             ItemDefinition lWeapon = Weapon;
             if (lWeapon != null && lWeapon.IsGun && !IsTarget) ItemPickup.SpawnServer(lWeapon, transform.position + Vector3.up * 1.1f, Random.Range(lWeapon.magazine / 3, lWeapon.magazine + 1), lWeapon.reserveAmmo / 3, Random.insideUnitSphere + Vector3.up * 2f);
             Match.MatchDirector.Instance?.HandleNpcDeath(this, pInfo);
         }
+
+        /// <summary>Bodyguards and lookouts see through passes.</summary>
+        public bool IsEnforcer => _enforcer || Role == NpcRole.Bodyguard || Role == NpcRole.Lookout;
+        private bool _enforcer;
+
+        /// <summary>Host: this NPC sees through passes (a security chief, a captain).</summary>
+        public void SetEnforcer(bool pEnforcer) => _enforcer = pEnforcer;
+
+        private ItemDefinition _carried;
+
+        /// <summary>Host: a pass, a key or a tool this NPC carries and drops when taken down.</summary>
+        public void SetCarried(ItemDefinition pItem) => _carried = pItem;
 
         /// <summary>The awareness gauge as everyone sees it (0-1).</summary>
         public float Gauge => Awareness.Value / 20f;

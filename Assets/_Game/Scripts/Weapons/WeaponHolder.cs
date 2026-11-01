@@ -84,6 +84,21 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (_flameFx != null) Destroy(_flameFx);
         }
 
+        /// <summary>Is an item of this kind anywhere in the inventory?</summary>
+        public bool Carries(ItemKind pKind)
+        {
+            if (Slots == null) return false;
+            for (int i = 0; i < Slots.Count; i++)
+            {
+                ItemDefinition lItem = GameDatabase.Item(Slots[i].item);
+                if (lItem != null && lItem.kind == pKind) return true;
+            }
+            return false;
+        }
+
+        /// <summary>The best pass carried: keycard over staff pass over invitation.</summary>
+        public AI.AccessLevel Access => Carries(ItemKind.Keycard) ? AI.AccessLevel.Security : Carries(ItemKind.StaffPass) ? AI.AccessLevel.Staff : Carries(ItemKind.Invitation) ? AI.AccessLevel.Guest : AI.AccessLevel.None;
+
         public InventorySlot SlotAt(int pSlot) => Slots != null && pSlot >= 0 && pSlot < Slots.Count ? Slots[pSlot] : InventorySlot.Empty;
         public ItemDefinition ItemIn(int pSlot) => GameDatabase.Item(SlotAt(pSlot).item);
 

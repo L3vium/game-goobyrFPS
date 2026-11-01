@@ -22,7 +22,17 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         /// <summary>Found lying around: thrown, it knocks out whoever it hits and makes a noise where it lands.</summary>
         Rock,
         Bottle,
-        Wrench
+        Wrench,
+        /// <summary>Legitimacy: makes Guest zones public for the carrier (a gala or reception invitation, a petition token).</summary>
+        Invitation,
+        /// <summary>Legitimacy: Staff zones (and Guest); also the key of staff padlocks.</summary>
+        StaffPass,
+        /// <summary>Legitimacy: Security zones (and below); opens keycard doors.</summary>
+        Keycard,
+        /// <summary>Pries open boarded and rusted doors (loudly).</summary>
+        Crowbar,
+        /// <summary>A note with a keypad code (vault, server room).</summary>
+        CodeNote
     }
 
     public enum ItemSlot
@@ -84,6 +94,8 @@ namespace Com.IsartDigital.GoobyrFPS.Data
 
         public bool IsGun => kind is ItemKind.Pistol or ItemKind.SilencedPistol or ItemKind.Smg or ItemKind.Shotgun or ItemKind.Sniper;
         public bool IsThrowable => kind is ItemKind.Coin or ItemKind.Brick or ItemKind.SmokeGrenade or ItemKind.C4 or ItemKind.Rock or ItemKind.Bottle or ItemKind.Wrench;
+        /// <summary>A pass or a tool: carried, never thrown or held as a weapon.</summary>
+        public bool IsKey => kind is ItemKind.Invitation or ItemKind.StaffPass or ItemKind.Keycard or ItemKind.Crowbar or ItemKind.CodeNote;
         /// <summary>A heavy throwable: knocks out the NPC it hits.</summary>
         public bool KnocksOut => kind is ItemKind.Brick or ItemKind.Rock or ItemKind.Bottle or ItemKind.Wrench;
         public bool IsPoison => kind is ItemKind.Poison or ItemKind.EmeticPoison;

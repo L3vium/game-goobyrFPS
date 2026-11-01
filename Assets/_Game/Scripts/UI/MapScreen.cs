@@ -107,7 +107,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             if (_contract || _frame == null) return;
             ReadNavigation();
-            _plan.texture = MapPlan.Floor(_floor);
+            // No plan baked for this map: a dark sheet, never a white square.
+            bool lReady = MapPlan.Ready;
+            _plan.texture = lReady ? MapPlan.Floor(_floor) : null;
+            _plan.color = lReady ? Color.white : new Color(0.08f, 0.09f, 0.1f, 0.95f);
             float lSpan = 1f / _zoom;
             _center.x = Mathf.Clamp(_center.x, lSpan * 0.5f, 1f - lSpan * 0.5f);
             _center.y = Mathf.Clamp(_center.y, lSpan * 0.5f, 1f - lSpan * 0.5f);
@@ -120,24 +123,32 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
             _used = 0;
             foreach (LevelZone lZone in LevelZone.All) Pin(lZone.transform.position, null, Color.white, 0f, lZone.ZoneName.ToUpperInvariant());
+            // Landmarks and the ways in: entrances, vents, climbs, cave mouths, overlooks.
+            foreach (MapPoi lPoi in MapPoi.All)
+            {
+                bool lLandmark = lPoi.Type == MapPoi.Kind.Landmark;
+                Pin(lPoi.transform.position, lLandmark ? UIIcons.DiamondOutline : PoiIcon(lPoi.Type), MapPoi.ColorOf(lPoi.Type), 0f, _zoom > 1.6f || lLandmark ? lPoi.Label.ToUpperInvariant() : null, lLandmark ? 20f : 14f, false);
+            }
             MatchDirector lDirector = MatchDirector.Instance;
             if (lDirector != null && lDirector.Proof.Value != ProofState.TargetAlive)
             {
                 List<MatchPoint> lExtractions = MatchPoint.OfKind(MatchPoint.Kind.Extraction);
                 for (int i = 0; i < lExtractions.Count; i++)
-                    if ((lDirector.ActiveExtractions.Value & (1 << i)) != 0) Pin(lExtractions[i].transform.position, UIIcons.Ring, UIFactory.Good, 0f, lExtractions[i].Label.ToUpperInvariant());
-                if (lDirector.Proof.Value == ProofState.Dropped) Pin(lDirector.ProofPosition.Value, UIIcons.Diamond, ThreatMarkers.Amber, 0f, null);
+                    if ((lDirector.ActiveExtractions.Value & (1 << i)) != 0) Pin(lExtractions[i].transform.position, UIIcons.Ring, UIFactory.Good, 0f, lExtractions[i].Label.ToUpperInvariant(), 26f, true);
+                if (lDirector.Proof.Value == ProofState.Dropped) Pin(lDirector.ProofPosition.Value, UIIcons.Diamond, ThreatMarkers.Amber, 0f, "PROOF", 24f, true);
             }
             foreach (Npc lNpc in Npc.All)
-                if (lNpc != null && lNpc.IsTarget && lNpc.Health.IsAlive) Pin(lNpc.transform.position, UIIcons.Chevron, ThreatMarkers.Red, 0f, "TARGET");
+                if (lNpc != null && lNpc.IsTarget && lNpc.Health.IsAlive) Pin(lNpc.transform.position, UIIcons.Chevron, ThreatMarkers.Red, 180f, "TARGET", 30f, true);
             PlayerAvatar lMe = PlayerAvatar.Local;
             foreach (PlayerAvatar lAvatar in PlayerAvatar.All)
             {
-                if (lAvatar == null || !lAvatar.Health.IsAlive) continue;
-                if (lAvatar == lMe) Pin(lAvatar.transform.position, UIIcons.Arrow, UIFactory.Paper, -lAvatar.LookYaw, null);
+                if (lAvatar == null || !lAvatar.Health.IsAlive || lAvatar == lMe) continue;
+                if (lAvatar.CarriesProof.Value) Pin(lAvatar.transform.position, UIIcons.Diamond, ThreatMarkers.Amber, 0f, "PROOF CARRIER", 22f, true);
                 else if (lMe != null && lAvatar.Team.Value == lMe.Team.Value && LobbyState.Instance != null && LobbyState.Instance.Mode.Value != MatchMode.FreeForAll)
-                    Pin(lAvatar.transform.position, UIIcons.Dot, ThreatMarkers.Blue, 0f, lAvatar.DisplayName.ToUpperInvariant());
+                    Pin(lAvatar.transform.position, UIIcons.Dot, ThreatMarkers.Blue, 0f, lAvatar.DisplayName.ToUpperInvariant(), 20f, true);
             }
+            // You, last so it draws on top: a big amber arrow on a dark halo, kept on the edge when out of view.
+            if (lMe != null && lMe.Health.IsAlive) Pin(lMe.transform.position, UIIcons.Arrow, UIFactory.Accent, -lMe.LookYaw, "YOU", 40f, true);
             for (int i = _used; i < _pool.Count; i++) _pool[i].rect.gameObject.SetActive(false);
         }
 
@@ -172,17 +183,38 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _center += lPan;
         }
 
-        /// <summary>A pin on the plan at a world point: an icon (optional, rotated) and a label under it.</summary>
-        private void Pin(Vector3 pWorld, Sprite pIcon, Color pColor, float pRotation, string pLabel)
+        private static Sprite PoiIcon(MapPoi.Kind pKind) => pKind switch
+        {
+            MapPoi.Kind.Entrance => UIIcons.Ring,
+            MapPoi.Kind.Overlook => UIIcons.Chevron,
+            MapPoi.Kind.Shortcut => UIIcons.DiamondOutline,
+            _ => UIIcons.Dot
+        };
+
+        /// <summary>
+        /// A pin on the plan at a world point: an icon (optional, rotated) over a dark halo so it reads
+        /// on any ground, and a label under it. Clamped pins stay on the frame edge when out of view.
+        /// </summary>
+        private void Pin(Vector3 pWorld, Sprite pIcon, Color pColor, float pRotation, string pLabel, float pSize = 22f, bool pClamp = false)
         {
             Rect lView = _plan.uvRect;
             Vector2 lUv = MapPlan.ToUv(pWorld);
             Vector2 p = new Vector2((lUv.x - lView.x) / lView.width - 0.5f, (lUv.y - lView.y) / lView.height - 0.5f) * FRAME;
-            if (Mathf.Abs(p.x) > FRAME * 0.5f || Mathf.Abs(p.y) > FRAME * 0.5f) return;
+            float lEdge = FRAME * 0.5f - pSize * 0.6f;
+            if (Mathf.Abs(p.x) > lEdge || Mathf.Abs(p.y) > lEdge)
+            {
+                if (!pClamp) return;
+                p = new Vector2(Mathf.Clamp(p.x, -lEdge, lEdge), Mathf.Clamp(p.y, -lEdge, lEdge));
+            }
             if (_used >= _pool.Count)
             {
                 RectTransform lRect = UIFactory.Rect(_icons, "Pin", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(22, 22));
-                Image lImage = lRect.gameObject.AddComponent<Image>();
+                Image lHalo = UIFactory.Stretch(lRect, "Halo").gameObject.AddComponent<Image>();
+                lHalo.sprite = UIIcons.Disc;
+                lHalo.color = new Color(0.04f, 0.05f, 0.06f, 0.7f);
+                lHalo.raycastTarget = false;
+                ((RectTransform)lHalo.transform).sizeDelta = new Vector2(10, 10);
+                Image lImage = UIFactory.Stretch(lRect, "Icon").gameObject.AddComponent<Image>();
                 lImage.raycastTarget = false;
                 TextMeshProUGUI lText = UIFactory.Title(_icons, "Label", "", 15, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(260, 22), true, 3f);
                 lText.outlineWidth = 0.2f;
@@ -192,6 +224,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             (RectTransform rect, Image icon, TextMeshProUGUI label) = _pool[_used++];
             rect.gameObject.SetActive(true);
             rect.anchoredPosition = p;
+            rect.sizeDelta = new Vector2(pSize, pSize);
+            rect.GetChild(0).gameObject.SetActive(pIcon != null);
             rect.localEulerAngles = new Vector3(0, 0, pRotation);
             icon.enabled = pIcon != null;
             icon.sprite = pIcon;
@@ -200,7 +234,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             label.text = pLabel;
             label.color = pIcon == null ? new Color(1, 1, 1, 0.75f) : pColor;
             label.fontSize = pIcon == null ? 20 : 14;
-            label.rectTransform.anchoredPosition = p + new Vector2(0, pIcon == null ? 0 : -20);
+            label.rectTransform.anchoredPosition = p + new Vector2(0, pIcon == null ? 0 : -(pSize * 0.5f + 10f));
         }
 
         // ---------------------------------------------------------------- contract page

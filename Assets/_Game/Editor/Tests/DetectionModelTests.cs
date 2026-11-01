@@ -146,6 +146,25 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Passes_MakeTheirZonePublicExceptForEnforcers()
+        {
+            Assert.AreEqual(SecurityTier.Public, SecurityZone.ForPlayer(SecurityTier.Hostile, AccessLevel.Guest, AccessLevel.Guest, false));
+            Assert.AreEqual(SecurityTier.Public, SecurityZone.ForPlayer(SecurityTier.Restricted, AccessLevel.Staff, AccessLevel.Security, false));
+            Assert.AreEqual(SecurityTier.Hostile, SecurityZone.ForPlayer(SecurityTier.Hostile, AccessLevel.Security, AccessLevel.Staff, false));
+            Assert.AreEqual(SecurityTier.Hostile, SecurityZone.ForPlayer(SecurityTier.Hostile, AccessLevel.Guest, AccessLevel.Security, true));
+            Assert.AreEqual(SecurityTier.Restricted, SecurityZone.ForPlayer(SecurityTier.Restricted, AccessLevel.None, AccessLevel.Security, false));
+            // Personal rooms are never legal, whatever the pass.
+            Assert.AreEqual(SecurityTier.Hostile, SecurityZone.ForPlayer(SecurityTier.Hostile, AccessLevel.Private, AccessLevel.Security, false));
+        }
+
+        [Test]
+        public void Escort_LastsLongerThanAConfrontation()
+        {
+            Assert.AreEqual(DetectionModel.Confrontation.Hold, DetectionModel.ResolveConfront(3f, 0f, false, DetectionModel.ESCORT_TIME));
+            Assert.AreEqual(DetectionModel.Confrontation.Combat, DetectionModel.ResolveConfront(3f, 0f, false));
+        }
+
+        [Test]
         public void Gauge_FillsFasterOnEdge()
         {
             float lCalm = DetectionModel.Fill(0f, 1f, 2f, 0.1f, false);

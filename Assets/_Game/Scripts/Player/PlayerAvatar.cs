@@ -317,6 +317,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             if (IsServer) AI.NoiseSystem.Emit(pPoint, 8f * pSize, AI.NoiseKind.Suspicious, OwnerClientId);
         }
 
+        /// <summary>Host: a notification for this player only (caught on camera...).</summary>
+        [Rpc(SendTo.Owner)]
+        public void NotifyRpc(string pWhat, string pWhere) => UI.Hud.Notify(pWhat, pWhere, UI.ThreatMarkers.Amber);
+
         [Rpc(SendTo.Server)]
         private void FallDamageRpc(float pDamage)
         {

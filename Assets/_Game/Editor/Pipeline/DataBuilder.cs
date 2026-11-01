@@ -78,24 +78,24 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
             List<MapDefinition> lMaps = new List<MapDefinition>
             {
-                Map("Map_Forest", "Pinecrest Hollow", "Map_Forest",
-                    "A logging town on a cold river, a fortified commune hidden in the pines with a military outpost next door, and a lakeside timber lodge.",
-                    new[] { "Millbrook Town", "The Grove & Outpost", "Lakeside Lodge" },
-                    new Color(0.45f, 0.72f, 0.82f), new Color(0.92f, 0.86f, 0.74f), new Color(0.78f, 0.8f, 0.72f), new Color(1f, 0.9f, 0.75f), new Color(0.5f, 0.55f, 0.55f), 1.25f, new Vector3(38f, -40f, 0), 0.0028f, pResetTuning, ForestTargets()),
-                Map("Map_Gulf", "Mirage Bay", "Map_Gulf",
-                    "A sun-bleached Gulf city: a dense souk, smugglers working the docks under the highway, and the Zenith, a luxury hotel tower with a helipad.",
-                    new[] { "Old Souk", "Smugglers' Docks", "The Zenith Tower" },
-                    new Color(0.35f, 0.65f, 0.95f), new Color(1f, 0.88f, 0.7f), new Color(0.98f, 0.85f, 0.7f), new Color(1f, 0.93f, 0.8f), new Color(0.6f, 0.55f, 0.5f), 1.5f, new Vector3(55f, 30f, 0), 0.0018f, pResetTuning, GulfTargets()),
-                Map("Map_Suburb", "Elmridge", "Map_Suburb",
-                    "A tidy American suburb: the downtown strip, a biker hideout in the old junkyard and bowling alley, and the colonial mansion on the hill.",
-                    new[] { "Downtown Strip", "Junkyard Bowl", "Hilltop Mansion" },
-                    new Color(0.55f, 0.75f, 0.95f), new Color(1f, 0.8f, 0.7f), new Color(0.95f, 0.82f, 0.75f), new Color(1f, 0.85f, 0.7f), new Color(0.55f, 0.5f, 0.6f), 1.35f, new Vector3(30f, 120f, 0), 0.0022f, pResetTuning, SuburbTargets())
+                Map("Map_SanLazaro", "San Lázaro", "Map_SanLazaro",
+                    "A Colombian river town on fiesta day: the plaza and the church, five coffee terraces climbing to an airstrip on the ridge, and the white Hacienda La Cumbre with its mirador over the gorge.",
+                    new[] { "Pueblo", "Cafetal & Airstrip", "Hacienda La Cumbre" },
+                    new Color(0.25f, 0.5f, 0.85f), new Color(0.85f, 0.9f, 0.92f), new Color(0.7f, 0.78f, 0.76f), new Color(1f, 0.95f, 0.85f), new Color(0.45f, 0.5f, 0.48f), 2.2f, new Vector3(55f, 30f, 0), 0.0025f, pResetTuning, SanLazaroTargets()),
+                Map("Map_QasrAlRimal", "Qasr al-Rimal", "Map_QasrAlRimal",
+                    "An oasis town on audience day: the souk under the Great Mesa, a palm grove and its dry wadi, the governor's citadel on the rock and a radar on the Little Mesa.",
+                    new[] { "Ain Zarqa", "Grove, Wadi & Radar", "The Citadel" },
+                    new Color(0.2f, 0.45f, 0.85f), new Color(0.95f, 0.88f, 0.75f), new Color(0.95f, 0.85f, 0.7f), new Color(1f, 0.95f, 0.85f), new Color(0.6f, 0.55f, 0.5f), 2.6f, new Vector3(62f, -20f, 0), 0.0015f, pResetTuning, QasrTargets()),
+                Map("Map_Weisshorn", "Weisshorn", "Map_Weisshorn",
+                    "An alpine gala night: the chalet village by the frozen lake, the pistes and the chairlift, the Grand Hotel on its platform and the cold-war observatory on the summit.",
+                    new[] { "Sankt Anna", "Ski Area & Observatory", "Grand Hotel Weisshorn" },
+                    new Color(0.3f, 0.45f, 0.75f), new Color(0.86f, 0.9f, 0.95f), new Color(0.8f, 0.84f, 0.9f), new Color(1f, 0.97f, 0.94f), new Color(0.55f, 0.6f, 0.7f), 2.0f, new Vector3(32f, 40f, 0), 0.003f, pResetTuning, WeisshornTargets())
             };
 
             // Ambiance per map: a misty pine morning, a hazy golden Gulf afternoon, a pink suburban dusk.
-            Atmosphere(lMaps[0], new Color(0.3f, 0.52f, 0.78f), new Color(0.78f, 0.84f, 0.86f), new Color(1f, 0.82f, 0.6f), new Color(1f, 0.9f, 0.76f), 1.6f, new Vector3(22f, -40f, 0), 0.55f, 0.0065f, -1f, 14f, new Color(0.22f, 0.28f, 0.34f), 0.9f, 2f, 14f);
-            Atmosphere(lMaps[1], new Color(0.22f, 0.48f, 0.86f), new Color(0.96f, 0.86f, 0.7f), new Color(1f, 0.75f, 0.45f), new Color(1f, 0.88f, 0.7f), 1.9f, new Vector3(28f, 60f, 0), 0.32f, 0.0035f, 0f, 40f, new Color(0.36f, 0.32f, 0.27f), 0.7f, 14f, 12f);
-            Atmosphere(lMaps[2], new Color(0.34f, 0.42f, 0.72f), new Color(1f, 0.74f, 0.62f), new Color(1f, 0.6f, 0.45f), new Color(1f, 0.78f, 0.62f), 1.5f, new Vector3(14f, 120f, 0), 0.5f, 0.0045f, 0f, 20f, new Color(0.3f, 0.25f, 0.3f), 1.0f, 18f, 16f);
+            Atmosphere(lMaps[0], new Color(0.24f, 0.48f, 0.84f), new Color(0.84f, 0.89f, 0.9f), new Color(1f, 0.88f, 0.72f), new Color(1f, 0.95f, 0.86f), 2.2f, new Vector3(55f, 30f, 0), 0.5f, 0.006f, 0f, 22f, new Color(0.3f, 0.36f, 0.34f), 0.9f, 4f, 12f);
+            Atmosphere(lMaps[1], new Color(0.2f, 0.45f, 0.86f), new Color(0.96f, 0.88f, 0.74f), new Color(1f, 0.82f, 0.55f), new Color(1f, 0.93f, 0.8f), 2.8f, new Vector3(62f, -20f, 0), 0.12f, 0.003f, 0f, 40f, new Color(0.4f, 0.36f, 0.3f), 0.7f, 10f, 12f);
+            Atmosphere(lMaps[2], new Color(0.3f, 0.46f, 0.76f), new Color(0.86f, 0.9f, 0.95f), new Color(1f, 0.92f, 0.85f), new Color(1f, 0.97f, 0.94f), 2.0f, new Vector3(32f, 40f, 0), 0.45f, 0.006f, 0f, 24f, new Color(0.38f, 0.42f, 0.5f), 0.8f, -6f, 12f);
 
             GameDatabase lDatabase = EditorAssets.LoadOrCreate<GameDatabase>(EditorAssets.RESOURCES + "/GameDatabase.asset");
             lDatabase.rules = lRules;
@@ -176,61 +176,61 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return new TargetProfile { displayName = pName, dossier = pDossier, zone = pZone, bodyColor = lColor, hat = pHat, scale = pScale, bodyguards = pGuards, proof = pProof, routine = new List<ActivityType>(pRoutine) };
         }
 
-        private static List<TargetProfile> ForestTargets() => new List<TargetProfile>
+        private static List<TargetProfile> SanLazaroTargets() => new List<TargetProfile>
         {
-            T("Barnaby Thistlewood", "Sawmill owner. Cuts corners and people.", 0, "#C8553D", HatStyle.Cap, 1.15f, 2, ProofKind.Dossier, ActivityType.Inspect, ActivityType.Drink, ActivityType.Phone, ActivityType.Toilet, ActivityType.Smoke),
-            T("Marta Quill", "Runs the diner and the town's secrets.", 0, "#E2A03F", HatStyle.Beanie, 1.05f, 1, ProofKind.Ledger, ActivityType.Dining, ActivityType.Drink, ActivityType.Phone, ActivityType.Toilet),
-            T("Sheriff Dunmore", "A badge for sale to the highest bidder.", 0, "#5B7DB1", HatStyle.Cowboy, 1.2f, 2, ProofKind.Badge, ActivityType.Lookout, ActivityType.Office, ActivityType.Drink, ActivityType.Smoke),
-            T("Otis Fernhallow", "Moonshiner. Never leaves his still for long.", 0, "#7C9A3C", HatStyle.Fedora, 1.1f, 2, ProofKind.Dossier, ActivityType.Inspect, ActivityType.Drink, ActivityType.Smoke, ActivityType.Toilet),
-            T("Penny Lark", "The mayor's fixer. Always on the phone.", 0, "#B65FCF", HatStyle.Beret, 1.0f, 1, ProofKind.Keycard, ActivityType.Phone, ActivityType.Office, ActivityType.Drink, ActivityType.Garden),
-            T("Elder Wren", "Leader of the Grove. Preaches by the fire.", 1, "#F2E3BC", HatStyle.Turban, 1.2f, 3, ProofKind.Dossier, ActivityType.Speech, ActivityType.Garden, ActivityType.Drink, ActivityType.Toilet),
-            T("Colonel Ashgrave", "Commands the outpost. Trusts nobody.", 1, "#556B2F", HatStyle.Beret, 1.25f, 3, ProofKind.Keycard, ActivityType.Inspect, ActivityType.Lookout, ActivityType.Office, ActivityType.Workout),
-            T("Sister Moss", "Brews the Grove's 'tea'. Taste-tests it herself.", 1, "#8FBF7F", HatStyle.Beanie, 1.0f, 2, ProofKind.Ring, ActivityType.Garden, ActivityType.Drink, ActivityType.Dining, ActivityType.Toilet),
-            T("Quartermaster Bell", "Sells the outpost's guns out the back door.", 1, "#A0522D", HatStyle.Cap, 1.15f, 2, ProofKind.Ledger, ActivityType.Inspect, ActivityType.Smoke, ActivityType.Phone, ActivityType.Drink),
-            T("Brother Tamsin", "The Grove's recruiter. Smiles too much.", 1, "#D98E73", HatStyle.None, 1.05f, 2, ProofKind.Dossier, ActivityType.Speech, ActivityType.Workout, ActivityType.Drink, ActivityType.Toilet),
-            T("Lady Corvina Vale", "Owns the lodge, the lake and the valley.", 2, "#2F4858", HatStyle.TopHat, 1.1f, 3, ProofKind.Ring, ActivityType.Dining, ActivityType.Drink, ActivityType.Garden, ActivityType.Toilet, ActivityType.Speech),
-            T("Rupert Vale", "Heir. Gambles the family fortune at the bar.", 2, "#33658A", HatStyle.Fedora, 1.15f, 2, ProofKind.Dossier, ActivityType.Drink, ActivityType.Phone, ActivityType.Toilet, ActivityType.Smoke),
-            T("Doctor Ilse Brandt", "Lodge physician. Prescribes silence.", 2, "#E0E0E0", HatStyle.None, 1.0f, 2, ProofKind.Briefcase, ActivityType.Office, ActivityType.Drink, ActivityType.Dining, ActivityType.Toilet),
-            T("Huntmaster Gale", "Leads the lodge's hunts. Prey varies.", 2, "#8B5A2B", HatStyle.Cowboy, 1.25f, 2, ProofKind.Dossier, ActivityType.Lookout, ActivityType.Smoke, ActivityType.Drink, ActivityType.Inspect),
-            T("The Accountant", "Nobody knows his name. Everybody knows his ledger.", 2, "#4A4A4A", HatStyle.Fedora, 1.05f, 3, ProofKind.Ledger, ActivityType.Office, ActivityType.Phone, ActivityType.Drink, ActivityType.Toilet)
+            T("Doña Celestina Ruiz", "Sponsors the fiesta, launders the cartel's coffee money. Stage, cantina, bell deck, dock.", 0, "#C0392B", HatStyle.None, 1.05f, 2, ProofKind.Ring, ActivityType.Speech, ActivityType.Drink, ActivityType.Lookout, ActivityType.Idle),
+            T("Fabio 'El Mono' Rengifo", "Owns the cantina and the smugglers' cave under it.", 0, "#E67E22", HatStyle.Cap, 1.15f, 2, ProofKind.Ledger, ActivityType.Drink, ActivityType.Dining, ActivityType.Office, ActivityType.Toilet),
+            T("Inspector Gilma Pardo", "The pueblo's police chief. Paid by everyone.", 0, "#2E4053", HatStyle.Cap, 1.1f, 2, ProofKind.Badge, ActivityType.Office, ActivityType.Phone, ActivityType.Inspect, ActivityType.Smoke),
+            T("Wilber Castaño", "Boatman. Runs the river for whoever pays.", 0, "#1F618D", HatStyle.Cowboy, 1.1f, 1, ProofKind.Dossier, ActivityType.Idle, ActivityType.Workout, ActivityType.Smoke, ActivityType.Drink),
+            T("Mayor Hernando Lozada", "Opens the fiesta, signs whatever the hacienda sends down.", 0, "#F4D03F", HatStyle.Fedora, 1.15f, 2, ProofKind.Keycard, ActivityType.Speech, ActivityType.Dining, ActivityType.Phone, ActivityType.Garden),
+            T("Ilse Varga", "The buyer. Flies in, tastes the coffee, buys the rest.", 1, "#5B2C6F", HatStyle.Beret, 1.05f, 2, ProofKind.Briefcase, ActivityType.Inspect, ActivityType.Phone, ActivityType.Drink, ActivityType.Dining),
+            T("Captain Rodrigo Duarte", "Commands the airstrip's sicarios. Sees through every pass.", 1, "#4D5656", HatStyle.Beret, 1.25f, 3, ProofKind.Keycard, ActivityType.Lookout, ActivityType.Inspect, ActivityType.Smoke, ActivityType.Workout),
+            T("Nelson Arbeláez", "The capataz. Every picker owes him a week.", 1, "#7E5109", HatStyle.Cowboy, 1.15f, 2, ProofKind.Dossier, ActivityType.Garden, ActivityType.Speech, ActivityType.Smoke, ActivityType.Toilet),
+            T("Lucho Guerrero", "Pilot. Never sober on the ground.", 1, "#117864", HatStyle.Cap, 1.05f, 1, ProofKind.Dossier, ActivityType.Dining, ActivityType.Inspect, ActivityType.Drink, ActivityType.Workout),
+            T("Dra. Amparo Rincón", "The chemist behind the 'fungicide'.", 1, "#D5DBDB", HatStyle.None, 1.0f, 2, ProofKind.Ledger, ActivityType.Office, ActivityType.Garden, ActivityType.Drink, ActivityType.Toilet),
+            T("Don Ramiro Elizalde", "The patrón. Study, toast on the loggia, chapel, dinner.", 2, "#F8F9F9", HatStyle.Fedora, 1.15f, 2, ProofKind.Ring, ActivityType.Office, ActivityType.Speech, ActivityType.Idle, ActivityType.Dining),
+            T("Teodoro Aranda", "The accountant. Counts the vault, drinks his coffee, checks the wine.", 2, "#566573", HatStyle.None, 1.0f, 1, ProofKind.Ledger, ActivityType.Office, ActivityType.Drink, ActivityType.Inspect, ActivityType.Toilet),
+            T("Valentina Elizalde", "The heir. Runs the reception like a campaign.", 2, "#A93226", HatStyle.Beret, 1.0f, 2, ProofKind.Ring, ActivityType.Garden, ActivityType.Drink, ActivityType.Dining, ActivityType.Phone),
+            T("Celso Ibarra", "The mayordomo. Knows every door and who opens it.", 2, "#283747", HatStyle.None, 1.05f, 1, ProofKind.Keycard, ActivityType.Inspect, ActivityType.Phone, ActivityType.Dining, ActivityType.Smoke),
+            T("Senator Octavio Peñalosa", "Guest of honour. Sells the valley's roads.", 2, "#1A5276", HatStyle.TopHat, 1.15f, 3, ProofKind.Briefcase, ActivityType.Speech, ActivityType.Drink, ActivityType.Garden, ActivityType.Toilet)
         };
 
-        private static List<TargetProfile> GulfTargets() => new List<TargetProfile>
+        private static List<TargetProfile> QasrTargets() => new List<TargetProfile>
         {
-            T("Faisal Amberline", "Spice merchant. The spice is not the product.", 0, "#E07A5F", HatStyle.Turban, 1.15f, 2, ProofKind.Ledger, ActivityType.Inspect, ActivityType.Drink, ActivityType.Phone, ActivityType.Toilet),
-            T("Noor Halcyon", "Gold dealer. Weighs everything twice.", 0, "#F2CC8F", HatStyle.None, 1.05f, 2, ProofKind.Ring, ActivityType.Office, ActivityType.Drink, ActivityType.Dining, ActivityType.Phone),
-            T("Karim 'Kite' Saleh", "Rooftop courier. Hard to catch, easy to spot.", 0, "#81B29A", HatStyle.Cap, 1.0f, 1, ProofKind.Dossier, ActivityType.Lookout, ActivityType.Smoke, ActivityType.Drink, ActivityType.Toilet),
-            T("Madame Ysolde", "Carpet seller and information broker.", 0, "#9A348E", HatStyle.Beret, 1.05f, 2, ProofKind.Keycard, ActivityType.Speech, ActivityType.Dining, ActivityType.Drink, ActivityType.Phone),
-            T("Inspector Rahal", "Customs inspector with very full pockets.", 0, "#3D5A80", HatStyle.Cap, 1.2f, 2, ProofKind.Badge, ActivityType.Inspect, ActivityType.Office, ActivityType.Smoke, ActivityType.Drink),
-            T("Captain Brine", "Runs the dock crews and the night boats.", 1, "#264653", HatStyle.Cap, 1.25f, 3, ProofKind.Dossier, ActivityType.Inspect, ActivityType.Lookout, ActivityType.Drink, ActivityType.Smoke),
-            T("Ziva Rook", "Forger. Her studio hides in a container.", 1, "#E76F51", HatStyle.Beanie, 1.0f, 2, ProofKind.Briefcase, ActivityType.Office, ActivityType.Drink, ActivityType.Phone, ActivityType.Toilet),
-            T("Old Man Tarek", "Owns the cargo ship. And the harbour master.", 1, "#B08968", HatStyle.Turban, 1.1f, 3, ProofKind.Ledger, ActivityType.Dining, ActivityType.Drink, ActivityType.Speech, ActivityType.Toilet),
-            T("Dex Marlowe", "Arms broker. Tests every crate personally.", 1, "#6D6875", HatStyle.Fedora, 1.15f, 2, ProofKind.Dossier, ActivityType.Inspect, ActivityType.Workout, ActivityType.Smoke, ActivityType.Drink),
-            T("The Twins' Mother", "Matriarch of the docks. Feared and fed.", 1, "#FFB4A2", HatStyle.None, 1.2f, 3, ProofKind.Ring, ActivityType.Dining, ActivityType.Speech, ActivityType.Drink, ActivityType.Toilet),
-            T("Sultana Varela", "Hotel owner. The penthouse is her throne.", 2, "#D4A373", HatStyle.Crown, 1.1f, 3, ProofKind.Ring, ActivityType.Speech, ActivityType.Drink, ActivityType.Dining, ActivityType.Toilet, ActivityType.Garden),
-            T("Hugo Spade", "Crypto prince. Lives at the pool bar.", 2, "#00B4D8", HatStyle.Cap, 1.05f, 2, ProofKind.Keycard, ActivityType.Drink, ActivityType.Workout, ActivityType.Phone, ActivityType.Toilet),
-            T("General Okafor", "Retired, rich, and planning a coup from suite 40.", 2, "#2A9D8F", HatStyle.Beret, 1.25f, 3, ProofKind.Dossier, ActivityType.Office, ActivityType.Phone, ActivityType.Drink, ActivityType.Smoke),
-            T("Celeste Moreau", "Star architect of the Zenith. Knows every vent.", 2, "#F4A261", HatStyle.Beret, 1.0f, 2, ProofKind.Briefcase, ActivityType.Inspect, ActivityType.Office, ActivityType.Drink, ActivityType.Toilet),
-            T("Mr. Velvet", "The hotel's head of security. Smiles at cameras.", 2, "#5E548E", HatStyle.Fedora, 1.2f, 2, ProofKind.Badge, ActivityType.Lookout, ActivityType.Inspect, ActivityType.Drink, ActivityType.Smoke)
+            T("Selin Arda", "Arms buyer. Bus station, tea house, caravanserai, never sits far from a brazier.", 0, "#7D3C98", HatStyle.Beret, 1.05f, 2, ProofKind.Briefcase, ActivityType.Inspect, ActivityType.Speech, ActivityType.Phone, ActivityType.Drink),
+            T("Hajj Mansour", "Gold dealer of the covered souk. Weighs everything twice.", 0, "#D4AC0D", HatStyle.Turban, 1.1f, 2, ProofKind.Ring, ActivityType.Office, ActivityType.Drink, ActivityType.Dining, ActivityType.Toilet),
+            T("Sheikh Badr al-Fahim", "Caravan master. Every truck in the oasis pays him.", 0, "#A04000", HatStyle.Turban, 1.2f, 2, ProofKind.Ledger, ActivityType.Workout, ActivityType.Dining, ActivityType.Phone, ActivityType.Smoke),
+            T("Captain Farid Lahlou", "Town police. Sells the citadel the names of petitioners.", 0, "#1B4F72", HatStyle.Cap, 1.15f, 2, ProofKind.Badge, ActivityType.Office, ActivityType.Smoke, ActivityType.Inspect, ActivityType.Garden),
+            T("Mona Haddad", "Runs the souk's smugglers from the minaret's shadow.", 0, "#922B21", HatStyle.None, 1.0f, 1, ProofKind.Dossier, ActivityType.Drink, ActivityType.Idle, ActivityType.Lookout, ActivityType.Dining),
+            T("Colonel Rashed", "Commands the radar. Walks the rope bridge to the keep every hour.", 1, "#4D5656", HatStyle.Beret, 1.25f, 3, ProofKind.Keycard, ActivityType.Office, ActivityType.Lookout, ActivityType.Idle, ActivityType.Workout),
+            T("Adjutant Karim", "The colonel's shadow. Sees through every pass.", 1, "#566573", HatStyle.Cap, 1.15f, 2, ProofKind.Badge, ActivityType.Inspect, ActivityType.Phone, ActivityType.Smoke, ActivityType.Dining),
+            T("Dr. Nabil Sayegh", "Radar engineer. The dish is his and nobody else's.", 1, "#5DADE2", HatStyle.None, 1.0f, 1, ProofKind.Briefcase, ActivityType.Office, ActivityType.Workout, ActivityType.Drink, ActivityType.Toilet),
+            T("Foreman Youssef", "Runs the date press and the tithe scale.", 1, "#6E2C00", HatStyle.Turban, 1.15f, 1, ProofKind.Ledger, ActivityType.Inspect, ActivityType.Garden, ActivityType.Speech, ActivityType.Smoke),
+            T("Layla Bennani", "Buys the oasis's water rights, one well at a time.", 1, "#117A65", HatStyle.Beret, 1.0f, 2, ProofKind.Dossier, ActivityType.Drink, ActivityType.Garden, ActivityType.Phone, ActivityType.Dining),
+            T("Governor Nasser al-Hadd", "Study, war room, the throne, tea on the pool terrace.", 2, "#F8F9F9", HatStyle.Crown, 1.15f, 3, ProofKind.Ring, ActivityType.Office, ActivityType.Speech, ActivityType.Drink, ActivityType.Dining),
+            T("Treasurer Idris", "Counts the vault, the archive and the tithe.", 2, "#7B7D7D", HatStyle.Fedora, 1.0f, 1, ProofKind.Ledger, ActivityType.Office, ActivityType.Inspect, ActivityType.Phone, ActivityType.Toilet),
+            T("Chamberlain Aziz", "Keeps the doors of the keep and the secrets behind them.", 2, "#283747", HatStyle.Turban, 1.05f, 1, ProofKind.Keycard, ActivityType.Inspect, ActivityType.Dining, ActivityType.Phone, ActivityType.Smoke),
+            T("Samira al-Hadd", "The governor's daughter. Holds court on the roof.", 2, "#AF7AC5", HatStyle.None, 1.0f, 2, ProofKind.Ring, ActivityType.Drink, ActivityType.Garden, ActivityType.Dining, ActivityType.Toilet),
+            T("General Halim Darwish", "Visiting with an army for sale.", 2, "#1D8348", HatStyle.Beret, 1.25f, 3, ProofKind.Dossier, ActivityType.Speech, ActivityType.Workout, ActivityType.Lookout, ActivityType.Drink)
         };
 
-        private static List<TargetProfile> SuburbTargets() => new List<TargetProfile>
+        private static List<TargetProfile> WeisshornTargets() => new List<TargetProfile>
         {
-            T("Chet Malloy", "Car dealer. Every sale is a scam.", 0, "#E63946", HatStyle.Cowboy, 1.15f, 2, ProofKind.Keycard, ActivityType.Phone, ActivityType.Drink, ActivityType.Smoke, ActivityType.Toilet),
-            T("Darlene Pike", "Owns the diner, the mall and the councilman.", 0, "#F4A6A6", HatStyle.None, 1.1f, 2, ProofKind.Ring, ActivityType.Dining, ActivityType.Drink, ActivityType.Office, ActivityType.Phone),
-            T("Chief Halvorsen", "Police chief with a second payroll.", 0, "#1D3557", HatStyle.Cap, 1.2f, 3, ProofKind.Badge, ActivityType.Office, ActivityType.Lookout, ActivityType.Drink, ActivityType.Smoke),
-            T("Mickey Glass", "Projectionist. Films more than movies.", 0, "#A8DADC", HatStyle.Beanie, 1.0f, 1, ProofKind.Briefcase, ActivityType.Inspect, ActivityType.Smoke, ActivityType.Drink, ActivityType.Toilet),
-            T("Reverend Doyle", "Weekend sermons, weeknight deals.", 0, "#6C584C", HatStyle.TopHat, 1.1f, 2, ProofKind.Dossier, ActivityType.Speech, ActivityType.Phone, ActivityType.Drink, ActivityType.Toilet),
-            T("Big Ronnie", "Bikers' president. The bowling alley is his court.", 1, "#3A3A3A", HatStyle.Beanie, 1.3f, 3, ProofKind.Dossier, ActivityType.Workout, ActivityType.Drink, ActivityType.Smoke, ActivityType.Toilet),
-            T("Jolene 'Wrench' Hart", "Chop-shop genius. Sleeps under cars.", 1, "#E9C46A", HatStyle.Cap, 1.05f, 2, ProofKind.Keycard, ActivityType.Inspect, ActivityType.Drink, ActivityType.Smoke, ActivityType.Phone),
-            T("Slick Tobias", "Fences everything the bikers steal.", 1, "#8E7DBE", HatStyle.Fedora, 1.0f, 2, ProofKind.Ledger, ActivityType.Office, ActivityType.Phone, ActivityType.Drink, ActivityType.Toilet),
-            T("Granny Voss", "Bakes pies. The pies are not the business.", 1, "#F1FAEE", HatStyle.Beanie, 0.95f, 2, ProofKind.Ring, ActivityType.Dining, ActivityType.Garden, ActivityType.Drink, ActivityType.Toilet),
-            T("Butch Calloway", "Enforcer. Practises his swing at the lanes.", 1, "#BC4749", HatStyle.Cap, 1.3f, 2, ProofKind.Dossier, ActivityType.Workout, ActivityType.Lookout, ActivityType.Drink, ActivityType.Smoke),
-            T("Senator Whitlock", "Hosts the garden party. Sells the town.", 2, "#F8F9FA", HatStyle.TopHat, 1.15f, 3, ProofKind.Ledger, ActivityType.Speech, ActivityType.Garden, ActivityType.Drink, ActivityType.Toilet, ActivityType.Dining),
-            T("Vivian Whitlock", "The senator's wife. The real senator.", 2, "#9D4EDD", HatStyle.Beret, 1.05f, 2, ProofKind.Ring, ActivityType.Garden, ActivityType.Drink, ActivityType.Phone, ActivityType.Toilet),
-            T("Preston Whitlock III", "Golden boy. Throws pool parties nightly.", 2, "#FFD166", HatStyle.Cap, 1.1f, 2, ProofKind.Dossier, ActivityType.Drink, ActivityType.Workout, ActivityType.Smoke, ActivityType.Toilet),
-            T("Agnes the Butler", "Has served three families. Buried two.", 2, "#495057", HatStyle.None, 1.0f, 1, ProofKind.Keycard, ActivityType.Inspect, ActivityType.Dining, ActivityType.Drink, ActivityType.Toilet),
-            T("Dr. Oswin Hale", "Family lawyer. Keeps the will in his case.", 2, "#2B2D42", HatStyle.Fedora, 1.05f, 2, ProofKind.Briefcase, ActivityType.Office, ActivityType.Phone, ActivityType.Drink, ActivityType.Garden)
+            T("Mara Lindqvist", "The banker. Fondue at the Gasthaus before the gala, always the same table.", 0, "#1F618D", HatStyle.Beret, 1.0f, 2, ProofKind.Briefcase, ActivityType.Dining, ActivityType.Drink, ActivityType.Phone, ActivityType.Idle),
+            T("Mayor Gerhard Moll", "Sold the mountain to the hotel, one permit at a time.", 0, "#7B241C", HatStyle.Fedora, 1.15f, 2, ProofKind.Ledger, ActivityType.Speech, ActivityType.Dining, ActivityType.Office, ActivityType.Toilet),
+            T("Lotte Brenner", "The landlady. Hears everything the skiers say.", 0, "#B7950B", HatStyle.None, 1.05f, 1, ProofKind.Dossier, ActivityType.Office, ActivityType.Drink, ActivityType.Smoke, ActivityType.Garden),
+            T("Inspector Rainer Huber", "The gendarme who never sees the snowcats at night.", 0, "#2E4053", HatStyle.Cap, 1.15f, 2, ProofKind.Badge, ActivityType.Inspect, ActivityType.Smoke, ActivityType.Lookout, ActivityType.Phone),
+            T("Pascal Imboden", "Rents skis. Rents other things to the hotel's guests.", 0, "#117864", HatStyle.Beanie, 1.05f, 1, ProofKind.Dossier, ActivityType.Workout, ActivityType.Idle, ActivityType.Drink, ActivityType.Dining),
+            T("Viktor Sorel", "Arms dealer. Cable car, bunker, the bar, a cigar on the terrace.", 1, "#4A235A", HatStyle.Fedora, 1.15f, 3, ProofKind.Briefcase, ActivityType.Inspect, ActivityType.Phone, ActivityType.Smoke, ActivityType.Drink),
+            T("Dr. Elias Frey", "Runs the observatory. The telescope looks at the hotel.", 1, "#D0D3D4", HatStyle.None, 1.0f, 1, ProofKind.Dossier, ActivityType.Office, ActivityType.Lookout, ActivityType.Dining, ActivityType.Toilet),
+            T("Captain Lars Wenger", "Commands the bunker for whoever pays this winter.", 1, "#424949", HatStyle.Beret, 1.25f, 3, ProofKind.Keycard, ActivityType.Inspect, ActivityType.Office, ActivityType.Workout, ActivityType.Smoke),
+            T("Annika Roth", "Ski instructor and courier. The pistes are her office.", 1, "#C0392B", HatStyle.Beanie, 1.0f, 1, ProofKind.Dossier, ActivityType.Workout, ActivityType.Drink, ActivityType.Speech, ActivityType.Idle),
+            T("Bruno Gasser", "Drives the groomer. Moves crates nobody declares.", 1, "#A04000", HatStyle.Cap, 1.2f, 1, ProofKind.Ledger, ActivityType.Inspect, ActivityType.Garden, ActivityType.Smoke, ActivityType.Toilet),
+            T("Konrad Aschauer", "The host. Suite, cinema, the speech under the chandelier, the sauna.", 2, "#17202A", HatStyle.TopHat, 1.15f, 3, ProofKind.Ring, ActivityType.Office, ActivityType.Idle, ActivityType.Speech, ActivityType.Workout),
+            T("Chief Brandt", "Hotel security. Inspects everything, trusts nothing.", 2, "#283747", HatStyle.Cap, 1.2f, 2, ProofKind.Keycard, ActivityType.Office, ActivityType.Inspect, ActivityType.Smoke, ActivityType.Phone),
+            T("Sabine Aschauer", "The host's wife. The real owner of the hotel.", 2, "#922B21", HatStyle.None, 1.0f, 2, ProofKind.Ring, ActivityType.Drink, ActivityType.Garden, ActivityType.Dining, ActivityType.Toilet),
+            T("Dmitri Volkov", "VIP guest. Buys the observatory's data.", 2, "#1C2833", HatStyle.Fedora, 1.2f, 3, ProofKind.Briefcase, ActivityType.Drink, ActivityType.Phone, ActivityType.Lookout, ActivityType.Dining),
+            T("Celeste Morel", "The gala singer. Carries messages in her songs.", 2, "#F5B7B1", HatStyle.None, 1.0f, 1, ProofKind.Dossier, ActivityType.Speech, ActivityType.Drink, ActivityType.Toilet, ActivityType.Idle)
         };
     }
 }

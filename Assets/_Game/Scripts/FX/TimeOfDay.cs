@@ -108,9 +108,10 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
             // Ambient light and reflections come from that sky.
             RenderSettings.ambientMode = AmbientMode.Skybox;
-            RenderSettings.ambientIntensity = p.ambient;
+            _ambient = p.ambient;
+            RenderSettings.ambientIntensity = p.ambient * _indoor;
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
-            RenderSettings.reflectionIntensity = Mathf.Clamp01(p.ambient);
+            RenderSettings.reflectionIntensity = Mathf.Clamp01(p.ambient) * _indoor;
             RenderSettings.fog = false;
             DynamicGI.UpdateEnvironment();
 
@@ -128,6 +129,31 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 lLight.enabled = p.lamps > 0.01f;
                 lLight.intensity = lAuthored * p.lamps;
             }
+        }
+
+        private float _ambient = 1f, _indoor = 1f, _appliedIndoor = 1f;
+
+        /// <summary>
+        /// Indoors (a roof right over the camera) the sky's ambient light is mostly shut out: without
+        /// it, generated interiors would glow sky-blue. Smoothed, and the environment refreshed only
+        /// when it changed noticeably.
+        /// </summary>
+        private void LateUpdate()
+        {
+            Camera lCamera = Camera.main;
+            if (lCamera == null || Current < 0) return;
+            Vector3 p = lCamera.transform.position;
+            bool lRoof = Physics.Raycast(p, Vector3.up, 14f, Core.GameLayers.WorldMask, QueryTriggerInteraction.Ignore);
+            int lWalls = 0;
+            if (lRoof)
+                foreach (Vector3 d in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right })
+                    if (Physics.Raycast(p, d, 18f, Core.GameLayers.WorldMask, QueryTriggerInteraction.Ignore)) lWalls++;
+            _indoor = Mathf.MoveTowards(_indoor, lRoof && lWalls >= 3 ? 0.3f : 1f, Time.deltaTime * 1.5f);
+            if (Mathf.Abs(_indoor - _appliedIndoor) < 0.05f && !(_indoor == 1f && _appliedIndoor != 1f)) return;
+            _appliedIndoor = _indoor;
+            RenderSettings.ambientIntensity = _ambient * _indoor;
+            RenderSettings.reflectionIntensity = Mathf.Clamp01(_ambient) * _indoor;
+            DynamicGI.UpdateEnvironment();
         }
 
         /// <summary>Each street lamp's authored intensity, remembered the first time it is dimmed.</summary>

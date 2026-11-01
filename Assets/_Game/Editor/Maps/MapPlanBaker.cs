@@ -23,15 +23,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public const int RES = 1024, FLOORS = 4;
         private const float CUT = 1.3f;
 
-        private static readonly Color32 VOID = new Color32(24, 26, 29, 255);
-        private static readonly Color32 GROUND = new Color32(54, 58, 63, 255);
-        private static readonly Color32 TREE = new Color32(41, 45, 49, 255);
-        private static readonly Color32 WATER = new Color32(33, 41, 50, 255);
-        private static readonly Color32 PATH = new Color32(112, 116, 121, 255);
-        private static readonly Color32 ROAD = new Color32(190, 193, 197, 255);
-        private static readonly Color32 FLOOR = new Color32(160, 164, 170, 255);
-        private static readonly Color32 WALL = new Color32(84, 89, 96, 255);
-        private static readonly Color32 EDGE = new Color32(62, 66, 72, 255);
+        private static readonly Color32 VOID = new Color32(16, 18, 21, 255);
+        private static readonly Color32 GROUND = new Color32(38, 42, 46, 255);
+        private static readonly Color32 TREE = new Color32(28, 32, 35, 255);
+        private static readonly Color32 WATER = new Color32(34, 58, 84, 255);
+        private static readonly Color32 PATH = new Color32(78, 82, 86, 255);
+        private static readonly Color32 ROAD = new Color32(112, 116, 121, 255);
+        private static readonly Color32 FLOOR = new Color32(150, 155, 162, 255);
+        private static readonly Color32 WALL = new Color32(232, 234, 238, 255);
+        private static readonly Color32 EDGE = new Color32(200, 204, 210, 255);
 
         public static void Bake(MapDefinition pMap, Terrain pLand, float pStorey)
         {
@@ -47,9 +47,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             List<int> lRoads = new List<int>(), lPaths = new List<int>();
             for (int l = 0; l < lData.terrainLayers.Length; l++)
             {
-                string lName = lData.terrainLayers[l] != null ? lData.terrainLayers[l].name : "";
-                if (lName.Contains("Asphalt") || lName.Contains("Cobble")) lRoads.Add(l);
-                else if (lName.Contains("Dirt")) lPaths.Add(l);
+                // Layers follow the Ground order (realistic maps use PBR sets under other names).
+                string lName = lData.terrainLayers[l] != null ? lData.terrainLayers[l].name.ToLowerInvariant() : "";
+                if (l == (int)Ground.Asphalt || l == (int)Ground.Cobble || lName.Contains("asphalt") || lName.Contains("cobble")) lRoads.Add(l);
+                else if (l == (int)Ground.Dirt) lPaths.Add(l);
             }
 
             // Tree crowns.
@@ -58,8 +59,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 GameObject lPrefab = lData.treePrototypes[lTree.prototypeIndex].prefab;
                 string lName = lPrefab != null ? lPrefab.name : "";
-                if (lName.StartsWith("Rock") || lName.StartsWith("Grass") || lName.StartsWith("Flower")) continue;
-                float lRadius = (lName.StartsWith("Bush") ? 1.1f : 2.4f) * lTree.widthScale;
+                if (lName.StartsWith("Rock") || lName.StartsWith("Grass") || lName.StartsWith("Flower") || lName.Contains("_Rock") || lName.Contains("Grass") || lName.Contains("Log") || lName.Contains("Fern")) continue;
+                bool lBush = lName.StartsWith("Bush") || lName.Contains("Bush") || lName.Contains("Banana") || lName.Contains("Shrub");
+                float lRadius = (lBush ? 1.1f : lName.Contains("Ceiba") ? 9f : lName.Contains("JungleTree") || lName.Contains("Acacia") ? 4.5f : 2.4f) * lTree.widthScale;
                 Disc(lTrees, lTree.position.x * RES, lTree.position.z * RES, lRadius / lCell);
             }
 

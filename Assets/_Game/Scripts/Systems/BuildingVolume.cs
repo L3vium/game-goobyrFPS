@@ -24,6 +24,8 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
         public static IReadOnlyList<BuildingVolume> All => _all;
 
         public string BuildingName => _buildingName;
+        /// <summary>Footprint and height (the volume stands on its transform, 4 m of slack below).</summary>
+        public Vector3 Size => _size;
         public bool PowerOn { get; set; } = true;
         public bool Gassed { get; set; }
 

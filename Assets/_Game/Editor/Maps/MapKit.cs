@@ -1198,6 +1198,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// </summary>
         public float CoverSpacing;
 
+        /// <summary>Storey height the map plan is baked with (3.6 m on the realistic maps).</summary>
+        public float PlanStorey = STOREY;
+
+        /// <summary>Called once the sun and the sky exist (the realistic maps add their time of day there).</summary>
+        public System.Action<Light, Material> AfterLight;
+
+        /// <summary>Registers something waist-high or taller as cover (cover points are generated around it).</summary>
+        public void AddCover(Vector3 pCenter, Vector3 pSize, Quaternion pRotation) => _coverSources.Add((pCenter, pSize, pRotation));
+
         /// <summary>Cover points around every registered cover source, where there is floor and room.</summary>
         private void GenerateCover()
         {
@@ -1263,6 +1272,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lLight.shadows = LightShadows.Soft;
             lLight.shadowStrength = 0.75f;
             RenderSettings.sun = lLight;
+            AfterLight?.Invoke(lLight, lSky);
 
             GameObject lVolume = new GameObject("MapVolume");
             lVolume.transform.SetParent(Lights, false);
@@ -1351,7 +1361,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             int lCount = 0;
             void Cull(GameObject pObject, float pScreen)
             {
-                if (pObject.GetComponent<LODGroup>() != null) return;
+                if (pObject.GetComponentInChildren<LODGroup>() != null) return;
                 Renderer[] lRenderers = pObject.GetComponentsInChildren<Renderer>();
                 if (lRenderers.Length == 0) return;
                 foreach (Renderer lRenderer in lRenderers)
@@ -1369,7 +1379,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             foreach (Transform lChild in Props)
             {
-                if (lChild.name == "PatrolCar" || lChild.name == "Chandelier") continue;
+                if (lChild.name == "PatrolCar" || lChild.name == "Chandelier" || lChild.name == "ArchSystems") continue;
                 Cull(lChild.gameObject, pPropScreen);
             }
             Debug.Log($"[Build] {Map.sceneName}: {lCount} culling groups");
@@ -1384,7 +1394,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Light();
             BakeNavMesh();
             SnapToNavMesh();
-            if (Land != null) MapPlanBaker.Bake(Map, Land, STOREY);
+            if (Land != null) MapPlanBaker.Bake(Map, Land, PlanStorey);
             Scene lScene = SceneManager.GetActiveScene();
             EditorSceneManager.SaveScene(lScene, _scenePath);
             AssetDatabase.SaveAssets();

@@ -32,6 +32,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public IReadOnlyList<(Vector2 center, float radius)> TallGrassFields => _tallGrass;
 
         public const int LAND_RESOLUTION = 1025;
+
+        /// <summary>Realistic maps: the PBR ground layers (in <see cref="Ground"/> order) instead of the stylized ones.</summary>
+        public TerrainLayer[] LandLayers;
+        /// <summary>Realistic maps: mesh details (instanced grass, ferns), each with a density 0..1 per world point.</summary>
+        public readonly List<(DetailPrototype prototype, System.Func<float, float, float> density, int max)> Details = new List<(DetailPrototype, System.Func<float, float, float>, int)>();
+        /// <summary>Realistic maps: the detail that fills the tall grass fields (null = the stylized blades).</summary>
+        public DetailPrototype TallGrassDetail;
+        private System.Func<float, float, bool> _holes;
         private string LandPath => EditorAssets.SCENES + "/" + Map.sceneName + "_Terrain.asset";
         private const int ALPHA_RESOLUTION = 1024, DETAIL_RESOLUTION = 1024;
 
@@ -56,7 +64,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (int x = 0; x < LAND_RESOLUTION; x++)
                     lHeights[z, x] = Mathf.Clamp01((pHeight(_landOrigin.x + x * lStep, _landOrigin.z + z * lStep) - pMinY) / lRange);
             _landData.SetHeights(0, 0, lHeights);
-            _landData.terrainLayers = TextureBuilder.Layers();
+            _landData.terrainLayers = LandLayers ?? TextureBuilder.Layers();
             _landData.alphamapResolution = ALPHA_RESOLUTION;
             _landData.SetTreeInstances(new TreeInstance[0], false);
             _landData.detailPrototypes = new DetailPrototype[0];
@@ -68,7 +76,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lObject.transform.position = _landOrigin;
             lObject.isStatic = true;
             Land = lObject.GetComponent<Terrain>();
-            Land.materialTemplate = LandMaterial();
+            Land.materialTemplate = LandLayers != null ? PbrLandMaterial() : LandMaterial();
             Land.heightmapPixelError = 3f;
             Land.basemapDistance = 220f;
             Land.drawInstanced = true;
@@ -91,6 +99,25 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             AssetDatabase.CreateAsset(lMaterial, lPath);
             return lMaterial;
         }
+
+        private static Material PbrLandMaterial()
+        {
+            string lPath = PbrLibrary.MATERIALS + "/M_LandPbr.mat";
+            Material lMaterial = AssetDatabase.LoadAssetAtPath<Material>(lPath);
+            if (lMaterial == null)
+            {
+                lMaterial = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
+                AssetDatabase.CreateAsset(lMaterial, lPath);
+            }
+            lMaterial.EnableKeyword("_NORMALMAP");
+            lMaterial.EnableKeyword("_MASKMAP");
+            lMaterial.EnableKeyword("_ALPHATEST_ON");
+            EditorUtility.SetDirty(lMaterial);
+            return lMaterial;
+        }
+
+        /// <summary>Cuts holes in the terrain where the function says so (cellars, cave mouths): applied by <see cref="Finish"/>.</summary>
+        public void LandHoles(System.Func<float, float, bool> pHole) => _holes = pHole;
 
         /// <summary>World point of a heightmap/alphamap sample.</summary>
         private Vector2 LandPoint(int pX, int pZ, int pResolution) => new Vector2(_landOrigin.x + (pX + 0.5f) / pResolution * _landSize, _landOrigin.z + (pZ + 0.5f) / pResolution * _landSize);
@@ -154,6 +181,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             string lFolder = EditorAssets.ROOT + "/Art/Generated/Trees", lPath = lFolder + "/" + pPiece + ".prefab";
             GameObject lExisting = AssetDatabase.LoadAssetAtPath<GameObject>(lPath);
             if (lExisting != null) return lExisting;
+            if (pPiece.StartsWith("Veg_")) return VegLibrary.TreePrefab(pPiece);
             Mesh lMesh = KitMesh("Nature", pPiece);
             if (lMesh == null) return null;
             EditorAssets.EnsureFolder(lFolder);
@@ -237,7 +265,38 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (Land == null) return;
             _landData.treePrototypes = _treePrototypes.ToArray();
             _landData.SetTreeInstances(_treeInstances.ToArray(), true);
-            if (_grassDensity != null)
+            if (Details.Count > 0)
+            {
+                _landData.SetDetailResolution(DETAIL_RESOLUTION, 32);
+                List<DetailPrototype> lPrototypes = new List<DetailPrototype>();
+                foreach (var lDetail in Details) lPrototypes.Add(lDetail.prototype);
+                if (TallGrassDetail != null) lPrototypes.Add(TallGrassDetail);
+                _landData.detailPrototypes = lPrototypes.ToArray();
+                for (int d = 0; d < Details.Count; d++)
+                {
+                    int[,] lLayer = new int[DETAIL_RESOLUTION, DETAIL_RESOLUTION];
+                    for (int z = 0; z < DETAIL_RESOLUTION; z++)
+                        for (int x = 0; x < DETAIL_RESOLUTION; x++)
+                        {
+                            Vector2 p = LandPoint(x, z, DETAIL_RESOLUTION);
+                            if (_tallGrass.Count > 0 && TallGrassDensity(p.x, p.y) > 0.3f) continue;
+                            lLayer[z, x] = Mathf.RoundToInt(Mathf.Clamp01(Details[d].density(p.x, p.y)) * Details[d].max);
+                        }
+                    _landData.SetDetailLayer(0, 0, d, lLayer);
+                }
+                if (TallGrassDetail != null)
+                {
+                    int[,] lTall = new int[DETAIL_RESOLUTION, DETAIL_RESOLUTION];
+                    for (int z = 0; z < DETAIL_RESOLUTION; z++)
+                        for (int x = 0; x < DETAIL_RESOLUTION; x++)
+                        {
+                            Vector2 p = LandPoint(x, z, DETAIL_RESOLUTION);
+                            lTall[z, x] = Mathf.RoundToInt(TallGrassDensity(p.x, p.y) * 6f);
+                        }
+                    _landData.SetDetailLayer(0, 0, Details.Count, lTall);
+                }
+            }
+            else if (_grassDensity != null)
             {
                 _landData.SetDetailResolution(DETAIL_RESOLUTION, 32);
                 _landData.detailPrototypes = new[]
@@ -277,6 +336,18 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                             lTall[z, x] = Mathf.RoundToInt(TallGrassDensity(p.x, p.y) * 7f);
                         }
                 _landData.SetDetailLayer(0, 0, 1, lTall);
+            }
+            if (_holes != null)
+            {
+                int lRes = _landData.holesResolution;
+                bool[,] lSolid = new bool[lRes, lRes];
+                for (int z = 0; z < lRes; z++)
+                    for (int x = 0; x < lRes; x++)
+                    {
+                        Vector2 p = LandPoint(x, z, lRes);
+                        lSolid[z, x] = !_holes(p.x, p.y);
+                    }
+                _landData.SetHoles(0, 0, lSolid);
             }
             Land.terrainData = _landData;
             Land.GetComponent<TerrainCollider>().terrainData = _landData;

@@ -25,7 +25,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             ArtBuilder.Build();
             SfxBuilder.Build();
             PrefabBuilder.Build();
-            new MapForest().Build();
+            PbrLibrary.Build();
+            new MapSanLazaro().Build();
             new MapGulf().Build();
             new MapSuburb().Build();
             Title();

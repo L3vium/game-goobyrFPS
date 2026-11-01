@@ -132,7 +132,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private void Maps()
         {
             EditorGUILayout.LabelField("Rebuild", EditorStyles.boldLabel);
-            if (GUILayout.Button("Pinecrest Hollow (forest)")) new MapForest().Build();
+            if (GUILayout.Button("San Lázaro (jungle)")) new MapSanLazaro().Build();
             if (GUILayout.Button("Mirage Bay (gulf)")) new MapGulf().Build();
             if (GUILayout.Button("Elmridge (suburb)")) new MapSuburb().Build();
             if (GUILayout.Button("Everything (data, art, prefabs, sounds, maps, title)")) BuildPipelineMenu.All();
@@ -167,20 +167,38 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // Edit mode: the static registries fill in OnEnable at play time, so look in the scene.
             MatchPoint[] lPoints = Object.FindObjectsByType<MatchPoint>(FindObjectsSortMode.None);
             ActivityNode[] lNodes = Object.FindObjectsByType<ActivityNode>(FindObjectsSortMode.None);
+            NpcSpawnPoint[] lSpawns = Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None);
             int Count(MatchPoint.Kind pKind) => System.Linq.Enumerable.Count(lPoints, p => p.PointKind == pKind);
+            bool Kit(ItemKind k) => k == ItemKind.Invitation || k == ItemKind.StaffPass || k == ItemKind.Keycard;
+            bool Throwable(ItemKind k) => k == ItemKind.Rock || k == ItemKind.Bottle || k == ItemKind.Wrench || k == ItemKind.Brick || k == ItemKind.Coin;
             int lStarts = Count(MatchPoint.Kind.Start), lExtractions = Count(MatchPoint.Kind.Extraction), lWeapons = Count(MatchPoint.Kind.WeaponSpawn);
+            int lInside = System.Linq.Enumerable.Count(lPoints, p => p.PointKind == MatchPoint.Kind.Start && Kit(p.Item));
+            int lThrowables = System.Linq.Enumerable.Count(lPoints, p => p.PointKind == MatchPoint.Kind.GadgetSpawn && Throwable(p.Item));
             int lRockets = System.Linq.Enumerable.Count(lPoints, p => p.PointKind == MatchPoint.Kind.UniqueWeaponSpawn && p.Item == ItemKind.RocketLauncher);
             int lFlames = System.Linq.Enumerable.Count(lPoints, p => p.PointKind == MatchPoint.Kind.UniqueWeaponSpawn && p.Item == ItemKind.Flamethrower);
-            int lNpcs = Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None).Length;
+            int lNpcs = lSpawns.Length;
             int lZones = Object.FindObjectsByType<LevelZone>(FindObjectsSortMode.None).Length;
             int lCovers = Object.FindObjectsByType<CoverPoint>(FindObjectsSortMode.None).Length;
-            if (lStarts < 3) lFails.Add($"{lStarts} start points (< 3)");
+            int lVents = Object.FindObjectsByType<Systems.VentCover>(FindObjectsSortMode.None).Length;
+            int lSecure = Object.FindObjectsByType<Systems.SecureDoor>(FindObjectsSortMode.None).Length;
+            int lCameras = Object.FindObjectsByType<SecurityCamera>(FindObjectsSortMode.None).Length;
+            int lRecorders = Object.FindObjectsByType<Systems.CameraRecorder>(FindObjectsSortMode.None).Length;
+            int lClimbs = 0;
+            foreach (Collider lCollider in Object.FindObjectsByType<Collider>(FindObjectsInactive.Include, FindObjectsSortMode.None)) if (lCollider.gameObject.layer == GameLayers.CLIMBABLE) lClimbs++;
+            UI.MapPoi[] lPois = Object.FindObjectsByType<UI.MapPoi>(FindObjectsSortMode.None);
+            if (lStarts - lInside < 6) lFails.Add($"{lStarts - lInside} edge starts (< 6)");
+            if (lInside < 3) lFails.Add($"{lInside} inside starts with a pass (< 3)");
             if (lExtractions < 3) lFails.Add($"{lExtractions} extractions (< 3)");
-            if (lWeapons < 40) lFails.Add($"{lWeapons} weapon spawns (< 40)");
+            if (lWeapons < 30) lFails.Add($"{lWeapons} weapon spawns (< 30)");
+            if (lThrowables < 80) lFails.Add($"{lThrowables} throwables (< 80)");
             if (lRockets < 3) lFails.Add($"{lRockets} rocket launcher spots (< 3)");
             if (lFlames < 3) lFails.Add($"{lFlames} flamethrower spots (< 3)");
             if (lZones != 3) lFails.Add($"{lZones} zones (!= 3)");
-            if (lNpcs < 150) lFails.Add($"{lNpcs} NPCs (< 150)");
+            if (lNpcs < 100) lFails.Add($"{lNpcs} NPCs (< 100)");
+            if (lVents < 2) lFails.Add($"{lVents} vent grilles (< 2)");
+            if (lClimbs < 6) lFails.Add($"{lClimbs} climbable drainpipes/ladders/vines (< 6)");
+            if (lCameras < 3 || lRecorders < 1) lFails.Add($"{lCameras} cameras, {lRecorders} recorders (need 3+ and 1)");
+            if (System.Linq.Enumerable.Count(lPois, p => p.Type == UI.MapPoi.Kind.Landmark) < 3) lFails.Add("fewer than 3 landmark POIs");
             if (pMap.targets.Count != 15) lFails.Add($"{pMap.targets.Count} targets (!= 15)");
             foreach (TargetProfile lTarget in pMap.targets)
                 foreach (ActivityType lActivity in lTarget.routine)
@@ -191,7 +209,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             System.Collections.Generic.List<Vector3> lThreats = MatchDirector.ThreatPositions();
             foreach (MatchPoint lStart in lPoints)
             {
-                if (lStart.PointKind != MatchPoint.Kind.Start) continue;
+                // Inside starts (with a pass) are among the NPCs on purpose.
+                if (lStart.PointKind != MatchPoint.Kind.Start || Kit(lStart.Item)) continue;
                 float lClearance = MatchRulesLogic.StartClearance(lStart.transform.position, lThreats);
                 if (lClearance < MatchRulesLogic.SAFE_START_DISTANCE) lFails.Add($"start {lStart.Label} {lClearance:0} m from an NPC (< {MatchRulesLogic.SAFE_START_DISTANCE:0})");
             }
@@ -200,38 +219,70 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (lGroup.name == "TallGrass" && lGroup.GetComponentInChildren<Systems.TallGrass>() != null) lFields++;
             if (lFields < 6) lFails.Add($"{lFields} tall grass fields (< 6)");
             int lOffMesh = 0;
-            foreach (NpcSpawnPoint lSpawn in Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
-                if (!UnityEngine.AI.NavMesh.SamplePosition(lSpawn.transform.position, out _, 1f, UnityEngine.AI.NavMesh.AllAreas)) lOffMesh++;
-            if (lOffMesh > 0) lFails.Add($"{lOffMesh} NPC posts off the NavMesh");
+            string lOffExample = "";
+            foreach (NpcSpawnPoint lSpawn in lSpawns)
+                if (!UnityEngine.AI.NavMesh.SamplePosition(lSpawn.transform.position, out _, 1f, UnityEngine.AI.NavMesh.AllAreas)) { lOffMesh++; if (lOffExample.Length == 0) lOffExample = $" e.g. {lSpawn.name} at {lSpawn.transform.position:F0}"; }
+            if (lOffMesh > 0) lFails.Add($"{lOffMesh} NPC posts off the NavMesh{lOffExample}");
+            // No isolated NPCs: every post has another NPC or a patrol point within 25 m (lookouts excepted).
+            int lAlone = 0;
+            string lAloneExample = "";
+            foreach (NpcSpawnPoint lSpawn in lSpawns)
+            {
+                if (lSpawn.Role == NpcRole.Lookout || lSpawn.Route != null) continue;
+                bool lNear = false;
+                foreach (Vector3 lOther in lThreats)
+                {
+                    Vector3 d = lOther - lSpawn.transform.position;
+                    if (d.sqrMagnitude > 0.25f && d.sqrMagnitude < 25f * 25f) { lNear = true; break; }
+                }
+                if (!lNear) { lAlone++; if (lAloneExample.Length == 0) lAloneExample = $" e.g. {lSpawn.name} at {lSpawn.transform.position:F0}"; }
+            }
+            if (lAlone > 0) lFails.Add($"{lAlone} NPCs more than 25 m from any other{lAloneExample}");
+            // Entries: the key building (largest volume) has 5+ ways in, the next two 3+.
+            Systems.BuildingVolume[] lBuildings = Object.FindObjectsByType<Systems.BuildingVolume>(FindObjectsSortMode.None);
+            System.Array.Sort(lBuildings, (a, b) => (b.Size.x * b.Size.z).CompareTo(a.Size.x * a.Size.z));
+            for (int i = 0; i < Mathf.Min(3, lBuildings.Length); i++)
+            {
+                Bounds lArea = new Bounds(lBuildings[i].transform.position + Vector3.up * lBuildings[i].Size.y * 0.5f, lBuildings[i].Size + new Vector3(16f, 30f, 16f));
+                int lEntries = System.Linq.Enumerable.Count(lPois, p => p.Type != UI.MapPoi.Kind.Landmark && p.Type != UI.MapPoi.Kind.Overlook && lArea.Contains(p.transform.position));
+                int lNeed = i == 0 ? 5 : 3;
+                if (lEntries < lNeed) lFails.Add($"{lBuildings[i].name}: {lEntries} entries (< {lNeed})");
+            }
+            // Floating props: anything placed in the props groups must stand on something.
             int lFloating = 0;
             string lFloatingExample = "";
             Terrain lLand = Terrain.activeTerrain;
             System.Collections.Generic.List<Bounds> lWaters = new System.Collections.Generic.List<Bounds>();
             foreach (MeshRenderer lWater in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
                 if (lWater.gameObject.layer == GameLayers.WATER) lWaters.Add(lWater.bounds);
-            // Piers and boats stand over water, not over its bed.
-            bool OverWater(Vector3 pFoot) => System.Linq.Enumerable.Any(lWaters, w => pFoot.x >= w.min.x && pFoot.x <= w.max.x && pFoot.z >= w.min.z && pFoot.z <= w.max.z && pFoot.y > w.max.y - 0.6f && pFoot.y - w.max.y < 2.5f);
+            bool OverWater(Vector3 pFoot) => System.Linq.Enumerable.Any(lWaters, w => pFoot.x >= w.min.x && pFoot.x <= w.max.x && pFoot.z >= w.min.z && pFoot.z <= w.max.z && pFoot.y > w.max.y - 0.8f && pFoot.y - w.max.y < 2.5f);
             Physics.SyncTransforms();
-            foreach (MeshRenderer lRenderer in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+            foreach (Transform lGroup in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
             {
-                if (lLand == null || !lRenderer.gameObject.isStatic || lRenderer.transform.parent == null) continue;
-                // Pieces under a parent other than the props/env groups belong to buildings (floors, roofs).
-                string lGroup = lRenderer.transform.parent.name;
-                if (lGroup != "Props" && lGroup != "Env" && lGroup != "TreesAll") continue;
-                Bounds lBounds = lRenderer.bounds;
-                Vector3 lFoot = new Vector3(lBounds.center.x, lBounds.min.y, lBounds.center.z);
-                float lGround = lLand.SampleHeight(lFoot) + lLand.transform.position.y;
-                if (lFoot.y - lGround < 0.3f || OverWater(lFoot)) continue;
-                // Held by anything it touches: a floor under it, a table, or a wall it hangs on (TVs, grilles).
-                bool lSupported = false;
-                foreach (Collider lTouch in Physics.OverlapBox(lBounds.center, lBounds.extents + Vector3.one * 0.12f, Quaternion.identity, GameLayers.WorldMask, QueryTriggerInteraction.Ignore))
-                    if (lTouch.gameObject != lRenderer.gameObject) { lSupported = true; break; }
-                if (lSupported) continue;
-                lFloating++;
-                if (lFloatingExample.Length == 0) lFloatingExample = $" e.g. {lRenderer.name} at {lFoot:F0} +{lFoot.y - lGround:0.0} m";
+                if (lLand == null || (lGroup.name != "Props" && lGroup.name != "ArchProps")) continue;
+                foreach (Transform lProp in lGroup)
+                {
+                    Renderer[] lRenderers = lProp.GetComponentsInChildren<Renderer>();
+                    if (lRenderers.Length == 0) continue;
+                    Bounds lBounds = lRenderers[0].bounds;
+                    foreach (Renderer r in lRenderers) lBounds.Encapsulate(r.bounds);
+                    if (lBounds.size.x > 30f || lBounds.size.z > 30f) continue;
+                    Vector3 lFoot = new Vector3(lBounds.center.x, lBounds.min.y, lBounds.center.z);
+                    float lGround = lLand.SampleHeight(lFoot) + lLand.transform.position.y;
+                    if (lFoot.y - lGround < 0.3f || OverWater(lFoot)) continue;
+                    bool lSupported = false;
+                    foreach (Collider lTouch in Physics.OverlapBox(lBounds.center, lBounds.extents + Vector3.one * 0.12f, Quaternion.identity, GameLayers.WorldMask, QueryTriggerInteraction.Ignore))
+                        if (!lTouch.transform.IsChildOf(lProp)) { lSupported = true; break; }
+                    if (lSupported) continue;
+                    lFloating++;
+                    if (lFloatingExample.Length == 0) lFloatingExample = $" e.g. {lProp.name} at {lFoot:F0} +{lFoot.y - lGround:0.0} m";
+                }
             }
             if (lFloating > 0) lFails.Add($"{lFloating} floating props{lFloatingExample}");
-            string lCounts = $"{lStarts} starts, {lExtractions} extractions, {lWeapons} weapons, {lNpcs} NPCs, {lCovers} covers";
+            string lScene = EditorAssets.SCENES + "/" + pMap.sceneName + ".unity";
+            float lMegabytes = System.IO.File.Exists(lScene) ? new System.IO.FileInfo(lScene).Length / (1024f * 1024f) : 0f;
+            if (lMegabytes > 90f) lFails.Add($"scene {lMegabytes:0} MB (> 90)");
+            string lCounts = $"{lStarts} starts ({lInside} inside), {lExtractions} extractions, {lWeapons} weapons, {lThrowables} throwables, {lNpcs} NPCs, {lVents} vents, {lClimbs} climbs, {lSecure} secure doors, {lCameras} cameras, {lCovers} covers, {lMegabytes:0} MB";
             return lFails.Count == 0 ? $"OK   {pMap.displayName}: {lCounts}" : $"FAIL {pMap.displayName}: {string.Join("; ", lFails)}  ({lCounts})";
         }
     }

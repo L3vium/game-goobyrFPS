@@ -110,7 +110,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private MotionState _lastMotion;
 
         // IK.
-        private float _lookWeight, _footWeight, _supportWeight;
+        private float _lookWeight, _footWeight, _supportWeight, _alignWeight;
         private float _pelvisOffset;
         private static readonly RaycastHit[] _hits = new RaycastHit[4];
 
@@ -441,16 +441,41 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
             // Long guns: the left hand on the fore-end.
             Transform lSocket = _body.WeaponSocket;
-            bool lSupport = lNear && Held == HeldKind.Rifle && _upperWeight > 0.5f && Time.time >= _actionUntil && lSocket != null && lSocket.childCount > 0;
+            bool lTwoHanded = Held == HeldKind.Rifle || (Held == HeldKind.Pistol && Aiming);
+            bool lSupport = lNear && lTwoHanded && _upperWeight > 0.5f && Time.time >= _actionUntil && lSocket != null && lSocket.childCount > 0;
             _supportWeight = Mathf.MoveTowards(_supportWeight, lSupport ? 1f : 0f, dt * 6f);
             if (_supportWeight > 0.01f && lSocket != null)
             {
-                HumanRig.Grip lGrip = HumanRig.Instance.rifle;
+                Transform lMuzzle = lSocket.childCount > 0 ? lSocket.GetChild(0).Find("Muzzle") : null;
                 _animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, _supportWeight * _upperWeight);
-                _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, _supportWeight * _upperWeight * 0.8f);
-                _animator.SetIKPosition(AvatarIKGoal.LeftHand, lSocket.TransformPoint(lGrip.supportPosition));
-                _animator.SetIKRotation(AvatarIKGoal.LeftHand, lSocket.rotation * lGrip.supportRotation);
+                _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
+                _animator.SetIKPosition(AvatarIKGoal.LeftHand, lSocket.TransformPoint(HumanRig.Instance.SupportFor(Held, lMuzzle)));
             }
+        }
+
+        /// <summary>The support hand's rotation on the bone itself (the grips are measured on raw bones, not in the IK goal space).</summary>
+        private void LateUpdate()
+        {
+            AlignWeapon();
+            if (_supportWeight <= 0.01f || _body == null || _body.HandL == null || _body.WeaponSocket == null) return;
+            Quaternion lTarget = _body.WeaponSocket.rotation * HumanRig.Instance.For(Held).supportRotation;
+            _body.HandL.rotation = Quaternion.Slerp(_body.HandL.rotation, lTarget, _supportWeight * _upperWeight * 0.85f);
+        }
+
+        /// <summary>
+        /// Aiming, the gun turns about the grip onto the aim line (the clips' hands are keyed for the
+        /// pose, not for each gun): what a remote player sees pointed at them is really pointed at them.
+        /// </summary>
+        private void AlignWeapon()
+        {
+            if (_body == null || _body.WeaponSocket == null || _animator == null) return;
+            bool lGun = Held == HeldKind.Pistol || Held == HeldKind.Rifle;
+            _alignWeight = Mathf.MoveTowards(_alignWeight, lGun && Aiming && _upperWeight > 0.5f && Time.time >= _actionUntil ? 1f : 0f, Time.deltaTime * 5f);
+            _body.SetHeld(Held, true);
+            if (_alignWeight <= 0.001f) return;
+            Quaternion lAim = Quaternion.Euler(Mathf.Clamp(AimPitch, -70f, 70f), transform.eulerAngles.y, 0f);
+            Transform lSocket = _body.WeaponSocket;
+            lSocket.rotation = Quaternion.Slerp(lSocket.rotation, lAim, _alignWeight);
         }
 
         /// <summary>Sets one foot's goal over the ground below it; returns how far the ground sits below the animated foot (negative = lower).</summary>

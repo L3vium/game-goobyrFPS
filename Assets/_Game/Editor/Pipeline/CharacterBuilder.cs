@@ -150,7 +150,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 "Brows" or "Lashes" => 0.3f,
                 "Shoes" or "Boots" => 0.85f,
                 "Earpiece" => 0.9f,
-                _ => 0.75f
+                // Wool suits and cotton: a soft sheen, no plastic highlight.
+                _ => 0.4f
             };
             // With a metallic map, _Smoothness scales the map's smoothness; without, it is the value.
             if (pPart == "Eyes" && !lHasMap) lSmoothness = 0.9f;
@@ -168,6 +169,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 pMaterial.SetFloat("_Cutoff", pPart == "Hair" ? 0.4f : 0.3f);
                 pMaterial.SetFloat("_ReceiveShadows", 1f);
             }
+            // Garments are open shells (collars, cuffs, hems): seen from inside they must not vanish.
+            bool lCloth = pPart is "Suit" or "Shirt" or "Top" or "Jacket" or "Parka" or "Vest" or "Pants";
+            if (lCloth) { pMaterial.SetFloat("_Cull", 0f); pMaterial.doubleSidedGI = true; }
             pMaterial.SetColor("_EmissionColor", Color.black);
             pMaterial.EnableKeyword("_EMISSION");
             pMaterial.globalIlluminationFlags = MaterialGlobalIlluminationFlags.EmissiveIsBlack;
@@ -566,10 +570,16 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         // ---------------------------------------------------------------- grips
 
+        /// <summary>Rake of a pistol grip: the handle leans back this much from vertical.</summary>
+        private const float GRIP_RAKE = 18f;
+
         /// <summary>
-        /// Measures the grips on the reference character posed by the aim clips: the right palm holds
-        /// the weapon's Grip with the barrel along the aim (pistol: straight ahead; rifle: towards the
-        /// left hand), the left hand's pose is stored in the weapon's frame.
+        /// The grips, from the hand's own geometry (the skeleton is shared, so the numbers hold for
+        /// every body): the knuckle line lies along the handle (pinky low, index high, raked back),
+        /// the wrist-to-knuckles axis along the barrel, the palm against the handle - so the clip's
+        /// curled fingers wrap round it. Long guns: the same firing hand; the support hand under the
+        /// fore-end, palm up, knuckle line along the barrel. Pistols: the support hand cups the firing
+        /// hand from the left. Small items sit between the thumb and the first fingers.
         /// </summary>
         public static void Calibrate()
         {
@@ -579,60 +589,78 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             try
             {
                 Animator lAnimator = lInstance.GetComponent<Animator>();
-                if (lAnimator == null) lAnimator = lInstance.AddComponent<Animator>();
-                lAnimator.avatar = AvatarAt(Fbx($"{DIR}/{REFERENCE}"));
-                lRig.pistol = Measure(lInstance, lAnimator, Clip("Aim_Pistol"), false);
-                lRig.rifle = Measure(lInstance, lAnimator, Clip("Aim_Rifle"), true);
+                HandFrame lRight = Frame(lAnimator, true), lLeft = Frame(lAnimator, false);
 
-                Transform lHead = lAnimator.GetBoneTransform(HumanBodyBones.Head);
-                lRig.eyeInHead = lHead != null ? lHead.InverseTransformPoint(lHead.position + lInstance.transform.up * 0.09f + lInstance.transform.forward * 0.1f) : lRig.eyeInHead;
+                // Weapon frame: +Z barrel, +Y up. The handle axis leans back by the rake.
+                Vector3 lHandleUp = Quaternion.AngleAxis(GRIP_RAKE, Vector3.right) * Vector3.up;
+                Quaternion lFiring = Quaternion.LookRotation(Vector3.ProjectOnPlane(Vector3.forward, lHandleUp), lHandleUp);
+                // Weapon in the right hand's space: hand basis maps onto the firing basis.
+                Quaternion lWeaponInHand = lRight.basis * Quaternion.Inverse(lFiring);
+                Vector3 lGripInHand = lRight.palm + lRight.palmNormal * 0.016f;
 
-                // A small item pinched between the thumb and the first fingers, flat in the palm.
-                Clip("Idle").SampleAnimation(lInstance, 0f);
+                // Pistol: the support hand against the left of the handle, a little lower and forward.
+                Quaternion lCup = Quaternion.LookRotation(Quaternion.AngleAxis(25f, Vector3.up) * Vector3.ProjectOnPlane(Vector3.forward, lHandleUp), lHandleUp);
+                Quaternion lCupHand = lCup * Quaternion.Inverse(lLeft.basis);
+                Vector3 lCupPalm = new Vector3(-0.03f, -0.035f, 0.012f);
+                lRig.pistol = new HumanRig.Grip
+                {
+                    handPosition = lGripInHand,
+                    handRotation = lWeaponInHand,
+                    supportRotation = lCupHand,
+                    supportPosition = lCupPalm - lCupHand * (lLeft.palm + lLeft.palmNormal * 0.012f)
+                };
+
+                // Long gun: the support palm up under the fore-end, knuckle line along the barrel,
+                // fingers wrapping up its right side.
+                Quaternion lUnder = Quaternion.LookRotation(Quaternion.AngleAxis(35f, Vector3.forward) * Vector3.right, Vector3.forward);
+                Quaternion lUnderHand = lUnder * Quaternion.Inverse(lLeft.basis);
+                Vector3 lForePalm = new Vector3(0f, -0.04f, lRig.foreEnd);
+                lRig.rifle = new HumanRig.Grip
+                {
+                    handPosition = lGripInHand,
+                    handRotation = lWeaponInHand,
+                    supportRotation = lUnderHand,
+                    supportPosition = lForePalm - lUnderHand * (lLeft.palm + lLeft.palmNormal * 0.02f)
+                };
+
+                // A small item between the thumb and the index, lying along the fingers.
                 Transform lHand = lAnimator.GetBoneTransform(HumanBodyBones.RightHand);
                 Transform lIndex = lAnimator.GetBoneTransform(HumanBodyBones.RightIndexProximal);
                 Transform lThumb = lAnimator.GetBoneTransform(HumanBodyBones.RightThumbIntermediate);
-                Vector3 lPinch = (lIndex.position + lThumb.position) * 0.5f;
-                lRig.pinchPosition = lHand.InverseTransformPoint(lPinch);
-                lRig.pinchRotation = Quaternion.Inverse(lHand.rotation) * Quaternion.LookRotation(lInstance.transform.forward, Vector3.up);
+                lRig.pinchPosition = lHand.InverseTransformPoint((lIndex.position + lThumb.position) * 0.5f) + lRight.palmNormal * 0.01f;
+                lRig.pinchRotation = lWeaponInHand;
+
+                Transform lHead = lAnimator.GetBoneTransform(HumanBodyBones.Head);
+                lRig.eyeInHead = lHead.InverseTransformPoint(lHead.position + Vector3.up * 0.085f + Vector3.forward * 0.1f);
             }
             finally { Object.DestroyImmediate(lInstance); }
             EditorUtility.SetDirty(lRig);
         }
 
-        private static HumanRig.Grip Measure(GameObject pInstance, Animator pAnimator, AnimationClip pClip, bool pRifle)
+        private struct HandFrame
         {
-            pInstance.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
-            pClip.SampleAnimation(pInstance, pClip.length * 0.5f);
-            Transform lRight = pAnimator.GetBoneTransform(HumanBodyBones.RightHand);
-            Transform lLeft = pAnimator.GetBoneTransform(HumanBodyBones.LeftHand);
-            Vector3 lRightPalm = Palm(pAnimator, true);
-            Vector3 lLeftPalm = Palm(pAnimator, false);
-            // Both clips aim straight ahead (+Z): the barrel follows the aim, whatever the hands' height.
-            Vector3 lForward = Vector3.forward;
-            Quaternion lWeapon = Quaternion.LookRotation(lForward, Vector3.up);
-            return new HumanRig.Grip
-            {
-                handPosition = lRight.InverseTransformPoint(lRightPalm),
-                handRotation = Quaternion.Inverse(lRight.rotation) * lWeapon,
-                supportPosition = Quaternion.Inverse(lWeapon) * (lLeft.position - lRightPalm),
-                supportRotation = Quaternion.Inverse(lWeapon) * lLeft.rotation
-            };
+            /// <summary>In the hand bone's space: up = pinky to index knuckle, forward = wrist to knuckles.</summary>
+            public Quaternion basis;
+            public Vector3 palm, palmNormal;
         }
 
-        /// <summary>Centre of the palm: a little past the wrist towards the knuckles, pushed to the palm side.</summary>
-        private static Vector3 Palm(Animator pAnimator, bool pRight)
+        private static HandFrame Frame(Animator pAnimator, bool pRight)
         {
             Transform lHand = pAnimator.GetBoneTransform(pRight ? HumanBodyBones.RightHand : HumanBodyBones.LeftHand);
-            Transform lMiddle = pAnimator.GetBoneTransform(pRight ? HumanBodyBones.RightMiddleProximal : HumanBodyBones.LeftMiddleProximal);
-            Transform lIndex = pAnimator.GetBoneTransform(pRight ? HumanBodyBones.RightIndexProximal : HumanBodyBones.LeftIndexProximal);
-            Transform lLittle = pAnimator.GetBoneTransform(pRight ? HumanBodyBones.RightLittleProximal : HumanBodyBones.LeftLittleProximal);
-            Transform lThumb = pAnimator.GetBoneTransform(pRight ? HumanBodyBones.RightThumbProximal : HumanBodyBones.LeftThumbProximal);
-            Vector3 lCentre = Vector3.Lerp(lHand.position, lMiddle.position, 0.55f);
-            Vector3 lNormal = Vector3.Cross(lMiddle.position - lHand.position, lIndex.position - lLittle.position).normalized;
-            // The palm faces the thumb's side.
-            if (Vector3.Dot(lNormal, lThumb.position - lCentre) < 0f) lNormal = -lNormal;
-            return lCentre + lNormal * 0.022f;
+            Vector3 lIndex = lHand.InverseTransformPoint(pAnimator.GetBoneTransform(pRight ? HumanBodyBones.RightIndexProximal : HumanBodyBones.LeftIndexProximal).position);
+            Vector3 lMiddle = lHand.InverseTransformPoint(pAnimator.GetBoneTransform(pRight ? HumanBodyBones.RightMiddleProximal : HumanBodyBones.LeftMiddleProximal).position);
+            Vector3 lLittle = lHand.InverseTransformPoint(pAnimator.GetBoneTransform(pRight ? HumanBodyBones.RightLittleProximal : HumanBodyBones.LeftLittleProximal).position);
+            Vector3 lUp = (lIndex - lLittle).normalized;
+            Vector3 lForward = Vector3.ProjectOnPlane(lMiddle, lUp).normalized;
+            Vector3 lRightAxis = Vector3.Cross(lUp, lForward);
+            // A right hand's palm is on its left (-right axis) in this basis; a left hand's on its right.
+            Vector3 lPalmNormal = pRight ? -lRightAxis : lRightAxis;
+            return new HandFrame
+            {
+                basis = Quaternion.LookRotation(lForward, lUp),
+                palm = Vector3.Lerp(Vector3.zero, lMiddle, 0.5f) + (lLittle - lIndex) * 0.15f,
+                palmNormal = lPalmNormal
+            };
         }
     }
 }

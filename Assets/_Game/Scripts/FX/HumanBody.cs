@@ -69,6 +69,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         {
             if (Model != null)
             {
+                // Hidden at once: Destroy only happens at the end of the frame (a portrait shot this frame).
+                Model.gameObject.SetActive(false);
                 if (Application.isPlaying) Destroy(Model.gameObject); else DestroyImmediate(Model.gameObject);
             }
             Model = null;
@@ -138,13 +140,13 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private Transform Bone(HumanBodyBones pBone) => Animator != null && Animator.isHuman ? Animator.GetBoneTransform(pBone) : null;
 
         /// <summary>Where the held item sits: the calibrated grip for guns, between the fingers for small items.</summary>
-        public void SetHeld(HeldKind pKind)
+        public void SetHeld(HeldKind pKind, bool pReset = false)
         {
-            if (WeaponSocket == null || pKind == _socketKind) return;
+            if (WeaponSocket == null || (pKind == _socketKind && !pReset)) return;
             _socketKind = pKind;
             HumanRig lRig = HumanRig.Instance;
             if (pKind == HeldKind.Throwable || pKind == HeldKind.Tool)
-                WeaponSocket.SetLocalPositionAndRotation(pKind == HeldKind.Tool ? lRig.pistol.handPosition : lRig.pinchPosition, lRig.pistol.handRotation);
+                WeaponSocket.SetLocalPositionAndRotation(pKind == HeldKind.Tool ? lRig.pistol.handPosition : lRig.pinchPosition, pKind == HeldKind.Tool ? lRig.pistol.handRotation : lRig.pinchRotation);
             else
             {
                 HumanRig.Grip lGrip = lRig.For(pKind);

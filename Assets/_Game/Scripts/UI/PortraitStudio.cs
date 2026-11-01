@@ -43,9 +43,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             lAnimator.Velocity = Vector3.zero;
             lAnimator.UseIK = false;
 
-            Light(new Vector3(1.6f, 2.4f, -1.2f), new Color(1f, 0.88f, 0.74f), 26f);
-            Light(new Vector3(-1.8f, 1.6f, -1.4f), new Color(0.55f, 0.65f, 0.9f), 7f);
-            Light(new Vector3(-0.9f, 2.2f, 1.6f), new Color(1f, 0.95f, 0.9f), 30f);
+            Light(new Vector3(1.6f, 2.4f, -1.2f), new Color(1f, 0.88f, 0.74f), 14f);
+            Light(new Vector3(-1.8f, 1.6f, -1.4f), new Color(0.55f, 0.65f, 0.9f), 4f);
+            Light(new Vector3(-0.9f, 2.2f, 1.6f), new Color(0.8f, 0.9f, 1f), 18f);
 
             _camera = new GameObject("PortraitCamera").AddComponent<Camera>();
             _camera.transform.SetParent(transform, false);

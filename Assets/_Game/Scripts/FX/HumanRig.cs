@@ -28,6 +28,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
         public Grip pistol = new Grip { handRotation = Quaternion.identity, supportRotation = Quaternion.identity };
         public Grip rifle = new Grip { handRotation = Quaternion.identity, supportRotation = Quaternion.identity };
+        [Tooltip("Distance of the long-gun support hand down the barrel the grips were built for; each gun shifts it to its own fore-end.")]
+        public float foreEnd = 0.3f;
         [Tooltip("A small item between the fingers (coin, card, vial), in the right hand's space.")]
         public Vector3 pinchPosition;
         public Quaternion pinchRotation = Quaternion.identity;
@@ -46,5 +48,13 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         }
 
         public Grip For(HeldKind pKind) => pKind == HeldKind.Rifle ? rifle : pistol;
+
+        /// <summary>The left hand's position in a weapon's space, moved to that gun's fore-end (long guns).</summary>
+        public Vector3 SupportFor(HeldKind pKind, Transform pMuzzle)
+        {
+            if (pKind != HeldKind.Rifle) return pistol.supportPosition;
+            float lFore = pMuzzle != null ? Mathf.Clamp(pMuzzle.localPosition.z * 0.5f, 0.17f, 0.42f) : foreEnd;
+            return rifle.supportPosition + Vector3.forward * (lFore - foreEnd);
+        }
     }
 }

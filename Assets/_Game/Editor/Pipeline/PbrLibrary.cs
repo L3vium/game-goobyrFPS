@@ -177,8 +177,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (string lFile in Directory.GetFiles(pDir))
             {
                 string lName = Path.GetFileNameWithoutExtension(lFile);
-                int lIndex = lName.IndexOf("_arm", System.StringComparison.OrdinalIgnoreCase);
-                if (lIndex <= 0) continue;
+                int lIndex = lName.LastIndexOf("_arm", System.StringComparison.OrdinalIgnoreCase);
+                // Only ARM textures (<prefix>_arm or <prefix>_arm_2k), not "..._Arms..." names or materials.
+                string lExt = Path.GetExtension(lFile).ToLowerInvariant();
+                if (lIndex <= 0 || (lExt != ".png" && lExt != ".jpg" && lExt != ".jpeg" && lExt != ".tga")) continue;
+                if (lName.Length > lIndex + 4 && lName[lIndex + 4] != '_') continue;
                 string lPrefix = lName.Substring(0, lIndex);
                 string lOut = $"{Unix(pDir)}/{lPrefix}_ms.png";
                 if (File.Exists(lOut)) continue;

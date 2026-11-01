@@ -25,6 +25,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
         private readonly List<Rigidbody> _bodies = new List<Rigidbody>();
         private float _settleCheck;
+        private float _startY;
 
         /// <summary>Turns the body into a ragdoll; returns null when there is no model.</summary>
         public static HumanRagdoll Spawn(HumanBody pBody, Vector3 pImpulse, Vector3 pPoint, Vector3 pVelocity = default)
@@ -46,6 +47,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             GameLayers.SetRecursive(lModel.gameObject, GameLayers.RAGDOLL);
             foreach (SkinnedMeshRenderer lSkin in lModel.GetComponentsInChildren<SkinnedMeshRenderer>()) lSkin.updateWhenOffscreen = true;
             lRagdoll.Build(lAnimator, lCharacter.right, lCharacter.forward);
+            lRagdoll._startY = lModel.position.y;
 
             foreach (Rigidbody lRigidbody in lRagdoll._bodies) lRigidbody.linearVelocity = pVelocity;
             if (pImpulse.sqrMagnitude > 0.0001f)
@@ -226,6 +228,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
         private void Update()
         {
+            // A body that fell through the world (water without a floor, a hole) is not kept.
+            if (Pelvis != null && Pelvis.position.y < _startY - 40f) { Destroy(gameObject); return; }
             // Once everything sleeps for a while, freeze the corpse: no more solver cost.
             _settleCheck += Time.deltaTime;
             if (_settleCheck < 6f) return;

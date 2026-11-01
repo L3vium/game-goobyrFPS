@@ -200,7 +200,10 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
   `Idle`'s avatar); clip settings from `clips.json` (rotation always baked, in-place clips bake
   everything, travelling clips let their travel go: the motor moves the body); the upper-body and
   arms masks; the `Characters/Human` and `Characters/Arms` controllers; the grips (`FX/HumanRig`,
-  measured on the aim clips: where a Grip sits in the right palm, where the left hand holds it).
+  from the hand's own geometry: knuckle line along the raked handle, wrist-to-knuckles along the
+  barrel, palm against it; support hand cupping a pistol or palm-up under a fore-end). Hand
+  rotations are written on the bones after the IK pass (the grips are raw-bone, not IK-goal space);
+  aiming, a third-person gun turns about its grip onto the aim line.
 - **Animation** (`FX/HumanAnimator`): states are chosen in code and reached by cross-fades (no
   transition graph to get stuck in). Velocity comes from the motor / NavMeshAgent or, for remote
   bodies, from the interpolated transform over 0.15 s - never a frame delta. Locomotion is a

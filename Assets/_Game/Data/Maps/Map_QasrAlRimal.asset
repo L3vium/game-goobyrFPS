@@ -44,10 +44,14 @@ MonoBehaviour:
   postExposure: -0.15
   shadowsTint: {r: 0.9, g: 0.95, b: 1.08, a: 1}
   highlightsTint: {r: 1.06, g: 1.02, b: 0.94, a: 1}
-  planFloors: []
-  planOrigin: {x: 0, y: 0}
+  planFloors:
+  - {fileID: 2800000, guid: 7e153a1e229d60d4db6d68a658ba0c44, type: 3}
+  - {fileID: 2800000, guid: d8ddc3746e5f448458c45a94d1115852, type: 3}
+  - {fileID: 2800000, guid: 7336ef9cf2c96a4459b5e7468adf6fce, type: 3}
+  - {fileID: 2800000, guid: 7878e514a9ca2a04491cfff02e13b70f, type: 3}
+  planOrigin: {x: -250, y: -250}
   planSize: 500
-  planStorey: 3.4
+  planStorey: 3.6
   targets:
   - displayName: Selin Arda
     dossier: Arms buyer. Bus station, tea house, caravanserai, never sits far from

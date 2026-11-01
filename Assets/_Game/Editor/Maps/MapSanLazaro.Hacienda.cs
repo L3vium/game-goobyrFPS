@@ -72,12 +72,18 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             A.BigCrate(_shedR.At(1.2f, 0, 2.6f, 0f), _shed.yaw);
             A.Gadget(ItemKind.Wrench, _shedR.At(3.5f, 0, 2f, 0.05f), "Shed wrench");
             A.Climb(new Vector3(145f, 41f, 67.6f), 8.4f, Vector3.back, false, "Vine trellis");
-            A.Climb(C(32.5f, 0, -0.3f, 0f), 3.4f, Vector3.back, false, "Orange espalier");
+
             // Chapel garden (W): the family cemetery.
             for (int i = 0; i < 8; i++)
             {
                 Vector3 p = G(68f + (i % 4) * 4f, 100f + (i / 4) * 6f, 0f);
-                A.BoxObject("Tomb", p, 0f, K.Props, 0, true, (ArchLib.Surface("stone_wall", 1.5f), new Vector3(0, 0.35f, 0), new Vector3(0.9f, 0.7f, 2f)), (ArchLib.Surface("marble_01", 1.5f), new Vector3(0, 1f, -0.9f), new Vector3(0.8f, 1.3f, 0.15f)));
+                ArchMat lMarble = ArchLib.Surface("marble_01", 1.2f);
+                A.BoxObject("Tomb", p, 0f, K.Props, 0, true,
+                    (ArchLib.Surface("stone_wall", 1.5f), new Vector3(0, 0.12f, 0), new Vector3(1.1f, 0.24f, 2.2f)),
+                    (lMarble, new Vector3(0, 0.38f, 0.1f), new Vector3(0.85f, 0.28f, 1.8f)),
+                    (lMarble, new Vector3(0, 0.95f, -0.92f), new Vector3(0.75f, 1.2f, 0.14f)),
+                    (lMarble, new Vector3(0, 1.75f, -0.92f), new Vector3(0.1f, 0.5f, 0.1f)),
+                    (lMarble, new Vector3(0, 1.82f, -0.92f), new Vector3(0.36f, 0.09f, 0.1f)));
             }
             // Kitchen garden (NW): beds and the ivy on the north wall (W5).
             for (int i = 0; i < 4; i++)
@@ -88,10 +94,38 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             A.Climb(new Vector3(74f, PAD_Y + 0.6f, COMPOUND.yMax + 0.3f), 3f, Vector3.forward, false, "North wall ivy");
             A.Climb(new Vector3(74f, PAD_Y, COMPOUND.yMax - 0.3f), 3.2f, Vector3.back, false, null);
-            // Service yard (N): the produce truck outside, the dumpster (the operator's smoke spot), the coal chute.
-            A.Model("Prop_Car_Pickup", G(100f, 147f, 0f), 90f);
+            // Service yard (N): the produce truck at the service gate, bins, the laundry lines, the dumpster
+            // (the operator's smoke spot), the staff signs.
+            ArchOutdoor.Truck(A, G(100f, 148f, 0f), 90f, new Color(0.15f, 0.45f, 0.25f), "ProduceTruck");
             A.Dumpster(G(117f, 136f, 0f), 180f);
+            ArchOutdoor.Bins(A, G(119.5f, 139.6f, 0f), 0f, 3);
             A.CrateStack(G(98f, 135f, 0f), 0f, 4);
+            A.LaundryCart(G(132f, 134f, 0f), 0f);
+            ArchMesh lLines = new ArchMesh();
+            ArchMat lLinen = ArchLib.PlainMat("Linen", new Color(0.93f, 0.92f, 0.88f), 0.2f, 0f);
+            for (int k = 0; k < 2; k++)
+            {
+                Vector3 a = G(136f, 132f + k * 3f, 0f), b = G(152f, 132f + k * 3f, 0f);
+                lLines.Cylinder(ArchLib.Surface("rough_wood", 1f), a, 0.06f, 2.3f, 6);
+                lLines.Cylinder(ArchLib.Surface("rough_wood", 1f), b, 0.06f, 2.3f, 6);
+                lLines.Tube(ArchLib.Iron, a + Vector3.up * 2.2f, b + Vector3.up * 2.2f, 0.01f, 4, false);
+                for (float t = 0.08f; t < 0.92f; t += 0.14f)
+                {
+                    Vector3 c = Vector3.Lerp(a, b, t) + Vector3.up * 1.55f;
+                    lLines.DoubleQuad(lLinen, c + new Vector3(-0.45f, -0.6f, 0), c + new Vector3(0.45f, -0.6f, 0), c + new Vector3(0.45f, 0.62f, 0), c + new Vector3(-0.45f, 0.62f, 0), false);
+                }
+            }
+            GameObject lLinesRoot = new GameObject("LaundryLines");
+            lLinesRoot.transform.SetParent(K.Props, false);
+            lLines.Flush(lLinesRoot.transform, "SanLazaro_LaundryLines");
+            ArchOutdoor.Sign(A, G(108f, 139f, 0f), 180f, "Solo personal");
+            ArchOutdoor.Sign(A, C(37f, 0, 32.6f, 1.6f), 180f, "Cocina - Solo personal", false);
+            // The frisk lane at the main gate: a guard booth, rope lines, the sign.
+            ArchOutdoor.GuardBooth(A, G(80.5f, 72.5f, 0f), 180f, false);
+            ArchOutdoor.RopeLine(A, G(73f, 71f, 0f), G(73f, 78f, 0f));
+            ArchOutdoor.RopeLine(A, G(77f, 71f, 0f), G(77f, 78f, 0f));
+            ArchOutdoor.Sign(A, G(78.5f, 79f, 0f), 180f, "Control de invitados", true, new Color(0.15f, 0.3f, 0.2f));
+            ArchOutdoor.CoverClusters(A, Rect.MinMaxRect(96f, 72f, 128f, 92f), 11f, "default", 91);
             A.Camera(C(33f, 0, 32.3f, 3.2f), G(108f, 140f, 1f), ZONE_HACIENDA);
             // Stable yard (E): garage, a jeep, the stables' feed sacks.
             A.Model("Prop_Car_Pickup", _garageR.At(6f, 0, 6f, 0f), _garage.yaw);

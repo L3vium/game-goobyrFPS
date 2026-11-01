@@ -17,7 +17,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// </summary>
         public static ArchSpec CasaSpec(Vector3 pOrigin, float pYaw)
         {
-            ArchSpec c = new ArchSpec { name = "CasaLaCumbre", origin = pOrigin, yaw = pYaw, size = new Vector2(40, 32), style = ArchStyles.Colonial(new Color(0.96f, 0.95f, 0.91f), "casa"), zone = ZONE_HACIENDA };
+            ArchSpec c = new ArchSpec { name = "CasaLaCumbre", origin = pOrigin, yaw = pYaw, size = new Vector2(40, 32), style = ArchStyles.Grand(ArchStyles.Colonial(new Color(0.96f, 0.95f, 0.91f), "casa"), new Color(0.95f, 0.88f, 0.72f), "casa"), zone = ZONE_HACIENDA };
             const SecurityTier P = SecurityTier.Public, R = SecurityTier.Restricted, H = SecurityTier.Hostile;
             const AccessLevel Gu = AccessLevel.Guest, St = AccessLevel.Staff, Se = AccessLevel.Security, Pr = AccessLevel.Private, No = AccessLevel.None;
             _ = P;
@@ -80,7 +80,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             c.Door(0, 2, 15.2f, DoorKind.Door, 1.0f).poi = "Confessional";
             c.Secure(0, 0, 29, SecureDoor.Lock.Crowbar, false, "Boarded sacristy window").sill = 0.9f;
             c.doors[c.doors.Count - 1].height = 1.5f;
-            c.Stair(0, 5.5f, 4, 9.5f, 10, 0, true, false);
+            // The grand stair: one straight marble flight from the hall up to the first-floor landing.
+            c.Stair(0, 4.5f, 3.5f, 8.5f, 10.5f, 0, false).grand = true;
+            c.Stair(1, 0.5f, 8f, 3f, 13.5f, 0, true, true);
             c.Stair(-1, 36, 14.5f, 39.6f, 19.5f, 2, true, true);
             c.Stair(0, 36, 14.5f, 39.6f, 19.5f, 2, true, true);
             c.Stair(1, 36, 14.5f, 39.6f, 19.5f, 2, true, true);
@@ -120,10 +122,21 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             c.Room("Archive", 2, 20, 24, 30, 32, RoomType.Archive, R, Se);
             c.Room("MiradorBase", 2, 30, 24, 40, 32, RoomType.GuardRoom, H, Se);
             c.Room("StairHall", 2, 30, 14, 40, 24, RoomType.Stair, R, St);
-            ArchRoom lWalk = c.Room("RoofWalk", 2, 0, 0, 10, 24, RoomType.Terrace, R, No); lWalk.open = true;
-            ArchRoom lTerrace = c.Room("RoofTerrace", 2, 10, 0, 30, 6, RoomType.Terrace, R, No); lTerrace.open = true;
+            // The third floor runs round all four wings (servants in the west, nursery and sewing room
+            // in the south, the steward's office in the east), with the patio gallery a storey higher.
+            c.Room("StairTop", 2, 0, 0, 10, 14, RoomType.Stair, R, St);
+            c.Room("Servants", 2, 0, 14, 10, 24, RoomType.Dormitory, R, St);
+            c.Room("Nursery", 2, 10, 0, 20, 6, RoomType.Bedroom, R, St);
+            c.Room("SewingRoom", 2, 20, 0, 30, 6, RoomType.Linen, R, St);
+            c.Room("Steward", 2, 30, 0, 40, 14, RoomType.Office, R, Se);
+            foreach (Rect r in PatioRing()) { ArchRoom lUpper = c.Room("UpperGallery", 2, r.xMin, r.yMin, r.xMax, r.yMax, RoomType.Gallery, R, St); lUpper.arcade = true; }
             c.Door(2, 10, 28); c.Door(2, 20, 28); c.Door(2, 30, 28); c.Door(2, 35, 24);
-            c.Door(2, 3, 24); c.Door(2, 35, 14);
+            c.Door(2, 3, 24); c.Door(2, 35, 14); c.Door(2, 5, 14);
+            c.Door(2, 10, 19); c.Door(2, 30, 19); c.Door(2, 15, 6); c.Door(2, 25, 6); c.Door(2, 15, 24);
+            c.Door(2, 10, 3); c.Door(2, 30, 3);
+            c.balconies.Add(new ArchBalcony { floor = 2, at = new Vector2(15, 0), width = 2.4f });
+            c.balconies.Add(new ArchBalcony { floor = 2, at = new Vector2(25, 0), width = 2.4f });
+            c.balconies.Add(new ArchBalcony { floor = 2, at = new Vector2(0, 19), width = 2.4f });
             // Attic vent: through the attic's south wall from the roof walk.
             ArchDuct lAttic = new ArchDuct();
             lAttic.nodes.Add(new Vector3(6.5f, 7.25f, 23.5f));
@@ -158,7 +171,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             c.cornices.Add(1);
             c.cornices.Add(2);
             c.drains.Add(new ArchDrain { at = new Vector2(0, 20.5f), topFloor = 1, poi = "North drainpipe" });
-            c.drains.Add(new ArchDrain { at = new Vector2(32.5f, 0), topFloor = 1, poi = "Espalier drainpipe" });
+            c.drains.Add(new ArchDrain { at = new Vector2(32.5f, 0), topFloor = 1, poi = "Espalier", kind = ClimbKind.Trellis });
+            c.Climb(0, 9f, ClimbKind.Ivy, "West ivy", 2);
+            c.Climb(40, 6.5f, ClimbKind.Ivy, "East ivy", 2);
             c.drains.Add(new ArchDrain { at = new Vector2(40, 22.5f), topFloor = 2 });
             c.drains.Add(new ArchDrain { at = new Vector2(8.5f, 32), topFloor = 2 });
             return c;

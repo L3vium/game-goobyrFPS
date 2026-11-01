@@ -129,7 +129,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             _garage.Room("GarageMine", -1, 2, 2, 14, 10, RoomType.Cellar, SecurityTier.Restricted, AccessLevel.Staff);
             _garage.Stair(-1, 9f, 2.5f, 13.6f, 9.5f, 0, true, true);
             _garage.Door(-1, 2, 6, DoorKind.Door, 1.4f).poi = "Mine gallery";
-            _mineHut = Hut("MineHut", new Vector2(120f, 30f), 3, 6f, 5f, RoomType.Bedroom, 1, SecurityTier.Restricted, AccessLevel.None);
+            _mineHut = Hut("MineHut", new Vector2(52f, 2f), 3, 6f, 5f, RoomType.Bedroom, 1, SecurityTier.Restricted, AccessLevel.None);
+            // The ski hamlet round the mid-station: the ski school and the ticket hut.
+            _skiSchool = Hut("SkiSchool", MIDSTATION + new Vector2(-19f, 3f), 1, 9f, 7f, RoomType.Shop, 1, SecurityTier.Public, AccessLevel.None);
+            _ticketHut = Hut("TicketHut", MIDSTATION + new Vector2(17f, -9f), 3, 5f, 4f, RoomType.Office, 1, SecurityTier.Restricted, AccessLevel.Staff);
             _observatory = Facing("Observatory", OBSERVATORY + new Vector2(0, -8f), SUMMIT_Y, 2, 18f, 14f, ArchStyles.Industrial("concrete_wall_008", "metal_plate"), ZONE_SKI);
             ArchSpec o = _observatory;
             o.style.snow = true;

@@ -27,7 +27,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private const float VILLAGE_Y = 0.5f, PLATFORM_Y = 45f, SUMMIT_Y = 70f;
         private static readonly Vector3 HOTEL = new Vector3(-35f, PLATFORM_Y, 82f);
         private static readonly Rect LAKE = Rect.MinMaxRect(-240f, -245f, -120f, -165f);
-        private static readonly Vector2 SKIJUMP = new Vector2(-95f, 10f), GARAGE = new Vector2(95f, -20f), MIDSTATION = new Vector2(10f, -10f), OBSERVATORY = new Vector2(45f, 172f), LIFT_BOTTOM = new Vector2(70f, -100f), LIFT_TOP = new Vector2(62f, 70f);
+        private static readonly Vector2[] TOWER_VIEW = { new Vector2(-20f, -118f), new Vector2(-11f, 98f) };
+        private static readonly Vector2 SKIJUMP = new Vector2(-95f, 10f), GARAGE = new Vector2(36f, -26f), MIDSTATION = new Vector2(10f, -10f), OBSERVATORY = new Vector2(45f, 172f), LIFT_BOTTOM = new Vector2(70f, -100f), LIFT_TOP = new Vector2(62f, 70f);
 
         protected override string MapFile => "Map_Weisshorn";
         protected override TimeOfDay.Biome Biome => TimeOfDay.Biome.Snow;
@@ -66,6 +67,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // Pine bands across the slope, open pistes between them.
             bool lPiste = z > -100f && z < 70f && (Mathf.Abs(x - 20f + z * 0.15f) < 22f || Mathf.Abs(x + 45f - z * 0.1f) < 16f || Mathf.Abs(x - 75f) < 12f);
             if (lPiste) return 0.02f;
+            // The view up the church street to the clock tower stays open.
+            if (LandShape.PathDistance(TOWER_VIEW, new Vector2(x, z), out _, out _) < 10f) return 0f;
             if (z > 185f) return 0.05f;
             float n = LandShape.Fbm(x, z, 40f, 3, 2.2f);
             return Mathf.Clamp01(0.75f + n * 0.5f + Mathf.Clamp01((Mathf.Abs(x) - 140f) / 40f));
@@ -92,13 +95,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             PbrLibrary.Layer("asphalt_02", 5f), PbrLibrary.Layer("cobblestone_floor_01", 3f)
         };
 
+        protected override float RockSlope => 47f;
+
         protected override void NaturalGround(float x, float z, float h, float pSlope, float[] w)
         {
             float n = LandShape.Fbm(x, z, 25f, 3, 1.7f);
             w[(int)Ground.Grass] = 2f + n;
             w[(int)Ground.DryGrass] = Mathf.Clamp01(0.3f - n) * 2f + Mathf.Clamp01((h - 70f) / 10f) * 3f;
             w[(int)Ground.ForestFloor] = Mathf.Clamp01(Woods(x, z, h) - 0.7f) * 1.5f;
-            w[(int)Ground.Sand] = Mathf.Clamp01((pSlope - 25f) / 10f) * 2f;
+            w[(int)Ground.Sand] = Mathf.Clamp01((pSlope - 40f) / 10f) * 2f;
         }
 
         protected override void Details()
@@ -110,7 +115,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         // ================================================================ plan
 
-        private ArchSpec _hotel, _church, _gasthaus, _valley, _rental, _boathouse, _midStation, _liftBottom, _liftTop, _garage, _mineHut, _observatory, _antenna, _cableTop;
+        private ArchSpec _hotel, _church, _gasthaus, _valley, _rental, _boathouse, _midStation, _liftBottom, _liftTop, _garage, _mineHut, _observatory, _antenna, _cableTop, _skiSchool, _ticketHut;
         private ArchResult _hotelR, _churchR, _gasthausR, _valleyR, _rentalR, _boathouseR, _midR, _liftBottomR, _liftTopR, _garageR, _mineHutR, _observatoryR, _antennaR, _cableTopR;
         private readonly List<(ArchSpec spec, int zone)> _village = new List<(ArchSpec, int)>();
         private readonly List<ArchResult> _chalets = new List<ArchResult>();
@@ -135,7 +140,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Road(6f, Ground.Asphalt, 40f, new Vector2(110, -150), new Vector2(140, -120), new Vector2(150, -60), new Vector2(125, -20), new Vector2(150, 20), new Vector2(120, 60), new Vector2(80, 100), new Vector2(50, 118));
             Road(3f, Ground.Dirt, 20f, new Vector2(-30, -112), new Vector2(-50, -60), new Vector2(-60, -10), new Vector2(-70, 40), new Vector2(-62, 80));
             Road(3f, Ground.Dirt, 20f, new Vector2(-30, 120), new Vector2(-20, 150), new Vector2(10, 168), new Vector2(OBSERVATORY.x - 20f, OBSERVATORY.y));
-            Road(3f, Ground.Dirt, 20f, new Vector2(MIDSTATION.x, MIDSTATION.y), new Vector2(60, -30), new Vector2(GARAGE.x, GARAGE.y));
+            Road(3f, Ground.Dirt, 20f, new Vector2(MIDSTATION.x, MIDSTATION.y), new Vector2(GARAGE.x, GARAGE.y), new Vector2(80, -30), new Vector2(125, -20));
             Clear.Add(Rect.MinMaxRect(-120f, -200f, 110f, -112f));
             Clear.Add(Rect.MinMaxRect(-62f, 60f, 50f, 124f));
             PlanVillage();

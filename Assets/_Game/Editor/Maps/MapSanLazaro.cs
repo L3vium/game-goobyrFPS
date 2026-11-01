@@ -84,9 +84,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return h;
         }
 
+        /// <summary>Sightlines kept open through the canopy: plaza and dock to the mirador.</summary>
+        private static readonly Vector2[] VIEW_PLAZA = { new Vector2(-5f, -150f), new Vector2(123f, 124f) }, VIEW_DOCK = { new Vector2(-30f, -200f), new Vector2(123f, 124f) };
+
         protected override float Woods(float x, float z, float h)
         {
             if (h < WATER_Y + 1f) return 0f;
+            Vector2 p = new Vector2(x, z);
+            if (z > -105f && z < 100f && (LandShape.PathDistance(VIEW_PLAZA, p, out _, out _) < 11f || LandShape.PathDistance(VIEW_DOCK, p, out _, out _) < 11f)) return 0f;
             float n = LandShape.Fbm(x, z, 50f, 3, 2.2f);
             // Dense jungle on the edges and the slopes, open terraces and pueblo.
             float lEdge = Mathf.Clamp01((Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) - 150f) / 50f);
@@ -198,15 +203,46 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Matches();
         }
 
+        /// <summary>A cluster of basalt columns (hexagonal prisms, 0.5 to 0.9 m) rising from the ground round a point.</summary>
+        private void Basalt(Vector2 pCenter, float pRadius, int pCount, int pSeed)
+        {
+            System.Random r = new System.Random(pSeed);
+            ArchMesh lMesh = new ArchMesh();
+            ArchMat lRock = ArchLib.Tinted("rock_face", new Color(0.42f, 0.42f, 0.46f), "basalt", 2.5f);
+            for (int i = 0; i < pCount; i++)
+            {
+                float a = (float)r.NextDouble() * Mathf.PI * 2f, d = Mathf.Sqrt((float)r.NextDouble()) * pRadius;
+                Vector2 p = pCenter + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * d;
+                if (Built(p.x, p.y)) continue;
+                float g = K.GroundAt(p.x, p.y);
+                if (g < WATER_Y - 1f) continue;
+                float lSlope = K.LandSlope(p.x, p.y);
+                float lHeight = 2f + (float)r.NextDouble() * (lSlope > 40f ? 9f : 4f);
+                lMesh.Cylinder(lRock, new Vector3(p.x, g - 2.5f, p.y), 0.5f + (float)r.NextDouble() * 0.4f, lHeight + 2.5f, 6);
+            }
+            GameObject lRoot = new GameObject("Basalt");
+            lRoot.transform.SetParent(K.Env, false);
+            lMesh.Flush(lRoot.transform, "SanLazaro_Basalt_" + pSeed);
+        }
+
         private void Water()
         {
             River(WATER_Y, 22f, new Vector3(-0.6f, 0, 0), RIVER);
             K.Water(new Vector3(WATERFALL_POOL.x, WATER_Y, WATERFALL_POOL.y), new Vector2(34f, 34f));
             // The fall: a tilted sheet from the plateau's lip, the stream above it.
-            GameObject lFall = K.Water(new Vector3(214f, 13f, -60f), new Vector2(10f, 36f));
-            lFall.transform.rotation = Quaternion.Euler(-74f, -90f, 0f);
-            Object.DestroyImmediate(lFall.GetComponent<Systems.WaterVolume>());
-            for (int i = lFall.transform.childCount - 1; i >= 0; i--) Object.DestroyImmediate(lFall.transform.GetChild(i).gameObject);
+            // The fall: three stepped sheets of fast water over basalt ledges.
+            Material lRiver = RiverMaterial();
+            foreach ((Vector3 c, float w, float tilt) in new[] { (new Vector3(214f, 13f, -60f), 10f, -74f), (new Vector3(212.6f, 6f, -57.5f), 6f, -66f), (new Vector3(213.2f, 9f, -63f), 5f, -80f) })
+            {
+                GameObject lFall = K.Water(c, new Vector2(w, 36f));
+                lFall.transform.rotation = Quaternion.Euler(tilt, -90f, 0f);
+                if (lRiver != null) lFall.GetComponent<MeshRenderer>().sharedMaterial = lRiver;
+                Object.DestroyImmediate(lFall.GetComponent<Systems.WaterVolume>());
+                for (int i = lFall.transform.childCount - 1; i >= 0; i--) Object.DestroyImmediate(lFall.transform.GetChild(i).gameObject);
+            }
+            // Basalt: hexagonal columns flank the fall and crown the north cliffs.
+            Basalt(new Vector2(214f, -60f), 22f, 70, 1337);
+            for (float x = -170f; x < 190f; x += 36f) Basalt(new Vector2(x, 192f), 14f, 22, (int)x);
             K.Water(new Vector3(232f, 30.4f, -54f), new Vector2(40f, 9f), new Vector3(-1.5f, 0, 0));
             Light lMist = new GameObject("WaterfallGlow").AddComponent<Light>();
             lMist.transform.SetParent(K.Lights, false);

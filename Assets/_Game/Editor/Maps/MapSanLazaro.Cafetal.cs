@@ -120,11 +120,28 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lMachine.Box(ArchLib.Iron, _roaster + new Vector3(0, 0.3f, 0), new Vector3(3.6f, 0.6f, 1.6f));
             lMachine.Cylinder(ArchLib.Galvanised, _roaster + new Vector3(0, 0f, 2.4f), 1.2f, 0.7f, 18);
             lMachine.Tube(ArchLib.Iron, _roaster + new Vector3(1.2f, 2.4f, 0), _roaster + new Vector3(1.2f, 6.8f, 0), 0.25f, 10);
+            // Hopper, burner glow, gauges, the gas line to the bottles, the stirring arm over the cooling tray.
+            lMachine.Box(ArchLib.Surface("rusty_metal_02", 1.5f), _roaster + new Vector3(-0.6f, 3.0f, 0), new Vector3(1.0f, 0.8f, 1.0f));
+            lMachine.Box(ArchLib.LampGlow, _roaster + new Vector3(0, 0.62f, -0.81f), new Vector3(2.2f, 0.18f, 0.02f), false);
+            lMachine.Cylinder(ArchLib.Brass, _roaster + new Vector3(1.75f, 1.6f, -0.5f), 0.12f, 0.06f, 10, false);
+            lMachine.Tube(ArchLib.Brass, _roaster + new Vector3(-1.8f, 0.4f, -0.4f), _roaster + new Vector3(-2.6f, 0.4f, -1.1f), 0.03f, 6, false);
+            lMachine.Tube(ArchLib.Iron, _roaster + new Vector3(0, 0.75f, 2.4f), _roaster + new Vector3(0, 1.1f, 2.4f), 0.05f, 6, false);
+            lMachine.Box(ArchLib.Iron, _roaster + new Vector3(0, 1.1f, 2.4f), new Vector3(2.0f, 0.06f, 0.08f), false);
             GameObject lRoaster = new GameObject("GasRoaster") { layer = Core.GameLayers.INTERACTABLE };
             lRoaster.transform.SetParent(A.Systems, false);
             lRoaster.transform.position = _roaster + Vector3.up;
             foreach (GameObject lPart in lMachine.Flush(lRoaster.transform, "SanLazaro_Roaster", Core.GameLayers.INTERACTABLE)) { lPart.isStatic = false; lPart.transform.position -= lRoaster.transform.position; }
             lRoaster.AddComponent<ExplosiveProp>();
+            Light lBurner = new GameObject("RoasterBurner").AddComponent<Light>();
+            lBurner.transform.SetParent(lRoaster.transform, false);
+            lBurner.transform.position = _roaster + new Vector3(0, 0.6f, -1.2f);
+            lBurner.type = LightType.Point;
+            lBurner.range = 6f;
+            lBurner.intensity = 2f;
+            lBurner.color = new Color(1f, 0.45f, 0.15f);
+            lBurner.shadows = LightShadows.None;
+            ArchOutdoor.Sign(A, _roaster + new Vector3(-2.6f, 0f, -2.4f), 180f, "Gas - Peligro", true, new Color(0.85f, 0.6f, 0.05f));
+            for (int i = 0; i < 3; i++) A.Sacks(_roaster + new Vector3(3.2f, 0f, -1.5f + i * 1.6f), 90f + i * 20f);
             A.Explosive(_roaster + new Vector3(-2.6f, 0, -1.4f), 0f, true);
             A.Explosive(_roaster + new Vector3(-2.6f, 0, -0.8f), 0f, true);
             K.Activity(ActivityType.Drink, _roaster + new Vector3(0, 0.05f, 3.8f), 180f, ZONE_CAFETAL, 20f);

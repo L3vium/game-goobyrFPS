@@ -49,6 +49,17 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     lAwning.Flush(lRoot.transform, "Qasr_Awning_" + (int)x + "_" + (int)(-z));
                 }
                 for (int i = 0; i < 3; i++) ArchOutdoor.Stall(A, G(x + (i % 2 == 0 ? -1.6f : 1.6f), -128f + i * 8f, 0f), i % 2 == 0 ? 90f : -90f, lCloths[i]);
+                for (int i = 0; i < 3; i++) ArchOutdoor.Stall(A, G(x + (i % 2 == 0 ? 1.6f : -1.6f), -124f + i * 8f, 0f), i % 2 == 0 ? -90f : 90f, lCloths[(i + 2) & 3]);
+                // Brass lanterns hung under the awnings, a blue shop door at every bay.
+                for (float z = -130f; z < -106f; z += 6.4f)
+                {
+                    A.Lamp(G(x, z, 3.6f), 0f, new Color(1f, 0.7f, 0.38f), 9f, 1.6f, false);
+                    A.BoxObject("SoukLantern", G(x, z, 3.5f), 0f, K.Env, 0, false, (ArchLib.Brass, new Vector3(0, 0.25f, 0), new Vector3(0.28f, 0.04f, 0.28f)), (ArchLib.LampGlow, new Vector3(0, 0.05f, 0), new Vector3(0.2f, 0.32f, 0.2f)), (ArchLib.Brass, new Vector3(0, 0.55f, 0), new Vector3(0.02f, 0.6f, 0.02f)));
+                    foreach (float s in new[] { -1f, 1f })
+                        A.BoxObject("BlueDoor", G(x + s * 3.55f, z + 1.5f, 0f), s < 0 ? 90f : -90f, K.Props, 0, false,
+                            (ArchLib.Tinted("old_planks_02", new Color(0.18f, 0.35f, 0.7f), "door_blue", 1.5f), new Vector3(0, 1.1f, 0), new Vector3(1.3f, 2.2f, 0.06f)),
+                            (ArchLib.Tinted("large_sandstone_blocks", new Color(0.95f, 0.86f, 0.72f), "sand_trim", 2f), new Vector3(0, 2.35f, 0), new Vector3(1.7f, 0.3f, 0.1f)));
+                }
                 Gateway(G(x, -134.5f, 0f), 0f, 5.6f, 6.4f, x < 10f ? "Crossing of Scales" : "Dyers' Arch");
                 Gateway(G(x, -105.5f, 0f), 0f, 5.6f, 6.4f, null);
             }
@@ -173,13 +184,17 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             _dish = G(168f, 150f, 0f);
             ArchOutdoor.WaterTower(A, _dish, 13f, 0f);
             ArchMesh lDishMesh = new ArchMesh();
-            lDishMesh.Dome(ArchLib.PlainMat("Dish", new Color(0.9f, 0.9f, 0.88f), 0.5f, 0.2f), _dish + Vector3.up * 19f, 6f, 16, 6, Quaternion.Euler(-60f, 200f, 0f));
+            ArchMat lDishSkin = ArchLib.Tinted("metal_plate_02", new Color(0.95f, 0.95f, 0.92f), "dish", 2f);
+            lDishMesh.Dome(lDishSkin, _dish + Vector3.up * 19f, 6f, 28, 8, Quaternion.Euler(-60f, 200f, 0f), true, ArchLib.Tinted("metal_plate", new Color(0.85f, 0.85f, 0.83f), "dishback", 2f));
+            lDishMesh.Tube(ArchLib.Iron, _dish + Vector3.up * 19f, _dish + Vector3.up * 19f + Quaternion.Euler(-60f, 200f, 0f) * Vector3.up * 4.5f, 0.12f, 8);
+            lDishMesh.Box(ArchLib.Galvanised, _dish + Vector3.up * 16.8f, new Vector3(2.4f, 2.4f, 2.4f));
             GameObject lDishRoot = new GameObject("RadarDish");
             lDishRoot.transform.SetParent(K.Env, false);
             lDishMesh.Flush(lDishRoot.transform, "Qasr_Dish");
             Poi(_dish + Vector3.up * 15f, "Radar dish", MapPoi.Kind.Landmark);
             ArchMesh lDome = new ArchMesh();
-            lDome.Dome(ArchLib.PlainMat("RadomeWhite", new Color(0.95f, 0.95f, 0.93f), 0.35f, 0f), G(132f, 150f, 0f), 7f, 18, 7, Quaternion.identity);
+            lDome.Dome(ArchLib.Tinted("rubber_tiles", new Color(1.2f, 1.2f, 1.18f), "radome", 1.4f), G(132f, 150f, 0f) + Vector3.up * 2.4f, 7f, 30, 9, Quaternion.identity);
+            lDome.Cylinder(ArchLib.Surface("concrete_wall_008", 3f), G(132f, 150f, -0.5f), 7.05f, 2.9f, 30);
             GameObject lDomeRoot = new GameObject("Radome");
             lDomeRoot.transform.SetParent(K.Env, false);
             lDome.Flush(lDomeRoot.transform, "Qasr_Radome");
@@ -232,31 +247,29 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 new ArchOutdoor.Gate { segment = 0, at = (-4f - CITADEL.xMin) / CITADEL.width, width = 5f, poi = "Main gate" },
                 new ArchOutdoor.Gate { segment = 3, at = (CITADEL.yMax - 108f) / CITADEL.height, width = 3f, ironGate = false, poi = "Goods lift" },
-                new ArchOutdoor.Gate { segment = 1, at = (70f - CITADEL.yMin) / CITADEL.height, width = 1.6f, locked = SecureDoor.Lock.Crowbar, ironGate = false, poi = "SE postern" },
+                new ArchOutdoor.Gate { segment = 1, at = (104f - CITADEL.yMin) / CITADEL.height, width = 1.6f, locked = SecureDoor.Lock.Crowbar, ironGate = false, poi = "SE postern" },
                 new ArchOutdoor.Gate { segment = 1, at = (124f - CITADEL.yMin) / CITADEL.height, width = 2.4f, poi = "Bridge gate" },
                 new ArchOutdoor.Gate { segment = 2, at = (CITADEL.xMax - (-10f)) / CITADEL.width, width = 1.4f, ironGate = false, poi = "Cleft" }
             };
             ArchStyle lFort = ArchStyles.Fortress();
             ArchOutdoor.Wall(A, lWall, true, 4.5f, 1.2f, lFort.facade, lFort.trim, lGates);
             Gateway(G(-4f, CITADEL.yMin, 0f), 0f, 5f, 5.4f, null);
-            // Courts: first (S) tables for the petitioners, second (E) drill yard, sheds, scaffold, third (W) kitchen yard.
-            for (int i = 0; i < 3; i++) A.Model("Furn_DiningTable", G(-20f + i * 10f, 80f, 0f), 0f);
-            for (int i = 0; i < 6; i++) K.LandTree("Veg_DatePalm", -30f + i * 11f, 88f, 0.7f);
-            ArchOutdoor.Fountain(A, G(-3f, 80f, 0f), 2.4f);
-            A.Model("Prop_Car_Pickup", G(28f, 104f, 0f), 180f);
-            A.Model("Prop_Car_Pickup", G(34f, 104f, 0f), 180f);
-            ArchOutdoor.Shed(A, G(30f, 136f, 0f), 0f, 12f, 6f, 3.4f, ArchLib.Surface("corrugated_iron_02", 2.5f));
-            A.Distraction("generator", G(36f, 134f, 0.12f), 0f);
-            A.Dumpster(G(-60f, 125f, 0f), 90f);
-            A.CrateStack(G(-60f, 132f, 0f), 0f, 4);
+            Courts(lFort);
             A.Camera(Kp(-0.3f, 0, 29.5f, 3f), G(-50f, 118f, 1f), ZONE_CITADEL);
-            // Scaffolding up the keep's east face to the roof (the wind-tower climb), the crowbar on it.
+            // Scaffolding up the keep's east face to the roof (the wind-tower climb), the crowbar on it:
+            // standards, ledgers, cross braces, a boarded lift at every storey, toe boards.
             Vector3 lScaffold = Kp(34.6f, 0, 26f, 0f);
             ArchMesh lPoles = new ArchMesh();
-            for (int f = 0; f < 4; f++)
+            ArchMat lTube = ArchLib.PlainMat("ScaffoldTube", new Color(0.55f, 0.56f, 0.58f), 0.5f, 0.7f), lBoard = ArchLib.Surface("old_planks_02", 1.5f);
+            foreach (float x in new[] { 0.2f, 1.6f })
+                for (float z = -2.9f; z <= 2.91f; z += 1.45f) lPoles.Tube(lTube, lScaffold + new Vector3(x, 0f, z), lScaffold + new Vector3(x, 15.2f, z), 0.045f, 8);
+            for (int f = 0; f < 5; f++)
             {
-                lPoles.Box(ArchLib.Surface("old_planks_02", 1.5f), lScaffold + new Vector3(0.9f, f * 3.6f + 3.4f, 0f), new Vector3(1.6f, 0.08f, 6f));
-                foreach (float z in new[] { -2.9f, 2.9f }) lPoles.Tube(ArchLib.Galvanised, lScaffold + new Vector3(1.6f, 0f, z), lScaffold + new Vector3(1.6f, 15f, z), 0.05f, 6);
+                float y = f * 3.6f + (f == 0 ? 0.4f : -0.2f);
+                foreach (float x in new[] { 0.2f, 1.6f }) lPoles.Tube(lTube, lScaffold + new Vector3(x, y + 1f, -3f), lScaffold + new Vector3(x, y + 1f, 3f), 0.04f, 8, false);
+                if (f > 0) lPoles.Box(lBoard, lScaffold + new Vector3(0.9f, y + 0.04f, 0f), new Vector3(1.6f, 0.08f, 6f));
+                if (f > 0) lPoles.Box(lBoard, lScaffold + new Vector3(1.65f, y + 0.18f, 0f), new Vector3(0.04f, 0.2f, 6f), Quaternion.identity, false);
+                if (f < 4) lPoles.Tube(lTube, lScaffold + new Vector3(1.66f, y + 0.2f, -2.9f), lScaffold + new Vector3(1.66f, y + 3.6f, 2.9f), 0.035f, 6, false);
             }
             GameObject lScaffoldRoot = new GameObject("Scaffold");
             lScaffoldRoot.transform.SetParent(K.Env, false);
@@ -280,6 +293,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             A.Breaker(Kp(33.4f, -1, 26f, 0f), -90f, _keepR.volume);
             A.Chandelier(Kp(22f, 1, 5.5f, 3.25f), 3f);
             A.Chandelier(Kp(17f, 3, 5.5f, 3.25f), 3f);
+            AudienceHall();
             A.Explosive(Kp(30f, 2, 28f, 0f), 0f, true);
             A.Distraction("radio", Kp(31f, 2, 32.8f, 0f), 180f);
             A.Distraction("phone", Kp(28f, 3, 28f, 0.8f), 0f);
@@ -294,19 +308,134 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             K.Water(Kp(28.5f, 3, 4f, -0.25f), new Vector2(7f, 4f));
             // The officers' balcony drop ladder (b9) into the second court.
             A.DropLadder(Kp(35.2f, 2, 5.5f, 0f), Kp(35.2f, 0, 5.5f, 0f), Vector3.right, "Officers' balcony ladder");
-            // Wind tower on the roof.
+            // The wind tower: a 12 m masonry shaft over the duct, slotted catchers at the top, crenels.
             ArchMesh lTower = new ArchMesh();
-            ArchMat lAdobe = ArchLib.Tinted("clay_plaster", OCHRES[0], "adobe_h0", 3.5f);
+            ArchMat lAdobe = ArchLib.Tinted("large_sandstone_blocks", new Color(1.45f, 1.15f, 0.82f), "fortress", 2.6f), lSlot = ArchLib.PlainMat("Soot", new Color(0.04f, 0.035f, 0.03f), 0.1f, 0f);
             Vector3 lTowerBase = Kp(12.5f, 4, 32.5f, 0f);
-            foreach (Vector3 o in new[] { new Vector3(-1.2f, 0, -1.2f), new Vector3(1.2f, 0, -1.2f), new Vector3(-1.2f, 0, 1.2f), new Vector3(1.2f, 0, 1.2f) })
-                lTower.Box(lAdobe, lTowerBase + o + Vector3.up * 2.5f, new Vector3(0.4f, 5f, 0.4f));
-            lTower.Box(lAdobe, lTowerBase + Vector3.up * 5.2f, new Vector3(3f, 0.5f, 3f));
+            foreach (Vector3 o in new[] { new Vector3(-1.45f, 0, 0), new Vector3(1.45f, 0, 0), new Vector3(0, 0, -1.45f), new Vector3(0, 0, 1.45f) })
+                lTower.Box(lAdobe, lTowerBase + o + Vector3.up * 6f, new Vector3(o.x != 0 ? 0.5f : 3.4f, 12f, o.z != 0 ? 0.5f : 3.4f));
+            for (int k = 0; k < 3; k++)
+                foreach (Vector3 lFace in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right })
+                    lTower.Box(lSlot, lTowerBase + lFace * 1.72f + Vector3.Cross(Vector3.up, lFace) * (k - 1) * 0.9f + Vector3.up * 10f, new Vector3(lFace.x != 0 ? 0.03f : 0.35f, 2.6f, lFace.z != 0 ? 0.03f : 0.35f), false);
+            lTower.Box(lAdobe, lTowerBase + Vector3.up * 12.2f, new Vector3(3.9f, 0.4f, 3.9f));
+            for (int k = 0; k < 4; k++) lTower.Box(lAdobe, lTowerBase + Vector3.up * 12.75f + Quaternion.Euler(0, k * 90f, 0) * new Vector3(1.6f, 0, 1.6f), new Vector3(0.6f, 0.7f, 0.6f));
+            A.Climb(lTowerBase + new Vector3(-1.75f, 0f, 0.4f), 12.4f, Vector3.left, true, "Wind-tower rungs");
             GameObject lTowerRoot = new GameObject("WindTower");
             lTowerRoot.transform.SetParent(K.Env, false);
             lTower.Flush(lTowerRoot.transform, "Qasr_WindTower");
             // The roof zipline to the kasbah (b8).
             A.Zipline(Kp(2f, 4, 2f, 0f), _kasbahR.At(7f, 2, 6f, 0f));
             _lookoutRoof = Kp(4f, 4, 30f);
+        }
+
+        /// <summary>
+        /// The three courts of the citadel (docs section 2): inner walls with gates split the mesa top into
+        /// the first court (south, petitioners), the second court (east, drill yard, scaffold) and the
+        /// third court (west, kitchen yard, stables), with the north terrace behind the keep.
+        /// </summary>
+        private void Courts(ArchStyle pFort)
+        {
+            ArchMat lBody = pFort.facade, lCap = pFort.trim;
+            float lKeepW = KEEP.x, lKeepE = KEEP.x + 34f, lKeepS = KEEP.z, lKeepN = KEEP.z + 34f;
+            void InnerWall(Vector2 a, Vector2 b, float pGateAt, string pGate)
+            {
+                float lLength = Vector2.Distance(a, b);
+                Vector2 lDir = (b - a) / lLength;
+                float lAlong = Mathf.Abs(lDir.x) > 0.5f ? (pGateAt - a.x) / (b.x - a.x) : (pGateAt - a.y) / (b.y - a.y);
+                ArchOutdoor.Wall(A, new[] { a, b }, false, 4f, 0.9f, lBody, lCap, new List<ArchOutdoor.Gate> { new ArchOutdoor.Gate { segment = 0, at = lAlong, width = 3.4f, poi = pGate } });
+            }
+            InnerWall(new Vector2(CITADEL.xMin + 0.6f, lKeepS), new Vector2(lKeepW, lKeepS), -46f, "Third-court gate");
+            InnerWall(new Vector2(lKeepE, lKeepS), new Vector2(CITADEL.xMax - 0.6f, lKeepS), 34f, "Second-court gate");
+            InnerWall(new Vector2(lKeepW, lKeepN), new Vector2(lKeepW, CITADEL.yMax - 0.6f), 152f, "North-terrace gate (west)");
+            InnerWall(new Vector2(lKeepE, lKeepN), new Vector2(lKeepE, CITADEL.yMax - 0.6f), 152f, "North-terrace gate (east)");
+            MarkBuilt(Rect.MinMaxRect(CITADEL.xMin, lKeepS - 1f, CITADEL.xMax, lKeepS + 1f));
+
+            // ---- first court: the petitioners' queue in rope lanes before the gate hall, the clerks' desks, palms, the fountain.
+            Vector3 lGateHall = Kp(19f, 0, 0f, 0f);
+            for (int k = 0; k < 4; k++)
+            {
+                float z = lGateHall.z - 3.5f - k * 2.2f;
+                ArchOutdoor.RopeLine(A, G(lGateHall.x - 7f, z, 0f), G(lGateHall.x - 3.5f, z, 0f), G(lGateHall.x, z, 0f), G(lGateHall.x + 3.5f, z, 0f), G(lGateHall.x + 7f, z, 0f));
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                Vector3 lDesk = G(lGateHall.x + (i == 0 ? -10f : 10f), lGateHall.z - 5f, 0f);
+                A.Model("Furn_Desk", lDesk, 0f);
+                A.Model("Furn_OfficeChair", lDesk + new Vector3(0, 0, 0.9f), 180f, null, ArchLib.Collide.None);
+                A.Model("Prop_Crate_Wood", lDesk + new Vector3(1.6f, 0, 0.2f), 10f);
+            }
+            ArchOutdoor.Sign(A, G(lGateHall.x - 8.5f, lGateHall.z - 12.5f, 0f), 180f, "Petitions", true, new Color(0.15f, 0.35f, 0.3f));
+            for (int i = 0; i < 4; i++) { K.LandTree("Veg_DatePalm", -64f + i * 9f, 90f, 0.7f); K.LandTree("Veg_DatePalm", 24f + i * 9f, 90f, 0.7f); }
+            ArchOutdoor.Fountain(A, G(-3f, 76f, 0f), 2.4f);
+            ArchOutdoor.GuardBooth(A, G(4.5f, 64.5f, 0f), 0f, false);
+            for (int i = 0; i < 3; i++) A.Model("Furn_DiningTable", G(-30f + i * 6f, 70f + (i % 2) * 2f, 0f), 0f);
+
+            // ---- second court (east): the drill yard, army trucks, sandbags, the motor shed.
+            ArchOutdoor.Truck(A, G(28f, 106f, 0f), 180f, new Color(0.33f, 0.36f, 0.22f), "ArmyTruck");
+            ArchOutdoor.Truck(A, G(36f, 106f, 0f), 175f, new Color(0.33f, 0.36f, 0.22f), "ArmyTruck");
+            ArchOutdoor.Shed(A, G(30f, 136f, 0f), 0f, 12f, 6f, 3.4f, ArchLib.Surface("corrugated_iron_02", 2.5f));
+            A.Distraction("generator", G(36f, 134f, 0.12f), 0f);
+            for (int i = 0; i < 4; i++) A.Model("Prop_Sandbags", G(24f + i * 1.5f, 150f, 0f), 0f);
+            A.CrateStack(G(42f, 150f, 0f), 0f, 4, true);
+            ArchOutdoor.GuardBooth(A, G(lKeepE + 25f, lKeepS + 3f, 0f), 180f, false);
+            ArchOutdoor.Sign(A, G(36.5f, lKeepS + 1.2f, 0f), 0f, "Garrison - No entry");
+            ArchOutdoor.CoverClusters(A, Rect.MinMaxRect(lKeepE + 4f, lKeepS + 18f, CITADEL.xMax - 4f, CITADEL.yMax - 4f), 13f, "military", 71);
+
+            // ---- third court (west): the kitchen yard (bins, a delivery truck, laundry), the stables.
+            ArchOutdoor.Truck(A, G(-44f, 118f, 0f), 90f, new Color(0.7f, 0.68f, 0.6f), "DeliveryTruck");
+            A.Dumpster(G(-26f, 112f, 0f), 90f);
+            ArchOutdoor.Bins(A, G(-25.5f, 116f, 0f), 90f, 4);
+            A.CrateStack(G(-28f, 128f, 0f), 0f, 4);
+            A.LaundryCart(G(-25f, 104f, 0f), 90f);
+            A.Sacks(G(-34f, 102f, 0f), 30f);
+            ArchOutdoor.Sign(A, G(-24.5f, 121f, 0f), 90f, "Staff only");
+            ArchOutdoor.Sign(A, G(-46f, lKeepS + 1.2f, 0f), 0f, "Kitchen yard - Staff only");
+            ArchOutdoor.CoverClusters(A, Rect.MinMaxRect(CITADEL.xMin + 4f, lKeepS + 30f, lKeepW - 8f, CITADEL.yMax - 4f), 13f, "market", 73);
+
+            // ---- the north terrace and the first court: crates, planters, carts break the open ground.
+            ArchOutdoor.CoverClusters(A, Rect.MinMaxRect(lKeepW + 2f, lKeepN + 4f, lKeepE - 2f, CITADEL.yMax - 4f), 12f, "military", 79);
+            ArchOutdoor.CoverClusters(A, Rect.MinMaxRect(CITADEL.xMin + 4f, CITADEL.yMin + 18f, CITADEL.xMax - 4f, lKeepS - 14f), 15f, "default", 83);
+        }
+
+        /// <summary>The audience hall (F1 south): a throne dais, two colonnades, a long carpet, mashrabiya screens on the windows.</summary>
+        private void AudienceHall()
+        {
+            ArchMat lMarble = ArchLib.Surface("marble_01", 1.5f), lVelvet = ArchLib.Tinted("velour_velvet", new Color(0.6f, 0.06f, 0.08f), "rope", 0.5f);
+            ArchMat lWood = ArchLib.Surface("dark_wood", 0.8f), lGold = ArchLib.Brass;
+            ArchMesh lMesh = new ArchMesh();
+            Vector3 o = Kp(0f, 1, 0f, 0f);
+            // Dais: three marble tiers against the east wall, a canopy of red velvet behind the throne.
+            for (int t = 0; t < 3; t++) lMesh.BoxMinMax(lMarble, o + new Vector3(30.2f + t * 0.6f, 0f, 2.2f + t * 0.35f), o + new Vector3(33.6f, 0.18f * (t + 1), 8.8f - t * 0.35f));
+            lMesh.BoxMinMax(lVelvet, o + new Vector3(33.55f, 0.6f, 3.8f), o + new Vector3(33.6f, 3.1f, 7.2f), false);
+            lMesh.BoxMinMax(lGold, o + new Vector3(33.4f, 3.05f, 3.6f), o + new Vector3(33.6f, 3.2f, 7.4f), false);
+            // Colonnades.
+            foreach (float z in new[] { 2.3f, 8.7f })
+                for (float x = 19f; x < 30f; x += 3.6f)
+                {
+                    lMesh.Box(lMarble, o + new Vector3(x, 0.15f, z), new Vector3(0.7f, 0.3f, 0.7f));
+                    lMesh.Cylinder(lMarble, o + new Vector3(x, 0.3f, z), 0.24f, 2.7f, 16);
+                    lMesh.Box(lGold, o + new Vector3(x, 3.1f, z), new Vector3(0.7f, 0.2f, 0.7f));
+                }
+            // A long carpet from the stair head to the dais.
+            lMesh.BoxMinMax(lVelvet, o + new Vector3(17.2f, 0.005f, 4.3f), o + new Vector3(30.2f, 0.02f, 6.7f), false);
+            lMesh.BoxMinMax(lGold, o + new Vector3(17.2f, 0.006f, 4.2f), o + new Vector3(30.2f, 0.018f, 4.3f), false);
+            lMesh.BoxMinMax(lGold, o + new Vector3(17.2f, 0.006f, 6.7f), o + new Vector3(30.2f, 0.018f, 6.8f), false);
+            // Mashrabiya screens: turned-wood lattices before the south windows.
+            for (float x = 19.8f; x < 30f; x += 3.6f)
+            {
+                Vector3 c = o + new Vector3(x, 0f, 0.75f);
+                lMesh.Box(lWood, c + new Vector3(0, 1.3f, 0), new Vector3(1.9f, 0.06f, 0.06f), false);
+                for (float u = -0.9f; u <= 0.91f; u += 0.15f) lMesh.Box(lWood, c + new Vector3(u, 1.45f, 0), new Vector3(0.03f, 2.3f, 0.04f), false);
+                for (float v = 0.4f; v < 2.6f; v += 0.15f) lMesh.Box(lWood, c + new Vector3(0, v, 0.02f), new Vector3(1.9f, 0.03f, 0.03f), false);
+                lMesh.Box(ArchLib.Invisible, c + new Vector3(0, 1.45f, 0), new Vector3(1.9f, 2.3f, 0.1f), true);
+            }
+            GameObject lRoot = new GameObject("AudienceHall");
+            lRoot.transform.SetParent(_keepR.interior, false);
+            lMesh.Flush(lRoot.transform, "Qasr_AudienceHall");
+            // The throne and the governor's cushions, rugs down the side aisles.
+            A.Model("Furn_Armchair", o + new Vector3(32.7f, 0.54f, 5.5f), -90f, _keepR.interior, ArchLib.Collide.Box, 1.25f);
+            for (int k = 0; k < 3; k++) { A.Model("Furn_Rug", o + new Vector3(19.5f + k * 3.6f, 0.01f, 1.1f), 0f, _keepR.interior, ArchLib.Collide.None); A.Model("Furn_Rug", o + new Vector3(19.5f + k * 3.6f, 0.01f, 9.9f), 0f, _keepR.interior, ArchLib.Collide.None); }
+            for (int k = 0; k < 4; k++) A.Model("Furn_PottedPlant", o + new Vector3(30f, 0f, k < 2 ? 1.1f + k * 0.8f : 9.1f + (k - 2) * 0.8f), 0f, _keepR.interior);
         }
 
         private void Tunnels()
@@ -326,6 +455,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lShaftRoot.transform.SetParent(K.Env, false);
             lShaft.Flush(lShaftRoot.transform, "Qasr_WellShaft");
             A.Climb(new Vector3(c.x, lShaftBottom.y, c.z - 0.9f), lTop - lShaftBottom.y + 0.4f, Vector3.forward, true, "Well shaft");
+            // The well's stone curb and winch in the cistern landing (the shaft's mouth).
+            ArchMesh lCurb = new ArchMesh();
+            foreach (Vector3 o in new[] { new Vector3(-1.3f, 0, 0), new Vector3(1.3f, 0, 0), new Vector3(0, 0, 1.3f) })
+                lCurb.Box(lStone, new Vector3(c.x, lTop + 0.4f, c.z) + o, new Vector3(o.x != 0 ? 0.4f : 2.6f, 0.8f, o.z != 0 ? 0.4f : 2.6f));
+            foreach (float s in new[] { -1.3f, 1.3f }) lCurb.Box(ArchLib.Surface("dark_wood", 1f), new Vector3(c.x + s, lTop + 1.4f, c.z), new Vector3(0.15f, 2f, 0.15f));
+            lCurb.Tube(ArchLib.Surface("dark_wood", 1f), new Vector3(c.x - 1.4f, lTop + 2.2f, c.z), new Vector3(c.x + 1.4f, lTop + 2.2f, c.z), 0.12f, 10);
+            GameObject lCurbRoot = new GameObject("WellCurb");
+            lCurbRoot.transform.SetParent(K.Env, false);
+            lCurb.Flush(lCurbRoot.transform, "Qasr_WellCurb");
             A.Climb(new Vector3(c.x + 0.9f, lShaftBottom.y, c.z), lTop - lShaftBottom.y + 0.4f, Vector3.left, true, null);
             Poi(G(88f, -112f, 1f), "Qanat mouth", MapPoi.Kind.Underground);
             Poi(G(-70f, -196f, 1f), "Qanat exit", MapPoi.Kind.Underground);

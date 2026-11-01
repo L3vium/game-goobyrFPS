@@ -198,6 +198,20 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // Plaza: the fiesta stage, the fountain, benches, lamps, bunting.
             Vector3 lStage = G(-16f, -146f, 0f);
             ArchOutdoor.Stage(A, lStage, -90f, 9f, 6f);
+            // The fireworks: mortar racks on crates behind the stage, the "pólvora" sign.
+            ArchMesh lFireworks = new ArchMesh();
+            ArchMat lTube = ArchLib.Tinted("painted_metal_shutter", new Color(0.2f, 0.25f, 0.6f), "mortar", 1f);
+            for (int k = 0; k < 3; k++)
+            {
+                Vector3 c = lStage + new Vector3(-6.5f, 0f, -3f + k * 3f);
+                lFireworks.Box(ArchLib.Surface("wooden_planks", 1f), c + Vector3.up * 0.35f, new Vector3(1.2f, 0.7f, 1.2f));
+                for (int t = 0; t < 9; t++) lFireworks.Cylinder(lTube, c + new Vector3(-0.4f + (t % 3) * 0.4f, 0.7f, -0.4f + (t / 3) * 0.4f), 0.08f, 0.55f, 10);
+            }
+            GameObject lFireworksRoot = new GameObject("Fireworks");
+            lFireworksRoot.transform.SetParent(K.Props, false);
+            lFireworks.Flush(lFireworksRoot.transform, "SanLazaro_Fireworks");
+            ArchOutdoor.Sign(A, lStage + new Vector3(-5f, 0f, 2.5f), -90f, "Pólvora - Peligro");
+            ArchOutdoor.Sign(A, lStage + new Vector3(4.2f, 0f, 5f), 90f, "Solo personal");
             A.Distraction("radio", lStage + new Vector3(-1f, 1.1f, 2.5f), 90f);
             ArchOutdoor.Fountain(A, G(-32f, -146f, 0f), 2.6f);
             for (int i = 0; i < 6; i++)

@@ -14,7 +14,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// </summary>
         public static ArchSpec KeepSpec(Vector3 pOrigin)
         {
-            ArchSpec k = new ArchSpec { name = "Keep", origin = pOrigin, size = new Vector2(34, 34), style = ArchStyles.Fortress(), zone = ZONE_CITADEL };
+            ArchSpec k = new ArchSpec { name = "Keep", origin = pOrigin, size = new Vector2(34, 34), style = ArchStyles.Grand(ArchStyles.Fortress(), new Color(0.45f, 0.7f, 0.68f), "keep"), zone = ZONE_CITADEL };
             const SecurityTier R = SecurityTier.Restricted, H = SecurityTier.Hostile;
             const AccessLevel Gu = AccessLevel.Guest, St = AccessLevel.Staff, Se = AccessLevel.Security, Pr = AccessLevel.Private, No = AccessLevel.None;
 
@@ -111,7 +111,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             k.holes.Add((4, new Rect(13.5f, 13.5f, 7f, 7f)));
 
             // Stairs: grand (gate hall -> F1, waiting gallery -> F2), private (F2 -> F3), service core (cellar -> roof), the scribes' secret stair.
-            k.Stair(0, 11.6f, 3f, 16.4f, 9.6f, 0, true, true);
+            // The grand stair: one marble flight from the gate hall up into the audience hall.
+            k.Stair(0, 12.5f, 2f, 16.5f, 9.5f, 0, false).grand = true;
             k.Stair(1, 5.6f, 1.6f, 10.4f, 8.2f, 0, true, false);
             k.Stair(2, 5.6f, 1.6f, 10.4f, 8.2f, 0, true, false);
             for (int f = -1; f <= 3; f++) k.Stair(f, 17.6f, 25f, 22.4f, 30.6f, 2, true, true);
@@ -134,6 +135,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             k.cornices.Add(1); k.cornices.Add(2); k.cornices.Add(3);
             k.drains.Add(new ArchDrain { at = new Vector2(0, 25f), topFloor = 1, poi = "West drainpipe" });
             k.drains.Add(new ArchDrain { at = new Vector2(34, 30f), topFloor = 3 });
+            k.drains.Add(new ArchDrain { at = new Vector2(0, 8f), topFloor = 3, poi = "South-west drainpipe" });
+            k.drains.Add(new ArchDrain { at = new Vector2(30f, 0), topFloor = 2 });
             k.drains.Add(new ArchDrain { at = new Vector2(8f, 34f), topFloor = 3 });
             return k;
         }

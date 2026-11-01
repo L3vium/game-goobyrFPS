@@ -105,6 +105,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             _liftTopR = Build(_liftTop, ZONE_SKI);
             _garageR = Build(_garage, ZONE_SKI);
             _mineHutR = Build(_mineHut, ZONE_SKI);
+            Build(_skiSchool, ZONE_SKI);
+            Build(_ticketHut, ZONE_SKI);
             _observatoryR = Build(_observatory, ZONE_SKI);
             _antennaR = Build(_antenna, ZONE_SKI);
             _cableTopR = Build(_cableTop, ZONE_SKI);
@@ -157,6 +159,23 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lTowerRoot.transform.SetParent(K.Env, false);
             lTower.Flush(lTowerRoot.transform, "Weisshorn_SkiJump");
             A.Climb(lJump + new Vector3(0, 0, 2.6f), 24.2f, Vector3.forward, true, "Ski-jump ladder");
+            ArchMesh lJumpDress = new ArchMesh();
+            ArchMat lRed = ArchLib.Tinted("painted_metal_shutter", new Color(0.85f, 0.12f, 0.1f), "hazard", 1f);
+            for (int i = 0; i < 18; i += 2)
+            {
+                float t = i / 18f;
+                Vector3 a = _skiJumpTop + new Vector3(0, 0, -3f) + new Vector3(0, -t * t * 20f, -t * 55f);
+                foreach (float s in new[] { -2.2f, 2.2f })
+                {
+                    lJumpDress.Box(lRed, a + new Vector3(s, 0.8f, 0), new Vector3(0.12f, 1.4f, 0.12f), false);
+                    lJumpDress.Box(i % 4 == 0 ? lRed : ArchLib.Snow, a + new Vector3(s, 1.3f, -1.5f), new Vector3(0.05f, 0.5f, 3f), false);
+                }
+            }
+            for (int k = 0; k < 4; k++) lJumpDress.Box(lRed, _skiJumpTop + new Vector3(k < 2 ? -3.4f : 3.4f, 3f, k % 2 == 0 ? -3.4f : 3.4f), new Vector3(0.15f, 6f, 0.15f), false);
+            GameObject lJumpRoot = new GameObject("SkiJumpDressing");
+            lJumpRoot.transform.SetParent(K.Env, false);
+            lJumpDress.Flush(lJumpRoot.transform, "Weisshorn_SkiJumpDress");
+            for (int k = 0; k < 2; k++) A.Lamp(_skiJumpTop + new Vector3(k == 0 ? -3.4f : 3.4f, 6f, -3.4f), 0f, new Color(0.9f, 0.95f, 1f), 30f, 3f, false);
             Poi(_skiJumpTop + Vector3.up, "Ski-jump", MapPoi.Kind.Overlook);
             MarkBuilt(new Rect(SKIJUMP.x - 6f, SKIJUMP.y - 60f, 12f, 66f));
             // Mid-station cafe: drinks and the lift queue.
@@ -167,6 +186,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             ArchOutdoor.Fence(A, LIFT_BOTTOM + new Vector2(-2, -10), LIFT_BOTTOM + new Vector2(-2, 6));
             // Piste markers and pine-band fences.
             for (int i = 0; i < 10; i++) ArchOutdoor.Fence(A, new Vector2(-10f + i * 4f, -60f + i * 10f), new Vector2(-6f + i * 4f, -56f + i * 10f), 1.2f);
+            PisteMarkers();
             // Observatory: the dome, the mast, the generator gas tanks, the cable car to the delivery yard.
             _domeTop = _observatoryR.At(9f, 1, 4.5f, 0f);
             ArchMesh lDome = new ArchMesh();
@@ -182,6 +202,26 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             A.Distraction("generator", _observatoryR.At(-2.5f, 0, 6f, 0f), 90f);
             A.Distraction("radio", _observatoryR.InRoom("Bunker1", 0.2f, 0.8f, 0f), 0f);
             Ride(new Vector3(40f, PLATFORM_Y + 4.05f, 120f), _cableTopR.At(4f, 0, 2f, 0f), "Cable car");
+        }
+
+        /// <summary>Orange and blue piste poles every 14 m along both edges of the three runs.</summary>
+        private void PisteMarkers()
+        {
+            ArchMesh lMesh = new ArchMesh();
+            ArchMat lOrange = ArchLib.Tinted("painted_metal_shutter", new Color(1f, 0.45f, 0.05f), "piste_o", 1f), lBlue = ArchLib.Tinted("painted_metal_shutter", new Color(0.1f, 0.3f, 0.9f), "piste_b", 1f);
+            for (float z = -95f; z < 68f; z += 14f)
+                foreach ((float centre, float half, ArchMat mat) in new[] { (20f - z * 0.15f, 20f, lBlue), (-45f + z * 0.1f, 14f, lOrange), (75f, 10f, lBlue) })
+                    foreach (float s in new[] { -1f, 1f })
+                    {
+                        float x = centre + s * half;
+                        if (Built(x, z)) continue;
+                        float g = K.GroundAt(x, z);
+                        lMesh.Cylinder(mat, new Vector3(x, g - 0.3f, z), 0.035f, 2.0f, 6, false);
+                        lMesh.Cylinder(ArchLib.Snow, new Vector3(x, g + 1.3f, z), 0.04f, 0.25f, 6, false);
+                    }
+            GameObject lRoot = new GameObject("PisteMarkers");
+            lRoot.transform.SetParent(K.Env, false);
+            lMesh.Flush(lRoot.transform, "Weisshorn_PisteMarkers");
         }
 
         private void DressHotel()
@@ -202,12 +242,36 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             A.DropLadder(Hp(-0.6f, 5, 4f, 1.2f), new Vector3(HOTEL.x - 0.6f, PLATFORM_Y + 8f, HOTEL.z + 4f), Vector3.left, "Spa-garden drop ladder");
             for (int i = 0; i < 3; i++) A.Lamp(G(-55f + i * 8f, 86f, 0f), 0f, new Color(1f, 0.75f, 0.45f), 12f, 2f);
             // Delivery yard: barrier gate (Padlock), trucks, dumpster, camera C2.
-            A.Model("Prop_Car_Pickup", G(20f, 118f, 0f), 90f);
-            A.Model("Prop_Car_Pickup", G(28f, 118f, 0f), 90f);
+            ArchOutdoor.Truck(A, G(18f, 119f, 0f), 90f, new Color(0.15f, 0.3f, 0.55f), "BeverageTruck");
+            ArchOutdoor.Truck(A, G(31f, 118.5f, 0f), 75f, new Color(0.75f, 0.75f, 0.72f), "LaundryVan");
             A.Dumpster(G(8f, 120f, 0f), 180f);
+            ArchOutdoor.Bins(A, G(2f, 122.6f, 0f), 180f, 4);
             A.CrateStack(G(-2f, 120f, 0f), 0f, 4);
+            A.LaundryCart(G(26f, 114.2f, 0f), 0f);
+            A.LaundryCart(G(23.6f, 114.2f, 0f), 0f);
+            A.Model("Prop_Pallet", G(12f, 114f, 0f), 10f);
             ArchOutdoor.LockedGate(A, G(48f, 117f, 0f), 0f, 4f, 2.2f, SecureDoor.Lock.Padlock, true);
+            ArchOutdoor.GuardBooth(A, G(44.5f, 113.5f, 0f), 90f, true, 3.4f);
+            ArchOutdoor.Sign(A, G(46f, 120.6f, 0f), 270f, "Privé - Personnel");
+            ArchOutdoor.Sign(A, G(6f, 113f, 0f), 180f, "Nur Personal");
+            ArchOutdoor.Fence(A, new Vector2(-7f, 124.5f), new Vector2(44f, 124.5f), 1.6f);
+            ArchOutdoor.Fence(A, new Vector2(50f, 124f), new Vector2(50f, 108f), 1.6f);
             Poi(G(48f, 117f, 1f), "Service-road barrier", MapPoi.Kind.Entrance);
+            // The funicular top station on the front terrace: a canopy, the frisk booth, a rope queue.
+            Vector3 lFunicular = new Vector3(-15f, PLATFORM_Y + 8.05f, 74f);
+            ArchOutdoor.Shed(A, lFunicular + new Vector3(0f, -0.05f, 0f), 0f, 6f, 5f, 3.2f, ArchLib.Surface("grey_roof_tiles", 2f), ArchLib.Surface("dark_wood", 1.5f), false);
+            ArchOutdoor.GuardBooth(A, lFunicular + new Vector3(5.5f, -0.05f, 4f), 180f, false);
+            ArchOutdoor.RopeLine(A, lFunicular + new Vector3(-1.5f, -0.05f, 3f), lFunicular + new Vector3(-1.5f, -0.05f, 7f), lFunicular + new Vector3(1.5f, -0.05f, 7f), lFunicular + new Vector3(1.5f, -0.05f, 3f));
+            ArchOutdoor.Sign(A, lFunicular + new Vector3(3f, -0.05f, 7.6f), 0f, "Gäste - Contrôle", true, new Color(0.15f, 0.25f, 0.45f));
+            // The terrace: banquet tables, patio heaters, planters along the rail.
+            for (int i = 0; i < 6; i++)
+            {
+                Vector3 p = new Vector3(HOTEL.x + 6f + i * 9.5f, PLATFORM_Y + 8.02f, HOTEL.z - 5f);
+                if (Mathf.Abs(p.x - lFunicular.x) < 6f) continue;
+                A.RoundTable(p, A.Props, ZONE_HOTEL);
+                ArchOutdoor.PatioHeater(A, p + new Vector3(2.4f, 0f, 1.2f));
+            }
+            for (int i = 0; i < 8; i++) ArchOutdoor.Planter(A, new Vector3(HOTEL.x + 4f + i * 8.5f, PLATFORM_Y + 8.02f, HOTEL.z - 8.4f), 0f);
             A.Camera(Hp(30f, 1, 30.3f, 3.4f), G(20f, 118f, 1f), ZONE_HOTEL);
             A.Climb(new Vector3(-20f, K.GroundAt(-20f, 131f), 131f), PLATFORM_Y + 20f - K.GroundAt(-20f, 131f), Vector3.back, false, "Crevasse ice wall");
 
@@ -224,14 +288,20 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             A.Breaker(Hp(27.6f, 0, 24f, 0f), -90f, _hotelR.volume);
             // The chandelier over the ballroom stage (the shared trick), the band stage, champagne.
             A.Chandelier(Hp(55f, 2, 15f, 7.6f), 6.8f);
-            ArchOutdoor.Stage(A, Hp(55f, 2, 26f, 0f), 180f, 10f, 5f);
-            for (int i = 0; i < 4; i++)
-            {
-                Vector3 p = Hp(47f + i * 5f, 2, 8f, 0f);
-                A.Model("Furn_DiningTable", p, 0f);
-                A.Drinks(p + Vector3.up * 0.77f, 0f, ZONE_HOTEL, 2, i == 1, 1.2f);
-            }
-            A.Model("Furn_PianoGrand", Hp(46f, 2, 24f, 0f), 120f);
+            A.Chandelier(Hp(46f, 2, 8f, 7.6f), 6.8f);
+            A.Chandelier(Hp(64f, 2, 8f, 7.6f), 6.8f);
+            ArchOutdoor.Stage(A, Hp(55f, 2, 26.2f, 0f), 0f, 11f, 5f);
+            int lTable = 0;
+            for (float x = 44f; x < 68f; x += 4f)
+                for (float z = 3f; z < 21f; z += 4f)
+                {
+                    if (Mathf.Abs(x - 55f) < 5f && z > 9f && z < 19f) continue;
+                    Vector3 p = Hp(x, 2, z, 0f);
+                    A.RoundTable(p, _hotelR.interior, ZONE_HOTEL);
+                    if (lTable++ % 5 == 1) A.Drinks(p + new Vector3(0.25f, 0.79f, 0.3f), 0f, ZONE_HOTEL, 2, true, 1.3f);
+                }
+            A.Model("Furn_PianoGrand", Hp(45.5f, 2, 25f, 0f), 120f);
+            A.Model("Furn_BarCounter", Hp(68.6f, 2, 6f, 0f), -90f, _hotelR.interior);
             // Spa: pool, sauna stove (explosive), hot tub heater, ipecac at the doctor's.
             K.Water(Hp(7f, 2, 21f, -0.3f), new Vector2(8f, 5f));
             A.Explosive(Hp(1.2f, 2, 29f, 0f), 0f, true);

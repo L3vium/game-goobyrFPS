@@ -19,6 +19,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lStyle.facade = ArchLib.Tinted("painted_plaster_wall", new Color(0.93f, 0.9f, 0.84f), "hotel", 3.5f);
             lStyle.plinth = ArchLib.Surface("stone_wall", 2.5f);
             lStyle.windowSpacing = 3.2f;
+            lStyle.trim = ArchLib.Tinted("stone_wall", new Color(0.92f, 0.9f, 0.86f), "alp_trim", 2f);
+            lStyle = ArchStyles.Grand(lStyle, new Color(0.86f, 0.8f, 0.68f), "hotel");
             ArchSpec h = new ArchSpec { name = "GrandHotel", origin = pOrigin, size = new Vector2(70, 30), storey = 4f, style = lStyle, zone = ZONE_HOTEL, plinth = 1.2f, cutLand = true };
             const SecurityTier R = SecurityTier.Restricted, H = SecurityTier.Hostile;
             const AccessLevel Gu = AccessLevel.Guest, St = AccessLevel.Staff, Se = AccessLevel.Security, Pr = AccessLevel.Private, No = AccessLevel.None;
@@ -41,14 +43,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             h.Secure(0, 35, 30, SecureDoor.Lock.Crowbar, false, "Mine door");
 
             // ---- L1 staff tier (opens south on the ski-room terrace)
-            h.Room("SkiRoom", 1, 0, 0, 14, 14, RoomType.Workshop, R, St);
-            h.Room("StaffCorridor", 1, 14, 0, 42, 14, RoomType.Corridor, R, St);
-            h.Room("Canteen", 1, 42, 0, 56, 14, RoomType.Mess, R, St);
-            h.Room("Linen", 1, 0, 14, 14, 30, RoomType.Linen, R, No);
-            h.Room("SecurityOffice", 1, 14, 14, 28, 30, RoomType.Security, H, Se);
-            h.Room("Kitchens", 1, 28, 14, 42, 30, RoomType.Kitchen, R, St);
-            h.Room("WineCellar", 1, 42, 14, 56, 30, RoomType.WineCellar, R, St);
-            h.Room("Storage", 1, 56, 0, 70, 30, RoomType.Store, R, St);
+            // The two lower storeys are the hotel's rusticated stone base.
+            Stone(h.Room("SkiRoom", 1, 0, 0, 14, 14, RoomType.Workshop, R, St));
+            Stone(h.Room("StaffCorridor", 1, 14, 0, 42, 14, RoomType.Corridor, R, St));
+            Stone(h.Room("Canteen", 1, 42, 0, 56, 14, RoomType.Mess, R, St));
+            Stone(h.Room("Linen", 1, 0, 14, 14, 30, RoomType.Linen, R, No));
+            Stone(h.Room("SecurityOffice", 1, 14, 14, 28, 30, RoomType.Security, H, Se));
+            Stone(h.Room("Kitchens", 1, 28, 14, 42, 30, RoomType.Kitchen, R, St));
+            Stone(h.Room("WineCellar", 1, 42, 14, 56, 30, RoomType.WineCellar, R, St));
+            Stone(h.Room("Storage", 1, 56, 0, 70, 30, RoomType.Store, R, St));
             h.Door(1, 14, 7); h.Door(1, 7, 14); h.Door(1, 42, 7); h.Door(1, 49, 14); h.Door(1, 35, 14); h.Door(1, 42, 22); h.Door(1, 56, 7);
             h.Secure(1, 14, 22, SecureDoor.Lock.Keycard, true); h.Secure(1, 28, 22, SecureDoor.Lock.Keycard, true);
             h.Door(1, 7, 0, DoorKind.Double, 2f).poi = "Ski-room door";
@@ -63,10 +66,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             h.Room("Lobby", 2, 0, 0, 40, 16, RoomType.Lobby, R, Gu);
             h.Room("ServiceStairL2", 2, 29, 8, 40, 16, RoomType.Stair, R, St).noFurniture = true;
             h.Room("ChuteL2", 2, 14, 1, 15, 2, RoomType.Store, R, St).noFurniture = true;
-            h.Room("Ballroom", 2, 40, 0, 70, 30, RoomType.Ballroom, R, Gu);
+            // The ballroom is dressed by hand round its stage (tables, chandelier), not by the furnisher.
+            h.Room("Ballroom", 2, 40, 0, 70, 30, RoomType.Ballroom, R, Gu).noFurniture = true;
             ArchRoom lBallVoid = h.Room("Ballroom", 3, 40, 0, 70, 30, RoomType.Ballroom, R, Gu);
             lBallVoid.isVoid = lBallVoid.noFloor = lBallVoid.noFurniture = lBallVoid.noLight = lBallVoid.noZone = true;
-            h.Door(2, 13, 23); h.Door(2, 26, 23); h.Door(2, 6, 16); h.Door(2, 19, 16, DoorKind.Double, 2f); h.Door(2, 27.5f, 16); h.Door(2, 35, 16);
+            h.Door(2, 13, 23); h.Door(2, 26, 23); h.Door(2, 6, 16); h.Door(2, 24.5f, 16, DoorKind.Double, 2f); h.Door(2, 27.5f, 16); h.Door(2, 35, 16);
             h.Door(2, 40, 23, DoorKind.Door, 1.4f); h.Door(2, 40, 4, DoorKind.Double, 2.4f); h.Door(2, 29, 12);
             h.Door(2, 2.5f, 26);
             h.Door(2, 14.5f, 0, DoorKind.Double, 2.6f).poi = "Front doors";
@@ -91,6 +95,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             h.Door(3, 40, 18.5f, DoorKind.Double, 1.8f).poi = "Mezzanine door";
             h.Door(3, 40, 4);
             foreach (float x in new[] { 6.5f, 19.5f, 33f }) h.balconies.Add(new ArchBalcony { floor = 3, at = new Vector2(x, 0), width = 3.2f, depth = 1.1f });
+            foreach (float x in new[] { 6.5f, 19.5f }) h.balconies.Add(new ArchBalcony { floor = 4, at = new Vector2(x, 0), width = 3.2f, depth = 1.1f });
+            foreach (float z in new[] { 12f, 24f }) h.balconies.Add(new ArchBalcony { floor = 3, at = new Vector2(0, z), width = 2.8f, depth = 1.0f });
             h.Room("ChuteL3", 3, 14, 1, 15, 2, RoomType.Store, R, St).noFurniture = true;
 
             // ---- L4 VIP floor, the ballroom roof
@@ -124,10 +130,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             h.Window(5, 0, 4, WindowKind.Open);
             for (int f = 6; f <= 8; f++) h.Room("ClockTower" + f, f, 20, 12, 28, 20, RoomType.Stair, H, Se).noFurniture = true;
             ArchRoom lBelfry = h.Room("Belfry", 9, 20, 12, 28, 20, RoomType.Belvedere, H, Se); lBelfry.arcade = true;
-            h.Roof(5, 0, 0, 20, 30, RoofKind.Gable, false, 38f);
-            h.Roof(9, 20, 12, 28, 20, RoofKind.Hip, true, 45f).overhang = 0.5f;
+            // Deep timber eaves on the steep alpine roofs.
+            h.Roof(5, 0, 0, 20, 30, RoofKind.Gable, false, 38f).overhang = 1.3f;
+            h.Roof(9, 20, 12, 28, 20, RoofKind.Hip, true, 45f).overhang = 0.9f;
 
-            // Stairs: grand (lobby -> L3), VIP (L3 -> L4), service core (L0 -> L5), clock tower, ballroom side stairs.
+            // Stairs: the feature stair up the atrium (lobby -> L3 gallery), the west lobby stair, VIP (L3 -> L4),
+            // service core (L0 -> L5), clock tower, ballroom side stairs.
+            h.Stair(2, 18f, 9.5f, 22f, 16f, 2, false).grand = true;
             h.Stair(2, 2.4f, 4f, 7.2f, 13f, 0, true, true);
             h.Stair(3, 18.4f, 0.6f, 23.6f, 6.2f, 3, true, true);
             for (int f = 0; f <= 4; f++) h.Stair(f, 32f, 9f, 39.6f, 13.4f, 3, true, true);
@@ -160,6 +169,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             h.drains.Add(new ArchDrain { at = new Vector2(1.5f, 0), topFloor = 3, poi = "South drainpipe" });
             h.drains.Add(new ArchDrain { at = new Vector2(0, 8f), topFloor = 4 });
             h.drains.Add(new ArchDrain { at = new Vector2(70f, 26f), topFloor = 3 });
+            h.drains.Add(new ArchDrain { at = new Vector2(39.5f, 0), topFloor = 4, poi = "Ballroom drainpipe" });
+            h.drains.Add(new ArchDrain { at = new Vector2(68.5f, 0), topFloor = 3 });
+            h.drains.Add(new ArchDrain { at = new Vector2(70f, 4f), topFloor = 3 });
             return h;
         }
 

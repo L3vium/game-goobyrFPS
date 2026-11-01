@@ -212,7 +212,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private void PlanCitadel()
         {
             CourtRange("Stables", new Vector2(-62f, 126f), 1, 26f, 1, RoomType.Garage, SecurityTier.Restricted, AccessLevel.Staff);
-            CourtRange("Barracks", new Vector2(48f, 108f), 3, 24f, 2, RoomType.Barracks, SecurityTier.Restricted, AccessLevel.Staff);
+            CourtRange("Barracks", new Vector2(48f, 113f), 3, 24f, 2, RoomType.Barracks, SecurityTier.Restricted, AccessLevel.Staff);
             CourtRange("WaitingWest", new Vector2(-36f, 70f), 2, 28f, 1, RoomType.Hall, SecurityTier.Restricted, AccessLevel.Guest);
             CourtRange("WaitingEast", new Vector2(28f, 70f), 2, 28f, 1, RoomType.Mess, SecurityTier.Restricted, AccessLevel.Guest);
             _keep = KeepSpec(KEEP);

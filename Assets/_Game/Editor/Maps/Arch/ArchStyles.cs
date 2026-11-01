@@ -123,6 +123,19 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return s;
         }
 
+        /// <summary>
+        /// A grand house's interiors on top of its style: wallpaper over a walnut dado in the guest rooms,
+        /// plaster ceilings with a crown moulding, bare concrete back of house.
+        /// </summary>
+        public static ArchStyle Grand(ArchStyle s, Color pWallpaper, string pSuffix)
+        {
+            s.wallpaper = ArchLib.Tinted("fabric_pattern_07", pWallpaper, "paper_" + pSuffix, 1.4f);
+            s.wainscot = ArchLib.Surface("walnut_veneer", 1.2f);
+            s.underbelly = ArchLib.Surface("concrete_wall_008", 3f);
+            s.guestCeiling = ArchLib.Tinted("painted_plaster_wall", new Color(1f, 0.99f, 0.96f), "ceiling", 3f);
+            return s;
+        }
+
         /// <summary>Alpine: dark timber over a stone base, steep slate roofs, snow on them.</summary>
         public static ArchStyle Alpine(bool pTimber = true)
         {

@@ -152,8 +152,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (ArchStair s in pSpec.stairs) Stair(c, s);
             foreach (ArchRoof lRoof in pSpec.roofs) Roof(c, lRoof);
             foreach (int f in pSpec.cornices) Cornice(c, f);
+            if (pSpec.stringCourses)
+                for (int f = 1; f <= c.maxF; f++) if (!pSpec.cornices.Contains(f)) StringCourse(c, f);
             foreach (ArchBalcony b in pSpec.balconies) Balcony(c, b);
             foreach (ArchDrain d in pSpec.drains) Drain(c, d);
+            foreach (ArchHatch h in pSpec.hatches) Hatch(c, h);
             c.mesh.Flush(r.shell, MeshPrefix + "_" + pSpec.name);
 
             if (!pSpec.shut)
@@ -305,11 +308,54 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private static Vector3 P(Seg pSeg, float n, float s, float y, float d) => pSeg.vertical ? new Vector3(pSeg.line + d * n, y, s) : new Vector3(s, y, pSeg.line + d * n);
 
         /// <summary>A box in segment coordinates.</summary>
-        private static void SegBox(Ctx c, Seg pSeg, float n, float s0, float s1, float y0, float y1, float d0, float d1, ArchMat pMat, bool pSolid = true)
+        private static void SegBox(Ctx c, Seg pSeg, float n, float s0, float s1, float y0, float y1, float d0, float d1, ArchMat pMat, bool pSolid = true, bool pSkipStart = false, bool pSkipEnd = false)
         {
             if (s1 - s0 < 0.01f || y1 - y0 < 0.01f || Mathf.Abs(d1 - d0) < 0.005f) return;
             Vector3 p0 = P(pSeg, n, s0, y0, d0), p1 = P(pSeg, n, s1, y1, d1);
-            c.mesh.BoxMinMax(pMat, Vector3.Min(p0, p1), Vector3.Max(p0, p1), pSolid);
+            // The end faces where a wall runs on into the next one are hidden inside it (and would
+            // z-fight with its outer face: the white seams at corners and partitions).
+            ArchMesh.Faces lSkip = ArchMesh.Faces.None;
+            if (pSkipStart) lSkip |= pSeg.vertical ? ArchMesh.Faces.Back : ArchMesh.Faces.Left;
+            if (pSkipEnd) lSkip |= pSeg.vertical ? ArchMesh.Faces.Front : ArchMesh.Faces.Right;
+            c.mesh.BoxMinMax(pMat, Vector3.Min(p0, p1), Vector3.Max(p0, p1), pSolid, lSkip);
+        }
+
+        /// <summary>The wall finish a room shows: wallpaper for guests, concrete back of house, plaster otherwise.</summary>
+        private static ArchMat InnerFor(Ctx c, ArchRoom pRoom)
+        {
+            ArchStyle st = c.spec.style;
+            if (pRoom == null) return st.interior;
+            if (IsCellar(pRoom)) return st.cellarWall ?? st.underbelly ?? st.interior;
+            if (st.underbelly != null && ArchSpec.IsUnderbelly(pRoom)) return st.underbelly;
+            if (st.wallpaper != null && ArchSpec.IsGuest(pRoom.type)) return st.wallpaper;
+            return st.interior;
+        }
+
+        /// <summary>
+        /// One room-facing leaf of a wall between <paramref name="pBack"/> and the face
+        /// <paramref name="pFace"/> (segment depths): guest rooms get a panelled dado, a dado rail and a
+        /// crown moulding under the ceiling.
+        /// </summary>
+        private static void Leaf(Ctx c, Seg s, float n, float p, float q, float ya, float yb, float pBack, float pFace, ArchRoom pRoom, bool pSkipStart, bool pSkipEnd)
+        {
+            ArchStyle st = c.spec.style;
+            ArchMat lMat = InnerFor(c, pRoom);
+            float y0 = FloorY(c, s.floor);
+            bool lGuest = st.wallpaper != null && st.wainscot != null && pRoom != null && pRoom.floor >= 0 && ArchSpec.IsGuest(pRoom.type);
+            float lOut = pFace > pBack ? 1f : -1f;
+            if (!lGuest) { SegBox(c, s, n, p, q, ya, yb, Mathf.Min(pBack, pFace), Mathf.Max(pBack, pFace), lMat, true, pSkipStart, pSkipEnd); return; }
+            float lDado = y0 + 0.95f;
+            if (ya < lDado)
+            {
+                float lTop = Mathf.Min(yb, lDado);
+                SegBox(c, s, n, p, q, ya, lTop, Mathf.Min(pBack, pFace + lOut * 0.015f), Mathf.Max(pBack, pFace + lOut * 0.015f), st.wainscot, true, pSkipStart, pSkipEnd);
+                if (lTop >= lDado - 0.01f) SegBox(c, s, n, p, q, lDado - 0.03f, lDado + 0.03f, Mathf.Min(pFace, pFace + lOut * 0.035f), Mathf.Max(pFace, pFace + lOut * 0.035f), st.trim, false, pSkipStart, pSkipEnd);
+            }
+            if (yb > lDado) SegBox(c, s, n, p, q, Mathf.Max(ya, lDado), yb, Mathf.Min(pBack, pFace), Mathf.Max(pBack, pFace), lMat, true, pSkipStart, pSkipEnd);
+            float lCeiling = y0 + c.spec.storey - c.spec.slab;
+            bool lOpenAbove = c.spec.rooms.Exists(o => o.floor == pRoom.floor + 1 && (o.noFloor || o.isVoid) && o.rect.Overlaps(pRoom.rect));
+            if (yb >= lCeiling - 0.01f && !pRoom.isVoid && !lOpenAbove)
+                SegBox(c, s, n, p, q, lCeiling - 0.14f, lCeiling, Mathf.Min(pFace, pFace + lOut * 0.07f), Mathf.Max(pFace, pFace + lOut * 0.07f), st.trim, false, pSkipStart, pSkipEnd);
         }
 
         private static bool DoorOn(Seg s, int pFloor, Vector2 pAt, out float pAlong)
@@ -366,7 +412,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             float lBase = 0f;
             if (lKind == WallKind.Facade && s.floor == c.minF) lBase = -c.spec.plinth;
             ArchMat lOuter = IsCellar(lOwner) ? (st.cellarWall ?? st.facade) : (lOwner.wallMat ?? st.facade);
-            ArchMat lInner = IsCellar(lOwner) ? (st.cellarWall ?? st.interior) : st.interior;
             // Top floor: walls rise a little into the roof (no gap under the eaves).
             float lTopExtra = 0f;
 
@@ -391,14 +436,20 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     lCursor = Mathf.Max(lCursor, b.y);
                 }
                 if (H + lTopExtra > lCursor) lSolid.Add(new Vector2(lCursor, H + lTopExtra));
+                bool lSkipA = p <= s.a + 0.001f, lSkipB = q >= s.b - 0.001f;
                 foreach (Vector2 v in lSolid)
                 {
                     if (lKind == WallKind.Partition)
-                        SegBox(c, s, n, p, q, y0 + v.x, y0 + v.y, -PARTITION * 0.5f, PARTITION * 0.5f, lInner);
+                    {
+                        // Two leaves, each finished for the room it faces.
+                        Leaf(c, s, n, p, q, y0 + v.x, y0 + v.y, 0f, -PARTITION * 0.5f, RoomOf(c, s.neg), lSkipA, lSkipB);
+                        Leaf(c, s, n, p, q, y0 + v.x, y0 + v.y, 0f, PARTITION * 0.5f, RoomOf(c, s.pos), lSkipA, lSkipB);
+                    }
                     else
                     {
-                        SegBox(c, s, n, p, q, y0 + v.x, y0 + v.y, -lT + 0.15f, 0f, lOuter);
-                        SegBox(c, s, n, p, q, y0 + Mathf.Max(0f, v.x), y0 + v.y, -lT, -lT + 0.15f, lInner);
+                        SegBox(c, s, n, p, q, y0 + v.x, y0 + v.y, -lT + 0.15f, 0f, lOuter, true, lSkipA, lSkipB);
+                        if (lOwner.isVoid || lOwner.open) SegBox(c, s, n, p, q, y0 + Mathf.Max(0f, v.x), y0 + v.y, -lT, -lT + 0.15f, InnerFor(c, lOwner), true, lSkipA, lSkipB);
+                        else Leaf(c, s, n, p, q, y0 + Mathf.Max(0f, v.x), y0 + v.y, -lT + 0.15f, -lT, lOwner, lSkipA, lSkipB);
                     }
                 }
             }
@@ -771,13 +822,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 ArchMat lFloor = lRoom.floorMat ?? FloorFor(st, lRoom);
                 foreach (Rect r in Rects(lCells, c.nx, c.nz))
                 {
-                    c.mesh.BoxMinMax(f == c.minF ? (st.cellarWall ?? st.ceiling) : st.ceiling, new Vector3(r.xMin, y - lSpec.slab, r.yMin), new Vector3(r.xMax, y - 0.02f, r.yMax), true, ArchMesh.Faces.Top);
+                    c.mesh.BoxMinMax(f == c.minF ? (st.cellarWall ?? st.ceiling) : st.ceiling, new Vector3(r.xMin, y - lSpec.slab, r.yMin), new Vector3(r.xMax, y - 0.02f, r.yMax), true, ArchMesh.Faces.Top | OutsideSides(c, f, r));
                     c.mesh.Quad(lFloor, new Vector3(r.xMin, y, r.yMin), new Vector3(r.xMax, y, r.yMin), new Vector3(r.xMax, y, r.yMax), new Vector3(r.xMin, y, r.yMax));
                 }
             }
 
             // Ceilings and flat roofs where nothing stands above.
-            bool[,] lCeiling = new bool[c.nx, c.nz], lFlat = new bool[c.nx, c.nz];
+            bool[,] lCeiling = new bool[c.nx, c.nz], lFlat = new bool[c.nx, c.nz], lGuestCeiling = new bool[c.nx, c.nz];
             bool lAnyFlat = false;
             for (int i = 0; i < c.nx; i++)
                 for (int j = 0; j < c.nz; j++)
@@ -786,16 +837,25 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     if (o < 0) continue;
                     ArchRoom lRoom = lSpec.rooms[o];
                     if (lRoom.open) continue;
-                    if (Owner(c, f + 1, i, j) >= 0) continue;
+                    int lAbove = Owner(c, f + 1, i, j);
+                    bool lGuestRoom = st.guestCeiling != null && f >= 0 && ArchSpec.IsGuest(lRoom.type);
+                    Vector2 lCell = new Vector2((i + 0.5f) * CELL, (j + 0.5f) * CELL);
+                    bool lHoleAbove = lSpec.stairs.Exists(st2 => st2.fromFloor == f && st2.rect.Contains(lCell)) || lSpec.holes.Exists(h => h.floor == f + 1 && h.rect.Contains(lCell))
+                        || c.shafts.Exists(b => b.min.y < FloorY(c, f + 1) - 0.05f && b.max.y > FloorY(c, f + 1) - lSpec.slab + 0.05f && b.min.x - 0.1f < lCell.x && b.max.x + 0.1f > lCell.x && b.min.z - 0.1f < lCell.y && b.max.z + 0.1f > lCell.y);
+                    if (lGuestRoom && !lHoleAbove && (lAbove < 0 || (!lSpec.rooms[lAbove].noFloor && !lSpec.rooms[lAbove].isVoid))) lGuestCeiling[i, j] = true;
+                    if (lAbove >= 0) continue;
                     if (f < 0) { lFlat[i, j] = true; lAnyFlat = true; continue; }
                     Vector2 p = new Vector2((i + 0.5f) * CELL, (j + 0.5f) * CELL);
-                    lCeiling[i, j] = true;
+                    if (!lGuestRoom) lCeiling[i, j] = true;
                     bool lRoofed = lSpec.roofs.Exists(r => r.onFloor == f && r.kind != RoofKind.Flat && r.rect.Contains(p));
                     if (!lRoofed) { lFlat[i, j] = true; lAnyFlat = true; }
                 }
             float yc = FloorY(c, f + 1) - lSpec.slab;
             foreach (Rect r in Rects(lCeiling, c.nx, c.nz))
                 c.mesh.Quad(st.ceiling, new Vector3(r.xMin, yc, r.yMin), new Vector3(r.xMin, yc, r.yMax), new Vector3(r.xMax, yc, r.yMax), new Vector3(r.xMax, yc, r.yMin));
+            float yg = yc - 0.006f;
+            foreach (Rect r in Rects(lGuestCeiling, c.nx, c.nz))
+                c.mesh.Quad(st.guestCeiling, new Vector3(r.xMin, yg, r.yMin), new Vector3(r.xMin, yg, r.yMax), new Vector3(r.xMax, yg, r.yMax), new Vector3(r.xMax, yg, r.yMin));
             if (!lAnyFlat) return;
             float yr = FloorY(c, f + 1);
             if (f < 0)
@@ -810,7 +870,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             foreach (Rect r in Rects(lFlat, c.nx, c.nz))
             {
-                c.mesh.BoxMinMax(st.ceiling, new Vector3(r.xMin, yc, r.yMin), new Vector3(r.xMax, yr - 0.02f, r.yMax), true, ArchMesh.Faces.Top | ArchMesh.Faces.Bottom);
+                c.mesh.BoxMinMax(st.ceiling, new Vector3(r.xMin, yc, r.yMin), new Vector3(r.xMax, yr - 0.02f, r.yMax), true, ArchMesh.Faces.Top | ArchMesh.Faces.Bottom | OutsideSides(c, f, r));
                 c.mesh.Quad(st.flatRoof ?? st.roof, new Vector3(r.xMin, yr, r.yMin), new Vector3(r.xMax, yr, r.yMin), new Vector3(r.xMax, yr, r.yMax), new Vector3(r.xMin, yr, r.yMax));
                 if (st.snow) c.mesh.Quad(ArchLib.Snow, new Vector3(r.xMin, yr + 0.06f, r.yMin), new Vector3(r.xMax, yr + 0.06f, r.yMin), new Vector3(r.xMax, yr + 0.06f, r.yMax), new Vector3(r.xMin, yr + 0.06f, r.yMax), false);
             }
@@ -839,6 +899,22 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         if (st.crenels && ((i + j) & 1) == 0) c.mesh.BoxMinMax(st.facade, new Vector3(a.x, b.y + 0.07f, a.z), new Vector3(b.x, b.y + 0.75f, b.z));
                     }
                 }
+        }
+
+        /// <summary>The sides of a slab rectangle that lie on the outer wall line (no room beyond on that floor): hidden in the facade.</summary>
+        private static ArchMesh.Faces OutsideSides(Ctx c, int f, Rect r)
+        {
+            int i0 = Mathf.RoundToInt(r.xMin / CELL), i1 = Mathf.RoundToInt(r.xMax / CELL), j0 = Mathf.RoundToInt(r.yMin / CELL), j1 = Mathf.RoundToInt(r.yMax / CELL);
+            bool Out(int i, int j) => Owner(c, f, i, j) < 0;
+            bool lLeft = true, lRight = true, lBack = true, lFront = true;
+            for (int j = j0; j < j1; j++) { if (!Out(i0 - 1, j)) lLeft = false; if (!Out(i1, j)) lRight = false; }
+            for (int i = i0; i < i1; i++) { if (!Out(i, j0 - 1)) lBack = false; if (!Out(i, j1)) lFront = false; }
+            ArchMesh.Faces lSkip = ArchMesh.Faces.None;
+            if (lLeft) lSkip |= ArchMesh.Faces.Left;
+            if (lRight) lSkip |= ArchMesh.Faces.Right;
+            if (lBack) lSkip |= ArchMesh.Faces.Back;
+            if (lFront) lSkip |= ArchMesh.Faces.Front;
+            return lSkip;
         }
 
         public static ArchMat FloorFor(ArchStyle st, ArchRoom pRoom)
@@ -892,17 +968,63 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // into the mass from below).
             bool lStackedBelow = lSpec.stairs.Exists(o => o != s && o.fromFloor == s.fromFloor - 1 && o.rect.Overlaps(s.rect));
             bool lStackedAbove = lSpec.stairs.Exists(o => o != s && o.fromFloor == s.fromFloor + 1 && o.rect.Overlaps(s.rect));
+            ArchMat lSoffit = lSpec.style.ceiling ?? lMat, lRunner = s.grand ? ArchLib.Surface("velour_velvet", 1f) : null;
+            ArchMat lBaluster = s.grand ? (lSpec.style.column ?? lSpec.style.trim) : ArchLib.Iron;
             void Flight(float w0, float w1, float u0, float u1, float h0, float h1, bool pSolid)
             {
                 int lCount = Mathf.Max(2, Mathf.CeilToInt((h1 - h0) / 0.18f - 0.01f));
-                float lRun = (u1 - u0) / lCount, lUp = (h1 - h0) / lCount;
+                float lRun = (u1 - u0) / lCount, lUp = (h1 - h0) / lCount, lSign = Mathf.Sign(u1 - u0);
+                // Grand flights always read as an open stair: steps on a sloping soffit between stringers.
+                bool lOpen = !pSolid || s.grand;
                 for (int k = 0; k < lCount; k++)
                 {
                     float ua = u0 + k * lRun, ub = ua + lRun, lTop = h0 + (k + 1) * lUp;
-                    c.mesh.BoxMinMax(lMat, new Vector3(w0, pSolid ? 0f : Mathf.Max(0f, lTop - lUp - 0.32f), Mathf.Min(ua, ub)), new Vector3(w1, lTop, Mathf.Max(ua, ub)), false);
+                    float lFoot = pSolid && !s.grand ? 0f : Mathf.Max(0f, lTop - lUp - 0.12f);
+                    // The tread with a nosing over the riser.
+                    c.mesh.BoxMinMax(lMat, new Vector3(w0, lFoot, Mathf.Min(ua - lSign * 0.03f, ub)), new Vector3(w1, lTop, Mathf.Max(ua - lSign * 0.03f, ub)), false);
+                    if (lRunner != null)
+                    {
+                        float lInset = (w1 - w0) * 0.18f;
+                        c.mesh.BoxMinMax(lRunner, new Vector3(w0 + lInset, lTop, Mathf.Min(ua, ub)), new Vector3(w1 - lInset, lTop + 0.008f, Mathf.Max(ua, ub)), false);
+                        c.mesh.BoxMinMax(lRunner, new Vector3(w0 + lInset, lTop - lUp, Mathf.Min(ua - lSign * 0.035f, ua - lSign * 0.045f)), new Vector3(w1 - lInset, lTop, Mathf.Max(ua - lSign * 0.035f, ua - lSign * 0.045f)), false);
+                    }
                     float lUnder = pSolid ? 0f : Mathf.Max(0f, lTop - lUp - 0.3f);
                     if (lTop - lUp - 0.05f > lUnder + 0.05f)
                         c.mesh.BoxMinMax(ArchLib.Invisible, new Vector3(w0 + 0.02f, lUnder, Mathf.Min(ua, ub) + 0.02f), new Vector3(w1 - 0.02f, lTop - lUp - 0.05f, Mathf.Max(ua, ub) - 0.02f), true);
+                }
+                // Nosing line N(u): through the top of every riser.
+                float N(float u) => h0 + lUp + (u - u0) / (u1 - u0) * (h1 - h0 - lUp);
+                if (lOpen)
+                {
+                    float Bt(float u) => Mathf.Max(h0 - 0.28f, N(u) - 0.48f);
+                    // Plastered soffit and two stringers (no stepped blocks underneath).
+                    c.mesh.DoubleQuad(lSoffit, new Vector3(w0, Bt(u0), u0), new Vector3(w1, Bt(u0), u0), new Vector3(w1, Bt(u1), u1), new Vector3(w0, Bt(u1), u1), true);
+                    foreach (float w in new[] { w0 - 0.04f, w1 + 0.04f })
+                    {
+                        c.mesh.DoubleQuad(lMat, new Vector3(w, Bt(u0), u0), new Vector3(w, N(u0) + 0.06f, u0), new Vector3(w, Mathf.Min(N(u1) + 0.06f, h1 + 0.06f), u1), new Vector3(w, Bt(u1), u1), false);
+                    }
+                }
+                if (s.grand)
+                {
+                    // A turned balustrade along both sides: handrail, a baluster per tread, newel posts.
+                    foreach (float w in new[] { w0 + 0.06f, w1 - 0.06f })
+                    {
+                        Vector3 lRailA = new Vector3(w, N(u0) + 0.92f, u0), lRailB = new Vector3(w, N(u1) + 0.92f, u1);
+                        c.mesh.Tube(ArchLib.Surface("walnut_veneer", 0.6f), lRailA, lRailB, 0.04f, 8, false);
+                        for (int k = 0; k < lCount; k++)
+                        {
+                            float um = u0 + (k + 0.5f) * lRun, lTop = h0 + (k + 1) * lUp;
+                            c.mesh.Cylinder(lBaluster, new Vector3(w, lTop, um), 0.03f, N(um) + 0.9f - lTop, 8, false, false);
+                        }
+                        c.mesh.BoxMinMax(lBaluster, new Vector3(w - 0.11f, h0, u0 - lSign * 0.11f - 0.11f), new Vector3(w + 0.11f, h0 + 1.15f, u0 - lSign * 0.11f + 0.11f), true);
+                        c.mesh.BoxMinMax(lBaluster, new Vector3(w - 0.14f, h0 + 1.15f, u0 - lSign * 0.11f - 0.14f), new Vector3(w + 0.14f, h0 + 1.22f, u0 - lSign * 0.11f + 0.14f), false);
+                        // Nothing falls through the balusters.
+                        for (int k = 0; k < lCount; k++)
+                        {
+                            float ua = u0 + k * lRun, ub = ua + lRun, lTop = h0 + (k + 1) * lUp;
+                            c.mesh.BoxMinMax(ArchLib.Invisible, new Vector3(w - 0.03f, lTop, Mathf.Min(ua, ub)), new Vector3(w + 0.03f, lTop + 0.95f, Mathf.Max(ua, ub)), true);
+                        }
+                    }
                 }
                 float lShift = lRun * 0.5f;
                 Vector3 a = new Vector3((w0 + w1) * 0.5f, h0, u0 - lShift), b = new Vector3((w0 + w1) * 0.5f, h1, u1 - lShift);
@@ -1047,6 +1169,22 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
         }
 
+        /// <summary>A plain stone band at a floor line, 0.3 m deep: a ledge to hang from and shimmy along.</summary>
+        private static void StringCourse(Ctx c, int f)
+        {
+            ArchStyle st = c.spec.style;
+            float y = FloorY(c, f);
+            foreach (Seg s in c.segs)
+            {
+                if (s.floor != f) continue;
+                WallKind lKind = Classify(c, s, out int lSide, out ArchRoom lOwner, out ArchRoom lOther);
+                if (lKind != WallKind.Facade || lOther != null) continue;
+                float n = lSide < 0 ? 1f : -1f;
+                SegBox(c, s, n, s.a - 0.3f, s.b + 0.3f, y - 0.06f, y + 0.12f, -0.02f, 0.3f, st.trim);
+                SegBox(c, s, n, s.a - 0.22f, s.b + 0.22f, y - 0.16f, y - 0.06f, -0.02f, 0.18f, st.trim);
+            }
+        }
+
         private static bool FacadeAt(Ctx c, int pFloor, Vector2 pAt, out Seg pSeg, out float pN, out float pAlong)
         {
             foreach (Seg s in c.segs)
@@ -1067,23 +1205,47 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (!FacadeAt(c, b.floor, b.at, out Seg s, out float n, out float sa)) { Debug.LogWarning($"[Arch] {c.spec.name}: balcony at {b.at} is not on a facade"); return; }
             ArchStyle st = c.spec.style;
             float y = FloorY(c, b.floor);
-            float s0 = sa - b.width * 0.5f, s1 = sa + b.width * 0.5f;
-            SegBox(c, s, n, s0, s1, y - 0.2f, y + 0.02f, -0.05f, b.depth, st.trim);
-            SegBox(c, s, n, s0 + 0.2f, s0 + 0.45f, y - 0.6f, y - 0.2f, 0f, b.depth * 0.7f, st.trim);
-            SegBox(c, s, n, s1 - 0.45f, s1 - 0.2f, y - 0.6f, y - 0.2f, 0f, b.depth * 0.7f, st.trim);
-            // Railing: front and sides, bars and a top rail.
-            SegBox(c, s, n, s0, s1, y + 0.98f, y + 1.04f, b.depth - 0.06f, b.depth, ArchLib.Iron);
-            SegBox(c, s, n, s0, s0 + 0.05f, y + 0.98f, y + 1.04f, 0f, b.depth, ArchLib.Iron);
-            SegBox(c, s, n, s1 - 0.05f, s1, y + 0.98f, y + 1.04f, 0f, b.depth, ArchLib.Iron);
-            for (float k = s0 + 0.08f; k < s1 - 0.04f; k += 0.13f) SegBox(c, s, n, k, k + 0.022f, y, y + 0.98f, b.depth - 0.045f, b.depth - 0.023f, ArchLib.Iron, false);
-            for (float k = 0.1f; k < b.depth - 0.05f; k += 0.13f)
+            float s0 = sa - b.width * 0.5f, s1 = sa + b.width * 0.5f, d = b.depth;
+            // A moulded stone slab on two carved consoles, paved on top.
+            SegBox(c, s, n, s0, s1, y - 0.22f, y + 0.04f, -0.05f, d, st.trim);
+            SegBox(c, s, n, s0 - 0.04f, s1 + 0.04f, y - 0.1f, y - 0.02f, d - 0.02f, d + 0.04f, st.trim, false);
+            SegBox(c, s, n, s0 + 0.03f, s1 - 0.03f, y + 0.04f, y + 0.05f, 0.02f, d - 0.03f, ArchLib.Surface("large_floor_tiles_02", 1.2f), false);
+            foreach (float k in new[] { s0 + 0.25f, s1 - 0.5f })
             {
-                SegBox(c, s, n, s0 + 0.012f, s0 + 0.034f, y, y + 0.98f, k, k + 0.022f, ArchLib.Iron, false);
-                SegBox(c, s, n, s1 - 0.034f, s1 - 0.012f, y, y + 0.98f, k, k + 0.022f, ArchLib.Iron, false);
+                SegBox(c, s, n, k, k + 0.25f, y - 0.55f, y - 0.22f, 0f, d * 0.45f, st.trim);
+                SegBox(c, s, n, k, k + 0.25f, y - 0.8f, y - 0.55f, 0f, d * 0.2f, st.trim);
             }
-            SegBox(c, s, n, s0, s1, y + 0.02f, y + 0.98f, b.depth - 0.05f, b.depth - 0.02f, ArchLib.Iron, true);
-            SegBox(c, s, n, s0, s0 + 0.03f, y + 0.02f, y + 0.98f, 0f, b.depth, ArchLib.Iron, true);
-            SegBox(c, s, n, s1 - 0.03f, s1, y + 0.02f, y + 0.98f, 0f, b.depth, ArchLib.Iron, true);
+            // Wrought-iron railing: top rail, bottom rail, bars, posts; collision by invisible panels.
+            SegBox(c, s, n, s0, s1, y + 0.98f, y + 1.05f, d - 0.07f, d, ArchLib.Iron, false);
+            SegBox(c, s, n, s0, s0 + 0.06f, y + 0.98f, y + 1.05f, 0f, d, ArchLib.Iron, false);
+            SegBox(c, s, n, s1 - 0.06f, s1, y + 0.98f, y + 1.05f, 0f, d, ArchLib.Iron, false);
+            SegBox(c, s, n, s0, s1, y + 0.12f, y + 0.15f, d - 0.06f, d - 0.03f, ArchLib.Iron, false);
+            foreach (float k in new[] { s0, s1 - 0.05f, (s0 + s1) * 0.5f - 0.025f })
+                SegBox(c, s, n, k, k + 0.05f, y + 0.04f, y + 1.0f, d - 0.07f, d - 0.02f, ArchLib.Iron, false);
+            for (float k = s0 + 0.12f; k < s1 - 0.08f; k += 0.12f) SegBox(c, s, n, k, k + 0.02f, y + 0.04f, y + 0.98f, d - 0.055f, d - 0.035f, ArchLib.Iron, false);
+            for (float k = 0.12f; k < d - 0.06f; k += 0.12f)
+            {
+                SegBox(c, s, n, s0 + 0.015f, s0 + 0.035f, y + 0.04f, y + 0.98f, k, k + 0.02f, ArchLib.Iron, false);
+                SegBox(c, s, n, s1 - 0.035f, s1 - 0.015f, y + 0.04f, y + 0.98f, k, k + 0.02f, ArchLib.Iron, false);
+            }
+            SegBox(c, s, n, s0, s1, y + 0.04f, y + 1.0f, d - 0.06f, d - 0.03f, ArchLib.Invisible, true);
+            SegBox(c, s, n, s0, s0 + 0.04f, y + 0.04f, y + 1.0f, 0f, d, ArchLib.Invisible, true);
+            SegBox(c, s, n, s1 - 0.04f, s1, y + 0.04f, y + 1.0f, 0f, d, ArchLib.Invisible, true);
+            Poi(c, P(s, n, sa, y + 1f, d + 0.3f), "Balcony", MapPoi.Kind.Entrance);
+        }
+
+        private static ArchMat _ivy;
+
+        /// <summary>Leaves for ivy sheets: the jungle bush foliage (alpha-cut), else a plain green.</summary>
+        private static ArchMat Ivy
+        {
+            get
+            {
+                if (_ivy != null && _ivy.material != null) return _ivy;
+                Material lLeaf = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/_Game/Art/PBR/Models/Veg_JungleBush_A/M_Veg_JungleBush_A_leaf.mat");
+                _ivy = lLeaf != null ? new ArchMat("IvyLeaf", lLeaf, 0.9f) : ArchLib.PlainMat("Ivy", new Color(0.15f, 0.3f, 0.1f), 0.2f, 0f);
+                return _ivy;
+            }
         }
 
         private static void Drain(Ctx c, ArchDrain d)
@@ -1103,22 +1265,70 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             float lHeight = FloorY(c, lTop + 1) - 0.1f;
             Vector3 lNormal = (s.vertical ? Vector3.right : Vector3.forward) * n;
-            Transform lRoot = c.result.root;
-            float lYaw = Quaternion.LookRotation(lRoot.rotation * lNormal).eulerAngles.y;
-            Vector3 lFoot = P(s, n, sa, 0f, 0.1f);
-            for (float y = 0.55f; y < lHeight - 0.6f; y += 3f)
-                ArchLib.Place("Prop_Drainpipe", c.result.shell, lRoot.TransformPoint(lFoot + Vector3.up * y), lYaw, ArchLib.Collide.None, ArchLib.Galvanised);
-            ArchLib.Place("Prop_Drainpipe_Bottom", c.result.shell, lRoot.TransformPoint(lFoot), lYaw, ArchLib.Collide.None, ArchLib.Galvanised);
-            ArchLib.Place("Prop_Drainpipe_Top", c.result.shell, lRoot.TransformPoint(lFoot + Vector3.up * (lHeight - 0.7f)), lYaw, ArchLib.Collide.None, ArchLib.Galvanised);
-            GameObject lClimb = new GameObject("Drainpipe_Climb") { layer = GameLayers.CLIMBABLE };
+            string lLabel = string.IsNullOrEmpty(d.poi) ? (d.kind == ClimbKind.Drainpipe ? "Drainpipe" : d.kind == ClimbKind.Ivy ? "Ivy" : "Trellis") : d.poi;
+            float lWidth;
+            if (d.kind == ClimbKind.Drainpipe)
+            {
+                // A cast-iron downpipe on wall brackets: shoe at the foot, hopper head under the gutter.
+                ArchMat lCast = ArchLib.PlainMat("CastIronPipe", new Color(0.16f, 0.17f, 0.18f), 0.45f, 0.55f);
+                Vector3 lFoot = P(s, n, sa, 0f, 0.13f);
+                c.mesh.Cylinder(lCast, lFoot + Vector3.up * 0.25f, 0.06f, lHeight - 0.6f, 10, false);
+                c.mesh.Tube(lCast, lFoot + Vector3.up * 0.27f, lFoot + Vector3.up * 0.05f + lNormal * 0.18f, 0.06f, 10, false);
+                for (float y = 0.9f; y < lHeight - 0.5f; y += 1.6f)
+                {
+                    c.mesh.Box(lCast, P(s, n, sa, y, 0.065f), s.vertical ? new Vector3(0.13f, 0.06f, 0.05f) : new Vector3(0.05f, 0.06f, 0.13f), false);
+                    c.mesh.Box(lCast, P(s, n, sa, y, 0.13f), new Vector3(0.15f, 0.07f, 0.15f), false);
+                }
+                c.mesh.Box(lCast, P(s, n, sa, lHeight - 0.2f, 0.16f), new Vector3(0.28f, 0.3f, 0.28f), false);
+                lWidth = 0.45f;
+            }
+            else if (d.kind == ClimbKind.Ivy)
+            {
+                // Three staggered sheets of leaves over the wall, densest at the foot.
+                lWidth = 1.6f;
+                for (int k = 0; k < 3; k++)
+                {
+                    float w = lWidth * (1f - k * 0.18f), h = lHeight * (1f - k * 0.12f), dd = 0.04f + k * 0.07f, off = (k - 1) * 0.15f;
+                    c.mesh.DoubleQuad(Ivy, P(s, n, sa + off - w * 0.5f, 0f, dd), P(s, n, sa + off + w * 0.5f, 0f, dd), P(s, n, sa + off + w * 0.5f, h, dd), P(s, n, sa + off - w * 0.5f, h, dd), false);
+                }
+                ArchMat lStem = ArchLib.Surface("rough_wood", 0.6f);
+                for (float k = -0.5f; k <= 0.51f; k += 0.5f) c.mesh.Tube(lStem, P(s, n, sa + k, 0f, 0.05f), P(s, n, sa + k * 0.4f, lHeight - 0.3f, 0.05f), 0.035f, 6, false);
+            }
+            else
+            {
+                // A timber espalier lattice on battens, with vines through it.
+                lWidth = 1.4f;
+                ArchMat lWood = ArchLib.Surface("rough_wood", 1f);
+                for (float k = -0.6f; k <= 0.61f; k += 0.3f) SegBox(c, s, n, sa + k - 0.02f, sa + k + 0.02f, 0.05f, lHeight, 0.04f, 0.08f, lWood, false);
+                for (float y = 0.3f; y < lHeight; y += 0.3f) SegBox(c, s, n, sa - 0.68f, sa + 0.68f, y, y + 0.035f, 0.08f, 0.115f, lWood, false);
+                c.mesh.DoubleQuad(Ivy, P(s, n, sa - 0.55f, 0f, 0.13f), P(s, n, sa + 0.55f, 0f, 0.13f), P(s, n, sa + 0.4f, lHeight * 0.85f, 0.13f), P(s, n, sa - 0.4f, lHeight * 0.7f, 0.13f), false);
+            }
+            GameObject lClimb = new GameObject(d.kind + "_Climb") { layer = GameLayers.CLIMBABLE };
             lClimb.transform.SetParent(c.result.shell, false);
             lClimb.transform.localPosition = P(s, n, sa, lHeight * 0.5f, 0.16f);
             lClimb.transform.localRotation = Quaternion.LookRotation(lNormal);
             BoxCollider lBox = lClimb.AddComponent<BoxCollider>();
             lBox.center = new Vector3(0, 0.5f, 0);
-            lBox.size = new Vector3(0.45f, lHeight + 1f, 0.28f);
+            lBox.size = new Vector3(lWidth, lHeight + 1f, 0.28f);
             lClimb.isStatic = true;
-            Poi(c, P(s, n, sa, 1f, 0.5f), string.IsNullOrEmpty(d.poi) ? "Drainpipe" : d.poi, MapPoi.Kind.Climb);
+            Poi(c, P(s, n, sa, 1f, 0.5f), lLabel, MapPoi.Kind.Climb);
+        }
+
+        /// <summary>A coal-chute hatch: a sloping steel double lid in a concrete curb at the foot of the wall, padlocked.</summary>
+        private static void Hatch(Ctx c, ArchHatch h)
+        {
+            if (!FacadeAt(c, 0, h.at, out Seg s, out float n, out float sa) && !FacadeAt(c, Mathf.Max(0, c.minF), h.at, out s, out n, out sa)) return;
+            ArchMat lCurb = ArchLib.Surface("concrete_wall_008", 1.5f), lLid = ArchLib.Surface("painted_metal_shutter", 1f);
+            SegBox(c, s, n, sa - 0.75f, sa + 0.75f, -0.1f, 0.25f, 0f, 1.1f, lCurb);
+            // Two lids leaning from the wall (0.6 m up) to the curb.
+            for (int k = 0; k < 2; k++)
+            {
+                float a0 = sa - 0.68f + k * 0.69f, a1 = a0 + 0.67f;
+                c.mesh.Quad(lLid, P(s, n, a0, 0.3f, 1.02f), P(s, n, a1, 0.3f, 1.02f), P(s, n, a1, 0.62f, 0.05f), P(s, n, a0, 0.62f, 0.05f));
+                c.mesh.Quad(lLid, P(s, n, a0, 0.62f, 0.05f), P(s, n, a1, 0.62f, 0.05f), P(s, n, a1, 0.3f, 1.02f), P(s, n, a0, 0.3f, 1.02f));
+            }
+            c.mesh.Box(ArchLib.Brass, P(s, n, sa, 0.42f, 0.62f), new Vector3(0.08f, 0.1f, 0.08f), false);
+            Poi(c, P(s, n, sa, 0.6f, 1.4f), h.poi, MapPoi.Kind.Entrance);
         }
 
         // ---------------------------------------------------------------- vents
@@ -1143,7 +1353,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Dictionary<(Vector3Int, Vector3Int), (int node, string poi)> lOpen = new Dictionary<(Vector3Int, Vector3Int), (int, string)>();
                 foreach ((int lNode, Vector3Int lDir, string lPoi) in lDuct.grilles) lOpen[(Key(lDuct.nodes[lNode]), lDir)] = (lNode, lPoi);
                 Vector3Int[] lDirs = { Vector3Int.right, Vector3Int.left, Vector3Int.up, Vector3Int.down, new Vector3Int(0, 0, 1), new Vector3Int(0, 0, -1) };
-                ArchMat lMetal = ArchLib.Galvanised;
+                ArchMat lMetal = ArchLib.PlainMat("DuctSteel", new Color(0.6f, 0.61f, 0.62f), 0.5f, 0.3f, 1f);
                 foreach (Vector3Int lCell in lCells)
                 {
                     // Cell centre: x/z centred on the node, y = floor of the duct + 0.5.
@@ -1157,6 +1367,24 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         Vector3 lSize = new Vector3(lDir.x != 0 ? 0.06f : 1.12f, lDir.y != 0 ? 0.06f : 1.12f, lDir.z != 0 ? 0.06f : 1.12f);
                         if (lOpen.TryGetValue((lCell, lDir), out (int node, string poi) lGrille)) { Grille(c, lFace, lDir, lGrille.poi); continue; }
                         c.mesh.Box(lMetal, lFace, lSize);
+                    }
+                    // Horizontal runs hang from the slab above on threaded rods (no floating boxes).
+                    bool lVertical = lCells.Contains(lCell + Vector3Int.up) || lCells.Contains(lCell + Vector3Int.down);
+                    if (!lVertical)
+                    {
+                        int lFloor = Mathf.FloorToInt((lCenter.y - 0.5f + 0.05f) / c.spec.storey);
+                        float lCeil = (lFloor + 1) * c.spec.storey - c.spec.slab, lTopY = lCenter.y + 0.56f;
+                        if (lCeil - lTopY > 0.04f && lCeil - lTopY < 3f)
+                            foreach (float k in new[] { -0.45f, 0.45f })
+                            {
+                                Vector3 lRod = lCenter + (lCells.Contains(lCell + Vector3Int.right) || lCells.Contains(lCell + Vector3Int.left) ? new Vector3(0, 0, k) : new Vector3(k, 0, 0));
+                                c.mesh.Box(ArchLib.Iron, new Vector3(lRod.x, (lTopY + lCeil) * 0.5f, lRod.z), new Vector3(0.025f, lCeil - lTopY, 0.025f), false);
+                            }
+                        // A strap round the duct.
+                        Vector3 lAxis = lCells.Contains(lCell + Vector3Int.right) || lCells.Contains(lCell + Vector3Int.left) ? Vector3.right : Vector3.forward;
+                        Vector3 lStrap = lAxis == Vector3.right ? new Vector3(0.05f, 1.15f, 1.15f) : new Vector3(1.15f, 1.15f, 0.05f);
+                        c.mesh.Box(lMetal, lCenter + Vector3.up * 0.575f, new Vector3(lStrap.x, 0.02f, lStrap.z), false);
+                        c.mesh.Box(lMetal, lCenter - Vector3.up * 0.575f, new Vector3(lStrap.x, 0.02f, lStrap.z), false);
                     }
                     // Vertical cells: a climbable inner side.
                     if (lCells.Contains(lCell + Vector3Int.up) || lCells.Contains(lCell + Vector3Int.down))

@@ -28,16 +28,16 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             switch (t)
             {
-                case RoomType.Salon: case RoomType.Living: return new[] { I("Furn_Bookshelf", true), I("Furn_Cabinet", true), I("Furn_PottedPlant"), I("Furn_FloorLamp"), I("Furn_Sofa"), I("Furn_PottedPlant") };
+                case RoomType.Salon: case RoomType.Living: return new[] { I("Furn_Bookshelf", true), I("Furn_Cabinet", true), I("Furn_PottedPlant"), I("Furn_FloorLamp"), I("Furn_Sofa"), I("Furn_PianoGrand"), I("Furn_PottedPlant"), I("Furn_Armchair") };
                 case RoomType.Dining: return new[] { I("Furn_Cabinet", true), I("Furn_PottedPlant"), I("Furn_Cabinet", true), I("Furn_PottedPlant") };
                 case RoomType.Kitchen: return new[] { I("Furn_KitchenCounter"), I("Furn_Stove"), I("Furn_KitchenCounter"), I("Furn_Fridge", true), I("Furn_Sink"), I("Furn_Shelves_Metal", true) };
                 case RoomType.Pantry: case RoomType.Store: return new[] { I("Furn_Shelves_Metal", true), I("Furn_Shelves_Metal", true), I("Prop_Crate_Wood"), I("Furn_Shelves_Metal", true), I("Prop_Pallet") };
-                case RoomType.Office: return new[] { I("Furn_Bookshelf", true), I("Furn_Cabinet", true), I("Furn_PottedPlant"), I("Furn_Armchair") };
+                case RoomType.Office: return new[] { I("Furn_Bookshelf", true), I("Furn_Cabinet", true), I("Furn_Shelves_Metal", true), I("Furn_PottedPlant"), I("Furn_Cabinet", true), I("Furn_Armchair") };
                 case RoomType.Study: case RoomType.Library: return new[] { I("Furn_Bookshelf", true), I("Furn_Bookshelf", true), I("Furn_Armchair"), I("Furn_FloorLamp"), I("Furn_Cabinet", true) };
-                case RoomType.Bedroom: case RoomType.Suite: return new[] { I("Furn_Bed"), I("Furn_FloorLamp"), I("Furn_Armchair"), I("Furn_Cabinet", true), I("Furn_PottedPlant") };
+                case RoomType.Bedroom: case RoomType.Suite: return new[] { I("Furn_Bed"), I("Furn_Cabinet", true), I("Furn_FloorLamp"), I("Furn_Armchair"), I("Furn_Desk"), I("Furn_PottedPlant"), I("Furn_Sofa") };
                 case RoomType.Bath: return new[] { I("Furn_Sink"), I("Furn_Bathtub") };
-                case RoomType.Corridor: case RoomType.Gallery: case RoomType.Loggia: return new[] { I("Furn_PottedPlant"), I("Furn_Armchair"), I("Furn_PottedPlant") };
-                case RoomType.Hall: case RoomType.Lobby: return new[] { I("Furn_PottedPlant"), I("Furn_Cabinet", true), I("Furn_Armchair"), I("Furn_PottedPlant") };
+                case RoomType.Corridor: case RoomType.Gallery: case RoomType.Loggia: return new[] { I("Furn_PottedPlant"), I("Furn_Armchair"), I("Furn_Cabinet", true), I("Furn_PottedPlant"), I("Furn_Sofa") };
+                case RoomType.Hall: case RoomType.Lobby: return new[] { I("Furn_PottedPlant"), I("Furn_Cabinet", true), I("Furn_Armchair"), I("Furn_Sofa"), I("Furn_PottedPlant"), I("Furn_FloorLamp") };
                 case RoomType.Cellar: case RoomType.ColdRoom: case RoomType.CoalStore: return new[] { I("Furn_Shelves_Metal", true), I("Prop_Crate_Wood"), I("Prop_Pallet"), I("Prop_Crate_Wood") };
                 case RoomType.WineCellar: return new[] { I("Furn_Shelves_Metal", true), I("Furn_Shelves_Metal", true), I("Furn_Shelves_Metal", true), I("Prop_Crate_Wood") };
                 case RoomType.Laundry: return new[] { I("Furn_Shelves_Metal", true), I("Furn_Sink"), I("Furn_Shelves_Metal", true) };
@@ -58,7 +58,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 case RoomType.Clinic: return new[] { I("Furn_Bed"), I("Furn_Cabinet", true), I("Furn_Sink") };
                 case RoomType.Plant: return new[] { I("Furn_Shelves_Metal", true), I("Prop_Generator") };
                 case RoomType.Classroom: return new[] { I("Furn_Bookshelf", true), I("Furn_Desk") };
-                case RoomType.Ballroom: return new[] { I("Furn_PianoGrand"), I("Furn_PottedPlant"), I("Furn_PottedPlant"), I("Furn_Sofa") };
+                case RoomType.Ballroom: return new[] { I("Furn_PianoGrand"), I("Furn_PottedPlant"), I("Furn_BarCounter"), I("Furn_PottedPlant"), I("Furn_Sofa"), I("Furn_FloorLamp") };
                 default: return new Item[0];
             }
         }
@@ -178,8 +178,63 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     break;
                 }
                 case RoomType.Kitchen:
-                    if (W > 4f && D > 4f) At(pKit, b, pRoom, "Furn_DiningTable", c, lWide ? 0f : 90f);
+                    // A central island: two counters back to back, the prep table beyond.
+                    if (W > 5f && D > 5f)
+                    {
+                        Vector2 lOff = lWide ? new Vector2(0, 0.32f) : new Vector2(0.32f, 0);
+                        At(pKit, b, pRoom, "Furn_KitchenCounter", c - lOff, lWide ? 180f : -90f);
+                        At(pKit, b, pRoom, "Furn_KitchenCounter", c + lOff, lWide ? 0f : 90f);
+                        At(pKit, b, pRoom, "Furn_KitchenCounter", c - lOff + (lWide ? new Vector2(1.3f, 0) : new Vector2(0, 1.3f)), lWide ? 180f : -90f);
+                        At(pKit, b, pRoom, "Furn_KitchenCounter", c + lOff + (lWide ? new Vector2(1.3f, 0) : new Vector2(0, 1.3f)), lWide ? 0f : 90f);
+                        pKit.Model("Furn_Stove", b.At(c.x - (lWide ? 1.4f : 0f), pRoom.floor, c.y - (lWide ? 0f : 1.4f), 0f), b.Yaw(lWide ? 0f : 90f), b.interior);
+                    }
+                    else if (W > 4f && D > 4f) At(pKit, b, pRoom, "Furn_DiningTable", c, lWide ? 0f : 90f);
                     break;
+                case RoomType.Hall: case RoomType.Lobby:
+                    // A fireplace on a wall, a sofa group on a rug before it, a reception desk in a lobby.
+                    Vector2? lFire = AgainstWall(pKit, b, pRoom, "Furn_Cabinet", true, r, (k, p, y) => k.Fireplace(p, y, b.interior));
+                    if (W > 6f && D > 6f)
+                    {
+                        Vector2 g = c + (lWide ? new Vector2(W * 0.18f, 0) : new Vector2(0, D * 0.18f));
+                        At(pKit, b, pRoom, "Furn_Rug", g, lWide ? 0f : 90f, false);
+                        At(pKit, b, pRoom, "Furn_CoffeeTable", g, lWide ? 0f : 90f);
+                        At(pKit, b, pRoom, "Furn_Sofa", g + (lWide ? new Vector2(0, -1.4f) : new Vector2(-1.4f, 0)), lWide ? 0f : 90f);
+                        At(pKit, b, pRoom, "Furn_Sofa", g + (lWide ? new Vector2(0, 1.4f) : new Vector2(1.4f, 0)), lWide ? 180f : -90f);
+                        At(pKit, b, pRoom, "Furn_Armchair", g + (lWide ? new Vector2(1.7f, 0) : new Vector2(0, 1.7f)), lWide ? -90f : 180f);
+                        pKit.Drinks(b.At(g.x, pRoom.floor, g.y, 0.42f), b.Yaw(0f), pZone, 2, true, 1.3f);
+                    }
+                    if (pRoom.type == RoomType.Lobby || W * D > 120f)
+                    {
+                        Vector2 lDesk = c - (lWide ? new Vector2(W * 0.25f, 0) : new Vector2(0, D * 0.25f));
+                        if (At(pKit, b, pRoom, "Furn_BarCounter", lDesk, lWide ? 90f : 0f))
+                        {
+                            pKit.Distraction("phone", b.At(lDesk.x, pRoom.floor, lDesk.y, 1.08f), b.Yaw(0f));
+                            pKit.Model("Furn_FloorLamp", b.At(lDesk.x + (lWide ? 0f : 1.4f), pRoom.floor, lDesk.y + (lWide ? 1.4f : 0f), 0f), b.Yaw(0f), b.interior);
+                        }
+                    }
+                    break;
+                case RoomType.Archive: case RoomType.Library:
+                    // Aisles of shelving across the room.
+                    for (float u = (lWide ? pRoom.rect.xMin : pRoom.rect.yMin) + 2.2f; u < (lWide ? pRoom.rect.xMax : pRoom.rect.yMax) - 1.6f; u += 1.9f)
+                        for (float v = (lWide ? pRoom.rect.yMin : pRoom.rect.xMin) + 1.9f; v < (lWide ? pRoom.rect.yMax : pRoom.rect.xMax) - 1.5f; v += 1.3f)
+                            At(pKit, b, pRoom, pRoom.type == RoomType.Library ? "Furn_Bookshelf" : "Furn_Shelves_Metal", lWide ? new Vector2(u, v) : new Vector2(v, u), lWide ? 90f : 0f);
+                    break;
+                case RoomType.Armoury: case RoomType.Vault:
+                    AgainstWall(pKit, b, pRoom, "Furn_Bookshelf", true, r, (k, p, y) => k.GunRack(p, y, b.interior));
+                    AgainstWall(pKit, b, pRoom, "Furn_Bookshelf", true, r, (k, p, y) => k.GunRack(p, y, b.interior));
+                    pKit.CrateStack(b.At(c.x, pRoom.floor, c.y, 0f), b.Yaw(0f), 4, true);
+                    break;
+                case RoomType.WineCellar:
+                    for (int k = 0; k < 4; k++) AgainstWall(pKit, b, pRoom, "Furn_Bookshelf", true, r, (kk, p, y) => kk.WineRack(p, y, b.interior));
+                    if (W > 4.5f && D > 4.5f) pKit.WineRack(b.At(c.x, pRoom.floor, c.y, 0f), b.Yaw(lWide ? 0f : 90f), b.interior, true);
+                    break;
+                case RoomType.CoalStore:
+                    pKit.CoalHeap(b.At(pRoom.rect.xMin + 1.6f, pRoom.floor, pRoom.rect.yMax - 1.6f, 0f), b.interior);
+                    break;
+                case RoomType.Store: case RoomType.Pantry: case RoomType.ColdRoom:
+                    if (W > 4f && D > 4f) pKit.CrateStack(b.At(c.x, pRoom.floor, c.y, 0f), b.Yaw(0f), 4);
+                    break;
+
                 case RoomType.Office: case RoomType.Study: case RoomType.Police: case RoomType.Radio: case RoomType.Classroom:
                     if (At(pKit, b, pRoom, "Furn_Desk", c, lWide ? 180f : 90f))
                     {
@@ -190,7 +245,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     break;
                 case RoomType.Bedroom: case RoomType.Suite:
                     AgainstWall(pKit, b, pRoom, "Furn_Wardrobe", true, r, (k, p, y) => k.Wardrobe(p, y, b.interior));
-                    if (pRoom.type == RoomType.Suite) At(pKit, b, pRoom, "Furn_Rug", c, 0f, false);
+                    if (W > 3.5f && D > 3.5f) At(pKit, b, pRoom, "Furn_Rug", c, lWide ? 0f : 90f, false);
                     break;
                 case RoomType.Bath:
                     AgainstWall(pKit, b, pRoom, "Furn_Toilet", false, r, (k, p, y) => k.Toilet(p, y, pZone));
@@ -247,10 +302,33 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     AgainstWall(pKit, b, pRoom, "Furn_Shelves_Metal", false, r, (k, p, y) => k.BigCrate(p, y));
                     break;
                 case RoomType.Ballroom:
-                    pKit.Chandelier(b.At(c.x, pRoom.floor, c.y, b.Storey - b.spec.slab - 0.05f), b.Storey - b.spec.slab - 0.4f);
+                {
+                    bool lTall = b.spec.rooms.Exists(o => o.floor == pRoom.floor + 1 && (o.noFloor || o.isVoid) && o.rect.Overlaps(pRoom.rect));
+                    float lHook = (lTall ? 2f : 1f) * b.Storey - b.spec.slab - 0.05f;
+                    pKit.Chandelier(b.At(c.x, pRoom.floor, c.y, lHook), lHook - 0.4f);
+                    // Dressed round tables in rows round a dance floor in the middle.
+                    for (float u = pRoom.rect.xMin + 2.4f; u < pRoom.rect.xMax - 2f; u += 3.4f)
+                        for (float v = pRoom.rect.yMin + 2.4f; v < pRoom.rect.yMax - 2f; v += 3.4f)
+                        {
+                            Vector2 p = new Vector2(u, v);
+                            if (Mathf.Abs(p.x - c.x) < W * 0.2f && Mathf.Abs(p.y - c.y) < D * 0.2f) continue;
+                            Rect lFoot = new Rect(p.x - 1.3f, p.y - 1.3f, 2.6f, 2.6f);
+                            if (!Free(b, pRoom, lFoot, false)) continue;
+                            b.used.Add((pRoom.floor, lFoot));
+                            pKit.RoundTable(b.At(p.x, pRoom.floor, p.y, 0f), b.interior, pZone);
+                        }
                     break;
+                }
             }
-            foreach (Item lItem in WallItems(pRoom.type)) AgainstWall(pKit, b, pRoom, lItem.model, lItem.tall, r);
+            // Line the walls: the room's pieces, again and again until the perimeter is dressed.
+            Item[] lItems = WallItems(pRoom.type);
+            int lWanted = Mathf.Min(16, Mathf.RoundToInt((W + D) * 2f / 2.6f)), lMisses = 0, lPlaced = 0;
+            for (int k = 0; lItems.Length > 0 && lPlaced < lWanted && lMisses < lItems.Length + 2; k++)
+            {
+                Item lItem = lItems[k % lItems.Length];
+                if (AgainstWall(pKit, b, pRoom, lItem.model, lItem.tall, r) != null) { lPlaced++; lMisses = 0; }
+                else lMisses++;
+            }
             // A throwable in every room with a purpose.
             if (pRoom.type != RoomType.Stair && pRoom.type != RoomType.Corridor)
             {

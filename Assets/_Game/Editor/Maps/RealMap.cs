@@ -55,6 +55,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>A tree (or bush, or rock) for a wild point, by roll 0..1 under the woods density.</summary>
         protected abstract string TreeAt(float pX, float pZ, float pHeight, float pRoll, System.Random pRandom, out float pScale);
         protected virtual float WaterLevel => -100f;
+        /// <summary>Slope (degrees) where bare rock takes over the ground (snow maps keep snow higher).</summary>
+        protected virtual float RockSlope => 32f;
+        /// <summary>The boulders that dress cliff faces (embedded, 4 to 10 m) to break the stretched walls.</summary>
+        protected virtual string CliffRock(System.Random pRandom) => pRandom.Next(3) switch { 0 => "Veg_Rock_A", 1 => "Veg_Rock_B", _ => "Veg_Rock_C" };
         protected virtual void NaturalGround(float pX, float pZ, float pHeight, float pSlope, float[] pWeights)
         {
             float n = LandShape.Fbm(pX, pZ, 30f, 3, 1.7f);
@@ -247,7 +251,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             float[] w = new float[8];
             NaturalGround(pX, pZ, pHeight, pSlope, w);
             w[(int)Ground.Dirt] += Mathf.Clamp01((pSlope - 22f) / 12f) * 2f;
-            w[(int)Ground.Rock] += Mathf.Clamp01((pSlope - 32f) / 8f) * 10f;
+            w[(int)Ground.Rock] += Mathf.Clamp01((pSlope - RockSlope) / 8f) * 10f;
             int s = OnStreet(pX, pZ, 0f);
             if (s >= 0) { w[(int)Streets[s].ground] += 40f; return w; }
             if (OnStreet(pX, pZ, 1.2f) >= 0) w[(int)Ground.Dirt] += 5f;
@@ -310,8 +314,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     float lSlope = K.LandSlope(px, pz);
                     if (lSlope > 38f)
                     {
-                        // Scree slopes: boulders break up the rock faces (never on sheer walls, where they would hang).
+                        // Scree slopes: boulders break up the rock faces.
                         if (lSlope < 52f && lRandom.NextDouble() < 0.05) K.LandTree(lRandom.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A", px, pz, 1.5f + (float)lRandom.NextDouble() * 2f);
+                        // Cliff walls: big boulders half sunk into the face give a broken, layered silhouette
+                        // and hide the terrain texture stretched down the steep slope.
+                        else if (lSlope >= 52f && lRandom.NextDouble() < 0.2) K.LandTree(CliffRock(lRandom), px, pz, 4f + (float)lRandom.NextDouble() * 6f);
                         continue;
                     }
                     float lWoods = Woods(px, pz, h);
@@ -418,6 +425,65 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             CaveHole(pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth * 0.6f);
             CaveHole(pPath[pPath.Length - 1], pPath[Mathf.Max(0, pPath.Length - 2)], pWidth * 0.6f);
+            Mouth(lRoot, pName + "_A", pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth, pHeight);
+            Mouth(lRoot, pName + "_B", pPath[pPath.Length - 1], pPath[Mathf.Max(0, pPath.Length - 2)], pWidth, pHeight);
+        }
+
+        /// <summary>
+        /// A visible cave mouth where a tunnel meets the open ground: a timber frame (posts, lintel,
+        /// struts), boulders heaped either side and over it, a lantern hung at the entrance.
+        /// </summary>
+        private void Mouth(Transform pRoot, string pName, Vector3 pEnd, Vector3 pInward, float pWidth, float pHeight)
+        {
+            if (Mathf.Abs(K.GroundAt(pEnd.x, pEnd.z) - pEnd.y) > 2.5f) return;
+            Vector3 lIn = pInward - pEnd;
+            lIn.y = 0f;
+            if (lIn.sqrMagnitude < 0.01f) return;
+            lIn.Normalize();
+            Vector3 lSide = Vector3.Cross(Vector3.up, lIn);
+            ArchMesh lMesh = new ArchMesh();
+            ArchMat lTimber = ArchLib.Surface("rough_wood", 1.2f);
+            Vector3 lFrame = pEnd + lIn * 1.2f;
+            float w = pWidth * 0.5f - 0.15f, h = pHeight - 0.25f;
+            foreach (float s in new[] { -1f, 1f }) lMesh.Tube(lTimber, lFrame + lSide * s * w - Vector3.up * 0.3f, lFrame + lSide * s * w + Vector3.up * h, 0.13f, 8);
+            lMesh.Tube(lTimber, lFrame - lSide * (w + 0.3f) + Vector3.up * h, lFrame + lSide * (w + 0.3f) + Vector3.up * h, 0.15f, 8);
+            foreach (float s in new[] { -1f, 1f }) lMesh.Tube(lTimber, lFrame + lSide * s * w + Vector3.up * (h - 0.8f), lFrame + lSide * s * (w - 0.6f) + Vector3.up * h, 0.07f, 6, false);
+            lMesh.Box(ArchLib.LampGlow, lFrame + Vector3.up * (h - 0.35f) - lIn * 0.15f, new Vector3(0.16f, 0.24f, 0.16f), false);
+            GameObject lObject = new GameObject("CaveMouth_" + pName);
+            lObject.transform.SetParent(pRoot, false);
+            lMesh.Flush(lObject.transform, K.Map.sceneName + "_CaveMouth_" + pName);
+            Light lLight = new GameObject("Lamp").AddComponent<Light>();
+            lLight.transform.SetParent(K.Lights, false);
+            lLight.transform.position = lFrame + Vector3.up * (h - 0.6f) - lIn * 0.4f;
+            lLight.type = LightType.Point;
+            lLight.range = 8f;
+            lLight.intensity = 1.8f;
+            lLight.color = new Color(1f, 0.62f, 0.32f);
+            lLight.shadows = LightShadows.None;
+            // Boulders framing the opening.
+            System.Random r = new System.Random(pName.GetHashCode());
+            foreach (float s in new[] { -1f, 1f })
+                for (int k = 0; k < 2; k++)
+                {
+                    Vector3 p = pEnd + lSide * s * (pWidth * 0.5f + 1.6f + k * 1.8f) + lIn * (0.5f + k * 1.2f);
+                    K.LandTree(CliffRock(r), p.x, p.z, 2.2f + (float)r.NextDouble() * 1.6f);
+                }
+        }
+
+        /// <summary>Running water: the lake shader with faster, choppier ripples, a swell and wide foam.</summary>
+        protected static Material RiverMaterial()
+        {
+            Material lBase = ArtBuilder.Water;
+            if (lBase == null) return null;
+            Material lRiver = EditorAssets.Material(EditorAssets.ART_RESOURCES + "/M_WaterRiver.mat", lBase.shader);
+            lRiver.CopyPropertiesFromMaterial(lBase);
+            lRiver.SetFloat("_RippleStrength", 1.15f);
+            lRiver.SetFloat("_RippleSpeed", 1.7f);
+            lRiver.SetFloat("_RippleScale", 0.55f);
+            lRiver.SetFloat("_Swell", 0.14f);
+            lRiver.SetFloat("_FoamWidth", 1.3f);
+            UnityEditor.EditorUtility.SetDirty(lRiver);
+            return lRiver;
         }
 
         /// <summary>A flat water strip along a polyline (a river), each leg a rotated swimmable plane.</summary>
@@ -430,6 +496,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 float lLength = Vector2.Distance(a, b) + pWidth;
                 GameObject lWater = K.Water(new Vector3(lMid.x, pLevel, lMid.y), new Vector2(pWidth, lLength), pCurrent);
                 lWater.transform.rotation = Quaternion.Euler(0, Mathf.Atan2(b.x - a.x, b.y - a.y) * Mathf.Rad2Deg, 0);
+                Material lRiver = RiverMaterial();
+                if (lRiver != null) lWater.GetComponent<MeshRenderer>().sharedMaterial = lRiver;
             }
         }
 

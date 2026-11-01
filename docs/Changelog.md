@@ -25,6 +25,16 @@
   balconies, ledges you can hang from, drainpipes, crawlable vents, locked doors that need a
   crowbar, a keycard, a staff key or a code, cameras and a recorder, furnished rooms. Caves,
   qanats and mine galleries link the zones underground.
+- The maps look lived in: every room is furnished for what it is (offices, kitchens with an island,
+  bedrooms, archives in aisles, armouries with gun racks, wine cellars, a coal heap, lobbies with a
+  fireplace and a reception desk, ballrooms with dressed tables), guest rooms have wallpaper,
+  panelling and plaster ceilings, the back of house is bare concrete. Each key building has a
+  grand stair with a carpet runner and balustrades. Facades show their ways in: cast-iron
+  drainpipes, ivy, trellises, a ledge at every floor, real balconies, coal-chute hatches.
+  Backstage reads at a glance: delivery yards with trucks and bins, guard booths with barriers,
+  rope queues, staff-only signs, inner walls and gates between the citadel's three courts. Open
+  ground is broken up with cover. Stages have truss, PA stacks and lights; market stalls sell real
+  goods; cliffs are broken by boulders; cave mouths are framed and lit; rivers run.
 - Version 0.6.0.
 - Public, restricted and hostile areas, like Hitman: walk the plaza or the market freely as long
   as you behave (no raised gun, no sprinting or climbing in front of guards); staff areas get you

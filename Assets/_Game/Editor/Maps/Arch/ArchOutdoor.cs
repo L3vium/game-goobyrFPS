@@ -15,7 +15,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// the land (with gates), stone stairs, retaining walls, open sheds, market stalls, piers, a water
     /// tower, a radio mast, fuel tanks, a crashed DC-3, a stage, a fountain, garden walls, fences.
     /// </summary>
-    public static class ArchOutdoor
+    public static partial class ArchOutdoor
     {
         private static int _count;
 
@@ -235,26 +235,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return Flush(A, lMesh, "Shed");
         }
 
-        /// <summary>A market stall: a counter, four posts, a striped fabric awning.</summary>
-        public static void Stall(ArchKit A, Vector3 pGround, float pYaw, Color pAwning)
-        {
-            ArchMat lWood = ArchLib.Surface("rough_wood", 1.2f), lCloth = ArchLib.Tinted("rough_linen", pAwning, "awning_" + ColorUtility.ToHtmlStringRGB(pAwning), 1f);
-            ArchMesh lMesh = new ArchMesh();
-            lMesh.Frame = Matrix4x4.TRS(pGround, Quaternion.Euler(0, pYaw, 0), Vector3.one);
-            lMesh.Box(lWood, new Vector3(0, 0.45f, 0.4f), new Vector3(2.4f, 0.9f, 0.8f));
-            lMesh.Box(lWood, new Vector3(0, 0.92f, 0.45f), new Vector3(2.5f, 0.05f, 0.95f));
-            foreach (float x in new[] { -1.2f, 1.2f })
-                foreach (float z in new[] { 0f, 1.6f })
-                    lMesh.Box(lWood, new Vector3(x, 1.2f, z), new Vector3(0.08f, 2.4f, 0.08f), false);
-            lMesh.Quad(lCloth, new Vector3(1.4f, 2.5f, -0.3f), new Vector3(1.4f, 2.35f, 1.8f), new Vector3(-1.4f, 2.35f, 1.8f), new Vector3(-1.4f, 2.5f, -0.3f), false);
-            lMesh.Quad(lCloth, new Vector3(-1.4f, 2.5f, -0.3f), new Vector3(-1.4f, 2.35f, 1.8f), new Vector3(1.4f, 2.35f, 1.8f), new Vector3(1.4f, 2.5f, -0.3f), false);
-            // Produce: crates of fruit as coloured boxes.
-            Color[] lFruit = { new Color(0.85f, 0.45f, 0.1f), new Color(0.75f, 0.15f, 0.1f), new Color(0.35f, 0.55f, 0.15f), new Color(0.9f, 0.8f, 0.2f) };
-            for (int i = 0; i < 4; i++)
-                lMesh.Box(ArchLib.PlainMat("Fruit" + i, lFruit[i], 0.4f, 0f), new Vector3(-0.9f + i * 0.6f, 1.02f, 0.45f), new Vector3(0.5f, 0.14f, 0.4f), false);
-            Flush(A, lMesh, "Stall", A.Props);
-        }
-
         /// <summary>A timber pier on posts from <paramref name="pFrom"/> to <paramref name="pTo"/> at a deck height.</summary>
         public static void Pier(ArchKit A, Vector2 pFrom, Vector2 pTo, float pWidth, float pDeck)
         {
@@ -335,7 +315,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Vector3 lWorld = pGround;
             pGround = Vector3.zero;
             Vector3 c = pGround + Vector3.up * (pRadius + 0.4f);
-            lMesh.Tube(ArchLib.PlainMat("TankWhite", new Color(0.85f, 0.84f, 0.8f), 0.45f, 0.3f), c - lAxis, c + lAxis, pRadius, 16);
+            ArchMat lPaint = ArchLib.Tinted("metal_plate", new Color(0.92f, 0.9f, 0.84f), "tank", 2f);
+            lMesh.Tube(lPaint, c - lAxis, c + lAxis, pRadius, 28);
+            // Dished ends, a walkway ladder, a hazard band.
+            lMesh.Dome(lPaint, c + lAxis, pRadius, 20, 4, lRot * Quaternion.Euler(90f, 0, 0));
+            lMesh.Dome(lPaint, c - lAxis, pRadius, 20, 4, lRot * Quaternion.Euler(-90f, 0, 0));
+            lMesh.Tube(ArchLib.Tinted("painted_metal_shutter", new Color(0.85f, 0.15f, 0.1f), "hazard", 1f), c - lAxis * 0.1f, c + lAxis * 0.1f, pRadius + 0.01f, 28, false);
+            lMesh.Box(ArchLib.Iron, c + Vector3.up * (pRadius + 0.05f), new Vector3(0.5f, 0.1f, 0.5f), lRot, false);
             foreach (float t in new[] { -0.35f, 0.35f }) lMesh.Box(ArchLib.Surface("concrete_floor_02", 2f), pGround + lAxis * t * 2f + Vector3.up * 0.3f, new Vector3(pRadius * 2f, 0.6f, 0.5f), lRot);
             GameObject lTank = Flush(A, lMesh, "FuelTank", A.Systems);
             foreach (Transform t in lTank.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.INTERACTABLE; t.gameObject.isStatic = false; }
@@ -359,33 +345,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lMesh.Box(lAlu, new Vector3(0, 3.6f, -11.5f), new Vector3(0.2f, 2.8f, 2.2f));
             lMesh.Box(lAlu, new Vector3(0, 2.4f, -11.6f), new Vector3(5.5f, 0.15f, 1.6f));
             Flush(A, lMesh, "DC3");
-        }
-
-        /// <summary>The fiesta stage: a plank platform on trestles, steps, a backdrop, lights.</summary>
-        public static void Stage(ArchKit A, Vector3 pGround, float pYaw, float pWidth, float pDepth)
-        {
-            ArchMat lDeck = ArchLib.Surface("wood_floor_deck", 2f), lFrame = ArchLib.Surface("rough_wood", 1.2f), lCloth = ArchLib.Tinted("velour_velvet", new Color(0.7f, 0.08f, 0.1f), "stage", 1.5f);
-            ArchMesh lMesh = new ArchMesh();
-            lMesh.Frame = Matrix4x4.TRS(pGround, Quaternion.Euler(0, pYaw, 0), Vector3.one);
-            lMesh.Box(lDeck, new Vector3(0, 1.0f, 0), new Vector3(pWidth, 0.15f, pDepth));
-            lMesh.Box(lCloth, new Vector3(0, 0.47f, -pDepth * 0.5f + 0.02f), new Vector3(pWidth, 0.9f, 0.03f));
-            for (float x = -pWidth * 0.5f + 0.3f; x <= pWidth * 0.5f; x += 2f)
-                foreach (float z in new[] { -pDepth * 0.5f + 0.3f, pDepth * 0.5f - 0.3f })
-                    lMesh.Box(lFrame, new Vector3(x, 0.47f, z), new Vector3(0.12f, 0.95f, 0.12f), false);
-            lMesh.Box(lCloth, new Vector3(0, 3.0f, pDepth * 0.5f - 0.1f), new Vector3(pWidth, 4f, 0.06f));
-            foreach (float x in new[] { -pWidth * 0.5f, pWidth * 0.5f }) lMesh.Box(lFrame, new Vector3(x, 2.6f, pDepth * 0.5f - 0.1f), new Vector3(0.2f, 5.2f, 0.2f));
-            lMesh.Box(lFrame, new Vector3(0, 5.1f, pDepth * 0.5f - 0.1f), new Vector3(pWidth + 0.2f, 0.2f, 0.2f));
-            // Steps up the side.
-            for (int i = 0; i < 5; i++) lMesh.Box(lFrame, new Vector3(pWidth * 0.5f + 0.5f, 0.1f + i * 0.18f, -pDepth * 0.5f + 0.6f + i * 0.28f), new Vector3(1.0f, 0.2f + i * 0.36f, 0.3f), false);
-            GameObject lRoot = Flush(A, lMesh, "Stage", A.Props);
-            GameObject lRamp = new GameObject("StageSteps");
-            lRamp.transform.SetParent(lRoot.transform, false);
-            Vector3 a = pGround + Quaternion.Euler(0, pYaw, 0) * new Vector3(pWidth * 0.5f + 0.5f, 0f, -pDepth * 0.5f + 0.3f), b = pGround + Quaternion.Euler(0, pYaw, 0) * new Vector3(pWidth * 0.5f + 0.5f, 1.08f, -pDepth * 0.5f + 2.2f);
-            Quaternion lSlope = Quaternion.LookRotation((b - a).normalized);
-            lRamp.transform.SetPositionAndRotation((a + b) * 0.5f + lSlope * Vector3.down * 0.1f, lSlope);
-            lRamp.AddComponent<BoxCollider>().size = new Vector3(1f, 0.2f, Vector3.Distance(a, b) + 0.3f);
-            for (int k = 0; k < 4; k++)
-                A.Lamp(pGround + Quaternion.Euler(0, pYaw, 0) * new Vector3(-pWidth * 0.4f + k * pWidth * 0.27f, 5f, pDepth * 0.5f - 0.4f), 0f, new Color(1f, 0.6f, 0.35f), 12f, 2.5f, false);
         }
 
         /// <summary>A stone fountain: a round basin with water, a column.</summary>

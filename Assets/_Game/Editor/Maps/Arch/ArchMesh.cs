@@ -151,24 +151,43 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>An axis-aligned box from its min and max corners.</summary>
         public void BoxMinMax(ArchMat pMat, Vector3 pMin, Vector3 pMax, bool pSolid = true, Faces pSkip = Faces.None) => Box(pMat, (pMin + pMax) * 0.5f, pMax - pMin, Quaternion.identity, pSolid, pSkip);
 
-        /// <summary>A vertical cylinder (column, pipe, post) from its base centre.</summary>
+        /// <summary>A quad with its own vertex normals and UVs (smooth curved surfaces).</summary>
+        public void QuadSmooth(ArchMat pMat, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 na, Vector3 nb, Vector3 nc, Vector3 nd, Vector2 ua, Vector2 ub, Vector2 uc, Vector2 ud, bool pSolid = true)
+        {
+            if (pMat == null) return;
+            a = Frame.MultiplyPoint3x4(a); b = Frame.MultiplyPoint3x4(b); c = Frame.MultiplyPoint3x4(c); d = Frame.MultiplyPoint3x4(d);
+            na = Frame.MultiplyVector(na).normalized; nb = Frame.MultiplyVector(nb).normalized; nc = Frame.MultiplyVector(nc).normalized; nd = Frame.MultiplyVector(nd).normalized;
+            Batch lBatch = Get(pMat, pSolid);
+            int s = lBatch.v.Count;
+            lBatch.v.Add(a); lBatch.v.Add(b); lBatch.v.Add(c); lBatch.v.Add(d);
+            lBatch.n.Add(na); lBatch.n.Add(nb); lBatch.n.Add(nc); lBatch.n.Add(nd);
+            float k = 1f / Mathf.Max(0.05f, pMat.tile);
+            lBatch.uv.Add(ua * k); lBatch.uv.Add(ub * k); lBatch.uv.Add(uc * k); lBatch.uv.Add(ud * k);
+            lBatch.t.Add(s); lBatch.t.Add(s + 2); lBatch.t.Add(s + 1);
+            lBatch.t.Add(s); lBatch.t.Add(s + 3); lBatch.t.Add(s + 2);
+        }
+
+        /// <summary>A vertical cylinder (column, pipe, post) from its base centre: smooth sides, flat caps.</summary>
         public void Cylinder(ArchMat pMat, Vector3 pBase, float pRadius, float pHeight, int pSides = 12, bool pSolid = true, bool pCaps = true)
         {
             for (int i = 0; i < pSides; i++)
             {
                 float a0 = i * Mathf.PI * 2f / pSides, a1 = (i + 1) * Mathf.PI * 2f / pSides;
-                Vector3 d0 = new Vector3(Mathf.Cos(a0), 0, Mathf.Sin(a0)) * pRadius, d1 = new Vector3(Mathf.Cos(a1), 0, Mathf.Sin(a1)) * pRadius;
-                Quad(pMat, pBase + d1, pBase + d1 + Vector3.up * pHeight, pBase + d0 + Vector3.up * pHeight, pBase + d0, pSolid);
+                Vector3 n0 = new Vector3(Mathf.Cos(a0), 0, Mathf.Sin(a0)), n1 = new Vector3(Mathf.Cos(a1), 0, Mathf.Sin(a1));
+                Vector3 d0 = n0 * pRadius, d1 = n1 * pRadius, h = Vector3.up * pHeight;
+                float u0 = a0 * pRadius, u1 = a1 * pRadius;
+                QuadSmooth(pMat, pBase + d1, pBase + d1 + h, pBase + d0 + h, pBase + d0, n1, n1, n0, n0,
+                    new Vector2(-u1, 0), new Vector2(-u1, pHeight), new Vector2(-u0, pHeight), new Vector2(-u0, 0), pSolid);
                 if (pCaps)
                 {
-                    Tri(pMat, pBase + Vector3.up * pHeight, pBase + d0 + Vector3.up * pHeight, pBase + d1 + Vector3.up * pHeight, pSolid);
+                    Tri(pMat, pBase + h, pBase + d0 + h, pBase + d1 + h, pSolid);
                     Tri(pMat, pBase, pBase + d1, pBase + d0, pSolid);
                 }
             }
         }
 
-        /// <summary>A hemisphere (a radome, a dish when rotated), open at its base, seen from outside.</summary>
-        public void Dome(ArchMat pMat, Vector3 pCenter, float pRadius, int pSegments, int pRings, Quaternion pRotation, bool pSolid = true)
+        /// <summary>A hemisphere (a radome, a dish when rotated), open at its base: smooth outside, a plain inside.</summary>
+        public void Dome(ArchMat pMat, Vector3 pCenter, float pRadius, int pSegments, int pRings, Quaternion pRotation, bool pSolid = true, ArchMat pInside = null)
         {
             for (int r = 0; r < pRings; r++)
             {
@@ -176,9 +195,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (int s = 0; s < pSegments; s++)
                 {
                     float b0 = s * Mathf.PI * 2f / pSegments, b1 = (s + 1) * Mathf.PI * 2f / pSegments;
-                    Vector3 P(float a, float b) => pCenter + pRotation * new Vector3(Mathf.Cos(a) * Mathf.Cos(b), Mathf.Sin(a), Mathf.Cos(a) * Mathf.Sin(b)) * pRadius;
-                    Quad(pMat, P(a0, b1), P(a1, b1), P(a1, b0), P(a0, b0), pSolid);
-                    Quad(pMat, P(a0, b0), P(a1, b0), P(a1, b1), P(a0, b1), false);
+                    Vector3 N(float a, float b) => pRotation * new Vector3(Mathf.Cos(a) * Mathf.Cos(b), Mathf.Sin(a), Mathf.Cos(a) * Mathf.Sin(b));
+                    Vector3 P(float a, float b) => pCenter + N(a, b) * pRadius;
+                    Vector2 U(float a, float b) => new Vector2(b * pRadius, a * pRadius);
+                    QuadSmooth(pMat, P(a0, b1), P(a1, b1), P(a1, b0), P(a0, b0), N(a0, b1), N(a1, b1), N(a1, b0), N(a0, b0), U(a0, b1), U(a1, b1), U(a1, b0), U(a0, b0), pSolid);
+                    QuadSmooth(pInside ?? pMat, P(a0, b0), P(a1, b0), P(a1, b1), P(a0, b1), -N(a0, b0), -N(a1, b0), -N(a1, b1), -N(a0, b1), U(a0, b0), U(a1, b0), U(a1, b1), U(a0, b1), false);
                 }
             }
         }

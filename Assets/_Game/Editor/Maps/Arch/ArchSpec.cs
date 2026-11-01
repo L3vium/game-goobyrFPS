@@ -95,6 +95,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>Dogleg: the first flight runs in the left half (seen climbing).</summary>
         public bool leftFirst = true;
         public ArchMat mat;
+        /// <summary>A feature stair (hall to gallery): stone treads, a carpet runner, a turned balustrade
+        /// along every open side, newel posts and a smooth plastered underside.</summary>
+        public bool grand;
     }
 
     public class ArchRoof
@@ -130,12 +133,23 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public float depth = 1.1f;
     }
 
-    /// <summary>A drainpipe (climbable) from the ground to the eaves at a point of the outer wall.</summary>
+    public enum ClimbKind { Drainpipe, Ivy, Trellis }
+
+    /// <summary>A climb up an outer wall (climbable) from the ground to the eaves: a cast-iron drainpipe
+    /// on brackets, a sheet of ivy, or a timber espalier trellis with vines.</summary>
     public class ArchDrain
     {
         public Vector2 at;
         public int topFloor = -1;
         public string poi;
+        public ClimbKind kind = ClimbKind.Drainpipe;
+    }
+
+    /// <summary>A coal-chute or cellar hatch at the foot of an outer wall (a visible way down).</summary>
+    public class ArchHatch
+    {
+        public Vector2 at;
+        public string poi = "Coal chute";
     }
 
     /// <summary>Materials of a building family (stucco casa, adobe, chalet...).</summary>
@@ -150,6 +164,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public bool snow;
         /// <summary>Merlons on the parapets (fortresses).</summary>
         public bool crenels;
+        /// <summary>Guest rooms (salons, suites, the hall): wallpaper above a panelled dado, a crown moulding.</summary>
+        public ArchMat wallpaper, wainscot;
+        /// <summary>Back-of-house walls (cellars, plant, garages, laundries): bare concrete.</summary>
+        public ArchMat underbelly;
+        /// <summary>Guest ceilings (plaster) when <see cref="ceiling"/> is timber.</summary>
+        public ArchMat guestCeiling;
     }
 
     /// <summary>A building to generate: footprint, floors, rooms, openings, stairs, roofs, vents, climbs.</summary>
@@ -171,6 +191,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public readonly List<ArchDuct> ducts = new List<ArchDuct>();
         public readonly List<ArchBalcony> balconies = new List<ArchBalcony>();
         public readonly List<ArchDrain> drains = new List<ArchDrain>();
+        public readonly List<ArchHatch> hatches = new List<ArchHatch>();
+        /// <summary>A continuous string-course ledge (0.3 m deep, hangable) at every upper floor line.</summary>
+        public bool stringCourses = true;
         /// <summary>Extra holes in a floor slab (chutes, hatches): floor and rectangle.</summary>
         public readonly List<(int floor, Rect rect)> holes = new List<(int, Rect)>();
         /// <summary>Floors that get a stone cornice ledge (0.35 m deep, hangable) along the facades.</summary>
@@ -240,6 +263,28 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             roofs.Add(lRoof);
             return lRoof;
         }
+
+        public ArchDrain Climb(float pX, float pZ, ClimbKind pKind, string pPoi = null, int pTopFloor = -1)
+        {
+            ArchDrain lClimb = new ArchDrain { at = new Vector2(pX, pZ), kind = pKind, poi = pPoi, topFloor = pTopFloor };
+            drains.Add(lClimb);
+            return lClimb;
+        }
+
+        public ArchHatch Hatch(float pX, float pZ, string pPoi = "Coal chute")
+        {
+            ArchHatch lHatch = new ArchHatch { at = new Vector2(pX, pZ), poi = pPoi };
+            hatches.Add(lHatch);
+            return lHatch;
+        }
+
+        /// <summary>Guest rooms: wallpaper, panelling, plaster ceilings, the good furniture.</summary>
+        public static bool IsGuest(RoomType t) => t == RoomType.Hall || t == RoomType.Salon || t == RoomType.Dining || t == RoomType.Study || t == RoomType.Suite
+            || t == RoomType.Library || t == RoomType.Lobby || t == RoomType.Ballroom || t == RoomType.Gallery || t == RoomType.Bedroom || t == RoomType.Office;
+
+        /// <summary>Back of house: concrete and pipes.</summary>
+        public static bool IsUnderbelly(ArchRoom r) => r.floor < 0 || r.type == RoomType.Plant || r.type == RoomType.Garage || r.type == RoomType.Laundry
+            || r.type == RoomType.ColdRoom || r.type == RoomType.CoalStore || r.type == RoomType.Workshop || r.type == RoomType.Hangar;
 
         public int MinFloor
         {

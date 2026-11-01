@@ -372,6 +372,119 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (!string.IsNullOrEmpty(pPoi)) Poi(pBottom + pOut * 0.6f + Vector3.up, pPoi, MapPoi.Kind.Climb);
         }
 
+        // ---------------------------------------------------------------- furniture built from PBR parts
+
+        /// <summary>A stone fireplace (front +z): jambs, mantel, a sooty firebox, logs, a hearth and a fire glow.</summary>
+        public void Fireplace(Vector3 pPosition, float pYaw, Transform pParent)
+        {
+            ArchMat lStone = ArchLib.Surface("marble_01", 1.2f), lSoot = ArchLib.PlainMat("Soot", new Color(0.04f, 0.035f, 0.03f), 0.1f, 0f), lLog = ArchLib.Surface("rough_wood", 0.5f);
+            BoxObject("Fireplace", pPosition, pYaw, pParent, GameLayers.DEFAULT, true,
+                (lStone, new Vector3(-0.75f, 0.6f, 0f), new Vector3(0.3f, 1.2f, 0.5f)),
+                (lStone, new Vector3(0.75f, 0.6f, 0f), new Vector3(0.3f, 1.2f, 0.5f)),
+                (lStone, new Vector3(0f, 1.3f, 0.02f), new Vector3(1.9f, 0.2f, 0.56f)),
+                (lStone, new Vector3(0f, 1.15f, 0f), new Vector3(1.3f, 0.12f, 0.5f)),
+                (lSoot, new Vector3(0f, 0.55f, -0.2f), new Vector3(1.2f, 1.1f, 0.1f)),
+                (lStone, new Vector3(0f, 0.04f, 0.45f), new Vector3(1.9f, 0.08f, 0.5f)),
+                (lLog, new Vector3(-0.1f, 0.14f, 0f), new Vector3(0.7f, 0.12f, 0.12f)),
+                (lLog, new Vector3(0.1f, 0.24f, 0.05f), new Vector3(0.65f, 0.11f, 0.11f)),
+                (ArchLib.LampGlow, new Vector3(0f, 0.12f, -0.05f), new Vector3(0.6f, 0.06f, 0.2f)));
+            Light lFire = new GameObject("FireGlow").AddComponent<Light>();
+            lFire.transform.SetParent(pParent ?? Props, false);
+            lFire.transform.position = pPosition + Quaternion.Euler(0, pYaw, 0) * new Vector3(0, 0.5f, 0.5f);
+            lFire.type = LightType.Point;
+            lFire.range = 6f;
+            lFire.intensity = 1.8f;
+            lFire.color = new Color(1f, 0.5f, 0.2f);
+            lFire.shadows = LightShadows.None;
+        }
+
+        /// <summary>A wall rack of rifles and shotguns (front +z), a locking bar across.</summary>
+        public void GunRack(Vector3 pPosition, float pYaw, Transform pParent)
+        {
+            ArchMat lWood = ArchLib.Surface("dark_wood", 1f);
+            BoxObject("GunRack", pPosition, pYaw, pParent, GameLayers.DEFAULT, true,
+                (lWood, new Vector3(0, 0.9f, -0.2f), new Vector3(1.4f, 1.8f, 0.06f)),
+                (lWood, new Vector3(0, 0.12f, -0.05f), new Vector3(1.4f, 0.08f, 0.3f)),
+                (lWood, new Vector3(0, 1.45f, -0.08f), new Vector3(1.4f, 0.06f, 0.22f)),
+                (ArchLib.Iron, new Vector3(0, 1.0f, 0.02f), new Vector3(1.45f, 0.04f, 0.04f)));
+            Quaternion lRot = Quaternion.Euler(0, pYaw, 0);
+            string[] lGuns = { "W_Sniper", "W_Shotgun", "W_Smg", "W_Sniper" };
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject lGun = ArchLib.Place(lGuns[i], pParent ?? Props, pPosition + lRot * new Vector3(-0.5f + i * 0.33f, 0.2f, -0.07f), pYaw, ArchLib.Collide.None, ArchLib.Iron);
+                if (lGun == null) continue;
+                lGun.transform.rotation = lRot * Quaternion.Euler(-80f, 0f, 0f);
+            }
+        }
+
+        /// <summary>A wine rack: a dark timber lattice with bottles lying in it (against a wall, or free-standing double).</summary>
+        public void WineRack(Vector3 pPosition, float pYaw, Transform pParent, bool pDouble = false)
+        {
+            ArchMat lWood = ArchLib.Surface("dark_wood", 1f), lBottle = ArchLib.PlainMat("WineBottle", new Color(0.06f, 0.16f, 0.08f), 0.9f, 0.1f);
+            ArchMesh lMesh = new ArchMesh();
+            float w = 1.3f, h = 1.9f, d = pDouble ? 0.7f : 0.38f;
+            for (int k = 0; k <= 4; k++) lMesh.Box(lWood, new Vector3(-w * 0.5f + k * w / 4f, h * 0.5f, 0), new Vector3(0.04f, h, d));
+            for (int k = 0; k <= 7; k++) lMesh.Box(lWood, new Vector3(0, 0.04f + k * (h - 0.08f) / 7f, 0), new Vector3(w, 0.03f, d), false);
+            for (int col = 0; col < 8; col++)
+                for (int row = 0; row < 7; row++)
+                {
+                    if ((col * 7 + row) % 5 == 3) continue;
+                    Vector3 c = new Vector3(-w * 0.5f + 0.09f + col * (w - 0.18f) / 7f, 0.13f + row * (h - 0.08f) / 7f, 0);
+                    lMesh.Tube(lBottle, c + new Vector3(0, 0, -d * 0.5f + 0.02f), c + new Vector3(0, 0, d * 0.5f - 0.02f), 0.04f, 8, false);
+                }
+            GameObject lRoot = new GameObject("WineRack");
+            lRoot.transform.SetParent(pParent ?? Props, false);
+            lRoot.transform.SetPositionAndRotation(pPosition, Quaternion.Euler(0, pYaw, 0));
+            lMesh.Flush(lRoot.transform, "Shape_WineRack" + (pDouble ? "2" : "1"));
+            BoxCollider lBox = lRoot.AddComponent<BoxCollider>();
+            lBox.center = new Vector3(0, h * 0.5f, 0);
+            lBox.size = new Vector3(w, h, d);
+            lRoot.isStatic = true;
+            Cover(lRoot);
+        }
+
+        /// <summary>A heap of coal in a cellar corner, a shovel in it.</summary>
+        public void CoalHeap(Vector3 pPosition, Transform pParent)
+        {
+            ArchMesh lMesh = new ArchMesh();
+            ArchMat lCoal = ArchLib.Tinted("aerial_rocks_02", new Color(0.12f, 0.12f, 0.13f), "coal", 0.4f);
+            lMesh.Dome(lCoal, Vector3.down * 0.4f, 1.6f, 16, 4, Quaternion.identity);
+            lMesh.Tube(ArchLib.Surface("rough_wood", 0.5f), new Vector3(0.6f, 0.6f, 0.3f), new Vector3(1.2f, 1.6f, 0.6f), 0.025f, 6, false);
+            lMesh.Box(ArchLib.Iron, new Vector3(0.55f, 0.55f, 0.28f), new Vector3(0.25f, 0.03f, 0.3f), Quaternion.Euler(0, 30f, 40f), false);
+            GameObject lRoot = new GameObject("CoalHeap");
+            lRoot.transform.SetParent(pParent ?? Props, false);
+            lRoot.transform.position = pPosition;
+            lMesh.Flush(lRoot.transform, "Shape_CoalHeap");
+            lRoot.isStatic = true;
+        }
+
+        /// <summary>A round banquet table dressed with a white cloth, a centrepiece and a candle, six chairs round it.</summary>
+        public void RoundTable(Vector3 pPosition, Transform pParent, int pZone)
+        {
+            ArchMat lCloth = ArchLib.PlainMat("TableCloth", new Color(0.95f, 0.94f, 0.92f), 0.2f, 0f);
+            ArchMesh lMesh = new ArchMesh();
+            lMesh.Cylinder(lCloth, new Vector3(0, 0.02f, 0), 0.82f, 0.74f, 24, true);
+            lMesh.Cylinder(lCloth, new Vector3(0, 0.74f, 0), 0.86f, 0.03f, 24, false);
+            lMesh.Cylinder(ArchLib.Brass, new Vector3(0, 0.77f, 0), 0.12f, 0.02f, 12, false);
+            lMesh.Cylinder(ArchLib.PlainMat("Candle", new Color(0.95f, 0.92f, 0.82f), 0.3f, 0f), new Vector3(0, 0.79f, 0), 0.025f, 0.22f, 8, false);
+            GameObject lRoot = new GameObject("BanquetTable");
+            lRoot.transform.SetParent(pParent ?? Props, false);
+            lRoot.transform.position = pPosition;
+            lMesh.Flush(lRoot.transform, "Shape_BanquetTable");
+            BoxCollider lBox = lRoot.AddComponent<BoxCollider>();
+            lBox.center = new Vector3(0, 0.38f, 0);
+            lBox.size = new Vector3(1.6f, 0.76f, 1.6f);
+            lRoot.isStatic = true;
+            ArchLib.Place("Furn_PottedPlant", lRoot.transform, pPosition + new Vector3(0.3f, 0.79f, 0.2f), 0f, ArchLib.Collide.None, null, 0.35f);
+            for (int k = 0; k < 6; k++)
+            {
+                float a = k * 60f;
+                Vector3 lChair = pPosition + Quaternion.Euler(0, a, 0) * new Vector3(0, 0, 1.15f);
+                ArchLib.Place("Furn_DiningChair", lRoot.transform, lChair, a + 180f, ArchLib.Collide.None, null);
+            }
+            if (R < 0.35f) Drinks(pPosition + new Vector3(-0.2f, 0.79f, -0.3f), 0f, pZone, 2, false);
+        }
+
         public void Chandelier(Vector3 pHook, float pDrop)
         {
             Transform lRoot = new GameObject("Chandelier") { layer = GameLayers.INTERACTABLE }.transform;
@@ -379,10 +492,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lRoot.position = pHook;
             Transform lCrystal = new GameObject("Crystal").transform;
             lCrystal.SetParent(lRoot, false);
-            lCrystal.position = pHook + Vector3.down * 0.75f;
-            GameObject lModel = ArchLib.Place("Prop_Chandelier", lCrystal, lCrystal.position - Vector3.up * 0.4f, 0f, ArchLib.Collide.None, ArchLib.Brass, 1.6f);
+            lCrystal.position = pHook + Vector3.down * 0.55f;
+            // The model hangs from the crystal point: its top there, not its foot (it used to sit near the floor).
+            float lHeight = Mathf.Max(0.3f, ArchLib.ModelBounds("Prop_Chandelier").size.y) * 1.6f;
+            GameObject lModel = ArchLib.Place("Prop_Chandelier", lCrystal, lCrystal.position - Vector3.up * lHeight, 0f, ArchLib.Collide.None, ArchLib.Brass, 1.6f);
             if (lModel != null) foreach (Transform t in lModel.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
-            GameObject lChain = BoxObject("Chain", pHook + Vector3.down * 0.25f, 0f, lRoot, GameLayers.INTERACTABLE, true, (ArchLib.Brass, Vector3.zero, new Vector3(0.05f, 0.5f, 0.05f)));
+            GameObject lChain = BoxObject("Chain", pHook + Vector3.down * 0.28f, 0f, lRoot, GameLayers.INTERACTABLE, true, (ArchLib.Brass, Vector3.zero, new Vector3(0.05f, 0.56f, 0.05f)), (ArchLib.Brass, new Vector3(0, 0.27f, 0), new Vector3(0.4f, 0.04f, 0.4f)));
             lChain.isStatic = false;
             Light lLight = new GameObject("ChandelierLight").AddComponent<Light>();
             lLight.transform.SetParent(lCrystal, false);

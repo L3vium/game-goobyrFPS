@@ -47,24 +47,43 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   holes cut over cellars and tunnel mouths, `Veg_*` trees, bushes and rocks as terrain trees
   (`VegLibrary`: LOD groups, trunk colliders), instanced `Veg_*` grass details, 8-12 tall grass
   fields with hiding triggers, invisible map edges, a `TimeOfDay` with the biome's presets.
+  Cliff faces (over 52°) carry big boulders sunk into them so walls read broken, not stretched;
+  bare rock starts at a per-map slope (snow maps keep snow higher). Tunnels get timber-framed,
+  lantern-lit mouths with boulders where they reach the open; rivers and falls use a faster,
+  choppier copy of the water material.
 - **Buildings** (`ArchSpec` → `ArchBuilder`): rooms on a 0.5 m grid per floor; walls found on the
   room boundaries (two-leaf facades: plaster outside, painted plaster inside; partitions; arcades
   with columns and arches; parapets; balustrades over voids); doors with casings and open leaves,
   windows with frames, glass, 0.3 m+ stone sills and shutters; slabs with stair wells; straight
-  and dogleg stairs (visible steps, smooth ramp colliders, ≤ 0.18 m risers); hip, gable and shed
-  roofs with eaves and snow; flat roofs with parapets; cornice ledges (hangable); balconies;
-  drainpipes (climbable); crawlable 1 m vent ducts with grilles; secure doors; room lights;
-  security zones per room; a building volume. One combined mesh per material
-  (`ArchMesh`, world box UVs), mesh colliders. `ArchFurnish` furnishes every room by type with
-  the `Furn_*` models and a throwable; `ArchKit` places the systemic props (drinks, toilets,
-  wardrobes and dumpsters to hide in, distractions, explosives, cameras, recorder, breaker, air
-  handler, drop ladders, chandeliers, ziplines, chatter, POIs); `ArchOutdoor` builds walls with
-  gates, stairs, retaining walls, sheds, stalls, piers, towers, masts, tanks, stages.
+  and dogleg stairs (visible steps on a plastered soffit between stringers, smooth ramp colliders,
+  ≤ 0.18 m risers) and **grand stairs** (marble treads, a carpet runner, turned balustrades and
+  newels on both sides); hip, gable and shed roofs with eaves and snow; flat roofs with parapets;
+  cornice ledges and a 0.3 m string course at every upper floor line (hangable); balconies on
+  carved consoles with wrought-iron rails; exterior climbs (`ArchDrain`: cast-iron downpipes on
+  brackets, ivy sheets, espalier trellises, all climbable); coal-chute hatches; crawlable 1 m vent
+  ducts hung from the slab with grilles; secure doors; room lights; security zones per room; a
+  building volume. Wall finishes follow the tier: wallpaper over a walnut dado and a crown
+  moulding in guest rooms with plaster ceilings (`ArchStyles.Grand`), painted plaster for staff,
+  bare concrete back of house. Walls that run on into the next one hide their end faces (no
+  seams). One combined mesh per material (`ArchMesh`, world box UVs, smooth cylinders and domes),
+  mesh colliders. `ArchFurnish` furnishes every room by type with the `Furn_*` models until its
+  walls are lined (offices: desks, cabinets, shelves; kitchens: an island; bedrooms: beds,
+  wardrobes, rugs; halls and lobbies: a fireplace, a sofa group, a reception desk; archives and
+  libraries: aisles of shelving; armouries: gun racks and crates; wine cellars: racks; coal
+  stores: a heap; ballrooms: dressed round tables and a hanging chandelier) and a throwable;
+  `ArchKit` places the systemic props (drinks, toilets, wardrobes and dumpsters to hide in,
+  distractions, explosives, cameras, recorder, breaker, air handler, drop ladders, chandeliers,
+  ziplines, chatter, POIs); `ArchOutdoor` builds walls with gates, stairs, retaining walls, sheds,
+  market stalls with baskets, sacks and crates, piers, towers, masts, tanks, concert stages (box
+  truss, PA stacks, spots), box trucks, guard booths with barrier arms, rope queue lines, painted
+  signs, bins, patio heaters, planters, hedges, and cover clusters that break long sightlines.
 - **Validation** (`Goobyr/Validate Maps`): 6+ edge starts 50 m clear of NPCs and 3+ inside starts,
   3+ extractions, 30+ weapons, 80+ throwables, 100+ NPCs all on the NavMesh and none more than
   25 m from another, 5+ entries into the key building (3+ into the next two), vents, climbs,
   cameras and a recorder, 6+ tall grass fields, no floating prop, every target's routine
-  available in its zone, the scene under 90 MB. `MapShots` renders review screenshots.
+  available in its zone, the scene under 90 MB. `MapShots` renders review screenshots, including
+  per-building sets (every climb, balcony and the largest rooms per floor) and, in play mode, the
+  busiest groups of NPCs.
 
 ## Systems
 - **AI** (`AI/Npc`, rules in `AI/DetectionModel`): sight is a 90° cone out to 20 m (lookouts

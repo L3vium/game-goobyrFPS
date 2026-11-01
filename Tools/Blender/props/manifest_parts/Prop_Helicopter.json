@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Helicopter",
+ "category": "vehicle",
+ "size_m": [
+  9.673,
+  3.07,
+  11.086
+ ],
+ "tris": 8278,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "light utility helicopter (static), 10 m rotor, ~8.3 m long; for helipads"
+}

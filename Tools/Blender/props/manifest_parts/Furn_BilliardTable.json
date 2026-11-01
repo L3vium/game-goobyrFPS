@@ -1,0 +1,13 @@
+{
+ "name": "Furn_BilliardTable",
+ "category": "furniture",
+ "size_m": [
+  2.84,
+  0.836,
+  1.6
+ ],
+ "tris": 7960,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "9 ft pool table 2.84 x 1.6 m"
+}

@@ -1,0 +1,13 @@
+{
+ "name": "Furn_DiningTable",
+ "category": "furniture",
+ "size_m": [
+  2.2,
+  0.76,
+  1.0
+ ],
+ "tris": 2012,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "2.2 x 1.0 x 0.76 m, seats 8"
+}

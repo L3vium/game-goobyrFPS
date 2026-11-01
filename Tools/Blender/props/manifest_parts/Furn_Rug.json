@@ -1,0 +1,13 @@
+{
+ "name": "Furn_Rug",
+ "category": "furniture",
+ "size_m": [
+  2.4,
+  0.01,
+  1.7
+ ],
+ "tris": 12,
+ "source": "Procedural pattern (numpy) + Poly Haven 'wool_boucle' fibre",
+ "licence": "Original + CC0 (Poly Haven)",
+ "notes": "2.4 x 1.7 m Persian-style rug, 1 cm thick"
+}

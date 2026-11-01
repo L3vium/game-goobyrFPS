@@ -1,0 +1,13 @@
+{
+ "name": "Furn_BarCounter",
+ "category": "furniture",
+ "size_m": [
+  2.7,
+  1.1,
+  0.745
+ ],
+ "tris": 3736,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "2.6 m bar, customer side -Y (Unity +Z) with brass foot rail"
+}

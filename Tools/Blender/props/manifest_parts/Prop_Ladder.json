@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Ladder",
+ "category": "architecture",
+ "size_m": [
+  0.51,
+  3.0,
+  0.227
+ ],
+ "tris": 4232,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "3 m fixed steel ladder, rungs every 0.3 m, wall at +Y (Unity -Z) 0.2 m behind"
+}

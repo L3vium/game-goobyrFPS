@@ -1,0 +1,13 @@
+{
+ "name": "Furn_TV",
+ "category": "furniture",
+ "size_m": [
+  1.24,
+  0.86,
+  0.197
+ ],
+ "tris": 1297,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "55-inch flat TV on feet"
+}

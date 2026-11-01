@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Car_Sedan",
+ "category": "vehicle",
+ "size_m": [
+  2.141,
+  1.498,
+  4.882
+ ],
+ "tris": 23102,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "4.85 m executive saloon, dark blue metallic, tinted glass greenhouse"
+}

@@ -1,0 +1,13 @@
+{
+ "name": "Prop_AlarmPanel",
+ "category": "system",
+ "size_m": [
+  0.24,
+  0.445,
+  0.054
+ ],
+ "tris": 3655,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "wall keypad; pivot at the centre of its back (wall) face, wall at +Y (Unity -Z)"
+}

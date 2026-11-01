@@ -1,0 +1,12 @@
+{
+ "name": "Furn_Cabinet",
+ "category": "furniture",
+ "size_m": [
+  1.719,
+  2.361,
+  1.117
+ ],
+ "tris": 12170,
+ "source": "Poly Haven 'GothicCabinet_01' (polyhaven.com/a/GothicCabinet_01)",
+ "licence": "CC0 (Poly Haven)"
+}

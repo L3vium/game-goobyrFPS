@@ -1,0 +1,12 @@
+{
+ "name": "Furn_OfficeChair",
+ "category": "furniture",
+ "size_m": [
+  0.643,
+  1.206,
+  0.687
+ ],
+ "tris": 6996,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

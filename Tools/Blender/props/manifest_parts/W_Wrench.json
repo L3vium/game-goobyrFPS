@@ -1,0 +1,12 @@
+{
+ "name": "W_Wrench",
+ "category": "throwable",
+ "size_m": [
+  0.068,
+  0.031,
+  0.254
+ ],
+ "tris": 5390,
+ "source": "Poly Haven 'adjustable_wrench' (polyhaven.com/a/adjustable_wrench)",
+ "licence": "CC0 (Poly Haven)"
+}

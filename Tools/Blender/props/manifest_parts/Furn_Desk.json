@@ -1,0 +1,12 @@
+{
+ "name": "Furn_Desk",
+ "category": "furniture",
+ "size_m": [
+  2.0,
+  0.788,
+  0.947
+ ],
+ "tris": 6898,
+ "source": "Poly Haven 'metal_office_desk' (polyhaven.com/a/metal_office_desk)",
+ "licence": "CC0 (Poly Haven)"
+}

@@ -1,0 +1,12 @@
+{
+ "name": "Furn_Armchair",
+ "category": "furniture",
+ "size_m": [
+  0.82,
+  1.023,
+  0.987
+ ],
+ "tris": 8916,
+ "source": "Poly Haven 'modern_arm_chair_01' (polyhaven.com/a/modern_arm_chair_01)",
+ "licence": "CC0 (Poly Haven)"
+}

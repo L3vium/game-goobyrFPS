@@ -1,0 +1,12 @@
+{
+ "name": "Furn_Stove",
+ "category": "furniture",
+ "size_m": [
+  0.503,
+  0.859,
+  0.648
+ ],
+ "tris": 13914,
+ "source": "Poly Haven 'electric_stove' (polyhaven.com/a/electric_stove)",
+ "licence": "CC0 (Poly Haven)"
+}

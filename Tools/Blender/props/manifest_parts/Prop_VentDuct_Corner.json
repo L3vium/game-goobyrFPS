@@ -1,0 +1,13 @@
+{
+ "name": "Prop_VentDuct_Corner",
+ "category": "architecture",
+ "size_m": [
+  2.06,
+  1.12,
+  2.06
+ ],
+ "tris": 4232,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "90 deg elbow, legs to -Z and +X (Unity), each ending 1.5 m from the pivot"
+}

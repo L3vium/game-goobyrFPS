@@ -1,0 +1,12 @@
+{
+ "name": "W_Shotgun",
+ "category": "weapon",
+ "size_m": [
+  0.043,
+  0.175,
+  1.08
+ ],
+ "tris": 5662,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

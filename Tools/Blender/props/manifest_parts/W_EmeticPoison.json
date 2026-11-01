@@ -1,0 +1,12 @@
+{
+ "name": "W_EmeticPoison",
+ "category": "throwable",
+ "size_m": [
+  0.035,
+  0.08,
+  0.037
+ ],
+ "tris": 3752,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

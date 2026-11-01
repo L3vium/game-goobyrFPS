@@ -1,0 +1,12 @@
+{
+ "name": "Furn_Bookshelf",
+ "category": "furniture",
+ "size_m": [
+  1.374,
+  2.063,
+  0.581
+ ],
+ "tris": 10106,
+ "source": "Poly Haven 'wooden_bookshelf_worn' (polyhaven.com/a/wooden_bookshelf_worn)",
+ "licence": "CC0 (Poly Haven)"
+}

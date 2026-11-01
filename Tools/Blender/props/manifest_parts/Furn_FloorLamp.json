@@ -1,0 +1,13 @@
+{
+ "name": "Furn_FloorLamp",
+ "category": "furniture",
+ "size_m": [
+  0.505,
+  1.687,
+  0.805
+ ],
+ "tris": 2508,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "1.7 m brass floor lamp, drum shade"
+}

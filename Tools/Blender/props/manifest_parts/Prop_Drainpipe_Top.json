@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Drainpipe_Top",
+ "category": "architecture",
+ "size_m": [
+  0.42,
+  0.72,
+  0.203
+ ],
+ "tris": 1976,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "rainwater hopper head; its bottom spigot plugs into Prop_Drainpipe's top socket"
+}

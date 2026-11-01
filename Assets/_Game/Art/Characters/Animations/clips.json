@@ -1,0 +1,461 @@
+[
+  {
+    "name": "Idle",
+    "file": "Idle.fbx",
+    "loop": true,
+    "inPlace": false,
+    "durationSec": 4.0,
+    "upperBodyOnly": false,
+    "notes": "Relaxed standing idle. Source: CMU 113_21."
+  },
+  {
+    "name": "Idle_Armed",
+    "file": "Idle_Armed.fbx",
+    "loop": true,
+    "inPlace": false,
+    "durationSec": 4.0,
+    "upperBodyOnly": false,
+    "notes": "Pistol low ready (two hands, muzzle down). Source: hand-keyed (IK) over CMU 113_21 idle."
+  },
+  {
+    "name": "Walk_F",
+    "file": "Walk_F.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.167,
+    "upperBodyOnly": false,
+    "notes": "Normal walk. Source speed 1.33 m/s. Source: CMU 16_15."
+  },
+  {
+    "name": "Walk_B",
+    "file": "Walk_B.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.233,
+    "upperBodyOnly": false,
+    "notes": "Walk backwards. Source speed 1.95 m/s. Source: CMU 143_39."
+  },
+  {
+    "name": "Walk_L",
+    "file": "Walk_L.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.367,
+    "upperBodyOnly": false,
+    "notes": "Side-step walk to the left (facing forward). Source speed 1.91 m/s. Source: CMU 143_40."
+  },
+  {
+    "name": "Walk_R",
+    "file": "Walk_R.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.367,
+    "upperBodyOnly": false,
+    "notes": "Side-step walk to the right (facing forward). Source speed 1.91 m/s. Source: CMU 143_40 (mirrored)."
+  },
+  {
+    "name": "Run_F",
+    "file": "Run_F.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 0.8,
+    "upperBodyOnly": false,
+    "notes": "Jog/run. Source speed 3.36 m/s. Source: CMU 16_35."
+  },
+  {
+    "name": "Run_B",
+    "file": "Run_B.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.133,
+    "upperBodyOnly": false,
+    "notes": "Fast backpedal. Source speed 1.21 m/s. Source: CMU 76_11."
+  },
+  {
+    "name": "Run_L",
+    "file": "Run_L.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 0.933,
+    "upperBodyOnly": false,
+    "notes": "Fast lateral shuffle (facing forward). Source speed 2.58 m/s. Source: CMU 78_30."
+  },
+  {
+    "name": "Run_R",
+    "file": "Run_R.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 0.933,
+    "upperBodyOnly": false,
+    "notes": "Fast lateral shuffle (facing forward). Source speed 2.58 m/s. Source: CMU 78_30 (mirrored)."
+  },
+  {
+    "name": "Sprint_F",
+    "file": "Sprint_F.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 0.733,
+    "upperBodyOnly": false,
+    "notes": "Sprint. Source speed 4.21 m/s. Source: CMU 09_01."
+  },
+  {
+    "name": "CrouchIdle",
+    "file": "CrouchIdle.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 3.0,
+    "upperBodyOnly": false,
+    "notes": "Crouched idle (hips ~0.36 m lower). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "CrouchWalk_F",
+    "file": "CrouchWalk_F.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.167,
+    "upperBodyOnly": false,
+    "notes": "Careful crouched creep. Source speed 1.13 m/s. Source: CMU 139_31."
+  },
+  {
+    "name": "CrouchWalk_B",
+    "file": "CrouchWalk_B.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.167,
+    "upperBodyOnly": false,
+    "notes": "Careful crouched creep backwards (reversed forward creep). Source speed 1.13 m/s. Source: CMU 139_31."
+  },
+  {
+    "name": "CrouchWalk_L",
+    "file": "CrouchWalk_L.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 0.8,
+    "upperBodyOnly": false,
+    "notes": "Crouched sneak side-step left. Source speed 1.26 m/s. Source: CMU 139_14."
+  },
+  {
+    "name": "CrouchWalk_R",
+    "file": "CrouchWalk_R.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 0.8,
+    "upperBodyOnly": false,
+    "notes": "Crouched sneak side-step right. Source speed 1.26 m/s. Source: CMU 139_14 (mirrored)."
+  },
+  {
+    "name": "Crawl_F",
+    "file": "Crawl_F.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 0.8,
+    "upperBodyOnly": false,
+    "notes": "Crawl on hands and knees. Source speed 0.59 m/s. Source: CMU 133_01."
+  },
+  {
+    "name": "Jump_Start",
+    "file": "Jump_Start.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 0.6,
+    "upperBodyOnly": false,
+    "notes": "Crouch and take-off; hips rise at the end (physics drives the jump). Source: CMU 16_01."
+  },
+  {
+    "name": "Fall_Loop",
+    "file": "Fall_Loop.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.0,
+    "upperBodyOnly": false,
+    "notes": "Airborne loop, limbs balancing. Source: hand-keyed over the CMU 16_01 apex pose."
+  },
+  {
+    "name": "Land",
+    "file": "Land.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 0.8,
+    "upperBodyOnly": false,
+    "notes": "Landing absorb back to stand. Source: CMU 16_01."
+  },
+  {
+    "name": "Slide",
+    "file": "Slide.fbx",
+    "loop": false,
+    "inPlace": true,
+    "durationSec": 1.0,
+    "upperBodyOnly": false,
+    "notes": "Run-to-slide (hips drop to 0.30 m); in place, hold the last frame while sliding. Source: hand-keyed (IK), starts from the Run_F pose."
+  },
+  {
+    "name": "Vault",
+    "file": "Vault.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 1.9,
+    "upperBodyOnly": false,
+    "notes": "Running jump over a waist-high obstacle; root motion kept (forward travel). Source: CMU 127_25."
+  },
+  {
+    "name": "Mantle",
+    "file": "Mantle.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 1.6,
+    "upperBodyOnly": false,
+    "notes": "Climb onto a 1.10 m ledge from standing (root motion +1.10 m up, 0.65 m forward). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Climb_Ladder",
+    "file": "Climb_Ladder.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.9,
+    "upperBodyOnly": false,
+    "notes": "Ladder climb cycle (two rungs), in place: vertical travel 0.68 m per 1.9 s cycle removed. Source: CMU 13_33."
+  },
+  {
+    "name": "Hang_Idle",
+    "file": "Hang_Idle.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 3.0,
+    "upperBodyOnly": false,
+    "notes": "Hanging from a ledge: wall face 0.12 m in front of the root, top at 2.10 m (hands on top of it). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Shimmy_L",
+    "file": "Shimmy_L.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.0,
+    "upperBodyOnly": false,
+    "notes": "Ledge shimmy towards the character's left, 0.22 m per 1 s cycle. Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Shimmy_R",
+    "file": "Shimmy_R.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.0,
+    "upperBodyOnly": false,
+    "notes": "Ledge shimmy towards the character's right, 0.22 m per 1 s cycle. Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Hang_ClimbUp",
+    "file": "Hang_ClimbUp.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 2.2,
+    "upperBodyOnly": false,
+    "notes": "From Hang_Idle to standing on the ledge (+2.10 m up, 0.5 m forward root motion). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Swim_Idle",
+    "file": "Swim_Idle.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 2.0,
+    "upperBodyOnly": false,
+    "notes": "Treading water, upright; water line at the shoulders (~1.45 m above the root). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Swim_F",
+    "file": "Swim_F.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.567,
+    "upperBodyOnly": false,
+    "notes": "Breaststroke, body horizontal, in place (hips ~0.35 m below the standing hip height). Source: CMU 125_01 (dry-land swim capture)."
+  },
+  {
+    "name": "Aim_Pistol",
+    "file": "Aim_Pistol.fbx",
+    "loop": true,
+    "inPlace": false,
+    "durationSec": 2.0,
+    "upperBodyOnly": true,
+    "notes": "Upper-body aim pose (two-handed pistol), breathing loop; mask the legs. Source: hand-keyed (IK) over CMU 113_21 idle."
+  },
+  {
+    "name": "Aim_Rifle",
+    "file": "Aim_Rifle.fbx",
+    "loop": true,
+    "inPlace": false,
+    "durationSec": 2.0,
+    "upperBodyOnly": true,
+    "notes": "Upper-body aim pose (two-handed rifle), breathing loop; mask the legs. Source: hand-keyed (IK) over CMU 113_21 idle."
+  },
+  {
+    "name": "Fire_Pistol",
+    "file": "Fire_Pistol.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 0.3,
+    "upperBodyOnly": true,
+    "notes": "Single shot recoil from the aim pose (upper body). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Fire_Rifle",
+    "file": "Fire_Rifle.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 0.2,
+    "upperBodyOnly": true,
+    "notes": "Single shot recoil from the aim pose (upper body). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Reload",
+    "file": "Reload.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 2.0,
+    "upperBodyOnly": true,
+    "notes": "Pistol magazine reload from the aim pose (2 s, upper body). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Punch",
+    "file": "Punch.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 1.2,
+    "upperBodyOnly": false,
+    "notes": "Jab/cross from guard. Source: CMU 143_23."
+  },
+  {
+    "name": "Takedown_Attacker",
+    "file": "Takedown_Attacker.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 3.0,
+    "upperBodyOnly": false,
+    "notes": "Rear choke hold, 3 s. Paired clip: put both actors on the same transform (victim starts 0.45 m in front, same facing). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Takedown_Victim",
+    "file": "Takedown_Victim.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 3.0,
+    "upperBodyOnly": false,
+    "notes": "Rear choke hold, 3 s. Paired clip: put both actors on the same transform (victim starts 0.45 m in front, same facing). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Throw",
+    "file": "Throw.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 1.6,
+    "upperBodyOnly": false,
+    "notes": "Overhand throw, release ~0.9 s in. Source: CMU 141_11."
+  },
+  {
+    "name": "HitReact_F",
+    "file": "HitReact_F.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 0.6,
+    "upperBodyOnly": false,
+    "notes": "Hit from the front (additive-friendly, starts and ends on the idle pose). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "HitReact_B",
+    "file": "HitReact_B.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 0.6,
+    "upperBodyOnly": false,
+    "notes": "Hit from the back (additive-friendly, starts and ends on the idle pose). Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Death_F",
+    "file": "Death_F.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 1.6,
+    "upperBodyOnly": false,
+    "notes": "Collapse forward onto the face; root motion kept. Source: CMU 140_01 (reversed get-up, time-warped)."
+  },
+  {
+    "name": "Death_B",
+    "file": "Death_B.fbx",
+    "loop": false,
+    "inPlace": false,
+    "durationSec": 1.7,
+    "upperBodyOnly": false,
+    "notes": "Collapse backwards onto the back; root motion kept. Source: CMU 140_08 (reversed get-up, time-warped)."
+  },
+  {
+    "name": "Talk_Phone",
+    "file": "Talk_Phone.fbx",
+    "loop": true,
+    "inPlace": false,
+    "durationSec": 2.7,
+    "upperBodyOnly": false,
+    "notes": "Standing on the phone (right hand at the ear), loop. Source: CMU 79_36."
+  },
+  {
+    "name": "Smoke_Idle",
+    "file": "Smoke_Idle.fbx",
+    "loop": true,
+    "inPlace": false,
+    "durationSec": 7.0,
+    "upperBodyOnly": false,
+    "notes": "Standing smoking idle, loop (cigarette in the right hand). Source: CMU 80_28."
+  },
+  {
+    "name": "Sit_Chair",
+    "file": "Sit_Chair.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 4.0,
+    "upperBodyOnly": false,
+    "notes": "Seated idle loop; hips at 0.56 m (seat ~0.45 m). Source: CMU 143_18 (seated pose) + breathing."
+  },
+  {
+    "name": "Lean_Wall",
+    "file": "Lean_Wall.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 4.0,
+    "upperBodyOnly": false,
+    "notes": "Leaning back against a wall (wall plane 0.08 m behind the root), arms crossed, one foot on the wall. Source: hand-keyed (IK)."
+  },
+  {
+    "name": "Look_Around",
+    "file": "Look_Around.fbx",
+    "loop": true,
+    "inPlace": false,
+    "durationSec": 4.0,
+    "upperBodyOnly": false,
+    "notes": "Searching: scanning left and right (4 s loop). Source: CMU 113_21 idle + hand-keyed head/torso scan."
+  },
+  {
+    "name": "Patrol_Walk",
+    "file": "Patrol_Walk.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 1.6,
+    "upperBodyOnly": false,
+    "notes": "Slow alert walk, rifle at low ready. Source speed 0.66 m/s. Source: CMU 91_10."
+  },
+  {
+    "name": "Cower",
+    "file": "Cower.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 2.0,
+    "upperBodyOnly": false,
+    "notes": "Civilian panic: crouched, arms covering the head, loop. Source: CMU 142_16 (cowering pose at 34 s) + hand-keyed trembling."
+  },
+  {
+    "name": "Run_Panic",
+    "file": "Run_Panic.fbx",
+    "loop": true,
+    "inPlace": true,
+    "durationSec": 0.8,
+    "upperBodyOnly": false,
+    "notes": "Panicked run, arms protecting the head. Source speed 3.36 m/s. Source: CMU 16_35."
+  }
+]

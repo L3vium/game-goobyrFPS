@@ -1,0 +1,13 @@
+{
+ "name": "Furn_Locker",
+ "category": "furniture",
+ "size_m": [
+  0.4,
+  1.8,
+  0.552
+ ],
+ "tris": 1376,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "steel locker 0.4 x 0.5 x 1.8 m, hollow; Door pivots on its left hinge"
+}

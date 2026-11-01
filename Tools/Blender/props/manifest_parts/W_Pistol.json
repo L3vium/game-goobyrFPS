@@ -1,0 +1,12 @@
+{
+ "name": "W_Pistol",
+ "category": "weapon",
+ "size_m": [
+  0.032,
+  0.176,
+  0.239
+ ],
+ "tris": 3048,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

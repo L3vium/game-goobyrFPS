@@ -1,0 +1,12 @@
+{
+ "name": "W_Rock",
+ "category": "throwable",
+ "size_m": [
+  0.147,
+  0.072,
+  0.089
+ ],
+ "tris": 3344,
+ "source": "Poly Haven 'stone_01' (polyhaven.com/a/stone_01)",
+ "licence": "CC0 (Poly Haven)"
+}

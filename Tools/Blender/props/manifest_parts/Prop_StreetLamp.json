@@ -1,0 +1,12 @@
+{
+ "name": "Prop_StreetLamp",
+ "category": "architecture",
+ "size_m": [
+  0.704,
+  3.871,
+  0.387
+ ],
+ "tris": 19400,
+ "source": "Poly Haven 'street_lamp_01' (polyhaven.com/a/street_lamp_01)",
+ "licence": "CC0 (Poly Haven)"
+}

@@ -97,3 +97,93 @@
 - Poly Haven model `electric_stove` (CC0) - https://polyhaven.com/a/electric_stove
 - Poly Haven texture `tree_bark_03` (CC0) - https://polyhaven.com/a/tree_bark_03
 - Poly Haven model `island_tree_01` (CC0) - https://polyhaven.com/a/island_tree_01
+- Poly Haven texture `chinese_hackberry_bark` (CC0) - https://polyhaven.com/a/chinese_hackberry_bark
+- Poly Haven model `pachira_aquatica_01` (CC0) - https://polyhaven.com/a/pachira_aquatica_01
+- Poly Haven texture `japanese_hackberry_bark` (CC0) - https://polyhaven.com/a/japanese_hackberry_bark
+- Poly Haven model `jacaranda_tree` (CC0) - https://polyhaven.com/a/jacaranda_tree
+- Poly Haven texture `palm_tree_bark` (CC0) - https://polyhaven.com/a/palm_tree_bark
+- Poly Haven texture `fever_tree_bark` (CC0) - https://polyhaven.com/a/fever_tree_bark
+- Poly Haven model `grass_medium_02` (CC0) - https://polyhaven.com/a/grass_medium_02
+- Poly Haven texture `metasequoia_bark` (CC0) - https://polyhaven.com/a/metasequoia_bark
+- Poly Haven model `fern_02` (CC0) - https://polyhaven.com/a/fern_02
+- Poly Haven model `calathea_orbifolia_01` (CC0) - https://polyhaven.com/a/calathea_orbifolia_01
+- Poly Haven model `anthurium_botany_01` (CC0) - https://polyhaven.com/a/anthurium_botany_01
+- Poly Haven texture `bark_brown_02` (CC0) - https://polyhaven.com/a/bark_brown_02
+- Poly Haven texture `palm_bark` (CC0) - https://polyhaven.com/a/palm_bark
+- Poly Haven texture `eucalyptus_bark` (CC0) - https://polyhaven.com/a/eucalyptus_bark
+- Poly Haven texture `bark_brown_01` (CC0) - https://polyhaven.com/a/bark_brown_01
+- Poly Haven model `shrub_04` (CC0) - https://polyhaven.com/a/shrub_04
+- Poly Haven texture `bark_willow_02` (CC0) - https://polyhaven.com/a/bark_willow_02
+- Poly Haven model `searsia_burchellii` (CC0) - https://polyhaven.com/a/searsia_burchellii
+- Poly Haven model `wild_rooibos_bush` (CC0) - https://polyhaven.com/a/wild_rooibos_bush
+- Poly Haven model `fir_tree_01` (CC0) - https://polyhaven.com/a/fir_tree_01
+- Poly Haven texture `japanese_sycamore` (CC0) - https://polyhaven.com/a/japanese_sycamore
+- Poly Haven model `shrub_03` (CC0) - https://polyhaven.com/a/shrub_03
+- Poly Haven texture `pine_bark` (CC0) - https://polyhaven.com/a/pine_bark
+- Poly Haven model `boulder_01` (CC0) - https://polyhaven.com/a/boulder_01
+- Poly Haven model `namaqualand_boulder_04` (CC0) - https://polyhaven.com/a/namaqualand_boulder_04
+- Poly Haven model `namaqualand_boulder_05` (CC0) - https://polyhaven.com/a/namaqualand_boulder_05
+- Poly Haven model `dead_tree_trunk` (CC0) - https://polyhaven.com/a/dead_tree_trunk
+- Poly Haven model `modular_fire_escape` (CC0) - https://polyhaven.com/a/modular_fire_escape
+
+## Realistic prop pack (Assets/_Game/Art/PBR/Models, built by Tools/Blender/props)
+Converted from Poly Haven models (CC0, decimated / re-pivoted / re-textured):
+- `W_Sniper` <- Poly Haven `bolt_action_rifle_7_62` (CC0) - https://polyhaven.com/a/bolt_action_rifle_7_62
+- `W_Bottle` <- Poly Haven `wine_bottles_01` (CC0) - https://polyhaven.com/a/wine_bottles_01
+- `W_Rock` <- Poly Haven `stone_01` (CC0) - https://polyhaven.com/a/stone_01
+- `W_Wrench` <- Poly Haven `adjustable_wrench` (CC0) - https://polyhaven.com/a/adjustable_wrench
+- `Prop_BreakerBox` <- Poly Haven `power_box_01` (CC0) - https://polyhaven.com/a/power_box_01
+- `Prop_Generator` <- Poly Haven `portable_generator` (CC0) - https://polyhaven.com/a/portable_generator
+- `Prop_SecurityCamera` <- Poly Haven `security_camera_01` (CC0) - https://polyhaven.com/a/security_camera_01
+- `Prop_Barrier_Concrete` <- Poly Haven `concrete_road_barrier` (CC0) - https://polyhaven.com/a/concrete_road_barrier
+- `Prop_ChainlinkFence` <- Poly Haven `modular_chainlink_fence` (CC0) - https://polyhaven.com/a/modular_chainlink_fence
+- `Prop_FireEscape` <- Poly Haven `modular_fire_escape` (CC0) - https://polyhaven.com/a/modular_fire_escape
+- `Prop_StreetLamp` <- Poly Haven `street_lamp_01` (CC0) - https://polyhaven.com/a/street_lamp_01
+- `Prop_Chandelier` <- Poly Haven `Chandelier_01` (CC0) - https://polyhaven.com/a/Chandelier_01
+- `Prop_Crate_Military` <- Poly Haven `wooden_military_crate` (CC0) - https://polyhaven.com/a/wooden_military_crate
+- `Prop_Crate_Wood` <- Poly Haven `wooden_crate_02` (CC0) - https://polyhaven.com/a/wooden_crate_02
+- `Prop_ExplosiveBarrel` <- Poly Haven `Barrel_01` (CC0) - https://polyhaven.com/a/Barrel_01
+- `Prop_Jerrycan` <- Poly Haven `metal_jerrycan` (CC0) - https://polyhaven.com/a/metal_jerrycan
+- `Prop_PropaneTank` <- Poly Haven `propane_tank` (CC0) - https://polyhaven.com/a/propane_tank
+- `Furn_Armchair` <- Poly Haven `modern_arm_chair_01` (CC0) - https://polyhaven.com/a/modern_arm_chair_01
+- `Furn_Bed` <- Poly Haven `GothicBed_01` (CC0) - https://polyhaven.com/a/GothicBed_01
+- `Furn_Bookshelf` <- Poly Haven `wooden_bookshelf_worn` (CC0) - https://polyhaven.com/a/wooden_bookshelf_worn
+- `Furn_Cabinet` <- Poly Haven `GothicCabinet_01` (CC0) - https://polyhaven.com/a/GothicCabinet_01
+- `Furn_CoffeeTable` <- Poly Haven `modern_coffee_table_01` (CC0) - https://polyhaven.com/a/modern_coffee_table_01
+- `Furn_Desk` <- Poly Haven `metal_office_desk` (CC0) - https://polyhaven.com/a/metal_office_desk
+- `Furn_DiningChair` <- Poly Haven `dining_chair_02` (CC0) - https://polyhaven.com/a/dining_chair_02
+- `Furn_PottedPlant` <- Poly Haven `potted_plant_02` (CC0) - https://polyhaven.com/a/potted_plant_02
+- `Furn_Rug` <- Poly Haven `wool_boucle` (CC0) - https://polyhaven.com/a/wool_boucle
+- `Furn_Shelves_Metal` <- Poly Haven `steel_frame_shelves_01` (CC0) - https://polyhaven.com/a/steel_frame_shelves_01
+- `Furn_Sofa` <- Poly Haven `sofa_02` (CC0) - https://polyhaven.com/a/sofa_02
+- `Furn_Stove` <- Poly Haven `electric_stove` (CC0) - https://polyhaven.com/a/electric_stove
+Modelled procedurally in Blender Python (original work, project-owned), textured from the Poly Haven CC0 textures listed above (box-projected and baked): `W_Flamethrower`, `W_Pistol`, `W_Remote`, `W_RocketLauncher`, `W_Shotgun`, `W_SilencedPistol`, `W_Smg`, `W_Brick`, `W_C4`, `W_Coin`, `W_EmeticPoison`, `W_Poison`, `W_SmokeGrenade`, `Prop_AirHandler`, `Prop_AlarmPanel`, `Prop_VentGrille`, `Prop_Drainpipe`, `Prop_Drainpipe_Bottom`, `Prop_Drainpipe_Top`, `Prop_Ladder`, `Prop_VentDuct_Corner`, `Prop_VentDuct_Straight`, `Prop_VentDuct_T`, `Prop_Pallet`, `Prop_Sandbags`, `Furn_BarCounter`, `Furn_Bathtub`, `Furn_BilliardTable`, `Furn_DiningTable`, `Furn_FloorLamp`, `Furn_Fridge`, `Furn_KitchenCounter`, `Furn_Locker`, `Furn_OfficeChair`, `Furn_PianoGrand`, `Furn_ServerRack`, `Furn_Sink`, `Furn_TV`, `Furn_Toilet`, `Furn_Wardrobe`, `Prop_Boat`, `Prop_Car_Pickup`, `Prop_Car_Sedan`, `Prop_Helicopter`.
+
+## Realistic characters and animations (`Assets/_Game/Art/Characters/`)
+
+Built by `Tools/Blender/characters/*.py` (original project scripts). Sources and licences:
+
+- **MakeHuman base mesh, morph targets, `game_engine` rig and skin weights** via the MPFB 2 extension for Blender
+  (extensions.blender.org, id `mpfb`; code GPL-3, only used as a tool - its human assets are **CC0**).
+  https://static.makehumancommunity.org/mpfb.html
+- **MakeHuman system assets (CC0)**: skins (`middleage_caucasian_male`, `young_caucasian_female`,
+  `young_african_male`, `young_caucasian_male`, `young_caucasian_male2`, `middleage_african_male`, `young_asian_male`,
+  `young_african_female`, `old_caucasian_male`), eyes (`high-poly` + iris textures), eyebrows, eyelashes and hair
+  (`short02`, `short03`, `short04`, `ponytail01`, `bob02`). https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html
+- **MakeHuman community clothes** (asset packs from files.makehumancommunity.org; recoloured/retextured, decimated):
+  - CC0: `toigo_male_suit_tie_and_jacket`, `toigo_female_suit`, `toigo_suit_with_dinner_jacket` (MRT / Margaret Toigo, pack suits01),
+    `cortu_cargo_pants` (pants01), `namuhekam_male_polo_shirt` (Namuhekam, shirts01).
+  - CC BY 4.0 - **Mindfront (Sweden)**: `mindfront_shoes_oxford_male`, `mindfront_shoes_oxford_female`, `mindfront_shoes_biker_boots_male`,
+    `mindfront_tactical_vest_male`, `mindfront_fishing_hat_01`, `mindfront_patrol_cap`, `mindfront_knitted_hat_01`, `mindfront_male_trousers_2`.
+  - CC BY 4.0 - **Elvaerwyn + Punkduck**: `elvs_emt_uniform_jacket_male`, `elvs_emt_uniform_pants_male`.
+  - CC BY - **Elvaerwyn**: `elvs_hooded_sweat_jacket1`, `elvs_male_shirt_tie_tucked1`.
+  - CC BY - **DredNicolson**: `drednicolson_short-tail_camo_tee`.
+  - CC BY 3.0 / 4.0 - **punkduck**: `punkduck_winter_boots`, `punkduck_v_neck_top`, `punkduck_female_tight_jeans`,
+    `punkduck_running_shoes_01` (CC BY 3.0), `punkduck_male_classic_jeans` (CC BY 4.0).
+  Asset pages: https://static.makehumancommunity.org/assets/assetpacks.html
+- **Motion capture**: data from the **CMU Graphics Lab Motion Capture Database - mocap.cs.cmu.edu** (created with funding
+  from NSF EIA-0196217), ASF/AMC retargeted by `anim_cmu.py`. Trials used: 09_01, 13_33, 16_01, 16_15, 16_35, 76_11,
+  78_30, 79_36, 80_28, 91_10, 113_21, 125_01, 127_25, 133_01, 139_14, 139_31, 140_01, 140_08, 141_11, 142_16, 143_18,
+  143_23, 143_39, 143_40.
+- Hand-keyed clips (aim, fire, reload, hang/shimmy/climb-up, mantle, slide, swim idle, takedown pair, hit reacts, lean,
+  crouch idle, look-around layer), procedural camouflage, the earpiece mesh and all recolours are original project work.

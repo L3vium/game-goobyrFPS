@@ -1,0 +1,12 @@
+{
+ "name": "Furn_Shelves_Metal",
+ "category": "furniture",
+ "size_m": [
+  1.097,
+  2.141,
+  0.502
+ ],
+ "tris": 4348,
+ "source": "Poly Haven 'steel_frame_shelves_01' (polyhaven.com/a/steel_frame_shelves_01)",
+ "licence": "CC0 (Poly Haven)"
+}

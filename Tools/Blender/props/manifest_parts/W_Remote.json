@@ -1,0 +1,12 @@
+{
+ "name": "W_Remote",
+ "category": "weapon",
+ "size_m": [
+  0.055,
+  0.156,
+  0.105
+ ],
+ "tris": 2087,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

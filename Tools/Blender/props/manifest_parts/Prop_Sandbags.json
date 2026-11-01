@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Sandbags",
+ "category": "prop",
+ "size_m": [
+  1.751,
+  0.476,
+  0.372
+ ],
+ "tris": 9216,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "4-row sandbag wall segment, ~1.5 m long, 0.45 m high"
+}

@@ -1,0 +1,13 @@
+{
+ "name": "Prop_VentDuct_Straight",
+ "category": "architecture",
+ "size_m": [
+  1.12,
+  1.12,
+  3.0
+ ],
+ "tris": 5056,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "1.0 m inner section, 3 m long along Z, open ends"
+}

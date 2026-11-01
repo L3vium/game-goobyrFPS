@@ -1,0 +1,13 @@
+{
+ "name": "Furn_KitchenCounter",
+ "category": "furniture",
+ "size_m": [
+  2.42,
+  0.9,
+  0.646
+ ],
+ "tris": 10788,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "2.4 m base-cabinet run, marble top at 0.9 m"
+}

@@ -1,0 +1,13 @@
+{
+ "name": "Prop_ChainlinkFence",
+ "category": "architecture",
+ "size_m": [
+  3.157,
+  2.523,
+  0.149
+ ],
+ "tris": 9484,
+ "source": "Poly Haven 'modular_chainlink_fence' (polyhaven.com/a/modular_chainlink_fence)",
+ "licence": "CC0 (Poly Haven)",
+ "notes": "3.0 m run: double + single panels between three posts; wire slot is alpha-tested"
+}

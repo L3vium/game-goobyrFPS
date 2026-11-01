@@ -149,6 +149,10 @@ FLOOR 3 +10.8 penthouse                   ROOF +14.4
 | b6 | West drainpipe from the bastion to the scribes' window | Climb | F1 W | 15 s, out of court view |
 | b7 | Wind-tower climb from the second-court scaffold → roof → duct | Climb + vent | roof / F3 pantry | 60 s, keep-roof lookout |
 | b8 | Grain chute to the wadi; roof zipline to the kasbah | One-way exits | out | instant, no return |
+| b9 | Officers' balcony **DropLadder** (F2 south) lowered into the second court, stays down for everyone | One-way shortcut | second court -> F2 S | first opened from inside; then a 15 s climb for all |
+
+**Breather on the upper floors:** the disused F2 bunk room (behind the officers' quarters) is
+Restricted with no access required — a pocket to wait in between the Security rooms.
 
 ## 5. Secondary fortresses
 - **Radar** [H/Se] (bunker, gantry, motor pool): front gate (Keycard), motor-pool ramp (Padlock),

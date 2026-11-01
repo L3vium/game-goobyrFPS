@@ -112,7 +112,7 @@ L3 +12                                  ||
 L4 VIP FLOOR +16                        ||  BALLROOM ROOF [H/Se]
 +-----------+-----------+-----------+   ||  helipad, skylight V,
 | B1 GUARD  | B2 DEALER | B3 BANKER |   ||  zipline lands (b7) C6
-| POST[H/Se]D [H/Se]    | [H/Pr]    |   ||
+| POST[H/Se]D [H/Se]    D [H/Pr]    D-- north balcony ledge B3 -> B1 (hang/shimmy)
 +-----D-----+-----D-----+-----D-----+   ||
 | CORRIDOR B ring [H/Se]  C4        D---D roof door
 +-----------+-----K-----+-----K-----+   ||
@@ -139,7 +139,11 @@ L5 ATTIC +20: ATTIC STORE [R] (crevasse window b8) D CLOCK ROOM [H/Se] lookout D
 
 **Eight distinct suites:** A1 after-party (3 guests), A2 empty renovation (breather), A3
 housekeeping (door open, cart), A4 singer dressing, A5 gala doctor (ipecac), B1 bodyguards' post,
-B2 dealer (briefcase, bodyguard), B3 **banker**.
+B2 dealer (briefcase, bodyguard), B3 **banker** (two exits: corridor door and a connecting door
+to B2, plus a north balcony whose ledge runs to the B1 guard post's window).
+
+**One-way shortcut:** the spa-garden **DropLadder**, lowered from the attic roof walk; once down it
+stays down for everyone and links the spa garden [R/Gu] to the roof walk [R/Se].
 
 ### Hotel-platform entries (onto the terraces)
 

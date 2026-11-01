@@ -155,6 +155,10 @@ FLOOR 2 +7.2
 | b7 | Mirador DropLadder, lowered from the tower gallery, stays down | One-way shortcut | tower → F2 NE | first run only from inside; then open for all |
 | b8 | Boarded sacristy window (Crowbar) | Tool-gated | ground NW | loud 10 m, reception 12 m away |
 
+**North-facade ledge (F1):** a stone cornice ledge runs guest B -> master-suite balcony -> study
+window -> guard room, reached from the W5 ivy route: the private rooms are linked from outside
+(hang and shimmy, unseen from the garden, exposed to the ridge track for 10 m).
+
 **Secret links:** both cave branches, the coffee chute.
 
 ## 5. Secondary fortresses

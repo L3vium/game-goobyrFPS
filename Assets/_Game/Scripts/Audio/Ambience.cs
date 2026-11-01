@@ -22,9 +22,9 @@ namespace Com.IsartDigital.GoobyrFPS.Audio
             {
                 string lBed = pScene.name switch
                 {
-                    "Map_Forest" => "amb_forest",
-                    "Map_Gulf" => "amb_desert",
-                    "Map_Suburb" => "amb_night",
+                    "Map_SanLazaro" => "amb_forest",
+                    "Map_QasrAlRimal" => "amb_desert",
+                    "Map_Weisshorn" => "amb_night",
                     _ => null
                 };
                 if (lBed == null) return;

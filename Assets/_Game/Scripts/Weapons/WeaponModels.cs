@@ -17,8 +17,22 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public static GameObject Build(ItemDefinition pItem, Transform pParent, int pLayer)
         {
             GameObject lModel;
-            GameObject lPrefab = pItem != null ? Resources.Load<GameObject>("Models/W_" + pItem.kind) : null;
-            if (lPrefab != null)
+            // The realistic PBR model (barrel along +Z, Grip and Muzzle children), as exported.
+            GameObject lRealistic = pItem != null ? ArtRegistry.Get("W_" + pItem.kind) : null;
+            GameObject lPrefab = lRealistic == null && pItem != null ? Resources.Load<GameObject>("Models/W_" + pItem.kind) : null;
+            if (lRealistic != null)
+            {
+                lModel = Object.Instantiate(lRealistic, pParent, false);
+                Transform lGrip = lModel.transform.Find("Grip");
+                if (lGrip != null) lModel.transform.localPosition = -lGrip.localPosition;
+                if (lModel.transform.Find("Muzzle") == null)
+                {
+                    Transform lMuzzle = new GameObject("Muzzle").transform;
+                    lMuzzle.SetParent(lModel.transform, false);
+                    lMuzzle.localPosition = new Vector3(0, 0.05f, 0.5f);
+                }
+            }
+            else if (lPrefab != null)
             {
                 lModel = Object.Instantiate(lPrefab, pParent, false);
                 // Exported facing -Z: turn around (the muzzle child turns with it).

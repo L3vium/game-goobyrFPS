@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99b5e5c3ff5a1e7498d5dac3a458516b, type: 3}
+  m_Name: ArtRegistry
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.ArtRegistry
+  entries:
+  - name: W_Bottle
+    model: {fileID: 919132149155446097, guid: 928cfb28550d9894c90d5e8dff8a5206, type: 3}
+  - name: W_Brick
+    model: {fileID: 919132149155446097, guid: 920f2497e6cf707478ae946bcba40c43, type: 3}
+  - name: W_C4
+    model: {fileID: 919132149155446097, guid: ded88aae05bdda647a618f61db8e18c8, type: 3}
+  - name: W_Coin
+    model: {fileID: 919132149155446097, guid: 7653ec3d2b61bf14cbd4439a494fd7da, type: 3}
+  - name: W_EmeticPoison
+    model: {fileID: 919132149155446097, guid: c66370731d661994aa6e1a85286f170d, type: 3}
+  - name: W_Flamethrower
+    model: {fileID: 919132149155446097, guid: 1d0e8a71bd71a8049a6e54e4264a8684, type: 3}
+  - name: W_Pistol
+    model: {fileID: 919132149155446097, guid: c7de5cf514dd9d5478cc46f45c4e246d, type: 3}
+  - name: W_Poison
+    model: {fileID: 919132149155446097, guid: 7f044d8c88bdb2947b6b69d0a19f70cb, type: 3}
+  - name: W_Remote
+    model: {fileID: 919132149155446097, guid: 6b893bca19351e945a1d66eed925699b, type: 3}
+  - name: W_Rock
+    model: {fileID: 919132149155446097, guid: 66cebcd3ca1a4d7419bbce88b4de58a8, type: 3}
+  - name: W_RocketLauncher
+    model: {fileID: 919132149155446097, guid: 672e12c20b68051418ef3b56d63b976e, type: 3}
+  - name: W_Shotgun
+    model: {fileID: 919132149155446097, guid: 886a4036315550849a48f8d7a6f813d9, type: 3}
+  - name: W_SilencedPistol
+    model: {fileID: 919132149155446097, guid: 1356fd0ea3d4cab4ca3a7db8666591f7, type: 3}
+  - name: W_Smg
+    model: {fileID: 919132149155446097, guid: 1b385f383dfb3d54caf889a8eaf7b4b9, type: 3}
+  - name: W_SmokeGrenade
+    model: {fileID: 919132149155446097, guid: d84941ac64c3e9d45979b331faabac5e, type: 3}
+  - name: W_Sniper
+    model: {fileID: 919132149155446097, guid: da48cac8b77e42640a0a22f8c49b6ad3, type: 3}
+  - name: W_Wrench
+    model: {fileID: 919132149155446097, guid: f1ba690360e37b148a3cc4e3de7155ed, type: 3}
+  - name: Chr_Agent
+    model: {fileID: 919132149155446097, guid: d253b6a310f876743b54f35c22863dbe, type: 3}
+  - name: Chr_Agent_F
+    model: {fileID: 919132149155446097, guid: afafb38a08043294ea2f2b29c45b0238, type: 3}
+  - name: Chr_Arms
+    model: {fileID: 919132149155446097, guid: 5c699fcb81dcf6c47b8a57cfa20d0cd3, type: 3}
+  - name: Chr_Bodyguard
+    model: {fileID: 919132149155446097, guid: 0c707c05362783449b5cc6c09609ec00, type: 3}
+  - name: Chr_Civilian_F
+    model: {fileID: 919132149155446097, guid: ac520df4cb9cc9d4e8a30e95d5af3cd6, type: 3}
+  - name: Chr_Civilian_M
+    model: {fileID: 919132149155446097, guid: 7e427395caf1ebd4fb53896ef2b77dcd, type: 3}
+  - name: Chr_Guard_Desert
+    model: {fileID: 919132149155446097, guid: c5801acee5abbb5488cb49af40110360, type: 3}
+  - name: Chr_Guard_Jungle
+    model: {fileID: 919132149155446097, guid: a0d85ac9b397ae0469c783745af56241, type: 3}
+  - name: Chr_Guard_Snow
+    model: {fileID: 919132149155446097, guid: 4a8d0df59902ab646a9315cd9c2a7a55, type: 3}
+  - name: Chr_Staff
+    model: {fileID: 919132149155446097, guid: 53da064e702c2d3448f504236b44629d, type: 3}
+  - name: Chr_VIP
+    model: {fileID: 919132149155446097, guid: 0189e7998fe68d4499107b13dd614829, type: 3}

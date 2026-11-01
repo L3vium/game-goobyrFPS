@@ -148,6 +148,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>Heavy masonry: thicker outer walls, deeper reveals.</summary>
         public float outerThickness = 0.45f;
         public bool snow;
+        /// <summary>Merlons on the parapets (fortresses).</summary>
+        public bool crenels;
     }
 
     /// <summary>A building to generate: footprint, floors, rooms, openings, stairs, roofs, vents, climbs.</summary>

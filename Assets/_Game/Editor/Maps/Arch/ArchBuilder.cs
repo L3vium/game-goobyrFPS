@@ -737,6 +737,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             SegBox(c, s, n, s.a, s.b, y0, y0 + 1.0f, -0.3f, 0f, pMat);
             SegBox(c, s, n, s.a - 0.03f, s.b + 0.03f, y0 + 1.0f, y0 + 1.08f, -0.36f, 0.05f, c.spec.style.trim);
+            if (c.spec.style.crenels)
+                for (float k = s.a + 0.25f; k < s.b - 0.4f; k += 1.0f) SegBox(c, s, n, k, k + 0.5f, y0 + 1.08f, y0 + 1.75f, -0.3f, 0f, pMat);
         }
 
         // ---------------------------------------------------------------- slabs, ceilings, flat roofs
@@ -834,6 +836,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         }
                         c.mesh.BoxMinMax(st.facade, a, b);
                         c.mesh.BoxMinMax(st.trim, new Vector3(a.x - 0.03f, b.y, a.z - 0.03f), new Vector3(b.x + 0.03f, b.y + 0.07f, b.z + 0.03f), false);
+                        if (st.crenels && ((i + j) & 1) == 0) c.mesh.BoxMinMax(st.facade, new Vector3(a.x, b.y + 0.07f, a.z), new Vector3(b.x, b.y + 0.75f, b.z));
                     }
                 }
         }
@@ -850,7 +853,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     return ArchLib.Surface("herringbone_parquet", 2f);
                 case RoomType.Cellar: case RoomType.WineCellar: case RoomType.ColdRoom: case RoomType.CoalStore: case RoomType.Crypt: case RoomType.Vault: case RoomType.Plant:
                     return ArchLib.Surface("cobblestone_floor_01", 2.5f);
-                case RoomType.Garage: case RoomType.Hangar: case RoomType.Workshop: case RoomType.Security: case RoomType.Armoury: case RoomType.Radio: case RoomType.Store:
+                case RoomType.Garage: case RoomType.Hangar: case RoomType.Workshop: case RoomType.Security: case RoomType.Armoury: case RoomType.Radio:
                     return ArchLib.Surface("concrete_floor_02", 3f);
                 case RoomType.Terrace: case RoomType.Loggia: case RoomType.Gallery: case RoomType.Belvedere:
                     return ArchLib.Surface("patterned_cobblestone", 2.5f);

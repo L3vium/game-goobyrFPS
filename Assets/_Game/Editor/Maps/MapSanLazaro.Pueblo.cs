@@ -35,7 +35,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             RoomType lFront = pRole switch { "shop" => RoomType.Shop, "bar" => RoomType.Bar, "office" => RoomType.Office, "clinic" => RoomType.Clinic, _ => RoomType.Living };
             if (!pEnterable)
             {
-                for (int f = 0; f < pFloors; f++) h.Room("Shut" + f, f, 0, 0, pWidth, pDepth, RoomType.Store, SecurityTier.Restricted).noFurniture = true;
+                for (int f = 0; f < pFloors; f++) h.Room("Shut" + f, f, 0, 0, pWidth, pDepth, RoomType.Bedroom, SecurityTier.Restricted).noFurniture = true;
                 h.Door(0, pWidth * 0.5f, 0, DoorKind.Door, 1.2f);
             }
             else

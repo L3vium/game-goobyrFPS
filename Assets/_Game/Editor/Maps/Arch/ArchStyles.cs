@@ -90,16 +90,16 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             return new ArchStyle
             {
-                facade = ArchLib.Tinted("clay_plaster", pFacade, "adobe_" + pSuffix, 3.5f),
-                interior = ArchLib.Tinted("clay_plaster", new Color(0.98f, 0.94f, 0.86f), "adobe_inside", 3f),
+                facade = ArchLib.Tinted("beige_wall_001", pFacade, "adobe_" + pSuffix, 3.5f),
+                interior = ArchLib.Tinted("painted_plaster_wall", new Color(0.98f, 0.93f, 0.84f), "adobe_inside", 3f),
                 trim = ArchLib.Tinted("large_sandstone_blocks", new Color(0.95f, 0.86f, 0.72f), "sand_trim", 2f),
                 plinth = ArchLib.Surface("large_sandstone_blocks", 2.5f),
-                roof = ArchLib.Tinted("clay_plaster", new Color(0.86f, 0.74f, 0.58f), "adobe_roof", 3f),
-                flatRoof = ArchLib.Tinted("clay_plaster", new Color(0.86f, 0.74f, 0.58f), "adobe_roof", 3f),
+                roof = ArchLib.Tinted("beige_wall_001", new Color(0.92f, 0.82f, 0.68f), "adobe_roof", 3f),
+                flatRoof = ArchLib.Tinted("beige_wall_001", new Color(0.92f, 0.82f, 0.68f), "adobe_roof", 3f),
                 shutter = ArchLib.Tinted("wooden_planks", new Color(0.35f, 0.24f, 0.16f), "screen", 1.2f),
                 frame = ArchLib.Tinted("wooden_planks", new Color(0.4f, 0.28f, 0.18f), "frame_brown", 1f),
                 door = pBlueDoor ? ArchLib.Tinted("old_planks_02", new Color(0.18f, 0.35f, 0.7f), "door_blue", 1.5f) : ArchLib.Surface("dark_wooden_planks", 1.5f),
-                ceiling = ArchLib.Tinted("clay_plaster", new Color(0.98f, 0.94f, 0.86f), "adobe_inside", 3f),
+                ceiling = ArchLib.Tinted("painted_plaster_wall", new Color(0.98f, 0.93f, 0.84f), "adobe_inside", 3f),
                 stair = ArchLib.Tinted("large_sandstone_blocks", new Color(0.95f, 0.86f, 0.72f), "sand_trim", 2f),
                 column = ArchLib.Tinted("large_sandstone_blocks", new Color(0.95f, 0.86f, 0.72f), "sand_trim", 2f),
                 soffit = ArchLib.Surface("dark_wooden_planks", 2f),
@@ -115,9 +115,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public static ArchStyle Fortress()
         {
             ArchStyle s = Adobe(new Color(0.92f, 0.8f, 0.62f), "keep", false);
-            s.facade = ArchLib.Surface("large_sandstone_blocks", 2.6f);
+            s.facade = ArchLib.Tinted("large_sandstone_blocks", new Color(1.45f, 1.15f, 0.82f), "fortress", 2.6f);
+            s.cellarWall = s.facade;
             s.outerThickness = 0.8f;
-            s.windowSpacing = 4.6f;
+            s.windowSpacing = 6f;
+            s.crenels = true;
             return s;
         }
 

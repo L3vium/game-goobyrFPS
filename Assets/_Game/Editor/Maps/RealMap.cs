@@ -71,7 +71,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (ArtBuilder.Sky(K.Map) == null) ArtBuilder.Build();
             Shape = new LandShape(Relief);
             Plan();
-            K.LandLayers = Layers();
+            K.LandLayers = Untinted(Layers());
             K.PlanStorey = 3.6f;
             K.AfterLight = (pSun, pSky) =>
             {
@@ -310,8 +310,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     float lSlope = K.LandSlope(px, pz);
                     if (lSlope > 38f)
                     {
-                        // Cliffs: boulders break up the stretched rock faces.
-                        if (lRandom.NextDouble() < 0.12) K.LandTree(lRandom.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A", px, pz, 4f + (float)lRandom.NextDouble() * 5f);
+                        // Scree slopes: boulders break up the rock faces (never on sheer walls, where they would hang).
+                        if (lSlope < 52f && lRandom.NextDouble() < 0.05) K.LandTree(lRandom.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A", px, pz, 1.5f + (float)lRandom.NextDouble() * 2f);
                         continue;
                     }
                     float lWoods = Woods(px, pz, h);
@@ -433,14 +433,44 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
         }
 
-        /// <summary>A layer with its albedo scaled (greener grass, paler sand).</summary>
+        /// <summary>A copy of the layer with its albedo scaled (greener grass, paler sand), saved next to it as
+        /// <c>TL_&lt;id&gt;_&lt;hex&gt;</c> so the shared layer other maps use stays untinted.</summary>
         protected static TerrainLayer Tint(TerrainLayer pLayer, Color pTint)
         {
             if (pLayer == null) return null;
-            pLayer.diffuseRemapMin = Vector4.zero;
-            pLayer.diffuseRemapMax = new Vector4(pTint.r, pTint.g, pTint.b, 1f);
-            UnityEditor.EditorUtility.SetDirty(pLayer);
-            return pLayer;
+            string lPath = UnityEditor.AssetDatabase.GetAssetPath(pLayer);
+            if (string.IsNullOrEmpty(lPath)) return pLayer;
+            string lTintPath = lPath.Replace(".terrainlayer", "_" + ColorUtility.ToHtmlStringRGB(pTint) + ".terrainlayer");
+            TerrainLayer lTinted = UnityEditor.AssetDatabase.LoadAssetAtPath<TerrainLayer>(lTintPath);
+            if (lTinted == null)
+            {
+                lTinted = new TerrainLayer();
+                UnityEditor.AssetDatabase.CreateAsset(lTinted, lTintPath);
+            }
+            UnityEditor.EditorUtility.CopySerialized(pLayer, lTinted);
+            lTinted.name = System.IO.Path.GetFileNameWithoutExtension(lTintPath);
+            lTinted.diffuseRemapMin = Vector4.zero;
+            lTinted.diffuseRemapMax = new Vector4(pTint.r, pTint.g, pTint.b, 1f);
+            UnityEditor.EditorUtility.SetDirty(lTinted);
+            _tinted.Add(lTinted);
+            return lTinted;
+        }
+
+        private static readonly System.Collections.Generic.HashSet<TerrainLayer> _tinted = new System.Collections.Generic.HashSet<TerrainLayer>();
+
+        /// <summary>Clears any albedo remap left on the shared layers (older builds tinted them in place).</summary>
+        private static TerrainLayer[] Untinted(TerrainLayer[] pLayers)
+        {
+            if (pLayers == null) return null;
+            foreach (TerrainLayer lLayer in pLayers)
+            {
+                if (lLayer == null || _tinted.Contains(lLayer)) continue;
+                if (lLayer.diffuseRemapMax == Vector4.one && lLayer.diffuseRemapMin == Vector4.zero) continue;
+                lLayer.diffuseRemapMin = Vector4.zero;
+                lLayer.diffuseRemapMax = Vector4.one;
+                UnityEditor.EditorUtility.SetDirty(lLayer);
+            }
+            return pLayers;
         }
 
         /// <summary>A POI on the pause map.</summary>

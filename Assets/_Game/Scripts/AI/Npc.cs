@@ -474,9 +474,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (pPlayer.Submerged.Value && lSight.distance > 3f) return 0f;
             if (lSight.angle > Mathf.Max(lSight.halfCone, DetectionModel.PERIPHERAL_ANGLE) && lSight.distance >= DetectionModel.CLOSE_RANGE) return 0f;
             if (SmokeVolume.Blocks(lEye, lTarget)) return 0f;
+            // The social ladder: a behaving player on the plaza is just another passer-by.
+            float lTier = pCombat ? 1f : DetectionModel.TierFactor(SecurityZone.At(pPlayer.transform.position), pPlayer.ActsSuspicious);
+            if (lTier <= 0f) return 0f;
             lSight.chestVisible = !Physics.Linecast(lEye, lTarget, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
             lSight.headVisible = !Physics.Linecast(lEye, pPlayer.Eye, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
-            return DetectionModel.Exposure(lSight);
+            return DetectionModel.Exposure(lSight) * lTier;
         }
 
         /// <summary>

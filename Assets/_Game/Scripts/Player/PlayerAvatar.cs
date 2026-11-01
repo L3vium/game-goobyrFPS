@@ -49,6 +49,13 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public LobbyPlayer Player => LobbyPlayer.ForClient(OwnerClientId);
         public string DisplayName => Player != null ? Player.Name : "Goob";
 
+        /// <summary>
+        /// Behaviour that gives a player away even in a public place: a raised gun, sprinting,
+        /// climbing or hanging off walls, carrying the proof.
+        /// </summary>
+        public bool ActsSuspicious => Aiming.Value || Sprinting.Value || CarriesProof.Value
+                                      || Motion.Value == MotionState.Climb || Motion.Value == MotionState.Hang || Motion.Value == MotionState.Vault || Motion.Value == MotionState.Mantle;
+
         /// <summary>Eye position as the NPCs and the camera see it.</summary>
         public Vector3 Eye => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? 0.98f : 1.74f);
         public Vector3 Chest => transform.position + Vector3.up * (Crouched.Value ? 0.6f : 1.1f);

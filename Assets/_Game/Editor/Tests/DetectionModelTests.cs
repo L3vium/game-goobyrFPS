@@ -137,6 +137,15 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Trespassing_PublicIsSafeUnlessSuspicious()
+        {
+            Assert.AreEqual(0f, DetectionModel.TierFactor(SecurityTier.Public, false));
+            Assert.Greater(DetectionModel.TierFactor(SecurityTier.Public, true), 0f);
+            Assert.Less(DetectionModel.TierFactor(SecurityTier.Restricted, false), DetectionModel.TierFactor(SecurityTier.Hostile, false));
+            Assert.AreEqual(1f, DetectionModel.TierFactor(SecurityTier.Hostile, false));
+        }
+
+        [Test]
         public void Gauge_FillsFasterOnEdge()
         {
             float lCalm = DetectionModel.Fill(0f, 1f, 2f, 0.1f, false);

@@ -178,6 +178,24 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return Mathf.Min(20f, (pFall - 0.6f) * 3f) * (pCrouched ? 0.5f : 1f);
         }
 
+        // ---------------------------------------------------------------- trespassing
+
+        /// <summary>
+        /// How much a sighting counts given where the player stands and what they do: nothing in a
+        /// public place for someone behaving (no weapon raised, not running, not carrying the
+        /// proof), 0.55 in a restricted area, full when trespassing in a hostile one - or anywhere
+        /// for someone acting suspicious (a raised gun is noticed even on the plaza, at 0.6).
+        /// </summary>
+        public static float TierFactor(SecurityTier pTier, bool pSuspicious)
+        {
+            switch (pTier)
+            {
+                case SecurityTier.Public: return pSuspicious ? 0.6f : 0f;
+                case SecurityTier.Restricted: return pSuspicious ? 1f : 0.55f;
+                default: return 1f;
+            }
+        }
+
         /// <summary>Within this angle of an NPC's back, a punch from someone it has not noticed is a silent takedown.</summary>
         public const float TAKEDOWN_ANGLE = 70f;
 

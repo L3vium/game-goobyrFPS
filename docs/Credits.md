@@ -95,3 +95,5 @@
 - Poly Haven model `steel_frame_shelves_01` (CC0) - https://polyhaven.com/a/steel_frame_shelves_01
 - Poly Haven model `potted_plant_02` (CC0) - https://polyhaven.com/a/potted_plant_02
 - Poly Haven model `electric_stove` (CC0) - https://polyhaven.com/a/electric_stove
+- Poly Haven texture `tree_bark_03` (CC0) - https://polyhaven.com/a/tree_bark_03
+- Poly Haven model `island_tree_01` (CC0) - https://polyhaven.com/a/island_tree_01

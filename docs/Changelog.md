@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Public, restricted and hostile areas, like Hitman: walk the plaza or the market freely as long
+  as you behave (no raised gun, no sprinting or climbing in front of guards); staff areas get you
+  noticed more slowly and warned first; compounds and private floors are trespassing.
 - Parkour: climb onto crates and walls up to 2.4 m, vault low walls, fences and open windows, climb
   over garden walls, grab ledges in the air and hang from them (shimmy, climb up, drop, leap to the
   next ledge), and top out of drainpipes onto the roof. Thin walls and window sills now work (they

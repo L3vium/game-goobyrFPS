@@ -5,7 +5,12 @@ characters (the Goobs). **Every NPC is hostile to every player.** A target is dr
 map's pool of 15; kill it, take the proof from its body (its plush head or the item it carries),
 carry it to one of the active extraction points. PvP is on: killing the carrier drops the proof.
 There are no disguises — it is stealth (sight, sound, cover, grass, smoke, darkness), and when
-it goes loud, everyone is lethal both ways.
+it goes loud, everyone is lethal both ways. Maps follow Hitman's **social ladder** instead
+(`AI/SecurityZone`, `DetectionModel.TierFactor`): in **public** places (streets, plazas, the
+market, the gala floor) a player who behaves - no gun raised, not sprinting, not climbing walls,
+not carrying the proof - is just another passer-by; in **restricted** areas (staff corridors,
+yards) guards notice at 55 % speed and confront before shooting; **hostile** areas (compounds,
+VIP floors, bunkers) are trespassing with full detection.
 
 ## Modes
 - **Free-for-all** — everyone for themselves.

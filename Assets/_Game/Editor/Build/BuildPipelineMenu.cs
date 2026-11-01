@@ -76,6 +76,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Scene lScene = EditorSceneManager.NewPreviewScene();
             RenderTexture lTarget = new RenderTexture(S, S, 24, RenderTextureFormat.ARGB32) { antiAliasing = 8 };
             Texture2D lTexture = new Texture2D(S, S, TextureFormat.RGBA32, false);
+            bool lRendered = false;
             try
             {
                 GameObject lSource = AssetDatabase.LoadAssetAtPath<GameObject>(CharacterBuilder.DIR + "/Chr_Agent/Chr_Agent.fbx");
@@ -107,18 +108,36 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lCamera.transform.position = lFace + lAgent.transform.forward * 2.05f + lAgent.transform.right * -0.45f + Vector3.down * 0.12f;
                 lCamera.transform.LookAt(lFace + Vector3.down * 0.2f);
                 lCamera.targetTexture = lTarget;
-                lCamera.Render();
-
-                RenderTexture.active = lTarget;
-                lTexture.ReadPixels(new Rect(0, 0, S, S), 0, 0);
-                lTexture.Apply();
-                RenderTexture.active = null;
+                // The editor compiles shader variants asynchronously and skips what is not ready (a
+                // black icon after a reimport): compile synchronously, and render again until the
+                // agent shows.
+                bool lAsync = ShaderUtil.allowAsyncCompilation;
+                ShaderUtil.allowAsyncCompilation = false;
+                try
+                {
+                    for (int lTry = 0; lTry < 4 && !lRendered; lTry++)
+                    {
+                        lCamera.Render();
+                        RenderTexture.active = lTarget;
+                        lTexture.ReadPixels(new Rect(0, 0, S, S), 0, 0);
+                        lTexture.Apply();
+                        RenderTexture.active = null;
+                        lRendered = HasSubject(lTexture);
+                    }
+                }
+                finally { ShaderUtil.allowAsyncCompilation = lAsync; }
                 lCamera.targetTexture = null;
             }
             finally
             {
                 EditorSceneManager.ClosePreviewScene(lScene);
                 lTarget.Release();
+            }
+            if (!lRendered)
+            {
+                Object.DestroyImmediate(lTexture);
+                Debug.LogError("[Build] icon: the render came out empty, Icon.png left unchanged");
+                return;
             }
 
             string lPath = EditorAssets.ROOT + "/Art/Icon.png";
@@ -138,6 +157,16 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             PlayerSettings.SplashScreen.show = false;
             AssetDatabase.SaveAssets();
             Debug.Log("[Build] icon");
+        }
+
+        /// <summary>True when the centre of the render holds more than the flat backdrop (the agent is there).</summary>
+        private static bool HasSubject(Texture2D pTexture)
+        {
+            int lBright = 0;
+            for (int y = pTexture.height / 4; y < pTexture.height * 3 / 4; y += 8)
+                for (int x = pTexture.width / 4; x < pTexture.width * 3 / 4; x += 8)
+                    if (pTexture.GetPixel(x, y).maxColorComponent > 0.15f) lBright++;
+            return lBright > 200;
         }
 
         private static void IconLight(Scene pScene, Quaternion pRotation, Color pColor, float pIntensity)

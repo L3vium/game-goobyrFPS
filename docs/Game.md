@@ -81,7 +81,16 @@ grass fields, NPC posts on the NavMesh and no prop floating over the terrain. Wa
   alone); the basement air handler gasses the whole building; distractions (radio, TV, phone,
   generator, car alarm); hiding spots; ziplines; jump pads; climbable surfaces; tall grass.
 - **Player** (eyes at 1.74 m, 0.98 m crouched): walk, sprint (held), crouch (held; crouching while moving slides,
-  much further out of a sprint and faster downhill), jump, mantle, climb, zipline, hide, swim
+  much further out of a sprint and faster downhill), crawl (crouched where a crouch doesn't fit:
+  vents, crawlspaces), jump, zipline, hide, swim, and **parkour** (`FpsMotor`): jump in front of
+  anything 0.45-2.4 m high to mantle onto it - the ledge is probed at six heights and four depths past
+  the face, so 30 cm walls and window sills count; thin obstacles with floor beyond (fences, garden
+  walls, open windows) are vaulted over or through; in the air, the hands grab any ledge they reach
+  and hang: shimmy with A/D, climb up with W or jump, drop with crouch or S, leap to the next ledge
+  with jump + A/D, kick off with jump + S. Drainpipes, ladders and ivy are climbed and topped out
+  onto the roof. Stairs keep you glued to the steps and step-ups ease the view; landings from a real
+  drop are heard (3 m per metre fallen, half crouched); remote players get the motion state
+  (`PlayerAvatar.Motion`) for their animation. Swimming:
   (`Systems/WaterVolume`: crouch dives, jump rises or climbs out at the surface, rivers carry you,
   20 s of breath under water; under water nobody sees you beyond arm's length, the view turns
   blue-green and the sound muffles; splashes are heard; deep water is cut out of the NavMesh); head bob, sway, tilt, landing dip, FOV kicks; 6-slot inventory;

@@ -103,6 +103,23 @@ def main():
         for c in res.get("result", {}).get("content", []):
             print(c.get("text", c)[:6000])
         return
+    if sys.argv[1] == "tests":
+        # run the EditMode tests, wait, print the summary and the failures
+        import time
+        res = call("tools/call", {"name": "run_tests", "arguments": {"mode": "EditMode"}})
+        job = json.loads(res["result"]["content"][0]["text"])["data"]["job_id"]
+        for _ in range(200):
+            time.sleep(3)
+            res = call("tools/call", {"name": "get_test_job", "arguments": {"job_id": job, "include_failed_tests": True}})
+            data = json.loads(res["result"]["content"][0]["text"])["data"]
+            if data["status"] != "running":
+                summary = (data.get("result") or {}).get("summary")
+                print(data["status"], json.dumps(summary))
+                for f in (data.get("result") or {}).get("results", []) or data["progress"].get("failures_so_far", []):
+                    print(json.dumps(f)[:800])
+                return
+        print("timeout")
+        return
     if sys.argv[1] == "schema":
         res = call("tools/list", {})
         for t in res["result"]["tools"]:

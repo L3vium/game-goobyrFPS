@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Parkour: climb onto crates and walls up to 2.4 m, vault low walls, fences and open windows, climb
+  over garden walls, grab ledges in the air and hang from them (shimmy, climb up, drop, leap to the
+  next ledge), and top out of drainpipes onto the roof. Thin walls and window sills now work (they
+  used to fail). Crouch into a vent and you crawl through it. Going down stairs no longer makes you
+  hop or flicker out of a sprint, and steps no longer jolt the view. Big drops are heard by guards.
 - Controls: left click punches; right click raises your gun and left click then fires; the mouse wheel
   cycles everything you carry, fists included, without getting stuck on empty slots. A punch from
   behind on a guard who hasn't noticed you is a silent takedown that kills at once (with a beat of

@@ -35,6 +35,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public readonly NetworkVariable<bool> Submerged = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> Aiming = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<float> Pitch = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        /// <summary>What the body is doing (climbing, hanging, vaulting...), for the third-person animation.</summary>
+        public readonly NetworkVariable<MotionState> Motion = new NetworkVariable<MotionState>(MotionState.Ground, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<int> Team = new NetworkVariable<int>(0);
         public readonly NetworkVariable<bool> CarriesProof = new NetworkVariable<bool>(false);
 
@@ -101,6 +103,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 Motor.OnLanded += HandleLanded;
                 Motor.OnJumped += () => { Animator.Squash(-0.15f); Audio.Sfx.Play("jump", transform.position, 0.6f); };
                 Motor.OnSlide += HandleSlide;
+                Motor.OnDrop += HandleDrop;
+                Motor.OnTraversal += HandleTraversal;
                 Motor.OnFallDamage += pDamage => FallDamageRpc(pDamage);
                 Motor.OnSplash += pSpeed => SplashRpc(transform.position + Vector3.up * 0.9f, Mathf.Clamp01(pSpeed / 8f) + 0.5f);
             }
@@ -160,6 +164,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 InGrass.Value = Motor.InGrass;
                 Hidden.Value = Motor.Mode == MotorMode.Hidden;
                 Submerged.Value = Motor.Underwater;
+                if (Motion.Value != Motor.State) Motion.Value = Motor.State;
                 CameraRig.Instance?.SetUnderwater(Motor.Underwater);
                 if (Mathf.Abs(Pitch.Value - _pitch) > 1f) Pitch.Value = _pitch;
                 Motor.SpeedMultiplier = CarriesProof.Value ? 0.92f : 1f;
@@ -205,7 +210,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             }
             else
             {
-                lEye = transform.position + Vector3.up * (Motor.EyeHeight + _landDip) + transform.rotation * lBob;
+                lEye = transform.position + Vector3.up * (Motor.EyeHeight + _landDip + Motor.StepSmoothing) + transform.rotation * lBob;
                 lRotation = Quaternion.Euler(_pitch, _yaw, _tilt + _slideTilt);
             }
             CameraRig.Instance.SetPose(lEye, lRotation);
@@ -228,6 +233,28 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 Juice.Shake(lImpact * 0.35f);
                 Audio.Sfx.Play("land", transform.position, 0.4f + lImpact);
             }
+        }
+
+        /// <summary>A landing from a real drop is heard (DetectionModel.LandingRadius): the host spreads it.</summary>
+        private void HandleDrop(float pDrop)
+        {
+            if (AI.DetectionModel.LandingRadius(pDrop, false) > 0f) LandNoiseRpc(transform.position, pDrop, Motor.Crouched);
+        }
+
+
+        [Rpc(SendTo.Server)]
+        private void LandNoiseRpc(Vector3 pPoint, float pDrop, bool pCrouched)
+        {
+            if (Vector3.Distance(pPoint, transform.position) > 4f) pPoint = transform.position;
+            float lRadius = AI.DetectionModel.LandingRadius(Mathf.Min(pDrop, 12f), pCrouched);
+            if (lRadius > 0f) AI.NoiseSystem.Emit(pPoint, lRadius, AI.NoiseKind.Footstep, OwnerClientId);
+        }
+
+        private void HandleTraversal(MotionState pState)
+        {
+            Audio.Sfx.Play(pState == MotionState.Vault ? "vault" : "mantle", transform.position, 0.55f, 10f);
+            Juice.Shake(0.04f);
+            if (pState == MotionState.Hang) _landDipVel -= 0.8f;
         }
 
         private void HandleSlide(float pSide)

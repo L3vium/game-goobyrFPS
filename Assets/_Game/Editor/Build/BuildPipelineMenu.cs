@@ -28,7 +28,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             PbrLibrary.Build();
             new MapSanLazaro().Build();
             new MapQasrAlRimal().Build();
-            new MapSuburb().Build();
+            new MapWeisshorn().Build();
             Title();
             Icon();
             Debug.Log("[Build] all done");

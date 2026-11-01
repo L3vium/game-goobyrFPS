@@ -134,7 +134,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             EditorGUILayout.LabelField("Rebuild", EditorStyles.boldLabel);
             if (GUILayout.Button("San Lázaro (jungle)")) new MapSanLazaro().Build();
             if (GUILayout.Button("Qasr al-Rimal (desert)")) new MapQasrAlRimal().Build();
-            if (GUILayout.Button("Elmridge (suburb)")) new MapSuburb().Build();
+            if (GUILayout.Button("Weisshorn (snow)")) new MapWeisshorn().Build();
             if (GUILayout.Button("Everything (data, art, prefabs, sounds, maps, title)")) BuildPipelineMenu.All();
             EditorGUILayout.Space();
             if (GUILayout.Button("Validate all maps", GUILayout.Height(30))) _report = MapValidator.ValidateAll();

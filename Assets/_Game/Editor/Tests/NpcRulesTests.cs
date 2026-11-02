@@ -207,6 +207,8 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
             Assert.IsTrue(NpcRules.Reports(true, 20f), "a witness with a guard close by tells it");
             Assert.IsFalse(NpcRules.Reports(true, NpcRules.REPORT_RANGE + 10f), "no guard near: it runs");
             Assert.IsFalse(NpcRules.Reports(false, 5f), "a shot only heard is not something to report");
+            Assert.IsTrue(NpcRules.ReporterNeeded(0));
+            Assert.IsFalse(NpcRules.ReporterNeeded(NpcRules.MAX_REPORTERS), "one or two go and tell, the rest run");
         }
 
         [Test]

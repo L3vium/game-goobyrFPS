@@ -183,7 +183,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (!IsCrowd || !Health.IsAlive || State.Value == NpcState.Report || State.Value == NpcState.KnockedOut) return;
             _threatPlayer = pCulprit;
             Npc lGuard = NearestGuard();
-            if (!NpcRules.Reports(true, lGuard != null ? Vector3.Distance(lGuard.transform.position, transform.position) : float.MaxValue))
+            // One or two witnesses go to tell; the rest of the crowd just runs.
+            if (!NpcRules.Reports(true, lGuard != null ? Vector3.Distance(lGuard.transform.position, transform.position) : float.MaxValue) || !NpcRules.ReporterNeeded(ReportersNear(pWhere)))
             {
                 FleeFrom(pWhere);
                 return;
@@ -201,6 +202,15 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             SetState(NpcState.Report);
             Bark(Barks.Scream);
             WitnessRunsRpc();
+        }
+
+        /// <summary>Witnesses already running to tell a guard about something near <paramref name="pWhere"/>.</summary>
+        private static int ReportersNear(Vector3 pWhere)
+        {
+            int lCount = 0;
+            foreach (Npc lOther in All)
+                if (lOther != null && lOther.State.Value == NpcState.Report && (lOther._reportPoint - pWhere).sqrMagnitude < 30f * 30f) lCount++;
+            return lCount;
         }
 
         /// <summary>The nearest armed guard free to listen (alive, conscious, not fighting), within report range.</summary>

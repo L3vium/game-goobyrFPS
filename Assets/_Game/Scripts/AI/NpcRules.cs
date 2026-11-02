@@ -144,6 +144,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// </summary>
         public static bool Reports(bool pSawIt, float pGuardDistance) => pSawIt && pGuardDistance <= REPORT_RANGE;
 
+        /// <summary>At most this many witnesses run to tell about one incident; the rest of the crowd flees.</summary>
+        public const int MAX_REPORTERS = 2;
+
+        /// <summary>Is another witness needed, with <paramref name="pReporting"/> already on their way?</summary>
+        public static bool ReporterNeeded(int pReporting) => pReporting < MAX_REPORTERS;
+
         // ---------------------------------------------------------------- barks
 
         /// <summary>The voices of the gibberish barks (<c>bark_&lt;voice&gt;_&lt;kind&gt;</c>): guards speak low or mid, the crowd any of them.</summary>

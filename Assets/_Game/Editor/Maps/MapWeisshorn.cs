@@ -61,6 +61,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return h;
         }
 
+        protected override ArchMat CliffMaterial => ArchLib.Surface("rock_face", 8f);
+
         protected override float Woods(float x, float z, float h)
         {
             if (h < 0.5f) return 0f;

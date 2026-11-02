@@ -40,6 +40,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         private readonly Dictionary<string, Batch> _batches = new Dictionary<string, Batch>();
+        private int _skipped;
+
+        /// <summary>Most vertices one saved mesh may hold (a runaway generator stops here instead of eating the editor).</summary>
+        public const int MAX_VERTICES = 1200000;
+
+        /// <summary>A point that must never reach a mesh: NaN, infinite, or absurdly far.</summary>
+        private static bool Bad(Vector3 p) => float.IsNaN(p.x) || float.IsNaN(p.y) || float.IsNaN(p.z) || Mathf.Abs(p.x) > 20000f || Mathf.Abs(p.y) > 20000f || Mathf.Abs(p.z) > 20000f;
 
         /// <summary>Applied to every point added (the frame of a stair flight, a rotated wing...).</summary>
         public Matrix4x4 Frame = Matrix4x4.identity;
@@ -76,10 +83,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             if (pMat == null) return;
             a = Frame.MultiplyPoint3x4(a); b = Frame.MultiplyPoint3x4(b); c = Frame.MultiplyPoint3x4(c); d = Frame.MultiplyPoint3x4(d);
+            if (Bad(a) || Bad(b) || Bad(c) || Bad(d)) { _skipped++; return; }
             Vector3 lNormal = Vector3.Cross(c - a, b - a);
             if (lNormal.sqrMagnitude < 1e-10f) lNormal = Vector3.Cross(d - a, c - a);
             lNormal.Normalize();
             Batch lBatch = Get(pMat, pSolid);
+            if (lBatch.v.Count >= MAX_VERTICES) { _skipped++; return; }
             int s = lBatch.v.Count;
             lBatch.v.Add(a); lBatch.v.Add(b); lBatch.v.Add(c); lBatch.v.Add(d);
             for (int i = 0; i < 4; i++) lBatch.n.Add(lNormal);
@@ -94,10 +103,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             if (pMat == null) return;
             a = Frame.MultiplyPoint3x4(a); b = Frame.MultiplyPoint3x4(b); c = Frame.MultiplyPoint3x4(c); d = Frame.MultiplyPoint3x4(d);
+            if (Bad(a) || Bad(b) || Bad(c) || Bad(d)) { _skipped++; return; }
             Vector3 lNormal = Vector3.Cross(c - a, b - a);
             if (lNormal.sqrMagnitude < 1e-10f) lNormal = Vector3.Cross(d - a, c - a);
             lNormal.Normalize();
             Batch lBatch = Get(pMat, pSolid);
+            if (lBatch.v.Count >= MAX_VERTICES) { _skipped++; return; }
             int s = lBatch.v.Count;
             lBatch.v.Add(a); lBatch.v.Add(b); lBatch.v.Add(c); lBatch.v.Add(d);
             for (int i = 0; i < 4; i++) lBatch.n.Add(lNormal);
@@ -118,6 +129,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             if (pMat == null) return;
             a = Frame.MultiplyPoint3x4(a); b = Frame.MultiplyPoint3x4(b); c = Frame.MultiplyPoint3x4(c);
+            if (Bad(a) || Bad(b) || Bad(c)) { _skipped++; return; }
             Vector3 lNormal = Vector3.Cross(c - a, b - a).normalized;
             Batch lBatch = Get(pMat, pSolid);
             int s = lBatch.v.Count;
@@ -156,8 +168,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             if (pMat == null) return;
             a = Frame.MultiplyPoint3x4(a); b = Frame.MultiplyPoint3x4(b); c = Frame.MultiplyPoint3x4(c); d = Frame.MultiplyPoint3x4(d);
+            if (Bad(a) || Bad(b) || Bad(c) || Bad(d)) { _skipped++; return; }
             na = Frame.MultiplyVector(na).normalized; nb = Frame.MultiplyVector(nb).normalized; nc = Frame.MultiplyVector(nc).normalized; nd = Frame.MultiplyVector(nd).normalized;
             Batch lBatch = Get(pMat, pSolid);
+            if (lBatch.v.Count >= MAX_VERTICES) { _skipped++; return; }
             int s = lBatch.v.Count;
             lBatch.v.Add(a); lBatch.v.Add(b); lBatch.v.Add(c); lBatch.v.Add(d);
             lBatch.n.Add(na); lBatch.n.Add(nb); lBatch.n.Add(nc); lBatch.n.Add(nd);
@@ -223,6 +237,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public List<GameObject> Flush(Transform pParent, string pName, int pLayer = 0, bool pShadows = true)
         {
             List<GameObject> lObjects = new List<GameObject>();
+            if (_skipped > 0) Debug.LogWarning($"[Arch] {pName}: {_skipped} faces skipped (NaN, out of range or over {MAX_VERTICES} vertices)");
+            _skipped = 0;
             foreach (Batch lBatch in _batches.Values)
             {
                 if (lBatch.t.Count == 0) continue;

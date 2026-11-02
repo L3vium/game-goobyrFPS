@@ -68,6 +68,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             if (!pBuilding.spec.furnish || pBuilding.spec.shut) return;
             System.Random lRandom = new System.Random(pBuilding.spec.name.GetHashCode());
+            foreach ((int f, Rect r) in pBuilding.spec.reserved) pBuilding.used.Add((f, r));
             foreach (ArchRoom lRoom in pBuilding.spec.rooms)
                 if (!lRoom.noFurniture && !lRoom.open) Room(pKit, pBuilding, lRoom, pZone, lRandom);
         }
@@ -152,11 +153,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     if (W > 4.5f && D > 4.5f)
                     {
                         At(pKit, b, pRoom, "Furn_Rug", c, lWide ? 0f : 90f, false);
-                        At(pKit, b, pRoom, "Furn_CoffeeTable", c, lWide ? 0f : 90f);
+                        bool lTable = At(pKit, b, pRoom, "Furn_CoffeeTable", c, lWide ? 0f : 90f);
                         At(pKit, b, pRoom, "Furn_Sofa", c + (lWide ? new Vector2(0, -1.3f) : new Vector2(-1.3f, 0)), lWide ? 0f : 90f);
                         At(pKit, b, pRoom, "Furn_Armchair", c + (lWide ? new Vector2(-1.6f, 0.6f) : new Vector2(0.6f, -1.6f)), lWide ? 120f : 210f);
                         At(pKit, b, pRoom, "Furn_Armchair", c + (lWide ? new Vector2(1.6f, 0.6f) : new Vector2(0.6f, 1.6f)), lWide ? 240f : -30f);
-                        pKit.Drinks(b.At(c.x, pRoom.floor, c.y, 0.4f), b.Yaw(0f), pZone, 2, true, 1.2f);
+                        if (lTable) pKit.Drinks(b.At(c.x, pRoom.floor, c.y, 0.4f), b.Yaw(0f), pZone, 2, true, 1.2f);
                     }
                     break;
                 case RoomType.Dining: case RoomType.Mess:
@@ -197,11 +198,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     {
                         Vector2 g = c + (lWide ? new Vector2(W * 0.18f, 0) : new Vector2(0, D * 0.18f));
                         At(pKit, b, pRoom, "Furn_Rug", g, lWide ? 0f : 90f, false);
-                        At(pKit, b, pRoom, "Furn_CoffeeTable", g, lWide ? 0f : 90f);
+                        bool lTable = At(pKit, b, pRoom, "Furn_CoffeeTable", g, lWide ? 0f : 90f);
                         At(pKit, b, pRoom, "Furn_Sofa", g + (lWide ? new Vector2(0, -1.4f) : new Vector2(-1.4f, 0)), lWide ? 0f : 90f);
                         At(pKit, b, pRoom, "Furn_Sofa", g + (lWide ? new Vector2(0, 1.4f) : new Vector2(1.4f, 0)), lWide ? 180f : -90f);
                         At(pKit, b, pRoom, "Furn_Armchair", g + (lWide ? new Vector2(1.7f, 0) : new Vector2(0, 1.7f)), lWide ? -90f : 180f);
-                        pKit.Drinks(b.At(g.x, pRoom.floor, g.y, 0.42f), b.Yaw(0f), pZone, 2, true, 1.3f);
+                        if (lTable) pKit.Drinks(b.At(g.x, pRoom.floor, g.y, 0.42f), b.Yaw(0f), pZone, 2, true, 1.3f);
                     }
                     if (pRoom.type == RoomType.Lobby || W * D > 120f)
                     {
@@ -239,7 +240,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     if (At(pKit, b, pRoom, "Furn_Desk", c, lWide ? 180f : 90f))
                     {
                         At(pKit, b, pRoom, "Furn_OfficeChair", c + (lWide ? new Vector2(0, 0.85f) : new Vector2(0.85f, 0)), lWide ? 180f : -90f, false);
-                        pKit.Distraction("phone", b.At(c.x + 0.6f, pRoom.floor, c.y, 0.79f), b.Yaw(0f));
+                        pKit.Distraction("phone", b.At(c.x + (lWide ? 0.6f : 0f), pRoom.floor, c.y + (lWide ? 0f : 0.6f), 0.79f), b.Yaw(0f));
+                        // The office PC (a distraction: hacked, it flashes an alarm the nearest guard comes to clear).
+                        Vector2 lPc = c + (lWide ? new Vector2(-0.35f, -0.12f) : new Vector2(-0.12f, -0.35f));
+                        pKit.Distraction("computer", b.At(lPc.x, pRoom.floor, lPc.y, 0.79f), b.Yaw(lWide ? 0f : 90f));
                         if (pRoom.type == RoomType.Study) At(pKit, b, pRoom, "Furn_Rug", c, lWide ? 0f : 90f, false);
                     }
                     break;
@@ -253,6 +257,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 case RoomType.Security:
                     if (At(pKit, b, pRoom, "Furn_Desk", c, 0f))
                     {
+                        pKit.Distraction("computer", b.At(c.x, pRoom.floor, c.y - 0.25f, 0.79f), b.Yaw(180f));
                         At(pKit, b, pRoom, "Furn_OfficeChair", c + new Vector2(0, -0.85f), 0f, false);
                         pKit.Model("Furn_TV", b.At(c.x - 0.5f, pRoom.floor, c.y + 0.15f, 0.79f), b.Yaw(180f), b.interior, ArchLib.Collide.None, 0.6f);
                         pKit.Model("Furn_TV", b.At(c.x + 0.5f, pRoom.floor, c.y + 0.15f, 0.79f), b.Yaw(180f), b.interior, ArchLib.Collide.None, 0.6f);
@@ -320,6 +325,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     break;
                 }
             }
+            // A pedestal fan in kitchens, guard rooms, messes and big offices (a distraction a guard walks over to switch off).
+            if (pRoom.type == RoomType.Kitchen || pRoom.type == RoomType.GuardRoom || pRoom.type == RoomType.Mess || pRoom.type == RoomType.Barracks || (pRoom.type == RoomType.Office && W * D > 40f))
+                AgainstWall(pKit, b, pRoom, "Furn_PottedPlant", false, r, (k, p, y) => k.Distraction("fan", p, y));
             // Line the walls: the room's pieces, again and again until the perimeter is dressed.
             Item[] lItems = WallItems(pRoom.type);
             int lWanted = Mathf.Min(16, Mathf.RoundToInt((W + D) * 2f / 2.6f)), lMisses = 0, lPlaced = 0;

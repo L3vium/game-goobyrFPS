@@ -190,14 +190,42 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (lInside < 3) lFails.Add($"{lInside} inside starts with a pass (< 3)");
             if (lExtractions < 3) lFails.Add($"{lExtractions} extractions (< 3)");
             if (lWeapons < 30) lFails.Add($"{lWeapons} weapon spawns (< 30)");
-            if (lThrowables < 80) lFails.Add($"{lThrowables} throwables (< 80)");
+            if (lThrowables < 150) lFails.Add($"{lThrowables} throwables (< 150)");
             if (lRockets < 3) lFails.Add($"{lRockets} rocket launcher spots (< 3)");
             if (lFlames < 3) lFails.Add($"{lFlames} flamethrower spots (< 3)");
             if (lZones != 3) lFails.Add($"{lZones} zones (!= 3)");
             if (lNpcs < 100) lFails.Add($"{lNpcs} NPCs (< 100)");
             if (lVents < 2) lFails.Add($"{lVents} vent grilles (< 2)");
             if (lClimbs < 6) lFails.Add($"{lClimbs} climbable drainpipes/ladders/vines (< 6)");
-            if (lCameras < 3 || lRecorders < 1) lFails.Add($"{lCameras} cameras, {lRecorders} recorders (need 3+ and 1)");
+            if (lCameras < 8 || lRecorders < 1) lFails.Add($"{lCameras} cameras, {lRecorders} recorders (need 8+ and 1)");
+            // Sentry guns: 3+, each driven by a terminal and reached by its cable; none covering a start.
+            Systems.AutoTurret[] lTurrets = Object.FindObjectsByType<Systems.AutoTurret>(FindObjectsSortMode.None);
+            Systems.TurretTerminal[] lTerminals = Object.FindObjectsByType<Systems.TurretTerminal>(FindObjectsSortMode.None);
+            Systems.TurretCable[] lCables = Object.FindObjectsByType<Systems.TurretCable>(FindObjectsSortMode.None);
+            if (lTurrets.Length < 3) lFails.Add($"{lTurrets.Length} sentry guns (< 3)");
+            foreach (Systems.AutoTurret lTurret in lTurrets)
+            {
+                bool lTerminal = System.Linq.Enumerable.Any(lTerminals, t => t.Turrets != null && System.Array.IndexOf(t.Turrets, lTurret) >= 0);
+                bool lCable = System.Linq.Enumerable.Any(lCables, c => c.Turret == lTurret);
+                if (!lTerminal || !lCable) lFails.Add($"sentry gun at {lTurret.transform.position:F0} has {(lTerminal ? "" : "no terminal ")}{(lCable ? "" : "no cable")}");
+                foreach (MatchPoint lPoint in lPoints)
+                {
+                    if (lPoint.PointKind != MatchPoint.Kind.Start && lPoint.PointKind != MatchPoint.Kind.Extraction) continue;
+                    Vector3 lTo = lPoint.transform.position + Vector3.up - (lTurret.transform.position + Vector3.up);
+                    if (lTo.magnitude > 24f || Vector3.Angle(new Vector3(lTo.x, 0f, lTo.z), lTurret.transform.forward) > 80f) continue;
+                    if (!Physics.Linecast(lTurret.transform.position + Vector3.up * 1.3f + lTurret.transform.forward * 0.6f, lPoint.transform.position + Vector3.up, ~0, QueryTriggerInteraction.Ignore))
+                        lFails.Add($"sentry gun at {lTurret.transform.position:F0} covers {lPoint.PointKind} {lPoint.name}");
+                }
+            }
+            // The new distractions: pedestal fans, garden hoses, office PCs.
+            int lFans = 0, lHoses = 0, lPcs = 0;
+            foreach (Systems.Distraction lDistraction in Object.FindObjectsByType<Systems.Distraction>(FindObjectsSortMode.None))
+            {
+                if (lDistraction.name == "Fan") lFans++;
+                else if (lDistraction.name == "HoseReel") lHoses++;
+                else if (lDistraction.name == "Computer") lPcs++;
+            }
+            if (lFans < 4 || lHoses < 3 || lPcs < 4) lFails.Add($"{lFans} fans, {lHoses} hoses, {lPcs} computers (need 4, 3, 4)");
             if (System.Linq.Enumerable.Count(lPois, p => p.Type == UI.MapPoi.Kind.Landmark) < 3) lFails.Add("fewer than 3 landmark POIs");
             if (pMap.targets.Count != 15) lFails.Add($"{pMap.targets.Count} targets (!= 15)");
             foreach (TargetProfile lTarget in pMap.targets)
@@ -282,7 +310,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             string lScene = EditorAssets.SCENES + "/" + pMap.sceneName + ".unity";
             float lMegabytes = System.IO.File.Exists(lScene) ? new System.IO.FileInfo(lScene).Length / (1024f * 1024f) : 0f;
             if (lMegabytes > 90f) lFails.Add($"scene {lMegabytes:0} MB (> 90)");
-            string lCounts = $"{lStarts} starts ({lInside} inside), {lExtractions} extractions, {lWeapons} weapons, {lThrowables} throwables, {lNpcs} NPCs, {lVents} vents, {lClimbs} climbs, {lSecure} secure doors, {lCameras} cameras, {lCovers} covers, {lMegabytes:0} MB";
+            string lCounts = $"{lStarts} starts ({lInside} inside), {lExtractions} extractions, {lWeapons} weapons, {lThrowables} throwables, {lNpcs} NPCs, {lVents} vents, {lClimbs} climbs, {lSecure} secure doors, {lCameras} cameras, {lTurrets.Length} sentry guns, {lTerminals.Length} terminals, {lFans} fans, {lHoses} hoses, {lPcs} PCs, {lCovers} covers, {lMegabytes:0} MB";
             return lFails.Count == 0 ? $"OK   {pMap.displayName}: {lCounts}" : $"FAIL {pMap.displayName}: {string.Join("; ", lFails)}  ({lCounts})";
         }
     }

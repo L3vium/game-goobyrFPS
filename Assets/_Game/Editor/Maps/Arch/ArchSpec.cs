@@ -192,6 +192,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public readonly List<ArchBalcony> balconies = new List<ArchBalcony>();
         public readonly List<ArchDrain> drains = new List<ArchDrain>();
         public readonly List<ArchHatch> hatches = new List<ArchHatch>();
+        /// <summary>Floor spots the furnisher leaves free (turret pads, a terminal's desk): floor and local rectangle.</summary>
+        public readonly List<(int floor, Rect rect)> reserved = new List<(int, Rect)>();
         /// <summary>A continuous string-course ledge (0.3 m deep, hangable) at every upper floor line.</summary>
         public bool stringCourses = true;
         /// <summary>Extra holes in a floor slab (chutes, hatches): floor and rectangle.</summary>

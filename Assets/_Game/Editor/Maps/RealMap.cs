@@ -91,10 +91,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lOutside.transform.SetParent(K.Markers, false);
             lOutside.AddComponent<SecurityOutside>().Setup(OutsideTier);
             Dress();
+            TopUpThrowables(160);
             K.LandHoles(HoleAt);
             PlantTallGrass();
             Details();
             Vegetate();
+            CliffSkin();
             Edges();
             K.CoverSpacing = 1.8f;
             K.DistanceCulling();
@@ -318,7 +320,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         if (lSlope < 52f && lRandom.NextDouble() < 0.05) K.LandTree(lRandom.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A", px, pz, 1.5f + (float)lRandom.NextDouble() * 2f);
                         // Cliff walls: big boulders half sunk into the face give a broken, layered silhouette
                         // and hide the terrain texture stretched down the steep slope.
-                        else if (lSlope >= 52f && lRandom.NextDouble() < 0.2) K.LandTree(CliffRock(lRandom), px, pz, 4f + (float)lRandom.NextDouble() * 6f);
+                        else if (lSlope >= 52f && lRandom.NextDouble() < 0.2) CliffBoulder(CliffRock(lRandom), px, pz, 4f + (float)lRandom.NextDouble() * 6f, lRandom);
                         continue;
                     }
                     float lWoods = Woods(px, pz, h);
@@ -328,6 +330,152 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     if (!string.IsNullOrEmpty(lPiece)) K.LandTree(lPiece, px, pz, lScale);
                 }
         }
+
+        // ---------------------------------------------------------------- security: turrets, terminals, cables
+
+        /// <summary>World points of a cable run laid in a building: each (x, floor, z, height over that floor), building-local.</summary>
+        protected static Vector3[] Route(ArchResult b, params Vector4[] pPoints)
+        {
+            Vector3[] lWorld = new Vector3[pPoints.Length];
+            for (int i = 0; i < pPoints.Length; i++) lWorld[i] = b.At(pPoints[i].x, Mathf.RoundToInt(pPoints[i].y), pPoints[i].z, pPoints[i].w);
+            return lWorld;
+        }
+
+        /// <summary>Points along the ground (5 cm up) from one point to another, every metre or so: a cable laid on the land.</summary>
+        protected Vector3[] GroundRun(Vector3 pFrom, Vector3 pTo, float pStep = 1.2f)
+        {
+            int lCount = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(new Vector2(pFrom.x, pFrom.z), new Vector2(pTo.x, pTo.z)) / pStep));
+            Vector3[] lPoints = new Vector3[lCount + 1];
+            for (int i = 0; i <= lCount; i++)
+            {
+                Vector3 p = Vector3.Lerp(pFrom, pTo, (float)i / lCount);
+                lPoints[i] = new Vector3(p.x, K.GroundAt(p.x, p.z) + 0.05f, p.z);
+            }
+            return lPoints;
+        }
+
+        protected static Vector3[] Join(params Vector3[][] pParts)
+        {
+            List<Vector3> lAll = new List<Vector3>();
+            foreach (Vector3[] lPart in pParts)
+                foreach (Vector3 p in lPart)
+                    if (lAll.Count == 0 || (lAll[lAll.Count - 1] - p).sqrMagnitude > 0.0001f) lAll.Add(p);
+            return lAll.ToArray();
+        }
+
+        /// <summary>
+        /// A turret's hidden control PC on a plain desk (front +z local, against a wall), at building-local
+        /// (x, floor, z) and local yaw; logs how far it is from each turret (the design wants 15 to 40 m).
+        /// </summary>
+        protected Systems.TurretTerminal TerminalDesk(ArchResult b, float pX, int pFloor, float pZ, float pYaw, params Systems.AutoTurret[] pTurrets)
+        {
+            A.Model("Furn_Desk", b.At(pX, pFloor, pZ, 0f), b.Yaw(pYaw), b.interior);
+            A.Model("Furn_OfficeChair", b.At(pX, pFloor, pZ, 0f) + b.Rotation * (Quaternion.Euler(0, pYaw, 0) * new Vector3(0.2f, 0f, 0.95f)), b.Yaw(pYaw + 180f), b.interior, ArchLib.Collide.None);
+            Systems.TurretTerminal lTerminal = A.Terminal(b.At(pX, pFloor, pZ, 0.79f), b.Yaw(pYaw), pTurrets);
+            foreach (Systems.AutoTurret t in pTurrets)
+            {
+                float d = Vector3.Distance(t.transform.position, lTerminal.transform.position);
+                if (d < 15f || d > 40f) Debug.LogWarning($"[Build] {K.Map.sceneName}: terminal {d:F1} m from its turret at {t.transform.position}");
+            }
+            return lTerminal;
+        }
+
+        /// <summary>
+        /// Tops the throwables up to <paramref name="pTarget"/>: bottles, bricks, rocks, wrenches and coins
+        /// dropped 2 to 3.5 m beside NPC posts and patrol stops (on a floor or the land, never inside a wall).
+        /// </summary>
+        private void TopUpThrowables(int pTarget)
+        {
+            Physics.SyncTransforms();
+            int lCount = 0;
+            foreach (MatchPoint p in K.Markers.GetComponentsInChildren<MatchPoint>())
+                if (p.PointKind == MatchPoint.Kind.GadgetSpawn && (p.Item == Data.ItemKind.Rock || p.Item == Data.ItemKind.Bottle || p.Item == Data.ItemKind.Wrench || p.Item == Data.ItemKind.Brick || p.Item == Data.ItemKind.Coin)) lCount++;
+            if (lCount >= pTarget) return;
+            List<Vector3> lPosts = new List<Vector3>();
+            foreach (NpcSpawnPoint s in K.Markers.GetComponentsInChildren<NpcSpawnPoint>()) lPosts.Add(s.transform.position);
+            foreach (PatrolRoute r in K.Markers.GetComponentsInChildren<PatrolRoute>()) foreach (Transform t in r.transform) lPosts.Add(t.position);
+            if (lPosts.Count == 0) return;
+            System.Random lRandom = new System.Random(K.Map.sceneName.GetHashCode() ^ 0x7b1);
+            int lAdded = 0;
+            for (int k = 0; k < lPosts.Count * 6 && lCount < pTarget; k++)
+            {
+                Vector3 lPost = lPosts[(k * 7) % lPosts.Count];
+                float a = (float)lRandom.NextDouble() * Mathf.PI * 2f, d = 2f + (float)lRandom.NextDouble() * 1.5f;
+                Vector3 p = lPost + new Vector3(Mathf.Cos(a) * d, 1.2f, Mathf.Sin(a) * d);
+                if (Physics.Linecast(lPost + Vector3.up * 1.2f, p, ~0, QueryTriggerInteraction.Ignore)) continue;
+                if (!Physics.Raycast(p, Vector3.down, out RaycastHit lHit, 3f, ~0, QueryTriggerInteraction.Ignore) || lHit.normal.y < 0.85f) continue;
+                Vector3 lSpot = lHit.point + Vector3.up * 0.05f;
+                if (Physics.CheckSphere(lSpot + Vector3.up * 0.4f, 0.3f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                A.Throwable(lSpot);
+                lCount++;
+                lAdded++;
+            }
+            Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} throwables added beside posts ({lCount} in all)");
+        }
+
+        /// <summary>The rock texture of the cliff skin (box-projected, so it never stretches down a wall).</summary>
+        protected virtual ArchMat CliffMaterial => ArchLib.Surface("cliff_side", 7f);
+
+        /// <summary>
+        /// Terrain textures are projected from above, so on a cliff they streak straight down. The
+        /// steep cells (over 46°) get a thin rock skin a few centimetres over the land instead: a mesh
+        /// following the ground with the land's own normals and UVs projected on the axis each face
+        /// looks along (a triplanar-style mapping), in 64 m chunks, no collider (the land collides).
+        /// </summary>
+        private void CliffSkin()
+        {
+            Terrain lLand = K.Land;
+            if (lLand == null) return;
+            ArchMat lRock = CliffMaterial;
+            const float STEP = 2f, CHUNK = 64f;
+            float lTile = 1f / Mathf.Max(0.05f, lRock.tile);
+            Transform lRoot = K.Group("CliffSkin", K.Env);
+            Vector3 lOrigin = lLand.transform.position;
+            Vector3 Normal(float x, float z) => lLand.terrainData.GetInterpolatedNormal((x - lOrigin.x) / lLand.terrainData.size.x, (z - lOrigin.z) / lLand.terrainData.size.z);
+            Vector3 Point(float x, float z) => new Vector3(x, K.GroundAt(x, z), z) + Normal(x, z) * 0.07f;
+            int lQuads = 0;
+            for (float cx = -HALF; cx < HALF; cx += CHUNK)
+                for (float cz = -HALF; cz < HALF; cz += CHUNK)
+                {
+                    ArchMesh lMesh = new ArchMesh();
+                    bool lAny = false;
+                    for (float x = cx; x < cx + CHUNK - 0.01f; x += STEP)
+                        for (float z = cz; z < cz + CHUNK - 0.01f; z += STEP)
+                        {
+                            float lSlope = Mathf.Max(K.LandSlope(x + STEP * 0.5f, z + STEP * 0.5f), Mathf.Max(K.LandSlope(x, z), K.LandSlope(x + STEP, z + STEP)));
+                            if (lSlope < 46f) continue;
+                            if (HoleAt(x + STEP * 0.5f, z + STEP * 0.5f) || HoleAt(x, z) || HoleAt(x + STEP, z + STEP)) continue;
+                            if (Built(x + STEP * 0.5f, z + STEP * 0.5f)) continue;
+                            Vector3 a = Point(x, z), b = Point(x + STEP, z), c = Point(x + STEP, z + STEP), d = Point(x, z + STEP);
+                            Vector3 lFace = Vector3.Cross(d - a, b - a).normalized;
+                            Vector3 lAbs = new Vector3(Mathf.Abs(lFace.x), Mathf.Abs(lFace.y), Mathf.Abs(lFace.z));
+                            Vector2 U(Vector3 p) => (lAbs.y >= lAbs.x && lAbs.y >= lAbs.z ? new Vector2(p.x, p.z) : lAbs.x >= lAbs.z ? new Vector2(lFace.x > 0 ? -p.z : p.z, p.y) : new Vector2(lFace.z > 0 ? p.x : -p.x, p.y));
+                            lMesh.QuadSmooth(lRock, a, b, c, d, Normal(x, z), Normal(x + STEP, z), Normal(x + STEP, z + STEP), Normal(x, z + STEP), U(a), U(b), U(c), U(d), false);
+                            lAny = true;
+                            lQuads++;
+                        }
+                    if (lAny) lMesh.Flush(lRoot, K.Map.sceneName + "_CliffSkin_" + (int)cx + "_" + (int)cz, 0, true);
+                }
+            _ = lTile;
+            Debug.Log($"[Build] {K.Map.sceneName}: cliff skin {lQuads} quads");
+        }
+
+        /// <summary>
+        /// A big boulder half sunk into a cliff face, as a scene object rather than a terrain tree (huge
+        /// terrain-tree colliders upset the physics queries of the plan baker), tilted at random.
+        /// </summary>
+        private void CliffBoulder(string pName, float pX, float pZ, float pScale, System.Random pRandom)
+        {
+            GameObject lPrefab = VegLibrary.TreePrefab(pName);
+            if (lPrefab == null) return;
+            if (_cliffRocks == null) _cliffRocks = K.Group("CliffRocks", K.Env);
+            GameObject lRock = (GameObject)UnityEditor.PrefabUtility.InstantiatePrefab(lPrefab, _cliffRocks);
+            lRock.transform.SetPositionAndRotation(new Vector3(pX, K.GroundAt(pX, pZ) - pScale * 0.35f, pZ), Quaternion.Euler((float)pRandom.NextDouble() * 30f - 15f, (float)pRandom.NextDouble() * 360f, (float)pRandom.NextDouble() * 30f - 15f));
+            lRock.transform.localScale = Vector3.one * pScale;
+            foreach (Transform t in lRock.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = true;
+        }
+
+        private Transform _cliffRocks;
 
         private void Edges()
         {

@@ -87,6 +87,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>Sightlines kept open through the canopy: plaza and dock to the mirador.</summary>
         private static readonly Vector2[] VIEW_PLAZA = { new Vector2(-5f, -150f), new Vector2(123f, 124f) }, VIEW_DOCK = { new Vector2(-30f, -200f), new Vector2(123f, 124f) };
 
+        protected override ArchMat CliffMaterial => ArchLib.Tinted("rock_face", new Color(0.55f, 0.55f, 0.58f), "basalt", 7f);
+
         protected override float Woods(float x, float z, float h)
         {
             if (h < WATER_Y + 1f) return 0f;

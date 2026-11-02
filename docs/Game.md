@@ -50,7 +50,10 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   Cliff faces (over 52°) carry big boulders sunk into them so walls read broken, not stretched;
   bare rock starts at a per-map slope (snow maps keep snow higher). Tunnels get timber-framed,
   lantern-lit mouths with boulders where they reach the open; rivers and falls use a faster,
-  choppier copy of the water material.
+  choppier copy of the water material. Snow maps get falling snow (`FX/SnowFall`, fading indoors)
+  and sparkling snow (`FX/SnowGlints` + `Goobyr/SnowGlint`): ice crystals scattered on snow
+  terrain and snowy meshes in 6 m tiles around the camera, each a tiny star that flashes when its
+  facet mirrors the sun into the eye.
 - **Buildings** (`ArchSpec` → `ArchBuilder`): rooms on a 0.5 m grid per floor; walls found on the
   room boundaries (two-leaf facades: plaster outside, painted plaster inside; partitions; arcades
   with columns and arches; parapets; balustrades over voids); doors with casings and open leaves,

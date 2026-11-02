@@ -56,9 +56,21 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 VolumeProfileFor(lMap);
             }
 
-            foreach (Material lMaterial in new[] { lToon, lTransparent, lWater, lGlow, lAdd, lAlpha }) EditorUtility.SetDirty(lMaterial);
+            Material lGlint = SnowGlintMaterial();
+
+            foreach (Material lMaterial in new[] { lToon, lTransparent, lWater, lGlow, lAdd, lAlpha, lGlint }) EditorUtility.SetDirty(lMaterial);
             AssetDatabase.SaveAssets();
             Debug.Log("[Build] materials");
+        }
+
+        /// <summary>The ice-crystal sparkle drawn on snow by <c>FX/SnowGlints</c> (loaded from Resources at runtime).</summary>
+        public static Material SnowGlintMaterial()
+        {
+            Material lGlint = EditorAssets.Material(EditorAssets.ART_RESOURCES + "/M_SnowGlint.mat", Shader.Find("Goobyr/SnowGlint"));
+            lGlint.shader = Shader.Find("Goobyr/SnowGlint");
+            lGlint.enableInstancing = true;
+            EditorUtility.SetDirty(lGlint);
+            return lGlint;
         }
 
         /// <summary>The map's post stack: atmosphere (volumetric fog), white balance, grading, bloom, vignette.</summary>

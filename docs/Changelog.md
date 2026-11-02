@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Fresh snow sparkles: ice crystals glint in the sun and twinkle as you move.
 - New distractions you switch on: a pedestal fan, a garden hose that sprays across the yard and an
   office PC you hack into a flashing, beeping alarm. Whoever is nearest walks over to turn it off.
 - Sentry guns guard the most restricted rooms: a red laser sweeps, a beep warns you, then it fires.

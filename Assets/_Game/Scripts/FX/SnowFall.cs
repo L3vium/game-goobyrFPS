@@ -6,7 +6,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
     /// <summary>
     /// Falling snow around whoever is looking: a small particle box (built by the map builder) that
     /// follows the active camera, so the whole map seems to snow for the cost of a few hundred flakes.
-    /// Indoors (a roof over the camera) the emission fades out.
+    /// Indoors (a roof over the camera) the emission fades out. It also brings the sparkle of the
+    /// snow on the ground (<see cref="SnowGlints"/>).
     /// </summary>
     [RequireComponent(typeof(ParticleSystem))]
     public class SnowFall : MonoBehaviour
@@ -15,7 +16,11 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private ParticleSystem _particles;
         private float _cover;
 
-        private void Awake() => _particles = GetComponent<ParticleSystem>();
+        private void Awake()
+        {
+            _particles = GetComponent<ParticleSystem>();
+            if (GetComponent<SnowGlints>() == null) gameObject.AddComponent<SnowGlints>();
+        }
 
         private void LateUpdate()
         {

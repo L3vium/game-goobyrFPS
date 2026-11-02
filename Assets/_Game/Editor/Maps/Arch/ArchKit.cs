@@ -408,14 +408,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return lTurret;
         }
 
-        /// <summary>The control PC of some turrets, on a desk top or a shelf: hide it where only the cable leads.</summary>
+        /// <summary>The control PC of some turrets, on a desk top or a shelf: hide it where only the cable leads (no map pin).</summary>
         public TurretTerminal Terminal(Vector3 pSurface, float pYaw, params AutoTurret[] pTurrets)
         {
             GameObject lPc = Computer("TurretTerminal", pSurface, pYaw, out Renderer lScreen);
             Part("TerminalTag", lPc.transform, Vector3.zero, m => m.Box(CableYellow, new Vector3(0.38f, 0.36f, 0.181f), new Vector3(0.16f, 0.05f, 0.004f), false));
             TurretTerminal lTerminal = lPc.AddComponent<TurretTerminal>();
             lTerminal.Setup(pTurrets, lScreen);
-            Poi(pSurface + Vector3.up * 0.4f, "Turret control", MapPoi.Kind.Shortcut);
             return lTerminal;
         }
 

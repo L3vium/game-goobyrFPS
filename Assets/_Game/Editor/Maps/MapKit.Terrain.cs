@@ -126,15 +126,22 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return lMaterial;
         }
 
+        /// <summary>
+        /// The realistic land's material: Goobyr/TerrainLit, URP's terrain shader whose layers are also
+        /// sampled at a larger turned scale and varied in broad patches, so no tile repeats at a distance.
+        /// </summary>
         private static Material PbrLandMaterial()
         {
             string lPath = PbrLibrary.MATERIALS + "/M_LandPbr.mat";
+            Shader lShader = Shader.Find("Goobyr/TerrainLit");
+            if (lShader == null) lShader = Shader.Find("Universal Render Pipeline/Terrain/Lit");
             Material lMaterial = AssetDatabase.LoadAssetAtPath<Material>(lPath);
             if (lMaterial == null)
             {
-                lMaterial = new Material(Shader.Find("Universal Render Pipeline/Terrain/Lit"));
+                lMaterial = new Material(lShader);
                 AssetDatabase.CreateAsset(lMaterial, lPath);
             }
+            else if (lMaterial.shader != lShader) lMaterial.shader = lShader;
             lMaterial.EnableKeyword("_NORMALMAP");
             lMaterial.EnableKeyword("_MASKMAP");
             lMaterial.EnableKeyword("_ALPHATEST_ON");

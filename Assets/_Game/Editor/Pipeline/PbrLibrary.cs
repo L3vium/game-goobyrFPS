@@ -169,7 +169,16 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (lImporter.sRGBTexture == lLinear) { lImporter.sRGBTexture = !lLinear; lChanged = true; }
                 if (lImporter.maxTextureSize != 2048) { lImporter.maxTextureSize = 2048; lChanged = true; }
                 if (lImporter.anisoLevel != 8) { lImporter.anisoLevel = 8; lChanged = true; }
-                if (lName.Contains("_diffa") && !lImporter.alphaIsTransparency) { lImporter.alphaIsTransparency = true; lImporter.mipMapsPreserveCoverage = true; lImporter.alphaTestReferenceValue = 0.45f; lChanged = true; }
+                // Alpha-tested cards (leaves, fronds, grass, impostors): mips keep the alpha coverage of the
+                // full-size texture, so a canopy stays a canopy at a distance instead of thinning to twigs.
+                bool lCutout = lName.Contains("_diffa") || (lName.Contains("_diff") && Path.GetExtension(lPath).ToLowerInvariant() == ".png" && LooksLikeCard(lName) && lImporter.DoesSourceTextureHaveAlpha());
+                if (lCutout && (!lImporter.alphaIsTransparency || !lImporter.mipMapsPreserveCoverage || !Mathf.Approximately(lImporter.alphaTestReferenceValue, CUTOFF)))
+                {
+                    lImporter.alphaIsTransparency = true;
+                    lImporter.mipMapsPreserveCoverage = true;
+                    lImporter.alphaTestReferenceValue = CUTOFF;
+                    lChanged = true;
+                }
                 if (lChanged) lImporter.SaveAndReimport();
             }
 
@@ -251,7 +260,42 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Object.DestroyImmediate(lAlpha);
             AssetDatabase.ImportAsset(pOut);
             TextureImporter lImporter = AssetImporter.GetAtPath(pOut) as TextureImporter;
-            if (lImporter != null) { lImporter.alphaIsTransparency = true; lImporter.mipMapsPreserveCoverage = true; lImporter.alphaTestReferenceValue = 0.45f; lImporter.maxTextureSize = 2048; lImporter.SaveAndReimport(); }
+            if (lImporter != null) { lImporter.alphaIsTransparency = true; lImporter.mipMapsPreserveCoverage = true; lImporter.alphaTestReferenceValue = CUTOFF; lImporter.maxTextureSize = 2048; lImporter.SaveAndReimport(); }
+        }
+
+        /// <summary>The alpha-test threshold of every cutout material and of its textures' coverage-preserving mips.</summary>
+        public const float CUTOFF = 0.45f;
+
+        /// <summary>
+        /// Turns a plant's material (a <c>Veg_*</c> model's bark, stem, leaves or impostor card) into
+        /// <c>Goobyr/Foliage</c>: the same maps, swayed by the world's wind (from the model's vertex
+        /// colours, see <c>Tools/Blender/vegetation/veg_lib.py</c>), with light glowing through the
+        /// leaves. <paramref name="pBend"/> is how far the crown leans at full wind (metres).
+        /// </summary>
+        public static void Foliage(Material pMaterial, float pBend)
+        {
+            Shader lFoliage = Shader.Find("Goobyr/Foliage");
+            if (pMaterial == null || lFoliage == null) return;
+            // Cutout (leaves, fronds, cards) or solid (bark, stems), whatever shader it had before.
+            bool lLeaf = pMaterial.shader == lFoliage ? pMaterial.IsKeywordEnabled("_ALPHATEST_ON") : pMaterial.HasProperty("_AlphaClip") && pMaterial.GetFloat("_AlphaClip") > 0.5f;
+            bool lCard = pMaterial.name.ToLowerInvariant().EndsWith("_card");
+            pMaterial.shader = lFoliage;
+            pMaterial.SetFloat("_AlphaClip", lLeaf ? 1f : 0f);
+            if (lLeaf) pMaterial.EnableKeyword("_ALPHATEST_ON"); else pMaterial.DisableKeyword("_ALPHATEST_ON");
+            if (pMaterial.GetTexture("_BumpMap") != null) pMaterial.EnableKeyword("_NORMALMAP"); else pMaterial.DisableKeyword("_NORMALMAP");
+            pMaterial.SetFloat("_Cutoff", CUTOFF);
+            pMaterial.SetFloat("_Cull", lLeaf ? 0f : 2f);
+            pMaterial.SetFloat("_Translucency", lLeaf ? (lCard ? 0.45f : 0.75f) : 0f);
+            pMaterial.SetFloat("_WindBend", pBend);
+            pMaterial.SetFloat("_WindFlutter", lLeaf && !lCard ? 0.5f : 0f);
+            pMaterial.SetFloat("_VertexAO", lCard ? 0f : 0.5f);
+            // Leaves keep a soft sheen, not a mirror of the blue sky.
+            pMaterial.SetFloat("_Smoothness", lLeaf ? 0.55f : 1f);
+            pMaterial.SetOverrideTag("RenderType", lLeaf ? "TransparentCutout" : "Opaque");
+            pMaterial.renderQueue = lLeaf ? (int)UnityEngine.Rendering.RenderQueue.AlphaTest : (int)UnityEngine.Rendering.RenderQueue.Geometry;
+            pMaterial.doubleSidedGI = lLeaf;
+            pMaterial.enableInstancing = true;
+            EditorUtility.SetDirty(pMaterial);
         }
 
         // ---------------------------------------------------------------- materials
@@ -366,6 +410,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (lPair.Key.type == typeof(Material)) lSlots.Add(lPair.Key.name);
 
             bool lChanged = false;
+            float lBend = IsPlant(lAsset) ? PlantBend(ModelHeight(lFbx)) : 0f;
             foreach (string lSlot in lSlots)
             {
                 string lPrefix = BestPrefix(pDir, lSlot);
@@ -374,6 +419,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Kind lKind = lLower.Contains("glass") || lLower.Contains("window") ? Kind.Glass : LooksLikeCard(lSlot) ? Kind.Cutout : Kind.Opaque;
                 Material lMaterial = MakeMaterial(pDir, lPrefix, $"{Unix(pDir)}/M_{lSlot}.mat", lKind);
                 if (lMaterial == null) continue;
+                if (lBend > 0f) Foliage(lMaterial, lBend);
                 AssetImporter.SourceAssetIdentifier lId = new AssetImporter.SourceAssetIdentifier(typeof(Material), lSlot);
                 if (lImporter.GetExternalObjectMap().TryGetValue(lId, out Object lOld) && lOld == lMaterial) continue;
                 lImporter.AddRemap(lId, lMaterial);
@@ -382,6 +428,26 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (lImporter.importAnimation && !lFbx.Contains("/Characters/")) { lImporter.importAnimation = false; lChanged = true; }
             if (lChanged) lImporter.SaveAndReimport();
             return true;
+        }
+
+        /// <summary>Plants sway in the wind (<see cref="Foliage"/>); rocks and logs do not.</summary>
+        public static bool IsPlant(string pAsset) => pAsset.StartsWith("Veg_") && !pAsset.Contains("Rock") && !pAsset.Contains("Log");
+
+        /// <summary>How far a plant's crown leans at full wind: a few centimetres for a fern, half a metre for a canopy tree.</summary>
+        public static float PlantBend(float pHeight) => 0.05f + 0.025f * Mathf.Max(0f, pHeight);
+
+        /// <summary>Height of a model's renderers (all LODs), 0 if it has none.</summary>
+        public static float ModelHeight(string pFbx)
+        {
+            GameObject lModel = AssetDatabase.LoadAssetAtPath<GameObject>(pFbx);
+            if (lModel == null) return 0f;
+            Bounds? lBounds = null;
+            foreach (Renderer lRenderer in lModel.GetComponentsInChildren<Renderer>())
+            {
+                if (lBounds == null) lBounds = lRenderer.bounds;
+                else { Bounds b = lBounds.Value; b.Encapsulate(lRenderer.bounds); lBounds = b; }
+            }
+            return lBounds?.size.y ?? 0f;
         }
 
         /// <summary>The texture prefix that belongs to a material slot: the slot name itself, or the longest prefix it starts with.</summary>

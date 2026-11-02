@@ -9,10 +9,72 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// Terrain-ready vegetation from the <c>Veg_*</c> models: tree prefabs (the model with its three
     /// LODs, a trunk capsule for trees and palms, a box for rocks and logs, nothing for bushes) and
     /// instanced detail meshes (grass, ferns) baked upright for the terrain's detail layers.
+    /// <para>
+    /// Every prefab casts sun shadows from its full and middle LODs (bushes, rocks and boulders
+    /// included; the impostor card of small plants does not), cross-fades its LODs with a dither,
+    /// and its plant materials use <c>Goobyr/Foliage</c> (wind, translucency). Existing prefabs are
+    /// tuned in place, so the terrains that use them update without a map rebuild.
+    /// </para>
     /// </summary>
     public static class VegLibrary
     {
         private const string FOLDER = EditorAssets.ROOT + "/Art/Generated/Veg";
+
+        /// <summary>Re-tunes every vegetation prefab (shadows, LOD cross-fade, foliage materials).</summary>
+        [MenuItem("Goobyr/Build/Vegetation")]
+        public static void TuneAll()
+        {
+            int lCount = 0;
+            foreach (string lGuid in AssetDatabase.FindAssets("t:Prefab", new[] { FOLDER }))
+            {
+                string lPath = AssetDatabase.GUIDToAssetPath(lGuid);
+                string lName = System.IO.Path.GetFileNameWithoutExtension(lPath);
+                if (!lName.StartsWith("Veg_")) continue;
+                Tune(lPath, lName);
+                lCount++;
+            }
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[Build] vegetation: {lCount} prefabs tuned");
+        }
+
+        private static readonly System.Collections.Generic.HashSet<string> _tuned = new System.Collections.Generic.HashSet<string>();
+
+        /// <summary>Applies the shadow, cross-fade and foliage settings to a saved vegetation prefab (keeps its GUID).</summary>
+        private static void Tune(string pPath, string pName)
+        {
+            _tuned.Add(pPath);
+            GameObject lRoot = PrefabUtility.LoadPrefabContents(pPath);
+            try
+            {
+                Configure(lRoot, pName);
+                PrefabUtility.SaveAsPrefabAsset(lRoot, pPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(lRoot); }
+        }
+
+        /// <summary>Shadows on every full and middle LOD, a dithered cross-fade between LODs, the foliage shader on plants.</summary>
+        private static void Configure(GameObject pRoot, string pName)
+        {
+            LODGroup lGroup = pRoot.GetComponent<LODGroup>();
+            Renderer[] lLast = null;
+            if (lGroup != null)
+            {
+                lGroup.fadeMode = LODFadeMode.CrossFade;
+                lGroup.animateCrossFading = true;
+                LOD[] lLods = lGroup.GetLODs();
+                if (lLods.Length > 1) lLast = lLods[lLods.Length - 1].renderers;
+            }
+            bool lTree = IsTree(pName);
+            float lBend = PbrLibrary.PlantBend(ArchLib.ModelBounds(pName).size.y);
+            foreach (Renderer lRenderer in pRoot.GetComponentsInChildren<Renderer>())
+            {
+                bool lCard = lLast != null && System.Array.IndexOf(lLast, lRenderer) >= 0;
+                lRenderer.shadowCastingMode = lCard && !lTree ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
+                lRenderer.receiveShadows = true;
+                if (!PbrLibrary.IsPlant(pName)) continue;
+                foreach (Material lMaterial in lRenderer.sharedMaterials) PbrLibrary.Foliage(lMaterial, lBend);
+            }
+        }
 
         private static float TrunkRadius(string pName)
         {
@@ -32,7 +94,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             string lPath = FOLDER + "/" + pName + ".prefab";
             GameObject lExisting = AssetDatabase.LoadAssetAtPath<GameObject>(lPath);
-            if (lExisting != null) return lExisting;
+            if (lExisting != null)
+            {
+                if (!_tuned.Contains(lPath)) { Tune(lPath, pName); lExisting = AssetDatabase.LoadAssetAtPath<GameObject>(lPath); }
+                return lExisting;
+            }
             if (!ArchLib.Has(pName)) { Debug.LogWarning($"[Veg] missing {pName}"); return null; }
             EditorAssets.EnsureFolder(FOLDER);
             GameObject lModel = AssetDatabase.LoadAssetAtPath<GameObject>($"{PbrLibrary.ROOT}/Models/{pName}/{pName}.fbx");
@@ -67,11 +133,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lGroup.SetLODs(lLods);
                 lGroup.RecalculateBounds();
             }
-            foreach (Renderer lRenderer in lRoot.GetComponentsInChildren<Renderer>())
-                if (!IsTree(pName)) lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            Configure(lRoot, pName);
             foreach (Transform t in lRoot.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.DEFAULT; t.gameObject.isStatic = true; }
             GameObject lPrefab = PrefabUtility.SaveAsPrefabAsset(lRoot, lPath);
             Object.DestroyImmediate(lRoot);
+            _tuned.Add(lPath);
             return lPrefab;
         }
 

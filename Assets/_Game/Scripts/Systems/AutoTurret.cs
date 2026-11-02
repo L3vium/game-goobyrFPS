@@ -12,8 +12,8 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
 {
     /// <summary>
     /// An automatic sentry gun guarding a restricted core. It sweeps its arc with a red laser; a
-    /// trespasser it sees (same tier rules as the cameras: passes count) gets a beep, a 0.6 s lock,
-    /// then bursts. A cable runs from it to a <see cref="TurretTerminal"/> hidden somewhere else:
+    /// trespasser it sees (anyone without the area's pass, calm or not - never in a public area)
+    /// gets a beep, a 0.6 s lock, then bursts. A cable runs from it to a <see cref="TurretTerminal"/> hidden somewhere else:
     /// hacking that turns the laser green and the gun on the guards and the target (staff and
     /// guests are spared), the hacker credited with the kills.
     /// <para>
@@ -147,7 +147,7 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
             _laser.SetPosition(1, lTo);
         }
 
-        /// <summary>Hostile: the nearest trespassing player in view. Turned: the nearest guard or target in view.</summary>
+        /// <summary>Hostile: the nearest trespassing player in view (outside public areas). Turned: the nearest guard or target in view.</summary>
         private Damageable FindTarget(out Vector3 pAim)
         {
             pAim = Vector3.zero;
@@ -159,7 +159,7 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
                 {
                     if (lPlayer == null || !lPlayer.IsSpawned || lPlayer.Health == null || !lPlayer.Health.IsAlive || lPlayer.Hidden.Value) continue;
                     SecurityTier lTier = SecurityZone.ForPlayer(SecurityZone.At(lPlayer.transform.position, out AccessLevel lNeed), lNeed, lPlayer.Weapons != null ? lPlayer.Weapons.Access : AccessLevel.None, false);
-                    if (DetectionModel.TierFactor(lTier, lPlayer.ActsSuspicious) <= 0.55f) continue;
+                    if (lTier == SecurityTier.Public) continue;
                     Consider(lPlayer.Health, lPlayer.Chest, ref lBest, ref lBestDistance, ref pAim);
                 }
                 return lBest;

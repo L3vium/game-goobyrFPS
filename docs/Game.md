@@ -128,7 +128,8 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
 - **Security** (`AI/SecurityCamera`, `Systems/AutoTurret`, `TurretTerminal`, `TurretCable`):
   cameras sweep corridors and gates and, after 1.2 s on a trespasser, send the two nearest guards
   of their zone (a breaker or the recorder switches them off). **Sentry guns** guard restricted
-  cores: same trespass rules as the cameras, a red laser, a warning beep, a 0.6 s lock, then
+  cores and fire on anyone there without the area's pass (never in a public area): a red laser, a
+  warning beep, a 0.6 s lock, then
   bursts (75 % hit chance, 45 % on a sprinting target), each burst a 35 m alarming noise. A thick
   yellow armoured cable runs from each gun along walls and ceilings to its **control PC**, hidden
   where only the cable leads; hacking it turns the laser green and the guns on guards and targets
@@ -160,7 +161,9 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   25 m in white, and within 70 m the security: cameras, sentry guns and their cables in amber (blue
   once a gun is turned), so a cable can be followed through walls to its control PC. Purely local and visual. Hidden parts are a solid silhouette, visible parts a rim
   of light; a stencil bit gives each pixel to the first colour drawn, so red wins.
-- **HUD** (`UI/Hud`, `UI/Minimap`, `UI/Compass`): minimal, nothing by default.
+- **HUD** (`UI/Hud`, `UI/Minimap`, `UI/Compass`): minimal, nothing by default. A status line above
+  the health shows TRESPASSING (amber) or HOSTILE AREA (red) wherever guards, cameras and sentry
+  guns would treat you as an intruder (a valid pass clears it).
   - A heading strip across the top (cardinal letters, ticks, heading) with the target's marker and
     distance always on it, plus extractions, teammates and the dropped proof.
   - A round minimap bottom left: the map's baked stylized plan of the floor you stand on, north up

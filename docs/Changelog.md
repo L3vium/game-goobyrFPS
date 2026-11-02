@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- New distractions you switch on: a pedestal fan, a garden hose that sprays across the yard and an
+  office PC you hack into a flashing, beeping alarm. Whoever is nearest walks over to turn it off.
+- Sentry guns guard the most restricted rooms: a red laser sweeps, a beep warns you, then it fires.
+  A thick yellow cable runs from each gun to its control PC, hidden somewhere quiet; follow the
+  cable (Instinct shows it through walls), hack the PC and the guns turn green and fire on the
+  guards instead. Instinct also shows the cameras, which still call guards when they see you.
 - Realistic people everywhere: the cartoon characters are gone. Agents wear a black suit (a man or a
   woman) with an armband in their team's colour; guards are dressed for the map's climate,
   bodyguards in black suits, staff in uniform, guests in civilian clothes, targets as VIPs.

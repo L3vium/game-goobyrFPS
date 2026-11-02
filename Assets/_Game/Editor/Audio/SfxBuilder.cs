@@ -68,6 +68,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Write("phone", Mix(Tone(0.4f, 1300f, 1300f, 0.4f, 1f, 22f), Delay(Tone(0.4f, 1300f, 1300f, 0.4f, 1f, 22f), 0.5f)));
             Write("caralarm", Siren(1.2f, 700f, 1100f, 6f, 0.5f));
             Write("generator", Tone(1.2f, 55f, 55f, 0.5f, 0.3f, 18f));
+            // Activatable distractions and turrets (0.6): a fan's whirr, a hose's hiss, a hacked PC's alarm.
+            Write("fan", Mix(Noise(1.2f, 0.3f, 900f, 0.3f), Tone(1.2f, 95f, 95f, 0.3f, 0.3f, 20f)));
+            Write("hose", Mix(Noise(1.2f, 0.45f, 5000f, 0.3f), Noise(1.2f, 0.2f, 1200f, 0.3f)));
+            Write("computer", Mix(Tone(0.25f, 1750f, 1750f, 0.45f, 3f), Delay(Tone(0.25f, 1750f, 1750f, 0.45f, 3f), 0.4f), Delay(Tone(0.3f, 1200f, 1200f, 0.4f, 3f), 0.8f)));
+            Write("keyboard", Mix(Tone(0.03f, 2400f, 2000f, 0.3f, 60f), Delay(Tone(0.03f, 2100f, 1900f, 0.3f, 60f), 0.09f), Delay(Tone(0.03f, 2500f, 2100f, 0.3f, 60f), 0.17f), Delay(Tone(0.03f, 2200f, 1900f, 0.3f, 60f), 0.28f), Delay(Tone(0.03f, 2350f, 2000f, 0.3f, 60f), 0.36f)));
+            Write("turret_warn", Mix(Tone(0.12f, 2200f, 2200f, 0.55f, 8f), Delay(Tone(0.12f, 2200f, 2200f, 0.55f, 8f), 0.16f), Delay(Tone(0.2f, 1500f, 1200f, 0.4f, 6f), 0.32f)));
             Write("siren", Siren(5f, 500f, 1000f, 0.5f, 0.7f));
             Write("brakes", Mix(Tone(0.8f, 2400f, 1800f, 0.25f, 2f), Noise(0.8f, 0.4f, 3000f, 2f)));
             Write("truck", Mix(Tone(2.5f, 60f, 75f, 0.5f, 0.6f, 12f), Noise(2.5f, 0.3f, 600f, 0.6f)));

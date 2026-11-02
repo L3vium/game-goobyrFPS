@@ -206,12 +206,20 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         // ---------------------------------------------------------------- distractions, hazards
 
-        /// <summary>tv, radio, phone, generator, caralarm (with the matching model).</summary>
+        /// <summary>
+        /// tv, radio, phone, generator, caralarm (with the matching model), fan (pedestal fan, floor),
+        /// hose (garden hose reel, at the foot of a wall facing out), computer (office PC on a desk top).
+        /// </summary>
         public void Distraction(string pKind, Vector3 pPosition, float pYaw)
         {
             GameObject lObject;
+            Transform lSpinner = null, lNozzle = null;
+            Renderer lScreen = null;
             switch (pKind)
             {
+                case "fan": lObject = Fan(pPosition, pYaw, out lSpinner); break;
+                case "hose": lObject = HoseReel(pPosition, pYaw, out lNozzle); break;
+                case "computer": lObject = Computer("Computer", pPosition, pYaw, out lScreen); break;
                 case "tv": lObject = Model("Furn_TV", pPosition, pYaw, Systems); break;
                 case "generator": lObject = Model("Prop_Generator", pPosition, pYaw, Systems); break;
                 case "caralarm": lObject = Model(R < 0.5f ? "Prop_Car_Sedan" : "Prop_Car_Pickup", pPosition, pYaw, Systems); break;
@@ -229,8 +237,222 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             if (lObject == null) return;
             foreach (Transform t in lObject.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.INTERACTABLE; t.gameObject.isStatic = false; }
-            string lPrompt = pKind switch { "radio" => "TURN THE RADIO ON", "tv" => "TURN THE TV ON", "phone" => "MAKE THE PHONE RING", "generator" => "START THE GENERATOR", "caralarm" => "SET OFF THE CAR ALARM", _ => "MAKE SOME NOISE" };
-            lObject.AddComponent<Systems.Distraction>().Setup(lPrompt, pKind, pKind == "generator" || pKind == "caralarm" ? 28f : 16f);
+            string lPrompt = pKind switch
+            {
+                "radio" => "TURN THE RADIO ON", "tv" => "TURN THE TV ON", "phone" => "MAKE THE PHONE RING", "generator" => "START THE GENERATOR",
+                "caralarm" => "SET OFF THE CAR ALARM", "fan" => "SWITCH THE FAN ON", "hose" => "OPEN THE HOSE", "computer" => "HACK THE PC (ALARM)", _ => "MAKE SOME NOISE"
+            };
+            float lRadius = pKind switch { "generator" => 28f, "caralarm" => 28f, "fan" => 9f, "hose" => 11f, "computer" => 14f, _ => 16f };
+            Systems.Distraction lDistraction = lObject.AddComponent<Systems.Distraction>();
+            lDistraction.Setup(lPrompt, pKind, lRadius);
+            lDistraction.SetupFx(lSpinner, lNozzle, lScreen);
+        }
+
+        private static ArchMat Gunmetal => ArchLib.PlainMat("Gunmetal", new Color(0.16f, 0.17f, 0.18f), 0.45f, 0.9f);
+        private static ArchMat OliveDrab => ArchLib.PlainMat("OliveDrab", new Color(0.24f, 0.26f, 0.16f), 0.3f, 0.2f);
+        private static ArchMat BlackPlastic => ArchLib.PlainMat("BlackPlastic", new Color(0.03f, 0.03f, 0.035f), 0.55f, 0f);
+        private static ArchMat BeigePlastic => ArchLib.PlainMat("BeigePlastic", new Color(0.72f, 0.69f, 0.6f), 0.4f, 0f);
+        private static ArchMat GardenGreen => ArchLib.PlainMat("GardenHose", new Color(0.12f, 0.42f, 0.14f), 0.55f, 0f);
+        private static ArchMat CableYellow => ArchLib.PlainMat("ArmouredCable", new Color(0.85f, 0.58f, 0.06f), 0.4f, 0.1f);
+        private static ArchMat ScreenMat => ArchLib.PlainMat("Screen", new Color(0.05f, 0.1f, 0.25f), 0.9f, 0f, 1f, new Color(0.15f, 0.35f, 0.9f));
+        private static ArchMat RedGlow => ArchLib.PlainMat("RedGlow", new Color(1f, 0.1f, 0.05f), 0.5f, 0f, 1f, new Color(4f, 0.2f, 0.1f));
+
+        /// <summary>A child object holding visual meshes only (no collider), free to move.</summary>
+        private static GameObject Part(string pName, Transform pParent, Vector3 pLocal, System.Action<ArchMesh> pBuild)
+        {
+            GameObject lPart = new GameObject(pName) { layer = GameLayers.INTERACTABLE };
+            lPart.transform.SetParent(pParent, false);
+            lPart.transform.localPosition = pLocal;
+            ArchMesh lMesh = new ArchMesh();
+            pBuild(lMesh);
+            foreach (GameObject lChild in lMesh.Flush(lPart.transform, "Arch_" + pName, GameLayers.INTERACTABLE)) lChild.isStatic = false;
+            return lPart;
+        }
+
+        private GameObject Root(string pName, Vector3 pPosition, float pYaw, Vector3 pColliderCenter, Vector3 pColliderSize)
+        {
+            GameObject lRoot = new GameObject(pName) { layer = GameLayers.INTERACTABLE };
+            lRoot.transform.SetParent(Systems, false);
+            lRoot.transform.SetPositionAndRotation(pPosition, Quaternion.Euler(0, pYaw, 0));
+            BoxCollider lBox = lRoot.AddComponent<BoxCollider>();
+            lBox.center = pColliderCenter;
+            lBox.size = pColliderSize;
+            return lRoot;
+        }
+
+        /// <summary>A pedestal fan; its blade hub spins on local Z.</summary>
+        private GameObject Fan(Vector3 pPosition, float pYaw, out Transform pBlades)
+        {
+            GameObject lRoot = Root("Fan", pPosition, pYaw, new Vector3(0, 0.65f, 0), new Vector3(0.5f, 1.3f, 0.35f));
+            Part("FanStand", lRoot.transform, Vector3.zero, m =>
+            {
+                m.Cylinder(BlackPlastic, Vector3.zero, 0.2f, 0.04f, 16, false);
+                m.Tube(ArchLib.Galvanised, new Vector3(0, 0.04f, 0), new Vector3(0, 1.08f, 0), 0.018f, 8, false);
+                m.Box(BeigePlastic, new Vector3(0, 1.12f, -0.1f), new Vector3(0.14f, 0.14f, 0.16f), false);
+                m.Tube(ArchLib.Galvanised, new Vector3(0, 1.12f, -0.02f), new Vector3(0, 1.12f, 0.06f), 0.235f, 24, false);
+            });
+            GameObject lBlades = Part("FanBlades", lRoot.transform, new Vector3(0, 1.12f, 0.02f), m =>
+            {
+                m.Cylinder(BeigePlastic, Vector3.zero, 0.04f, 0.04f, 10, false);
+                for (int i = 0; i < 3; i++)
+                    m.Box(BeigePlastic, Quaternion.Euler(0, 0, i * 120f) * new Vector3(0, 0.11f, 0), new Vector3(0.09f, 0.16f, 0.008f), Quaternion.Euler(0, 18f, i * 120f), false);
+            });
+            pBlades = lBlades.transform;
+            return lRoot;
+        }
+
+        /// <summary>A wall-mounted garden hose reel, the hose run out to a nozzle that sprays along its +Z.</summary>
+        private GameObject HoseReel(Vector3 pPosition, float pYaw, out Transform pNozzle)
+        {
+            GameObject lRoot = Root("HoseReel", pPosition, pYaw, new Vector3(0, 0.45f, 0.1f), new Vector3(0.6f, 0.9f, 0.3f));
+            Part("HoseReelBody", lRoot.transform, Vector3.zero, m =>
+            {
+                m.Box(ArchLib.Galvanised, new Vector3(0, 0.75f, 0.02f), new Vector3(0.12f, 0.2f, 0.04f), false);
+                m.Tube(GardenGreen, new Vector3(-0.17f, 0.55f, 0.14f), new Vector3(0.17f, 0.55f, 0.14f), 0.2f, 20, false);
+                m.Tube(ArchLib.Galvanised, new Vector3(-0.2f, 0.55f, 0.14f), new Vector3(0.2f, 0.55f, 0.14f), 0.04f, 8, false);
+                Vector3 lPrev = new Vector3(0.1f, 0.38f, 0.2f);
+                Vector3[] lRun = { new Vector3(0.25f, 0.04f, 0.45f), new Vector3(0.1f, 0.03f, 0.9f), new Vector3(-0.25f, 0.03f, 1.15f), new Vector3(-0.3f, 0.06f, 1.45f) };
+                foreach (Vector3 lPoint in lRun) { m.Tube(GardenGreen, lPrev, lPoint, 0.014f, 8, false); lPrev = lPoint; }
+                m.Tube(BlackPlastic, lPrev, lPrev + new Vector3(0, 0.03f, 0.15f), 0.022f, 8, false);
+            });
+            GameObject lNozzle = new GameObject("Nozzle");
+            lNozzle.transform.SetParent(lRoot.transform, false);
+            lNozzle.transform.localPosition = new Vector3(-0.3f, 0.1f, 1.62f);
+            lNozzle.transform.localRotation = Quaternion.Euler(-25f, 0f, 0f);
+            pNozzle = lNozzle.transform;
+            return lRoot;
+        }
+
+        /// <summary>A desktop PC (monitor, keyboard, tower) on a desk top; the screen is its own renderer.</summary>
+        private GameObject Computer(string pName, Vector3 pSurface, float pYaw, out Renderer pScreen)
+        {
+            GameObject lRoot = Root(pName, pSurface, pYaw, new Vector3(0, 0.22f, 0), new Vector3(0.7f, 0.45f, 0.45f));
+            Part("PcBody", lRoot.transform, Vector3.zero, m =>
+            {
+                m.Box(BlackPlastic, new Vector3(0, 0.01f, -0.05f), new Vector3(0.2f, 0.02f, 0.16f), false);
+                m.Box(BlackPlastic, new Vector3(0, 0.12f, -0.07f), new Vector3(0.05f, 0.2f, 0.04f), false);
+                m.Box(BlackPlastic, new Vector3(0, 0.28f, -0.05f), new Vector3(0.56f, 0.34f, 0.035f), false);
+                m.Box(BlackPlastic, new Vector3(0, 0.012f, 0.16f), new Vector3(0.44f, 0.024f, 0.15f), false);
+                m.Box(BlackPlastic, new Vector3(0.38f, 0.21f, -0.02f), new Vector3(0.18f, 0.42f, 0.4f), false);
+            });
+            GameObject lScreen = Part("PcScreen", lRoot.transform, Vector3.zero, m => m.Box(ScreenMat, new Vector3(0, 0.285f, -0.031f), new Vector3(0.52f, 0.3f, 0.004f), false));
+            pScreen = lScreen.GetComponentInChildren<Renderer>();
+            return lRoot;
+        }
+
+        // ---------------------------------------------------------------- turrets
+
+        /// <summary>
+        /// An automatic sentry gun on a floor pedestal (or hung under a ceiling at <paramref name="pMount"/>),
+        /// resting toward <paramref name="pLookAt"/>. Give it a <see cref="Terminal"/> and run a <see cref="Cable"/> between them.
+        /// </summary>
+        public AutoTurret Turret(Vector3 pMount, Vector3 pLookAt, bool pCeiling = false, float pRange = 24f)
+        {
+            Vector3 lDir = pLookAt - pMount;
+            float lYaw = Mathf.Atan2(lDir.x, lDir.z) * Mathf.Rad2Deg;
+            float lPivot = pCeiling ? -0.42f : 1.05f;
+            GameObject lRoot = Root("AutoTurret", pMount, lYaw, new Vector3(0, pCeiling ? -0.3f : 0.55f, 0), new Vector3(0.5f, pCeiling ? 0.6f : 1.1f, 0.5f));
+            Part("TurretMount", lRoot.transform, Vector3.zero, m =>
+            {
+                if (pCeiling)
+                {
+                    m.Box(Gunmetal, new Vector3(0, -0.02f, 0), new Vector3(0.36f, 0.04f, 0.36f), false);
+                    m.Tube(Gunmetal, new Vector3(0, -0.04f, 0), new Vector3(0, lPivot + 0.07f, 0), 0.06f, 12, false);
+                }
+                else
+                {
+                    m.Cylinder(Gunmetal, Vector3.zero, 0.34f, 0.05f, 20, false);
+                    m.Cylinder(Gunmetal, new Vector3(0, 0.05f, 0), 0.09f, lPivot - 0.12f, 14, false);
+                    for (int i = 0; i < 4; i++)
+                        m.Box(OliveDrab, Quaternion.Euler(0, i * 90f + 45f, 0) * new Vector3(0, 0.14f, 0.13f), new Vector3(0.03f, 0.2f, 0.16f), Quaternion.Euler(0, i * 90f + 45f, 0), false);
+                }
+            });
+            GameObject lYawPivot = Part("TurretYaw", lRoot.transform, new Vector3(0, lPivot, 0), m =>
+            {
+                m.Cylinder(Gunmetal, new Vector3(0, -0.07f, 0), 0.19f, 0.12f, 20, false);
+                m.Box(Gunmetal, new Vector3(-0.2f, 0.12f, 0), new Vector3(0.04f, 0.26f, 0.14f), false);
+                m.Box(Gunmetal, new Vector3(0.2f, 0.12f, 0), new Vector3(0.04f, 0.26f, 0.14f), false);
+            });
+            GameObject lPitchPivot = Part("TurretHead", lYawPivot.transform, new Vector3(0, 0.2f, 0), m =>
+            {
+                m.Box(OliveDrab, new Vector3(0, 0, 0.04f), new Vector3(0.34f, 0.26f, 0.5f), false);
+                m.Box(Gunmetal, new Vector3(0, 0.15f, 0.12f), new Vector3(0.12f, 0.07f, 0.16f), false);
+                m.Box(OliveDrab, new Vector3(0.24f, -0.04f, -0.02f), new Vector3(0.1f, 0.2f, 0.3f), false);
+                m.Box(OliveDrab, new Vector3(-0.24f, -0.04f, -0.02f), new Vector3(0.1f, 0.2f, 0.3f), false);
+                m.Tube(Gunmetal, new Vector3(0.07f, -0.02f, 0.28f), new Vector3(0.07f, -0.02f, 0.86f), 0.024f, 10, false);
+                m.Tube(Gunmetal, new Vector3(-0.07f, -0.02f, 0.28f), new Vector3(-0.07f, -0.02f, 0.86f), 0.024f, 10, false);
+                m.Tube(Gunmetal, new Vector3(0.07f, -0.02f, 0.7f), new Vector3(0.07f, -0.02f, 0.88f), 0.036f, 10, false);
+                m.Tube(Gunmetal, new Vector3(-0.07f, -0.02f, 0.7f), new Vector3(-0.07f, -0.02f, 0.88f), 0.036f, 10, false);
+            });
+            GameObject lLamp = Part("TurretLamp", lPitchPivot.transform, new Vector3(0, 0.15f, 0.205f), m => m.Box(RedGlow, Vector3.zero, new Vector3(0.05f, 0.03f, 0.01f), false));
+
+            GameObject lMuzzle = new GameObject("Muzzle");
+            lMuzzle.transform.SetParent(lPitchPivot.transform, false);
+            lMuzzle.transform.localPosition = new Vector3(0, 0.15f, 0.22f);
+
+            GameObject lLaserObject = new GameObject("Laser");
+            lLaserObject.transform.SetParent(lPitchPivot.transform, false);
+            LineRenderer lLaser = lLaserObject.AddComponent<LineRenderer>();
+            lLaser.useWorldSpace = true;
+            lLaser.positionCount = 2;
+            lLaser.widthMultiplier = 0.01f;
+            lLaser.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lLaser.receiveShadows = false;
+            lLaser.sharedMaterial = RedGlow.material;
+            lLaser.SetPosition(0, lMuzzle.transform.position);
+            lLaser.SetPosition(1, lMuzzle.transform.position + lMuzzle.transform.forward * pRange);
+
+            AutoTurret lTurret = lRoot.AddComponent<AutoTurret>();
+            lTurret.Setup(lYawPivot.transform, lPitchPivot.transform, lMuzzle.transform, lLaser, lLamp.GetComponentInChildren<Renderer>(), pRange);
+            Poi(pMount + Vector3.up * 1.2f, "Sentry gun", MapPoi.Kind.Landmark);
+            return lTurret;
+        }
+
+        /// <summary>The control PC of some turrets, on a desk top or a shelf: hide it where only the cable leads.</summary>
+        public TurretTerminal Terminal(Vector3 pSurface, float pYaw, params AutoTurret[] pTurrets)
+        {
+            GameObject lPc = Computer("TurretTerminal", pSurface, pYaw, out Renderer lScreen);
+            Part("TerminalTag", lPc.transform, Vector3.zero, m => m.Box(CableYellow, new Vector3(0.38f, 0.36f, 0.181f), new Vector3(0.16f, 0.05f, 0.004f), false));
+            TurretTerminal lTerminal = lPc.AddComponent<TurretTerminal>();
+            lTerminal.Setup(pTurrets, lScreen);
+            Poi(pSurface + Vector3.up * 0.4f, "Turret control", MapPoi.Kind.Shortcut);
+            return lTerminal;
+        }
+
+        /// <summary>
+        /// A thick yellow armoured cable from a turret to its terminal through <paramref name="pPoints"/>
+        /// (lay them along walls and ceilings, 5-10 cm off the surface): level spans sag a little and get
+        /// a clip every 1.2 m. Instinct draws it in the turret's colour.
+        /// </summary>
+        public TurretCable Cable(AutoTurret pTurret, params Vector3[] pPoints)
+        {
+            if (pPoints == null || pPoints.Length < 2) return null;
+            GameObject lRoot = new GameObject("TurretCable") { layer = GameLayers.DEFAULT };
+            lRoot.transform.SetParent(Systems, false);
+            ArchMesh lMesh = new ArchMesh();
+            const float RADIUS = 0.028f;
+            for (int i = 0; i < pPoints.Length - 1; i++)
+            {
+                Vector3 a = pPoints[i], b = pPoints[i + 1];
+                float lLength = Vector3.Distance(a, b);
+                bool lLevel = Mathf.Abs(a.y - b.y) < 0.5f && lLength > 1.5f;
+                int lSteps = lLevel ? Mathf.Clamp(Mathf.CeilToInt(lLength / 0.4f), 2, 40) : 1;
+                float lSag = lLevel ? Mathf.Min(0.12f, lLength * 0.02f) : 0f;
+                Vector3 lPrev = a;
+                for (int s = 1; s <= lSteps; s++)
+                {
+                    float t = s / (float)lSteps;
+                    Vector3 lPoint = Vector3.Lerp(a, b, t) + Vector3.down * (lSag * 4f * t * (1f - t));
+                    lMesh.Tube(CableYellow, lPrev, lPoint, RADIUS, 8, false);
+                    lPrev = lPoint;
+                }
+                for (float d = 0.6f; d < lLength; d += 1.2f)
+                    lMesh.Box(Gunmetal, Vector3.Lerp(a, b, d / lLength), new Vector3(0.07f, 0.07f, 0.07f), false);
+            }
+            lMesh.Flush(lRoot.transform, K.Map.sceneName + "_TurretCable_" + _unique++);
+            TurretCable lCable = lRoot.AddComponent<TurretCable>();
+            lCable.Setup(pTurret);
+            return lCable;
         }
 
         /// <summary>A red barrel or a gas tank that explodes when shot or set on fire.</summary>

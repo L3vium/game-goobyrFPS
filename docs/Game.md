@@ -119,7 +119,18 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   zones; breakers cut a building's lights (and an NPC comes to fix it); chandeliers drop when
   their chain is shot; poisonable drinks (lethal, or emetic → the drinker runs to a toilet,
   alone); the basement air handler gasses the whole building; distractions (radio, TV, phone,
-  generator, car alarm); hiding spots; ziplines; jump pads; climbable surfaces; tall grass.
+  generator, car alarm, a pedestal fan whose blades spin up, a garden hose that sprays, an office
+  PC hacked into a flashing alarm screen) - each one pulls the nearest NPC over to switch it off;
+  hiding spots; ziplines; jump pads; climbable surfaces; tall grass.
+- **Security** (`AI/SecurityCamera`, `Systems/AutoTurret`, `TurretTerminal`, `TurretCable`):
+  cameras sweep corridors and gates and, after 1.2 s on a trespasser, send the two nearest guards
+  of their zone (a breaker or the recorder switches them off). **Sentry guns** guard restricted
+  cores: same trespass rules as the cameras, a red laser, a warning beep, a 0.6 s lock, then
+  bursts (75 % hit chance, 45 % on a sprinting target), each burst a 35 m alarming noise. A thick
+  yellow armoured cable runs from each gun along walls and ceilings to its **control PC**, hidden
+  where only the cable leads; hacking it turns the laser green and the guns on guards and targets
+  (staff and guests are spared), the kills credited to the hacker. Every machine aims the guns
+  with the same rules; only the host fires.
 - **Player** (eyes at 1.74 m, 0.98 m crouched): walk, sprint (held), crouch (held; crouching while moving slides,
   much further out of a sprint and faster downhill), crawl (crouched where a crouch doesn't fit:
   vents, crawlspaces), jump, zipline, hide, swim, and **parkour** (`FpsMotor`): jump in front of
@@ -143,7 +154,8 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   to a cold grey with a scan wave rolling out from the eye, and what matters glows through the
   walls: the target and the proof (or whoever carries it) in red at any range, teammates in blue,
   NPCs within 55 m in white (amber when they are hunting you), everything usable or pickable within
-  25 m in white. Purely local and visual. Hidden parts are a solid silhouette, visible parts a rim
+  25 m in white, and within 70 m the security: cameras, sentry guns and their cables in amber (blue
+  once a gun is turned), so a cable can be followed through walls to its control PC. Purely local and visual. Hidden parts are a solid silhouette, visible parts a rim
   of light; a stencil bit gives each pixel to the first colour drawn, so red wins.
 - **HUD** (`UI/Hud`, `UI/Minimap`, `UI/Compass`): minimal, nothing by default.
   - A heading strip across the top (cardinal letters, ticks, heading) with the target's marker and

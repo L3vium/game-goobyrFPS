@@ -108,6 +108,21 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Seconds between the end of a confrontation (or escort) and the first shot: the gun is already up.</summary>
         public const float REACTION_CONFRONTED = 0.3f;
 
+        // ---------------------------------------------------------------- patrols
+
+        /// <summary>
+        /// Where a patrol member walks, in its leader's frame: the second at its shoulder (a pair walks
+        /// side by side), the others in pairs behind (slot 0 is the leader).
+        /// </summary>
+        public static Vector3 FormationSlot(int pSlot) => pSlot <= 0 ? Vector3.zero : new Vector3(pSlot % 2 == 1 ? 0.9f : 0f, 0f, -1.6f * (pSlot / 2));
+
+        /// <summary>
+        /// Seconds a patrol spends at a waypoint: its errand's duration give or take 15 % (0 walks
+        /// straight through), else the route's pause give or take 40 %. <paramref name="pRandom01"/> is a roll in [0, 1].
+        /// </summary>
+        public static float StopSeconds(bool pHasErrand, float pErrandSeconds, float pRoutePause, float pRandom01)
+            => pHasErrand ? pErrandSeconds * (0.85f + 0.3f * pRandom01) : pRoutePause * (0.6f + 0.8f * pRandom01);
+
         // ---------------------------------------------------------------- the phone call
 
         /// <summary>Seconds of real fighting before anyone thinks of the radio.</summary>

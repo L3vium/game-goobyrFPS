@@ -173,6 +173,22 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Patrol_PairsWalkSideBySideAndErrandsSetTheStop()
+        {
+            Assert.AreEqual(Vector3.zero, NpcRules.FormationSlot(0), "the leader");
+            Vector3 lPartner = NpcRules.FormationSlot(1);
+            Assert.AreEqual(0f, lPartner.z, 1e-4f, "the second walks at the leader's shoulder");
+            Assert.Greater(Mathf.Abs(lPartner.x), 0.5f);
+            Assert.Less(NpcRules.FormationSlot(2).z, -1f, "the third behind");
+            Assert.AreNotEqual(NpcRules.FormationSlot(2), NpcRules.FormationSlot(3));
+
+            Assert.AreEqual(0f, NpcRules.StopSeconds(true, 0f, 3f, 0.5f), "walked straight through");
+            Assert.That(NpcRules.StopSeconds(true, 10f, 3f, 0f), Is.InRange(8f, 12f), "the errand's own time");
+            Assert.That(NpcRules.StopSeconds(true, 10f, 3f, 1f), Is.InRange(8f, 12f));
+            Assert.That(NpcRules.StopSeconds(false, 0f, 3f, 0.5f), Is.InRange(1.5f, 4.5f), "a plain stop: the route's pause");
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

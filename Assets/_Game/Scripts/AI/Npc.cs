@@ -274,6 +274,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             else if (State.Value == NpcState.Routine && _activityNode != null && _waitUntil > 0f && lStopped) lPose = PoseFor(_activityNode.Activity);
             else if (State.Value == NpcState.Idle && _break != null && _breakUntil > 0f && lStopped) lPose = PoseFor(_break.Activity);
             else if (State.Value == NpcState.Investigate && lStopped) lPose = BodyPose.LookAround;
+            else if (State.Value == NpcState.Patrol && lStopped) lPose = PatrolPose();
             if (Pose.Value != lPose) Pose.Value = lPose;
         }
 
@@ -919,15 +920,31 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void UpdatePatrol()
         {
             if (_route == null || _route.Count == 0) { SetState(NpcState.Idle); return; }
-            if (Time.time < _waitUntil) { Stop(); return; }
-            // Groups walk in a column of twos behind whoever leads (the first one still on the round).
+            if (Time.time < _waitUntil)
+            {
+                // At a stop: its errand, facing the waypoint's way (a chatting pair face each other).
+                Stop();
+                FaceTowards(transform.position + ErrandFacing(this, _errand, _errandForward), 150f);
+                return;
+            }
+            _errand = null;
+            // A pair walks side by side behind whoever leads (the first one still on the round); more fall in behind.
             Npc lLeader = _route.Leader;
             if (lLeader != null && lLeader != this)
             {
-                int lSlot = _route.SlotOf(this);
-                Vector3 lOffset = new Vector3(lSlot % 2 == 1 ? -0.9f : 0.9f, 0f, -1.5f * ((lSlot + 1) / 2));
-                Vector3 lSpot = lLeader.transform.position + lLeader.transform.rotation * lOffset;
-                if (Vector3.Distance(transform.position, lSpot) > 0.6f) MoveTo(lSpot, PATROL * 1.25f);
+                Vector3 lSpot = lLeader.transform.position + lLeader.transform.rotation * NpcRules.FormationSlot(_route.SlotOf(this));
+                if (Time.time < lLeader._waitUntil)
+                {
+                    // The leader stopped: stand by it for its errand (a chatting pair face each other). It
+                    // does not chase its slot while the leader turns, or the two would circle each other.
+                    if (Vector3.Distance(transform.position, lLeader.transform.position) > 2.4f) MoveTo(lSpot, PATROL * 1.25f);
+                    else
+                    {
+                        Stop();
+                        FaceTowards(transform.position + ErrandFacing(this, lLeader._errand, lLeader._errandForward), 150f);
+                    }
+                }
+                else if (Vector3.Distance(transform.position, lSpot) > 0.6f) MoveTo(lSpot, PATROL * 1.25f);
                 else { Stop(); transform.rotation = Quaternion.RotateTowards(transform.rotation, lLeader.transform.rotation, 120f * Time.deltaTime); }
                 _routeIndex = lLeader._routeIndex;
                 return;
@@ -936,9 +953,56 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             MoveTo(lPoint, PATROL);
             if (Arrived(0.8f))
             {
+                PatrolStop lStop = _route.StopAt(_routeIndex);
+                _errand = lStop;
+                _errandForward = _route.Waypoint(_routeIndex).forward;
                 _routeIndex++;
-                _waitUntil = Time.time + _route.Pause * Random.Range(0.6f, 1.4f);
+                _waitUntil = Time.time + NpcRules.StopSeconds(lStop != null, lStop != null ? lStop.Duration : 0f, _route.Pause, Random.value);
             }
+        }
+
+        /// <summary>The errand at the stop the patrol stands at (null: a plain pause), and the way its waypoint faces.</summary>
+        private PatrolStop _errand;
+        private Vector3 _errandForward = Vector3.forward;
+
+        /// <summary>Which way a patrol member faces during an errand: its partner when chatting, else the waypoint's way.</summary>
+        private Vector3 ErrandFacing(Npc pMember, PatrolStop pErrand, Vector3 pForward)
+        {
+            if (pErrand != null && pErrand.Action == PatrolAction.Chat && _route != null)
+            {
+                Npc lPartner = PartnerOf(pMember);
+                if (lPartner != null)
+                {
+                    Vector3 lTo = lPartner.transform.position - pMember.transform.position;
+                    lTo.y = 0f;
+                    if (lTo.sqrMagnitude > 0.04f) return lTo.normalized;
+                }
+            }
+            return pForward;
+        }
+
+        /// <summary>The nearest other member of its route still on the round (who a pair chats with).</summary>
+        private Npc PartnerOf(Npc pMember)
+        {
+            Npc lBest = null;
+            float lBestDistance = 6f;
+            foreach (Npc lOther in _route.Members)
+            {
+                if (lOther == null || lOther == pMember || !lOther.Health.IsAlive || lOther.State.Value != NpcState.Patrol) continue;
+                float lDistance = Vector3.Distance(lOther.transform.position, pMember.transform.position);
+                if (lDistance < lBestDistance) { lBestDistance = lDistance; lBest = lOther; }
+            }
+            return lBest;
+        }
+
+        /// <summary>The errand pose of a patrol member standing at a stop (its own, or its leader's; a follower stands guard at a door check).</summary>
+        private BodyPose PatrolPose()
+        {
+            if (_route == null) return BodyPose.None;
+            if (_errand != null && Time.time < _waitUntil) return PatrolStop.PoseFor(_errand.Action);
+            Npc lLeader = _route.Leader;
+            if (lLeader == null || lLeader == this || lLeader._errand == null || Time.time >= lLeader._waitUntil) return BodyPose.None;
+            return lLeader._errand.Action == PatrolAction.CheckDoor ? BodyPose.ArmedIdle : PatrolStop.PoseFor(lLeader._errand.Action);
         }
 
         private void UpdateRoutine()

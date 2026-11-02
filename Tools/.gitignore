@@ -1,3 +1,4 @@
 .unity_mcp_session*
 .unity_editor_lock*
 .git_commit_lock
+.git_push_hold

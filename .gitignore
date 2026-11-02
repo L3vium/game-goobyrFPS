@@ -134,3 +134,10 @@ desktop.ini
 
 # MCP screenshots
 /Captures/
+
+# Written by the Performance Testing package at build time
+/Assets/Resources/PerformanceTestRun*
+/Assets/Resources.meta
+
+# Blender exports staged before import (per track)
+/Tools/Blender/out/

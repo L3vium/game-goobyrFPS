@@ -16,6 +16,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 MUTEX = os.path.join(HERE, ".git_commit_lock")
+PUSH_HOLD = os.path.join(HERE, ".git_push_hold")
 TRAILER = "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 
@@ -67,6 +68,10 @@ def main():
         if res.returncode:
             sys.exit(res.stdout + res.stderr)
         print(git("log", "--oneline", "-1").stdout.strip())
+        if os.path.exists(PUSH_HOLD):
+            # A long push (a player build over LFS) is running: commit now, the orchestrator pushes later.
+            print("committed; push deferred (" + open(PUSH_HOLD, encoding="utf-8").read().strip() + ")")
+            return
         for attempt in range(3):
             res = git("push", "-q", "origin", "dev")
             if res.returncode == 0:

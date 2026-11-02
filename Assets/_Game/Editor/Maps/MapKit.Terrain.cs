@@ -77,7 +77,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lObject.isStatic = true;
             Land = lObject.GetComponent<Terrain>();
             Land.materialTemplate = LandLayers != null ? PbrLandMaterial() : LandMaterial();
-            Land.heightmapPixelError = 3f;
+            // One pixel of error: slopes and banks keep their shape at a distance instead of faceting.
+            Land.heightmapPixelError = 1f;
             Land.basemapDistance = 220f;
             Land.drawInstanced = true;
             Land.treeDistance = 700f;

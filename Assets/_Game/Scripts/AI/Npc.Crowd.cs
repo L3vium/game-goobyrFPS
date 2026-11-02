@@ -150,12 +150,14 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return null;
         }
 
-        private static readonly NavMeshPath _path = new NavMeshPath();
+        /// <summary>Made on first use: Unity refuses a NavMeshPath built in a MonoBehaviour's (static) initializer.</summary>
+        private static NavMeshPath _path;
 
         private bool Reachable(Vector3 pPoint)
         {
             if (!_agent.isOnNavMesh) return false;
             if (!NavMesh.SamplePosition(pPoint, out NavMeshHit lHit, 4f, NavMesh.AllAreas)) return false;
+            _path ??= new NavMeshPath();
             return NavMesh.CalculatePath(transform.position, lHit.position, NavMesh.AllAreas, _path) && _path.status == NavMeshPathStatus.PathComplete;
         }
 

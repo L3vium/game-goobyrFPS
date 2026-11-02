@@ -10,7 +10,7 @@ Shader "Goobyr/Grass"
 {
     Properties
     {
-        _RootColor("Root", Color) = (0.045, 0.08, 0.022, 1)
+        _RootColor("Root", Color) = (0.07, 0.11, 0.035, 1)
         _TipColor("Tip", Color) = (0.3, 0.47, 0.13, 1)
         _DryColor("Dry Tip", Color) = (0.6, 0.54, 0.28, 1)
         _TranslucencyColor("Translucency", Color) = (0.55, 0.85, 0.2, 1)
@@ -18,7 +18,7 @@ Shader "Goobyr/Grass"
         _TuftRadius("Tuft Radius (m)", Float) = 0.14
         _WindScale("Wind", Float) = 0.9
         _Translucency("Translucency Amount", Range(0, 2)) = 1
-        _RootOcclusion("Root Occlusion", Range(0, 1)) = 0.35
+        _RootOcclusion("Root Occlusion", Range(0, 1)) = 0.55
         _Gloss("Gloss", Range(0, 1)) = 0.25
         _FarNormal("Far Ground Normal", Range(0, 1)) = 0.6
     }
@@ -144,6 +144,8 @@ Shader "Goobyr/Grass"
             float lFar = saturate(lDistance / 70.0);
             float3 lNormal = normalize(lFace + lAcross * (pInput.blade.x * 0.45));
             lNormal = normalize(lerp(lNormal, lGround, 0.3 + _FarNormal * lFar * 0.7));
+            // Near the root a blade is lit like the ground it grows from (no dark comb from a low camera).
+            lNormal = normalize(lerp(lNormal, lGround, (1.0 - t) * 0.6));
 
             Blade b;
             b.positionWS = lPosition;
@@ -223,7 +225,7 @@ Shader "Goobyr/Grass"
                 half3 lView = GetWorldSpaceNormalizeViewDir(input.positionWS);
                 float2 lScreenUv = GetNormalizedScreenSpaceUV(input.positionCS);
                 // Dark roots near the camera; far away the blades are seen whole and blend into the turf.
-                half lRoot = lerp(lerp(_RootOcclusion, 0.75h, input.look.w), 1.0h, smoothstep(0.0h, 0.75h, lAlong));
+                half lRoot = lerp(lerp(_RootOcclusion, 0.8h, input.look.w), 1.0h, smoothstep(0.0h, 0.7h, lAlong));
 
                 half lIndirectAO = 1.0h, lDirectAO = 1.0h;
                 #if defined(_SCREEN_SPACE_OCCLUSION)

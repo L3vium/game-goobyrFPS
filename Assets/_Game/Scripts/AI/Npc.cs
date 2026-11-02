@@ -104,6 +104,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private Vector3? _fleePoint;
         private int _routeIndex;
         private float _waitUntil;
+        /// <summary>When it reached the spot it went to check (-1: not there yet), and how long it looks around there.</summary>
+        private float _arrivedAt = -1f, _lookFor;
         private float _awareness;
         private float _perceptionTimer;
         private PlayerAvatar _suspect;
@@ -477,7 +479,11 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 _searchUntil = Mathf.Max(_searchUntil, Time.time + GameDatabase.Rules.searchDuration * 0.5f);
                 MoveTo(pPoint, RUN * 0.6f);
             }
-            else _investigatePoint = pPoint;
+            else
+            {
+                _investigatePoint = pPoint;
+                _arrivedAt = -1f;
+            }
         }
 
         /// <summary>Does its zone know this player to be hostile (<see cref="LevelZone.Hostiles"/>)?</summary>
@@ -839,6 +845,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (Flees && pAlarmed) { SetState(NpcState.Flee); return; }
             _investigatePoint = pPoint;
             _investigateAlarmed = pAlarmed;
+            // Its own clock for looking around once there (a patrol's pause timer is not it).
+            _arrivedAt = -1f;
+            _lookFor = NpcRules.LookAroundTime(pAlarmed);
             _awareness = Mathf.Max(_awareness, 0.3f);
             SetState(NpcState.Investigate);
             MoveTo(pPoint, pAlarmed ? RUN * 0.75f : WALK * 1.15f);
@@ -1005,13 +1014,15 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 if (!_breaker.PowerOn) _breaker.ToggleServer(ulong.MaxValue);
                 _breaker = null;
-                _waitUntil = Time.time + 2f;
+                _arrivedAt = Time.time;
+                _lookFor = 2f;
             }
             if (_distraction != null && Vector3.Distance(transform.position, _distraction.transform.position) < 2f)
             {
                 _distraction.TurnOffServer();
                 _distraction = null;
-                _waitUntil = Time.time + 2f;
+                _arrivedAt = Time.time;
+                _lookFor = 2f;
             }
 
             MoveTo(_investigatePoint, _investigateAlarmed ? RUN * 0.75f : WALK * 1.15f);
@@ -1019,8 +1030,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 Stop();
                 transform.Rotate(0, Mathf.Sin(_stateTime * 1.4f) * 90f * Time.deltaTime, 0);
-                if (_waitUntil < Time.time - 30f) _waitUntil = Time.time + (_investigateAlarmed ? 7f : 4f);
-                if (Time.time > _waitUntil) ReturnToDuty();
+                if (_arrivedAt < 0f) _arrivedAt = Time.time;
+                if (NpcRules.LookedAround(_arrivedAt, Time.time, _lookFor)) ReturnToDuty();
             }
             else if (_stateTime > 25f) ReturnToDuty();
         }

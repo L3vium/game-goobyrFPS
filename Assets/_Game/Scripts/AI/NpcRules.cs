@@ -34,6 +34,15 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// </summary>
         public static bool AimsManually(NpcState pState) => pState is NpcState.Engaged or NpcState.Combat or NpcState.Calling or NpcState.Suspicious;
 
+        /// <summary>Seconds an NPC looks around the spot it went to check: longer when it came weapon up.</summary>
+        public static float LookAroundTime(bool pAlarmed) => pAlarmed ? 7f : 4f;
+
+        /// <summary>
+        /// Has it looked around long enough? Its own clock, started when it reached the spot
+        /// (<paramref name="pArrivedAt"/> &lt; 0: not there yet) - never a timer left over from a patrol pause.
+        /// </summary>
+        public static bool LookedAround(float pArrivedAt, float pNow, float pFor) => pArrivedAt >= 0f && pNow - pArrivedAt >= pFor;
+
         // ---------------------------------------------------------------- spotting
 
         public enum SpotReaction : byte { Confront, Fight, Flee }

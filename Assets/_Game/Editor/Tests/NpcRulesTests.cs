@@ -85,6 +85,16 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Investigation_LooksAroundOnItsOwnClock()
+        {
+            Assert.IsFalse(NpcRules.LookedAround(-1f, 500f, NpcRules.LookAroundTime(false)), "not there yet");
+            Assert.IsFalse(NpcRules.LookedAround(100f, 102f, NpcRules.LookAroundTime(false)), "a patrol that just arrived stays and looks");
+            Assert.IsTrue(NpcRules.LookedAround(100f, 100f + NpcRules.LookAroundTime(false), NpcRules.LookAroundTime(false)));
+            Assert.Greater(NpcRules.LookAroundTime(true), NpcRules.LookAroundTime(false), "longer after a shot");
+            Assert.GreaterOrEqual(NpcRules.LookAroundTime(false), 3f);
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

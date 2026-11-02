@@ -50,8 +50,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (pChange == PlayModeStateChange.EnteredPlayMode && SessionState.GetBool(PENDING, false))
             {
                 SessionState.SetBool(PENDING, false);
-                AiShowcaseRunner lRunner = new GameObject("AiShowcaseRunner").AddComponent<AiShowcaseRunner>();
-                lRunner.OutputFolder = OutputFolder;
+                // Editor scripts can't be components: the runner's coroutine runs on a runtime host.
+                AiShowcaseRunner lRunner = new AiShowcaseRunner { OutputFolder = OutputFolder };
+                AI.CoroutineHost.Create("AiShowcaseRunner").StartCoroutine(lRunner.Run());
             }
             else if (pChange == PlayModeStateChange.EnteredEditMode)
             {

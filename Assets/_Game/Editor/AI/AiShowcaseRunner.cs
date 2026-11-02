@@ -26,7 +26,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// <item>the player fires in the air 11 m from the biggest crowd: screams, a stampede to the exits.</item>
     /// </list>
     /// </summary>
-    public class AiShowcaseRunner : MonoBehaviour
+    public class AiShowcaseRunner
     {
         public string OutputFolder { get; set; }
 
@@ -34,7 +34,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private readonly StringBuilder _log = new StringBuilder();
         private const string GAME_ROOT = "Assets/_Game/Prefabs/Net/P_GameRoot.prefab";
 
-        private IEnumerator Start()
+        public IEnumerator Run()
         {
             Directory.CreateDirectory(OutputFolder);
             yield return StartMatch();
@@ -60,7 +60,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private IEnumerator StartMatch()
         {
-            GameObject lRoot = Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(GAME_ROOT));
+            GameObject lRoot = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(GAME_ROOT));
             NetworkManager lNet = lRoot.GetComponentInChildren<NetworkManager>();
             if (lNet != null) lNet.NetworkConfig.EnableSceneManagement = false;
             yield return null;
@@ -74,7 +74,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             List<MapDefinition> lMaps = GameDatabase.Instance.maps;
             for (int i = 0; i < lMaps.Count; i++) if (lMaps[i] != null && lMaps[i].sceneName == SceneManager.GetActiveScene().name) LobbyState.Instance.MapIndex.Value = i;
-            NetworkObject lSession = Instantiate(NetPrefabs.Instance.mapSession);
+            NetworkObject lSession = Object.Instantiate(NetPrefabs.Instance.mapSession);
             lSession.Spawn(true);
             lUntil = Time.realtimeSinceStartup + 30f;
             while (PlayerAvatar.Local == null || Npc.All.Count < 10)
@@ -202,7 +202,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (lView != null)
             {
                 File.WriteAllBytes(Path.Combine(OutputFolder, $"{pName}_view_{pIndex:00}.png"), lView.EncodeToPNG());
-                Destroy(lView);
+                Object.Destroy(lView);
             }
             MapShots.Shot(Path.Combine(OutputFolder, $"{pName}_tp_{pIndex:00}.png"), pFrom, pTo, 58f, 1280, 720);
         }

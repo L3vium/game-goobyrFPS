@@ -756,6 +756,18 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             // Gunfire and explosions: whoever sees the player who made them knows who did it.
             if (pNoise.fromPlayer && pNoise.kind == NoiseKind.Alarming) ReportHostileAct(PlayerAvatar.ForClient(pNoise.source), HostileAct.Shot, null);
+            // Hearing a sound can make someone scream (another sound, heard right away): every nested call
+            // gets its own list, or the outer one would be cleared under its feet.
+            List<(Npc npc, float loudness, float distance)> lHearers = _hearDepth == 0 ? _hearers : new List<(Npc, float, float)>();
+            _hearDepth++;
+            try { HearAll(pNoise, lHearers); }
+            finally { _hearDepth--; }
+        }
+
+        private static int _hearDepth;
+
+        private static void HearAll(NoiseEvent pNoise, List<(Npc npc, float loudness, float distance)> _hearers)
+        {
             _hearers.Clear();
             Vector3 lFrom = pNoise.position + Vector3.up * 0.4f;
             foreach (Npc lNpc in All)

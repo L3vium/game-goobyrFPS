@@ -45,8 +45,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (pChange == PlayModeStateChange.EnteredPlayMode && SessionState.GetBool(PENDING, false))
             {
                 SessionState.SetBool(PENDING, false);
-                AiScenarioRunner lRunner = new GameObject("AiScenarioRunner").AddComponent<AiScenarioRunner>();
-                lRunner.ResultsPath = Path.Combine(Application.dataPath, "..", RESULTS);
+                // Editor scripts can't be components: the runner's coroutine runs on a runtime host.
+                AiScenarioRunner lRunner = new AiScenarioRunner { ResultsPath = Path.Combine(Application.dataPath, "..", RESULTS) };
+                AI.CoroutineHost.Create("AiScenarioRunner").StartCoroutine(lRunner.Run());
             }
             else if (pChange == PlayModeStateChange.EnteredEditMode)
             {

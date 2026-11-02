@@ -31,7 +31,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// <item>civilians flee from gunfire toward the exit away from it.</item>
     /// </list>
     /// </summary>
-    public class AiScenarioRunner : MonoBehaviour
+    public class AiScenarioRunner
     {
         public string ResultsPath { get; set; }
 
@@ -52,7 +52,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private const string GAME_ROOT = "Assets/_Game/Prefabs/Net/P_GameRoot.prefab";
 
-        private IEnumerator Start()
+        public IEnumerator Run()
         {
             float lStarted = Time.realtimeSinceStartup;
             BuildArena();
@@ -145,7 +145,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             GameObject lPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(GAME_ROOT);
             if (lPrefab == null) { _fatal = "no GameRoot prefab at " + GAME_ROOT; yield break; }
-            GameObject lRoot = Instantiate(lPrefab);
+            GameObject lRoot = Object.Instantiate(lPrefab);
             NetworkManager lNet = lRoot.GetComponentInChildren<NetworkManager>();
             // The arena is not a build scene: no scene management for it.
             if (lNet != null) lNet.NetworkConfig.EnableSceneManagement = false;
@@ -163,7 +163,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private IEnumerator SpawnPlayer()
         {
-            NetworkObject lAvatar = Instantiate(NetPrefabs.Instance.playerAvatar, new Vector3(0f, 0.2f, -95f), Quaternion.identity);
+            NetworkObject lAvatar = Object.Instantiate(NetPrefabs.Instance.playerAvatar, new Vector3(0f, 0.2f, -95f), Quaternion.identity);
             lAvatar.SpawnWithOwnership(NetworkManager.ServerClientId, true);
             _player = lAvatar.GetComponent<PlayerAvatar>();
             float lUntil = Time.realtimeSinceStartup + 10f;
@@ -191,7 +191,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             foreach (Npc lNpc in new List<Npc>(Npc.All))
                 if (lNpc != null && lNpc.IsSpawned) lNpc.NetworkObject.Despawn(true);
-            foreach (ItemPickup lPickup in FindObjectsByType<ItemPickup>(FindObjectsSortMode.None))
+            foreach (ItemPickup lPickup in Object.FindObjectsByType<ItemPickup>(FindObjectsSortMode.None))
                 if (lPickup != null && lPickup.IsSpawned) lPickup.NetworkObject.Despawn(true);
             yield return null;
             _zone.ResetSquad();
@@ -213,7 +213,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private Npc Spawn(NpcRole pRole, Vector3 pAt, float pYaw, ItemKind pWeapon)
         {
             if (NavMesh.SamplePosition(pAt, out NavMeshHit lHit, 4f, NavMesh.AllAreas)) pAt = lHit.position;
-            NetworkObject lObject = Instantiate(NetPrefabs.Instance.npc, pAt, Quaternion.Euler(0f, pYaw, 0f));
+            NetworkObject lObject = Object.Instantiate(NetPrefabs.Instance.npc, pAt, Quaternion.Euler(0f, pYaw, 0f));
             lObject.Spawn(true);
             Npc lNpc = lObject.GetComponent<Npc>();
             lNpc.InitServer(pRole, 0, pWeapon == ItemKind.Fists ? null : GameDatabase.Find(pWeapon), null, null, -1, null);
@@ -284,6 +284,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             yield return new WaitForSeconds(0.6f);
             Place(new Vector3(27f, 0f, -45f), 270f, true);
             yield return new WaitForSeconds(0.3f);
+            int lWalls = Senses.WallsBetween(_player.Eye + Vector3.up * 0.4f, lGuards[0].Eye);
             PlayerShot(ItemKind.Pistol);
             yield return new WaitForSeconds(3f);
             int lCame = 0;
@@ -295,7 +296,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             r.value = lCame;
             r.passed = lCame >= r.threshold;
-            r.notes = "walls between: " + Senses.WallsBetween(_player.Eye, lGuards[0].Eye) + "; " + lStates.ToString().Trim();
+            r.notes = "walls between the shot and the nearest guard: " + lWalls + "; " + lStates.ToString().Trim();
         }
 
         /// <summary>4. A guest sees a body: it runs to the guard 20 m off and tells it; the guard goes to look - within 20 s.</summary>

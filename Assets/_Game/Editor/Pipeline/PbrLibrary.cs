@@ -163,15 +163,30 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (lImporter == null) continue;
                 string lName = Path.GetFileNameWithoutExtension(lPath).ToLowerInvariant();
                 bool lChanged = false;
-                bool lNormal = lName.Contains("_nor_gl");
-                bool lLinear = lNormal || lName.Contains("_arm") || lName.EndsWith("_ms") || lName.Contains("_alpha");
+                bool lNormal = IsMap(lName, "nor_gl");
+                bool lLinear = lNormal || IsMap(lName, "arm") || lName.EndsWith("_ms") || IsMap(lName, "alpha");
                 if (lNormal && lImporter.textureType != TextureImporterType.NormalMap) { lImporter.textureType = TextureImporterType.NormalMap; lChanged = true; }
                 if (lImporter.sRGBTexture == lLinear) { lImporter.sRGBTexture = !lLinear; lChanged = true; }
                 if (lImporter.maxTextureSize != 2048) { lImporter.maxTextureSize = 2048; lChanged = true; }
                 if (lImporter.anisoLevel != 8) { lImporter.anisoLevel = 8; lChanged = true; }
                 // Alpha-tested cards (leaves, fronds, grass, impostors): mips keep the alpha coverage of the
                 // full-size texture, so a canopy stays a canopy at a distance instead of thinning to twigs.
-                bool lCutout = lName.Contains("_diffa") || (lName.Contains("_diff") && Path.GetExtension(lPath).ToLowerInvariant() == ".png" && LooksLikeCard(lName) && lImporter.DoesSourceTextureHaveAlpha());
+                bool lCutout = IsMap(lName, "diffa") || (IsMap(lName, "diff") && Path.GetExtension(lPath).ToLowerInvariant() == ".png" && LooksLikeCard(lName) && lImporter.DoesSourceTextureHaveAlpha());
+                // Colour maps compress to BC7 on PC (BC1/DXT5 band and smear the subtle colour of ground and bark),
+                // at the importer's own size.
+                if (!lLinear && (IsMap(lName, "diff") || IsMap(lName, "diffa")))
+                {
+                    TextureImporterPlatformSettings lPc = lImporter.GetPlatformTextureSettings("Standalone");
+                    if (!lPc.overridden || lPc.format != TextureImporterFormat.BC7 || lPc.maxTextureSize != lImporter.maxTextureSize)
+                    {
+                        lPc.overridden = true;
+                        lPc.format = TextureImporterFormat.BC7;
+                        lPc.maxTextureSize = lImporter.maxTextureSize;
+                        lPc.compressionQuality = 50;
+                        lImporter.SetPlatformTextureSettings(lPc);
+                        lChanged = true;
+                    }
+                }
                 if (lCutout && (!lImporter.alphaIsTransparency || !lImporter.mipMapsPreserveCoverage || !Mathf.Approximately(lImporter.alphaTestReferenceValue, CUTOFF)))
                 {
                     lImporter.alphaIsTransparency = true;
@@ -187,10 +202,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 string lName = Path.GetFileNameWithoutExtension(lFile);
                 int lIndex = lName.LastIndexOf("_arm", System.StringComparison.OrdinalIgnoreCase);
-                // Only ARM textures (<prefix>_arm or <prefix>_arm_2k), not "..._Arms..." names or materials.
+                // Only ARM textures (<prefix>_arm or <prefix>_arm_2k), not "..._Arms..." or "FP_Arm_diff".
                 string lExt = Path.GetExtension(lFile).ToLowerInvariant();
-                if (lIndex <= 0 || (lExt != ".png" && lExt != ".jpg" && lExt != ".jpeg" && lExt != ".tga")) continue;
-                if (lName.Length > lIndex + 4 && lName[lIndex + 4] != '_') continue;
+                if (lIndex <= 0 || (lExt != ".png" && lExt != ".jpg" && lExt != ".jpeg" && lExt != ".tga") || !IsMap(lName, "arm")) continue;
                 string lPrefix = lName.Substring(0, lIndex);
                 string lOut = $"{Unix(pDir)}/{lPrefix}_ms.png";
                 if (File.Exists(lOut)) continue;
@@ -201,14 +215,28 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (string lFile in Directory.GetFiles(pDir))
             {
                 string lName = Path.GetFileNameWithoutExtension(lFile);
-                int lIndex = lName.IndexOf("_alpha", System.StringComparison.OrdinalIgnoreCase);
-                if (lIndex <= 0 || Path.GetExtension(lFile).ToLowerInvariant() == ".meta") continue;
+                int lIndex = lName.LastIndexOf("_alpha", System.StringComparison.OrdinalIgnoreCase);
+                if (lIndex <= 0 || Path.GetExtension(lFile).ToLowerInvariant() == ".meta" || !IsMap(lName, "alpha")) continue;
                 string lPrefix = lName.Substring(0, lIndex);
                 string lDiff = Find(pDir, lPrefix, "diff");
                 string lOut = $"{Unix(pDir)}/{lPrefix}_diffa.png";
                 if (lDiff == null || File.Exists(lOut)) continue;
                 MergeAlpha(lDiff, Unix(lFile), lOut);
             }
+        }
+
+        /// <summary>
+        /// Is a texture this map (<c>&lt;prefix&gt;_arm</c>, <c>&lt;prefix&gt;_arm_2k</c>...)? Only the name's own
+        /// suffix counts: <c>FP_Arms_body_diff</c> or <c>Chr_Rook_Arms_diff</c> are colour maps, not ARM maps.
+        /// </summary>
+        public static bool IsMap(string pName, string pMap)
+        {
+            string lName = pName.ToLowerInvariant(), lToken = "_" + pMap.ToLowerInvariant();
+            if (lName.EndsWith(lToken)) return true;
+            int i = lName.LastIndexOf(lToken + "_", System.StringComparison.Ordinal);
+            if (i < 0) return false;
+            string lRest = lName.Substring(i + lToken.Length + 1);
+            return lRest.Length > 1 && lRest.EndsWith("k") && lRest.Substring(0, lRest.Length - 1).All(char.IsDigit);
         }
 
         private static Texture2D Read(string pPath)

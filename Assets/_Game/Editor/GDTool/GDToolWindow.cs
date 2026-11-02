@@ -226,6 +226,89 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 else if (lDistraction.name == "Computer") lPcs++;
             }
             if (lFans < 4 || lHoses < 3 || lPcs < 4) lFails.Add($"{lFans} fans, {lHoses} hoses, {lPcs} computers (need 4, 3, 4)");
+            // Patrols: at least 35 % of the guards walk a route; the key building has a loop on every floor
+            // with rooms; every new distraction device is within earshot of a post or a patrol stop.
+            int lArmed = 0, lMoving = 0;
+            System.Collections.Generic.List<Vector3> lStops = new System.Collections.Generic.List<Vector3>();
+            foreach (NpcSpawnPoint lSpawn in lSpawns)
+            {
+                if (lSpawn.Role == NpcRole.Guard || lSpawn.Role == NpcRole.Lookout) lArmed++;
+                if (lSpawn.Role == NpcRole.Patrol) { lArmed++; lMoving++; }
+                if (lSpawn.Role != NpcRole.Target) lStops.Add(lSpawn.transform.position);
+            }
+            PatrolRoute[] lRoutes = Object.FindObjectsByType<PatrolRoute>(FindObjectsSortMode.None);
+            foreach (PatrolRoute lRoute in lRoutes) for (int i = 0; i < lRoute.Count; i++) lStops.Add(lRoute.Point(i));
+            // The AI track's patrol audit: 35 % moving, a loop in every guarded building, a town patrol,
+            // an exit for every crowd, errands.
+            PatrolAudit.Report lAudit = PatrolAudit.Audit();
+            lFails.AddRange(PatrolAudit.Fails(lAudit));
+            lMoving = lAudit.moving;
+            lArmed = lAudit.guards;
+            // Staff and guests have somewhere to go between stints: 2+ break spots within 30 m in their zone.
+            int lCrowdCount = 0, lCrowdServed = 0;
+            foreach (NpcSpawnPoint lSpawn in lSpawns)
+            {
+                if (lSpawn.Role != NpcRole.Worker) continue;
+                lCrowdCount++;
+                int lNear = 0;
+                foreach (ActivityNode lNode in lNodes)
+                {
+                    bool lCrowdSpot = lNode.Activity is ActivityType.Drink or ActivityType.Dining or ActivityType.Garden or ActivityType.Smoke or ActivityType.Phone or ActivityType.Idle or ActivityType.Inspect;
+                    if (lCrowdSpot && lNode.Zone == lSpawn.Zone && Vector3.Distance(lNode.transform.position, lSpawn.transform.position) < 30f) lNear++;
+                }
+                if (lNear >= 2) lCrowdServed++;
+            }
+            if (lCrowdCount > 0 && lCrowdServed < lCrowdCount * 0.8f) lFails.Add($"only {lCrowdServed}/{lCrowdCount} staff and guests have 2+ break spots within 30 m (< 80 %)");
+            Systems.BuildingVolume lKey = null;
+            foreach (Systems.BuildingVolume lVolume in Object.FindObjectsByType<Systems.BuildingVolume>(FindObjectsSortMode.None))
+                if (lKey == null || lVolume.Size.x * lVolume.Size.z > lKey.Size.x * lKey.Size.z) lKey = lVolume;
+            string lLoops = "";
+            if (lKey != null)
+            {
+                Transform lBuilding = lKey.transform.parent;
+                System.Collections.Generic.Dictionary<int, int> lRoomsPerFloor = new System.Collections.Generic.Dictionary<int, int>();
+                float lStorey = 3.6f;
+                foreach (SecurityZone lZone in lBuilding.GetComponentsInChildren<SecurityZone>()) { lStorey = lZone.Size.y; break; }
+                foreach (SecurityZone lZone in lBuilding.GetComponentsInChildren<SecurityZone>())
+                {
+                    int f = Mathf.RoundToInt((lZone.transform.position.y - lBuilding.position.y) / lStorey);
+                    lRoomsPerFloor[f] = lRoomsPerFloor.TryGetValue(f, out int n) ? n + 1 : 1;
+                }
+                System.Collections.Generic.List<int> lMissing = new System.Collections.Generic.List<int>();
+                foreach (var lFloor in lRoomsPerFloor)
+                {
+                    if (lFloor.Value < 4) continue;
+                    float y = lBuilding.position.y + lFloor.Key * lStorey;
+                    bool lHas = System.Linq.Enumerable.Any(lRoutes, r => r.Count >= 4 && System.Linq.Enumerable.All(System.Linq.Enumerable.Range(0, r.Count), i => Mathf.Abs(r.Point(i).y - y) < 1.9f && lKey.Contains(r.Point(i) + Vector3.up)));
+                    if (!lHas) lMissing.Add(lFloor.Key);
+                }
+                lLoops = $"{lRoomsPerFloor.Count - lMissing.Count}/{lRoomsPerFloor.Count} floors looped in {lBuilding.name}";
+                if (lMissing.Count > 0) lFails.Add($"no patrol loop on floor(s) {string.Join(",", lMissing)} of {lBuilding.name}");
+            }
+            int lHeard = 0, lDevices = 0;
+            foreach (Systems.Distraction lDistraction in Object.FindObjectsByType<Systems.Distraction>(FindObjectsSortMode.None))
+            {
+                float lReach = lDistraction.name == "Fan" ? 9f : lDistraction.name == "HoseReel" ? 11f : lDistraction.name == "Computer" ? 14f : 0f;
+                if (lReach <= 0f) continue;
+                lDevices++;
+                if (System.Linq.Enumerable.Any(lStops, p => Vector3.Distance(p, lDistraction.transform.position) < lReach)) lHeard++;
+            }
+            if (lDevices > 0 && lHeard < lDevices * 0.6f) lFails.Add($"only {lHeard}/{lDevices} fans, hoses and PCs are within earshot of a post or a patrol stop (< 60 %)");
+            // Vent exits and sentry guns are watched: an armed post or a patrol stop within 20 m of each.
+            System.Collections.Generic.List<Vector3> lWatch = new System.Collections.Generic.List<Vector3>();
+            foreach (NpcSpawnPoint lSpawn in lSpawns) if (lSpawn.Role != NpcRole.Worker && lSpawn.Role != NpcRole.Target) lWatch.Add(lSpawn.transform.position);
+            foreach (PatrolRoute lRoute in lRoutes) for (int i = 0; i < lRoute.Count; i++) lWatch.Add(lRoute.Point(i));
+            int lVentsWatched = 0, lVentCount = 0, lGunsWatched = 0;
+            foreach (Systems.VentCover lVent in Object.FindObjectsByType<Systems.VentCover>(FindObjectsSortMode.None))
+            {
+                lVentCount++;
+                if (System.Linq.Enumerable.Any(lWatch, p => Vector3.Distance(p, lVent.transform.position) < 20f)) lVentsWatched++;
+            }
+            foreach (Systems.AutoTurret lGun in lTurrets) if (System.Linq.Enumerable.Any(lWatch, p => Vector3.Distance(p, lGun.transform.position) < 20f)) lGunsWatched++;
+            if (lVentCount > 0 && lVentsWatched < lVentCount * 0.6f) lFails.Add($"only {lVentsWatched}/{lVentCount} vent exits have a post or a patrol within 20 m (< 60 %)");
+            if (lGunsWatched < lTurrets.Length) lFails.Add($"{lTurrets.Length - lGunsWatched} sentry guns with no post or patrol within 20 m");
+            int lExits = Object.FindObjectsByType<ExitPoint>(FindObjectsSortMode.None).Length;
+            if (lExits < 4) lFails.Add($"{lExits} exits for fleeing civilians (< 4)");
             if (System.Linq.Enumerable.Count(lPois, p => p.Type == UI.MapPoi.Kind.Landmark) < 3) lFails.Add("fewer than 3 landmark POIs");
             if (pMap.targets.Count != 15) lFails.Add($"{pMap.targets.Count} targets (!= 15)");
             foreach (TargetProfile lTarget in pMap.targets)
@@ -310,7 +393,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             string lScene = EditorAssets.SCENES + "/" + pMap.sceneName + ".unity";
             float lMegabytes = System.IO.File.Exists(lScene) ? new System.IO.FileInfo(lScene).Length / (1024f * 1024f) : 0f;
             if (lMegabytes > 90f) lFails.Add($"scene {lMegabytes:0} MB (> 90)");
-            string lCounts = $"{lStarts} starts ({lInside} inside), {lExtractions} extractions, {lWeapons} weapons, {lThrowables} throwables, {lNpcs} NPCs, {lVents} vents, {lClimbs} climbs, {lSecure} secure doors, {lCameras} cameras, {lTurrets.Length} sentry guns, {lTerminals.Length} terminals, {lFans} fans, {lHoses} hoses, {lPcs} PCs, {lCovers} covers, {lMegabytes:0} MB";
+            string lCounts = $"{lStarts} starts ({lInside} inside), {lExtractions} extractions, {lWeapons} weapons, {lThrowables} throwables, {lNpcs} NPCs, {lVents} vents, {lClimbs} climbs, {lSecure} secure doors, {lCameras} cameras, {lTurrets.Length} sentry guns, {lTerminals.Length} terminals, {lFans} fans, {lHoses} hoses, {lPcs} PCs, {lMoving}/{lArmed} guards moving, {lRoutes.Length} routes ({lAudit.townRoutes} in town, {lAudit.stops} errands), {lLoops}, {lExits} exits, {lCrowdServed}/{lCrowdCount} with break spots, {lVentsWatched}/{lVentCount} vents and {lGunsWatched}/{lTurrets.Length} guns watched, {lCovers} covers, {lMegabytes:0} MB";
             return lFails.Count == 0 ? $"OK   {pMap.displayName}: {lCounts}" : $"FAIL {pMap.displayName}: {string.Join("; ", lFails)}  ({lCounts})";
         }
     }

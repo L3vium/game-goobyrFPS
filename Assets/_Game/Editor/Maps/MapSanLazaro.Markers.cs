@@ -156,7 +156,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Guard(C(26.5f, 1, 22.8f), 0f, Z, ItemKind.Smg);
             Guard(C(14f, -1, 21f), 90f, Z, ItemKind.Smg);
             Guard(C(26f, -1, 21f), 270f, Z, ItemKind.Shotgun);
-            A.Patrol(Z, 2, ItemKind.Smg, 4f, C(11.2f, 1, 7.2f), C(28.8f, 1, 7.2f), C(28.8f, 1, 22.8f), C(11.2f, 1, 22.8f));
+            A.Patrol(Z, 2, ItemKind.Smg, 4f, C(11.2f, 1, 7.2f), C(20f, 1, 7.2f), C(28.8f, 1, 7.2f), C(28.8f, 1, 15f), C(28.8f, 1, 22.8f), C(20f, 1, 22.8f), C(11.2f, 1, 22.8f), C(11.2f, 1, 15f));
             // Mirador lookout.
             A.Npc(NpcRole.Lookout, C(37f, 6, 30f), 200f, Z, ItemKind.Sniper, ItemKind.Fists, true);
             K.Weapon(ItemKind.Sniper, C(38f, 6, 25f, 0.05f));

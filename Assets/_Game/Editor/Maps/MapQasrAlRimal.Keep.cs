@@ -132,6 +132,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lWind.grilles.Add((4, new Vector3Int(0, 1, 0), "Wind tower"));
             k.ducts.Add(lWind);
 
+            // Floor kept free for the sentry guns and the cellar terminal (MapQasrAlRimal.Security).
+            k.reserved.Add((-1, new Rect(31.9f, 11.5f, 1.4f, 1.4f)));
+            k.reserved.Add((-1, new Rect(31.9f, 31.9f, 1.3f, 1.3f)));
+            k.reserved.Add((-1, new Rect(11.1f, 23.8f, 1.2f, 2.4f)));
+            k.reserved.Add((2, new Rect(31.9f, 31.9f, 1.3f, 1.3f)));
+            k.reserved.Add((3, new Rect(31.9f, 31.9f, 1.3f, 1.3f)));
             k.cornices.Add(1); k.cornices.Add(2); k.cornices.Add(3);
             k.drains.Add(new ArchDrain { at = new Vector2(0, 25f), topFloor = 1, poi = "West drainpipe" });
             k.drains.Add(new ArchDrain { at = new Vector2(34, 30f), topFloor = 3 });

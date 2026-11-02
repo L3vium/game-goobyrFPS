@@ -71,6 +71,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>Bottom of the opening (a boarded window, a hatch in a wall).</summary>
         public float sill;
         public string poi;
+        /// <summary>A painted sign board over this street door (the shop's name), or null.</summary>
+        public string sign;
     }
 
     public class ArchWindow
@@ -170,6 +172,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public ArchMat underbelly;
         /// <summary>Guest ceilings (plaster) when <see cref="ceiling"/> is timber.</summary>
         public ArchMat guestCeiling;
+        /// <summary>Dressed-stone quoins at the outer corners (alternating long and short blocks).</summary>
+        public bool quoins;
+        /// <summary>Weathering decals: rising damp at the foot of the walls, streaks under sills, cracks.</summary>
+        public bool weathered = true;
+        /// <summary>Street posters and notices pasted on the ground-floor facades (town houses).</summary>
+        public bool posters;
+        /// <summary>Most chimneys on one pitched roof (about one per 14 m of ridge); 0: none.</summary>
+        public int chimneys;
     }
 
     /// <summary>A building to generate: footprint, floors, rooms, openings, stairs, roofs, vents, climbs.</summary>

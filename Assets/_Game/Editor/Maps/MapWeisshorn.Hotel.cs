@@ -20,6 +20,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lStyle.plinth = ArchLib.Surface("stone_wall", 2.5f);
             lStyle.windowSpacing = 3.2f;
             lStyle.trim = ArchLib.Tinted("stone_wall", new Color(0.92f, 0.9f, 0.86f), "alp_trim", 2f);
+            lStyle.quoins = true;
+            lStyle.chimneys = 4;
             lStyle = ArchStyles.Grand(lStyle, new Color(0.86f, 0.8f, 0.68f), "hotel");
             ArchSpec h = new ArchSpec { name = "GrandHotel", origin = pOrigin, size = new Vector2(70, 30), storey = 4f, style = lStyle, zone = ZONE_HOTEL, plinth = 1.2f, cutLand = true };
             const SecurityTier R = SecurityTier.Restricted, H = SecurityTier.Hostile;
@@ -165,6 +167,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lDumb.grilles.Add((0, new Vector3Int(1, 0, 0), "Dumbwaiter"));
             h.ducts.Add(lDumb);
 
+            // Floor kept free for the sentry guns and the attic terminal (MapWeisshorn.Security).
+            h.reserved.Add((4, new Rect(24.3f, 0.5f, 1.4f, 1.4f)));
+            h.reserved.Add((4, new Rect(38.3f, 28.3f, 1.4f, 1.25f)));
+            h.reserved.Add((5, new Rect(1.8f, 28.3f, 2.6f, 1.25f)));
             h.cornices.Add(3); h.cornices.Add(4); h.cornices.Add(5);
             h.drains.Add(new ArchDrain { at = new Vector2(1.5f, 0), topFloor = 3, poi = "South drainpipe" });
             h.drains.Add(new ArchDrain { at = new Vector2(0, 8f), topFloor = 4 });

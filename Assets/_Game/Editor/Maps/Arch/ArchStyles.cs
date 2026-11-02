@@ -29,7 +29,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 floorDefault = ArchLib.Tinted("large_floor_tiles_02", new Color(0.86f, 0.55f, 0.42f), "terracotta", 2f),
                 lightColor = new Color(1f, 0.8f, 0.58f),
                 outerThickness = 0.5f,
-                windowSpacing = 3.4f
+                windowSpacing = 3.4f,
+                chimneys = 1
             };
         }
 
@@ -120,6 +121,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             s.outerThickness = 0.8f;
             s.windowSpacing = 6f;
             s.crenels = true;
+            s.quoins = true;
             return s;
         }
 
@@ -159,7 +161,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lightColor = new Color(1f, 0.75f, 0.45f),
                 outerThickness = 0.45f,
                 windowSpacing = 3.2f,
-                snow = true
+                snow = true,
+                quoins = !pTimber,
+                chimneys = 2
             };
         }
     }

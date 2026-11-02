@@ -20,7 +20,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Camera lCamera = lObject.AddComponent<Camera>();
             lObject.AddComponent<UniversalAdditionalCameraData>().renderPostProcessing = true;
             lCamera.transform.position = pFrom;
-            lCamera.transform.rotation = Quaternion.LookRotation((pTo - pFrom).normalized);
+            Vector3 lLook = (pTo - pFrom).normalized;
+            if (Mathf.Abs(lLook.y) > 0.97f) lLook = (lLook + Vector3.forward * 0.3f).normalized;
+            lCamera.transform.rotation = Quaternion.LookRotation(lLook, Vector3.up);
             lCamera.fieldOfView = pFov;
             lCamera.nearClipPlane = 0.05f;
             lCamera.farClipPlane = pFar;
@@ -108,6 +110,20 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             // Rooms: the largest named spaces of every floor (no corridors, stairs, galleries, terraces).
             Transform lZones = lRoot.Find("SecurityZones");
+            // Stairs: the first two stair halls, from a top corner looking down the flight.
+            if (lZones != null)
+            {
+                int lStairs = 0;
+                foreach (Transform z in lZones)
+                {
+                    AI.SecurityZone lZone = z.GetComponent<AI.SecurityZone>();
+                    if (lStairs >= 2 || lZone == null || !z.name.Contains("Stair") || lZone.Size.x < 2.5f || lZone.Size.z < 2.5f) continue;
+                    Vector3 c = z.position;
+                    Vector3 lHalf = new Vector3(lZone.Size.x * 0.5f - 0.5f, 0f, lZone.Size.z * 0.5f - 0.5f);
+                    Vector3 lFrom = c + z.rotation * new Vector3(-lHalf.x, 2.3f, -lHalf.z);
+                    lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_stair{lStairs++}_{z.name.Replace("Zone_", "").Split('_')[0].ToLowerInvariant()}.png"), lFrom, c + z.rotation * new Vector3(lHalf.x * 0.3f, 0.4f, lHalf.z * 0.3f), 74f)).Append('\n');
+                }
+            }
             if (lZones != null)
             {
                 System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<AI.SecurityZone>> lFloors = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.List<AI.SecurityZone>>();
@@ -138,6 +154,186 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_f{lFloor.Key}_{lName.ToLowerInvariant()}.png"), lFrom, lTo, 72f)).Append('\n');
                     }
                 }
+            }
+            return lLog.ToString();
+        }
+
+        /// <summary>
+        /// Shots of the security set: every sentry gun from in front (its laser toward the camera),
+        /// every terminal from where a player would stand, and each cable from beside its middle.
+        /// </summary>
+        public static string SecurityShots(string pDir, string pPrefix)
+        {
+            Physics.SyncTransforms();
+            System.Text.StringBuilder lLog = new System.Text.StringBuilder();
+            int n = 0;
+            foreach (Systems.AutoTurret t in Object.FindObjectsByType<Systems.AutoTurret>(FindObjectsSortMode.None))
+            {
+                Vector3 lTarget = t.transform.position + Vector3.up * 0.9f;
+                View(lTarget, t.transform.forward, 3.6f, 0.5f, out Vector3 lFrom);
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_turret{n++}.png"), lFrom, lTarget, 64f)).Append('\n');
+            }
+            n = 0;
+            foreach (Systems.TurretTerminal t in Object.FindObjectsByType<Systems.TurretTerminal>(FindObjectsSortMode.None))
+            {
+                Vector3 lTarget = t.transform.position + Vector3.up * 0.2f;
+                View(lTarget, t.transform.forward, 2.2f, 0.9f, out Vector3 lFrom);
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_terminal{n++}.png"), lFrom, lTarget, 68f)).Append('\n');
+            }
+            n = 0;
+            foreach (Systems.TurretCable c in Object.FindObjectsByType<Systems.TurretCable>(FindObjectsSortMode.None))
+            {
+                // Aim at a point a third of the way along the cable (its mesh is laid out in path order).
+                MeshFilter lFilter = null;
+                foreach (MeshFilter f in c.GetComponentsInChildren<MeshFilter>()) if (f.sharedMesh != null && (lFilter == null || f.sharedMesh.vertexCount > lFilter.sharedMesh.vertexCount)) lFilter = f;
+                if (lFilter == null) continue;
+                Vector3[] lVertices = lFilter.sharedMesh.vertices;
+                Vector3 lTarget = lFilter.transform.TransformPoint(lVertices[lVertices.Length / 3]);
+                View(lTarget, OpenSide(lTarget), 3.2f, 0.3f, out Vector3 lFrom);
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_cable{n++}.png"), lFrom, lTarget, 72f)).Append('\n');
+            }
+            return lLog.ToString();
+        }
+
+        /// <summary>The horizontal direction with the most free space from a point (the room side of a wall).</summary>
+        private static Vector3 OpenSide(Vector3 pPoint)
+        {
+            Vector3 lBest = Vector3.back;
+            float lFree = -1f;
+            for (int k = 0; k < 12; k++)
+            {
+                Vector3 d = Quaternion.Euler(0, k * 30f, 0) * Vector3.forward;
+                float lDistance = Physics.Raycast(pPoint + d * 0.12f, d, out RaycastHit lHit, 6f, ~0, QueryTriggerInteraction.Ignore) ? lHit.distance : 6f;
+                if (lDistance > lFree) { lFree = lDistance; lBest = d; }
+            }
+            return lBest;
+        }
+
+        private static Vector3 _panic;
+
+        /// <summary>Play mode: patrols caught walking (moving ones, 25 m apart), each from ahead and to one side.</summary>
+        public static string PatrolShots(string pDir, string pPrefix, int pCount)
+        {
+            Physics.SyncTransforms();
+            System.Text.StringBuilder lLog = new System.Text.StringBuilder();
+            System.Collections.Generic.List<Vector3> lDone = new System.Collections.Generic.List<Vector3>();
+            int n = 0;
+            foreach (AI.Npc lNpc in Object.FindObjectsByType<AI.Npc>(FindObjectsSortMode.None))
+            {
+                if (n >= pCount || lNpc.Role != AI.NpcRole.Patrol) continue;
+                UnityEngine.AI.NavMeshAgent lAgent = lNpc.GetComponent<UnityEngine.AI.NavMeshAgent>();
+                if (lAgent == null || lAgent.velocity.magnitude < 0.4f) continue;
+                Vector3 p = lNpc.transform.position;
+                if (lDone.Exists(d => Vector3.Distance(d, p) < 25f)) continue;
+                lDone.Add(p);
+                Vector3 lTarget = p + Vector3.up * 1.15f;
+                View(lTarget, lNpc.transform.forward + lNpc.transform.right * 0.7f, 6.5f, 0.45f, out Vector3 lFrom);
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_patrol{n++}.png"), lFrom, lTarget, 58f)).Append('\n');
+            }
+            return lLog.ToString();
+        }
+
+        /// <summary>
+        /// Play mode: a gunshot-loud alarm (blamed on nobody) in the middle of the biggest crowd - the
+        /// crowd startles, screams and runs for its exits. <see cref="FleeShots"/> a few seconds later.
+        /// </summary>
+        public static string Panic()
+        {
+            AI.Npc[] lNpcs = Object.FindObjectsByType<AI.Npc>(FindObjectsSortMode.None);
+            int lBest = -1, lBestCount = 0;
+            for (int i = 0; i < lNpcs.Length; i++)
+            {
+                if (lNpcs[i].Role != AI.NpcRole.Worker) continue;
+                int lCount = 0;
+                foreach (AI.Npc o in lNpcs) if (o.Role == AI.NpcRole.Worker && Vector3.Distance(o.transform.position, lNpcs[i].transform.position) < 12f) lCount++;
+                if (lCount > lBestCount) { lBestCount = lCount; lBest = i; }
+            }
+            if (lBest < 0) return "no crowd";
+            _panic = lNpcs[lBest].transform.position;
+            AI.NoiseSystem.Emit(_panic + Vector3.up, 45f, AI.NoiseKind.Alarming, ulong.MaxValue, false);
+            return $"panic at {_panic:F0} among {lBestCount}";
+        }
+
+        /// <summary>Play mode, after <see cref="Panic"/>: the scene wide from above, then the runners close up.</summary>
+        public static string FleeShots(string pDir, string pPrefix)
+        {
+            Physics.SyncTransforms();
+            System.Text.StringBuilder lLog = new System.Text.StringBuilder();
+            View(_panic + Vector3.up * 1.2f, Vector3.back, 16f, 7f, out Vector3 lHigh);
+            lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_flee_wide.png"), lHigh, _panic + Vector3.up * 0.8f, 66f)).Append('\n');
+            int n = 0;
+            foreach (AI.Npc lNpc in Object.FindObjectsByType<AI.Npc>(FindObjectsSortMode.None))
+            {
+                if (n >= 3 || lNpc.Role != AI.NpcRole.Worker || Vector3.Distance(lNpc.transform.position, _panic) > 40f) continue;
+                UnityEngine.AI.NavMeshAgent lAgent = lNpc.GetComponent<UnityEngine.AI.NavMeshAgent>();
+                if (lAgent == null || lAgent.velocity.magnitude < 1.5f) continue;
+                Vector3 lTarget = lNpc.transform.position + Vector3.up * 1.1f;
+                View(lTarget, lNpc.transform.forward, 5f, 0.3f, out Vector3 lFrom);
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_flee{n++}.png"), lFrom, lTarget, 60f)).Append('\n');
+            }
+            return lLog.ToString();
+        }
+
+        /// <summary>
+        /// Edit mode review set of a map: the whole map from a corner high up, the key building from the
+        /// air, the key building at dawn, noon, dusk and night, street fronts with posters and weathering,
+        /// a dressed corner (quoins or chamfer), and the grass at eye level.
+        /// </summary>
+        public static string Review(string pDir, string pPrefix)
+        {
+            Physics.SyncTransforms();
+            System.Text.StringBuilder lLog = new System.Text.StringBuilder();
+            Systems.BuildingVolume lKey = null;
+            foreach (Systems.BuildingVolume v in Object.FindObjectsByType<Systems.BuildingVolume>(FindObjectsSortMode.None))
+                if (lKey == null || v.Size.x * v.Size.z > lKey.Size.x * lKey.Size.z) lKey = v;
+            Time(1);
+            lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_aerial_map.png"), new Vector3(-170f, 190f, -230f), new Vector3(10f, 20f, 20f), 60f)).Append('\n');
+            if (lKey != null)
+            {
+                Vector3 c = lKey.transform.position;
+                float r = Mathf.Max(lKey.Size.x, lKey.Size.z);
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_aerial_key.png"), c + new Vector3(-r * 0.9f, r * 0.85f, -r * 1.1f), c, 55f)).Append('\n');
+                // Four times of day on the key building, from a clear point on its approach.
+                Vector3 lFrom = MapShots.Eye(c.x - lKey.Size.x * 0.4f, c.z - lKey.Size.z * 0.5f - r * 0.75f, 3.5f);
+                Vector3 lTo = c + Vector3.up * 2f;
+                string[] lNames = { "dawn", "noon", "dusk", "night" };
+                for (int t = 0; t < 4; t++)
+                {
+                    Time(t);
+                    lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_time_{lNames[t]}.png"), lFrom, lTo, 62f)).Append('\n');
+                }
+                Time(1);
+            }
+            // Street fronts: posters and weathering on the town houses, at eye level from across the street.
+            int n = 0;
+            System.Collections.Generic.List<Vector3> lSeen = new System.Collections.Generic.List<Vector3>();
+            foreach (UnityEngine.Rendering.Universal.DecalProjector d in Object.FindObjectsByType<UnityEngine.Rendering.Universal.DecalProjector>(FindObjectsSortMode.None))
+            {
+                if (n >= 3 || !d.name.StartsWith("Decal_Poster")) continue;
+                Vector3 p = d.transform.position;
+                if (lSeen.Exists(o => Vector3.Distance(o, p) < 40f)) continue;
+                lSeen.Add(p);
+                Vector3 lOut = -d.transform.forward;
+                Vector3 lFrom = p + lOut * 6.5f + Vector3.Cross(Vector3.up, lOut) * 2.5f;
+                lFrom.y = p.y - 0.1f;
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_street{n++}.png"), lFrom, p + Vector3.down * 0.5f, 62f)).Append('\n');
+            }
+            // A dressed corner of the key building (quoins or a chamfer), from the ground.
+            if (lKey != null)
+            {
+                Vector3 lCorner = lKey.transform.position + lKey.transform.rotation * new Vector3(-lKey.Size.x * 0.5f, 0f, -lKey.Size.z * 0.5f);
+                Vector3 lOut = lKey.transform.rotation * new Vector3(-1f, 0f, -1f).normalized;
+                Vector3 lBase = MapShots.Eye(lCorner.x + lOut.x * 7f, lCorner.z + lOut.z * 7f, 1.6f);
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_corner.png"), lBase, new Vector3(lCorner.x, lBase.y + 2.5f, lCorner.z), 64f)).Append('\n');
+            }
+            // Grass at eye level: toward the first tall grass field, from 9 m away.
+            foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
+            {
+                if (t.name != "TallGrass" || t.childCount == 0) continue;
+                Vector3 g = t.GetChild(0).position;
+                Vector3 lFrom = MapShots.Eye(g.x - 9f, g.z - 6f, 1.6f);
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_grass_eye.png"), lFrom, MapShots.Eye(g.x, g.z, 0.9f), 64f)).Append('\n');
+                break;
             }
             return lLog.ToString();
         }

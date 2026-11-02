@@ -70,7 +70,35 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             System.Random lRandom = new System.Random(pBuilding.spec.name.GetHashCode());
             foreach ((int f, Rect r) in pBuilding.spec.reserved) pBuilding.used.Add((f, r));
             foreach (ArchRoom lRoom in pBuilding.spec.rooms)
+            {
                 if (!lRoom.noFurniture && !lRoom.open) Room(pKit, pBuilding, lRoom, pZone, lRandom);
+                else if (lRoom.open && !lRoom.isVoid && lRoom.floor >= 0 && (lRoom.type == RoomType.Terrace || lRoom.type == RoomType.Loggia || lRoom.type == RoomType.Belvedere))
+                    Spots(pKit, pBuilding, lRoom, pZone, ActivityType.Smoke, ActivityType.Idle);
+            }
+        }
+
+        /// <summary>
+        /// The places staff and guests drift to between their stints, and guards take a break at: up to
+        /// one spot per type given, on free floor in the room (tried at its middle, then a quarter of the
+        /// way to each wall), kept free of later furniture.
+        /// </summary>
+        private static void Spots(ArchKit pKit, ArchResult b, ArchRoom pRoom, int pZone, params ActivityType[] pTypes)
+        {
+            Vector2 c = pRoom.rect.center;
+            float qx = pRoom.rect.width * 0.25f, qz = pRoom.rect.height * 0.25f;
+            Vector2[] lTries = { c, c + new Vector2(qx, 0f), c - new Vector2(qx, 0f), c + new Vector2(0f, qz), c - new Vector2(0f, qz), c + new Vector2(qx, qz), c - new Vector2(qx, qz) };
+            int lNext = 0;
+            foreach (ActivityType lType in pTypes)
+                for (; lNext < lTries.Length; lNext++)
+                {
+                    Vector2 p = lTries[lNext];
+                    Rect lFoot = new Rect(p.x - 0.35f, p.y - 0.35f, 0.7f, 0.7f);
+                    if (!Free(b, pRoom, lFoot, false)) continue;
+                    b.used.Add((pRoom.floor, lFoot));
+                    pKit.K.Activity(lType, b.At(p.x, pRoom.floor, p.y, 0.05f), b.Yaw(lNext * 90f), pZone, 14f);
+                    lNext++;
+                    break;
+                }
         }
 
         private static bool Free(ArchResult b, ArchRoom pRoom, Rect pFoot, bool pTall)
@@ -328,6 +356,21 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // A pedestal fan in kitchens, guard rooms, messes and big offices (a distraction a guard walks over to switch off).
             if (pRoom.type == RoomType.Kitchen || pRoom.type == RoomType.GuardRoom || pRoom.type == RoomType.Mess || pRoom.type == RoomType.Barracks || (pRoom.type == RoomType.Office && W * D > 40f))
                 AgainstWall(pKit, b, pRoom, "Furn_PottedPlant", false, r, (k, p, y) => k.Distraction("fan", p, y));
+            // Where the room's people go between their stints (a drink, a call, a look at the goods).
+            switch (pRoom.type)
+            {
+                case RoomType.Lobby: case RoomType.Hall: Spots(pKit, b, pRoom, pZone, ActivityType.Idle, ActivityType.Phone); break;
+                case RoomType.Bar: Spots(pKit, b, pRoom, pZone, ActivityType.Idle, ActivityType.Drink); break;
+                case RoomType.Ballroom: Spots(pKit, b, pRoom, pZone, ActivityType.Idle, ActivityType.Dining, ActivityType.Idle); break;
+                case RoomType.Salon: case RoomType.Living: Spots(pKit, b, pRoom, pZone, ActivityType.Idle, ActivityType.Phone); break;
+                case RoomType.Dining: case RoomType.Mess: Spots(pKit, b, pRoom, pZone, ActivityType.Dining, ActivityType.Idle); break;
+                case RoomType.Kitchen: Spots(pKit, b, pRoom, pZone, ActivityType.Inspect, ActivityType.Idle); break;
+                case RoomType.Spa: case RoomType.Gym: case RoomType.Clinic: Spots(pKit, b, pRoom, pZone, ActivityType.Idle); break;
+                case RoomType.Shop: Spots(pKit, b, pRoom, pZone, ActivityType.Inspect, ActivityType.Inspect); break;
+                case RoomType.Church: case RoomType.Chapel: Spots(pKit, b, pRoom, pZone, ActivityType.Idle); break;
+                case RoomType.GuardRoom: case RoomType.Barracks: Spots(pKit, b, pRoom, pZone, ActivityType.Smoke); break;
+                case RoomType.Office: Spots(pKit, b, pRoom, pZone, ActivityType.Phone); break;
+            }
             // Line the walls: the room's pieces, again and again until the perimeter is dressed.
             Item[] lItems = WallItems(pRoom.type);
             int lWanted = Mathf.Min(16, Mathf.RoundToInt((W + D) * 2f / 2.6f)), lMisses = 0, lPlaced = 0;

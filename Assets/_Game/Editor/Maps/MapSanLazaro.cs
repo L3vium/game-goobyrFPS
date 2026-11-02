@@ -145,11 +145,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         protected override void Details()
         {
-            DetailPrototype lGrass = VegLibrary.Detail("Veg_Grass_Jungle", 0.8f, 1.3f, new Color(0.85f, 0.95f, 0.8f), new Color(0.95f, 0.9f, 0.7f));
+            // Real grass (the world track's GPU blades) on the grass and dry-grass layers, tinted to the
+            // blades' far colour; the hiding fields grow tall blades. Ferns stay instanced details.
+            K.RealGrass(World.GrassStyle.Jungle(),
+                (x, z) => Built(x, z) || K.GroundAt(x, z) < WATER_Y + 0.4f || K.LandSlope(x, z) > 34f ? 0f : Mathf.Clamp01(0.8f + 0.35f * LandShape.Fbm(x, z, 20f, 2, 9.1f)),
+                new[] { Ground.Grass }, new[] { Ground.DryGrass });
             DetailPrototype lFern = VegLibrary.Detail("Veg_Fern", 0.8f, 1.4f, Color.white, new Color(0.9f, 0.95f, 0.85f));
-            if (lGrass != null) K.Details.Add((lGrass, (x, z) => Built(x, z) || K.GroundAt(x, z) < WATER_Y + 0.4f || K.LandSlope(x, z) > 34f ? 0f : Mathf.Clamp01(0.5f + LandShape.Fbm(x, z, 20f, 2, 9.1f)), 6));
             if (lFern != null) K.Details.Add((lFern, (x, z) => Built(x, z) || K.GroundAt(x, z) < WATER_Y + 0.4f || K.LandSlope(x, z) > 38f ? 0f : Mathf.Clamp01(Woods(x, z, K.GroundAt(x, z)) - 0.6f + LandShape.Fbm(x, z, 14f, 2, 4.4f) * 0.5f) * 1.2f, 3));
-            K.TallGrassDetail = VegLibrary.Detail("Veg_TallGrass_Jungle", 0.9f, 1.25f, Color.white, new Color(0.95f, 0.92f, 0.75f));
+            K.TallGrassDetail = null;
         }
 
         // ================================================================ plan
@@ -202,7 +205,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             DressAirstrip();
             DressHacienda();
             Caves();
+            Security();
             Matches();
+            Beats();
+            Exits();
         }
 
         /// <summary>A cluster of basalt columns (hexagonal prisms, 0.5 to 0.9 m) rising from the ground round a point.</summary>

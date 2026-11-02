@@ -74,12 +74,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // The rink on the street, lamps, the bus stop, the gasthaus fondue and TV.
             ArchMesh lRink = new ArchMesh();
             lRink.BoxMinMax(ArchLib.PlainMat("RinkIce", new Color(0.82f, 0.9f, 0.96f), 0.92f, 0f, 3f), new Vector3(55f, VILLAGE_Y - 0.2f, -184f), new Vector3(85f, VILLAGE_Y + 0.08f, -168f));
-            for (int i = 0; i < 4; i++)
+            // The boards, with a gate toward the street (north) and one toward the lake road (west).
+            (Vector3 a, Vector3 b)[] lBoards =
             {
-                Vector3 a = i switch { 0 => new Vector3(55, 0, -184), 1 => new Vector3(85, 0, -184), 2 => new Vector3(85, 0, -168), _ => new Vector3(55, 0, -168) };
-                Vector3 b = i switch { 0 => new Vector3(85, 0, -184), 1 => new Vector3(85, 0, -168), 2 => new Vector3(55, 0, -168), _ => new Vector3(55, 0, -184) };
+                (new Vector3(55, 0, -184), new Vector3(85, 0, -184)), (new Vector3(85, 0, -184), new Vector3(85, 0, -168)),
+                (new Vector3(85, 0, -168), new Vector3(70.8f, 0, -168)), (new Vector3(69.2f, 0, -168), new Vector3(55, 0, -168)),
+                (new Vector3(55, 0, -168), new Vector3(55, 0, -174.8f)), (new Vector3(55, 0, -176.4f), new Vector3(55, 0, -184))
+            };
+            foreach ((Vector3 a, Vector3 b) in lBoards)
                 lRink.Box(ArchLib.Surface("dark_wood", 1.2f), (a + b) * 0.5f + Vector3.up * (VILLAGE_Y + 0.5f), new Vector3(0.12f, 1.0f, (b - a).magnitude), Quaternion.LookRotation(b - a));
-            }
             GameObject lRinkRoot = new GameObject("Rink");
             lRinkRoot.transform.SetParent(K.Env, false);
             lRink.Flush(lRinkRoot.transform, "Weisshorn_Rink");

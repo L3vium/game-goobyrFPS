@@ -122,14 +122,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         protected override void Details()
         {
-            DetailPrototype lGrass = VegLibrary.Detail("Veg_Grass_Dry", 0.8f, 1.3f, Color.white, new Color(0.95f, 0.85f, 0.65f));
-            if (lGrass != null) K.Details.Add((lGrass, (x, z) =>
+            // Real grass: lush under the palms of the grove, straw tufts in the desert (no layer tinted:
+            // the oasis ground is the desert's).
+            K.RealGrass(World.GrassStyle.Oasis(), (x, z) =>
             {
                 bool lGrove = z > -100f && z < -24f && x > -160f && x < 150f;
                 if (Built(x, z) || K.LandSlope(x, z) > 30f) return 0f;
-                return lGrove ? Mathf.Clamp01(0.55f + LandShape.Fbm(x, z, 15f, 2, 3f)) : Mathf.Clamp01(LandShape.Fbm(x, z, 18f, 2, 7f) - 0.15f) * 0.6f;
-            }, 5));
-            K.TallGrassDetail = VegLibrary.Detail("Veg_TallGrass_Dry", 0.9f, 1.25f, Color.white, new Color(0.95f, 0.88f, 0.7f));
+                return lGrove ? Mathf.Clamp01(0.6f + LandShape.Fbm(x, z, 15f, 2, 3f)) : Mathf.Clamp01(LandShape.Fbm(x, z, 18f, 2, 7f) - 0.15f) * 0.6f;
+            }, null, null, (x, z) => z > -100f && z < -24f && x > -160f && x < 150f ? 0.25f : 0.85f);
+            K.TallGrassDetail = null;
         }
 
         // ================================================================ plan
@@ -181,7 +182,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             DressGrove();
             DressCitadel();
             Tunnels();
+            Security();
             Matches();
+            Beats();
+            Exits();
         }
 
         private void Water()

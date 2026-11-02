@@ -1203,6 +1203,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         /// <summary>Called once the sun and the sky exist (the realistic maps add their time of day there).</summary>
         public System.Action<Light, Material> AfterLight;
+        /// <summary>Called once the NavMesh is baked and the NPC points sit on it (the crowd's exits).</summary>
+        public System.Action AfterNavMesh;
 
         /// <summary>Registers something waist-high or taller as cover (cover points are generated around it).</summary>
         public void AddCover(Vector3 pCenter, Vector3 pSize, Quaternion pRotation) => _coverSources.Add((pCenter, pSize, pRotation));
@@ -1316,8 +1318,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         /// <summary>
-        /// NPC posts and patrol points a little off the baked NavMesh (a doorway, a crowd ring touching
-        /// a wall) move onto the closest walkable point within 4 m, so every NPC can stand and walk.
+        /// NPC posts, patrol points and activity spots a little off the baked NavMesh (a doorway, a crowd
+        /// ring touching a wall, a spot in front of a table) move onto the closest walkable point on the
+        /// same floor (else within 4 m), so every NPC can stand and walk - and a patrol loop through a
+        /// furnished room or past a stair well stays on its floor.
         /// </summary>
         private void SnapToNavMesh()
         {
@@ -1325,6 +1329,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             void Snap(Transform pPoint)
             {
                 if (NavMesh.SamplePosition(pPoint.position, out NavMeshHit lNear, 0.3f, NavMesh.AllAreas)) return;
+                if (SameFloor(pPoint.position, out Vector3 lSpot)) { pPoint.position = lSpot; lMoved++; return; }
                 if (NavMesh.SamplePosition(pPoint.position, out lNear, 4f, NavMesh.AllAreas)) { pPoint.position = lNear.position; lMoved++; }
                 else { lLost++; Debug.LogWarning($"[Build] {pPoint.name} at {pPoint.position:F0} has no NavMesh within 4 m"); }
             }
@@ -1340,7 +1345,29 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             foreach (PatrolRoute lRoute in Object.FindObjectsByType<PatrolRoute>(FindObjectsSortMode.None))
                 for (int i = 0; i < lRoute.transform.childCount; i++) Snap(lRoute.transform.GetChild(i));
+            foreach (ActivityNode lNode in Object.FindObjectsByType<ActivityNode>(FindObjectsSortMode.None)) Snap(lNode.transform);
             Debug.Log($"[Build] {lMoved} NPC points snapped onto the NavMesh, {lLost} without one");
+        }
+
+        /// <summary>The closest NavMesh point at about the same height (this floor, not the one below or above), in rings up to 3.6 m out.</summary>
+        private static bool SameFloor(Vector3 pPoint, out Vector3 pSpot)
+        {
+            pSpot = pPoint;
+            float lBest = float.MaxValue;
+            for (int lRing = 0; lRing <= 3; lRing++)
+            {
+                int lSteps = lRing == 0 ? 1 : 8 * lRing;
+                for (int k = 0; k < lSteps; k++)
+                {
+                    float a = k * Mathf.PI * 2f / lSteps;
+                    Vector3 lProbe = pPoint + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (lRing * 1.2f);
+                    if (!NavMesh.SamplePosition(lProbe, out NavMeshHit lHit, 1.1f, NavMesh.AllAreas) || Mathf.Abs(lHit.position.y - pPoint.y) > 1f) continue;
+                    float d = (lHit.position - pPoint).sqrMagnitude;
+                    if (d < lBest) { lBest = d; pSpot = lHit.position; }
+                }
+                if (lBest < float.MaxValue) return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -1394,6 +1421,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Light();
             BakeNavMesh();
             SnapToNavMesh();
+            AfterNavMesh?.Invoke();
             if (Land != null) MapPlanBaker.Bake(Map, Land, PlanStorey);
             Scene lScene = SceneManager.GetActiveScene();
             EditorSceneManager.SaveScene(lScene, _scenePath);

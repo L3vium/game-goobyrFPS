@@ -19,6 +19,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             int k = _houseCount++;
             ArchStyle lStyle = ArchStyles.Adobe(OCHRES[k % OCHRES.Length], "h" + (k % OCHRES.Length));
+            lStyle.posters = true;
             ArchSpec h = Facing("House" + k + (pEnterable ? "_" + pRole : ""), pFront, TOWN_Y, pFacing, pWidth, pDepth, lStyle, ZONE_TOWN);
             h.shut = !pEnterable;
             h.plinth = 1.2f;
@@ -32,7 +33,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 float lSplit = Mathf.Round(pDepth * 0.55f * 2f) / 2f;
                 h.Room("Front", 0, 0, 0, pWidth, lSplit, pRole == "shop" ? RoomType.Shop : pRole == "cafe" ? RoomType.Bar : RoomType.Living, SecurityTier.Public);
                 h.Room("Back", 0, 0, lSplit, pWidth, pDepth, RoomType.Kitchen, SecurityTier.Restricted);
-                h.Door(0, pWidth * 0.5f, 0, pRole == "shop" ? DoorKind.Double : DoorKind.Door, pRole == "shop" ? 2.0f : 1.2f);
+                h.Door(0, pWidth * 0.5f, 0, pRole == "shop" ? DoorKind.Double : DoorKind.Door, pRole == "shop" ? 2.0f : 1.2f).sign = pRole switch
+                {
+                    "shop" => new[] { "ÉPICERIE", "BOULANGERIE", "PHARMACIE", "TAILLEUR", "QUINCAILLERIE", "DATTES" }[k % 6],
+                    "cafe" => new[] { "CAFÉ", "SALON DE THÉ" }[k % 2],
+                    _ => null
+                };
                 h.Door(0, pWidth * 0.3f, lSplit);
                 h.Door(0, pWidth * 0.75f, pDepth, DoorKind.Door, 1.1f);
                 if (pFloors > 1)

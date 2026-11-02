@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Drainpipe_Bottom",
+ "category": "architecture",
+ "size_m": [
+  0.3,
+  0.604,
+  0.393
+ ],
+ "tris": 2860,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "shoe + ground gully; its top spigot (0.57 m) takes Prop_Drainpipe's bottom"
+}

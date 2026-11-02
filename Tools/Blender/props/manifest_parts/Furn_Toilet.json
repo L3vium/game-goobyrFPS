@@ -1,0 +1,13 @@
+{
+ "name": "Furn_Toilet",
+ "category": "furniture",
+ "size_m": [
+  0.42,
+  0.827,
+  0.626
+ ],
+ "tris": 3752,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "close-coupled WC, cistern against the wall at +Y (Unity -Z); seat lid raised"
+}

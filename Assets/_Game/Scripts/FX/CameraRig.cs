@@ -76,7 +76,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _lowPass.cutoffFrequency = 22000f;
             UniversalAdditionalCameraData lWorldData = WorldCamera.GetUniversalAdditionalCameraData();
             lWorldData.renderPostProcessing = true;
-            lWorldData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            lWorldData.antialiasing = AntialiasingMode.TemporalAntiAliasing;
 
             GameObject lView = new GameObject("ViewCamera");
             lView.transform.SetParent(lWorld.transform, false);
@@ -193,6 +193,28 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         }
 
         // ---------------------------------------------------------------- juice entry points
+
+        private Coroutine _hitStop;
+
+        /// <summary>Slows the game clock for a moment (call through <see cref="Juice.HitStop"/>, which keeps it to solo).</summary>
+        public void HitStop(float pSeconds, float pScale)
+        {
+            if (_hitStop != null) StopCoroutine(_hitStop);
+            _hitStop = StartCoroutine(HitStopRoutine(pSeconds, pScale));
+        }
+
+        private System.Collections.IEnumerator HitStopRoutine(float pSeconds, float pScale)
+        {
+            Time.timeScale = pScale;
+            yield return new WaitForSecondsRealtime(pSeconds);
+            Time.timeScale = 1f;
+            _hitStop = null;
+        }
+
+        private void OnDisable()
+        {
+            if (_hitStop != null) Time.timeScale = 1f;
+        }
 
         public void AddTrauma(float pAmount) => _trauma = Mathf.Clamp01(_trauma + pAmount);
         public void KickFov(float pAmount) => _fovKick += pAmount;

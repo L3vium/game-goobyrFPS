@@ -1,0 +1,12 @@
+{
+ "name": "Prop_SecurityCamera",
+ "category": "system",
+ "size_m": [
+  0.17,
+  0.286,
+  0.554
+ ],
+ "tris": 13571,
+ "source": "Poly Haven 'security_camera_01' (polyhaven.com/a/security_camera_01)",
+ "licence": "CC0 (Poly Haven)"
+}

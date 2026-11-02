@@ -42,6 +42,21 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return lBest;
         }
 
+        /// <summary>A random node of the zone within <paramref name="pRadius"/> whose activity passes the filter (a guard's break spot).</summary>
+        public static ActivityNode Near(int pZone, Vector3 pAround, float pRadius, System.Predicate<ActivityType> pFilter)
+        {
+            ActivityNode lPick = null;
+            int lSeen = 0;
+            float lRadiusSq = pRadius * pRadius;
+            foreach (ActivityNode lNode in _all)
+            {
+                if (lNode._zone != pZone || !pFilter(lNode._activity) || (lNode.transform.position - pAround).sqrMagnitude > lRadiusSq) continue;
+                // Reservoir pick: every candidate equally likely.
+                if (Random.Range(0, ++lSeen) == 0) lPick = lNode;
+            }
+            return lPick;
+        }
+
         private void OnDrawGizmos()
         {
             Gizmos.color = new Color(1f, 0.3f, 0.8f);

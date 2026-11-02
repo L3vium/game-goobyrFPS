@@ -1,0 +1,12 @@
+{
+ "name": "W_Poison",
+ "category": "throwable",
+ "size_m": [
+  0.018,
+  0.065,
+  0.018
+ ],
+ "tris": 1884,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

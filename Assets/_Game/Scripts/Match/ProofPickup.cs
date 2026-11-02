@@ -9,13 +9,13 @@ using UnityEngine;
 namespace Com.IsartDigital.GoobyrFPS.Match
 {
     /// <summary>
-    /// The proof of the kill: the target's head (a plush cartoon head, the target's hat still on)
-    /// or the item it always carries. It lies where the target fell, glows, and is carried on the
+    /// The proof of the kill: the item the target always carries (its dossier, a ring, a briefcase,
+    /// a keycard, a badge, a ledger). It lies where the target fell, glows, and is carried on the
     /// back of whoever took it - and drops when that player dies.
     /// </summary>
     public class ProofPickup : NetworkBehaviour
     {
-        public readonly NetworkVariable<ProofKind> Kind = new NetworkVariable<ProofKind>(ProofKind.Head);
+        public readonly NetworkVariable<ProofKind> Kind = new NetworkVariable<ProofKind>(ProofKind.Dossier);
         public readonly NetworkVariable<int> Profile = new NetworkVariable<int>(-1);
         public readonly NetworkVariable<ulong> Carrier = new NetworkVariable<ulong>(ulong.MaxValue);
 
@@ -55,19 +55,11 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
             switch (Kind.Value)
             {
-                case ProofKind.Head:
-                    GoobBody lHeadBody = new GameObject("Head").AddComponent<GoobBody>();
-                    lHeadBody.transform.SetParent(_visual, false);
-                    lHeadBody.Configure(Color.white, new Color(1f, 0.82f, 0.7f), lProfile != null ? lProfile.hat : HatStyle.Fedora, lProfile != null ? lProfile.bodyColor * 0.4f : Color.gray, 1f);
-                    lHeadBody.Build();
-                    // Keep only the head: a plush head with crossed-out eyes.
-                    lHeadBody.Torso.gameObject.SetActive(false);
-                    lHeadBody.HandL.gameObject.SetActive(false);
-                    lHeadBody.HandR.gameObject.SetActive(false);
-                    lHeadBody.FootL.gameObject.SetActive(false);
-                    lHeadBody.FootR.gameObject.SetActive(false);
-                    lHeadBody.Head.localPosition = Vector3.zero;
-                    foreach (Transform lPupil in lHeadBody.Pupils) lPupil.localScale = new Vector3(0.9f, 0.15f, 0.3f);
+                case ProofKind.Dossier:
+                    // A worn leather folder, papers showing at the edge, a strap across.
+                    GameArt.Part(_visual, "Folder", lBox, Vector3.zero, new Vector3(0.34f, 0.045f, 0.26f), new Color(0.3f, 0.17f, 0.09f));
+                    GameArt.Part(_visual, "Papers", lBox, new Vector3(0.012f, 0f, 0.008f), new Vector3(0.325f, 0.032f, 0.25f), new Color(0.92f, 0.9f, 0.84f));
+                    GameArt.Part(_visual, "Strap", lBox, new Vector3(0.06f, 0f, 0f), new Vector3(0.03f, 0.05f, 0.265f), new Color(0.16f, 0.09f, 0.05f));
                     break;
                 case ProofKind.Ring:
                     GameArt.Part(_visual, "Ring", lCyl, Vector3.zero, new Vector3(0.22f, 0.04f, 0.22f), new Color(1f, 0.8f, 0.2f));

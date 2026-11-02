@@ -16,8 +16,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     public class TitleDiorama : MonoBehaviour
     {
         private Camera _camera;
-        private Vector3 _eye = new Vector3(-0.6f, 1.5f, -4.4f);
-        private Vector3 _look = new Vector3(-1.15f, 1.38f, 0f);
+        private Vector3 _eye = new Vector3(-0.85f, 1.45f, -2.9f);
+        private Vector3 _look = new Vector3(-0.6f, 1.25f, 0f);
 
         private void Start()
         {
@@ -29,7 +29,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _camera.backgroundColor = new Color(0.62f, 0.5f, 0.42f);
             UniversalAdditionalCameraData lData = _camera.GetUniversalAdditionalCameraData();
             lData.renderPostProcessing = true;
-            lData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            lData.antialiasing = AntialiasingMode.TemporalAntiAliasing;
             _camera.gameObject.AddComponent<AudioListener>();
 
             BuildSet();
@@ -73,25 +73,22 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             return lPart;
         }
 
-        /// <summary>The agent: dark suit, gloves, earpiece, the hush pistol held low.</summary>
+        /// <summary>The agent: black suit, red tie, the silenced pistol held low in both hands, breathing.</summary>
         private void BuildAgent()
         {
             GameObject lAgent = new GameObject("Agent");
             lAgent.transform.SetParent(transform, false);
-            lAgent.transform.localPosition = new Vector3(0.55f, 0, 0);
-            lAgent.transform.localRotation = Quaternion.Euler(0, 205f, 0);
-            GoobBody lBody = lAgent.AddComponent<GoobBody>();
-            GoobLook lLook = GoobLook.Default(new Color(0.09f, 0.09f, 0.11f));
-            lLook.hair = Hair.Short;
-            lLook.hairColor = new Color(0.12f, 0.1f, 0.08f);
-            lLook.earpiece = true;
-            lLook.hands = HandStyle.Glove;
-            lLook.scale = 1.05f;
-            lBody.Configure(lLook);
-            GoobAnimator lAnimator = lAgent.AddComponent<GoobAnimator>();
-            lAnimator.HoldingWeapon = true;
-            lAnimator.AimPitch = 8f;
-            lBody.Build();
+            lAgent.transform.localPosition = new Vector3(0.15f, 0, 0.3f);
+            lAgent.transform.localRotation = Quaternion.Euler(0, 200f, 0);
+            HumanBody lBody = lAgent.AddComponent<HumanBody>();
+            lBody.Culling = AnimatorCullingMode.AlwaysAnimate;
+            lBody.Configure(HumanCast.AGENT, Color.clear);
+            HumanAnimator lAnimator = lAgent.AddComponent<HumanAnimator>();
+            lAnimator.Velocity = Vector3.zero;
+            lAnimator.Held = HeldKind.Pistol;
+            lAnimator.Pose = BodyPose.ArmedIdle;
+            lAnimator.AimPitch = -3f;
+            lBody.SetHeld(HeldKind.Pistol);
             ItemDefinition lPistol = GameDatabase.Instance != null ? GameDatabase.Find(ItemKind.SilencedPistol) : null;
             if (lPistol != null && lBody.WeaponSocket != null) WeaponModels.Build(lPistol, lBody.WeaponSocket, 0);
         }
@@ -113,6 +110,17 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             lFill.intensity = 0.45f;
             lFill.shadows = LightShadows.None;
             lFill.color = new Color(0.6f, 0.7f, 0.95f);
+            // A soft warm key on the agent's face from the camera side.
+            Light lKey = new GameObject("Key").AddComponent<Light>();
+            lKey.transform.SetParent(transform, false);
+            lKey.transform.localPosition = new Vector3(-1.4f, 2.3f, -1.3f);
+            lKey.transform.LookAt(transform.TransformPoint(new Vector3(0.15f, 1.5f, 0.3f)));
+            lKey.type = LightType.Spot;
+            lKey.spotAngle = 40f;
+            lKey.range = 7f;
+            lKey.intensity = 5f;
+            lKey.color = new Color(1f, 0.86f, 0.7f);
+            lKey.shadows = LightShadows.Soft;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.55f, 0.6f, 0.75f);
             RenderSettings.ambientEquatorColor = new Color(0.55f, 0.48f, 0.42f);
@@ -130,7 +138,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             lVolume.sharedProfile = lProfile;
             DepthOfField lDof = lProfile.Add<DepthOfField>(true);
             lDof.mode.Override(DepthOfFieldMode.Bokeh);
-            lDof.focusDistance.Override(4.5f);
+            lDof.focusDistance.Override(3.4f);
             lDof.focalLength.Override(85f);
             lDof.aperture.Override(2.2f);
             Bloom lBloom = lProfile.Add<Bloom>(true);

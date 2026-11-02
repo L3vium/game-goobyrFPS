@@ -1,0 +1,12 @@
+{
+ "name": "Prop_Generator",
+ "category": "system",
+ "size_m": [
+  0.818,
+  0.577,
+  0.564
+ ],
+ "tris": 19400,
+ "source": "Poly Haven 'portable_generator' (polyhaven.com/a/portable_generator)",
+ "licence": "CC0 (Poly Haven)"
+}

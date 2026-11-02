@@ -1,0 +1,12 @@
+{
+ "name": "W_Smg",
+ "category": "weapon",
+ "size_m": [
+  0.05,
+  0.28,
+  0.418
+ ],
+ "tris": 5646,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

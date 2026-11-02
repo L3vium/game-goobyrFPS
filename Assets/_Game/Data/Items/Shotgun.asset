@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c8f7e51f3b3ee944b9e257aa40147e3, type: 3}
   m_Name: Shotgun
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.ItemDefinition
-  displayName: Thumper
+  displayName: Shotgun
   kind: 4
   slot: 0
   color: {r: 0.85, g: 0.35, b: 0.3, a: 1}
@@ -31,7 +31,7 @@ MonoBehaviour:
   recoil: 4.5
   adsFov: 68
   shake: 0.45
-  noiseRadius: 60
+  noiseRadius: 50
   projectileSpeed: 0
   explosionRadius: 0
   throwForce: 18

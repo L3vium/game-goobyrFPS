@@ -1,0 +1,12 @@
+{
+ "name": "Prop_Crate_Military",
+ "category": "prop",
+ "size_m": [
+  1.242,
+  0.465,
+  0.52
+ ],
+ "tris": 11624,
+ "source": "Poly Haven 'wooden_military_crate' (polyhaven.com/a/wooden_military_crate)",
+ "licence": "CC0 (Poly Haven)"
+}

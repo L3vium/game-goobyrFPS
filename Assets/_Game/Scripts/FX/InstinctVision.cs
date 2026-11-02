@@ -45,6 +45,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public const float TARGET_RANGE = 10000f;
         public const float NPC_RANGE = 55f;
         public const float USE_RANGE = 25f;
+        /// <summary>Cameras, turrets and turret cables: far enough to read a security layout and follow a cable.</summary>
+        public const float SECURITY_RANGE = 70f;
         private const float REFRESH = 0.12f;
         private const float WAVE_SPEED = 85f;
         private const float WAVE_REACH = 140f;
@@ -136,6 +138,21 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 AddTree(lNpc.transform, Slot.Npc);
             }
 
+            // Security: cameras and turrets (and the cables that lead to their terminal) in orange while
+            // they work against you, turned turrets in blue.
+            float lSecurityRange = SECURITY_RANGE * SECURITY_RANGE;
+            foreach (SecurityCamera lCamera in SecurityCamera.All)
+                if (lCamera != null && !lCamera.Off && (lCamera.transform.position - lEye).sqrMagnitude < lSecurityRange) AddTree(lCamera.transform, Slot.Alert);
+            foreach (AutoTurret lTurret in AutoTurret.All)
+                if (lTurret != null && (lTurret.transform.position - lEye).sqrMagnitude < lSecurityRange) AddTree(lTurret.transform, lTurret.Turned ? Slot.Ally : Slot.Alert);
+            foreach (TurretCable lCable in TurretCable.All)
+            {
+                if (lCable == null || lCable.Turret == null) continue;
+                Slot lSlot = lCable.Turret.Turned ? Slot.Ally : Slot.Alert;
+                foreach (Renderer lRenderer in lCable.Renderers)
+                    if (lRenderer != null && lRenderer.bounds.SqrDistance(lEye) < lSecurityRange) Add(lRenderer, lSlot);
+            }
+
             // What you can use or take.
             float lUseRange = USE_RANGE * USE_RANGE;
             foreach (Interactable lInteractable in WorldRegistry.All)
@@ -164,7 +181,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             foreach (Renderer lRenderer in _buffer) if (!IsGlow(lRenderer)) Add(lRenderer, pSlot);
         }
 
-        private static void AddBody(GoobBody pBody, Slot pSlot)
+        private static void AddBody(HumanBody pBody, Slot pSlot)
         {
             if (pBody == null || pBody.Renderers == null) return;
             foreach (Renderer lRenderer in pBody.Renderers) Add(lRenderer, pSlot);
@@ -174,10 +191,10 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private static bool IsGlow(Renderer pRenderer) => pRenderer.name == "Ring" || pRenderer.name == "Glow" || pRenderer.name.EndsWith("_Glow");
 
         /// <summary>
-        /// What the player can actually use: sprinkler heads, burning crates and patrol cars are
-        /// interactables for the systems, not for the player.
+        /// What the player can actually use: sprinkler heads, burning crates, patrol cars and turrets
+        /// are interactables for the systems, not for the player (turrets are drawn with security).
         /// </summary>
-        private static bool Usable(Interactable pInteractable) => !(pInteractable is Sprinkler) && !(pInteractable is Flammable) && !(pInteractable is VehiclePatrol);
+        private static bool Usable(Interactable pInteractable) => !(pInteractable is Sprinkler) && !(pInteractable is Flammable) && !(pInteractable is VehiclePatrol) && !(pInteractable is AutoTurret);
 
         /// <summary>
         /// The meshes of an interactable: its own, or - for a trigger put next to a kit piece (a breaker

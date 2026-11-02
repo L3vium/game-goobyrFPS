@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Com.IsartDigital.GoobyrFPS.AI;
 using Com.IsartDigital.GoobyrFPS.Data;
 using Com.IsartDigital.GoobyrFPS.FX;
 using Com.IsartDigital.GoobyrFPS.Match;
@@ -26,6 +27,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private Canvas _canvas;
         private RectTransform _root;
         private TextMeshProUGUI _crosshair, _hitmarker, _health, _ammo, _weaponName, _prompt, _clock, _dossier, _status, _bannerTitle, _bannerSub, _stealth, _spectating, _voice, _scoreboard;
+        /// <summary>Where you stand socially: nothing in public, TRESPASSING (amber), HOSTILE AREA (red).</summary>
+        private TextMeshProUGUI _zone;
         private Image _healthFill, _flash, _extractFill, _scope;
         private RectTransform _extractBar, _scoreboardPanel, _markers;
         private readonly TextMeshProUGUI[] _slots = new TextMeshProUGUI[WeaponHolder.SLOT_COUNT];
@@ -150,6 +153,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _healthFill.rectTransform.pivot = new Vector2(0, 0.5f);
             _health = UIFactory.Text(lHealthPanel.transform, "Health", "100", 22, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 12), new Vector2(200, 30));
             _stealth = UIFactory.Text(lHealthPanel.transform, "Stealth", "", 18, new Color(0.6f, 1f, 0.7f), TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 36), new Vector2(200, 26));
+            _zone = UIFactory.Text(_root, "Zone", "", 17, UIFactory.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0), new Vector2(0, 112), new Vector2(500, 26));
 
             // Ammo, bottom right.
             Image lAmmoPanel = UIFactory.Panel(_root, "AmmoPanel", new Color(0, 0, 0, 0), new Vector2(1, 0), new Vector2(-40, 36), new Vector2(320, 70));
@@ -213,7 +217,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _flash.color = new Color(1, 1, 1, 0);
 
             // Typography: condensed capitals for numbers and titles, the accent as a thin rule.
-            foreach (TextMeshProUGUI lText in new[] { _health, _ammo, _clock, _bannerTitle, _bannerSub, _weaponName, _status, _stealth, _spectating, _prompt })
+            foreach (TextMeshProUGUI lText in new[] { _health, _ammo, _clock, _bannerTitle, _bannerSub, _weaponName, _status, _stealth, _zone, _spectating, _prompt })
             {
                 lText.font = UIFactory.Heading;
                 lText.characterSpacing = 4f;
@@ -300,6 +304,11 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 if (lRatio < 0.3f && lAlive && CameraRig.Instance != null) CameraRig.Instance.PulseHurt(0.15f + Mathf.Sin(Time.time * 6f) * 0.05f);
                 bool lConcealed = lMe.Hidden.Value || (lMe.Crouched.Value && lMe.InGrass.Value);
                 _stealth.text = "";
+
+                // Trespass status, as guards, cameras and sentry guns judge it (a valid pass makes it public).
+                SecurityTier lTier = lAlive ? SecurityZone.ForPlayer(SecurityZone.At(lMe.transform.position, out AccessLevel lNeed), lNeed, lWeapons != null ? lWeapons.Access : AccessLevel.None, false) : SecurityTier.Public;
+                _zone.text = lTier == SecurityTier.Hostile ? "HOSTILE AREA" : lTier == SecurityTier.Restricted ? "TRESPASSING" : "";
+                _zone.color = lTier == SecurityTier.Hostile ? UIFactory.Danger : UIFactory.Accent;
             }
 
             // Ammo and slots.

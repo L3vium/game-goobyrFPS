@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Com.IsartDigital.GoobyrFPS.EditorTools
 {
     /// <summary>
-    /// A small street that shows one building of each kit style, props and Goobs: the place to
+    /// A small street that shows one building of each kit style, props and the characters: the place to
     /// check the kit's orientation, roofs, stairs and outfits after touching the assembler.
     /// Saved as <c>Scenes/KitTest.unity</c> (not in the build).
     /// </summary>
@@ -49,19 +49,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             K.Point(AI.MatchPoint.Kind.Start, new Vector3(0, 0.2f, 0), 0, "Test");
             K.Finish();
 
-            // Goobs lined up to check the outfits.
-            int lIndex = 0;
-            foreach (FX.Outfit lOutfit in System.Enum.GetValues(typeof(FX.Outfit)))
+            // Every character lined up to check the outfits.
+            string[] lCharacters = { FX.HumanCast.AGENT, FX.HumanCast.AGENT_F, "Chr_Guard_Jungle", "Chr_Guard_Desert", "Chr_Guard_Snow", FX.HumanCast.BODYGUARD, FX.HumanCast.STAFF, FX.HumanCast.CIVILIAN_M, FX.HumanCast.CIVILIAN_F, FX.HumanCast.VIP };
+            for (int i = 0; i < lCharacters.Length; i++)
             {
-                GameObject lGoob = new GameObject("Goob_" + lOutfit);
-                lGoob.transform.position = new Vector3(-12 + lIndex * 3f, 0, 2);
-                lGoob.transform.rotation = Quaternion.Euler(0, 180, 0);
-                FX.GoobBody lBody = lGoob.AddComponent<FX.GoobBody>();
-                FX.GoobLook lLook = FX.GoobLook.Random(new System.Random(lIndex * 31), lOutfit, Net.LobbyPlayer.TeamColor(lIndex));
-                lLook.hat = (HatStyle)(lIndex % 9);
-                lBody.Configure(lLook);
-                lBody.Build();
-                lIndex++;
+                GameObject lHuman = new GameObject(lCharacters[i]);
+                lHuman.transform.position = new Vector3(-13.5f + i * 3f, 0, 2);
+                lHuman.transform.rotation = Quaternion.Euler(0, 180, 0);
+                lHuman.AddComponent<FX.HumanBody>().Configure(lCharacters[i], Color.clear);
             }
             UnityEditor.SceneManagement.EditorSceneManager.SaveOpenScenes();
             Debug.Log("[Build] kit test scene");

@@ -11,6 +11,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
     /// </summary>
     public static class Effects
     {
+        /// <summary>Colour of the spray a bullet or a blow throws out of a body.</summary>
+        public static readonly Color Blood = new Color(0.42f, 0.03f, 0.03f);
+
         private static readonly Dictionary<string, Queue<ParticleSystem>> _pools = new Dictionary<string, Queue<ParticleSystem>>();
         private static Transform _root;
 
@@ -55,7 +58,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             Emit("sparks", pPosition, Quaternion.LookRotation(pNormal), 5, 1f);
         }
 
-        /// <summary>Hit on a Goob: a puff of fluffy coloured bits (no gore, it is a plush world).</summary>
+        /// <summary>Hit on a character: a spray of particles in the given colour (blood for bodies).</summary>
         public static void Fluff(Vector3 pPosition, Vector3 pDirection, Color pColor, bool pBig)
         {
             Emit("fluff", pPosition, Quaternion.LookRotation(pDirection), pBig ? 22 : 10, pBig ? 1.4f : 1f, pColor);

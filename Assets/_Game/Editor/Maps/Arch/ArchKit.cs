@@ -1,0 +1,838 @@
+using System.Collections.Generic;
+using Com.IsartDigital.GoobyrFPS.AI;
+using Com.IsartDigital.GoobyrFPS.Core;
+using Com.IsartDigital.GoobyrFPS.Data;
+using Com.IsartDigital.GoobyrFPS.Systems;
+using Com.IsartDigital.GoobyrFPS.UI;
+using Unity.AI.Navigation;
+using UnityEngine;
+
+// Author : Baptiste Vu Liem
+namespace Com.IsartDigital.GoobyrFPS.EditorTools
+{
+    /// <summary>
+    /// The systemic props of the realistic maps, built from the finished models (or PBR boxes): drinks,
+    /// toilets, wardrobes, dumpsters, crates and laundry carts to hide in, TVs, radios, phones and
+    /// generators that distract, explosive barrels and gas tanks, CCTV cameras and the recorder,
+    /// breakers, the air handler, drop ladders, chandeliers, ziplines, chatter spots and map POIs.
+    /// Markers go through <see cref="MapKit"/>.
+    /// </summary>
+    public class ArchKit
+    {
+        public readonly MapKit K;
+        public readonly Transform Props, Systems;
+        private readonly System.Random _rng;
+        private readonly List<Vector3> _hides = new List<Vector3>();
+        private int _unique;
+
+        /// <summary>Every hiding container placed so far (for the "container within 15 m" rule).</summary>
+        public IReadOnlyList<Vector3> Hides => _hides;
+
+        public ArchKit(MapKit pKit)
+        {
+            K = pKit;
+            Props = K.Props;
+            Systems = K.Group("ArchSystems", K.Props);
+            _rng = new System.Random(K.Map.sceneName.GetHashCode() ^ 0x5a17);
+        }
+
+        public float R => (float)_rng.NextDouble();
+        public T Pick<T>(params T[] pItems) => pItems[_rng.Next(pItems.Length)];
+
+        private static ArchMat Wood => ArchLib.Surface("old_planks_02", 1.5f);
+        private static ArchMat DarkWood => ArchLib.Surface("dark_wooden_planks", 1.5f);
+
+        /// <summary>A model with a box collider (or a PBR box of its manifest size).</summary>
+        public GameObject Model(string pName, Vector3 pPosition, float pYaw, Transform pParent = null, ArchLib.Collide pCollide = ArchLib.Collide.Box, float pScale = 1f)
+        {
+            GameObject lObject = ArchLib.Place(pName, pParent ?? Props, pPosition, pYaw, pCollide, Wood, pScale);
+            if (lObject != null && pCollide == ArchLib.Collide.Box) Cover(lObject);
+            return lObject;
+        }
+
+        /// <summary>Registers an object waist-high or taller (and not huge) as cover for the AI.</summary>
+        public void Cover(GameObject pObject)
+        {
+            BoxCollider lBox = pObject.GetComponent<BoxCollider>();
+            if (lBox == null || lBox.isTrigger) return;
+            Vector3 lSize = Vector3.Scale(lBox.size, pObject.transform.lossyScale);
+            if (lSize.y < 0.8f || lSize.x * lSize.z > 30f || lSize.y > 4f) return;
+            K.AddCover(pObject.transform.TransformPoint(lBox.center), lSize, pObject.transform.rotation);
+        }
+
+        /// <summary>A box mesh object (no model exists for it): a dumpster, a cart, a pew.</summary>
+        public GameObject BoxObject(string pName, Vector3 pPosition, float pYaw, Transform pParent, int pLayer, bool pCollider, params (ArchMat mat, Vector3 center, Vector3 size)[] pParts)
+        {
+            GameObject lObject = new GameObject(pName) { layer = pLayer };
+            lObject.transform.SetParent(pParent ?? Props, false);
+            lObject.transform.SetPositionAndRotation(pPosition, Quaternion.Euler(0, pYaw, 0));
+            ArchMesh lMesh = new ArchMesh();
+            Bounds lBounds = new Bounds(pParts[0].center, pParts[0].size);
+            foreach ((ArchMat lMat, Vector3 lCenter, Vector3 lSize) in pParts)
+            {
+                lMesh.Box(lMat, lCenter, lSize, false);
+                lBounds.Encapsulate(new Bounds(lCenter, lSize));
+            }
+            // Same parts, same mesh: shared between every copy of a shape.
+            int lHash = 17;
+            foreach ((ArchMat lMat, Vector3 lCenter, Vector3 lSize) in pParts) lHash = lHash * 31 + (lMat.id + lCenter.ToString("F2") + lSize.ToString("F2")).GetHashCode();
+            foreach (GameObject lPart in lMesh.Flush(lObject.transform, "Shape_" + pName + "_" + ((uint)lHash).ToString("X8"), pLayer))
+                lPart.isStatic = pLayer == GameLayers.DEFAULT;
+            if (pCollider)
+            {
+                BoxCollider lBox = lObject.AddComponent<BoxCollider>();
+                lBox.center = lBounds.center;
+                lBox.size = lBounds.size;
+                Cover(lObject);
+            }
+            lObject.isStatic = pLayer == GameLayers.DEFAULT;
+            return lObject;
+        }
+
+        // ---------------------------------------------------------------- drinks, toilets
+
+        /// <summary>Poisonable glasses (and a bottle) on a surface, plus the Drink activity in front.</summary>
+        public void Drinks(Vector3 pSurface, float pYaw, int pZone, int pCount, bool pActivity = true, float pFront = 1.0f)
+        {
+            Quaternion lRot = Quaternion.Euler(0, pYaw, 0);
+            for (int i = 0; i < pCount; i++)
+            {
+                Vector3 lPos = pSurface + lRot * new Vector3((i - (pCount - 1) * 0.5f) * 0.35f, 0f, 0f);
+                GameObject lGlass = new GameObject("Drink") { layer = GameLayers.INTERACTABLE };
+                lGlass.transform.SetParent(Systems, false);
+                lGlass.transform.position = lPos;
+                ArchMesh lMesh = new ArchMesh();
+                lMesh.Cylinder(ArchLib.Glass, Vector3.zero, 0.04f, 0.13f, 10, false, false);
+                lMesh.Flush(lGlass.transform, "Arch_DrinkGlass");
+                GameObject lLiquid = new GameObject("Liquid");
+                lLiquid.transform.SetParent(lGlass.transform, false);
+                ArchMesh lLiquidMesh = new ArchMesh();
+                lLiquidMesh.Cylinder(ArchLib.PlainMat("Aguardiente", new Color(0.75f, 0.5f, 0.2f, 1f), 0.9f, 0f), Vector3.up * 0.005f, 0.035f, 0.08f, 10, false);
+                List<GameObject> lParts = lLiquidMesh.Flush(lLiquid.transform, "Arch_DrinkLiquid");
+                // Drink looks for a renderer on "Liquid": move it up one level.
+                if (lParts.Count > 0)
+                {
+                    lLiquid.AddComponent<MeshFilter>().sharedMesh = lParts[0].GetComponent<MeshFilter>().sharedMesh;
+                    lLiquid.AddComponent<MeshRenderer>().sharedMaterial = lParts[0].GetComponent<MeshRenderer>().sharedMaterial;
+                    Object.DestroyImmediate(lParts[0]);
+                }
+                foreach (Transform t in lGlass.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.INTERACTABLE; t.gameObject.isStatic = false; }
+                BoxCollider lBox = lGlass.AddComponent<BoxCollider>();
+                lBox.size = new Vector3(0.3f, 0.35f, 0.3f);
+                lBox.center = new Vector3(0, 0.15f, 0);
+                lBox.isTrigger = true;
+                lGlass.AddComponent<Drink>();
+            }
+            Model("W_Bottle", pSurface + lRot * new Vector3((pCount * 0.5f + 0.2f) * 0.35f, 0f, 0.05f), pYaw, null, ArchLib.Collide.None);
+            if (pActivity) K.Activity(ActivityType.Drink, pSurface + lRot * new Vector3(0, 0, -pFront), pYaw, pZone, 14f);
+        }
+
+        public void Toilet(Vector3 pPosition, float pYaw, int pZone)
+        {
+            GameObject lToilet = Model("Furn_Toilet", pPosition, pYaw, Systems);
+            if (lToilet == null) return;
+            lToilet.AddComponent<Toilet>();
+            K.Activity(ActivityType.Toilet, pPosition + Quaternion.Euler(0, pYaw, 0) * new Vector3(0, 0, 0.75f), pYaw + 180f, pZone, 10f);
+        }
+
+        // ---------------------------------------------------------------- hiding spots
+
+        private void Hiding(GameObject pObject, Vector3 pInside, Vector3 pExit, string pPrompt)
+        {
+            foreach (Transform t in pObject.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.INTERACTABLE; t.gameObject.isStatic = false; }
+            Transform lInside = new GameObject("Inside").transform;
+            lInside.SetParent(pObject.transform, false);
+            lInside.position = pInside;
+            Transform lExit = new GameObject("Exit").transform;
+            lExit.SetParent(pObject.transform, false);
+            lExit.position = pExit;
+            pObject.AddComponent<HidingSpot>().Setup(lInside, lExit, pPrompt);
+            _hides.Add(pObject.transform.position);
+        }
+
+        public void Wardrobe(Vector3 pPosition, float pYaw, Transform pParent = null)
+        {
+            GameObject lWardrobe = Model("Furn_Wardrobe", pPosition, pYaw, pParent ?? Systems);
+            if (lWardrobe == null) return;
+            Hiding(lWardrobe, pPosition + Vector3.up * 0.05f, pPosition + Quaternion.Euler(0, pYaw, 0) * new Vector3(0, 0.05f, 1.0f), "HIDE IN THE WARDROBE");
+        }
+
+        public void Dumpster(Vector3 pPosition, float pYaw)
+        {
+            ArchMat lMetal = ArchLib.Surface("green_metal_rust", 1.5f), lDark = ArchLib.Iron;
+            GameObject lBin = BoxObject("Dumpster", pPosition, pYaw, Systems, GameLayers.INTERACTABLE, true,
+                (lMetal, new Vector3(0, 0.65f, 0), new Vector3(1.9f, 1.1f, 1.15f)),
+                (lMetal, new Vector3(0, 1.24f, -0.1f), new Vector3(1.95f, 0.06f, 1.3f)),
+                (lDark, new Vector3(-0.75f, 0.06f, -0.4f), new Vector3(0.12f, 0.12f, 0.12f)),
+                (lDark, new Vector3(0.75f, 0.06f, -0.4f), new Vector3(0.12f, 0.12f, 0.12f)),
+                (lDark, new Vector3(-0.75f, 0.06f, 0.4f), new Vector3(0.12f, 0.12f, 0.12f)),
+                (lDark, new Vector3(0.75f, 0.06f, 0.4f), new Vector3(0.12f, 0.12f, 0.12f)));
+            Hiding(lBin, pPosition + Vector3.up * 0.1f, pPosition + Quaternion.Euler(0, pYaw, 0) * new Vector3(0, 0.05f, 1.3f), "HIDE IN THE DUMPSTER");
+        }
+
+        public void BigCrate(Vector3 pPosition, float pYaw)
+        {
+            ArchMat lWood = ArchLib.Surface("wooden_planks", 1.2f);
+            GameObject lCrate = BoxObject("HideCrate", pPosition, pYaw, Systems, GameLayers.INTERACTABLE, true,
+                (lWood, new Vector3(0, 0.65f, 0), new Vector3(1.6f, 1.3f, 1.2f)),
+                (DarkWood, new Vector3(0, 0.65f, -0.61f), new Vector3(1.64f, 0.12f, 0.03f)),
+                (DarkWood, new Vector3(0, 0.65f, 0.61f), new Vector3(1.64f, 0.12f, 0.03f)));
+            Hiding(lCrate, pPosition + Vector3.up * 0.1f, pPosition + Quaternion.Euler(0, pYaw, 0) * new Vector3(0, 0.05f, 1.3f), "HIDE IN THE CRATE");
+            lCrate.AddComponent<Flammable>().Setup(14f, 2.6f, false, 1.2f);
+        }
+
+        public void LaundryCart(Vector3 pPosition, float pYaw)
+        {
+            ArchMat lCloth = ArchLib.Surface("hessian_230", 1f), lMetal = ArchLib.Galvanised;
+            GameObject lCart = BoxObject("LaundryCart", pPosition, pYaw, Systems, GameLayers.INTERACTABLE, true,
+                (lCloth, new Vector3(0, 0.6f, 0), new Vector3(1.1f, 0.8f, 0.75f)),
+                (lMetal, new Vector3(0, 0.18f, 0), new Vector3(1.15f, 0.06f, 0.8f)),
+                (lMetal, new Vector3(-0.5f, 0.07f, -0.32f), new Vector3(0.1f, 0.14f, 0.1f)),
+                (lMetal, new Vector3(0.5f, 0.07f, 0.32f), new Vector3(0.1f, 0.14f, 0.1f)));
+            Hiding(lCart, pPosition + Vector3.up * 0.1f, pPosition + Quaternion.Euler(0, pYaw, 0) * new Vector3(0, 0.05f, 1.0f), "HIDE IN THE LAUNDRY CART");
+        }
+
+        /// <summary>A banana-leaf pile, a haystack of coffee sacks: soft hiding outdoors.</summary>
+        public void Sacks(Vector3 pPosition, float pYaw)
+        {
+            ArchMat lCloth = ArchLib.Surface("hessian_230", 0.8f);
+            GameObject lPile = BoxObject("SackPile", pPosition, pYaw, Systems, GameLayers.INTERACTABLE, true,
+                (lCloth, new Vector3(0, 0.35f, 0), new Vector3(1.8f, 0.7f, 1.4f)),
+                (lCloth, new Vector3(0.1f, 0.9f, 0.05f), new Vector3(1.4f, 0.5f, 1.1f)),
+                (lCloth, new Vector3(-0.2f, 1.25f, 0), new Vector3(0.9f, 0.3f, 0.7f)));
+            Hiding(lPile, pPosition + Vector3.up * 0.1f, pPosition + Quaternion.Euler(0, pYaw, 0) * new Vector3(0, 0.05f, 1.3f), "HIDE IN THE SACKS");
+            lPile.AddComponent<Flammable>().Setup(15f, 3f, false, 1.2f);
+        }
+
+        // ---------------------------------------------------------------- distractions, hazards
+
+        /// <summary>
+        /// tv, radio, phone, generator, caralarm (with the matching model), fan (pedestal fan, floor),
+        /// hose (garden hose reel, at the foot of a wall facing out), computer (office PC on a desk top).
+        /// </summary>
+        public void Distraction(string pKind, Vector3 pPosition, float pYaw)
+        {
+            GameObject lObject;
+            Transform lSpinner = null, lNozzle = null;
+            Renderer lScreen = null;
+            switch (pKind)
+            {
+                case "fan": lObject = Fan(pPosition, pYaw, out lSpinner); break;
+                case "hose": lObject = HoseReel(pPosition, pYaw, out lNozzle); break;
+                case "computer": lObject = Computer("Computer", pPosition, pYaw, out lScreen); break;
+                case "tv": lObject = Model("Furn_TV", pPosition, pYaw, Systems); break;
+                case "generator": lObject = Model("Prop_Generator", pPosition, pYaw, Systems); break;
+                case "caralarm": lObject = Model(R < 0.5f ? "Prop_Car_Sedan" : "Prop_Car_Pickup", pPosition, pYaw, Systems); break;
+                case "phone":
+                    lObject = BoxObject("Phone", pPosition, pYaw, Systems, GameLayers.INTERACTABLE, true,
+                        (ArchLib.PlainMat("Bakelite", new Color(0.05f, 0.05f, 0.05f), 0.8f, 0f), new Vector3(0, 0.05f, 0), new Vector3(0.22f, 0.1f, 0.2f)),
+                        (ArchLib.PlainMat("Bakelite", new Color(0.05f, 0.05f, 0.05f), 0.8f, 0f), new Vector3(0, 0.13f, 0), new Vector3(0.24f, 0.05f, 0.06f)));
+                    break;
+                default:
+                    lObject = BoxObject("Radio", pPosition, pYaw, Systems, GameLayers.INTERACTABLE, true,
+                        (ArchLib.Surface("walnut_veneer", 0.5f), new Vector3(0, 0.15f, 0), new Vector3(0.45f, 0.3f, 0.2f)),
+                        (ArchLib.Surface("rough_linen", 0.3f), new Vector3(0.08f, 0.15f, 0.101f), new Vector3(0.22f, 0.2f, 0.01f)));
+                    pKind = "radio";
+                    break;
+            }
+            if (lObject == null) return;
+            foreach (Transform t in lObject.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.INTERACTABLE; t.gameObject.isStatic = false; }
+            string lPrompt = pKind switch
+            {
+                "radio" => "TURN THE RADIO ON", "tv" => "TURN THE TV ON", "phone" => "MAKE THE PHONE RING", "generator" => "START THE GENERATOR",
+                "caralarm" => "SET OFF THE CAR ALARM", "fan" => "SWITCH THE FAN ON", "hose" => "OPEN THE HOSE", "computer" => "HACK THE PC (ALARM)", _ => "MAKE SOME NOISE"
+            };
+            float lRadius = pKind switch { "generator" => 28f, "caralarm" => 28f, "fan" => 9f, "hose" => 11f, "computer" => 14f, _ => 16f };
+            Systems.Distraction lDistraction = lObject.AddComponent<Systems.Distraction>();
+            lDistraction.Setup(lPrompt, pKind, lRadius);
+            lDistraction.SetupFx(lSpinner, lNozzle, lScreen);
+        }
+
+        private static ArchMat Gunmetal => ArchLib.PlainMat("Gunmetal", new Color(0.16f, 0.17f, 0.18f), 0.45f, 0.9f);
+        private static ArchMat OliveDrab => ArchLib.PlainMat("OliveDrab", new Color(0.24f, 0.26f, 0.16f), 0.3f, 0.2f);
+        private static ArchMat BlackPlastic => ArchLib.PlainMat("BlackPlastic", new Color(0.03f, 0.03f, 0.035f), 0.55f, 0f);
+        private static ArchMat BeigePlastic => ArchLib.PlainMat("BeigePlastic", new Color(0.72f, 0.69f, 0.6f), 0.4f, 0f);
+        private static ArchMat GardenGreen => ArchLib.PlainMat("GardenHose", new Color(0.12f, 0.42f, 0.14f), 0.55f, 0f);
+        private static ArchMat CableYellow => ArchLib.PlainMat("ArmouredCable", new Color(0.85f, 0.58f, 0.06f), 0.4f, 0.1f);
+        private static ArchMat ScreenMat => ArchLib.PlainMat("Screen", new Color(0.05f, 0.1f, 0.25f), 0.9f, 0f, 1f, new Color(0.15f, 0.35f, 0.9f));
+        private static ArchMat RedGlow => ArchLib.PlainMat("RedGlow", new Color(1f, 0.1f, 0.05f), 0.5f, 0f, 1f, new Color(4f, 0.2f, 0.1f));
+
+        /// <summary>A child object holding visual meshes only (no collider), free to move.</summary>
+        private static GameObject Part(string pName, Transform pParent, Vector3 pLocal, System.Action<ArchMesh> pBuild)
+        {
+            GameObject lPart = new GameObject(pName) { layer = GameLayers.INTERACTABLE };
+            lPart.transform.SetParent(pParent, false);
+            lPart.transform.localPosition = pLocal;
+            ArchMesh lMesh = new ArchMesh();
+            pBuild(lMesh);
+            foreach (GameObject lChild in lMesh.Flush(lPart.transform, "Arch_" + pName, GameLayers.INTERACTABLE)) lChild.isStatic = false;
+            return lPart;
+        }
+
+        private GameObject Root(string pName, Vector3 pPosition, float pYaw, Vector3 pColliderCenter, Vector3 pColliderSize)
+        {
+            GameObject lRoot = new GameObject(pName) { layer = GameLayers.INTERACTABLE };
+            lRoot.transform.SetParent(Systems, false);
+            lRoot.transform.SetPositionAndRotation(pPosition, Quaternion.Euler(0, pYaw, 0));
+            BoxCollider lBox = lRoot.AddComponent<BoxCollider>();
+            lBox.center = pColliderCenter;
+            lBox.size = pColliderSize;
+            return lRoot;
+        }
+
+        /// <summary>A pedestal fan; its blade hub spins on local Z.</summary>
+        private GameObject Fan(Vector3 pPosition, float pYaw, out Transform pBlades)
+        {
+            GameObject lRoot = Root("Fan", pPosition, pYaw, new Vector3(0, 0.65f, 0), new Vector3(0.5f, 1.3f, 0.35f));
+            Part("FanStand", lRoot.transform, Vector3.zero, m =>
+            {
+                m.Cylinder(BlackPlastic, Vector3.zero, 0.2f, 0.04f, 16, false);
+                m.Tube(ArchLib.Galvanised, new Vector3(0, 0.04f, 0), new Vector3(0, 1.08f, 0), 0.018f, 8, false);
+                m.Box(BeigePlastic, new Vector3(0, 1.12f, -0.1f), new Vector3(0.14f, 0.14f, 0.16f), false);
+                m.Tube(ArchLib.Galvanised, new Vector3(0, 1.12f, -0.02f), new Vector3(0, 1.12f, 0.06f), 0.235f, 24, false);
+            });
+            GameObject lBlades = Part("FanBlades", lRoot.transform, new Vector3(0, 1.12f, 0.02f), m =>
+            {
+                m.Cylinder(BeigePlastic, Vector3.zero, 0.04f, 0.04f, 10, false);
+                for (int i = 0; i < 3; i++)
+                    m.Box(BeigePlastic, Quaternion.Euler(0, 0, i * 120f) * new Vector3(0, 0.11f, 0), new Vector3(0.09f, 0.16f, 0.008f), Quaternion.Euler(0, 18f, i * 120f), false);
+            });
+            pBlades = lBlades.transform;
+            return lRoot;
+        }
+
+        /// <summary>A wall-mounted garden hose reel, the hose run out to a nozzle that sprays along its +Z.</summary>
+        private GameObject HoseReel(Vector3 pPosition, float pYaw, out Transform pNozzle)
+        {
+            GameObject lRoot = Root("HoseReel", pPosition, pYaw, new Vector3(0, 0.45f, 0.1f), new Vector3(0.6f, 0.9f, 0.3f));
+            Part("HoseReelBody", lRoot.transform, Vector3.zero, m =>
+            {
+                m.Box(ArchLib.Galvanised, new Vector3(0, 0.75f, 0.02f), new Vector3(0.12f, 0.2f, 0.04f), false);
+                m.Tube(GardenGreen, new Vector3(-0.17f, 0.55f, 0.14f), new Vector3(0.17f, 0.55f, 0.14f), 0.2f, 20, false);
+                m.Tube(ArchLib.Galvanised, new Vector3(-0.2f, 0.55f, 0.14f), new Vector3(0.2f, 0.55f, 0.14f), 0.04f, 8, false);
+                Vector3 lPrev = new Vector3(0.1f, 0.38f, 0.2f);
+                Vector3[] lRun = { new Vector3(0.25f, 0.04f, 0.45f), new Vector3(0.1f, 0.03f, 0.9f), new Vector3(-0.25f, 0.03f, 1.15f), new Vector3(-0.3f, 0.06f, 1.45f) };
+                foreach (Vector3 lPoint in lRun) { m.Tube(GardenGreen, lPrev, lPoint, 0.014f, 8, false); lPrev = lPoint; }
+                m.Tube(BlackPlastic, lPrev, lPrev + new Vector3(0, 0.03f, 0.15f), 0.022f, 8, false);
+            });
+            GameObject lNozzle = new GameObject("Nozzle");
+            lNozzle.transform.SetParent(lRoot.transform, false);
+            lNozzle.transform.localPosition = new Vector3(-0.3f, 0.1f, 1.62f);
+            lNozzle.transform.localRotation = Quaternion.Euler(-25f, 0f, 0f);
+            pNozzle = lNozzle.transform;
+            return lRoot;
+        }
+
+        /// <summary>A desktop PC (monitor, keyboard, tower) on a desk top; the screen is its own renderer.</summary>
+        private GameObject Computer(string pName, Vector3 pSurface, float pYaw, out Renderer pScreen)
+        {
+            GameObject lRoot = Root(pName, pSurface, pYaw, new Vector3(0, 0.22f, 0), new Vector3(0.7f, 0.45f, 0.45f));
+            Part("PcBody", lRoot.transform, Vector3.zero, m =>
+            {
+                m.Box(BlackPlastic, new Vector3(0, 0.01f, -0.05f), new Vector3(0.2f, 0.02f, 0.16f), false);
+                m.Box(BlackPlastic, new Vector3(0, 0.12f, -0.07f), new Vector3(0.05f, 0.2f, 0.04f), false);
+                m.Box(BlackPlastic, new Vector3(0, 0.28f, -0.05f), new Vector3(0.56f, 0.34f, 0.035f), false);
+                m.Box(BlackPlastic, new Vector3(0, 0.012f, 0.16f), new Vector3(0.44f, 0.024f, 0.15f), false);
+                m.Box(BlackPlastic, new Vector3(0.38f, 0.21f, -0.02f), new Vector3(0.18f, 0.42f, 0.4f), false);
+            });
+            GameObject lScreen = Part("PcScreen", lRoot.transform, Vector3.zero, m => m.Box(ScreenMat, new Vector3(0, 0.285f, -0.031f), new Vector3(0.52f, 0.3f, 0.004f), false));
+            pScreen = lScreen.GetComponentInChildren<Renderer>();
+            return lRoot;
+        }
+
+        // ---------------------------------------------------------------- turrets
+
+        /// <summary>
+        /// An automatic sentry gun on a floor pedestal (or hung under a ceiling at <paramref name="pMount"/>),
+        /// resting toward <paramref name="pLookAt"/>. Give it a <see cref="Terminal"/> and run a <see cref="Cable"/> between them.
+        /// </summary>
+        public AutoTurret Turret(Vector3 pMount, Vector3 pLookAt, bool pCeiling = false, float pRange = 24f)
+        {
+            Vector3 lDir = pLookAt - pMount;
+            float lYaw = Mathf.Atan2(lDir.x, lDir.z) * Mathf.Rad2Deg;
+            float lPivot = pCeiling ? -0.42f : 1.05f;
+            GameObject lRoot = Root("AutoTurret", pMount, lYaw, new Vector3(0, pCeiling ? -0.3f : 0.55f, 0), new Vector3(0.5f, pCeiling ? 0.6f : 1.1f, 0.5f));
+            Part("TurretMount", lRoot.transform, Vector3.zero, m =>
+            {
+                if (pCeiling)
+                {
+                    m.Box(Gunmetal, new Vector3(0, -0.02f, 0), new Vector3(0.36f, 0.04f, 0.36f), false);
+                    m.Tube(Gunmetal, new Vector3(0, -0.04f, 0), new Vector3(0, lPivot + 0.07f, 0), 0.06f, 12, false);
+                }
+                else
+                {
+                    m.Cylinder(Gunmetal, Vector3.zero, 0.34f, 0.05f, 20, false);
+                    m.Cylinder(Gunmetal, new Vector3(0, 0.05f, 0), 0.09f, lPivot - 0.12f, 14, false);
+                    for (int i = 0; i < 4; i++)
+                        m.Box(OliveDrab, Quaternion.Euler(0, i * 90f + 45f, 0) * new Vector3(0, 0.14f, 0.13f), new Vector3(0.03f, 0.2f, 0.16f), Quaternion.Euler(0, i * 90f + 45f, 0), false);
+                }
+            });
+            GameObject lYawPivot = Part("TurretYaw", lRoot.transform, new Vector3(0, lPivot, 0), m =>
+            {
+                m.Cylinder(Gunmetal, new Vector3(0, -0.07f, 0), 0.19f, 0.12f, 20, false);
+                m.Box(Gunmetal, new Vector3(-0.2f, 0.12f, 0), new Vector3(0.04f, 0.26f, 0.14f), false);
+                m.Box(Gunmetal, new Vector3(0.2f, 0.12f, 0), new Vector3(0.04f, 0.26f, 0.14f), false);
+            });
+            GameObject lPitchPivot = Part("TurretHead", lYawPivot.transform, new Vector3(0, 0.2f, 0), m =>
+            {
+                m.Box(OliveDrab, new Vector3(0, 0, 0.04f), new Vector3(0.34f, 0.26f, 0.5f), false);
+                m.Box(Gunmetal, new Vector3(0, 0.15f, 0.12f), new Vector3(0.12f, 0.07f, 0.16f), false);
+                m.Box(OliveDrab, new Vector3(0.24f, -0.04f, -0.02f), new Vector3(0.1f, 0.2f, 0.3f), false);
+                m.Box(OliveDrab, new Vector3(-0.24f, -0.04f, -0.02f), new Vector3(0.1f, 0.2f, 0.3f), false);
+                m.Tube(Gunmetal, new Vector3(0.07f, -0.02f, 0.28f), new Vector3(0.07f, -0.02f, 0.86f), 0.024f, 10, false);
+                m.Tube(Gunmetal, new Vector3(-0.07f, -0.02f, 0.28f), new Vector3(-0.07f, -0.02f, 0.86f), 0.024f, 10, false);
+                m.Tube(Gunmetal, new Vector3(0.07f, -0.02f, 0.7f), new Vector3(0.07f, -0.02f, 0.88f), 0.036f, 10, false);
+                m.Tube(Gunmetal, new Vector3(-0.07f, -0.02f, 0.7f), new Vector3(-0.07f, -0.02f, 0.88f), 0.036f, 10, false);
+            });
+            GameObject lLamp = Part("TurretLamp", lPitchPivot.transform, new Vector3(0, 0.15f, 0.205f), m => m.Box(RedGlow, Vector3.zero, new Vector3(0.05f, 0.03f, 0.01f), false));
+
+            GameObject lMuzzle = new GameObject("Muzzle");
+            lMuzzle.transform.SetParent(lPitchPivot.transform, false);
+            lMuzzle.transform.localPosition = new Vector3(0, 0.15f, 0.22f);
+
+            GameObject lLaserObject = new GameObject("Laser");
+            lLaserObject.transform.SetParent(lPitchPivot.transform, false);
+            LineRenderer lLaser = lLaserObject.AddComponent<LineRenderer>();
+            lLaser.useWorldSpace = true;
+            lLaser.positionCount = 2;
+            lLaser.widthMultiplier = 0.01f;
+            lLaser.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lLaser.receiveShadows = false;
+            lLaser.sharedMaterial = RedGlow.material;
+            lLaser.SetPosition(0, lMuzzle.transform.position);
+            lLaser.SetPosition(1, lMuzzle.transform.position + lMuzzle.transform.forward * pRange);
+
+            AutoTurret lTurret = lRoot.AddComponent<AutoTurret>();
+            lTurret.Setup(lYawPivot.transform, lPitchPivot.transform, lMuzzle.transform, lLaser, lLamp.GetComponentInChildren<Renderer>(), pRange);
+            Poi(pMount + Vector3.up * 1.2f, "Sentry gun", MapPoi.Kind.Landmark);
+            return lTurret;
+        }
+
+        /// <summary>The control PC of some turrets, on a desk top or a shelf: hide it where only the cable leads (no map pin).</summary>
+        public TurretTerminal Terminal(Vector3 pSurface, float pYaw, params AutoTurret[] pTurrets)
+        {
+            GameObject lPc = Computer("TurretTerminal", pSurface, pYaw, out Renderer lScreen);
+            Part("TerminalTag", lPc.transform, Vector3.zero, m => m.Box(CableYellow, new Vector3(0.38f, 0.36f, 0.181f), new Vector3(0.16f, 0.05f, 0.004f), false));
+            TurretTerminal lTerminal = lPc.AddComponent<TurretTerminal>();
+            lTerminal.Setup(pTurrets, lScreen);
+            return lTerminal;
+        }
+
+        /// <summary>
+        /// A thick yellow armoured cable from a turret to its terminal through <paramref name="pPoints"/>
+        /// (lay them along walls and ceilings, 5-10 cm off the surface): level spans sag a little and get
+        /// a clip every 1.2 m. Instinct draws it in the turret's colour.
+        /// </summary>
+        public TurretCable Cable(AutoTurret pTurret, params Vector3[] pPoints)
+        {
+            if (pPoints == null || pPoints.Length < 2) return null;
+            GameObject lRoot = new GameObject("TurretCable") { layer = GameLayers.DEFAULT };
+            lRoot.transform.SetParent(Systems, false);
+            ArchMesh lMesh = new ArchMesh();
+            const float RADIUS = 0.028f;
+            for (int i = 0; i < pPoints.Length - 1; i++)
+            {
+                Vector3 a = pPoints[i], b = pPoints[i + 1];
+                float lLength = Vector3.Distance(a, b);
+                bool lLevel = Mathf.Abs(a.y - b.y) < 0.5f && lLength > 1.5f;
+                int lSteps = lLevel ? Mathf.Clamp(Mathf.CeilToInt(lLength / 0.4f), 2, 40) : 1;
+                float lSag = lLevel ? Mathf.Min(0.12f, lLength * 0.02f) : 0f;
+                Vector3 lPrev = a;
+                for (int s = 1; s <= lSteps; s++)
+                {
+                    float t = s / (float)lSteps;
+                    Vector3 lPoint = Vector3.Lerp(a, b, t) + Vector3.down * (lSag * 4f * t * (1f - t));
+                    lMesh.Tube(CableYellow, lPrev, lPoint, RADIUS, 8, false);
+                    lPrev = lPoint;
+                }
+                for (float d = 0.6f; d < lLength; d += 1.2f)
+                    lMesh.Box(Gunmetal, Vector3.Lerp(a, b, d / lLength), new Vector3(0.07f, 0.07f, 0.07f), false);
+            }
+            lMesh.Flush(lRoot.transform, K.Map.sceneName + "_TurretCable_" + _unique++);
+            TurretCable lCable = lRoot.AddComponent<TurretCable>();
+            lCable.Setup(pTurret);
+            return lCable;
+        }
+
+        /// <summary>A red barrel or a gas tank that explodes when shot or set on fire.</summary>
+        public GameObject Explosive(Vector3 pPosition, float pYaw, bool pTank = false)
+        {
+            GameObject lObject = Model(pTank ? "Prop_PropaneTank" : "Prop_ExplosiveBarrel", pPosition, pYaw, Systems);
+            if (lObject == null) return null;
+            foreach (Transform t in lObject.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.INTERACTABLE; t.gameObject.isStatic = false; }
+            lObject.AddComponent<ExplosiveProp>();
+            return lObject;
+        }
+
+        public GameObject Crate(Vector3 pPosition, float pYaw, bool pMilitary = false)
+        {
+            GameObject lObject = Model(pMilitary ? "Prop_Crate_Military" : "Prop_Crate_Wood", pPosition, pYaw);
+            if (lObject != null) { lObject.isStatic = false; lObject.AddComponent<Flammable>().Setup(12f, 2.4f, false, 0.8f); foreach (Transform t in lObject.GetComponentsInChildren<Transform>()) t.gameObject.layer = GameLayers.INTERACTABLE; }
+            return lObject;
+        }
+
+        /// <summary>A stack of crates on a pallet (cover).</summary>
+        public void CrateStack(Vector3 pPosition, float pYaw, int pCount, bool pMilitary = false)
+        {
+            Quaternion lRot = Quaternion.Euler(0, pYaw, 0);
+            Model("Prop_Pallet", pPosition, pYaw);
+            Vector3 lSize = ArchLib.ManifestSize(pMilitary ? "Prop_Crate_Military" : "Prop_Crate_Wood");
+            for (int i = 0; i < pCount; i++)
+            {
+                Vector3 lOffset = new Vector3((i % 2 - 0.5f) * (lSize.x + 0.02f), 0.145f + (i / 4) * lSize.y, ((i / 2) % 2 - 0.5f) * Mathf.Min(0.4f, lSize.z * 0.35f));
+                Crate(pPosition + lRot * lOffset, pYaw + (R - 0.5f) * 6f, pMilitary);
+            }
+        }
+
+        // ---------------------------------------------------------------- security
+
+        /// <summary>A CCTV camera on a wall, looking at a point; reports to the zone's guards.</summary>
+        public SecurityCamera Camera(Vector3 pMount, Vector3 pLookAt, int pZone, float pRange = 18f)
+        {
+            GameObject lRoot = new GameObject("SecurityCamera");
+            lRoot.transform.SetParent(Systems, false);
+            lRoot.transform.position = pMount;
+            Vector3 lDir = (pLookAt - pMount).normalized;
+            lRoot.transform.rotation = Quaternion.LookRotation(lDir);
+            GameObject lModel = ArchLib.Place("Prop_SecurityCamera", lRoot.transform, pMount - Vector3.up * 0.15f, lRoot.transform.eulerAngles.y, ArchLib.Collide.None, ArchLib.Iron);
+            if (lModel != null) { lModel.transform.SetParent(lRoot.transform, true); foreach (Transform t in lModel.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false; }
+            SecurityCamera lCamera = lRoot.AddComponent<SecurityCamera>();
+            lCamera.Setup(pZone, pRange);
+            GameObject lPoi = new GameObject("Poi_Camera");
+            lPoi.transform.SetParent(lRoot.transform, false);
+            return lCamera;
+        }
+
+        public void Recorder(Vector3 pPosition, float pYaw, int pZone)
+        {
+            GameObject lRack = Model("Furn_ServerRack", pPosition, pYaw, Systems);
+            if (lRack == null) return;
+            foreach (Transform t in lRack.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.INTERACTABLE; t.gameObject.isStatic = false; }
+            lRack.AddComponent<CameraRecorder>().Setup(pZone);
+        }
+
+        public Breaker Breaker(Vector3 pWallPoint, float pYaw, BuildingVolume pBuilding)
+        {
+            GameObject lBox = Model("Prop_BreakerBox", pWallPoint + Vector3.up * 1.2f, pYaw, Systems, ArchLib.Collide.Box);
+            if (lBox == null) return null;
+            foreach (Transform t in lBox.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.INTERACTABLE; t.gameObject.isStatic = false; }
+            GameObject lLever = BoxObject("Lever", pWallPoint + Vector3.up * 1.45f + Quaternion.Euler(0, pYaw, 0) * new Vector3(0.2f, 0, 0.08f), pYaw, lBox.transform, GameLayers.INTERACTABLE, false,
+                (ArchLib.PlainMat("LeverRed", new Color(0.7f, 0.08f, 0.06f), 0.5f, 0f), new Vector3(0, 0, 0), new Vector3(0.05f, 0.2f, 0.05f)));
+            Breaker lBreaker = lBox.AddComponent<Breaker>();
+            lBreaker.Setup(pBuilding, lLever.transform);
+            return lBreaker;
+        }
+
+        /// <summary>The building's air handler: poison it and the gas comes out of every listed vent.</summary>
+        public void AirHandler(Vector3 pPosition, float pYaw, BuildingVolume pBuilding, Transform[] pVents)
+        {
+            GameObject lUnit = Model("Prop_AirHandler", pPosition, pYaw, Systems);
+            if (lUnit == null) return;
+            foreach (Transform t in lUnit.GetComponentsInChildren<Transform>()) { t.gameObject.layer = GameLayers.INTERACTABLE; t.gameObject.isStatic = false; }
+            lUnit.AddComponent<VentPoison>().Setup(pBuilding, pVents);
+        }
+
+        /// <summary>
+        /// A ladder folded on a roof or a tower, lowered from the top (stays down): the lever at the
+        /// top, the ladder hanging from <paramref name="pTop"/> to <paramref name="pBottom"/>
+        /// against a wall whose outward normal is <paramref name="pOut"/>.
+        /// </summary>
+        public void DropLadder(Vector3 pTop, Vector3 pBottom, Vector3 pOut, string pPoi)
+        {
+            float lYaw = Quaternion.LookRotation(pOut).eulerAngles.y;
+            GameObject lRoot = new GameObject("DropLadder") { layer = GameLayers.INTERACTABLE };
+            lRoot.transform.SetParent(Systems, false);
+            lRoot.transform.position = pTop + Vector3.up * 0.6f - pOut * 0.4f;
+            GameObject lHook = BoxObject("Hook", lRoot.transform.position, lYaw, lRoot.transform, GameLayers.INTERACTABLE, true,
+                (ArchLib.Iron, new Vector3(0, 0, 0), new Vector3(0.6f, 0.9f, 0.12f)),
+                (ArchLib.PlainMat("LeverRed", new Color(0.7f, 0.08f, 0.06f), 0.5f, 0f), new Vector3(0, 0.3f, 0.1f), new Vector3(0.08f, 0.3f, 0.08f)));
+            GameObject lLadder = new GameObject("Ladder");
+            lLadder.transform.SetParent(lRoot.transform, false);
+            float lHeight = pTop.y - pBottom.y;
+            Vector3 lFoot = new Vector3(pTop.x, pBottom.y, pTop.z) + pOut * 0.25f;
+            for (float y = 0f; y < lHeight - 0.2f; y += 3f) ArchLib.Place("Prop_Ladder", lLadder.transform, lFoot + Vector3.up * y, lYaw, ArchLib.Collide.None, ArchLib.Iron);
+            GameObject lClimb = new GameObject("Climbable") { layer = GameLayers.CLIMBABLE };
+            lClimb.transform.SetParent(lLadder.transform, false);
+            lClimb.transform.position = lFoot + Vector3.up * (lHeight * 0.5f + 0.5f) + pOut * 0.05f;
+            lClimb.transform.rotation = Quaternion.LookRotation(pOut);
+            BoxCollider lBox = lClimb.AddComponent<BoxCollider>();
+            lBox.size = new Vector3(0.6f, lHeight + 1f, 0.2f);
+            lLadder.SetActive(false);
+            lRoot.AddComponent<DropLadder>().Setup(lLadder);
+            Poi(pBottom + pOut * 0.6f, pPoi, MapPoi.Kind.Shortcut);
+        }
+
+        /// <summary>A fixed climb: a ladder or a vine trellis against a wall (layer Climbable).</summary>
+        public void Climb(Vector3 pBottom, float pHeight, Vector3 pOut, bool pLadder, string pPoi)
+        {
+            float lYaw = Quaternion.LookRotation(pOut).eulerAngles.y;
+            Transform lRoot = new GameObject(pLadder ? "Ladder" : "Trellis").transform;
+            lRoot.SetParent(Props, false);
+            lRoot.position = pBottom;
+            if (pLadder)
+                for (float y = 0f; y < pHeight - 0.2f; y += 3f) ArchLib.Place("Prop_Ladder", lRoot, pBottom + Vector3.up * y, lYaw, ArchLib.Collide.None, ArchLib.Iron);
+            else
+            {
+                ArchMesh lMesh = new ArchMesh();
+                ArchMat lWood = ArchLib.Surface("rough_wood", 1f);
+                Quaternion lRot = Quaternion.Euler(0, lYaw, 0);
+                for (float x = -0.6f; x <= 0.61f; x += 0.3f) lMesh.Box(lWood, lRot * new Vector3(x, pHeight * 0.5f, 0.06f), new Vector3(0.04f, pHeight, 0.04f), lRot, false);
+                for (float y = 0.3f; y < pHeight; y += 0.3f) lMesh.Box(lWood, new Vector3(0, y, 0) + lRot * new Vector3(0, 0, 0.1f), new Vector3(1.3f, 0.035f, 0.035f), lRot, false);
+                lMesh.Flush(lRoot, K.Map.sceneName + "_Trellis_" + (_unique++));
+                // Vines on it.
+                for (float y = 0.2f; y < pHeight - 0.5f; y += 1.1f)
+                    ArchLib.Place(R < 0.5f ? "Veg_JungleBush_A" : "Veg_Fern", lRoot, pBottom + Vector3.up * y + pOut * 0.15f + Quaternion.Euler(0, lYaw, 0) * new Vector3((R - 0.5f) * 0.8f, 0, 0), lYaw + R * 360f, ArchLib.Collide.None, null, 0.7f);
+            }
+            GameObject lClimb = new GameObject("Climbable") { layer = GameLayers.CLIMBABLE };
+            lClimb.transform.SetParent(lRoot, false);
+            lClimb.transform.position = pBottom + Vector3.up * (pHeight * 0.5f + 0.5f) + pOut * 0.12f;
+            lClimb.transform.rotation = Quaternion.LookRotation(pOut);
+            BoxCollider lBox = lClimb.AddComponent<BoxCollider>();
+            lBox.size = new Vector3(pLadder ? 0.6f : 1.3f, pHeight + 1f, 0.22f);
+            lClimb.isStatic = true;
+            if (!string.IsNullOrEmpty(pPoi)) Poi(pBottom + pOut * 0.6f + Vector3.up, pPoi, MapPoi.Kind.Climb);
+        }
+
+        // ---------------------------------------------------------------- furniture built from PBR parts
+
+        /// <summary>A stone fireplace (front +z): jambs, mantel, a sooty firebox, logs, a hearth and a fire glow.</summary>
+        public void Fireplace(Vector3 pPosition, float pYaw, Transform pParent)
+        {
+            ArchMat lStone = ArchLib.Surface("marble_01", 1.2f), lSoot = ArchLib.PlainMat("Soot", new Color(0.04f, 0.035f, 0.03f), 0.1f, 0f), lLog = ArchLib.Surface("rough_wood", 0.5f);
+            BoxObject("Fireplace", pPosition, pYaw, pParent, GameLayers.DEFAULT, true,
+                (lStone, new Vector3(-0.75f, 0.6f, 0f), new Vector3(0.3f, 1.2f, 0.5f)),
+                (lStone, new Vector3(0.75f, 0.6f, 0f), new Vector3(0.3f, 1.2f, 0.5f)),
+                (lStone, new Vector3(0f, 1.3f, 0.02f), new Vector3(1.9f, 0.2f, 0.56f)),
+                (lStone, new Vector3(0f, 1.15f, 0f), new Vector3(1.3f, 0.12f, 0.5f)),
+                (lSoot, new Vector3(0f, 0.55f, -0.2f), new Vector3(1.2f, 1.1f, 0.1f)),
+                (lStone, new Vector3(0f, 0.04f, 0.45f), new Vector3(1.9f, 0.08f, 0.5f)),
+                (lLog, new Vector3(-0.1f, 0.14f, 0f), new Vector3(0.7f, 0.12f, 0.12f)),
+                (lLog, new Vector3(0.1f, 0.24f, 0.05f), new Vector3(0.65f, 0.11f, 0.11f)),
+                (ArchLib.LampGlow, new Vector3(0f, 0.12f, -0.05f), new Vector3(0.6f, 0.06f, 0.2f)));
+            Light lFire = new GameObject("FireGlow").AddComponent<Light>();
+            lFire.transform.SetParent(pParent ?? Props, false);
+            lFire.transform.position = pPosition + Quaternion.Euler(0, pYaw, 0) * new Vector3(0, 0.5f, 0.5f);
+            lFire.type = LightType.Point;
+            lFire.range = 6f;
+            lFire.intensity = 1.8f;
+            lFire.color = new Color(1f, 0.5f, 0.2f);
+            lFire.shadows = LightShadows.None;
+        }
+
+        /// <summary>A wall rack of rifles and shotguns (front +z), a locking bar across.</summary>
+        public void GunRack(Vector3 pPosition, float pYaw, Transform pParent)
+        {
+            ArchMat lWood = ArchLib.Surface("dark_wood", 1f);
+            BoxObject("GunRack", pPosition, pYaw, pParent, GameLayers.DEFAULT, true,
+                (lWood, new Vector3(0, 0.9f, -0.2f), new Vector3(1.4f, 1.8f, 0.06f)),
+                (lWood, new Vector3(0, 0.12f, -0.05f), new Vector3(1.4f, 0.08f, 0.3f)),
+                (lWood, new Vector3(0, 1.45f, -0.08f), new Vector3(1.4f, 0.06f, 0.22f)),
+                (ArchLib.Iron, new Vector3(0, 1.0f, 0.02f), new Vector3(1.45f, 0.04f, 0.04f)));
+            Quaternion lRot = Quaternion.Euler(0, pYaw, 0);
+            string[] lGuns = { "W_Sniper", "W_Shotgun", "W_Smg", "W_Sniper" };
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject lGun = ArchLib.Place(lGuns[i], pParent ?? Props, pPosition + lRot * new Vector3(-0.5f + i * 0.33f, 0.2f, -0.07f), pYaw, ArchLib.Collide.None, ArchLib.Iron);
+                if (lGun == null) continue;
+                lGun.transform.rotation = lRot * Quaternion.Euler(-80f, 0f, 0f);
+            }
+        }
+
+        /// <summary>A wine rack: a dark timber lattice with bottles lying in it (against a wall, or free-standing double).</summary>
+        public void WineRack(Vector3 pPosition, float pYaw, Transform pParent, bool pDouble = false)
+        {
+            ArchMat lWood = ArchLib.Surface("dark_wood", 1f), lBottle = ArchLib.PlainMat("WineBottle", new Color(0.06f, 0.16f, 0.08f), 0.9f, 0.1f);
+            ArchMesh lMesh = new ArchMesh();
+            float w = 1.3f, h = 1.9f, d = pDouble ? 0.7f : 0.38f;
+            for (int k = 0; k <= 4; k++) lMesh.Box(lWood, new Vector3(-w * 0.5f + k * w / 4f, h * 0.5f, 0), new Vector3(0.04f, h, d));
+            for (int k = 0; k <= 7; k++) lMesh.Box(lWood, new Vector3(0, 0.04f + k * (h - 0.08f) / 7f, 0), new Vector3(w, 0.03f, d), false);
+            for (int col = 0; col < 8; col++)
+                for (int row = 0; row < 7; row++)
+                {
+                    if ((col * 7 + row) % 5 == 3) continue;
+                    Vector3 c = new Vector3(-w * 0.5f + 0.09f + col * (w - 0.18f) / 7f, 0.13f + row * (h - 0.08f) / 7f, 0);
+                    lMesh.Tube(lBottle, c + new Vector3(0, 0, -d * 0.5f + 0.02f), c + new Vector3(0, 0, d * 0.5f - 0.02f), 0.04f, 8, false);
+                }
+            GameObject lRoot = new GameObject("WineRack");
+            lRoot.transform.SetParent(pParent ?? Props, false);
+            lRoot.transform.SetPositionAndRotation(pPosition, Quaternion.Euler(0, pYaw, 0));
+            lMesh.Flush(lRoot.transform, "Shape_WineRack" + (pDouble ? "2" : "1"));
+            BoxCollider lBox = lRoot.AddComponent<BoxCollider>();
+            lBox.center = new Vector3(0, h * 0.5f, 0);
+            lBox.size = new Vector3(w, h, d);
+            lRoot.isStatic = true;
+            Cover(lRoot);
+        }
+
+        /// <summary>A heap of coal in a cellar corner, a shovel in it.</summary>
+        public void CoalHeap(Vector3 pPosition, Transform pParent)
+        {
+            ArchMesh lMesh = new ArchMesh();
+            ArchMat lCoal = ArchLib.Tinted("aerial_rocks_02", new Color(0.12f, 0.12f, 0.13f), "coal", 0.4f);
+            lMesh.Dome(lCoal, Vector3.down * 0.4f, 1.6f, 16, 4, Quaternion.identity);
+            lMesh.Tube(ArchLib.Surface("rough_wood", 0.5f), new Vector3(0.6f, 0.6f, 0.3f), new Vector3(1.2f, 1.6f, 0.6f), 0.025f, 6, false);
+            lMesh.Box(ArchLib.Iron, new Vector3(0.55f, 0.55f, 0.28f), new Vector3(0.25f, 0.03f, 0.3f), Quaternion.Euler(0, 30f, 40f), false);
+            GameObject lRoot = new GameObject("CoalHeap");
+            lRoot.transform.SetParent(pParent ?? Props, false);
+            lRoot.transform.position = pPosition;
+            lMesh.Flush(lRoot.transform, "Shape_CoalHeap");
+            lRoot.isStatic = true;
+        }
+
+        /// <summary>A round banquet table dressed with a white cloth, a centrepiece and a candle, six chairs round it.</summary>
+        public void RoundTable(Vector3 pPosition, Transform pParent, int pZone)
+        {
+            ArchMat lCloth = ArchLib.PlainMat("TableCloth", new Color(0.95f, 0.94f, 0.92f), 0.2f, 0f);
+            ArchMesh lMesh = new ArchMesh();
+            lMesh.Cylinder(lCloth, new Vector3(0, 0.02f, 0), 0.82f, 0.74f, 24, true);
+            lMesh.Cylinder(lCloth, new Vector3(0, 0.74f, 0), 0.86f, 0.03f, 24, false);
+            lMesh.Cylinder(ArchLib.Brass, new Vector3(0, 0.77f, 0), 0.12f, 0.02f, 12, false);
+            lMesh.Cylinder(ArchLib.PlainMat("Candle", new Color(0.95f, 0.92f, 0.82f), 0.3f, 0f), new Vector3(0, 0.79f, 0), 0.025f, 0.22f, 8, false);
+            GameObject lRoot = new GameObject("BanquetTable");
+            lRoot.transform.SetParent(pParent ?? Props, false);
+            lRoot.transform.position = pPosition;
+            lMesh.Flush(lRoot.transform, "Shape_BanquetTable");
+            BoxCollider lBox = lRoot.AddComponent<BoxCollider>();
+            lBox.center = new Vector3(0, 0.38f, 0);
+            lBox.size = new Vector3(1.6f, 0.76f, 1.6f);
+            lRoot.isStatic = true;
+            ArchLib.Place("Furn_PottedPlant", lRoot.transform, pPosition + new Vector3(0.3f, 0.79f, 0.2f), 0f, ArchLib.Collide.None, null, 0.35f);
+            for (int k = 0; k < 6; k++)
+            {
+                float a = k * 60f;
+                Vector3 lChair = pPosition + Quaternion.Euler(0, a, 0) * new Vector3(0, 0, 1.15f);
+                ArchLib.Place("Furn_DiningChair", lRoot.transform, lChair, a + 180f, ArchLib.Collide.None, null);
+            }
+            if (R < 0.35f) Drinks(pPosition + new Vector3(-0.2f, 0.79f, -0.3f), 0f, pZone, 2, false);
+        }
+
+        public void Chandelier(Vector3 pHook, float pDrop)
+        {
+            Transform lRoot = new GameObject("Chandelier") { layer = GameLayers.INTERACTABLE }.transform;
+            lRoot.SetParent(Systems, false);
+            lRoot.position = pHook;
+            Transform lCrystal = new GameObject("Crystal").transform;
+            lCrystal.SetParent(lRoot, false);
+            lCrystal.position = pHook + Vector3.down * 0.55f;
+            // The model hangs from the crystal point: its top there, not its foot (it used to sit near the floor).
+            float lHeight = Mathf.Max(0.3f, ArchLib.ModelBounds("Prop_Chandelier").size.y) * 1.6f;
+            GameObject lModel = ArchLib.Place("Prop_Chandelier", lCrystal, lCrystal.position - Vector3.up * lHeight, 0f, ArchLib.Collide.None, ArchLib.Brass, 1.6f);
+            if (lModel != null) foreach (Transform t in lModel.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = false;
+            GameObject lChain = BoxObject("Chain", pHook + Vector3.down * 0.28f, 0f, lRoot, GameLayers.INTERACTABLE, true, (ArchLib.Brass, Vector3.zero, new Vector3(0.05f, 0.56f, 0.05f)), (ArchLib.Brass, new Vector3(0, 0.27f, 0), new Vector3(0.4f, 0.04f, 0.4f)));
+            lChain.isStatic = false;
+            Light lLight = new GameObject("ChandelierLight").AddComponent<Light>();
+            lLight.transform.SetParent(lCrystal, false);
+            lLight.type = LightType.Point;
+            lLight.range = 12f;
+            lLight.intensity = 2.2f;
+            lLight.color = new Color(1f, 0.85f, 0.62f);
+            lLight.shadows = LightShadows.None;
+            lRoot.gameObject.AddComponent<Systems.Chandelier>().Setup(lCrystal, pDrop);
+        }
+
+        public void Zipline(Vector3 pStart, Vector3 pEnd)
+        {
+            Transform lRoot = new GameObject("Zipline").transform;
+            lRoot.SetParent(Systems, false);
+            lRoot.position = pStart;
+            Transform lA = new GameObject("Start").transform;
+            lA.SetParent(lRoot, false);
+            lA.position = pStart + Vector3.up * 2.6f;
+            Transform lB = new GameObject("End").transform;
+            lB.SetParent(lRoot, false);
+            lB.position = pEnd + Vector3.up * 2.6f;
+            ArchMesh lMesh = new ArchMesh();
+            lMesh.Cylinder(ArchLib.Iron, pStart - lRoot.position, 0.08f, 2.9f, 8);
+            lMesh.Cylinder(ArchLib.Iron, pEnd - lRoot.position, 0.08f, 2.9f, 8);
+            lMesh.Tube(ArchLib.Iron, lA.localPosition, lB.localPosition, 0.015f, 6, false);
+            lMesh.Flush(lRoot, K.Map.sceneName + "_Zipline_" + (_unique++));
+            GameObject lGrab = new GameObject("Grab") { layer = GameLayers.INTERACTABLE };
+            lGrab.transform.SetParent(lRoot, false);
+            lGrab.transform.position = pStart + Vector3.up * 1.6f;
+            BoxCollider lBox = lGrab.AddComponent<BoxCollider>();
+            lBox.isTrigger = true;
+            lBox.size = new Vector3(1.6f, 2f, 1.6f);
+            lGrab.AddComponent<Zipline>().Setup(lA, lB, 16f);
+            Poi(pStart, "Zipline", MapPoi.Kind.Shortcut);
+        }
+
+        public void Chatter(Vector3 pPosition, string pSpeaker, params string[] pLines)
+        {
+            GameObject lSpot = new GameObject("Chatter_" + pSpeaker);
+            lSpot.transform.SetParent(Systems, false);
+            lSpot.transform.position = pPosition;
+            lSpot.AddComponent<ChatterSpot>().Setup(pSpeaker, 7f, pLines);
+        }
+
+        public void Poi(Vector3 pPosition, string pLabel, MapPoi.Kind pKind)
+        {
+            GameObject lPoi = new GameObject("Poi_" + pLabel);
+            lPoi.transform.SetParent(Systems, false);
+            lPoi.transform.position = pPosition;
+            lPoi.AddComponent<MapPoi>().Setup(pKind, pLabel);
+        }
+
+        /// <summary>A security zone box (outdoor areas): centre on the ground, size, yaw.</summary>
+        public void Zone(Vector3 pCenter, Vector3 pSize, float pYaw, SecurityTier pTier, AccessLevel pAccess = AccessLevel.None, string pName = "Area")
+        {
+            GameObject lZone = new GameObject("Zone_" + pName + "_" + pTier + "_" + pAccess);
+            lZone.transform.SetParent(Systems, false);
+            lZone.transform.SetPositionAndRotation(pCenter, Quaternion.Euler(0, pYaw, 0));
+            lZone.AddComponent<SecurityZone>().Setup(pTier, pSize, pAccess);
+        }
+
+        /// <summary>A street or garden lamp lit at night (lights named "Lamp" follow the time of day).</summary>
+        public void Lamp(Vector3 pGround, float pYaw, Color pColor, float pRange = 14f, float pIntensity = 2.2f, bool pPost = true, float pHeight = 3.8f)
+        {
+            if (pPost) Model("Prop_StreetLamp", pGround, pYaw, null, ArchLib.Collide.Box);
+            Light lLight = new GameObject("Lamp").AddComponent<Light>();
+            lLight.transform.SetParent(K.Lights, false);
+            lLight.transform.position = pGround + Vector3.up * (pPost ? pHeight : 0f);
+            lLight.type = LightType.Point;
+            lLight.range = pRange;
+            lLight.intensity = pIntensity;
+            lLight.color = pColor;
+            lLight.shadows = LightShadows.None;
+        }
+
+        // ---------------------------------------------------------------- markers
+
+        /// <summary>An NPC post with what it carries and whether it sees through passes.</summary>
+        public NpcSpawnPoint Npc(NpcRole pRole, Vector3 pPosition, float pYaw, int pZone, ItemKind pWeapon, ItemKind pCarries = ItemKind.Fists, bool pEnforcer = false, PatrolRoute pRoute = null)
+        {
+            GameObject lMarker = new GameObject("Npc_" + pRole);
+            lMarker.transform.SetParent(K.Markers, false);
+            lMarker.transform.SetPositionAndRotation(pPosition, Quaternion.Euler(0, pYaw, 0));
+            NpcSpawnPoint lSpawn = lMarker.AddComponent<NpcSpawnPoint>();
+            lSpawn.Setup(pRole, pZone, pRoute, pWeapon);
+            lSpawn.Carries = pCarries;
+            lSpawn.Enforcer = pEnforcer;
+            return lSpawn;
+        }
+
+        /// <summary>A patrol pair (or group) on a loop of world points.</summary>
+        public void Patrol(int pZone, int pSize, ItemKind pWeapon, float pPause, params Vector3[] pPoints)
+        {
+            PatrolRoute lRoute = K.Route(pPause, pPoints);
+            Vector3 lBack = pPoints.Length > 1 ? (pPoints[0] - pPoints[1]).normalized : Vector3.back;
+            lBack.y = 0f;
+            Vector3 lSide = Vector3.Cross(Vector3.up, lBack).normalized;
+            float lYaw = Quaternion.LookRotation(lBack.sqrMagnitude > 0.001f ? -lBack : Vector3.forward).eulerAngles.y;
+            for (int i = 0; i < Mathf.Clamp(pSize, 1, 5); i++)
+            {
+                Vector3 p = pPoints[0] + lBack * (1.4f * ((i + 1) / 2)) + lSide * (i == 0 ? 0f : i % 2 == 1 ? -0.8f : 0.8f);
+                Npc(NpcRole.Patrol, p, lYaw, pZone, i == 0 ? pWeapon : ItemKind.Smg, ItemKind.Fists, false, lRoute);
+            }
+        }
+
+        /// <summary>A gadget spawn (a pass, a key, a tool, a poison) with a label for the designers.</summary>
+        public void Gadget(ItemKind pKind, Vector3 pPosition, string pLabel) => K.Point(MatchPoint.Kind.GadgetSpawn, pPosition, 0f, pLabel, pKind);
+
+        /// <summary>A throwable lying on a surface (rock, bottle, wrench, brick, coin).</summary>
+        public void Throwable(Vector3 pPosition, ItemKind pKind = ItemKind.Fists)
+        {
+            if (pKind == ItemKind.Fists) pKind = Pick(ItemKind.Bottle, ItemKind.Wrench, ItemKind.Rock, ItemKind.Brick, ItemKind.Coin, ItemKind.Bottle);
+            K.Gadget(pKind, pPosition);
+        }
+    }
+}

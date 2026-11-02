@@ -1,0 +1,12 @@
+{
+ "name": "Prop_BreakerBox",
+ "category": "system",
+ "size_m": [
+  0.346,
+  0.503,
+  0.107
+ ],
+ "tris": 13056,
+ "source": "Poly Haven 'power_box_01' (polyhaven.com/a/power_box_01)",
+ "licence": "CC0 (Poly Haven)"
+}

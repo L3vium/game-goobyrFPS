@@ -13,10 +13,11 @@ using UnityEngine;
 namespace Com.IsartDigital.GoobyrFPS.Player
 {
     /// <summary>
-    /// A player's Goob on the map, spawned by the match for each living player.
+    /// A player's agent on the map, spawned by the match for each living player.
     /// <para>
     /// The owner moves it (<see cref="FpsMotor"/>, owner-authoritative NetworkTransform) and looks
-    /// through its eyes; everyone else sees a wobbly third-person Goob in the team's colour. What the
+    /// through its eyes (first-person arms); everyone else sees the agent in a suit with the team's
+    /// armband, animated from the motion state, speed, stance and aim sent here. What the
     /// NPCs need to judge visibility - crouched, concealed, hidden, sprinting - is written by the
     /// owner into network variables; health, team and the proof stay with the host.
     /// </para>
@@ -35,6 +36,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public readonly NetworkVariable<bool> Submerged = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> Aiming = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<float> Pitch = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        /// <summary>What the body is doing (climbing, hanging, vaulting...), for the third-person animation.</summary>
+        public readonly NetworkVariable<MotionState> Motion = new NetworkVariable<MotionState>(MotionState.Ground, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<int> Team = new NetworkVariable<int>(0);
         public readonly NetworkVariable<bool> CarriesProof = new NetworkVariable<bool>(false);
 
@@ -42,14 +45,21 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public CharacterController Controller { get; private set; }
         public Damageable Health { get; private set; }
         public WeaponHolder Weapons { get; private set; }
-        public GoobBody Body { get; private set; }
-        public GoobAnimator Animator { get; private set; }
+        public HumanBody Body { get; private set; }
+        public HumanAnimator Animator { get; private set; }
         public LobbyPlayer Player => LobbyPlayer.ForClient(OwnerClientId);
-        public string DisplayName => Player != null ? Player.Name : "Goob";
+        public string DisplayName => Player != null ? Player.Name : "Agent";
+
+        /// <summary>
+        /// Behaviour that gives a player away even in a public place: a raised gun, sprinting,
+        /// climbing or hanging off walls, carrying the proof.
+        /// </summary>
+        public bool ActsSuspicious => Aiming.Value || Sprinting.Value || CarriesProof.Value
+                                      || Motion.Value == MotionState.Climb || Motion.Value == MotionState.Hang || Motion.Value == MotionState.Vault || Motion.Value == MotionState.Mantle;
 
         /// <summary>Eye position as the NPCs and the camera see it.</summary>
-        public Vector3 Eye => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? 0.98f : 1.74f);
-        public Vector3 Chest => transform.position + Vector3.up * (Crouched.Value ? 0.6f : 1.1f);
+        public Vector3 Eye => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? BodyMetrics.CROUCH_EYE : BodyMetrics.EYE);
+        public Vector3 Chest => transform.position + Vector3.up * (Crouched.Value ? BodyMetrics.CROUCH_CHEST : BodyMetrics.CHEST);
 
         private float _yaw, _pitch;
         private float _bobPhase, _bobAmount;
@@ -63,15 +73,15 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             Controller = GetComponent<CharacterController>();
             Health = GetComponent<Damageable>();
             Weapons = GetComponent<WeaponHolder>();
-            Body = GetComponentInChildren<GoobBody>();
-            Animator = GetComponentInChildren<GoobAnimator>();
+            Body = GetComponentInChildren<HumanBody>();
+            Animator = GetComponentInChildren<HumanAnimator>();
             Motor.enabled = false;
         }
 
         public override void OnNetworkSpawn()
         {
             All.Add(this);
-            Health.HeadHeight = 1.3f;
+            Health.HeadCentre = () => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? BodyMetrics.CROUCH_HEAD_CENTRE : BodyMetrics.HEAD_CENTRE);
             Health.InitHealth(GameDatabase.Rules.playerHealth);
             Health.OnHitClient += HandleHit;
             gameObject.AddComponent<Audio.Footsteps>().Init(
@@ -99,8 +109,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 Body.SetShadowOnly(true);
                 GameInput.LockCursor(true);
                 Motor.OnLanded += HandleLanded;
-                Motor.OnJumped += () => { Animator.Squash(-0.15f); Audio.Sfx.Play("jump", transform.position, 0.6f); };
+                Motor.OnJumped += () => { Animator?.Jumped(); Audio.Sfx.Play("jump", transform.position, 0.6f); };
                 Motor.OnSlide += HandleSlide;
+                Motor.OnDrop += HandleDrop;
+                Motor.OnTraversal += HandleTraversal;
                 Motor.OnFallDamage += pDamage => FallDamageRpc(pDamage);
                 Motor.OnSplash += pSpeed => SplashRpc(transform.position + Vector3.up * 0.9f, Mathf.Clamp01(pSpeed / 8f) + 0.5f);
             }
@@ -117,21 +129,32 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             Health.Team = pTeam;
             if (Body == null) return;
-            // Agents wear a suit in their team's colour; the face and hair vary with the seat.
+            // Agents wear the black suit (a man or a woman by seat) and an armband in the team's colour.
             int lSeat = Player != null ? Player.Seat.Value : (int)OwnerClientId;
-            GoobLook lLook = GoobLook.Random(new System.Random(lSeat * 977 + 11), Outfit.Suit, LobbyPlayer.TeamColor(pTeam) * 0.85f);
-            lLook.facial = Facial.None;
-            lLook.earpiece = true;
-            lLook.scale = 1f;
-            Body.Configure(lLook);
+            Body.Configure(HumanCast.ForAgent(lSeat), LobbyPlayer.TeamColor(pTeam), 1f);
             if (IsOwner) Body.SetShadowOnly(true);
+            Weapons?.RefreshThirdPerson(true);
         }
 
         // ---------------------------------------------------------------- owner loop
 
+        /// <summary>Host: how fast this player really moves over the ground (smoothed), for how far the NPCs hear their steps.</summary>
+        public float HostSpeed { get; private set; }
+        private Vector3 _lastHostPosition;
+
+        private void TrackHostSpeed()
+        {
+            Vector3 lDelta = transform.position - _lastHostPosition;
+            _lastHostPosition = transform.position;
+            lDelta.y = 0f;
+            float lInstant = Mathf.Min(20f, lDelta.magnitude / Mathf.Max(Time.deltaTime, 0.0001f));
+            HostSpeed = Mathf.Lerp(HostSpeed, lInstant, 1f - Mathf.Exp(-8f * Time.deltaTime));
+        }
+
         private void Update()
         {
             if (!IsSpawned) return;
+            if (IsServer) TrackHostSpeed();
 
             if (IsOwner && Health.IsAlive)
             {
@@ -146,6 +169,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 InGrass.Value = Motor.InGrass;
                 Hidden.Value = Motor.Mode == MotorMode.Hidden;
                 Submerged.Value = Motor.Underwater;
+                if (Motion.Value != Motor.State) Motion.Value = Motor.State;
                 CameraRig.Instance?.SetUnderwater(Motor.Underwater);
                 if (Mathf.Abs(Pitch.Value - _pitch) > 1f) Pitch.Value = _pitch;
                 Motor.SpeedMultiplier = CarriesProof.Value ? 0.92f : 1f;
@@ -154,10 +178,14 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             if (Animator != null)
             {
                 Animator.AimPitch = IsOwner ? _pitch : Pitch.Value;
+                Animator.Motion = IsOwner ? Motor.State : Motion.Value;
                 Animator.Crouched = Crouched.Value;
+                Animator.Sprinting = Sprinting.Value;
                 Animator.Aiming = Aiming.Value;
-                Animator.Talking = Player != null && Player.TalkingNow.Value;
-                Animator.HoldingWeapon = Weapons != null && Weapons.HoldsWeapon;
+                Animator.Held = Weapons != null ? WeaponModels.HeldOf(Weapons.HeldItem) : HeldKind.None;
+                // The owner knows its velocity; others measure the interpolated transform.
+                Animator.Velocity = IsOwner ? Motor.Velocity : (Vector3?)null;
+                Animator.UseIK = !IsOwner;
             }
             if (Body != null && !IsOwner) Body.SetVisible(!Hidden.Value && Health.IsAlive);
         }
@@ -191,7 +219,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             }
             else
             {
-                lEye = transform.position + Vector3.up * (Motor.EyeHeight + _landDip) + transform.rotation * lBob;
+                lEye = transform.position + Vector3.up * (Motor.EyeHeight + _landDip + Motor.StepSmoothing) + transform.rotation * lBob;
                 lRotation = Quaternion.Euler(_pitch, _yaw, _tilt + _slideTilt);
             }
             CameraRig.Instance.SetPose(lEye, lRotation);
@@ -208,12 +236,33 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             float lImpact = Mathf.Clamp01((pFallSpeed - 2f) / 14f);
             _landDipVel -= lImpact * 3.5f;
-            Animator.Squash(lImpact * 0.6f);
             if (lImpact > 0.2f)
             {
                 Juice.Shake(lImpact * 0.35f);
                 Audio.Sfx.Play("land", transform.position, 0.4f + lImpact);
             }
+        }
+
+        /// <summary>A landing from a real drop is heard (DetectionModel.LandingRadius): the host spreads it.</summary>
+        private void HandleDrop(float pDrop)
+        {
+            if (AI.DetectionModel.LandingRadius(pDrop, false) > 0f) LandNoiseRpc(transform.position, pDrop, Motor.Crouched);
+        }
+
+
+        [Rpc(SendTo.Server)]
+        private void LandNoiseRpc(Vector3 pPoint, float pDrop, bool pCrouched)
+        {
+            if (Vector3.Distance(pPoint, transform.position) > 4f) pPoint = transform.position;
+            float lRadius = AI.DetectionModel.LandingRadius(Mathf.Min(pDrop, 12f), pCrouched);
+            if (lRadius > 0f) AI.NoiseSystem.Emit(pPoint, lRadius, AI.NoiseKind.Footstep, OwnerClientId);
+        }
+
+        private void HandleTraversal(MotionState pState)
+        {
+            Audio.Sfx.Play(pState == MotionState.Vault ? "vault" : "mantle", transform.position, 0.55f, 10f);
+            Juice.Shake(0.04f);
+            if (pState == MotionState.Hang) _landDipVel -= 0.8f;
         }
 
         private void HandleSlide(float pSide)
@@ -239,7 +288,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         private void HandleHit(float pAmount, Vector3 pPoint, Vector3 pDirection, bool pHeadshot)
         {
-            Animator?.Shove(pDirection * Mathf.Clamp01(pAmount / 40f));
+            Animator?.Hit(pDirection);
             HitFlash.Play(Body);
             if (IsOwner)
             {
@@ -250,7 +299,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         private void HandleDeath(Vector3 pImpulse, Vector3 pPoint, DamageType pType)
         {
-            GoobRagdoll.Spawn(Body, pImpulse, pPoint);
+            Vector3 lVelocity = Animator != null ? Animator.MeasuredVelocity : Vector3.zero;
+            HumanRagdoll lRagdoll = HumanRagdoll.Spawn(Body, pImpulse, pPoint, lVelocity);
+            if (lRagdoll != null) HitFlash.Play(lRagdoll.gameObject, 1.4f);
+            Effects.Fluff(pPoint, pImpulse.normalized, Effects.Blood, true);
             Controller.enabled = false;
             if (IsOwner)
             {
@@ -268,6 +320,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             Effects.Splash(pPoint, pSize);
             if (IsServer) AI.NoiseSystem.Emit(pPoint, 8f * pSize, AI.NoiseKind.Suspicious, OwnerClientId);
         }
+
+        /// <summary>Host: a notification for this player only (caught on camera...).</summary>
+        [Rpc(SendTo.Owner)]
+        public void NotifyRpc(string pWhat, string pWhere) => UI.Hud.Notify(pWhat, pWhere, UI.ThreatMarkers.Amber);
 
         [Rpc(SendTo.Server)]
         private void FallDamageRpc(float pDamage)

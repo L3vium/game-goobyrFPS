@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Boat",
+ "category": "vehicle",
+ "size_m": [
+  2.309,
+  1.402,
+  5.82
+ ],
+ "tris": 7646,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "5.6 m centre-console motorboat with outboard; waterline about 0.3 m above the pivot"
+}

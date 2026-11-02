@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f72260ffbcad8274386970a7a87112b4, type: 3}
+  m_Name: HumanRig
+  m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.HumanRig
+  pistol:
+    handPosition: {x: 0.021021493, y: 0.056053407, z: -0.00014363416}
+    handRotation: {x: -0.32176185, y: 0.65484995, z: 0.61623085, w: 0.29648048}
+    supportPosition: {x: -0.0113769155, y: -0.13546214, z: -0.043949522}
+    supportRotation: {x: 0.21998723, y: -0.86784446, z: -0.36819965, w: 0.25076038}
+  rifle:
+    handPosition: {x: 0.021021493, y: 0.056053407, z: -0.00014363416}
+    handRotation: {x: -0.32176185, y: 0.65484995, z: 0.61623085, w: 0.29648048}
+    supportPosition: {x: -0.035710853, y: -0.0894205, z: 0.29679722}
+    supportRotation: {x: -0.052026223, y: -0.46285182, z: -0.4529317, w: 0.7602069}
+  foreEnd: 0.3
+  pinchPosition: {x: -0.0146244485, y: 0.095305085, z: 0.034629658}
+  pinchRotation: {x: -0.32176185, y: 0.65484995, z: 0.61623085, w: 0.29648048}
+  leftFistRotation: {x: -0.32176185, y: -0.65484995, z: -0.61623085, w: -0.29648048}
+  leftPalm: {x: -0.011147295, y: 0.055157237, z: -0.012701385}
+  eyeInHead: {x: 0, y: 0.08437103, z: 0.10053125}

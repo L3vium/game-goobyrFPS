@@ -172,7 +172,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             bool lAlive = pNpc.Health.IsAlive;
             bool lAlert = lAlive && (pState == NpcState.Engaged || pState == NpcState.Combat || pState == NpcState.Calling);
             bool lShow = lAlive ? lAlert || pState == NpcState.Search || pGauge > 0.02f || pState == NpcState.Flee || pState == NpcState.Sick : pState == NpcState.KnockedOut;
-            Vector3 lHead = pNpc.transform.position + Vector3.up * (2.25f * pNpc.transform.localScale.y);
+            Vector3 lHead = pNpc.transform.position + Vector3.up * (Core.BodyMetrics.MARKER * pNpc.transform.localScale.y);
             float lDistance = Vector3.Distance(pCamPos, lHead);
             if (!lShow || lDistance > (pState == NpcState.KnockedOut ? 20f : SHOW_RANGE)) { lMarker.root.gameObject.SetActive(false); return; }
 

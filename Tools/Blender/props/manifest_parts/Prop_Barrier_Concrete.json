@@ -1,0 +1,12 @@
+{
+ "name": "Prop_Barrier_Concrete",
+ "category": "architecture",
+ "size_m": [
+  1.544,
+  0.832,
+  0.637
+ ],
+ "tris": 4722,
+ "source": "Poly Haven 'concrete_road_barrier' (polyhaven.com/a/concrete_road_barrier)",
+ "licence": "CC0 (Poly Haven)"
+}

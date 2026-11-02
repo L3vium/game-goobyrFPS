@@ -1,0 +1,13 @@
+{
+ "name": "Prop_VentGrille",
+ "category": "system",
+ "size_m": [
+  0.9,
+  0.9,
+  0.091
+ ],
+ "tris": 2536,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "0.9 x 0.9 m removable louvred cover; pivot at the centre of its back (wall) plane, louvres face -Y (Unity +Z)"
+}

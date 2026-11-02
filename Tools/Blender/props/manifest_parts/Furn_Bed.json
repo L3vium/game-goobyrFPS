@@ -1,0 +1,12 @@
+{
+ "name": "Furn_Bed",
+ "category": "furniture",
+ "size_m": [
+  1.494,
+  1.534,
+  2.04
+ ],
+ "tris": 18741,
+ "source": "Poly Haven 'GothicBed_01' (polyhaven.com/a/GothicBed_01)",
+ "licence": "CC0 (Poly Haven)"
+}

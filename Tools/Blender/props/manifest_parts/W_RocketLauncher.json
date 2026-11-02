@@ -1,0 +1,12 @@
+{
+ "name": "W_RocketLauncher",
+ "category": "weapon",
+ "size_m": [
+  0.09,
+  0.188,
+  1.17
+ ],
+ "tris": 5252,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

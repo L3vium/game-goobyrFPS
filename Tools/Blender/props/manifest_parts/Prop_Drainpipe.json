@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Drainpipe",
+ "category": "architecture",
+ "size_m": [
+  0.12,
+  3.0,
+  0.149
+ ],
+ "tris": 1840,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "3 m vertical downpipe (100 mm), socket at the top, wall at +Y (Unity -Z) 9 cm behind the axis; stack segments every 3 m; climbable"
+}

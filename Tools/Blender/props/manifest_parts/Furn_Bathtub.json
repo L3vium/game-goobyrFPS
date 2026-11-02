@@ -1,0 +1,13 @@
+{
+ "name": "Furn_Bathtub",
+ "category": "furniture",
+ "size_m": [
+  1.7,
+  0.759,
+  0.78
+ ],
+ "tris": 1828,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "1.7 x 0.78 m built-in bathtub, taps at -X / +Y corner"
+}

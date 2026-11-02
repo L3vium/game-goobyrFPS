@@ -1,0 +1,12 @@
+{
+ "name": "Furn_DiningChair",
+ "category": "furniture",
+ "size_m": [
+  0.434,
+  0.973,
+  0.576
+ ],
+ "tris": 9700,
+ "source": "Poly Haven 'dining_chair_02' (polyhaven.com/a/dining_chair_02)",
+ "licence": "CC0 (Poly Haven)"
+}

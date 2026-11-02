@@ -1,0 +1,12 @@
+{
+ "name": "Prop_ExplosiveBarrel",
+ "category": "prop",
+ "size_m": [
+  0.563,
+  0.88,
+  0.563
+ ],
+ "tris": 2682,
+ "source": "Poly Haven 'Barrel_01' (polyhaven.com/a/Barrel_01)",
+ "licence": "CC0 (Poly Haven)"
+}

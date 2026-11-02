@@ -1,0 +1,12 @@
+{
+ "name": "Furn_PottedPlant",
+ "category": "furniture",
+ "size_m": [
+  0.701,
+  0.841,
+  0.657
+ ],
+ "tris": 18300,
+ "source": "Poly Haven 'potted_plant_02' (polyhaven.com/a/potted_plant_02)",
+ "licence": "CC0 (Poly Haven)"
+}

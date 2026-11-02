@@ -1,0 +1,13 @@
+{
+ "name": "Prop_AirHandler",
+ "category": "system",
+ "size_m": [
+  2.546,
+  2.3,
+  1.067
+ ],
+ "tris": 8386,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "basement air-handling unit 2.2 x 1.0 x 1.7 m, access panels on the front (Unity +Z)"
+}

@@ -1,0 +1,13 @@
+{
+ "name": "W_Sniper",
+ "category": "weapon",
+ "size_m": [
+  0.073,
+  0.255,
+  1.231
+ ],
+ "tris": 14927,
+ "source": "Poly Haven 'bolt_action_rifle_7_62' (polyhaven.com/a/bolt_action_rifle_7_62)",
+ "licence": "CC0 (Poly Haven)",
+ "notes": "Poly Haven rifle + procedural 3-12x44 scope (W_Sniper_body textures)"
+}

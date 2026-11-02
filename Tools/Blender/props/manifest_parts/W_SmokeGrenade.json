@@ -1,0 +1,12 @@
+{
+ "name": "W_SmokeGrenade",
+ "category": "throwable",
+ "size_m": [
+  0.066,
+  0.144,
+  0.07
+ ],
+ "tris": 1557,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

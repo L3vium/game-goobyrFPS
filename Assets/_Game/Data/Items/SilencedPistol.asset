@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c8f7e51f3b3ee944b9e257aa40147e3, type: 3}
   m_Name: SilencedPistol
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.ItemDefinition
-  displayName: Hush Pistol
+  displayName: Silenced Pistol
   kind: 2
   slot: 0
   color: {r: 0.35, g: 0.75, b: 0.95, a: 1}
@@ -31,7 +31,7 @@ MonoBehaviour:
   recoil: 1.4
   adsFov: 62
   shake: 0.08
-  noiseRadius: 9
+  noiseRadius: 8
   projectileSpeed: 0
   explosionRadius: 0
   throwForce: 18

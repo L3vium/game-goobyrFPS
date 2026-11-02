@@ -1,0 +1,12 @@
+{
+ "name": "W_Coin",
+ "category": "throwable",
+ "size_m": [
+  0.025,
+  0.002,
+  0.025
+ ],
+ "tris": 2444,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Pallet",
+ "category": "prop",
+ "size_m": [
+  1.201,
+  0.144,
+  0.8
+ ],
+ "tris": 2301,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "EUR pallet 1.2 x 0.8 x 0.144 m"
+}

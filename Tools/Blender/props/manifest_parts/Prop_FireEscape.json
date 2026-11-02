@@ -1,0 +1,13 @@
+{
+ "name": "Prop_FireEscape",
+ "category": "architecture",
+ "size_m": [
+  4.793,
+  4.96,
+  1.387
+ ],
+ "tris": 7986,
+ "source": "Poly Haven 'modular_fire_escape' (polyhaven.com/a/modular_fire_escape)",
+ "licence": "CC0 (Poly Haven)",
+ "notes": "one storey: platform+railing on top, stairs down to the ground"
+}

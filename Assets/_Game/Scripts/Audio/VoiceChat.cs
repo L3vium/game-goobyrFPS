@@ -11,7 +11,7 @@ namespace Com.IsartDigital.GoobyrFPS.Audio
     /// <summary>
     /// Proximity voice chat on Steam Voice. The speaker's machine records compressed voice, the
     /// host relays it only to players within range, and each listener decompresses it into a 3D
-    /// audio source on the speaker's Goob - voices come from where people stand. The host switches
+    /// audio source on the speaker's agent - voices come from where people stand. The host switches
     /// it on or off for the room (lobby option); push-to-talk (B) or open mic is a local setting.
     /// Needs Steam: on a LAN session without Steam it stays silent.
     /// </summary>

@@ -1,0 +1,912 @@
+[
+ {
+  "name": "W_Flamethrower",
+  "category": "weapon",
+  "size_m": [
+   0.108,
+   0.192,
+   0.827
+  ],
+  "tris": 7589,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_Pistol",
+  "category": "weapon",
+  "size_m": [
+   0.032,
+   0.176,
+   0.239
+  ],
+  "tris": 3048,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_Remote",
+  "category": "weapon",
+  "size_m": [
+   0.055,
+   0.156,
+   0.105
+  ],
+  "tris": 2087,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_RocketLauncher",
+  "category": "weapon",
+  "size_m": [
+   0.09,
+   0.188,
+   1.17
+  ],
+  "tris": 5252,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_Shotgun",
+  "category": "weapon",
+  "size_m": [
+   0.043,
+   0.175,
+   1.08
+  ],
+  "tris": 5662,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_SilencedPistol",
+  "category": "weapon",
+  "size_m": [
+   0.034,
+   0.176,
+   0.416
+  ],
+  "tris": 4116,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_Smg",
+  "category": "weapon",
+  "size_m": [
+   0.05,
+   0.28,
+   0.418
+  ],
+  "tris": 5646,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_Sniper",
+  "category": "weapon",
+  "size_m": [
+   0.073,
+   0.255,
+   1.231
+  ],
+  "tris": 14927,
+  "source": "Poly Haven 'bolt_action_rifle_7_62' (polyhaven.com/a/bolt_action_rifle_7_62)",
+  "licence": "CC0 (Poly Haven)",
+  "notes": "Poly Haven rifle + procedural 3-12x44 scope (W_Sniper_body textures)"
+ },
+ {
+  "name": "W_Bottle",
+  "category": "throwable",
+  "size_m": [
+   0.075,
+   0.298,
+   0.075
+  ],
+  "tris": 6520,
+  "source": "Poly Haven 'wine_bottles_01' (polyhaven.com/a/wine_bottles_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "W_Brick",
+  "category": "throwable",
+  "size_m": [
+   0.104,
+   0.066,
+   0.216
+  ],
+  "tris": 1826,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_C4",
+  "category": "throwable",
+  "size_m": [
+   0.057,
+   0.091,
+   0.337
+  ],
+  "tris": 3184,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_Coin",
+  "category": "throwable",
+  "size_m": [
+   0.025,
+   0.002,
+   0.025
+  ],
+  "tris": 2444,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_EmeticPoison",
+  "category": "throwable",
+  "size_m": [
+   0.035,
+   0.08,
+   0.037
+  ],
+  "tris": 3752,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_Poison",
+  "category": "throwable",
+  "size_m": [
+   0.018,
+   0.065,
+   0.018
+  ],
+  "tris": 1884,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_Rock",
+  "category": "throwable",
+  "size_m": [
+   0.147,
+   0.072,
+   0.089
+  ],
+  "tris": 3344,
+  "source": "Poly Haven 'stone_01' (polyhaven.com/a/stone_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "W_SmokeGrenade",
+  "category": "throwable",
+  "size_m": [
+   0.066,
+   0.144,
+   0.07
+  ],
+  "tris": 1557,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "W_Wrench",
+  "category": "throwable",
+  "size_m": [
+   0.068,
+   0.031,
+   0.254
+  ],
+  "tris": 5390,
+  "source": "Poly Haven 'adjustable_wrench' (polyhaven.com/a/adjustable_wrench)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_AirHandler",
+  "category": "system",
+  "size_m": [
+   2.546,
+   2.3,
+   1.067
+  ],
+  "tris": 8386,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "basement air-handling unit 2.2 x 1.0 x 1.7 m, access panels on the front (Unity +Z)"
+ },
+ {
+  "name": "Prop_AlarmPanel",
+  "category": "system",
+  "size_m": [
+   0.24,
+   0.445,
+   0.054
+  ],
+  "tris": 3655,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "wall keypad; pivot at the centre of its back (wall) face, wall at +Y (Unity -Z)"
+ },
+ {
+  "name": "Prop_BreakerBox",
+  "category": "system",
+  "size_m": [
+   0.346,
+   0.503,
+   0.107
+  ],
+  "tris": 13056,
+  "source": "Poly Haven 'power_box_01' (polyhaven.com/a/power_box_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_Generator",
+  "category": "system",
+  "size_m": [
+   0.818,
+   0.577,
+   0.564
+  ],
+  "tris": 19400,
+  "source": "Poly Haven 'portable_generator' (polyhaven.com/a/portable_generator)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_SecurityCamera",
+  "category": "system",
+  "size_m": [
+   0.17,
+   0.286,
+   0.554
+  ],
+  "tris": 13571,
+  "source": "Poly Haven 'security_camera_01' (polyhaven.com/a/security_camera_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_VentGrille",
+  "category": "system",
+  "size_m": [
+   0.9,
+   0.9,
+   0.091
+  ],
+  "tris": 2536,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "0.9 x 0.9 m removable louvred cover; pivot at the centre of its back (wall) plane, louvres face -Y (Unity +Z)"
+ },
+ {
+  "name": "Prop_Barrier_Concrete",
+  "category": "architecture",
+  "size_m": [
+   1.544,
+   0.832,
+   0.637
+  ],
+  "tris": 4722,
+  "source": "Poly Haven 'concrete_road_barrier' (polyhaven.com/a/concrete_road_barrier)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_ChainlinkFence",
+  "category": "architecture",
+  "size_m": [
+   3.157,
+   2.523,
+   0.149
+  ],
+  "tris": 9484,
+  "source": "Poly Haven 'modular_chainlink_fence' (polyhaven.com/a/modular_chainlink_fence)",
+  "licence": "CC0 (Poly Haven)",
+  "notes": "3.0 m run: double + single panels between three posts; wire slot is alpha-tested"
+ },
+ {
+  "name": "Prop_Drainpipe",
+  "category": "architecture",
+  "size_m": [
+   0.12,
+   3.0,
+   0.149
+  ],
+  "tris": 1840,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "3 m vertical downpipe (100 mm), socket at the top, wall at +Y (Unity -Z) 9 cm behind the axis; stack segments every 3 m; climbable"
+ },
+ {
+  "name": "Prop_Drainpipe_Bottom",
+  "category": "architecture",
+  "size_m": [
+   0.3,
+   0.604,
+   0.393
+  ],
+  "tris": 2860,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "shoe + ground gully; its top spigot (0.57 m) takes Prop_Drainpipe's bottom"
+ },
+ {
+  "name": "Prop_Drainpipe_Top",
+  "category": "architecture",
+  "size_m": [
+   0.42,
+   0.72,
+   0.203
+  ],
+  "tris": 1976,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "rainwater hopper head; its bottom spigot plugs into Prop_Drainpipe's top socket"
+ },
+ {
+  "name": "Prop_FireEscape",
+  "category": "architecture",
+  "size_m": [
+   4.793,
+   4.96,
+   1.387
+  ],
+  "tris": 7986,
+  "source": "Poly Haven 'modular_fire_escape' (polyhaven.com/a/modular_fire_escape)",
+  "licence": "CC0 (Poly Haven)",
+  "notes": "one storey: platform+railing on top, stairs down to the ground"
+ },
+ {
+  "name": "Prop_Ladder",
+  "category": "architecture",
+  "size_m": [
+   0.51,
+   3.0,
+   0.227
+  ],
+  "tris": 4232,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "3 m fixed steel ladder, rungs every 0.3 m, wall at +Y (Unity -Z) 0.2 m behind"
+ },
+ {
+  "name": "Prop_StreetLamp",
+  "category": "architecture",
+  "size_m": [
+   0.704,
+   3.871,
+   0.387
+  ],
+  "tris": 19400,
+  "source": "Poly Haven 'street_lamp_01' (polyhaven.com/a/street_lamp_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_VentDuct_Corner",
+  "category": "architecture",
+  "size_m": [
+   2.06,
+   1.12,
+   2.06
+  ],
+  "tris": 4232,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "90 deg elbow, legs to -Z and +X (Unity), each ending 1.5 m from the pivot"
+ },
+ {
+  "name": "Prop_VentDuct_Straight",
+  "category": "architecture",
+  "size_m": [
+   1.12,
+   1.12,
+   3.0
+  ],
+  "tris": 5056,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "1.0 m inner section, 3 m long along Z, open ends"
+ },
+ {
+  "name": "Prop_VentDuct_T",
+  "category": "architecture",
+  "size_m": [
+   3.0,
+   1.12,
+   2.06
+  ],
+  "tris": 6332,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "T junction, legs to -X, +X and -Z (Unity), 1.5 m each"
+ },
+ {
+  "name": "Prop_Chandelier",
+  "category": "prop",
+  "size_m": [
+   0.746,
+   0.798,
+   0.815
+  ],
+  "tris": 19399,
+  "source": "Poly Haven 'Chandelier_01' (polyhaven.com/a/Chandelier_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_Crate_Military",
+  "category": "prop",
+  "size_m": [
+   1.242,
+   0.465,
+   0.52
+  ],
+  "tris": 11624,
+  "source": "Poly Haven 'wooden_military_crate' (polyhaven.com/a/wooden_military_crate)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_Crate_Wood",
+  "category": "prop",
+  "size_m": [
+   0.529,
+   0.464,
+   1.166
+  ],
+  "tris": 5176,
+  "source": "Poly Haven 'wooden_crate_02' (polyhaven.com/a/wooden_crate_02)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_ExplosiveBarrel",
+  "category": "prop",
+  "size_m": [
+   0.563,
+   0.88,
+   0.563
+  ],
+  "tris": 2682,
+  "source": "Poly Haven 'Barrel_01' (polyhaven.com/a/Barrel_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_Jerrycan",
+  "category": "prop",
+  "size_m": [
+   0.35,
+   0.455,
+   0.172
+  ],
+  "tris": 7760,
+  "source": "Poly Haven 'metal_jerrycan' (polyhaven.com/a/metal_jerrycan)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_Pallet",
+  "category": "prop",
+  "size_m": [
+   1.201,
+   0.144,
+   0.8
+  ],
+  "tris": 2301,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "EUR pallet 1.2 x 0.8 x 0.144 m"
+ },
+ {
+  "name": "Prop_PropaneTank",
+  "category": "prop",
+  "size_m": [
+   0.337,
+   0.554,
+   0.337
+  ],
+  "tris": 5238,
+  "source": "Poly Haven 'propane_tank' (polyhaven.com/a/propane_tank)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Prop_Sandbags",
+  "category": "prop",
+  "size_m": [
+   1.751,
+   0.476,
+   0.372
+  ],
+  "tris": 9216,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "4-row sandbag wall segment, ~1.5 m long, 0.45 m high"
+ },
+ {
+  "name": "Furn_Armchair",
+  "category": "furniture",
+  "size_m": [
+   0.82,
+   1.023,
+   0.987
+  ],
+  "tris": 8916,
+  "source": "Poly Haven 'modern_arm_chair_01' (polyhaven.com/a/modern_arm_chair_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_BarCounter",
+  "category": "furniture",
+  "size_m": [
+   2.7,
+   1.1,
+   0.745
+  ],
+  "tris": 3736,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "2.6 m bar, customer side -Y (Unity +Z) with brass foot rail"
+ },
+ {
+  "name": "Furn_Bathtub",
+  "category": "furniture",
+  "size_m": [
+   1.7,
+   0.759,
+   0.78
+  ],
+  "tris": 1828,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "1.7 x 0.78 m built-in bathtub, taps at -X / +Y corner"
+ },
+ {
+  "name": "Furn_Bed",
+  "category": "furniture",
+  "size_m": [
+   1.494,
+   1.534,
+   2.04
+  ],
+  "tris": 18741,
+  "source": "Poly Haven 'GothicBed_01' (polyhaven.com/a/GothicBed_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_BilliardTable",
+  "category": "furniture",
+  "size_m": [
+   2.84,
+   0.836,
+   1.6
+  ],
+  "tris": 7960,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "9 ft pool table 2.84 x 1.6 m"
+ },
+ {
+  "name": "Furn_Bookshelf",
+  "category": "furniture",
+  "size_m": [
+   1.374,
+   2.063,
+   0.581
+  ],
+  "tris": 10106,
+  "source": "Poly Haven 'wooden_bookshelf_worn' (polyhaven.com/a/wooden_bookshelf_worn)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_Cabinet",
+  "category": "furniture",
+  "size_m": [
+   1.719,
+   2.361,
+   1.117
+  ],
+  "tris": 12170,
+  "source": "Poly Haven 'GothicCabinet_01' (polyhaven.com/a/GothicCabinet_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_CoffeeTable",
+  "category": "furniture",
+  "size_m": [
+   1.202,
+   0.39,
+   0.6
+  ],
+  "tris": 4504,
+  "source": "Poly Haven 'modern_coffee_table_01' (polyhaven.com/a/modern_coffee_table_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_Desk",
+  "category": "furniture",
+  "size_m": [
+   2.0,
+   0.788,
+   0.947
+  ],
+  "tris": 6898,
+  "source": "Poly Haven 'metal_office_desk' (polyhaven.com/a/metal_office_desk)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_DiningChair",
+  "category": "furniture",
+  "size_m": [
+   0.434,
+   0.973,
+   0.576
+  ],
+  "tris": 9700,
+  "source": "Poly Haven 'dining_chair_02' (polyhaven.com/a/dining_chair_02)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_DiningTable",
+  "category": "furniture",
+  "size_m": [
+   2.2,
+   0.76,
+   1.0
+  ],
+  "tris": 2012,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "2.2 x 1.0 x 0.76 m, seats 8"
+ },
+ {
+  "name": "Furn_FloorLamp",
+  "category": "furniture",
+  "size_m": [
+   0.505,
+   1.687,
+   0.805
+  ],
+  "tris": 2508,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "1.7 m brass floor lamp, drum shade"
+ },
+ {
+  "name": "Furn_Fridge",
+  "category": "furniture",
+  "size_m": [
+   0.7,
+   1.84,
+   0.737
+  ],
+  "tris": 2049,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "stainless fridge-freezer 0.7 x 0.68 x 1.85 m"
+ },
+ {
+  "name": "Furn_KitchenCounter",
+  "category": "furniture",
+  "size_m": [
+   2.42,
+   0.9,
+   0.646
+  ],
+  "tris": 10788,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "2.4 m base-cabinet run, marble top at 0.9 m"
+ },
+ {
+  "name": "Furn_Locker",
+  "category": "furniture",
+  "size_m": [
+   0.4,
+   1.8,
+   0.552
+  ],
+  "tris": 1376,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "steel locker 0.4 x 0.5 x 1.8 m, hollow; Door pivots on its left hinge"
+ },
+ {
+  "name": "Furn_OfficeChair",
+  "category": "furniture",
+  "size_m": [
+   0.643,
+   1.206,
+   0.687
+  ],
+  "tris": 6996,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned"
+ },
+ {
+  "name": "Furn_PianoGrand",
+  "category": "furniture",
+  "size_m": [
+   1.515,
+   1.876,
+   2.308
+  ],
+  "tris": 15815,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "concert grand ~1.5 x 2.2 m, lid propped open, keyboard faces -Y (Unity +Z)"
+ },
+ {
+  "name": "Furn_PottedPlant",
+  "category": "furniture",
+  "size_m": [
+   0.701,
+   0.841,
+   0.657
+  ],
+  "tris": 18300,
+  "source": "Poly Haven 'potted_plant_02' (polyhaven.com/a/potted_plant_02)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_Rug",
+  "category": "furniture",
+  "size_m": [
+   2.4,
+   0.01,
+   1.7
+  ],
+  "tris": 12,
+  "source": "Procedural pattern (numpy) + Poly Haven 'wool_boucle' fibre",
+  "licence": "Original + CC0 (Poly Haven)",
+  "notes": "2.4 x 1.7 m Persian-style rug, 1 cm thick"
+ },
+ {
+  "name": "Furn_ServerRack",
+  "category": "furniture",
+  "size_m": [
+   0.6,
+   2.0,
+   1.125
+  ],
+  "tris": 19600,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "42U rack 0.6 x 1.07 x 2.0 m with tinted glass door"
+ },
+ {
+  "name": "Furn_Shelves_Metal",
+  "category": "furniture",
+  "size_m": [
+   1.097,
+   2.141,
+   0.502
+  ],
+  "tris": 4348,
+  "source": "Poly Haven 'steel_frame_shelves_01' (polyhaven.com/a/steel_frame_shelves_01)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_Sink",
+  "category": "furniture",
+  "size_m": [
+   0.517,
+   1.035,
+   0.436
+  ],
+  "tris": 3808,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "pedestal washbasin with mixer tap, wall at +Y (Unity -Z)"
+ },
+ {
+  "name": "Furn_Sofa",
+  "category": "furniture",
+  "size_m": [
+   1.807,
+   0.709,
+   0.818
+  ],
+  "tris": 2728,
+  "source": "Poly Haven 'sofa_02' (polyhaven.com/a/sofa_02)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_Stove",
+  "category": "furniture",
+  "size_m": [
+   0.503,
+   0.859,
+   0.648
+  ],
+  "tris": 13914,
+  "source": "Poly Haven 'electric_stove' (polyhaven.com/a/electric_stove)",
+  "licence": "CC0 (Poly Haven)"
+ },
+ {
+  "name": "Furn_TV",
+  "category": "furniture",
+  "size_m": [
+   1.24,
+   0.86,
+   0.197
+  ],
+  "tris": 1297,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "55-inch flat TV on feet"
+ },
+ {
+  "name": "Furn_Toilet",
+  "category": "furniture",
+  "size_m": [
+   0.42,
+   0.827,
+   0.626
+  ],
+  "tris": 3752,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "close-coupled WC, cistern against the wall at +Y (Unity -Z); seat lid raised"
+ },
+ {
+  "name": "Furn_Wardrobe",
+  "category": "furniture",
+  "size_m": [
+   1.06,
+   2.1,
+   0.669
+  ],
+  "tris": 3332,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "1.0 x 0.6 x 2.1 m, hollow (hide-in), doors Door_L / Door_R pivot on their hinges (rotate around local Y in Unity)"
+ },
+ {
+  "name": "Prop_Boat",
+  "category": "vehicle",
+  "size_m": [
+   2.309,
+   1.402,
+   5.82
+  ],
+  "tris": 7646,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "5.6 m centre-console motorboat with outboard; waterline about 0.3 m above the pivot"
+ },
+ {
+  "name": "Prop_Car_Pickup",
+  "category": "vehicle",
+  "size_m": [
+   2.281,
+   1.91,
+   5.342
+  ],
+  "tris": 24033,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "5.3 m crew-less single-cab pickup, silver, open bed (cover / throwables)"
+ },
+ {
+  "name": "Prop_Car_Sedan",
+  "category": "vehicle",
+  "size_m": [
+   2.141,
+   1.498,
+   4.882
+  ],
+  "tris": 23102,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "4.85 m executive saloon, dark blue metallic, tinted glass greenhouse"
+ },
+ {
+  "name": "Prop_Helicopter",
+  "category": "vehicle",
+  "size_m": [
+   9.673,
+   3.07,
+   11.086
+  ],
+  "tris": 8278,
+  "source": "Procedural (Blender Python)",
+  "licence": "Original, project-owned",
+  "notes": "light utility helicopter (static), 10 m rotor, ~8.3 m long; for helipads"
+ }
+]

@@ -1,0 +1,12 @@
+{
+ "name": "Prop_Crate_Wood",
+ "category": "prop",
+ "size_m": [
+  0.529,
+  0.464,
+  1.166
+ ],
+ "tris": 5176,
+ "source": "Poly Haven 'wooden_crate_02' (polyhaven.com/a/wooden_crate_02)",
+ "licence": "CC0 (Poly Haven)"
+}

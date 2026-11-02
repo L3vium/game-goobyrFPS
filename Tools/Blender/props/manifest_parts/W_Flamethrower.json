@@ -1,0 +1,12 @@
+{
+ "name": "W_Flamethrower",
+ "category": "weapon",
+ "size_m": [
+  0.108,
+  0.192,
+  0.827
+ ],
+ "tris": 7589,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

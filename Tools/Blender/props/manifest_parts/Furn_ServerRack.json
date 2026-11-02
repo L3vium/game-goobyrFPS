@@ -1,0 +1,13 @@
+{
+ "name": "Furn_ServerRack",
+ "category": "furniture",
+ "size_m": [
+  0.6,
+  2.0,
+  1.125
+ ],
+ "tris": 19600,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "42U rack 0.6 x 1.07 x 2.0 m with tinted glass door"
+}

@@ -109,13 +109,35 @@ Shader "Hidden/Goobyr/VolumetricFog"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
             TEXTURE2D(_FogTex);
             SAMPLER(sampler_FogTex);
+            float4 _FogTex_TexelSize;
 
+            // Depth-aware upsample of the half-resolution fog: a 3x3 bilateral filter whose taps
+            // only count where the scene sits at the same depth as this pixel. No halos around
+            // foliage and railings, and the jittered march averages out into smooth shafts.
             float4 Frag(Varyings input) : SV_Target
             {
-                float4 scene = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, input.texcoord);
-                float4 fog = SAMPLE_TEXTURE2D(_FogTex, sampler_FogTex, input.texcoord);
+                float2 uv = input.texcoord;
+                float4 scene = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv);
+                float centreDepth = LinearEyeDepth(SampleSceneDepth(uv), _ZBufferParams);
+                float4 sum = 0;
+                float weights = 0;
+                [unroll]
+                for (int y = -1; y <= 1; y++)
+                {
+                    [unroll]
+                    for (int x = -1; x <= 1; x++)
+                    {
+                        float2 tapUv = uv + float2(x, y) * _FogTex_TexelSize.xy;
+                        float tapDepth = LinearEyeDepth(SampleSceneDepth(tapUv), _ZBufferParams);
+                        float w = (x == 0 && y == 0 ? 2.0 : 1.0) / (1e-3 + abs(tapDepth - centreDepth) / max(centreDepth, 0.1) * 40.0 + 0.02);
+                        sum += SAMPLE_TEXTURE2D(_FogTex, sampler_LinearClamp, tapUv) * w;
+                        weights += w;
+                    }
+                }
+                float4 fog = sum / max(weights, 1e-4);
                 return float4(scene.rgb * fog.a + fog.rgb, scene.a);
             }
             ENDHLSL

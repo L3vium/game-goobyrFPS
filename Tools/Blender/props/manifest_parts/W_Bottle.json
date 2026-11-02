@@ -1,0 +1,12 @@
+{
+ "name": "W_Bottle",
+ "category": "throwable",
+ "size_m": [
+  0.075,
+  0.298,
+  0.075
+ ],
+ "tris": 6520,
+ "source": "Poly Haven 'wine_bottles_01' (polyhaven.com/a/wine_bottles_01)",
+ "licence": "CC0 (Poly Haven)"
+}

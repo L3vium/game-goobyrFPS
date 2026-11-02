@@ -1,0 +1,13 @@
+{
+ "name": "Prop_Car_Pickup",
+ "category": "vehicle",
+ "size_m": [
+  2.281,
+  1.91,
+  5.342
+ ],
+ "tris": 24033,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "5.3 m crew-less single-cab pickup, silver, open bed (cover / throwables)"
+}

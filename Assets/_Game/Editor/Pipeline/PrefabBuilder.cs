@@ -109,13 +109,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return lTransform;
         }
 
-        private static void AddGoob(GameObject pParent, int pLayer)
+        /// <summary>The realistic body (model spawned at runtime from the art registry) and its animation driver.</summary>
+        private static void AddHuman(GameObject pParent, int pLayer, AnimatorCullingMode pCulling)
         {
-            GameObject lGoob = new GameObject("Goob");
-            lGoob.transform.SetParent(pParent.transform, false);
-            lGoob.AddComponent<GoobBody>();
-            lGoob.AddComponent<GoobAnimator>();
-            lGoob.layer = pLayer;
+            GameObject lBody = new GameObject("Body") { layer = pLayer };
+            lBody.transform.SetParent(pParent.transform, false);
+            lBody.AddComponent<HumanBody>().Culling = pCulling;
+            lBody.AddComponent<HumanAnimator>();
         }
 
         private static GameObject MakeAvatar()
@@ -136,7 +136,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lObject.AddComponent<PlayerAvatar>();
             lObject.AddComponent<WeaponHolder>();
             lObject.AddComponent<PlayerInteractor>();
-            AddGoob(lObject, GameLayers.PLAYER);
+            AddHuman(lObject, GameLayers.PLAYER, AnimatorCullingMode.AlwaysAnimate);
             return lObject;
         }
 
@@ -159,7 +159,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lObject.AddComponent<Damageable>();
             lObject.AddComponent<Npc>();
             lObject.AddComponent<NpcVisuals>();
-            AddGoob(lObject, GameLayers.NPC);
+            AddHuman(lObject, GameLayers.NPC, AnimatorCullingMode.CullUpdateTransforms);
             return lObject;
         }
 

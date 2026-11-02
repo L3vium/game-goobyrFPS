@@ -1,0 +1,13 @@
+{
+ "name": "Furn_Fridge",
+ "category": "furniture",
+ "size_m": [
+  0.7,
+  1.84,
+  0.737
+ ],
+ "tris": 2049,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "stainless fridge-freezer 0.7 x 0.68 x 1.85 m"
+}

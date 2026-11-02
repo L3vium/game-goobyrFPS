@@ -23,7 +23,8 @@ namespace Com.IsartDigital.GoobyrFPS.Data
 
     public enum ProofKind
     {
-        Head,
+        /// <summary>The target's dossier (a leather folder it never lets go of).</summary>
+        Dossier,
         Ring,
         Briefcase,
         Keycard,
@@ -59,8 +60,10 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         public Color bodyColor = new Color(0.85f, 0.3f, 0.3f);
         public HatStyle hat = HatStyle.Fedora;
         public float scale = 1.1f;
+        [Tooltip("Character model (Art/Characters folder name, e.g. Chr_VIP). Empty: chosen from the name.")]
+        public string character = "";
         public int bodyguards = 2;
-        public ProofKind proof = ProofKind.Head;
+        public ProofKind proof = ProofKind.Dossier;
         public List<ActivityType> routine = new List<ActivityType>();
         public bool enabled = true;
     }

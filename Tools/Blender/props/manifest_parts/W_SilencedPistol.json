@@ -1,0 +1,12 @@
+{
+ "name": "W_SilencedPistol",
+ "category": "weapon",
+ "size_m": [
+  0.034,
+  0.176,
+  0.416
+ ],
+ "tris": 4116,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

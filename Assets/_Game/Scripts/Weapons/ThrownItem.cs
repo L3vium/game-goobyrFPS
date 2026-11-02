@@ -89,7 +89,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 return;
             }
 
-            if (lKind == ItemKind.Brick)
+            if (Item.KnocksOut)
             {
                 Npc lNpc = pCollision.collider.GetComponentInParent<Npc>();
                 Damageable lTarget = pCollision.collider.GetComponentInParent<Damageable>();
@@ -99,12 +99,13 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 lShootable?.OnShotServer(new DamageInfo { amount = 20f, type = DamageType.Melee, point = transform.position, attacker = _thrower, attackerTeam = _team });
             }
 
-            if (lKind == ItemKind.Coin || lKind == ItemKind.Brick)
+            if (lKind == ItemKind.Coin || Item.KnocksOut)
             {
+                // Where it lands, the nearest guard or two come to look (see DetectionModel.Responders).
                 _landed = true;
-                NoiseSystem.Emit(transform.position, lKind == ItemKind.Coin ? 14f : 10f, NoiseKind.Distraction, _thrower);
-                FeedbackRpc(lKind == ItemKind.Coin ? 1 : 2);
-                Invoke(nameof(Remove), 8f);
+                NoiseSystem.Emit(transform.position, Item.noiseRadius > 0f ? Item.noiseRadius : 12f, NoiseKind.Distraction, _thrower);
+                FeedbackRpc(lKind == ItemKind.Coin ? 1 : lKind == ItemKind.Bottle ? 3 : lKind == ItemKind.Wrench ? 4 : 2);
+                Invoke(nameof(Remove), lKind == ItemKind.Bottle ? 0.05f : 8f);
             }
         }
 
@@ -137,6 +138,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 case 0: Audio.Sfx.Play("c4_stick", transform.position, 0.8f, 15f); break;
                 case 1: Audio.Sfx.Play("coin", transform.position, 1f, 25f); break;
                 case 2: Audio.Sfx.Play("brick", transform.position, 1f, 25f); Effects.Dust(transform.position, 0.5f); break;
+                case 3: Audio.Sfx.Play("glass", transform.position, 1f, 30f); Effects.Impact(transform.position, Vector3.up, new Color(0.6f, 0.75f, 0.6f)); break;
+                case 4: Audio.Sfx.Play("metal_clang", transform.position, 1f, 28f); break;
             }
             Juice.Squash(transform, 0.3f);
         }

@@ -12,6 +12,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         [SerializeField] private int _zone;
         [SerializeField] private PatrolRoute _route;
         [SerializeField] private ItemKind _weapon = ItemKind.Smg;
+        /// <summary>A pass, key or tool carried and dropped when taken down (Fists = nothing).</summary>
+        [SerializeField] private ItemKind _carries = ItemKind.Fists;
+        public ItemKind Carries { get => _carries; set => _carries = value; }
+        /// <summary>Sees through passes (a security chief, a captain): like bodyguards and lookouts.</summary>
+        [SerializeField] private bool _enforcer;
+        public bool Enforcer { get => _enforcer; set => _enforcer = value; }
 
         public NpcRole Role => _role;
         public int Zone => _zone;

@@ -1,0 +1,12 @@
+{
+ "name": "W_Brick",
+ "category": "throwable",
+ "size_m": [
+  0.104,
+  0.066,
+  0.216
+ ],
+ "tris": 1826,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

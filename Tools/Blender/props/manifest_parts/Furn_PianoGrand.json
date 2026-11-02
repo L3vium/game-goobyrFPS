@@ -1,0 +1,13 @@
+{
+ "name": "Furn_PianoGrand",
+ "category": "furniture",
+ "size_m": [
+  1.515,
+  1.876,
+  2.308
+ ],
+ "tris": 15815,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "concert grand ~1.5 x 2.2 m, lid propped open, keyboard faces -Y (Unity +Z)"
+}

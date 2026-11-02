@@ -1,0 +1,12 @@
+{
+ "name": "Prop_Jerrycan",
+ "category": "prop",
+ "size_m": [
+  0.35,
+  0.455,
+  0.172
+ ],
+ "tris": 7760,
+ "source": "Poly Haven 'metal_jerrycan' (polyhaven.com/a/metal_jerrycan)",
+ "licence": "CC0 (Poly Haven)"
+}

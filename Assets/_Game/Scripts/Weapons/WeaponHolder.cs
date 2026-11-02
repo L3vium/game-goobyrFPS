@@ -45,6 +45,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
 
         private float _nextFire;
         private float _nextMelee;
+        private float _nextScroll;
+        private ThrowArc _arc;
         private bool _aiming;
         private int _lastGadget = 2;
         private GameObject _thirdPersonModel;
@@ -78,8 +80,24 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public override void OnNetworkDespawn()
         {
             if (View != null) Destroy(View.gameObject);
+            if (_arc != null) Destroy(_arc.gameObject);
             if (_flameFx != null) Destroy(_flameFx);
         }
+
+        /// <summary>Is an item of this kind anywhere in the inventory?</summary>
+        public bool Carries(ItemKind pKind)
+        {
+            if (Slots == null) return false;
+            for (int i = 0; i < Slots.Count; i++)
+            {
+                ItemDefinition lItem = GameDatabase.Item(Slots[i].item);
+                if (lItem != null && lItem.kind == pKind) return true;
+            }
+            return false;
+        }
+
+        /// <summary>The best pass carried: keycard over staff pass over invitation.</summary>
+        public AI.AccessLevel Access => Carries(ItemKind.Keycard) ? AI.AccessLevel.Security : Carries(ItemKind.StaffPass) ? AI.AccessLevel.Staff : Carries(ItemKind.Invitation) ? AI.AccessLevel.Guest : AI.AccessLevel.None;
 
         public InventorySlot SlotAt(int pSlot) => Slots != null && pSlot >= 0 && pSlot < Slots.Count ? Slots[pSlot] : InventorySlot.Empty;
         public ItemDefinition ItemIn(int pSlot) => GameDatabase.Item(SlotAt(pSlot).item);
@@ -90,16 +108,21 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         {
             if (!IsSpawned) return;
             UpdateThirdPersonFlame();
-            if (!IsOwner || !Avatar.Health.IsAlive) return;
-            if (Avatar.Motor.Mode == MotorMode.Hidden || Avatar.Motor.Mode == MotorMode.Zipline) { _aiming = false; return; }
+            if (!IsOwner || !Avatar.Health.IsAlive) { if (_arc != null) _arc.Hide(); return; }
+            if (Avatar.Motor.Mode == MotorMode.Hidden || Avatar.Motor.Mode == MotorMode.Zipline) { _aiming = false; if (_arc != null) _arc.Hide(); return; }
 
             int lSlot = GameInput.SlotPressed;
             if (lSlot >= 0) Select(lSlot);
             float lScroll = GameInput.Scroll;
-            if (Mathf.Abs(lScroll) > 0.1f) Select((Selected.Value + (lScroll < 0 ? 1 : SLOT_COUNT - 1)) % SLOT_COUNT);
+            if (Mathf.Abs(lScroll) > 0.1f && Time.time >= _nextScroll)
+            {
+                _nextScroll = Time.time + 0.12f;
+                Cycle(lScroll < 0 ? 1 : -1);
+            }
 
+            // Right click raises the weapon (aims); only then does left click fire. Lowered, left click punches.
             ItemDefinition lHeld = HeldItem;
-            _aiming = GameInput.Aim && lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher);
+            _aiming = GameInput.Aim && lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher || lHeld.kind == ItemKind.Flamethrower);
             Avatar.Motor.Aiming = _aiming;
             if (Avatar.Aiming.Value != _aiming) Avatar.Aiming.Value = _aiming;
 
@@ -109,22 +132,46 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (GameInput.Detonate) DetonateRpc();
 
             bool lFlaming = false;
-            if (lHeld == null)
+            bool lArc = lHeld != null && lHeld.IsThrowable && GameInput.Aim;
+            if (lArc)
+            {
+                if (_arc == null) _arc = ThrowArc.Create();
+                Vector3 lDir = Avatar.AimDirection;
+                _arc.Show(Avatar.AimOrigin + lDir * 0.5f, lDir.normalized * lHeld.throwForce + Vector3.up * 2.5f);
+            }
+            else if (_arc != null) _arc.Hide();
+
+            if (lHeld != null && lHeld.slot == ItemSlot.Gadget)
+            {
+                // Throwables: right click shows the arc, left click throws.
+                if (GameInput.FirePressed) ThrowGadget(Selected.Value);
+            }
+            else if (lHeld == null || !_aiming)
             {
                 if (GameInput.FirePressed) TryMelee();
             }
             else if (lHeld.kind == ItemKind.Flamethrower)
             {
                 lFlaming = GameInput.Fire && SlotAt(Selected.Value).magazine > 0 && !Reloading.Value;
-                if (lFlaming) Avatar.Motor.Aiming = true;
-            }
-            else if (lHeld.slot == ItemSlot.Gadget)
-            {
-                if (GameInput.FirePressed) ThrowGadget(Selected.Value);
             }
             else if (lHeld.automatic ? GameInput.Fire : GameInput.FirePressed) TryFire(lHeld);
 
             if (Flaming.Value != lFlaming) Flaming.Value = lFlaming;
+        }
+
+        /// <summary>
+        /// The mouse wheel: next / previous slot that holds something, plus the fists (an empty
+        /// weapon slot). Empty gadget slots are skipped, and it wraps round.
+        /// </summary>
+        private void Cycle(int pStep)
+        {
+            int lFists = -1;
+            for (int i = 0; i < WEAPON_SLOTS; i++) if (SlotAt(i).IsEmpty) { lFists = i; break; }
+            for (int n = 1; n <= SLOT_COUNT; n++)
+            {
+                int lSlot = ((Selected.Value + pStep * n) % SLOT_COUNT + SLOT_COUNT) % SLOT_COUNT;
+                if (!SlotAt(lSlot).IsEmpty || lSlot == lFists) { Select(lSlot); return; }
+            }
         }
 
         public void Select(int pSlot)
@@ -173,8 +220,10 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                         Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
                         if (lTarget != null && lTarget.IsAlive)
                         {
-                            UI.Hud.Hitmarker(lTarget.IsHeadshot(lHit.point));
-                            Effects.Fluff(lHit.point, -lDir, new Color(1f, 0.9f, 0.8f), false);
+                            bool lHead = lTarget.IsHeadshot(lHit.point);
+                            UI.Hud.Hitmarker(lHead);
+                            if (lHead) Juice.Kill(true);
+                            Effects.Fluff(lHit.point, -lDir, Effects.Blood, lHead);
                         }
                         else Effects.Impact(lHit.point, lHit.normal, new Color(0.75f, 0.7f, 0.6f));
                     }
@@ -256,6 +305,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             ItemDefinition lItem = GameDatabase.Item(pItem);
             if (lItem == null) return;
             Vector3 lMuzzle = _thirdPersonModel != null ? (_thirdPersonModel.transform.Find("Muzzle")?.position ?? pOrigin) : pOrigin;
+            Avatar.Animator?.Fire();
             Effects.Muzzle(lMuzzle, Avatar.AimDirection, lItem.kind == ItemKind.SilencedPistol ? 0.5f : 1f);
             foreach (Vector3 lEnd in pEnds)
             {
@@ -293,6 +343,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private void ReloadFeedbackRpc(float pTime)
         {
             if (IsOwner) View?.PlayReload(pTime);
+            else Avatar.Animator?.Reload(pTime);
             Sfx.Play("reload", transform.position, 0.6f, 15f);
         }
 
@@ -300,23 +351,44 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private void MeleeRpc(Vector3 pOrigin, Vector3 pDirection)
         {
             if (!Avatar.Health.IsAlive) return;
+            SwingRpc();
             if (!Physics.SphereCast(pOrigin, 0.35f, pDirection, out RaycastHit lHit, 1.7f, GameLayers.CharacterMask, QueryTriggerInteraction.Ignore)) return;
             Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
             if (lTarget == null || lTarget == Avatar.Health) return;
 
-            // From behind, unaware: a takedown (knock out). Otherwise a solid punch.
+            // From behind, on an NPC that hasn't noticed you: a silent takedown, dead at once.
+            // Otherwise a solid punch (and a scuffle the guards close by hear).
             Npc lNpc = lTarget.GetComponent<Npc>();
-            bool lFromBehind = Vector3.Dot(lTarget.transform.forward, pDirection) > 0.35f;
-            bool lTakedown = lNpc != null && lFromBehind && !lNpc.InCombat;
-            DamageInfo lInfo = new DamageInfo
+            Vector3 lFlat = Vector3.ProjectOnPlane(pDirection, Vector3.up);
+            float lFromBack = Vector3.Angle(lTarget.transform.forward, lFlat);
+            bool lTakedown = lNpc != null && DetectionModel.CanTakedown(lFromBack, lNpc.Gauge, lNpc.IsAlerted);
+            if (lTakedown)
             {
-                amount = lTakedown ? 0f : 34f, type = DamageType.Melee, point = lHit.point, direction = pDirection,
-                attacker = OwnerClientId, attackerTeam = Avatar.Team.Value, knockout = lTakedown
-            };
-            if (lTakedown) lNpc.KnockOut(pDirection, OwnerClientId);
-            else lTarget.ApplyDamage(lInfo);
+                lNpc.Takedown(pDirection, OwnerClientId, Avatar.Team.Value);
+                TakedownFeedbackRpc(lHit.point, pDirection);
+                return;
+            }
+            lTarget.ApplyDamage(new DamageInfo
+            {
+                amount = 34f, type = DamageType.Melee, point = lHit.point, direction = pDirection,
+                attacker = OwnerClientId, attackerTeam = Avatar.Team.Value
+            });
             NoiseSystem.Emit(lHit.point, 6f, NoiseKind.Suspicious, OwnerClientId);
             PunchFeedbackRpc(lHit.point, pDirection);
+        }
+
+        /// <summary>Everyone else sees the agent swing (a punch or the start of a takedown).</summary>
+        [Rpc(SendTo.NotOwner)]
+        private void SwingRpc() => Avatar.Animator?.Punch();
+
+        [Rpc(SendTo.NotOwner)]
+        private void ThrowAnimRpc() => Avatar.Animator?.Throw();
+
+        [Rpc(SendTo.Everyone)]
+        private void TakedownFeedbackRpc(Vector3 pPoint, Vector3 pDirection)
+        {
+            Sfx.Play("takedown", pPoint, 0.8f, 8f);
+            if (IsOwner) { Juice.Takedown(); UI.Hud.Hitmarker(true); }
         }
 
         [Rpc(SendTo.Everyone)]
@@ -337,6 +409,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (Vector3.Distance(pOrigin, transform.position) > 4f) pOrigin = Avatar.Eye;
 
             NetworkObject lThrown = ThrownItem.Spawn(lItem, pOrigin, pDirection, OwnerClientId, Avatar.Team.Value);
+            ThrowAnimRpc();
             if (lItem.kind == ItemKind.C4 && lThrown != null) _charges.Add(lThrown);
             ConsumeServer(pSlot);
         }
@@ -467,24 +540,24 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             Flamethrower.TickServer(Avatar.Eye, Avatar.AimDirection, lItem, OwnerClientId, Avatar.Team.Value, Avatar.Health);
         }
 
-        private void RefreshThirdPerson()
+        /// <summary>The held item in the third-person body's right hand (the owner only sees its shadow).</summary>
+        public void RefreshThirdPerson(bool pForce = false)
         {
             ItemDefinition lItem = HeldItem;
             int lIndex = lItem != null ? lItem.Index : -1;
-            if (lIndex == _thirdPersonItem) return;
+            if (lIndex == _thirdPersonItem && !pForce && _thirdPersonModel != null) return;
             _thirdPersonItem = lIndex;
             if (_thirdPersonModel != null) Destroy(_thirdPersonModel);
             _thirdPersonModel = null;
             if (lItem == null || Avatar.Body == null || Avatar.Body.WeaponSocket == null) return;
+            Avatar.Body.SetHeld(WeaponModels.HeldOf(lItem));
             _thirdPersonModel = WeaponModels.Build(lItem, Avatar.Body.WeaponSocket, GameLayers.PLAYER);
-            _thirdPersonModel.transform.localPosition = Vector3.zero;
-            _thirdPersonModel.transform.localScale = Vector3.one * 1.3f;
             if (IsOwner) foreach (Renderer lRenderer in _thirdPersonModel.GetComponentsInChildren<Renderer>()) lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
         }
 
         private void LateUpdate()
         {
-            if (_thirdPersonItem == -2 || (_thirdPersonModel == null && HeldItem != null)) RefreshThirdPerson();
+            if (_thirdPersonItem == -2 || (_thirdPersonModel == null && HeldItem != null && Avatar.Body != null && Avatar.Body.Built)) RefreshThirdPerson();
         }
     }
 }

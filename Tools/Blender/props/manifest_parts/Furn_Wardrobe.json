@@ -1,0 +1,13 @@
+{
+ "name": "Furn_Wardrobe",
+ "category": "furniture",
+ "size_m": [
+  1.06,
+  2.1,
+  0.669
+ ],
+ "tris": 3332,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "1.0 x 0.6 x 2.1 m, hollow (hide-in), doors Door_L / Door_R pivot on their hinges (rotate around local Y in Unity)"
+}

@@ -1,0 +1,12 @@
+{
+ "name": "Prop_PropaneTank",
+ "category": "prop",
+ "size_m": [
+  0.337,
+  0.554,
+  0.337
+ ],
+ "tris": 5238,
+ "source": "Poly Haven 'propane_tank' (polyhaven.com/a/propane_tank)",
+ "licence": "CC0 (Poly Haven)"
+}

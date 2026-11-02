@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c8f7e51f3b3ee944b9e257aa40147e3, type: 3}
   m_Name: RocketLauncher
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.ItemDefinition
-  displayName: Big Boomer
+  displayName: Rocket Launcher
   kind: 6
   slot: 0
   color: {r: 1, g: 0.75, b: 0.2, a: 1}
@@ -31,7 +31,7 @@ MonoBehaviour:
   recoil: 8
   adsFov: 60
   shake: 0.6
-  noiseRadius: 80
+  noiseRadius: 70
   projectileSpeed: 42
   explosionRadius: 7.5
   throwForce: 18

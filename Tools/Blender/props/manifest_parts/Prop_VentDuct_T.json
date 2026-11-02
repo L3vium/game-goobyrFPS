@@ -1,0 +1,13 @@
+{
+ "name": "Prop_VentDuct_T",
+ "category": "architecture",
+ "size_m": [
+  3.0,
+  1.12,
+  2.06
+ ],
+ "tris": 6332,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "T junction, legs to -X, +X and -Z (Unity), 1.5 m each"
+}

@@ -40,6 +40,16 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Write("throw", Noise(0.25f, 0.4f, 1800f, 6f, true));
             Write("coin", Mix(Tone(0.5f, 2600f, 2600f, 0.5f, 6f), Tone(0.5f, 3900f, 3900f, 0.3f, 7f), Delay(Tone(0.3f, 2700f, 2700f, 0.3f, 9f), 0.12f)));
             Write("brick", Mix(Tone(0.25f, 120f, 70f, 0.9f, 12f), Noise(0.2f, 0.7f, 1200f, 14f)));
+            // Throwables, takedowns, parkour, doors (0.6): glass shatter, metal clang, a muffled neck snap...
+            Write("glass", Mix(Noise(0.5f, 0.8f, 7000f, 7f), Tone(0.4f, 3100f, 2900f, 0.35f, 9f), Delay(Tone(0.3f, 4400f, 4200f, 0.25f, 12f), 0.05f), Delay(Noise(0.3f, 0.4f, 6000f, 10f), 0.09f)));
+            Write("metal_clang", Mix(Tone(0.7f, 620f, 600f, 0.7f, 5f, 0.02f), Tone(0.6f, 1470f, 1450f, 0.4f, 6f), Noise(0.06f, 0.6f, 3000f, 40f)));
+            Write("takedown", Mix(Noise(0.25f, 0.6f, 900f, 12f, true), Delay(Tone(0.12f, 140f, 60f, 0.8f, 20f), 0.12f), Delay(Noise(0.05f, 0.5f, 2500f, 50f), 0.2f)));
+            Write("vault", Mix(Noise(0.3f, 0.45f, 1400f, 8f, true), Delay(Tone(0.12f, 110f, 70f, 0.6f, 18f), 0.28f)));
+            Write("mantle", Mix(Noise(0.4f, 0.4f, 1100f, 6f, true), Tone(0.1f, 160f, 90f, 0.4f, 20f), Delay(Tone(0.12f, 120f, 70f, 0.6f, 18f), 0.32f)));
+            Write("crowbar", Mix(Tone(0.5f, 900f, 700f, 0.5f, 6f, 0.05f), Noise(0.45f, 0.7f, 2200f, 6f), Delay(Mix(Tone(0.3f, 180f, 90f, 0.9f, 10f), Noise(0.3f, 0.8f, 1800f, 10f)), 0.4f)));
+            Write("door_unlock", Mix(Tone(0.06f, 1800f, 1800f, 0.5f, 40f), Delay(Tone(0.08f, 900f, 900f, 0.6f, 30f), 0.12f), Delay(Noise(0.2f, 0.3f, 1500f, 12f), 0.2f)));
+            Write("vent_open", Mix(Noise(0.5f, 0.35f, 3000f, 5f), Delay(Tone(0.3f, 480f, 440f, 0.4f, 8f), 0.35f)));
+            Write("ladder_drop", Mix(Noise(0.4f, 0.5f, 1500f, 6f, true), Delay(Tone(0.5f, 300f, 280f, 0.8f, 7f, 0.03f), 0.38f), Delay(Tone(0.4f, 760f, 740f, 0.4f, 8f), 0.4f)));
             Write("c4_stick", Mix(Noise(0.08f, 0.5f, 800f, 30f), Delay(Tone(0.06f, 2200f, 2200f, 0.4f, 30f), 0.1f), Delay(Tone(0.06f, 2200f, 2200f, 0.4f, 30f), 0.25f)));
             Write("pickup", Mix(Tone(0.12f, 700f, 1000f, 0.6f, 10f), Delay(Tone(0.15f, 1000f, 1500f, 0.6f, 10f), 0.07f)));
             Write("flame_start", Noise(0.6f, 0.6f, 900f, 2f));
@@ -58,6 +68,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Write("phone", Mix(Tone(0.4f, 1300f, 1300f, 0.4f, 1f, 22f), Delay(Tone(0.4f, 1300f, 1300f, 0.4f, 1f, 22f), 0.5f)));
             Write("caralarm", Siren(1.2f, 700f, 1100f, 6f, 0.5f));
             Write("generator", Tone(1.2f, 55f, 55f, 0.5f, 0.3f, 18f));
+            // Activatable distractions and turrets (0.6): a fan's whirr, a hose's hiss, a hacked PC's alarm.
+            Write("fan", Mix(Noise(1.2f, 0.3f, 900f, 0.3f), Tone(1.2f, 95f, 95f, 0.3f, 0.3f, 20f)));
+            Write("hose", Mix(Noise(1.2f, 0.45f, 5000f, 0.3f), Noise(1.2f, 0.2f, 1200f, 0.3f)));
+            Write("computer", Mix(Tone(0.25f, 1750f, 1750f, 0.45f, 3f), Delay(Tone(0.25f, 1750f, 1750f, 0.45f, 3f), 0.4f), Delay(Tone(0.3f, 1200f, 1200f, 0.4f, 3f), 0.8f)));
+            Write("keyboard", Mix(Tone(0.03f, 2400f, 2000f, 0.3f, 60f), Delay(Tone(0.03f, 2100f, 1900f, 0.3f, 60f), 0.09f), Delay(Tone(0.03f, 2500f, 2100f, 0.3f, 60f), 0.17f), Delay(Tone(0.03f, 2200f, 1900f, 0.3f, 60f), 0.28f), Delay(Tone(0.03f, 2350f, 2000f, 0.3f, 60f), 0.36f)));
+            Write("turret_warn", Mix(Tone(0.12f, 2200f, 2200f, 0.55f, 8f), Delay(Tone(0.12f, 2200f, 2200f, 0.55f, 8f), 0.16f), Delay(Tone(0.2f, 1500f, 1200f, 0.4f, 6f), 0.32f)));
             Write("siren", Siren(5f, 500f, 1000f, 0.5f, 0.7f));
             Write("brakes", Mix(Tone(0.8f, 2400f, 1800f, 0.25f, 2f), Noise(0.8f, 0.4f, 3000f, 2f)));
             Write("truck", Mix(Tone(2.5f, 60f, 75f, 0.5f, 0.6f, 12f), Noise(2.5f, 0.3f, 600f, 0.6f)));

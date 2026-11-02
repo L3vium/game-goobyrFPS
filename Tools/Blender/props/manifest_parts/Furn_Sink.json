@@ -1,0 +1,13 @@
+{
+ "name": "Furn_Sink",
+ "category": "furniture",
+ "size_m": [
+  0.517,
+  1.035,
+  0.436
+ ],
+ "tris": 3808,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned",
+ "notes": "pedestal washbasin with mixer tap, wall at +Y (Unity -Z)"
+}

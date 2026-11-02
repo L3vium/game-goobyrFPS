@@ -1,0 +1,12 @@
+{
+ "name": "W_C4",
+ "category": "throwable",
+ "size_m": [
+  0.057,
+  0.091,
+  0.337
+ ],
+ "tris": 3184,
+ "source": "Procedural (Blender Python)",
+ "licence": "Original, project-owned"
+}

@@ -1,6 +1,75 @@
 # Changelog
 
 ## Unreleased
+- Everyone is the same size: your eyes are at the height of everyone else's (the crowd no longer
+  looks like children, the bodyguards no longer tower over you), and headshots follow the head.
+- The HUD tells you when you are TRESPASSING or in a HOSTILE AREA. Sentry guns only fire on
+  trespassers, never in public areas.
+- Fresh snow sparkles: ice crystals glint in the sun and twinkle as you move.
+- New distractions you switch on: a pedestal fan, a garden hose that sprays across the yard and an
+  office PC you hack into a flashing, beeping alarm. Whoever is nearest walks over to turn it off.
+- Sentry guns guard the most restricted rooms: a red laser sweeps, a beep warns you, then it fires.
+  A thick yellow cable runs from each gun to its control PC, hidden somewhere quiet; follow the
+  cable (Instinct shows it through walls), hack the PC and the guns turn green and fire on the
+  guards instead. Instinct also shows the cameras, which still call guards when they see you.
+- Realistic people everywhere: the cartoon characters are gone. Agents wear a black suit (a man or a
+  woman) with an armband in their team's colour; guards are dressed for the map's climate,
+  bodyguards in black suits, staff in uniform, guests in civilian clothes, targets as VIPs.
+- New animation from motion capture: walking, running, sprinting, crouching, crawling, sliding,
+  jumping, falling, landing, vaulting, climbing ladders, hanging and shimmying, swimming, aiming,
+  firing, reloading, punching, throwing, phone calls, smoking, looking around, cowering. The feet no
+  longer slide (each clip plays at the speed it really covers), the feet stay on slopes and stairs,
+  and running down stairs no longer flickers into a fall. Heads follow where people look.
+- Bodies fall as real ragdolls built from the pose they died in, keep their momentum and take the
+  blow where they were hit; a takedown victim struggles before going limp.
+- First person: your own sleeves and hands hold every weapon and item, aim down the sights, recoil,
+  reload, punch and throw. The arms are lit and graded like the world (no more white hands), the
+  suit sleeves end in white shirt cuffs, the support hand cups under the firing hand, the forearms
+  stay low in the frame, and bare hands raise a boxing guard.
+- The proof is the target's dossier (or the item it carries) instead of a head. The contract shows
+  a studio portrait of the target; new key art on the title screen and a new app icon.
+- Three new maps replace Pinecrest Hollow, Mirage Bay and Elmridge, built from the map design
+  documents with a realistic look: **San Lázaro** (a Colombian river town on fiesta day, coffee
+  terraces, an airstrip and the white Hacienda La Cumbre with its mirador), **Qasr al-Rimal** (a
+  desert oasis souk, a palm grove and dry wadi, the governor's citadel on the Great Mesa and a
+  radar on the Little Mesa) and **Weisshorn** (an alpine gala night: chalet village, frozen lake,
+  ski area, the Grand Hotel and an observatory on the summit, with falling snow). Every building
+  is generated room by room: real walls, doors and windows with sills and shutters, stairs, roofs,
+  balconies, ledges you can hang from, drainpipes, crawlable vents, locked doors that need a
+  crowbar, a keycard, a staff key or a code, cameras and a recorder, furnished rooms. Caves,
+  qanats and mine galleries link the zones underground.
+- The maps look lived in: every room is furnished for what it is (offices, kitchens with an island,
+  bedrooms, archives in aisles, armouries with gun racks, wine cellars, a coal heap, lobbies with a
+  fireplace and a reception desk, ballrooms with dressed tables), guest rooms have wallpaper,
+  panelling and plaster ceilings, the back of house is bare concrete. Each key building has a
+  grand stair with a carpet runner and balustrades. Facades show their ways in: cast-iron
+  drainpipes, ivy, trellises, a ledge at every floor, real balconies, coal-chute hatches.
+  Backstage reads at a glance: delivery yards with trucks and bins, guard booths with barriers,
+  rope queues, staff-only signs, inner walls and gates between the citadel's three courts. Open
+  ground is broken up with cover. Stages have truss, PA stacks and lights; market stalls sell real
+  goods; cliffs are broken by boulders; cave mouths are framed and lit; rivers run.
+- Version 0.6.0.
+- Public, restricted and hostile areas, like Hitman: walk the plaza or the market freely as long
+  as you behave (no raised gun, no sprinting or climbing in front of guards); staff areas get you
+  noticed more slowly and warned first; compounds and private floors are trespassing.
+- Parkour: climb onto crates and walls up to 2.4 m, vault low walls, fences and open windows, climb
+  over garden walls, grab ledges in the air and hang from them (shimmy, climb up, drop, leap to the
+  next ledge), and top out of drainpipes onto the roof. Thin walls and window sills now work (they
+  used to fail). Crouch into a vent and you crawl through it. Going down stairs no longer makes you
+  hop or flicker out of a sprint, and steps no longer jolt the view. Big drops are heard by guards.
+- Controls: left click punches; right click raises your gun and left click then fires; the mouse wheel
+  cycles everything you carry, fists included, without getting stuck on empty slots. A punch from
+  behind on a guard who hasn't noticed you is a silent takedown that kills at once (with a beat of
+  slow motion in solo). Rocks, bottles and wrenches join the coins and bricks: hold right click to see
+  the throw's arc, they knock out whoever they hit and draw the nearest guard to where they land.
+  Weapons have plain names now (Silenced Pistol, SMG, Sniper Rifle...).
+- AI rewritten around hearing that makes sense: a sound carries a set distance in the open, walls and
+  floors muffle it, and only the one to three guards who hear it best go and look - the others turn
+  their heads. Nobody learns your exact position from a sound any more; a distant shot no longer
+  pulls every guard on the map. Footsteps follow how you really move: silent standing still, a
+  whisper crouched, loud sprinting. Searching guards now fight back when they see you or are shot
+  (they used to wander), reinforcements too. A body is radioed in by whoever finds it and two mates
+  come to secure it; guards on posts take breaks (a smoke, a call) you can wait for.
 - Version 0.5.0.
 - Agents' squash-and-stretch no longer breaks (NaN body scale errors) after a long frame hitch.
 - Caster mode, tournament style: join a room (even a contract already running) as a caster to watch

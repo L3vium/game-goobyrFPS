@@ -81,44 +81,15 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             if (CameraRig.Instance != null) CameraRig.Instance.HitStop(pSeconds, pScale);
         }
 
-        /// <summary>Squash and stretch on any transform (pickups, jump pads, props being hit).</summary>
+        /// <summary>
+        /// Squash and stretch on any transform (pickups, jump pads, props being hit, devices switched on),
+        /// played by Feel (<see cref="FeelFx.Squash"/>). Amounts are the old cartoon scale: a realistic
+        /// object flexes about a third of that.
+        /// </summary>
         public static void Squash(Transform pTarget, float pAmount = 0.3f, float pDuration = 0.35f)
         {
             if (pTarget == null) return;
-            SquashStretch lSquash = pTarget.GetComponent<SquashStretch>();
-            if (lSquash == null) lSquash = pTarget.gameObject.AddComponent<SquashStretch>();
-            lSquash.Play(pAmount, pDuration);
-        }
-    }
-
-    /// <summary>Spring-based squash and stretch around the object's rest scale.</summary>
-    public class SquashStretch : MonoBehaviour
-    {
-        private Vector3 _rest;
-        private float _value, _velocity;
-        private bool _initialised;
-
-        public void Play(float pAmount, float pDuration)
-        {
-            if (!_initialised) { _rest = transform.localScale; _initialised = true; }
-            _velocity -= pAmount * 14f / Mathf.Max(0.1f, pDuration);
-            enabled = true;
-        }
-
-        private void Update()
-        {
-            float dt = Time.deltaTime;
-            _velocity += (-_value * 260f - _velocity * 11f) * dt;
-            _value += _velocity * dt;
-            float lY = 1f + _value;
-            float lXZ = 1f / Mathf.Sqrt(Mathf.Max(0.2f, lY));
-            transform.localScale = new Vector3(_rest.x * lXZ, _rest.y * lY, _rest.z * lXZ);
-            if (Mathf.Abs(_value) < 0.001f && Mathf.Abs(_velocity) < 0.01f)
-            {
-                transform.localScale = _rest;
-                _value = _velocity = 0f;
-                enabled = false;
-            }
+            FeelFx.Squash(pTarget, pAmount * 0.35f, pDuration);
         }
     }
 }

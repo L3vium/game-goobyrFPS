@@ -187,9 +187,12 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   desert wind and surf, suburban night; underwater bed when diving), a tension drone that follows
   your threat status with a stinger when spotted and a hit when it turns to combat. Sounds fade
   logarithmically with distance.
-- **Juice**: trauma screen shake, hit flash, chromatic aberration / bloom / exposure pulses,
-  hurt vignette, squash and stretch, fluff puffs on hits, explosions with fireball, shockwave,
-  debris and light flash, smoke clouds, hitmarkers, damage arcs, kill feed, banners.
+- **Juice**: trauma screen shake, chromatic aberration / bloom / exposure pulses, hurt vignette,
+  hit-stop and slow-motion on takedowns (solo), and on world objects through Feel (`FX/FeelFx`,
+  MMF_Player built at runtime): the white hit flash on people and props (MMF_Flicker) and a
+  subtle squash and stretch (MMF_SquashAndStretch) on hits, pickups, throws, jump pads and
+  devices switched on; blood and dust puffs, explosions with fireball, shockwave, debris and
+  light flash, smoke clouds, hitmarkers, damage arcs, kill feed, banners.
 - **Online**: played between friends. *Create a room* opens a Steam room (found only by its
   six-letter code; LAN when Steam is not running), *Join a room* takes the code (or a direct IP), and
   Steam invites work too (Facepunch transport, App ID 480 for now); LAN/IP and solo through Unity Transport. The agent name is the typed nickname, else the

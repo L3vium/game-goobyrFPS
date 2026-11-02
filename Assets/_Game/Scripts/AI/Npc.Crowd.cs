@@ -323,6 +323,52 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
         }
 
+        private Npc _chatWith;
+        private float _chatUntil, _nextChat;
+        private int _solo = -1;
+
+        /// <summary>Staff on its own (no other civilian within 4 m of its post): it goes about its work, a crowd member watches its scene.</summary>
+        private bool Solo
+        {
+            get
+            {
+                if (_solo >= 0) return _solo == 1;
+                _solo = 1;
+                foreach (Npc lOther in All)
+                    if (lOther != this && lOther != null && lOther.IsCrowd && (lOther._home - _home).sqrMagnitude < 16f) { _solo = 0; break; }
+                return _solo == 1;
+            }
+        }
+
+        /// <summary>
+        /// An idle civilian now and then turns to a neighbour standing within 2.5 m and chats (both face
+        /// each other, small talk) for a few seconds. True while chatting.
+        /// </summary>
+        private bool Mingle()
+        {
+            if (_chatWith != null && Time.time < _chatUntil && _chatWith.Health.IsAlive && _chatWith.State.Value == NpcState.Idle)
+            {
+                FaceTowards(_chatWith.transform.position, 120f);
+                SmallTalk(0.3f);
+                return true;
+            }
+            _chatWith = null;
+            if (Time.time < _nextChat) return false;
+            _nextChat = Time.time + Random.Range(8f, 20f);
+            foreach (Npc lOther in All)
+            {
+                if (lOther == this || lOther == null || !lOther.IsCrowd || !lOther.Health.IsAlive || lOther.State.Value != NpcState.Idle) continue;
+                if (lOther._chatWith != null && lOther._chatWith != this) continue;
+                if ((lOther.transform.position - transform.position).sqrMagnitude > 2.5f * 2.5f) continue;
+                _chatWith = lOther;
+                _chatUntil = Time.time + Random.Range(4f, 9f);
+                lOther._chatWith = this;
+                lOther._chatUntil = _chatUntil;
+                return true;
+            }
+            return false;
+        }
+
         /// <summary>Everyone: a witness runs for a guard - the players close by are told (stop them).</summary>
         [Unity.Netcode.Rpc(Unity.Netcode.SendTo.Everyone)]
         private void WitnessRunsRpc()

@@ -910,6 +910,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 return;
             }
             Stop();
+            // Guests and staff standing around turn to each other and chat.
+            if (IsCrowd && Mingle()) return;
             float lScan = Role == NpcRole.Lookout ? Mathf.Sin(Time.time * 0.25f + NetworkObjectId) * 70f : Mathf.Sin(Time.time * 0.15f + NetworkObjectId) * 30f;
             transform.rotation = Quaternion.RotateTowards(transform.rotation, _homeRotation * Quaternion.Euler(0, lScan, 0), 40f * Time.deltaTime);
         }
@@ -927,7 +929,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 if (Time.time < _nextBreakAt) return false;
                 // Staff and guests mingle more than guards leave their posts.
-                _nextBreakAt = Time.time + (IsCrowd ? Random.Range(20f, 50f) : Random.Range(45f, 120f));
+                _nextBreakAt = Time.time + NpcRules.BreakInterval(IsCrowd, IsCrowd && Solo, Random.value);
                 _break = ActivityNode.Near(ZoneIndex.Value, _home, lReach, IsCrowd ? (System.Predicate<ActivityType>)CrowdActivity : BreakActivity);
                 _breakUntil = 0f;
                 if (_break == null) return false;

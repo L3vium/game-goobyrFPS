@@ -144,6 +144,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// </summary>
         public static bool Reports(bool pSawIt, float pGuardDistance) => pSawIt && pGuardDistance <= REPORT_RANGE;
 
+        /// <summary>
+        /// Seconds until the next break from the post: staff on its own keeps busy (8-20 s), a crowd
+        /// member watching a scene wanders now and then (20-50 s), a guard rarely leaves its post (45-120 s).
+        /// </summary>
+        public static float BreakInterval(bool pCrowd, bool pSolo, float pRandom01)
+            => pSolo ? Mathf.Lerp(8f, 20f, pRandom01) : pCrowd ? Mathf.Lerp(20f, 50f, pRandom01) : Mathf.Lerp(45f, 120f, pRandom01);
+
         /// <summary>At most this many witnesses run to tell about one incident; the rest of the crowd flees.</summary>
         public const int MAX_REPORTERS = 2;
 

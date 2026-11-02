@@ -178,10 +178,19 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _ => 2.5f
         };
 
-        /// <summary>At most this many barks start across the map each second (a stampede is a few screams, not fifty).</summary>
+        /// <summary>At most this many barks start across the map each second (a stampede is a few screams, not fifty)...</summary>
         public const int MAX_BARKS_PER_SECOND = 5;
+        /// <summary>...and at most this many of them small talk, so chatter never crowds out a scream or a "hey!".</summary>
+        public const int MAX_CHATTER_PER_SECOND = 2;
 
         public static bool BarkAllowed(int pBarksThisSecond) => pBarksThisSecond < MAX_BARKS_PER_SECOND;
+
+        /// <summary>May this bark start now, with that many barks (and that many small talk lines) already this second?</summary>
+        public static bool BarkAllowed(int pBarksThisSecond, int pChatterThisSecond, bool pChatter)
+            => pChatter ? pChatterThisSecond < MAX_CHATTER_PER_SECOND && pBarksThisSecond < MAX_BARKS_PER_SECOND - 1 : pBarksThisSecond < MAX_BARKS_PER_SECOND;
+
+        /// <summary>Small talk is only worth sending when a player is this close to hear it.</summary>
+        public const float CHATTER_EARSHOT = 20f;
 
         // ---------------------------------------------------------------- patrols
 

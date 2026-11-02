@@ -229,6 +229,9 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         {
             Assert.IsTrue(NpcRules.BarkAllowed(0));
             Assert.IsFalse(NpcRules.BarkAllowed(NpcRules.MAX_BARKS_PER_SECOND), "a stampede is a few screams, not fifty");
+            Assert.IsFalse(NpcRules.BarkAllowed(2, NpcRules.MAX_CHATTER_PER_SECOND, true), "small talk has its own small budget");
+            Assert.IsTrue(NpcRules.BarkAllowed(2, NpcRules.MAX_CHATTER_PER_SECOND, false), "so a scream still gets through");
+            Assert.IsFalse(NpcRules.BarkAllowed(NpcRules.MAX_BARKS_PER_SECOND - 1, 0, true), "chatter leaves room for an alarm");
             Assert.AreEqual(NpcRules.VoiceOf(42, true), NpcRules.VoiceOf(42, true), "the same voice all match");
             for (ulong lId = 0; lId < 50; lId++)
             {

@@ -38,18 +38,29 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private float _nextBark;
         private static float _barkWindowStart;
-        private static int _barksInWindow;
+        private static int _barksInWindow, _chatterInWindow;
 
         /// <summary>Host: say something, unless it spoke a moment ago or the map is already loud.</summary>
         private void Bark(Barks pBark)
         {
             if (!IsServer || !Health.IsAlive) return;
             if (Time.time < _nextBark && pBark != Barks.Scream) return;
-            if (Time.time - _barkWindowStart > 1f) { _barkWindowStart = Time.time; _barksInWindow = 0; }
-            if (!NpcRules.BarkAllowed(_barksInWindow)) return;
+            bool lChatter = pBark == Barks.Chatter;
+            if (lChatter && !PlayerWithin(NpcRules.CHATTER_EARSHOT)) return;
+            if (Time.time - _barkWindowStart > 1f || Time.time < _barkWindowStart) { _barkWindowStart = Time.time; _barksInWindow = 0; _chatterInWindow = 0; }
+            if (!NpcRules.BarkAllowed(_barksInWindow, _chatterInWindow, lChatter)) return;
             _barksInWindow++;
+            if (lChatter) _chatterInWindow++;
             _nextBark = Time.time + NpcRules.BarkGap(pBark);
             BarkRpc(pBark);
+        }
+
+        /// <summary>Is a living player within <paramref name="pRange"/> metres (anyone to hear it)?</summary>
+        private bool PlayerWithin(float pRange)
+        {
+            foreach (Player.PlayerAvatar lPlayer in Player.PlayerAvatar.All)
+                if (lPlayer != null && lPlayer.Health.IsAlive && (lPlayer.transform.position - transform.position).sqrMagnitude < pRange * pRange) return true;
+            return false;
         }
 
         [Rpc(SendTo.Everyone)]

@@ -600,17 +600,23 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Quaternion lWeaponInHand = lRight.basis * Quaternion.Inverse(lFiring);
                 Vector3 lGripInHand = lRight.palm + lRight.palmNormal * 0.016f;
 
-                // Long guns and pistols alike: the support palm up, knuckle line along the barrel, fingers
-                // wrapping up the right side (a pistol: under and around the firing hand's fingers).
+                // Long guns: the support palm up under the fore-end, knuckle line along the barrel, fingers
+                // wrapping up its right side.
                 Quaternion lUnder = Quaternion.LookRotation(Quaternion.AngleAxis(35f, Vector3.forward) * Vector3.right, Vector3.forward);
                 Quaternion lUnderHand = lUnder * Quaternion.Inverse(lLeft.basis);
-                Vector3 lCupPalm = new Vector3(-0.002f, -0.05f, 0.015f);
+
+                // Pistol: the support palm cups the base of the grip, its fingers run forward and up round
+                // the front of the firing hand's fingers (curled by the viewmodel), index side - and the
+                // thumb - on the left of the frame.
+                Quaternion lCup = Quaternion.LookRotation(new Vector3(0.15f, 0.6f, 0.8f).normalized, Vector3.left);
+                Quaternion lCupHand = lCup * Quaternion.Inverse(lLeft.basis);
+                Vector3 lCupPalm = new Vector3(-0.006f, -0.085f, -0.01f);
                 lRig.pistol = new HumanRig.Grip
                 {
                     handPosition = lGripInHand,
                     handRotation = lWeaponInHand,
-                    supportRotation = lUnderHand,
-                    supportPosition = lCupPalm - lUnderHand * (lLeft.palm + lLeft.palmNormal * 0.02f)
+                    supportRotation = lCupHand,
+                    supportPosition = lCupPalm - lCupHand * (lLeft.palm + lLeft.palmNormal * 0.02f)
                 };
 
                 Vector3 lForePalm = new Vector3(0f, -0.04f, lRig.foreEnd);

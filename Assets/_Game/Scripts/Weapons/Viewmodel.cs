@@ -362,6 +362,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public static Vector3 SHOULDER_DROP = new Vector3(0f, 0.2f, 0.24f);
         public static float RIFLE_YAW = 12f, NEAR_CLIP = 0.06f, FIST_AMOUNT = 0f;
         public static Vector2 THUMB_BEND = new Vector2(100f, 80f);
+        /// <summary>Support-hand fingers as a share of the fist curl: pistol (around the firing hand), long guns.</summary>
+        public static Vector2 SUPPORT_CURL = new Vector2(0.7f, 0.65f);
         /// <summary>Elbows down and in: the forearms rise from the bottom of the screen, not across it.</summary>
         public static Vector3 RIGHT_ELBOW = new Vector3(0.3f, -0.62f, 0.1f), LEFT_ELBOW = new Vector3(-0.18f, -0.65f, 0.18f);
 
@@ -425,6 +427,67 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             {
                 Fist(true, _ikRight);
                 Fist(false, _ikLeft);
+            }
+            else if ((_held == HeldKind.Pistol || _held == HeldKind.Rifle) && _reloadT >= 1f) Support(_ikLeft);
+        }
+
+        /// <summary>
+        /// The support hand on a gun: its fingers close to a share of the fist around the firing hand
+        /// (pistol) or the magazine well / fore-end (long guns) - curled to a target per phalanx, so the
+        /// clip's own curl is not added twice - and the thumb lies forward along the frame, under the slide.
+        /// </summary>
+        private void Support(float pWeight)
+        {
+            if (pWeight <= 0.01f || !HandAxes(false, out Vector3 lForward, out Vector3 lPalm)) return;
+            float lShare = (_held == HeldKind.Pistol ? SUPPORT_CURL.x : SUPPORT_CURL.y) * pWeight;
+            for (int f = 4; f < 8; f++) CurlTo(f, lForward, lPalm, lShare);
+
+            Vector3 lAlongFrame = _pivot.forward;
+            HumanBodyBones[] lThumb = { HumanBodyBones.LeftThumbProximal, HumanBodyBones.LeftThumbIntermediate, HumanBodyBones.LeftThumbDistal };
+            for (int j = 0; j < 3; j++)
+            {
+                Transform lBone = _animator.GetBoneTransform(lThumb[j]);
+                if (lBone == null) continue;
+                Vector3 lAlong = lBone.rotation * Vector3.up;
+                // The base turns most of the way, the joints straighten it onto the frame line.
+                float lAmount = (j == 0 ? 0.75f : 0.9f) * pWeight;
+                lBone.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lAlong, lAlongFrame), lAmount) * lBone.rotation;
+            }
+        }
+
+        /// <summary>A hand's forward (wrist to knuckles) and palm normal, from its bones.</summary>
+        private bool HandAxes(bool pRight, out Vector3 pForward, out Vector3 pPalm)
+        {
+            pForward = pPalm = Vector3.zero;
+            Transform lHand = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightHand : HumanBodyBones.LeftHand);
+            Transform lIndex = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightIndexProximal : HumanBodyBones.LeftIndexProximal);
+            Transform lLittle = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightLittleProximal : HumanBodyBones.LeftLittleProximal);
+            Transform lMiddle = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightMiddleProximal : HumanBodyBones.LeftMiddleProximal);
+            if (lHand == null || lIndex == null || lLittle == null || lMiddle == null) return false;
+            Vector3 lUp = (lIndex.position - lLittle.position).normalized;
+            pForward = (lMiddle.position - lHand.position).normalized;
+            pPalm = Vector3.Cross(lUp, pForward).normalized * (pRight ? -1f : 1f);
+            return true;
+        }
+
+        /// <summary>
+        /// Bends one finger to a share of the fist curl: each phalanx turns towards the palm until its
+        /// angle to the previous one (the hand for the first) reaches its target, whatever the clip did.
+        /// </summary>
+        private void CurlTo(int pFinger, Vector3 pForward, Vector3 pPalm, float pShare)
+        {
+            Vector3 lParent = pForward;
+            for (int j = 0; j < 3; j++)
+            {
+                Transform lBone = _animator.GetBoneTransform(FINGERS[pFinger][j]);
+                if (lBone == null) return;
+                Vector3 lAlong = lBone.rotation * Vector3.up;
+                Vector3 lAxis = Vector3.Cross(lParent, pPalm);
+                if (lAxis.sqrMagnitude < 0.0001f) return;
+                lAxis.Normalize();
+                float lBent = Vector3.SignedAngle(lParent, lAlong, lAxis);
+                lBone.rotation = Quaternion.AngleAxis(FIST_CURL[j] * pShare - lBent, lAxis) * lBone.rotation;
+                lParent = lBone.rotation * Vector3.up;
             }
         }
 

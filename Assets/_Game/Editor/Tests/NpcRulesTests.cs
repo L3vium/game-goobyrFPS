@@ -189,6 +189,52 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Crowd_RunsForAnExitAwayFromTheThreatAndCowersWhenCornered()
+        {
+            Vector3 lSelf = Vector3.zero, lThreat = new Vector3(10f, 0f, 0f);
+            Assert.AreEqual(float.MaxValue, NpcRules.ExitScore(lSelf, lThreat, new Vector3(30f, 0f, 0f)), "never past the gunman");
+            float lBehind = NpcRules.ExitScore(lSelf, lThreat, new Vector3(-30f, 0f, 0f));
+            float lSide = NpcRules.ExitScore(lSelf, lThreat, new Vector3(5f, 0f, 25f));
+            Assert.AreEqual(30f, lBehind, 0.01f, "straight away from it: just the distance");
+            Assert.Less(lBehind, NpcRules.ExitScore(lSelf, lThreat, new Vector3(12f, 0f, 6f)), "an exit right by the threat is worse than a farther one away from it");
+            Assert.Less(lSide, float.MaxValue);
+
+            Assert.IsTrue(NpcRules.ShouldCower(3f, true), "too close to run past");
+            Assert.IsTrue(NpcRules.ShouldCower(10f, false), "nowhere to go");
+            Assert.IsFalse(NpcRules.ShouldCower(10f, true));
+            Assert.IsFalse(NpcRules.ShouldCower(30f, false));
+
+            Assert.IsTrue(NpcRules.Reports(true, 20f), "a witness with a guard close by tells it");
+            Assert.IsFalse(NpcRules.Reports(true, NpcRules.REPORT_RANGE + 10f), "no guard near: it runs");
+            Assert.IsFalse(NpcRules.Reports(false, 5f), "a shot only heard is not something to report");
+        }
+
+        [Test]
+        public void Panic_SpreadsOncePerIncident()
+        {
+            IncidentLog lLog = new IncidentLog();
+            int lFirst = lLog.At(new Vector3(0f, 0f, 0f), 10f);
+            Assert.AreEqual(lFirst, lLog.At(new Vector3(6f, 0f, 3f), 12f), "the next shot of the same fight");
+            Assert.AreNotEqual(lFirst, lLog.At(new Vector3(200f, 0f, 0f), 12f), "another place");
+            Assert.AreNotEqual(lFirst, lLog.At(new Vector3(0f, 0f, 0f), 12f + IncidentLog.WINDOW + 1f), "much later");
+            Assert.LessOrEqual(NpcRules.PANIC_RADIUS, 12f);
+        }
+
+        [Test]
+        public void Barks_RateLimitedWithAVoicePerNpc()
+        {
+            Assert.IsTrue(NpcRules.BarkAllowed(0));
+            Assert.IsFalse(NpcRules.BarkAllowed(NpcRules.MAX_BARKS_PER_SECOND), "a stampede is a few screams, not fifty");
+            Assert.AreEqual(NpcRules.VoiceOf(42, true), NpcRules.VoiceOf(42, true), "the same voice all match");
+            for (ulong lId = 0; lId < 50; lId++)
+            {
+                string lGuard = NpcRules.VoiceOf(lId, false);
+                Assert.IsTrue(lGuard == "low" || lGuard == "mid", "guards speak low or mid");
+            }
+            Assert.Greater(NpcRules.BarkGap(Barks.Chatter), NpcRules.BarkGap(Barks.Hey));
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

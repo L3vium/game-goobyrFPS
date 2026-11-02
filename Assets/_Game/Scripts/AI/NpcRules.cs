@@ -108,6 +108,68 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Seconds between the end of a confrontation (or escort) and the first shot: the gun is already up.</summary>
         public const float REACTION_CONFRONTED = 0.3f;
 
+        // ---------------------------------------------------------------- the crowd
+
+        /// <summary>Panic reaches the people this close to a panicking civilian who can see it.</summary>
+        public const float PANIC_RADIUS = 10f;
+        /// <summary>A witness runs to a guard this close (farther: it just runs away).</summary>
+        public const float REPORT_RANGE = 45f;
+        /// <summary>Closer than this, a civilian is too scared to run past the threat: it cowers.</summary>
+        public const float COWER_RANGE = 5f;
+
+        /// <summary>
+        /// How good an exit is for a civilian running from a threat - lower is better, float.MaxValue
+        /// never: an exit beyond the threat (the way there runs into it) is never taken; the score is
+        /// the distance, plus a penalty when the straight way passes within 8 m of the threat.
+        /// </summary>
+        public static float ExitScore(Vector3 pSelf, Vector3 pThreat, Vector3 pExit)
+        {
+            Vector3 lToExit = pExit - pSelf, lToThreat = pThreat - pSelf;
+            lToExit.y = 0f;
+            lToThreat.y = 0f;
+            float lExit = lToExit.magnitude, lThreat = lToThreat.magnitude;
+            if (lExit < 1f) return 0f;
+            if (lThreat > 0.5f && lExit > lThreat && Vector3.Angle(lToExit, lToThreat) < 35f) return float.MaxValue;
+            float lAlong = Mathf.Clamp01(Vector3.Dot(lToThreat, lToExit) / (lExit * lExit));
+            float lPass = (lToThreat - lToExit * lAlong).magnitude;
+            return lExit + (lPass < 8f ? (8f - lPass) * 12f : 0f);
+        }
+
+        /// <summary>Does a fleeing civilian cower where it stands? When the threat is right on it, or when it has no way out and the threat is close.</summary>
+        public static bool ShouldCower(float pThreatDistance, bool pHasWayOut) => pThreatDistance < COWER_RANGE || (!pHasWayOut && pThreatDistance < 15f);
+
+        /// <summary>
+        /// What a civilian does about what it saw: a crime, a body or a gun out with a guard within
+        /// reach is reported (it runs to the guard); otherwise, and for gunfire it only heard, it runs.
+        /// </summary>
+        public static bool Reports(bool pSawIt, float pGuardDistance) => pSawIt && pGuardDistance <= REPORT_RANGE;
+
+        // ---------------------------------------------------------------- barks
+
+        /// <summary>The voices of the gibberish barks (<c>bark_&lt;voice&gt;_&lt;kind&gt;</c>): guards speak low or mid, the crowd any of them.</summary>
+        public static readonly string[] VOICES = { "low", "mid", "high", "squeak" };
+
+        /// <summary>An NPC's own voice, the same on every machine and all match long.</summary>
+        public static string VoiceOf(ulong pId, bool pCrowd)
+        {
+            int lCount = pCrowd ? VOICES.Length : 2;
+            return VOICES[(int)((pId * 2654435761UL >> 7) % (ulong)lCount)];
+        }
+
+        /// <summary>Seconds before the same NPC speaks again after this bark (small talk is sparse, alarms quick).</summary>
+        public static float BarkGap(Barks pBark) => pBark switch
+        {
+            Barks.Chatter => 3.5f,
+            Barks.Scream => 4f,
+            Barks.Radio => 4f,
+            _ => 2.5f
+        };
+
+        /// <summary>At most this many barks start across the map each second (a stampede is a few screams, not fifty).</summary>
+        public const int MAX_BARKS_PER_SECOND = 5;
+
+        public static bool BarkAllowed(int pBarksThisSecond) => pBarksThisSecond < MAX_BARKS_PER_SECOND;
+
         // ---------------------------------------------------------------- patrols
 
         /// <summary>

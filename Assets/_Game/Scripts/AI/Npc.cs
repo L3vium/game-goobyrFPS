@@ -29,7 +29,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         Flee,
         Sick,
         KnockedOut,
-        Dead
+        Dead,
+        /// <summary>A civilian witness running to the nearest guard to tell what it saw (appended: the enum is sent as a byte).</summary>
+        Report
     }
 
     /// <summary>
@@ -51,7 +53,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
     /// </para>
     /// </summary>
     [RequireComponent(typeof(Damageable), typeof(NavMeshAgent))]
-    public class Npc : NetworkBehaviour
+    public partial class Npc : NetworkBehaviour
     {
         public static readonly List<Npc> All = new List<Npc>();
 
@@ -198,12 +200,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Health.InitHealth(NpcRules.MaxHealth(Role, GameDatabase.Rules.npcHealth));
             Health.OnDeathClient += HandleDeathClient;
             Health.OnHitClient += HandleHitClient;
-            gameObject.AddComponent<Audio.Footsteps>().Init(() => !Health.IsAlive ? 0f : State.Value == NpcState.Combat || State.Value == NpcState.Flee || State.Value == NpcState.Search ? 0.9f : 0.45f);
+            gameObject.AddComponent<Audio.Footsteps>().Init(() => !Health.IsAlive ? 0f : State.Value == NpcState.Combat || State.Value == NpcState.Flee || State.Value == NpcState.Search || State.Value == NpcState.Report ? 0.9f : 0.45f);
             if (IsServer)
             {
                 Health.OnDamagedServer += HandleDamagedServer;
                 Health.OnDeathServer += HandleDeathServer;
-                if (!_hearing) { NoiseSystem.OnNoise += HearAll; _hearing = true; _reportedBodies.Clear(); }
+                if (!_hearing) { NoiseSystem.OnNoise += HearAll; _hearing = true; _reportedBodies.Clear(); ResetCrowd(); }
                 BreakerAlert.OnBreaker += HandleBreaker;
                 _nextBreakAt = Time.time + Random.Range(20f, 90f);
                 _agent.enabled = true;
@@ -270,7 +272,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             bool lStopped = !_agent.isOnNavMesh || _agent.isStopped || _agent.velocity.sqrMagnitude < 0.04f;
             BodyPose lPose = BodyPose.None;
             if (State.Value == NpcState.Calling) lPose = BodyPose.Phone;
-            else if (State.Value == NpcState.Flee && IsCrowd && lStopped) lPose = BodyPose.Cower;
+            else if (State.Value == NpcState.Flee && IsCrowd && lStopped && Time.time >= _startledUntil) lPose = BodyPose.Cower;
             else if (State.Value == NpcState.Routine && _activityNode != null && _waitUntil > 0f && lStopped) lPose = PoseFor(_activityNode.Activity);
             else if (State.Value == NpcState.Idle && _break != null && _breakUntil > 0f && lStopped) lPose = PoseFor(_break.Activity);
             else if (State.Value == NpcState.Investigate && lStopped) lPose = BodyPose.LookAround;
@@ -289,7 +291,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _animator.Held = lArmed ? WeaponModels.HeldOf(Weapon) : HeldKind.None;
             _animator.Aiming = lArmed && (lState == NpcState.Engaged || lState == NpcState.Combat);
             _animator.Crouched = IsServer && InCombat && _cover != null && _cover.Low && !_targetVisible;
-            _animator.Panic = lState == NpcState.Flee && IsCrowd;
+            _animator.Panic = (lState == NpcState.Flee || lState == NpcState.Report) && IsCrowd;
             _animator.Calling = lState == NpcState.Calling;
             _animator.Pose = Pose.Value;
             _animator.Velocity = IsServer && _agent.enabled ? _agent.velocity : (Vector3?)null;
@@ -337,6 +339,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 case NpcState.Search: UpdateSearch(); break;
                 case NpcState.Calling: UpdateCalling(dt); break;
                 case NpcState.Flee: UpdateFlee(); break;
+                case NpcState.Report: UpdateReport(); break;
                 case NpcState.Sick: UpdateSick(); break;
             }
 
@@ -411,6 +414,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 _suspect = lBest;
                 if (lBest == _combatTarget) _lastSawTarget = Time.time;
                 if (State.Value == NpcState.Engaged) { }
+                else if (_awareness >= 1f && Flees && (State.Value == NpcState.Flee || State.Value == NpcState.Report))
+                {
+                    // Already running: it keeps an eye on the threat, nothing more.
+                    _combatTarget = lBest;
+                    _targetVisible = true;
+                    _lastSawTarget = Time.time;
+                }
                 else if (_awareness >= 1f) Spot(lBest);
                 else if (OnEdge) HuntToward(lBest.transform.position);
                 else if (CanBecomeSuspicious)
@@ -558,6 +568,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// </summary>
         private void WatchForFights()
         {
+            if (IsCrowd) { CrowdWatchFights(); return; }
             if (Flees || Weapon == null || State.Value == NpcState.Flee || State.Value == NpcState.Sick) return;
             foreach (Npc lOther in _hot)
             {
@@ -605,9 +616,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             switch (NpcRules.OnSpotted(Flees, OnEdge, IsHostile(pPlayer), TierFor(pPlayer), lCrime))
             {
                 case NpcRules.SpotReaction.Flee:
-                    // A scream: the guards close by come and look.
-                    NoiseSystem.Emit(transform.position, 14f, NoiseKind.Suspicious, pPlayer.OwnerClientId);
-                    FleeFrom(pPlayer.transform.position);
+                    // The crowd reports a gun (or stares at anything else odd); the target runs for its safe room.
+                    if (IsCrowd) CrowdSpotted(pPlayer);
+                    else
+                    {
+                        _threatPlayer = pPlayer;
+                        FleeFrom(pPlayer.transform.position);
+                    }
                     return;
                 case NpcRules.SpotReaction.Fight:
                     // A known hostile, or a trespasser while it is already expecting trouble: it opens fire.
@@ -686,29 +701,50 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 if (NpcRules.ConeAngle(transform.forward, lBody - Eye, Role == NpcRole.Lookout) > GameDatabase.Rules.npcVisionAngle * 0.5f) continue;
                 if (!Senses.Clear(Eye, lBody)) continue;
                 _seenBodies.Add(lOther.NetworkObjectId);
-                if (!_reportedBodies.Add(lOther.NetworkObjectId))
+                if (IsCrowd)
+                {
+                    // A guest finds a body: a scream, and it runs to tell a guard (who radios it in).
+                    if (_reportedBodies.Contains(lOther.NetworkObjectId)) { Bark(Barks.Huh); Glance(lOther.transform.position, 0.4f); }
+                    else Witness(lOther.transform.position, null, HostileAct.Killed, lOther.NetworkObjectId);
+                    return;
+                }
+                if (_reportedBodies.Contains(lOther.NetworkObjectId))
                 {
                     // Someone already radioed this one in: wary, not a new alert.
                     Glance(lOther.transform.position, 0.4f);
                     return;
                 }
-                // First to find it: runs over and radios it in. The two nearest mates come to secure
-                // the area and the zone stays on edge for a while (sharper eyes).
+                // First to find it: runs over and radios it in.
                 Investigate(lOther.transform.position, true);
-                BodyFoundRpc();
-                if (Zone == null) return;
-                Zone.RaiseAlertness(90f);
-                int lSent = 0;
-                foreach (Npc lMate in Zone.NearestMembers(lOther.transform.position, 30f))
-                {
-                    if (lMate == this || !lMate.OnDuty || lMate.Flees) continue;
-                    lMate._seenBodies.Add(lOther.NetworkObjectId);
-                    lMate.AlertToPoint(lOther.transform.position, true);
-                    if (++lSent >= 2) break;
-                }
+                RadioBodyIn(lOther.NetworkObjectId, lOther.transform.position);
                 return;
             }
         }
+
+        /// <summary>
+        /// Host: this guard calls a body in (it found it, or a witness told it): the two nearest mates
+        /// come to secure the area and the zone stays on edge for a while (sharper eyes).
+        /// </summary>
+        private void RadioBodyIn(ulong pBody, Vector3 pWhere)
+        {
+            if (!_reportedBodies.Add(pBody)) return;
+            BodyFoundRpc();
+            Bark(Barks.Radio);
+            if (Zone == null) return;
+            Zone.RaiseAlertness(90f);
+            int lSent = 0;
+            foreach (Npc lMate in Zone.NearestMembers(pWhere, 30f))
+            {
+                if (lMate == this || !lMate.OnDuty || lMate.Flees) continue;
+                lMate._seenBodies.Add(pBody);
+                lMate.AlertToPoint(pWhere, true);
+                if (++lSent >= 2) break;
+            }
+        }
+
+        /// <summary>The body a witness is running to report (<see cref="NO_BODY"/>: none, it saw something else).</summary>
+        private ulong _reportBody = NO_BODY;
+        private const ulong NO_BODY = ulong.MaxValue;
 
         /// <summary>
         /// Host: hand a sound out to the NPCs who can hear it. Loudness falls with distance and with
@@ -768,8 +804,11 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
             foreach (Npc lNpc in All)
             {
-                if (lNpc == null || lNpc == pVictim || !lNpc.IsServer || lNpc.Zone == null || lNpc.Flees) continue;
-                if (lNpc.Sees(pPlayer)) lNpc.Zone.MarkHostile(pPlayer, pAct);
+                if (lNpc == null || lNpc == pVictim || !lNpc.IsServer || lNpc.Zone == null || lNpc.IsTarget) continue;
+                if (!lNpc.Sees(pPlayer)) continue;
+                // A guard tells its zone at once; a civilian runs to tell a guard.
+                if (lNpc.IsCrowd) lNpc.Witness(pPlayer.transform.position, pPlayer, pAct);
+                else lNpc.Zone.MarkHostile(pPlayer, pAct);
             }
         }
 
@@ -777,7 +816,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public bool IsArmedGuard => !Flees && Weapon != null;
 
         /// <summary>Free to go and check a sound: not fighting, fleeing, sick or already on its way to one.</summary>
-        private bool CanRespond => !InCombat && State.Value != NpcState.Engaged && State.Value != NpcState.Flee && State.Value != NpcState.Sick && State.Value != NpcState.Investigate;
+        private bool CanRespond => !InCombat && State.Value != NpcState.Engaged && State.Value != NpcState.Flee && State.Value != NpcState.Sick && State.Value != NpcState.Investigate && State.Value != NpcState.Report;
 
         private void Hear(NoiseEvent pNoise, DetectionModel.Heard pHeard, float pDistance)
         {
@@ -861,16 +900,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             MoveTo(pPoint, pAlarmed ? RUN * 0.75f : WALK * 1.15f);
         }
 
-        /// <summary>Where the trouble it runs from is (a shot, a body, the player): set by every way into fleeing.</summary>
+        /// <summary>Where the trouble it runs from is (a shot, a body, the player): set by every way into fleeing (<see cref="FleeFrom(Vector3)"/>).</summary>
         private Vector3 _threatPoint;
-
-        /// <summary>Host: run from a threat at <paramref name="pFrom"/>; a new threat while fleeing re-plans the escape.</summary>
-        private void FleeFrom(Vector3 pFrom)
-        {
-            _threatPoint = pFrom;
-            _fleePoint = null;
-            SetState(NpcState.Flee);
-        }
 
         // ---------------------------------------------------------------- non-combat states
 
@@ -895,11 +926,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private bool TakeBreak()
         {
             if (Role != NpcRole.Guard && !IsCrowd) return false;
+            float lReach = IsCrowd ? 30f : 22f;
             if (_break == null)
             {
                 if (Time.time < _nextBreakAt) return false;
-                _nextBreakAt = Time.time + Random.Range(45f, 120f);
-                _break = ActivityNode.Near(ZoneIndex.Value, _home, 22f, BreakActivity);
+                // Staff and guests mingle more than guards leave their posts.
+                _nextBreakAt = Time.time + (IsCrowd ? Random.Range(20f, 50f) : Random.Range(45f, 120f));
+                _break = ActivityNode.Near(ZoneIndex.Value, _home, lReach, IsCrowd ? (System.Predicate<ActivityType>)CrowdActivity : BreakActivity);
                 _breakUntil = 0f;
                 if (_break == null) return false;
             }
@@ -916,6 +949,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         }
 
         private static bool BreakActivity(ActivityType pType) => pType == ActivityType.Smoke || pType == ActivityType.Phone || pType == ActivityType.Inspect || pType == ActivityType.Idle || pType == ActivityType.Drink;
+
+        /// <summary>Where staff and guests wander between their stints at the scene: the bar, the buffet, the garden, a smoke, a call.</summary>
+        private static bool CrowdActivity(ActivityType pType) => pType is ActivityType.Drink or ActivityType.Dining or ActivityType.Garden or ActivityType.Smoke or ActivityType.Phone or ActivityType.Idle or ActivityType.Inspect;
 
         private void UpdatePatrol()
         {
@@ -1134,19 +1170,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void UpdateFlee()
         {
             // The target bolts to its zone's safe room and hides there; it fights only if cornered.
-            // A crowd member just runs away from the trouble.
-            if (IsCrowd)
-            {
-                if (_fleePoint == null)
-                {
-                    Vector3 lWish = NpcRules.FleeWish(transform.position, _threatPoint, transform.forward, 22f);
-                    _fleePoint = UnityEngine.AI.NavMesh.SamplePosition(lWish, out UnityEngine.AI.NavMeshHit lHit, 8f, UnityEngine.AI.NavMesh.AllAreas) ? lHit.position : _home;
-                }
-                MoveTo(_fleePoint.Value, RUN);
-                if (Arrived(1.5f)) Stop();
-                if (_stateTime > 45f && (Zone == null || !Zone.InCombat)) { _fleePoint = null; ReturnToDuty(); }
-                return;
-            }
+            // A crowd member runs for an exit (Npc.Crowd).
+            if (IsCrowd) { UpdateCrowdFlee(); return; }
             Vector3 lSafe = Zone != null ? Zone.SafeRoom : _home;
             MoveTo(lSafe, RUN * 0.9f);
             if (Arrived(1.5f))

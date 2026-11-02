@@ -95,6 +95,20 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Flee_RunsAwayFromTheThreatNotFromTheMapOrigin()
+        {
+            // A crowd member at (100, 0, 100), a shot at (110, 0, 100): it runs toward -x, whatever the origin.
+            Vector3 lWish = NpcRules.FleeWish(new Vector3(100f, 0f, 100f), new Vector3(110f, 0f, 100f), Vector3.forward, 22f);
+            Assert.Less(lWish.x, 100f);
+            Assert.AreEqual(100f, lWish.z, 0.01f);
+            Assert.AreEqual(22f, Vector3.Distance(lWish, new Vector3(100f, 0f, 100f)), 0.01f);
+            // The threat right on it: it bolts the way it faces.
+            Vector3 lBolt = NpcRules.FleeWish(new Vector3(5f, 2f, 5f), new Vector3(5f, 0f, 5f), Vector3.right, 10f);
+            Assert.AreEqual(15f, lBolt.x, 0.01f);
+            Assert.AreEqual(2f, lBolt.y, 0.01f, "stays on its floor");
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

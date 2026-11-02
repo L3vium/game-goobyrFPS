@@ -43,6 +43,22 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// </summary>
         public static bool LookedAround(float pArrivedAt, float pNow, float pFor) => pArrivedAt >= 0f && pNow - pArrivedAt >= pFor;
 
+        /// <summary>
+        /// Where a fleeing NPC wishes to be: <paramref name="pDistance"/> straight away from the threat
+        /// on the ground plane; with the threat on top of it, ahead of it (it bolts the way it faces).
+        /// </summary>
+        public static Vector3 FleeWish(Vector3 pSelf, Vector3 pThreat, Vector3 pForward, float pDistance)
+        {
+            Vector3 lAway = pSelf - pThreat;
+            lAway.y = 0f;
+            if (lAway.sqrMagnitude < 0.01f)
+            {
+                lAway = new Vector3(pForward.x, 0f, pForward.z);
+                if (lAway.sqrMagnitude < 0.0001f) lAway = Vector3.forward;
+            }
+            return pSelf + lAway.normalized * pDistance;
+        }
+
         // ---------------------------------------------------------------- spotting
 
         public enum SpotReaction : byte { Confront, Fight, Flee }

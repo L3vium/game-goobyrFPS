@@ -599,7 +599,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 case NpcRules.SpotReaction.Flee:
                     // A scream: the guards close by come and look.
                     NoiseSystem.Emit(transform.position, 14f, NoiseKind.Suspicious, pPlayer.OwnerClientId);
-                    SetState(NpcState.Flee);
+                    FleeFrom(pPlayer.transform.position);
                     return;
                 case NpcRules.SpotReaction.Fight:
                     // A known hostile, or a trespasser while it is already expecting trouble: it opens fire.
@@ -776,7 +776,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (pHeard == DetectionModel.Heard.None) return;
             if (Flees)
             {
-                if (pNoise.kind == NoiseKind.Alarming && pHeard == DetectionModel.Heard.Alarmed) SetState(NpcState.Flee);
+                if (pNoise.kind == NoiseKind.Alarming && pHeard == DetectionModel.Heard.Alarmed) FleeFrom(pNoise.position);
                 else Glance(pNoise.position, 0.3f);
                 return;
             }
@@ -820,7 +820,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public void AlertToPoint(Vector3 pPoint, bool pAlarmed)
         {
             if (!Health.IsAlive || State.Value == NpcState.KnockedOut || State.Value == NpcState.Sick) return;
-            if (Flees) { SetState(NpcState.Flee); return; }
+            if (Flees) { FleeFrom(pPoint); return; }
             if (InCombat || State.Value == NpcState.Engaged) { if (_combatTarget == null) _searchCenter = pPoint; return; }
             if (State.Value == NpcState.Search)
             {
@@ -842,7 +842,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private void Investigate(Vector3 pPoint, bool pAlarmed)
         {
-            if (Flees && pAlarmed) { SetState(NpcState.Flee); return; }
+            if (Flees && pAlarmed) { FleeFrom(pPoint); return; }
             _investigatePoint = pPoint;
             _investigateAlarmed = pAlarmed;
             // Its own clock for looking around once there (a patrol's pause timer is not it).
@@ -851,6 +851,17 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _awareness = Mathf.Max(_awareness, 0.3f);
             SetState(NpcState.Investigate);
             MoveTo(pPoint, pAlarmed ? RUN * 0.75f : WALK * 1.15f);
+        }
+
+        /// <summary>Where the trouble it runs from is (a shot, a body, the player): set by every way into fleeing.</summary>
+        private Vector3 _threatPoint;
+
+        /// <summary>Host: run from a threat at <paramref name="pFrom"/>; a new threat while fleeing re-plans the escape.</summary>
+        private void FleeFrom(Vector3 pFrom)
+        {
+            _threatPoint = pFrom;
+            _fleePoint = null;
+            SetState(NpcState.Flee);
         }
 
         // ---------------------------------------------------------------- non-combat states
@@ -1057,10 +1068,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 if (_fleePoint == null)
                 {
-                    Vector3 lFrom = _combatTarget != null ? _combatTarget.transform.position : _investigatePoint;
-                    Vector3 lAway = transform.position - lFrom;
-                    lAway.y = 0f;
-                    Vector3 lWish = transform.position + (lAway.sqrMagnitude > 0.01f ? lAway.normalized : -transform.forward) * 22f;
+                    Vector3 lWish = NpcRules.FleeWish(transform.position, _threatPoint, transform.forward, 22f);
                     _fleePoint = UnityEngine.AI.NavMesh.SamplePosition(lWish, out UnityEngine.AI.NavMeshHit lHit, 8f, UnityEngine.AI.NavMesh.AllAreas) ? lHit.position : _home;
                 }
                 MoveTo(_fleePoint.Value, RUN);
@@ -1345,7 +1353,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 ReportHostileAct(lAttacker, lAct, this);
                 if (Health.Health.Value > 0f && !Flees) Zone?.MarkHostile(lAttacker, lAct);
             }
-            if (Flees) { SetState(NpcState.Flee); return; }
+            if (Flees) { FleeFrom(lAttacker != null ? lAttacker.transform.position : pInfo.point - pInfo.direction.normalized * 5f); return; }
             if (lAttacker != null)
             {
                 _awareness = 1f;

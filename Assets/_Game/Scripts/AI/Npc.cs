@@ -139,6 +139,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private ActivityNode _break;
         private float _breakUntil;
         private float _nextStepHeard;
+        private float _lastShotNoise = -100f;
 
         /// <summary>Bodies some NPC already reported: the next to stumble on them is wary, not a new alert.</summary>
         private static readonly HashSet<ulong> _reportedBodies = new HashSet<ulong>();
@@ -726,12 +727,18 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (_hearers.Count == 0) return;
             _hearers.Sort((a, b) => b.loudness.CompareTo(a.loudness));
 
+            // Gunfire brings every armed guard who hears it; the unarmed and quieter sounds keep the cap.
             int lResponders = DetectionModel.Responders(pNoise.kind, _hearers[0].loudness);
             int lGiven = 0;
             foreach ((Npc lNpc, float lLoudness, float lDistance) in _hearers)
             {
-                bool lResponder = lGiven < lResponders && lNpc.CanRespond;
-                if (lResponder) lGiven++;
+                bool lResponder;
+                if (NpcRules.AlwaysResponds(pNoise.kind, lNpc.IsArmedGuard, pNoise.capped)) lResponder = lNpc.CanRespond;
+                else
+                {
+                    lResponder = lGiven < lResponders && lNpc.CanRespond;
+                    if (lResponder) lGiven++;
+                }
                 lNpc.Hear(pNoise, DetectionModel.React(pNoise.kind, lLoudness, lResponder), lDistance);
             }
         }
@@ -760,6 +767,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
         }
 
+        /// <summary>A guard with a gun (not the crowd, not the target): answers every gunfire it hears.</summary>
+        public bool IsArmedGuard => !Flees && Weapon != null;
+
         /// <summary>Free to go and check a sound: not fighting, fleeing, sick or already on its way to one.</summary>
         private bool CanRespond => !InCombat && State.Value != NpcState.Engaged && State.Value != NpcState.Flee && State.Value != NpcState.Sick && State.Value != NpcState.Investigate;
 
@@ -781,7 +791,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                     Glance(pNoise.position, pNoise.kind == NoiseKind.Alarming ? 0.4f : 0.2f);
                     break;
                 case DetectionModel.Heard.Investigate:
-                    Investigate(lGuess, false);
+                    // Faint gunfire is still gunfire: it goes to look weapon up.
+                    Investigate(lGuess, pNoise.kind == NoiseKind.Alarming);
                     if (pNoise.kind == NoiseKind.Distraction) _distraction = WorldRegistry.Nearest<Distraction>(pNoise.position, 2.5f, d => d.State == 1);
                     break;
                 case DetectionModel.Heard.Alarmed:
@@ -1244,6 +1255,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 lEnd = Ballistics.TraceServer(lMuzzle, lPelletDir, lWeapon, lWeapon.damage * GameDatabase.Rules.npcDamageMultiplier / lPellets * (lPellets > 1 ? 1.4f : 1f) * 0.75f, DamageInfo.NO_PLAYER, Match.MatchRulesLogic.NO_TEAM, transform);
             }
             ShotRpc(lMuzzle, lEnd, WeaponItem.Value);
+            // A guard's gunfire is heard like anyone's: the mates in earshot come running, the crowd scatters.
+            if (NpcRules.ShotNoiseDue(_lastShotNoise, Time.time))
+            {
+                _lastShotNoise = Time.time;
+                NoiseSystem.Emit(lMuzzle, lWeapon.noiseRadius, lWeapon.kind == ItemKind.SilencedPistol ? NoiseKind.Suspicious : NoiseKind.Alarming, DamageInfo.NO_PLAYER, false);
+            }
         }
 
         /// <summary>

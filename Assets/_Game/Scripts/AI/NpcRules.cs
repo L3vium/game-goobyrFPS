@@ -52,6 +52,22 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return SpotReaction.Confront;
         }
 
+        // ---------------------------------------------------------------- hearing
+
+        /// <summary>An NPC's gunfire is a sound like any other, at most once every this many seconds per shooter.</summary>
+        public const float SHOT_NOISE_INTERVAL = 1.5f;
+
+        /// <summary>Is it time for this shooter's gunfire to be heard again?</summary>
+        public static bool ShotNoiseDue(float pLastNoise, float pNow) => pNow - pLastNoise >= SHOT_NOISE_INTERVAL || pNow < pLastNoise;
+
+        /// <summary>
+        /// Gunfire and explosions bring every armed guard who hears them (walls and distance already
+        /// decide who does); the unarmed, and every other kind of sound, keep the cap of the few who
+        /// hear it best (<see cref="DetectionModel.Responders"/>). A capped sound (a far siren) is
+        /// capped for everyone.
+        /// </summary>
+        public static bool AlwaysResponds(NoiseKind pKind, bool pArmedGuard, bool pCapped) => pKind == NoiseKind.Alarming && pArmedGuard && !pCapped;
+
         // ---------------------------------------------------------------- weapons in hand
 
         /// <summary>A weapon anyone recognises from across a room: every gun, the rocket launcher, the flamethrower.</summary>

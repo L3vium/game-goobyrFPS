@@ -34,6 +34,20 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Gunfire_BringsEveryArmedGuardInEarshotButCapsTheCrowd()
+        {
+            Assert.IsTrue(NpcRules.AlwaysResponds(NoiseKind.Alarming, true, false));
+            Assert.IsFalse(NpcRules.AlwaysResponds(NoiseKind.Alarming, false, false), "the unarmed keep the cap");
+            Assert.IsFalse(NpcRules.AlwaysResponds(NoiseKind.Alarming, true, true), "a far siren stays capped");
+            Assert.IsFalse(NpcRules.AlwaysResponds(NoiseKind.Suspicious, true, false), "a silenced shot stays quiet");
+            Assert.IsFalse(NpcRules.AlwaysResponds(NoiseKind.Distraction, true, false));
+            Assert.LessOrEqual(DetectionModel.Responders(NoiseKind.Alarming, 1f), 3);
+            Assert.IsTrue(NpcRules.ShotNoiseDue(-100f, 0f), "an NPC's first shot is heard");
+            Assert.IsFalse(NpcRules.ShotNoiseDue(10f, 10f + NpcRules.SHOT_NOISE_INTERVAL * 0.5f), "rate-limited");
+            Assert.IsTrue(NpcRules.ShotNoiseDue(10f, 10f + NpcRules.SHOT_NOISE_INTERVAL));
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

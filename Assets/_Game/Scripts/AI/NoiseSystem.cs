@@ -23,6 +23,11 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>The player responsible (for "who shot"), or ulong.MaxValue.</summary>
         public ulong source;
         public bool fromPlayer;
+        /// <summary>
+        /// Only the few who hear it best go and look, armed or not (a siren heard across the map).
+        /// Otherwise every armed guard in earshot answers an alarming sound (<see cref="NpcRules.AlwaysResponds"/>).
+        /// </summary>
+        public bool capped;
     }
 
     /// <summary>
@@ -33,9 +38,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
     {
         public static event Action<NoiseEvent> OnNoise;
 
-        public static void Emit(Vector3 pPosition, float pRadius, NoiseKind pKind, ulong pSource = ulong.MaxValue, bool pFromPlayer = true)
+        public static void Emit(Vector3 pPosition, float pRadius, NoiseKind pKind, ulong pSource = ulong.MaxValue, bool pFromPlayer = true, bool pCapped = false)
         {
-            OnNoise?.Invoke(new NoiseEvent { position = pPosition, radius = pRadius, kind = pKind, source = pSource, fromPlayer = pFromPlayer });
+            OnNoise?.Invoke(new NoiseEvent { position = pPosition, radius = pRadius, kind = pKind, source = pSource, fromPlayer = pFromPlayer, capped = pCapped });
         }
     }
 }

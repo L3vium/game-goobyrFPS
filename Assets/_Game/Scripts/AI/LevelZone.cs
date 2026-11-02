@@ -334,7 +334,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 lZone.ReportThreatPoint(pPoint, 4, 150f);
             }
             // The siren itself: heard far, but only as a sound (the nearest few look, the rest glance).
-            NoiseSystem.Emit(pPoint, 120f, NoiseKind.Alarming, ulong.MaxValue, false);
+            NoiseSystem.Emit(pPoint, 120f, NoiseKind.Alarming, ulong.MaxValue, false, true);
         }
 
         public static void Reset() => GlobalAlarm = false;

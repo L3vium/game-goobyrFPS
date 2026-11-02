@@ -109,6 +109,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lExit.AddComponent<ExitPoint>().Setup(-1);
             }
 
+            Physics.SyncTransforms();
             NavMeshSurface lSurface = _arena.gameObject.AddComponent<NavMeshSurface>();
             lSurface.collectObjects = CollectObjects.Children;
             lSurface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
@@ -158,7 +159,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (Time.realtimeSinceStartup > lUntil) { _fatal = "the host did not start"; yield break; }
                 yield return null;
             }
-            UI.Hud.Ensure();
         }
 
         private IEnumerator SpawnPlayer()

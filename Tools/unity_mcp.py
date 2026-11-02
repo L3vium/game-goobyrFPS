@@ -6,15 +6,74 @@
     python Tools/unity_mcp.py <tool> @args.json
 
 The editor's MCP port is read from UNITY_MCP_PORT (default 8084).
+
+Several agents share one editor. Each one sets UNITY_MCP_AGENT=<name> (its own MCP session, so
+replies never cross) and holds the editor lock for anything that changes the editor's state:
+
+    python Tools/unity_mcp.py lock <minutes> [what]   take or renew the lock (exit 3 if held)
+    python Tools/unity_mcp.py unlock                  release it
+    python Tools/unity_mcp.py who                     who holds it, until when
+
+Play mode, opening/saving scenes, builders and menu items, refresh/compile, tests and builds
+refuse to run without the lock (the HEAVY tools below); reads (console, execute_code queries)
+don't need it.
 """
 import json
 import os
 import sys
+import time
 import urllib.request
 
 PORT = int(os.environ.get("UNITY_MCP_PORT", "8084"))
 URL = f"http://localhost:{PORT}/mcp"
-SESSION_FILE = os.path.join(os.path.dirname(__file__), ".unity_mcp_session")
+AGENT = os.environ.get("UNITY_MCP_AGENT", "main")
+HERE = os.path.dirname(os.path.abspath(__file__))
+SESSION_FILE = os.path.join(HERE, ".unity_mcp_session." + AGENT)
+LOCK_FILE = os.path.join(HERE, ".unity_editor_lock")
+HEAVY = {"refresh_unity", "run_tests", "manage_scene", "execute_menu_item", "manage_editor", "manage_asset", "manage_prefabs"}
+
+
+def _lock_state():
+    """(owner, until, what) of the editor lock, or None when free or expired."""
+    try:
+        with open(LOCK_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if data.get("until", 0) < time.time():
+        return None
+    return data.get("owner"), data["until"], data.get("what", "")
+
+
+def lock(minutes, what=""):
+    state = _lock_state()
+    if state and state[0] != AGENT:
+        print(f"LOCKED by {state[0]} until {time.strftime('%H:%M:%S', time.localtime(state[1]))} ({state[2]})")
+        sys.exit(3)
+    tmp = LOCK_FILE + "." + AGENT
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"owner": AGENT, "until": time.time() + minutes * 60, "what": what}, f)
+    os.replace(tmp, LOCK_FILE)
+    state = _lock_state()
+    if not state or state[0] != AGENT:
+        print("lost the race for the lock, try again")
+        sys.exit(3)
+    print(f"locked by {AGENT} for {minutes} min ({what})")
+
+
+def unlock():
+    state = _lock_state()
+    if state and state[0] == AGENT:
+        os.remove(LOCK_FILE)
+    print("unlocked")
+
+
+def _require_lock(tool):
+    state = _lock_state()
+    if state is None or state[0] != AGENT:
+        holder = f"held by {state[0]} ({state[2]})" if state else "free"
+        print(f"'{tool}' changes the editor: take the lock first (python Tools/unity_mcp.py lock <minutes> <what>); it is {holder}")
+        sys.exit(3)
 
 
 def _post(payload, session=None):
@@ -78,6 +137,18 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__)
         return
+    if sys.argv[1] == "lock":
+        lock(float(sys.argv[2]) if len(sys.argv) > 2 else 15, " ".join(sys.argv[3:]))
+        return
+    if sys.argv[1] == "unlock":
+        unlock()
+        return
+    if sys.argv[1] == "who":
+        state = _lock_state()
+        print("free" if state is None else f"{state[0]} until {time.strftime('%H:%M:%S', time.localtime(state[1]))} ({state[2]})")
+        return
+    if sys.argv[1] in ("compile", "tests") or sys.argv[1] in HEAVY:
+        _require_lock(sys.argv[1])
     if sys.argv[1] == "list":
         res = call("tools/list", {})
         for t in res["result"]["tools"]:

@@ -117,6 +117,16 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Ghost_SentWhenItChangesNotOverAndOver()
+        {
+            Assert.IsTrue(NpcRules.GhostSendDue(true, false, 0.1f), "the player slipped out of sight: show the shadow");
+            Assert.IsTrue(NpcRules.GhostSendDue(false, true, 0.1f), "seen again: hide it");
+            Assert.IsFalse(NpcRules.GhostSendDue(false, false, 5f), "in plain sight: nothing to send");
+            Assert.IsFalse(NpcRules.GhostSendDue(true, true, 0.5f));
+            Assert.IsTrue(NpcRules.GhostSendDue(true, true, 1.2f), "the shadow follows the squad's belief");
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

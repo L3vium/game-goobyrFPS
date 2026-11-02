@@ -46,6 +46,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             public float lastSeenTime;
             public bool visibleNow;
             public float lastGhostSend;
+            /// <summary>What the hunted player was last told: is their shadow shown?</summary>
+            public bool ghostShown;
         }
 
         public readonly List<Npc> Members = new List<Npc>();
@@ -198,15 +200,16 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 _visibilityResetTime = Time.time + 0.5f;
                 foreach (Contact lContact in _contacts.Values)
                 {
-                    bool lWasVisible = lContact.visibleNow;
                     lContact.visibleNow = Time.time - lContact.lastSeenTime < 0.45f;
                     if (lContact.player == null || !lContact.player.IsSpawned) continue;
 
-                    // The hunted player sees their "shadow" where the squad believes they are.
+                    // The hunted player sees their "shadow" where the squad believes they are: sent when it
+                    // appears or goes, then once a second while shown (it follows the squad's belief).
                     bool lShowGhost = !lContact.visibleNow && Time.time - lContact.lastSeenTime < GameDatabase.Rules.searchDuration;
-                    if (lShowGhost != lWasVisible || Time.time - lContact.lastGhostSend > 1f)
+                    if (NpcRules.GhostSendDue(lShowGhost, lContact.ghostShown, Time.time - lContact.lastGhostSend))
                     {
                         lContact.lastGhostSend = Time.time;
+                        lContact.ghostShown = lShowGhost;
                         lContact.player.ShowGhostRpc(lContact.lastKnown, lShowGhost, Index);
                     }
                 }

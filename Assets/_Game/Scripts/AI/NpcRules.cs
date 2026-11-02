@@ -101,6 +101,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>A caller drops the phone and fights as soon as nobody else is left fighting.</summary>
         public static bool KeepsCalling(int pOtherFighters) => pOtherFighters > 0;
 
+        /// <summary>
+        /// Should the hunted player be told about their "shadow" (where a squad believes they are)?
+        /// When it appears or goes away, and once a second while it is shown (it follows the belief);
+        /// never over and over while they are in plain sight.
+        /// </summary>
+        public static bool GhostSendDue(bool pShow, bool pShown, float pSinceSend) => pShow != pShown || (pShow && pSinceSend > 1f);
+
         // ---------------------------------------------------------------- hearing
 
         /// <summary>An NPC's gunfire is a sound like any other, at most once every this many seconds per shooter.</summary>

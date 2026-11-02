@@ -14,7 +14,7 @@ Weapon-first authoring, one family at a time:
   4. the socket bone weapon_r is keyed equal to the weapon's Grip frame, so Unity parents the model
      there at identity and it lands where it was authored.
 Static poses are 2-frame actions <Family>_<Hip|ADS|Sprint>; clips (Jab, Cross, Takedown, reloads,
-throws) are keyframed hand paths solved and baked at 60 fps. Output (staging, see fp_common.OUT):
+throws) are keyframed hand paths solved and baked at 30 fps. Output (staging, see fp_common.OUT):
 FP_Arms.fbx (mesh, rig, every action as a take), the baked textures, fp_poses.json (socket and Sight
 per pose in Unity camera space, clip events) and previews.
 """
@@ -85,18 +85,20 @@ GRIPS = {
         # metacarpals along the barrel tipped 8 deg down, palm on the right panel, web under the tang
         r=dict(c=(0.0, -0.0153, 0.028), fingers=(0.0, -0.99, -0.14), palm=(1.0, -0.12, 0.0), depth=0.037,
                reach=0.066, slide=-0.004),
-        # support: heel of the hand on the left panel, fingers down round the firing fingers, thumb forward
-        l=dict(c=(0.0155, -0.002, 0.012), fingers=(0.0, -0.62, -0.78), palm=(-1.0, 0.0, 0.1), depth=0.022,
-               reach=0.040, slide=-0.004),
+        # support: palm on the left panel over the firing fingertips, its knuckle line up the front strap so
+        # the fingers wrap the firing fingers below the guard, the thumb up the grip to reach forward
+        l=dict(c=(0.0, 0.004, 0.0), axis=UP_PISTOL, palm=(-1.0, 0.0, 0.0), depth=0.038, reach=0.051),
         # thumbs forward on the left of the frame, the firing thumb resting over the support thumb
-        thumb_r=dict(swing=(0, 0), start=(20, 0, 0), target=(0.033, -0.042, 0.072)),
-        thumb_l=dict(swing=(0, 0), start=(10, 0, 0), target=(0.030, -0.100, 0.046)),
+        thumb_r=dict(swing=(0, 0), start=(20, 0, 0), target=(0.034, -0.050, 0.064)),
+        thumb_l=dict(swing=(0, 0), start=(10, 0, 0), target=(0.032, -0.085, 0.040)),
         trigger=(0.0, -0.070, 0.056)),
     "W_Smg": dict(
         r=dict(c=(0.0, -0.0095, 0.019), axis=(0.0, -0.166, 0.986), palm=(1.0, -0.35, 0.0), depth=0.041,
                reach=0.060),
         l=dict(c=(0.0, -0.28, 0.008), axis=(0.0, -0.10, 0.995), palm=(-1.0, 0.3, 0.0), depth=0.040, reach=0.060),
-        thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.026, -0.012, 0.040)), thumb_l=dict(swing=(-10, 20), start=(20, 25, 20)),
+        thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.028, -0.020, 0.022)),
+        # the support thumb wraps the front of the magazine/grip on the right instead of standing up
+        thumb_l=dict(swing=(0, 0), start=(20, 10, 10), target=(-0.020, -0.295, 0.030)),
         trigger=(0.0, -0.068, 0.050)),
     "W_Shotgun": dict(
         # the straight stock wrist crosses the palm diagonally: metacarpals forward-down, thumb round onto the left side (low: the big glove sits a hand-width from the eye in ADS)
@@ -129,8 +131,9 @@ FAMILIES = {
     "Pistol": dict(weapon="W_Pistol", hands="both", poses=dict(
         Hip=dict(sight=(0.07, -0.105, 0.40), turn=(4, -5, -7), chest=0, trig="frame", clav=(12, 4),
                  pole_r=(1.0, -0.6, -0.1), pole_l=(-1.0, -0.6, 0.0)),
-        ADS=dict(sight=(0.0, 0.0, 0.45), turn=(0, 0, 0), chest=0, trig="trigger", clav=(18, 7),
-                 pole_r=(1.0, -0.6, -0.1), pole_l=(-1.0, -0.6, 0.0)),
+        # wrists in a V under the gun, elbows down and out: the sleeves leave by the bottom edge
+        ADS=dict(sight=(0.0, 0.0, 0.43), turn=(0, 0, 0), chest=0, trig="trigger", clav=(18, 7),
+                 pole_r=(0.45, -1.0, -0.1), pole_l=(-0.45, -1.0, 0.0)),
         Sprint=dict(sight=(0.12, -0.25, 0.32), turn=(38, -22, -35), chest=-4, trig="frame", left="free"))),
     "Smg": dict(weapon="W_Smg", hands="both", poses=dict(
         Hip=dict(sight=(0.105, -0.088, 0.26), turn=(2, -5, -7), chest=14, trig="frame", clav_l=(18, 6)),
@@ -159,7 +162,7 @@ POLES = dict(r=(0.55, -1.0, -0.15), l=(-0.55, -1.0, -0.05))  # elbows down and o
 # ------------------------------------------------------------------ free hands (fists, items)
 # A hand: knuckles = middle knuckle position, fwd = metacarpal direction, palm = palm normal (Unity
 # space); grip = finger curls (index, paddle) and thumb (abduction, roll, curls).
-FIST = dict(index=(88, 102, 58), paddle=(90, 104, 60), thumb=(38, 30, 28, 42, 34), tuck=True)
+FIST = dict(index=(92, 106, 62), paddle=(96, 108, 64), thumb=(38, 30, 28, 42, 34), tuck=True)
 OPEN = dict(index=(6, 8, 4), paddle=(8, 10, 6), thumb=(-10, 0, 6, 8, 6))
 CLAW = dict(index=(40, 55, 35), paddle=(45, 60, 40), thumb=(20, 20, 20, 25, 20))
 PINCH = dict(index=(48, 62, 30), paddle=(70, 88, 52), thumb=(18, 32, 30, 22, 16), key=True)
@@ -167,9 +170,9 @@ CUP = dict(index=(30, 38, 22), paddle=(36, 44, 26), thumb=(10, 20, 24, 18, 12))
 WRAP = dict(index=(58, 66, 38), paddle=(64, 72, 42), thumb=(-6, 18, 34, 16, 10))
 LOOSE = dict(index=(25, 35, 20), paddle=(32, 44, 26), thumb=(8, 10, 12, 16, 10))
 
-GUARD_R = dict(knuckles=(0.115, -0.10, 0.37), fwd=(-0.18, 0.28, 1.0), palm=(-0.72, -0.55, 0.0), grip=FIST,
+GUARD_R = dict(knuckles=(0.115, -0.080, 0.34), fwd=(-0.18, 0.28, 1.0), palm=(-0.72, -0.55, 0.0), grip=FIST,
                pole=(0.35, -1.0, -0.25))
-GUARD_L = dict(knuckles=(-0.085, -0.08, 0.43), fwd=(0.14, 0.26, 1.0), palm=(0.72, -0.55, 0.0), grip=FIST,
+GUARD_L = dict(knuckles=(-0.090, -0.065, 0.39), fwd=(0.14, 0.26, 1.0), palm=(0.72, -0.55, 0.0), grip=FIST,
                pole=(-0.35, -1.0, -0.25))
 LEFT_DOWN = dict(knuckles=(-0.20, -0.60, 0.20), fwd=(0.1, -1.0, 0.25), palm=(1.0, 0.0, 0.0), grip=LOOSE,
                  pole=(-0.8, -0.3, -0.6))
@@ -254,7 +257,8 @@ def set_grip(P, side, g):
         m = (h1.lerp(t1, 0.5) + h2.lerp(t2, 0.5)) * 0.5
         hm = P.get("hand_" + side)
         out = (m - (hm.translation + hm.to_3x3().col[1] * 0.05)).normalized()
-        target, w = m + out * 0.019, w_tuck
+        # outside the phalanges (finger + thumb radius), across their front, not sunk in
+        target, w = m + out * (R.FINGER_SPEC["index"]["r"][1] + R.THUMB_SPEC["r"][1] + 0.003), w_tuck
     elif w_key > 0.01:
         # key pinch: the thumb pad presses the item on the thumb side of the index's middle phalanx
         target, w = key_point(P, side, 0.004 + R.THUMB_SPEC["r"][1] * 0.6), w_key
@@ -318,32 +322,34 @@ GUARD = dict(r=GUARD_R, l=GUARD_L, chest=0.0, clav_r=(6, 10), clav_l=(6, 10))
 # Times in seconds; Catmull-Rom through the keys gives the arcs, extra keys give the anticipation,
 # the overshoot ("goofy") and the settle. `events` are written to the manifest (strike = contact).
 CLIPS = {
+    # read from the camera: the anticipation pulls the fist back 5 cm, it travels to the screen centre at
+    # eye level turning palm-down (a slight inward corkscrew), the other fist stays up as the guard
     "Jab": dict(family="Fists", length=0.50, events=dict(strike=0.16), keys=[
         (0.00, GUARD),
-        (0.05, dict(l=_h(GUARD_L, knuckles=(-0.078, -0.113, 0.405)), chest=-3.0)),
-        (0.12, dict(l=_h(GUARD_L, knuckles=(-0.058, -0.105, 0.52), fwd=(0.10, 0.16, 1.0), palm=(0.35, -1.0, 0.0)),
-                    r=_h(GUARD_R, knuckles=(0.12, -0.12, 0.355)), chest=8.0, clav_l=(18, 8))),
-        (0.16, dict(l=_h(GUARD_L, knuckles=(-0.046, -0.112, 0.572), fwd=(0.06, 0.15, 1.0), palm=(0.06, -1.0, 0.0)),
-                    chest=12.0, clav_l=(26, 6))),
-        (0.20, dict(l=_h(GUARD_L, knuckles=(-0.043, -0.110, 0.582), fwd=(0.05, 0.14, 1.0), palm=(0.04, -1.0, 0.0)),
-                    chest=13.0, clav_l=(27, 6))),
-        (0.27, dict(l=_h(GUARD_L, knuckles=(-0.062, -0.10, 0.50), fwd=(0.12, 0.2, 1.0), palm=(0.5, -0.9, 0.0)),
+        (0.05, dict(l=_h(GUARD_L, knuckles=(-0.098, -0.075, 0.34)), chest=-4.0)),
+        (0.12, dict(l=_h(GUARD_L, knuckles=(-0.060, -0.045, 0.45), fwd=(0.10, 0.10, 1.0), palm=(0.35, -1.0, 0.0)),
+                    r=_h(GUARD_R, knuckles=(0.118, -0.085, 0.33)), chest=8.0, clav_l=(18, 8))),
+        (0.16, dict(l=_h(GUARD_L, knuckles=(-0.030, -0.030, 0.50), fwd=(0.07, 0.05, 1.0), palm=(0.06, -1.0, 0.0)),
+                    chest=12.0, clav_l=(28, 8))),
+        (0.20, dict(l=_h(GUARD_L, knuckles=(-0.027, -0.028, 0.51), fwd=(0.06, 0.05, 1.0), palm=(0.04, -1.0, 0.0)),
+                    chest=13.0, clav_l=(29, 8))),
+        (0.27, dict(l=_h(GUARD_L, knuckles=(-0.055, -0.050, 0.45), fwd=(0.12, 0.15, 1.0), palm=(0.5, -0.9, 0.0)),
                     r=GUARD_R, chest=6.0, clav_l=(14, 8))),
-        (0.40, dict(l=_h(GUARD_L, knuckles=(-0.088, -0.098, 0.425)), chest=-1.0, clav_l=(6, 10))),
+        (0.40, dict(l=_h(GUARD_L, knuckles=(-0.092, -0.068, 0.385)), chest=-1.0, clav_l=(6, 10))),
         (0.50, GUARD),
     ]),
     "Cross": dict(family="Fists", length=0.56, events=dict(strike=0.18), keys=[
         (0.00, GUARD),
-        (0.06, dict(r=_h(GUARD_R, knuckles=(0.126, -0.124, 0.345)), chest=4.0)),
-        (0.14, dict(r=_h(GUARD_R, knuckles=(0.062, -0.105, 0.50), fwd=(-0.05, 0.16, 1.0), palm=(-0.35, -1.0, 0.0)),
-                    l=_h(GUARD_L, knuckles=(-0.092, -0.102, 0.405)), chest=-14.0, clav_r=(20, 6))),
-        (0.18, dict(r=_h(GUARD_R, knuckles=(0.030, -0.112, 0.555), fwd=(-0.02, 0.15, 1.0), palm=(-0.05, -1.0, 0.0)),
-                    chest=-20.0, clav_r=(28, 4))),
-        (0.22, dict(r=_h(GUARD_R, knuckles=(0.026, -0.110, 0.568), fwd=(-0.01, 0.14, 1.0), palm=(-0.04, -1.0, 0.0)),
-                    chest=-21.0, clav_r=(29, 4))),
-        (0.30, dict(r=_h(GUARD_R, knuckles=(0.072, -0.10, 0.47), fwd=(-0.12, 0.2, 1.0), palm=(-0.5, -0.9, 0.0)),
+        (0.06, dict(r=_h(GUARD_R, knuckles=(0.125, -0.090, 0.295)), chest=4.0)),
+        (0.14, dict(r=_h(GUARD_R, knuckles=(0.070, -0.050, 0.44), fwd=(-0.06, 0.10, 1.0), palm=(-0.35, -1.0, 0.0)),
+                    l=_h(GUARD_L, knuckles=(-0.095, -0.070, 0.37)), chest=-14.0, clav_r=(20, 6))),
+        (0.18, dict(r=_h(GUARD_R, knuckles=(0.025, -0.032, 0.50), fwd=(-0.05, 0.05, 1.0), palm=(-0.05, -1.0, 0.0)),
+                    chest=-20.0, clav_r=(30, 6))),
+        (0.22, dict(r=_h(GUARD_R, knuckles=(0.022, -0.030, 0.51), fwd=(-0.04, 0.05, 1.0), palm=(-0.04, -1.0, 0.0)),
+                    chest=-21.0, clav_r=(31, 6))),
+        (0.30, dict(r=_h(GUARD_R, knuckles=(0.070, -0.055, 0.44), fwd=(-0.12, 0.15, 1.0), palm=(-0.5, -0.9, 0.0)),
                     l=GUARD_L, chest=-10.0, clav_r=(14, 8))),
-        (0.45, dict(r=_h(GUARD_R, knuckles=(0.117, -0.117, 0.362)), chest=1.0, clav_r=(6, 10))),
+        (0.45, dict(r=_h(GUARD_R, knuckles=(0.118, -0.082, 0.35)), chest=1.0, clav_r=(6, 10))),
         (0.56, GUARD),
     ]),
     "Takedown": dict(family="Fists", length=1.10, events=dict(strike=0.30), keys=[
@@ -526,7 +532,8 @@ class Builder:
         root, points, mag = self.weapon(wname)
         grips = GRIPS[wname]
         sight_local = points["Sight"].translation
-        rot = F.euler_u(*spec["turn"])
+        # the sight line, not the bore, is squared with the view (the shotgun's raised, tilted comb line)
+        rot = F.euler_u(*spec["turn"]) @ points["Sight"].to_3x3().inverted()
         W = F.frame(rot, F.u2b(spec["sight"]) - rot @ sight_local)
         root.matrix_world = W
         bpy.context.view_layer.update()
@@ -536,6 +543,7 @@ class Builder:
         P = S.Pose(self.arm)
         self.body(P, spec)
         # right hand on the handle
+        grips = dict(grips, r=self.trigger_fit(wname, P, W, grips, spec, bvh))
         hr = grip_hand("r", W, grips["r"])
         P.arm_ik("r", hr.translation, hr.to_3x3(), F.u2b(spec.get("pole_r", POLES["r"])))
         P.set("weapon_r", socket_matrix(W))
@@ -593,7 +601,7 @@ class Builder:
             o.hide_render = False
 
     def play_clip(self, name, clip):
-        """Solves a clip frame by frame from its keys and keys every bone (baked, 60 fps)."""
+        """Solves a clip frame by frame from its keys and keys every bone (baked, 30 fps)."""
         keys = clip["keys"]
         tracks = {}
         for side in R.SIDES:
@@ -777,6 +785,35 @@ class Builder:
                 rot = (F.euler_u(0, -fwd * sgn, 0) @ F.euler_u(0, 0, up * sgn))
                 P.rotate_about("clavicle_" + side, rot)
 
+    def trigger_fit(self, wname, P, W, grips, spec, bvh):
+        """The firing-hand grip slid along the handle (reach: along the fingers, slide: along the thumb
+        side) so the trigger finger's pad lands on the trigger face, within ~3 mm where it can; searched
+        once per gun and kept for all its poses (the hand does not slide on the grip between them)."""
+        cache = self.__dict__.setdefault("_trigger_fit", {})
+        if wname not in cache:
+            g0 = grips["r"]
+            pole = F.u2b(spec.get("pole_r", POLES["r"]))
+            def fit(dr, ds):
+                g = dict(g0, reach=g0.get("reach", 0.062) + dr, slide=g0.get("slide", 0.0) + ds)
+                hr = grip_hand("r", W, g)
+                P.arm_ik("r", hr.translation, hr.to_3x3(), pole)
+                P.set("weapon_r", socket_matrix(W))
+                err = P.trigger("r", W @ Vector(grips["trigger"]), W.to_3x3() @ Vector((0, -1, 0)), bvh)
+                return (err + 0.15 * math.hypot(dr, ds), err, dr, ds, g)  # the smallest move that reaches
+            # coordinate search: along the thumb side (up/down the handle), then along the fingers, then again
+            best = fit(0.0, 0.0)
+            for axis, steps in (("s", range(-6, 7)), ("r", range(-6, 7)), ("s", range(-2, 3))):
+                for k in steps:
+                    dr, ds = (best[2], best[3] + k * 0.006 / (3 if axis == "s" and len(steps) == 5 else 1))                         if axis == "s" else (best[2] + k * 0.004, best[3])
+                    c = fit(dr, ds)
+                    if c[0] < best[0]:
+                        best = c
+            cache[wname] = best[4]
+            print("TRIGGER FIT %s reach %+.0f mm slide %+.0f mm -> %.1f mm"
+                  % (wname, best[2] * 1000, best[3] * 1000, best[1] * 1000))
+            P.report.pop("r_trigger_err_mm", None)
+        return cache[wname]
+
     def close_hand(self, P, side, bvh, grips, spec, W):
         th = grips["thumb_" + side]
         if side == "r":
@@ -909,7 +946,7 @@ class Builder:
                                  use_mesh_modifiers=False, path_mode="STRIP", embed_textures=False,
                                  bake_anim=True, bake_anim_use_all_bones=True, bake_anim_use_nla_strips=False,
                                  bake_anim_use_all_actions=True, bake_anim_force_startend_keying=True,
-                                 bake_anim_step=1.0, bake_anim_simplify_factor=0.0)
+                                 bake_anim_step=1.0, bake_anim_simplify_factor=0.25)
         F.write_json(os.path.join(F.OUT, "fp_poses.json"), self.manifest)
         print("EXPORTED", path)
 

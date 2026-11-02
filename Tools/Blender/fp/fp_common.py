@@ -28,7 +28,7 @@ PREVIEW = os.environ.get("GOOBYR_FP_PREVIEW") or os.path.join(OUT, "previews")
 # Weapons are read from the staging export when it exists (it carries the new points), else Assets.
 WEAPON_DIRS = [p for p in (os.environ.get("GOOBYR_PROPS_OUT"), L.MODELS) if p]
 
-FPS = 60
+FPS = 30  # clips are baked at 30 fps (Unity interpolates); static poses are two keys
 # vertical field of view of the Unity overlay camera that draws the arms (CameraRig.VIEW_FOV)
 VIEW_FOV = float(os.environ.get("GOOBYR_FP_FOV", "48"))
 

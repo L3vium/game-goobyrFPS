@@ -312,8 +312,10 @@ def build_shotgun():
         return (p[0] - grip[0], p[1] - grip[1], p[2] - grip[2])
     return L.finalize("W_Shotgun", P, specs, "weapon", size=2048, view="weapon", pivot=grip,
                       empties={"Grip": (0, 0, 0), "Muzzle": (0, -0.61 - grip[1], bz - grip[2]),
-                               # along the rib: just over the receiver's top rear onto the bead
-                               "Sight": rel((0, 0.10, 0.0685)),
+                               # the comb line: the eye 45 mm over the receiver's top rear, looking down
+                               # 3.7 deg onto the bead (0, -0.605, 0.068) - aimed, the stock and the
+                               # firing hand sit low in the view instead of under the eye
+                               "Sight": (rel((0, 0.10, 0.1135)), (3.7, 0, 0)),
                                # middle of the pump (y -0.15 .. -0.355, axis bz - 0.022)
                                "ForeGrip": rel((0, -0.2525, bz - 0.022)),
                                # loading port under the receiver, shells pushed up into the tube

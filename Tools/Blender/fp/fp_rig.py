@@ -42,6 +42,12 @@ if os.environ.get("GOOBYR_FP_PLACEHOLDER") != "1" and os.path.exists(os.path.joi
     except Exception as e:  # the module is optional: the placeholder still builds
         print("CAST GLOVE UNAVAILABLE:", e)
         CG = None
+if CG is not None:
+    # first person: the cast's glove shape at a near-real size (its 1.10 'readable' hand, a hand-width
+    # from the eye, crowds the view and overshoots the triggers); bones and mesh both read these
+    CG.SCALE = float(os.environ.get("GOOBYR_FP_HAND_SCALE", "0.97"))
+    CG.LAYOUT = {k: ([tuple(c * CG.SCALE for c in p) for p in v] if isinstance(v, list)
+                     else tuple(c * CG.SCALE for c in v)) for k, v in CG.HAND.items()}
 
 SIDES = ("r", "l")
 FINGERS = ("index", "middle", "ring", "pinky")

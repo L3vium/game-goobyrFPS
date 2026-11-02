@@ -147,8 +147,26 @@ def preview_points(folder, out_dir):
         print("PREVIEW", sc.render.filepath)
 
 
+def set_point(out_folder, name, point, loc, rot):
+    """Moves one empty of a staged export (FBX round trip, no re-bake); the builder carries the same
+    values, so the next full build reproduces it."""
+    path = os.path.join(out_folder, name, name + ".fbx")
+    root = import_model(path)
+    for o in list(root.children):
+        if o.type == "EMPTY" and o.name.split(".")[0] == point:
+            bpy.data.objects.remove(o)
+    L.add_empty(point, root, Vector(loc), rot)
+    print("POINT", name, point, loc, rot)
+    L.export_fbx(root, name, os.path.join(out_folder, name))
+    print("EXPORTED", path)
+
+
 if __name__ == "__main__":
     args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    if "--set" in args:  # --set W_Shotgun Sight x y z rx ry rz
+        i = args.index("--set")
+        v = [float(x) for x in args[i + 3:i + 9]]
+        set_point(L.OUT_MODELS, args[i + 1], args[i + 2], v[0:3], v[3:6])
     if "--add" in args:
         add_sniper(L.OUT_MODELS)
     if "--list" in args:

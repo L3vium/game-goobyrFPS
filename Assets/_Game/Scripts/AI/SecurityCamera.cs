@@ -52,7 +52,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 Vector3 lTo = lPlayer.Chest - transform.position;
                 if (lTo.magnitude > _range || Vector3.Angle(transform.forward, lTo) > _halfAngle) continue;
                 SecurityTier lTier = SecurityZone.ForPlayer(SecurityZone.At(lPlayer.transform.position, out AccessLevel lNeed), lNeed, lPlayer.Weapons != null ? lPlayer.Weapons.Access : AccessLevel.None, false);
-                if (DetectionModel.TierFactor(lTier, Npc.ActsSuspicious(lPlayer)) <= 0.55f) continue;
+                // A camera reports trespassers in hostile areas and suspicious behaviour anywhere (a gun out, climbing...).
+                if (lTier != SecurityTier.Hostile && !Npc.ActsSuspicious(lPlayer)) continue;
                 if (!Senses.Clear(transform.position, lPlayer.Chest)) continue;
                 lCaught = lPlayer;
                 break;

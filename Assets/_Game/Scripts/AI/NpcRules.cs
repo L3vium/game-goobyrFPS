@@ -97,9 +97,16 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             if (pFlees) return SpotReaction.Flee;
             if (pKnownHostile || pCrime) return SpotReaction.Fight;
+            // A hostile area is no place to be: whoever is noticed there is shot.
+            if (pTier == SecurityTier.Hostile) return SpotReaction.Fight;
             if (pOnEdge && pTier != SecurityTier.Public) return SpotReaction.Fight;
             return SpotReaction.Confront;
         }
+
+        /// <summary>Seconds between noticing a player it fights on sight and the first shot.</summary>
+        public const float REACTION_ON_SIGHT = 0.45f;
+        /// <summary>Seconds between the end of a confrontation (or escort) and the first shot: the gun is already up.</summary>
+        public const float REACTION_CONFRONTED = 0.3f;
 
         // ---------------------------------------------------------------- the phone call
 

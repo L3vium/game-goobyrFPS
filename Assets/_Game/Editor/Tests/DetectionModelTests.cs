@@ -158,10 +158,11 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
-        public void Escort_LastsLongerThanAConfrontation()
+        public void Escort_IsAShortWarningBeforeTheFirstShot()
         {
-            Assert.AreEqual(DetectionModel.Confrontation.Hold, DetectionModel.ResolveConfront(3f, 0f, false, DetectionModel.ESCORT_TIME));
-            Assert.AreEqual(DetectionModel.Confrontation.Combat, DetectionModel.ResolveConfront(3f, 0f, false));
+            Assert.AreEqual(DetectionModel.Confrontation.Hold, DetectionModel.ResolveConfront(DetectionModel.ESCORT_TIME - 0.2f, 0f, false, DetectionModel.ESCORT_TIME));
+            Assert.AreEqual(DetectionModel.Confrontation.Combat, DetectionModel.ResolveConfront(DetectionModel.ESCORT_TIME, 0f, false, DetectionModel.ESCORT_TIME));
+            Assert.LessOrEqual(DetectionModel.ESCORT_TIME, 2f, "a warning, not a negotiation");
         }
 
         [Test]

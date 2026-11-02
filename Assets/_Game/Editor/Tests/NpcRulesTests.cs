@@ -138,6 +138,40 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
             Assert.AreEqual(180f, NpcRules.ConeAngle(Vector3.forward, new Vector3(0f, 20f, 5f), true), "nor straight up");
         }
 
+        /// <summary>Seconds for a guard's gauge to fill on a player standing in front of it at this distance, in this tier.</summary>
+        private static float TimeToSpot(float pDistance, SecurityTier pTier, bool pSuspicious)
+        {
+            DetectionModel.Sight lSight = new DetectionModel.Sight { distance = pDistance, range = 20f, angle = 0f, halfCone = 45f, chestVisible = true, headVisible = true };
+            float lExposure = DetectionModel.Exposure(lSight) * DetectionModel.TierFactor(pTier, pSuspicious);
+            float lGauge = 0f, lTime = 0f;
+            const float TICK = 0.18f;
+            while (lGauge < 1f && lTime < 30f)
+            {
+                lGauge = DetectionModel.Fill(lGauge, lExposure, 2.2f, TICK, false);
+                lTime += TICK;
+            }
+            return lTime;
+        }
+
+        [Test]
+        public void Timeline_RestrictedShootsWithinFourSecondsHostileOnSightPublicNever()
+        {
+            // Restricted: the gauge fills, a short warning, then the first shot - 3 to 4 s at 8-10 m.
+            foreach (float lDistance in new[] { 8f, 10f })
+            {
+                float lFirstShot = TimeToSpot(lDistance, SecurityTier.Restricted, false) + DetectionModel.ESCORT_TIME + NpcRules.REACTION_CONFRONTED;
+                Assert.That(lFirstShot, Is.InRange(2.5f, 4.2f), "restricted at " + lDistance + " m");
+            }
+            Assert.AreEqual(NpcRules.SpotReaction.Confront, NpcRules.OnSpotted(false, false, false, SecurityTier.Restricted));
+            // Hostile: no warning, a short reaction.
+            Assert.AreEqual(NpcRules.SpotReaction.Fight, NpcRules.OnSpotted(false, false, false, SecurityTier.Hostile));
+            Assert.Less(TimeToSpot(10f, SecurityTier.Hostile, false) + NpcRules.REACTION_ON_SIGHT, 2.5f);
+            // An armed trespasser is in a fight within 3 s.
+            Assert.Less(TimeToSpot(10f, SecurityTier.Restricted, true) + NpcRules.REACTION_ON_SIGHT, 3f);
+            // Public, calm and unarmed: never noticed at all.
+            Assert.GreaterOrEqual(TimeToSpot(3f, SecurityTier.Public, false), 30f);
+        }
+
         [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {

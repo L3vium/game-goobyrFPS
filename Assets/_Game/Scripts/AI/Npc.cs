@@ -611,7 +611,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 case NpcRules.SpotReaction.Fight:
                     // A known hostile, or a trespasser while it is already expecting trouble: it opens fire.
                     Zone?.ReportContact(pPlayer, pPlayer.transform.position, true);
-                    _reactionUntil = Time.time + 0.35f;
+                    _reactionUntil = Time.time + NpcRules.REACTION_ON_SIGHT;
                     EnterCombat();
                     return;
             }
@@ -650,7 +650,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 case DetectionModel.Confrontation.Combat:
                     Zone?.ReportContact(_combatTarget, lPlayer, lUnseen < 0.4f);
-                    _reactionUntil = Time.time + 0.3f;
+                    _reactionUntil = Time.time + NpcRules.REACTION_CONFRONTED;
                     EnterCombat();
                     // A rare few go for the zone's flare launcher (a map-wide alarm).
                     _wantsAlarm = Random.value < 0.1f && WorldRegistry.Nearest<AlarmTrigger>(transform.position, 45f, a => a.State == 0) != null;
@@ -1102,7 +1102,10 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             SetState(NpcState.Combat);
             _combatStart = Time.time;
             _repositionTime = 0f;
-            _burstLeft = 0;
+            // The first burst is ready: it fires as soon as its reaction time is up, not a pause later.
+            ItemDefinition lWeapon = Weapon;
+            _burstLeft = lWeapon != null && lWeapon.automatic ? Random.Range(3, 6) : Random.Range(1, 3);
+            _nextShot = 0f;
         }
 
         private void UpdateCombat(float dt)

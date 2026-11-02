@@ -146,8 +146,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             Rigidbody lBody = pBone.gameObject.AddComponent<Rigidbody>();
             lBody.mass = MASS * pShare;
             lBody.linearDamping = 0.05f;
-            lBody.angularDamping = 0.35f;
-            lBody.sleepThreshold = 0.02f;
+            lBody.angularDamping = 0.45f;
+            lBody.sleepThreshold = 0.06f;
             lBody.interpolation = RigidbodyInterpolation.Interpolate;
             lBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             lBody.solverIterations = 12;

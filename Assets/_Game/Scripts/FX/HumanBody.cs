@@ -151,7 +151,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
             ApplyShadow();
             Face = lModel.AddComponent<HumanFace>();
-            if (!Face.Init(Model)) { Destroy(Face); Face = null; }
+            if (!Face.Init(Model)) { if (Application.isPlaying) Destroy(Face); else DestroyImmediate(Face); Face = null; }
             Wobble = lModel.AddComponent<HumanWobble>();
             Wobble.Init(Animator, lNear.Count > 0 ? lNear[0] : null);
             Model.gameObject.SetActive(_visible);
@@ -297,8 +297,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             Flash(0f);
             lModel.SetParent(null, true);
             HumanIK lIK = lModel.GetComponent<HumanIK>();
-            if (lIK != null) Destroy(lIK);
-            if (Wobble != null) Destroy(Wobble);
+            if (lIK != null) { if (Application.isPlaying) Destroy(lIK); else DestroyImmediate(lIK); }
+            if (Wobble != null) { if (Application.isPlaying) Destroy(Wobble); else DestroyImmediate(Wobble); }
             Face = null;
             Wobble = null;
             Model = null;

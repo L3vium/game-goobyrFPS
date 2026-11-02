@@ -506,6 +506,11 @@ def export(name, preview=False):
             img = bake_slot(so, sources, slot, res)
             metal = (look or {}).get("metal", 0.0)
             diff = img["DIFFUSE"][..., :3]
+            if slot in ("Team", "Lining"):
+                # team slots keep only the fabric's light and shade; Unity tints them with the team colour
+                lum = diff @ np.array([0.2126, 0.7152, 0.0722])
+                lum = np.clip(lum / max(float(np.median(lum)), 1e-3) * 0.9, 0, 1)
+                diff = np.repeat(lum[..., None], 3, axis=2)
             save_np(diff, prefix + "_diff.jpg", fmt="JPEG")
             save_np(img["NORMAL"][..., :3], prefix + "_nor_gl.png", True, "PNG")
             arm = np.stack([np.clip(img["AO"][..., 0] * 0.85 + 0.15, 0, 1), img["ROUGHNESS"][..., 0],

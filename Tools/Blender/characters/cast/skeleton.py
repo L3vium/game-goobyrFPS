@@ -65,8 +65,8 @@ class Build:
         j["spine_02"] = V(0, 0.008, 1.085)
         j["spine_03"] = V(0, 0.012, 1.165)
         j["spine_03_tail"] = V(0, 0.030, 1.330)
-        j["neck"] = V(0, 0.010, 1.420)
-        j["head"] = V(0, 0.000, 1.530)
+        j["neck"] = V(0, 0.010, 1.425)
+        j["head"] = V(0, 0.000, EYE_Z - 0.040)     # BodyMetrics.HEAD_BONE_TO_EYE: HumanBody's eye normalisation stays 1
         j["head_tail"] = V(0, 0.000, HEIGHT)
         for s, sx in (("l", 1.0), ("r", -1.0)):
             j["clavicle_" + s] = V(sx * 0.025, -0.022, 1.405)

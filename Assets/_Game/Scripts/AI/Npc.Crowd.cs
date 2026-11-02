@@ -40,6 +40,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private float _reportTalkUntil, _nextGuardPick;
 
         private const float STARTLE = 0.6f;
+        private float _nextThreatLook;
+        /// <summary>Cowering where it stands; safe at its exit (on the phone).</summary>
+        private bool _cowering, _safe;
+
+        /// <summary>The pose of a fleeing civilian standing still: frozen staring during the startle, on the phone once out, cowering otherwise.</summary>
+        private Com.IsartDigital.GoobyrFPS.FX.BodyPose CrowdFleePose() => Time.time < _startledUntil ? Com.IsartDigital.GoobyrFPS.FX.BodyPose.None
+            : _safe && !_cowering ? Com.IsartDigital.GoobyrFPS.FX.BodyPose.Phone : Com.IsartDigital.GoobyrFPS.FX.BodyPose.Cower;
 
         /// <summary>Host: a new match (statics outlive a match on the host).</summary>
         private static void ResetCrowd() => _incidents.Clear();
@@ -73,7 +80,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void UpdateCrowdFlee()
         {
             if (_threatPlayer != null && (!_threatPlayer.IsSpawned || !_threatPlayer.Health.IsAlive)) _threatPlayer = null;
-            if (_threatPlayer != null && Sees(_threatPlayer)) _threatPoint = _threatPlayer.transform.position;
+            // Keeps an eye on the gunman it runs from (a few looks a second, not every frame).
+            if (_threatPlayer != null && Time.time >= _nextThreatLook)
+            {
+                _nextThreatLook = Time.time + 0.3f;
+                if (Sees(_threatPlayer)) _threatPoint = _threatPlayer.transform.position;
+            }
             if (Time.time < _startledUntil)
             {
                 Stop();
@@ -98,16 +110,19 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
             Vector3 lToThreat = _threatPoint - transform.position;
             lToThreat.y = 0f;
-            if (NpcRules.ShouldCower(lToThreat.magnitude, _exit != null || (_fleePoint.Value - transform.position).sqrMagnitude > 25f))
+            _cowering = NpcRules.ShouldCower(lToThreat.magnitude, _exit != null || (_fleePoint.Value - transform.position).sqrMagnitude > 25f);
+            _safe = false;
+            if (_cowering)
             {
-                // Hands over the head where it stands (the pose comes from being stopped while fleeing).
+                // Hands over the head where it stands.
                 Stop();
                 FaceTowards(_threatPoint, 200f);
             }
             else
             {
                 MoveTo(_fleePoint.Value, RUN);
-                if (Arrived(1.5f)) Stop();
+                // Made it out: it catches its breath and calls someone.
+                if (Arrived(1.5f)) { Stop(); _safe = true; }
             }
             if (_stateTime > 45f && (Zone == null || !Zone.InCombat))
             {

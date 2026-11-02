@@ -274,7 +274,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             bool lStopped = !_agent.isOnNavMesh || _agent.isStopped || _agent.velocity.sqrMagnitude < 0.04f;
             BodyPose lPose = BodyPose.None;
             if (State.Value == NpcState.Calling) lPose = BodyPose.Phone;
-            else if (State.Value == NpcState.Flee && IsCrowd && lStopped && Time.time >= _startledUntil) lPose = BodyPose.Cower;
+            else if (State.Value == NpcState.Flee && IsCrowd && lStopped) lPose = CrowdFleePose();
             else if (State.Value == NpcState.Routine && _activityNode != null && _waitUntil > 0f && lStopped) lPose = PoseFor(_activityNode.Activity);
             else if (State.Value == NpcState.Idle && _break != null && _breakUntil > 0f && lStopped) lPose = PoseFor(_break.Activity);
             else if (State.Value == NpcState.Investigate && lStopped) lPose = BodyPose.LookAround;

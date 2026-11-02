@@ -208,7 +208,7 @@ def convert(name, ph_id, category, keep=None, drop=(), max_tris=20000, rot_z=0.0
     """keep: object-name substrings to keep (None = all); drop: substrings to remove.
     children: {ChildName: substring} objects kept as separate child meshes (doors...).
     extra(objs) -> list of extra objects to add (already textured), may adjust things."""
-    folder = os.path.join(L.MODELS, name)
+    folder = os.path.join(L.OUT_MODELS, name)
     os.makedirs(folder, exist_ok=True)
     src = os.path.join(L.MODELS, ph_id)
     objs = import_ph(ph_id)
@@ -280,6 +280,18 @@ def convert(name, ph_id, category, keep=None, drop=(), max_tris=20000, rot_z=0.0
 
 
 # ------------------------------------------------------------------ special cases
+def sniper_points(co, trig_c, bore):
+    """ForeGrip and MagWell of the rifle from its vertices (barrel along -Y): the fore-end 30 cm ahead
+    of the trigger, halfway between its underside and the bore; the magazine floor 7.5 cm ahead."""
+    def underside(y):
+        band = co[(np.abs(co[:, 1] - y) < 0.012) & (np.abs(co[:, 0] - bore.x) < 0.012)]
+        return float(band[:, 2].min()) if len(band) else bore.z - 0.04
+    yf = trig_c.y - 0.30
+    ym = trig_c.y - 0.075
+    return (Vector((bore.x, yf, (underside(yf) + bore.z) * 0.5)),
+            Vector((bore.x, ym, underside(ym))))
+
+
 def sniper():
     """bolt_action_rifle_7_62 + a modern variable scope (procedural, baked) on rings."""
     import build_weapons as W  # noqa: F401  (spec helpers)
@@ -350,6 +362,10 @@ def sniper():
             m["final"] = True
         sniper.grip = trig_c + Vector((0, 0.07, -0.04))
         sniper.muzzle = bore
+        # first-person points (see build_weapons): the scope's eyepiece on its axis, the fore-end
+        # 30 cm ahead of the trigger, the magazine under the receiver
+        sniper.sight = Vector((0.0, cy + 0.17, axis_z))
+        sniper.foregrip, sniper.magwell = sniper_points(co, trig_c, bore)
         return [scope]
 
     def pv(ob, mn, mx):
@@ -358,7 +374,9 @@ def sniper():
     return convert("W_Sniper", "bolt_action_rifle_7_62", "weapon", drop=("bullet", "_scope"), max_tris=15000,
                    per_obj_max={"_wrap": 900, "_bolt_a": 1000},
                    pivot=pv, view="weapon", extra=extra,
-                   empties={"Grip": lambda p: Vector((0, 0, 0)), "Muzzle": lambda p: sniper.muzzle - p},
+                   empties={"Grip": lambda p: Vector((0, 0, 0)), "Muzzle": lambda p: sniper.muzzle - p,
+                            "Sight": lambda p: sniper.sight - p, "ForeGrip": lambda p: sniper.foregrip - p,
+                            "MagWell": lambda p: sniper.magwell - p},
                    rename={"bolt_action_rifle_7_62": "rifle", "bolt_action_rifle_7_62_accesories": "accessories"},
                    notes="Poly Haven rifle + procedural 3-12x44 scope (W_Sniper_body textures)")
 

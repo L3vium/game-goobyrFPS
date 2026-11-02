@@ -17,24 +17,38 @@ V = lambda *a: np.array(a, dtype=np.float64)
 # Presets: every number is a radius or an offset in metres.
 PRESETS = {
     "slim": dict(shoulder_x=0.180, hip_x=0.083, chest=(0.122, 0.096, 0.150), waist=(0.104, 0.084, 0.11),
-                 belly=(0.106, 0.086, 0.105, -0.002), pelvis=(0.124, 0.094, 0.108), butt=(0.058, 0.055, 0.072),
-                 neck=0.051, delt=0.054, girdle=0.054, arm=(0.046, 0.037), forearm=0.039, thigh=(0.069, 0.048),
+                 belly=(0.106, 0.086, 0.105, -0.002), pelvis=(0.120, 0.092, 0.106), butt=(0.056, 0.054, 0.070),
+                 neck=0.051, delt=0.054, girdle=0.054, arm=(0.046, 0.037), forearm=0.039, thigh=(0.067, 0.047),
                  calf=(0.049, 0.031), calf_m=0.041, pecs=0.8, bust=0.0, trap=0.038),
-    "average": dict(shoulder_x=0.190, hip_x=0.086, chest=(0.136, 0.110, 0.158), waist=(0.118, 0.096, 0.115),
-                    belly=(0.120, 0.102, 0.110, -0.012), pelvis=(0.130, 0.100, 0.112), butt=(0.062, 0.060, 0.076),
-                    neck=0.057, delt=0.062, girdle=0.062, arm=(0.053, 0.041), forearm=0.043, thigh=(0.075, 0.051),
+    "average": dict(shoulder_x=0.190, hip_x=0.085, chest=(0.138, 0.110, 0.158), waist=(0.118, 0.096, 0.115),
+                    belly=(0.118, 0.100, 0.108, -0.010), pelvis=(0.122, 0.098, 0.110), butt=(0.057, 0.058, 0.073),
+                    neck=0.057, delt=0.062, girdle=0.062, arm=(0.053, 0.041), forearm=0.043, thigh=(0.071, 0.050),
                     calf=(0.054, 0.033), calf_m=0.046, pecs=1.1, bust=0.0, trap=0.045),
-    "heavy": dict(shoulder_x=0.200, hip_x=0.096, chest=(0.150, 0.124, 0.160), waist=(0.150, 0.136, 0.13),
-                  belly=(0.164, 0.164, 0.150, -0.060), pelvis=(0.160, 0.120, 0.122), butt=(0.072, 0.068, 0.084),
-                  neck=0.066, delt=0.066, girdle=0.068, arm=(0.058, 0.046), forearm=0.047, thigh=(0.092, 0.060),
+    # Rook: a little broader in the shoulders and chest, straight and narrow in the hips
+    "hero": dict(shoulder_x=0.196, hip_x=0.084, chest=(0.142, 0.113, 0.160), waist=(0.116, 0.095, 0.114),
+                 belly=(0.114, 0.097, 0.106, -0.008), pelvis=(0.118, 0.096, 0.108), butt=(0.055, 0.057, 0.071),
+                 neck=0.058, delt=0.066, girdle=0.065, arm=(0.055, 0.042), forearm=0.044, thigh=(0.069, 0.050),
+                 calf=(0.054, 0.034), calf_m=0.046, pecs=1.2, bust=0.0, trap=0.048),
+    "hero_f": dict(shoulder_x=0.182, hip_x=0.084, chest=(0.122, 0.097, 0.150), waist=(0.098, 0.082, 0.108),
+                   belly=(0.104, 0.088, 0.100, -0.006), pelvis=(0.128, 0.102, 0.110), butt=(0.062, 0.061, 0.075),
+                   neck=0.049, delt=0.053, girdle=0.054, arm=(0.046, 0.036), forearm=0.038, thigh=(0.069, 0.048),
+                   calf=(0.050, 0.031), calf_m=0.042, pecs=0.0, bust=0.95, trap=0.037),
+    "heavy": dict(shoulder_x=0.200, hip_x=0.092, chest=(0.150, 0.124, 0.160), waist=(0.146, 0.132, 0.13),
+                  belly=(0.156, 0.156, 0.145, -0.056), pelvis=(0.138, 0.112, 0.116), butt=(0.064, 0.062, 0.078),
+                  neck=0.066, delt=0.066, girdle=0.068, arm=(0.058, 0.046), forearm=0.047, thigh=(0.082, 0.058),
                   calf=(0.059, 0.036), calf_m=0.051, pecs=1.2, bust=0.0, trap=0.052),
-    "female": dict(shoulder_x=0.180, hip_x=0.088, chest=(0.122, 0.097, 0.150), waist=(0.100, 0.084, 0.11),
-                   belly=(0.108, 0.090, 0.105, -0.008), pelvis=(0.140, 0.108, 0.118), butt=(0.068, 0.064, 0.080),
-                   neck=0.049, delt=0.051, girdle=0.052, arm=(0.045, 0.035), forearm=0.037, thigh=(0.076, 0.050),
+    # bodyguard: broad shoulders, barrel chest, a firm belly, narrow hips
+    "bulky": dict(shoulder_x=0.205, hip_x=0.088, chest=(0.166, 0.140, 0.172), waist=(0.146, 0.126, 0.128),
+                  belly=(0.142, 0.128, 0.128, -0.030), pelvis=(0.130, 0.106, 0.112), butt=(0.058, 0.058, 0.074),
+                  neck=0.072, delt=0.074, girdle=0.076, arm=(0.063, 0.049), forearm=0.051, thigh=(0.080, 0.058),
+                  calf=(0.060, 0.037), calf_m=0.052, pecs=1.4, bust=0.0, trap=0.062),
+    "female": dict(shoulder_x=0.180, hip_x=0.086, chest=(0.122, 0.097, 0.150), waist=(0.100, 0.084, 0.11),
+                   belly=(0.108, 0.090, 0.105, -0.008), pelvis=(0.132, 0.105, 0.114), butt=(0.064, 0.062, 0.077),
+                   neck=0.049, delt=0.051, girdle=0.052, arm=(0.045, 0.035), forearm=0.037, thigh=(0.072, 0.049),
                    calf=(0.050, 0.031), calf_m=0.042, pecs=0.0, bust=1.0, trap=0.035),
-    "female_curvy": dict(shoulder_x=0.182, hip_x=0.092, chest=(0.126, 0.100, 0.150), waist=(0.114, 0.096, 0.12),
-                         belly=(0.124, 0.108, 0.12, -0.020), pelvis=(0.152, 0.116, 0.125), butt=(0.075, 0.069, 0.086),
-                         neck=0.052, delt=0.054, girdle=0.055, arm=(0.049, 0.038), forearm=0.040, thigh=(0.084, 0.054),
+    "female_curvy": dict(shoulder_x=0.182, hip_x=0.090, chest=(0.126, 0.100, 0.150), waist=(0.112, 0.095, 0.12),
+                         belly=(0.120, 0.106, 0.118, -0.018), pelvis=(0.142, 0.112, 0.120), butt=(0.070, 0.066, 0.082),
+                         neck=0.052, delt=0.054, girdle=0.055, arm=(0.049, 0.038), forearm=0.040, thigh=(0.078, 0.052),
                          calf=(0.054, 0.033), calf_m=0.045, pecs=0.0, bust=1.2, trap=0.039),
 }
 
@@ -43,7 +57,7 @@ class BodyShape:
     def __init__(self, preset="average"):
         self.preset = preset
         self.p = dict(PRESETS[preset])
-        self.female = preset.startswith("female")
+        self.female = preset.startswith("female") or preset.endswith("_f")
         self.sk = Build(self.p["shoulder_x"], self.p["hip_x"], self.female)
         self.j = self.sk.j
         self.lumps = []          # (name, prim, k, region)

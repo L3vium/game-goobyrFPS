@@ -164,6 +164,11 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             if (_animator == null || !_animator.isActiveAndEnabled) return;
             bool lFromBack = Vector3.Dot(pWorldDirection, transform.forward) > 0f;
             _animator.CrossFadeInFixedTime(lFromBack ? S_HIT_B : S_HIT_F, 0.04f, HIT, 0f);
+            if (_body != null)
+            {
+                if (_body.Face != null) _body.Face.React(FaceMood.Pain, 0.7f);
+                if (_body.Wobble != null) _body.Wobble.Kick(pWorldDirection, 1f);
+            }
         }
 
         /// <summary>The owner jumped (remote players infer it from the vertical speed).</summary>
@@ -210,7 +215,23 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _lastMotion = Motion;
 
             UpdateUpper(lState, dt);
+            UpdateFace(lState);
         }
+
+        /// <summary>The standing expression from what the body does (local only).</summary>
+        private void UpdateFace(string pBase)
+        {
+            HumanFace lFace = _body != null ? _body.Face : null;
+            if (lFace == null) return;
+            bool lGun = Held == HeldKind.Pistol || Held == HeldKind.Rifle;
+            if (Panic || pBase == S_COWER) lFace.Mood = FaceMood.Scared;
+            else if (lGun && Aiming) lFace.Mood = FaceMood.Angry;
+            else if (Pose == BodyPose.Smoke || Pose == BodyPose.Phone || Calling) lFace.Mood = FaceMood.Smile;
+            else lFace.Mood = FaceMood.Neutral;
+        }
+
+        /// <summary>A short surprise on the face (an NPC spotting something), for the AI to call.</summary>
+        public void Surprise() { if (_body != null && _body.Face != null) _body.Face.React(FaceMood.Surprised, 0.9f); }
 
         private void MeasureVelocity(float dt)
         {
@@ -263,6 +284,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                     _airborne = false;
                     // A real drop gets the landing absorb, unless already running on.
                     if (_fallSpeed > 5.5f && new Vector2(_velocity.x, _velocity.z).magnitude < 2.5f) _landUntil = Time.time + 0.45f;
+                    if (_body != null && _body.Wobble != null && _fallSpeed > 2.5f) _body.Wobble.Kick(transform.forward, Mathf.Clamp(_fallSpeed / 6f, 0.3f, 1.5f));
                 }
             }
         }
@@ -328,7 +350,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 }
             }
             int lTier = Sprinting && pLocal.z > 0.5f * pSpeed ? 3 : pSpeed > RUN_FROM ? 2 : 1;
-            SetGait(pLocal, pSpeed, lTier, WALK, RUN, SPRINT, dt, out pPace, 2f);
+            // The pace may reach 2.5: quick little steps when the motor outruns the clip (TABS-ish scurry).
+            SetGait(pLocal, pSpeed, lTier, WALK, RUN, SPRINT, dt, out pPace, 2.5f);
             return S_LOCOMOTION;
         }
 
@@ -452,7 +475,44 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
                 _animator.SetIKPosition(AvatarIKGoal.LeftHand, lSocket.TransformPoint(HumanRig.Instance.SupportFor(Held, lMuzzle)));
             }
+            if (lNear) PushHandsOut();
         }
+
+        /// <summary>
+        /// Keeps the hands out of the body: a hand goal inside the head sphere or the torso capsule is
+        /// pushed back onto its surface (the mocap was taken on slimmer bodies). Not for poses whose
+        /// hands belong at the head (phone, smoke) or while the support hand holds a gun.
+        /// </summary>
+        private void PushHandsOut()
+        {
+            if (_body.Hips == null || _body.Head == null || Pose == BodyPose.Phone || Pose == BodyPose.Smoke || Calling) return;
+            if (_baseState == Animator.StringToHash(S_TAKEDOWN_ATTACKER) || _baseState == Animator.StringToHash(S_TAKEDOWN_VICTIM)) return;
+            float lScale = _body.Model != null ? _body.Model.lossyScale.y : 1f;
+            Vector3 lHead = _body.HeadCentre;
+            Vector3 lBottom = _body.Hips.position + Vector3.up * 0.02f * lScale;
+            Vector3 lTop = _body.Chest != null ? _body.Chest.position : lBottom + Vector3.up * 0.35f * lScale;
+            foreach (AvatarIKGoal lGoal in HANDS)
+            {
+                if (lGoal == AvatarIKGoal.LeftHand && _supportWeight > 0.3f) continue;
+                Vector3 lHand = _animator.GetIKPosition(lGoal), lOut = lHand;
+                Vector3 lAxis = lTop - lBottom;
+                float t = Mathf.Clamp01(Vector3.Dot(lOut - lBottom, lAxis) / Mathf.Max(lAxis.sqrMagnitude, 1e-4f));
+                Vector3 lOnAxis = lBottom + lAxis * t, lAway = lOut - lOnAxis;
+                lAway.y = 0f;
+                float lRadius = TORSO_RADIUS * lScale;
+                if (lAway.sqrMagnitude < lRadius * lRadius) lOut = lOnAxis + new Vector3(0f, lOut.y - lOnAxis.y, 0f) + (lAway.sqrMagnitude > 1e-6f ? lAway.normalized : transform.right) * lRadius;
+                Vector3 lFromHead = lOut - lHead;
+                float lHeadRadius = BodyMetrics.HEAD_RADIUS * 0.9f * lScale;
+                if (lFromHead.sqrMagnitude < lHeadRadius * lHeadRadius) lOut = lHead + (lFromHead.sqrMagnitude > 1e-6f ? lFromHead.normalized : transform.forward) * lHeadRadius;
+                if ((lOut - lHand).sqrMagnitude < 1e-6f) continue;
+                _animator.SetIKPositionWeight(lGoal, 1f);
+                _animator.SetIKPosition(lGoal, lOut);
+            }
+        }
+
+        private static readonly AvatarIKGoal[] HANDS = { AvatarIKGoal.LeftHand, AvatarIKGoal.RightHand };
+        /// <summary>Radius of the torso capsule the hands are kept out of (metres at model scale 1).</summary>
+        private const float TORSO_RADIUS = 0.15f;
 
         /// <summary>The support hand's rotation on the bone itself (the grips are measured on raw bones, not in the IK goal space).</summary>
         private void LateUpdate()

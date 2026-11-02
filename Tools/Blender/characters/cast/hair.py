@@ -31,10 +31,11 @@ LINE_HIGH = [(0, 1.745), (20, 1.742), (40, 1.725), (55, 1.700), (68, 1.660), (77
 class HairCap(sdf.Prim):
     """Skull ellipsoid inflated by a thickness field, cut under a hairline (by azimuth)."""
 
-    def __init__(self, f, line, t_top=0.010, t_side=0.004, t_back=0.007, z_top=(1.69, 1.76), soft=0.006):
+    def __init__(self, f, line, t_top=0.010, t_side=0.004, t_back=0.007, z_top=(1.69, 1.76), soft=0.006, line_dz=0.0):
         cr = f["cranium"]
         self.skull = sdf.Ellipsoid(V(0, 0.012, HEIGHT - cr[2]), cr)
-        self.line, self.t_top, self.t_side, self.t_back, self.z_top, self.soft = line, t_top, t_side, t_back, z_top, soft
+        self.line = [(a, z + line_dz * max(0.0, 1.0 - a / 70.0)) for a, z in line]
+        self.t_top, self.t_side, self.t_back, self.z_top, self.soft = t_top, t_side, t_back, z_top, soft
         m = max(t_top, t_side, t_back) + 0.02
         self.lo, self.hi = self.skull.lo - m, self.skull.hi + m
 
@@ -92,26 +93,47 @@ def lock(p0, p1, p2, p3, r0, r1, r2, r3, n=10):
 
 # ------------------------------------------------------------------------------------- styles
 
-def quiff(f, voxel=0.0012, lean=0.012, height=1.0):
-    """Rook: short faded sides, a broad quiff of distinct locks swept up, back and to his left."""
+def quiff(f, voxel=0.0011, lean=0.012, height=1.0, line_dz=-0.010, seed=5):
+    """Rook: short faded sides and a quiff of distinct, slightly irregular clumps swept up, back and
+    to his left, with a second thinner layer on top so the volume never reads as one block."""
+    rnd = np.random.RandomState(seed)
     part = sdf.Part("Hair", voxel, "Hair")
-    part.add(HairCap(f, LINE_MALE, t_top=0.012, t_side=0.0028, t_back=0.0055))
+    part.add(HairCap(f, LINE_MALE, t_top=0.011, t_side=0.0028, t_back=0.0055, line_dz=line_dz))
+    z0 = 1.690 + line_dz
     h = height
-    locks = ((-0.064, -0.018, 0.84, 0.004), (-0.038, -0.004, 0.96, -0.004), (-0.010, 0.004, 1.0, 0.002),
-             (0.017, 0.0, 0.98, -0.003), (0.043, -0.008, 0.92, 0.003), (0.064, -0.020, 0.80, 0.0))
-    for x0, dz, rr, dy in locks:
-        part.add(lock(V(x0, -0.080, 1.690),
-                      V(x0 * 1.06 + lean * 0.3, -0.126 + dy, 1.758 + dz * 0.5 * h),
-                      V(x0 * 0.98 + lean, -0.062 + dy, 1.792 + (0.020 + dz) * h),
-                      V(x0 * 0.82 + lean * 0.6, 0.050, 1.800 + dz * 0.4),
-                      0.014 * rr, 0.0245 * rr, 0.0255 * rr, 0.017 * rr), 0.007)
-    part.displace(grooves_x(0.0165, 0.0026, 0.004), 0.0026, lo=V(-0.13, -0.17, 1.712), hi=V(0.13, 0.15, 1.88))
-    part.meta["flow"] = (1.0, 0.2, 1.0)
+    xs = np.linspace(-0.066, 0.066, 9)
+    for i, x0 in enumerate(xs):
+        x0 = x0 + rnd.uniform(-0.004, 0.004)
+        edge = abs(x0) / 0.066
+        dz = -0.020 * edge ** 1.5 + rnd.uniform(-0.006, 0.006)
+        rr = (0.95 - 0.25 * edge) * rnd.uniform(0.85, 1.1)
+        dy = rnd.uniform(-0.006, 0.006)
+        part.add(lock(V(x0, -0.080, z0 + 0.004),
+                      V(x0 * 1.07 + lean * 0.3, -0.125 + dy, 1.756 + dz * 0.5 * h),
+                      V(x0 * 0.98 + lean + rnd.uniform(-0.004, 0.004), -0.060 + dy, 1.793 + (0.020 + dz) * h),
+                      V(x0 * 0.80 + lean * 0.6, 0.048, 1.800 + dz * 0.4),
+                      0.012 * rr, 0.0175 * rr, 0.0170 * rr, 0.010 * rr, n=12), 0.0045)
+    # thinner top layer, offset between the clumps, tips breaking the outline at the front
+    for i, x0 in enumerate((xs[:-1] + xs[1:]) * 0.5):
+        x0 = x0 + rnd.uniform(-0.003, 0.003)
+        edge = abs(x0) / 0.066
+        dz = -0.016 * edge ** 1.5 + rnd.uniform(-0.004, 0.006)
+        part.add(lock(V(x0 * 0.9, 0.030, 1.802),
+                      V(x0 * 0.98 + lean, -0.040, 1.818 + dz),
+                      V(x0 * 1.03 + lean * 0.6, -0.100, 1.806 + dz),
+                      V(x0 * 1.05 + lean * 0.4, -0.128 + rnd.uniform(-0.003, 0.003), 1.784 + dz),
+                      0.008, 0.0105, 0.009, 0.004, n=12), 0.004)
+
+    def strands(P):
+        x = P[..., 0] + 0.003 * np.sin(P[..., 1] * 37.0 + P[..., 2] * 19.0)
+        return (0.00055 * np.cos(2 * np.pi * x / 0.0055)).astype(F)
+    part.displace(strands, 0.0006, lo=V(-0.13, -0.17, 1.70), hi=V(0.13, 0.15, 1.88))
+    part.meta["flow"] = (0.35, 1.0, 0.7)
     return part
 
 
-def bun(f, voxel=0.0012, strands=True):
-    """Rook F: hair pulled back into a high copper bun, two loose strands at the temples."""
+def bun(f, voxel=0.0011, strands=False, fringe=False):
+    """Hair pulled back into a high bun; optional side-swept fringe (Rook F) and temple strands."""
     part = sdf.Part("Hair", voxel, "Hair")
     part.add(HairCap(f, LINE_FEMALE, t_top=0.008, t_side=0.006, t_back=0.007, z_top=(1.66, 1.74)))
     c = V(0, 0.070, 1.800)
@@ -121,6 +143,16 @@ def bun(f, voxel=0.0012, strands=True):
         part.add(lock(V(sx * 0.070, -0.072, 1.690), V(sx * 0.090, -0.094, 1.655), V(sx * 0.094, -0.090, 1.615),
                       V(sx * 0.087, -0.084, 1.592), 0.0060, 0.0050, 0.0040, 0.0022, n=8), 0.006)
     part.displace(grooves_radial(c, c - V(0, -0.12, 1.66), 46, 0.0016), 0.0016, lo=V(-0.13, -0.16, 1.55), hi=V(0.13, 0.16, 1.86))
+    if fringe:
+        # side-swept fringe from a parting on her left, across the forehead to her right temple
+        for k, (dx, dz, r0) in enumerate(((0.0, 0.0, 0.011), (0.008, -0.009, 0.009), (-0.010, 0.010, 0.008), (0.004, -0.018, 0.007))):
+            part.add(lock(V(0.040 + dx, -0.090, 1.722 + dz), V(0.008 + dx, -0.132, 1.712 + dz * 0.8),
+                          V(-0.046 + dx * 0.5, -0.128, 1.676 + dz * 0.6), V(-0.084, -0.100, 1.632 + dz * 0.4),
+                          r0, r0 * 1.2, r0 * 0.9, 0.0025, n=12), 0.004)
+        part.add(lock(V(-0.082, -0.066, 1.684), V(-0.096, -0.084, 1.640), V(-0.095, -0.080, 1.598), V(-0.088, -0.072, 1.566),
+                      0.0060, 0.0052, 0.0040, 0.0018, n=10), 0.004)
+        part.displace(lambda P: (0.0005 * np.cos(2 * np.pi * (P[..., 2] + 0.6 * P[..., 0]) / 0.0045)).astype(F), 0.0005,
+                      lo=V(-0.12, -0.16, 1.55), hi=V(0.06, -0.06, 1.76))
     part.meta["flow"] = (1.0, 1.0, 1.0)
     return part
 

@@ -148,7 +148,8 @@ def build(name, coll=None, head_only=False):
     hp_meta = parts[1].meta if spec.get("hair") else {}
     hair_m = M.get(name + "_Hair", M.hair, spec.get("hair_colour", (0.1, 0.07, 0.05)), hp_meta.get("rough", 0.48),
                    flow=hp_meta.get("flow", (1, 1, 1)), sheen=0.18 if hp_meta.get("rough", 0.48) < 0.7 else 0.05)
-    brow_m = M.get(name + "_Brows", M.hair, spec.get("brow_colour", spec.get("hair_colour", (0.1, 0.07, 0.05))), 0.62, sheen=0.06, roots=(1.60, 1.70))
+    brow_m = M.get(name + "_Brows", M.hair, spec.get("brow_colour", spec.get("hair_colour", (0.1, 0.07, 0.05))), 0.62,
+                   flow=(1.0, 0.25, 0.25), sheen=0.06, roots=(1.60, 1.70))
     looks = spec["looks"]
     for pname, (ob, p) in obs.items():
         mat = p.material
@@ -157,10 +158,13 @@ def build(name, coll=None, head_only=False):
             co = A.verts(ob)
             if pname == "Head":
                 A.set_colours(ob, head.skin_colours(co, f))
+                A.set_colours(ob, head.skin_masks(co, f), "Mask")
             elif pname.startswith("Lid"):
                 A.set_colours(ob, np.ones((len(co), 3)) * np.array([0.97, 0.88, 0.85]))
+                A.set_colours(ob, np.zeros((len(co), 3)), "Mask")
             else:
                 A.set_colours(ob, np.ones((len(co), 3)))
+                A.set_colours(ob, np.zeros((len(co), 3)), "Mask")
         elif mat == "Lashes":
             A.assign(ob, lash)
         elif mat == "Hair":

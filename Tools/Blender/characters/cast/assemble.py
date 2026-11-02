@@ -17,11 +17,11 @@ def collection(name):
     return col
 
 
-def eyeball(name, centre, r, outward_deg=-2.0, side=1.0, coll=None):
+def eyeball(name, centre, r, outward_deg=-2.0, side=1.0, coll=None, segments=(40, 28)):
     """UV sphere whose pole looks forward (-Y); UVs = planar front projection (iris at 0.5, 0.5)."""
     me = bpy.data.meshes.new(name)
     bm = bmesh.new()
-    bmesh.ops.create_uvsphere(bm, u_segments=40, v_segments=28, radius=r)
+    bmesh.ops.create_uvsphere(bm, u_segments=segments[0], v_segments=segments[1], radius=r)
     # pole along -Y
     bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=_rot_x(math.radians(90)))
     uv = bm.loops.layers.uv.new("UVMap")

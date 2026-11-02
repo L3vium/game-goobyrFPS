@@ -239,23 +239,39 @@ def plain(mat, colour, rough=0.5, metal=0.0, coat=0.0, noise=0.0, bump=0.0, scal
 
 
 def skin(mat, tone, rough=0.56):
+    """Skin for the look-dev and the bake: tone x blush colours (attribute Col), mottling, stubble dots
+    (Mask.r), glossier T-zone (Mask.g), pores in the bump."""
     b = NB(mat)
     attr = b.n("ShaderNodeVertexColor")
     attr.layer_name = "Col"
+    mask = b.n("ShaderNodeVertexColor")
+    mask.layer_name = "Mask"
+    msep = b.n("ShaderNodeSeparateColor")
+    b.link(mask.outputs["Color"], msep.inputs[0])
     m = b.mix(1.0, _srgb(tone)[:3], attr.outputs["Color"], "MULTIPLY")
     vec = b.coords(1.0)
     nz = b.noise(vec, 90.0, 6.0, 0.6)
     v = b.math("SUBTRACT", nz.outputs[0], 0.5)
-    v = b.math("MULTIPLY", v, 0.10)
+    v = b.math("MULTIPLY", v, 0.12)
     v = b.math("ADD", v, 1.0)
     cr = b.n("ShaderNodeCombineColor")
     for i in range(3):
         b.link(v, cr.inputs[i])
     m2 = b.mix(1.0, m, cr.outputs[0], "MULTIPLY")
-    b.link(m2, b.bsdf.inputs["Base Color"])
-    pores = b.noise(vec, 900.0, 2.0, 0.5)
-    b.link(b.bump(pores.outputs[0], 0.04, 0.0005), b.bsdf.inputs["Normal"])
-    b.inp("Roughness", rough)
+    # stubble: fine dark dots where the mask says so
+    dots = b.noise(vec, 1400.0, 1.0, 0.4)
+    dd = b.math("GREATER_THAN", dots.outputs[0], 0.53)
+    sd = b.math("MULTIPLY", dd, msep.outputs[0])
+    shade = b.math("MULTIPLY", msep.outputs[0], 0.18)
+    sd = b.math("ADD", b.math("MULTIPLY", sd, 0.45), shade)
+    m3 = b.mix(sd, m2, (0.10, 0.09, 0.09), "MIX")
+    b.link(m3, b.bsdf.inputs["Base Color"])
+    pores = b.noise(vec, 1100.0, 2.0, 0.5)
+    stub_b = b.math("MULTIPLY", dd, msep.outputs[0])
+    hb = b.math("ADD", pores.outputs[0], b.math("MULTIPLY", stub_b, 0.6))
+    b.link(b.bump(hb, 0.07, 0.0005), b.bsdf.inputs["Normal"])
+    r = b.math("SUBTRACT", rough, b.math("MULTIPLY", msep.outputs[1], 0.20))
+    b.link(r, b.bsdf.inputs["Roughness"])
     b.inp("Subsurface Weight", 0.12)
     b.inp("Subsurface Radius", (1.0, 0.4, 0.22))
     b.inp("Subsurface Scale", 0.012)

@@ -58,11 +58,13 @@ ROOK_LOOKS = {
     "Lens": dict(kind="glass", colour=(0.98, 0.58, 0.10)),
 }
 
+ROOK_F_SHADES = ("shades_on_head", dict(up=True, z_up=1.738, tilt_up=-42.0))
+
 ROOK_OUTFIT = [
     ("tee", dict(hem=0.950)),
     ("bomber", dict()),
     ("scarf", dict()),
-    ("trousers", dict(top=0.972, bottom=0.150)),
+    ("trousers", dict(top=0.972, bottom=0.150, straight=True)),
     ("boots", dict()),
     ("gloves", dict()),
     ("shades_on_head", dict(up=True)),
@@ -70,18 +72,18 @@ ROOK_OUTFIT = [
 
 CAST = {
     "Chr_Rook": dict(
-        title="Rook", role="Hero (player), male", body="average",
-        face=dict(iris=(0.30, 0.44, 0.22), brow=(1.30, 1.05), jaw_square=0.75, nose="button", nose_scale=1.04,
-                  smile=1.3, skin=SKIN["light"], freckles=0.6, blush=0.4),
+        title="Rook", role="Hero (player), male", body="hero",
+        face=dict(iris=(0.30, 0.44, 0.22), brow=(1.22, 1.05), jaw_square=0.7, nose="button", nose_scale=1.02,
+                  smile=1.3, skin=SKIN["light"], freckles=0.6, blush=0.4, jaw=(0.066, 0.075, 0.063), ears=1.0, stubble=0.55),
         hair="quiff", hair_colour=HAIR["copper"], brow_colour=(0.46, 0.18, 0.07),
         outfit=ROOK_OUTFIT, looks=ROOK_LOOKS,
     ),
     "Chr_Rook_F": dict(
-        title="Rook", role="Hero (player), female", body="female",
-        face=dict(iris=(0.30, 0.44, 0.22), brow=(0.95, 1.0), jaw_square=0.0, chin=0.92, cheek=1.05, nose="button",
-                  nose_scale=0.92, lips=1.12, smile=1.3, female=True, lashes=True, eye_r=0.0199, skin=SKIN["light"],
-                  freckles=0.6, blush=0.45, jaw=(0.080, 0.077, 0.068)),
-        hair="bun", hair_colour=HAIR["copper"], brow_colour=(0.46, 0.18, 0.07),
-        outfit=ROOK_OUTFIT, looks=ROOK_LOOKS,
+        title="Rook", role="Hero (player), female", body="hero_f",
+        face=dict(iris=(0.30, 0.44, 0.22), brow=(0.72, 1.0), jaw_square=0.0, chin=0.88, cheek=0.9, nose="button",
+                  nose_scale=0.84, lips=1.12, mouth_w=1.03, smile=1.4, female=True, lashes=True, eye_r=0.0212, skin=SKIN["light"],
+                  freckles=0.6, blush=0.5, jaw=(0.066, 0.074, 0.062), ears=0.95, lid_up=26.0),
+        hair="bun", hair_kw=dict(fringe=True), hair_colour=HAIR["copper"], brow_colour=(0.46, 0.18, 0.07),
+        outfit=[g if g[0] != "shades_on_head" else ROOK_F_SHADES for g in ROOK_OUTFIT], looks=ROOK_LOOKS,
     ),
 }

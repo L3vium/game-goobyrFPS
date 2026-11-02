@@ -56,6 +56,46 @@ def slab(z0, z1):
     return [sdf.HalfSpace(V(0, 0, z0), (0, 0, -1)), sdf.HalfSpace(V(0, 0, z1), (0, 0, 1))]
 
 
+def fold_arcs(part, centre, axis, radius, side, count=3, spacing=0.022, tube=0.0055, arc=0.55, k=0.010, seed=0):
+    """Bunched cloth: `count` partial rings round a limb axis, only on the `side` half (inner elbow,
+    back of the knee), a little irregular. Smooth-unioned into `part`."""
+    rnd = np.random.RandomState(seed)
+    axis, side = sdf.unit(axis), sdf.unit(side)
+    side = sdf.unit(side - axis * (side @ axis))
+    for i in range(count):
+        t = (i - (count - 1) * 0.5) * spacing + rnd.uniform(-0.003, 0.003)
+        tilt = sdf.unit(axis + side * rnd.uniform(-0.25, 0.25))
+        c = V(*centre) + axis * t
+        ring = sdf.Torus(c, tilt, radius + rnd.uniform(-0.002, 0.003), tube * rnd.uniform(0.8, 1.15))
+        keep = sdf.HalfSpace(c + side * (radius * np.cos(np.pi * arc)), -side)
+        part.add(sdf.Intersect([ring, keep], 0.006, box=(ring.lo, ring.hi)), k)
+
+
+def creases(part, pts_pairs, tube=0.0045, k=0.010):
+    """Straight soft ridges (whiskers, armpit pulls) between surface points."""
+    for a, b in pts_pairs:
+        part.add(sdf.Capsule(a, b, tube), k)
+
+
+def stitch_line(path, side_offset=0.0035, both=True):
+    """Topstitching beside a seam: returned as polylines (list of point arrays) for the bake-only
+    stitch geometry (export.py turns them into dashes)."""
+    P = np.array([np.asarray(p, dtype=np.float64) for p in path])
+    if len(P) < 2:
+        return []
+    out = []
+    t = np.gradient(P, axis=0)
+    t /= np.maximum(np.linalg.norm(t, axis=1, keepdims=True), 1e-9)
+    # surface normal guess: away from the body's vertical axis
+    radial = P - np.stack([np.zeros(len(P)), np.full(len(P), 0.01), P[:, 2]], axis=1)
+    radial /= np.maximum(np.linalg.norm(radial, axis=1, keepdims=True), 1e-9)
+    side = np.cross(t, radial)
+    side /= np.maximum(np.linalg.norm(side, axis=1, keepdims=True), 1e-9)
+    for s in ((1, -1) if both else (1,)):
+        out.append(P + side * side_offset * s)
+    return out
+
+
 # ------------------------------------------------------------------------------------- tops
 
 def tee(B, name="Tee", material="Tee", hem=0.895, sleeve=0.42, ease=0.006, neck_drop=0.0, voxel=0.003):
@@ -97,14 +137,25 @@ def bomber(B, ease=0.017, hem=0.985, open_w=0.046, pockets=True, armband=True, n
     jac.sub(sdf.RoundCone(V(0, 0.014, 1.40), V(0, 0.0, 1.64), nr + 0.020, nr + 0.028), 0.01)
     wedge = _front_wedge(open_w)
     jac.sub(wedge, 0.0)
-    # sleeve elbow folds (a couple of soft ridges on the inner elbow)
-    for s in ("l", "r"):
+    # cloth folds: bunching at the inner elbow, pulls from the armpits, gathers above the waistband
+    for si, s in enumerate(("l", "r")):
         sh, el = j["shoulder_" + s], j["elbow_" + s]
         u = sdf.unit(el - sh)
         inner = sdf.unit(np.cross(u, V(0, 1, 0))) * (1 if s == "l" else -1)
-        for i, off in enumerate((-0.025, 0.005, 0.03)):
-            c = el + u * off - inner * (B.limb_radius("upperarm", 1) + ease * 0.8)
-            jac.add(sdf.Capsule(c + V(0, -0.028, 0) + u * 0.01, c + V(0, 0.022, 0) - u * 0.008, 0.0065), 0.012)
+        r_el = B.limb_radius("upperarm", 1) + 0.006 + ease
+        fold_arcs(jac, el, u, r_el, -inner + V(0, -0.35, 0), count=4, spacing=0.020, tube=0.0060, arc=0.42, seed=3 + si)
+        fold_arcs(jac, sh + (el - sh) * 0.55, u, B.limb_radius("upperarm", 0.55) + 0.006 + ease, -inner, count=2,
+                  spacing=0.05, tube=0.0045, arc=0.3, seed=7 + si)
+        sx = 1 if s == "l" else -1
+        pit = V(sx * (B.sk.shoulder_x - 0.045), -0.060, 1.300)
+        creases(jac, [(pit + V(0, -0.03, 0.0), pit + V(-sx * 0.060, -0.055, -0.070)),
+                      (pit + V(0, -0.02, -0.025), pit + V(-sx * 0.040, -0.050, -0.120))], 0.0045, 0.012)
+    for a in np.radians(np.linspace(-150, 150, 13)):
+        d = V(np.sin(a), -np.cos(a), 0)
+        if abs(np.sin(a)) < 0.25 and np.cos(a) > 0:
+            continue                      # the open front
+        p0 = surface_along(jac, V(0, 0.01, hem + 0.030) + d * 0.35, -d, 0.0, 0.35)
+        creases(jac, [(p0 + V(0, 0, -0.012) - d * 0.002, p0 + V(0, 0, 0.040) - d * 0.004)], 0.0042, 0.010)
     if pockets:
         # MA-1 utility pocket on the left sleeve (outer side), pen slots
         sh, el = j["shoulder_l"], j["elbow_l"]
@@ -124,8 +175,10 @@ def bomber(B, ease=0.017, hem=0.985, open_w=0.046, pockets=True, armband=True, n
             if y is not None:
                 R = sdf.rot((0, 0, 1), -sx * 22) @ sdf.rot((0, 1, 0), sx * 14)
                 jac.add(sdf.Box(V(x, y + 0.0030, z), (0.040, 0.0042, 0.011), R, 0.0035), 0.003)
-    for path in _bomber_seams(B, jac):
+    seams = _bomber_seams(B, jac)
+    for path in seams:
         jac.sub(sdf.tube(path, 0.0016), 0.0012)
+    jac.meta["stitches"] = [line for path in seams for line in stitch_line(path, 0.0045)]
     parts = [jac]
     jac.meta["slots"] = ["Lining"]
     wz = lambda z: open_w + 0.045 * (1.46 - z) / 0.5
@@ -165,6 +218,11 @@ def bomber(B, ease=0.017, hem=0.985, open_w=0.046, pockets=True, armband=True, n
                 fp.append(V(x2, y2 - 0.0006, z))
         if len(zp) > 2:
             zips.add(sdf.tube(zp, 0.0026), 0.0)
+            if sx > 0:
+                # the pull: a tab hanging from the slider at the bottom of the left edge
+                tip = zp[0]
+                zips.add(sdf.Box(tip + V(0.002, -0.004, 0.006), (0.0045, 0.0018, 0.008), sdf.rot((0, 1, 0), -12), 0.0016), 0.001)
+                zips.add(sdf.Box(tip + V(0.0035, -0.006, -0.010), (0.0055, 0.0016, 0.012), sdf.rot((0, 1, 0), -8), 0.0014), 0.0015)
         if len(fp) > 2:
             facing.add(sdf.ribbon(fp, [(sx * 0.15, -1, 0)] * len(fp), 0.0095, 0.0016, 0.0012), 0.002)
     parts.append(zips)
@@ -218,7 +276,7 @@ def _front_wedge(open_w):
                           sdf.HalfSpace(V(0, -0.030, 0), (0, 1, 0))], 0.0, box=((-0.2, -0.4, 0.6), (0.2, 0.0, 1.7)))
 
 
-def _rib_ridges(spacing=0.0055, amp=0.0011):
+def _rib_ridges(spacing=0.0065, amp=0.0016):
     def fn(P):
         ang = np.arctan2(P[..., 0], -P[..., 1])
         return (amp * 0.5 * (1 + np.cos(2 * np.pi * (P[..., 0] + P[..., 1] * 0.3) / spacing))).astype(np.float32)
@@ -227,7 +285,7 @@ def _rib_ridges(spacing=0.0055, amp=0.0011):
 
 def scarf(B, name="Scarf", material="Scarf", ends=True):
     nr = B.p["neck"]
-    part = sdf.Part(name, 0.0025, material)
+    part = sdf.Part(name, 0.0018, material)
     n1 = sdf.unit((0, -0.30, 1))
     part.add(sdf.Torus(V(0, 0.006, 1.452), n1, nr + 0.031, 0.025))
     n2 = sdf.unit((0.08, -0.18, 1))
@@ -240,15 +298,19 @@ def scarf(B, name="Scarf", material="Scarf", ends=True):
         part.add(sdf.ribbon(pb, [(0, -1, 0.1)] * len(pb), [0.026, 0.028, 0.030, 0.031, 0.032, 0.032, 0.032], 0.007), 0.008)
 
     def knit(P):
-        return (0.0006 * np.cos(P[..., 2] * 2 * np.pi / 0.007 + P[..., 0] * 300.0) * np.cos(P[..., 0] * 2 * np.pi / 0.008)).astype(np.float32)
-    part.displace(knit, 0.0006)
+        # chunky rib knit: columns (cos across) of chevron rows, readable at a few metres
+        x, z = P[..., 0], P[..., 2]
+        col = np.cos(x * 2 * np.pi / 0.011 + 0.4 * np.sin(z * 90.0))
+        row = np.abs(np.sin((z + 0.35 * np.abs(np.mod(x, 0.011) - 0.0055)) * 2 * np.pi / 0.009))
+        return (-0.0012 * (0.5 + 0.5 * col) - 0.0006 * row).astype(np.float32)
+    part.displace(knit, 0.0018)
     return [part]
 
 
 # ------------------------------------------------------------------------------------- bottoms
 
 def trousers(B, name="Trousers", material="Trousers", top=0.995, bottom=0.150, ease=0.009, baggy=0.0,
-             cargo=True, belt=True, stack=True, crease=False, voxel=0.003):
+             cargo=True, belt=True, stack=True, crease=False, voxel=0.003, straight=False, folds=True):
     j = B.j
     part = sdf.Part(name, voxel, material)
     shell(part, lumps(B, names=["pelvis", "butt", "waist", "belly"]), 0.02)
@@ -257,7 +319,10 @@ def trousers(B, name="Trousers", material="Trousers", top=0.995, bottom=0.150, e
         t0, t1 = B.p["thigh"]
         c0, c1 = B.p["calf"]
         part.add(sdf.RoundCone(hp + V(0.004 if s == "l" else -0.004, 0, -0.035), kn, t0 + baggy, t1 + baggy * 1.4), 0.05)
-        part.add(sdf.RoundCone(kn, an + V(0, 0, 0.06), t1 + baggy * 1.3, c1 + 0.014 + baggy), 0.03)
+        if straight:
+            part.add(sdf.RoundCone(kn, an + V(0, 0, 0.06), t1 + 0.004 + baggy, t1 - 0.004 + baggy), 0.03)
+        else:
+            part.add(sdf.RoundCone(kn, an + V(0, 0, 0.06), t1 + baggy * 1.3, c1 + 0.014 + baggy), 0.03)
         part.add(sdf.Sphere(kn + V(0, -0.006, 0), t1 + baggy * 1.2), 0.03)
     shell(part, lumps(B, regions=["thigh", "calf"]), 0.02)
     part.offset(ease)
@@ -269,15 +334,29 @@ def trousers(B, name="Trousers", material="Trousers", top=0.995, bottom=0.150, e
             for i, z in enumerate((bottom + 0.040, bottom + 0.095)):
                 r = B.p["calf"][1] + 0.024 + baggy - i * 0.002
                 part.add(sdf.Torus(V(an[0], an[1] - 0.002, z), (0.05 * (1 if i % 2 else -1), -0.12 + 0.1 * i, 1), r, 0.0075), 0.014)
+    if folds:
+        for si, s in enumerate(("l", "r")):
+            hp, kn = j["hip_" + s], j["knee_" + s]
+            u = sdf.unit(kn - hp)
+            r_kn = B.p["thigh"][1] + ease + baggy + 0.006
+            fold_arcs(part, kn + V(0, 0.004, 0.005), u, r_kn, V(0, 1, 0), count=3, spacing=0.022, tube=0.0050, arc=0.38, seed=11 + si)
+            fold_arcs(part, kn + V(0, -0.002, 0.045), u, r_kn + 0.002, V(0, -1, 0), count=2, spacing=0.03, tube=0.0035, arc=0.25, seed=13 + si)
+            sx = 1 if s == "l" else -1
+            crotch = V(sx * 0.030, -0.075, 0.835)
+            creases(part, [(crotch, crotch + V(sx * 0.055, -0.010, 0.060)), (crotch + V(0, 0, -0.030), crotch + V(sx * 0.060, -0.004, 0.020))],
+                    0.0040, 0.012)
+    cargo_paths = []
     if cargo:
         for s, sx in (("l", 1), ("r", -1)):
             hp, kn = j["hip_" + s], j["knee_" + s]
-            c = hp + (kn - hp) * 0.55
-            r = B.p["thigh"][0] * 0.82 + baggy + ease
-            pc = V(c[0] + sx * r * 0.95, c[1] + 0.002, c[2])
-            R = sdf.rot((0, 1, 0), -sx * 3)
-            part.add(sdf.Box(pc, (0.010, 0.050, 0.070), R, 0.008), 0.006)
-            part.add(sdf.Box(pc + V(sx * 0.004, 0, 0.060), (0.011, 0.053, 0.016), R, 0.006), 0.003)
+            c = hp + (kn - hp) * 0.50
+            r = B.p["thigh"][0] * 0.80 + baggy + ease
+            pc = V(c[0] + sx * r * 0.97, c[1] - 0.010, c[2])
+            R = sdf.rot((0, 1, 0), -sx * 4)
+            part.add(sdf.Box(pc, (0.014, 0.060, 0.078), R, 0.010), 0.006)                       # bellows pocket
+            part.add(sdf.Box(pc + V(sx * 0.006, 0, 0.066), (0.014, 0.064, 0.020), R, 0.007), 0.003)  # flap
+            part.add(sdf.CappedCone(pc + V(sx * 0.018, 0, 0.060), pc + V(sx * 0.024, 0, 0.060), 0.0065, 0.006, 0.002), 0.0)
+            cargo_paths.append([pc + V(sx * 0.016, y, z) for y, z in ((-0.056, 0.045), (-0.056, -0.072), (0.056, -0.072), (0.056, 0.045))])
     if crease:
         for s in ("l", "r"):
             hp, kn, an = j["hip_" + s], j["knee_" + s], j["ankle_" + s]
@@ -290,6 +369,7 @@ def trousers(B, name="Trousers", material="Trousers", top=0.995, bottom=0.150, e
                     pts.append(V(x, y + 0.0028, z))
             if len(pts) > 2:
                 part.add(sdf.tube(pts, 0.0026), 0.006)
+    part.meta["stitches"] = [np.array(p) for p in cargo_paths]
     parts = [part]
     if belt:
         b = sdf.Part(name + "Belt", 0.0025, "Belt")
@@ -330,9 +410,26 @@ def boots(B, name="Boots", upper="Boots", sole_mat="Sole", height=0.20, chunk=1.
                 p0 = surface_along(up, p + V(0, -0.06, 0), (0, 1, 0), -0.01, 0.12)
                 lace.add(sdf.Capsule(p0 + V(-0.016, -0.002, -0.006), p0 + V(0.016, -0.002, 0.006), 0.0028))
                 lace.add(sdf.Capsule(p0 + V(0.016, -0.002, -0.006), p0 + V(-0.016, -0.002, 0.006), 0.0028))
+                for ex in (-0.019, 0.019):           # metal eyelets
+                    lace.add(sdf.Torus(p0 + V(ex, -0.0005, 0.0), (0, 1, 0), 0.0032, 0.0012))
+        # heel pull tab
+        up.add(sdf.Box(V(an[0], an[1] + 0.052, height + 0.006), (0.010, 0.004, 0.018), None, 0.003), 0.004)
     up.inter(sdf.HalfSpace(V(0, 0, 0.026), (0, 0, -1)), 0.004)
     # tread grooves on the sole
     so.sub(sdf.Box(V(0, -0.02, 0.0), (0.2, 0.004, 0.006), None, 0.002), 0.0)
+    # welt stitching round the top of the sole
+    welt = []
+    for s, sx in (("l", 1), ("r", -1)):
+        an, toe = j["ankle_" + s], j["toe_" + s]
+        line = []
+        for a in np.linspace(0, 2 * np.pi, 40):
+            c = V(an[0], (an[1] + 0.05 + toe[1] + 0.03) * 0.5, 0.036)
+            ry = (an[1] + 0.05 - (toe[1] + 0.03)) * 0.5 + 0.044
+            d = V(np.sin(a) * 0.3, np.cos(a), 0)
+            p = surface_along(up, c + V(np.sin(a) * 0.08 * chunk, np.cos(a) * ry, 0), -sdf.unit(d), 0.0, 0.1)
+            line.append(p)
+        welt.append(np.array(line))
+    up.meta["stitches"] = welt
     parts = [up, so]
     if laces:
         parts.append(lace)
@@ -349,12 +446,12 @@ def bare_hands(B, material="Skin"):
 
 # ------------------------------------------------------------------------------------- accessories
 
-def shades_on_head(B, hair_part, name="Shades", up=True, lens_mat="Lens", frame_mat="Frame"):
+def shades_on_head(B, hair_part, name="Shades", up=True, lens_mat="Lens", frame_mat="Frame", z_up=1.702, tilt_up=-24.0):
     """Chunky wayfarer-ish shades. up=True: pushed up onto the hair; up=False: on the eyes."""
     frame = sdf.Part(name, 0.0008, frame_mat)
     lens = sdf.Part(name + "Lens", 0.0008, lens_mat)
     if up:
-        z, tilt = 1.702, -24.0
+        z, tilt = z_up, tilt_up
         ys = []
         for sx in (1, -1):
             for dz in (-0.012, 0.0, 0.012):

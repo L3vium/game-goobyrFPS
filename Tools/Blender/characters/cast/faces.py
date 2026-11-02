@@ -1,11 +1,11 @@
 # Author : Baptiste Vu Liem
-"""Facial expressions of the cast as vertex deformations of the head parts (the step-2 shape keys:
-Blink, Smile, Surprised, Angry, Scared, Pain; Dead = X pupils via the eye texture + slack face).
+"""Facial expressions of the cast as vertex deformations (exported as the head mesh's shape keys:
+Blink, Smile, Surprised, Angry, Scared, Pain, Dead; X eyes on death are an eye-texture swap).
 
-Each expression = lid hinge angles (rotation of the lid shells about the eye's lateral axis),
-brow moves (inner/outer ends), jaw opening (rotation of the lower face about a jaw pivot) and mouth
-corner moves, all with smooth falloffs. apply() deforms the objects in place from their rest
-coordinates (kept in a custom attribute) so expressions can be swapped freely.
+Each expression = lid hinge angles (rotation of the lid shells about the eye's lateral axis), brow
+moves (inner / outer ends), jaw opening (rotation of the lower face about a jaw pivot) and mouth
+corner moves, all with smooth falloffs. deform() works on any vertex array given each vertex's part
+name, so it serves the look-dev renders (apply) and the exported shape keys alike.
 """
 import math
 
@@ -26,6 +26,8 @@ EXPRESSIONS = {
     "Pain":      dict(up=34, low=-12, brow=(0.0045, -0.0025, 0.0030), jaw=7, corner=(-0.0030, -0.004, 0.002), cheek=0.002),
     "Dead":      dict(up=16, low=0, brow=(0.0, -0.001, 0), jaw=6, corner=(-0.002, 0.0, 0.0), cheek=0),
 }
+SHAPE_KEYS = ["Blink", "Smile", "Surprised", "Angry", "Scared", "Pain", "Dead"]
+FACE_PARTS = ("Head", "Beard", "Brows", "LidUp_l", "LidUp_r", "LidLow_l", "LidLow_r", "Lash_l", "Lash_r")
 
 
 def _rot_x(P, centre, deg):
@@ -37,60 +39,38 @@ def _rot_x(P, centre, deg):
     return np.stack([q[:, 0], y, z], axis=1) + centre
 
 
-def _get(ob):
-    co = np.empty(len(ob.data.vertices) * 3, np.float32)
-    ob.data.vertices.foreach_get("co", co)
-    return co.reshape(-1, 3).astype(np.float64)
-
-
-def _set(ob, P):
-    ob.data.vertices.foreach_set("co", P.astype(np.float32).ravel())
-    ob.data.update()
-
-
-_REST = {}
-
-
-def remember(objs):
-    for ob in objs:
-        key = ob.as_pointer()
-        if key not in _REST or len(_REST[key]) != len(ob.data.vertices):
-            _REST[key] = _get(ob)
-
-
-def rest(ob):
-    return _REST[ob.as_pointer()].copy()
-
-
-def apply(objs, f, kind):
-    """Deform head / lids / lashes / brows objects (dict name -> object) to the expression `kind`."""
+def deform(P, part_of, f, kind):
+    """New positions for vertices P (N,3) whose part names are part_of (N,) for expression `kind`."""
     e = EXPRESSIONS[kind]
-    remember(objs.values())
+    P = np.asarray(P, dtype=np.float64).copy()
+    part_of = np.asarray(part_of)
     centres = head.eye_centres(f)
-    for name, ob in objs.items():
-        P = rest(ob)
-        if name.startswith(("LidUp", "Lash")):
-            c = centres[0] if name.endswith("_l") else centres[1]
+    for side, c in (("l", centres[0]), ("r", centres[1])):
+        m = (part_of == "LidUp_" + side) | (part_of == "Lash_" + side)
+        if m.any():
             ang = (f["lid_up"] - f["lid_low"] - 3.0) if e["up"] is None else e["up"]
-            P = _rot_x(P, c, ang)
-        elif name.startswith("LidLow"):
-            c = centres[0] if name.endswith("_l") else centres[1]
-            P = _rot_x(P, c, -e["low"]) if e["low"] else P
-        elif name == "Brows":
-            ax = np.abs(P[:, 0])
-            t = np.clip((ax - 0.0105) / 0.055, 0, 1)
-            di, do, dx = e["brow"]
-            P[:, 2] += di * (1 - t) + do * t
-            P[:, 0] -= np.sign(P[:, 0]) * dx * (1 - t)
-            P[:, 1] -= 0.002 * (abs(di) > 0.005) * (1 - t)
-        elif name in ("Head", "Beard"):
-            P = _deform_face(P, e, f)
-        _set(ob, P)
+            P[m] = _rot_x(P[m], c, ang)
+        m = part_of == "LidLow_" + side
+        if m.any() and e["low"]:
+            P[m] = _rot_x(P[m], c, -e["low"])
+    m = part_of == "Brows"
+    if m.any():
+        Q = P[m]
+        ax = np.abs(Q[:, 0])
+        t = np.clip((ax - 0.0105) / 0.055, 0, 1)
+        di, do, dx = e["brow"]
+        Q[:, 2] += di * (1 - t) + do * t
+        Q[:, 0] -= np.sign(Q[:, 0]) * dx * (1 - t)
+        Q[:, 1] -= 0.002 * (abs(di) > 0.005) * (1 - t)
+        P[m] = Q
+    m = (part_of == "Head") | (part_of == "Beard")
+    if m.any():
+        P[m] = _deform_face(P[m], e)
+    return P
 
 
-def _deform_face(P, e, f):
+def _deform_face(P, e):
     P = P.copy()
-    # jaw: everything under the lip line in the front of the face rotates down about the jaw pivot
     if e["jaw"]:
         pivot = V(0, 0.000, 1.552)
         below = np.clip((1.5335 - P[:, 2]) / 0.004, 0, 1)
@@ -100,7 +80,6 @@ def _deform_face(P, e, f):
         w = below * front * neck * side
         Q = _rot_x(P, pivot, e["jaw"])
         P = P + (Q - P) * w[:, None]
-    # mouth corners
     dz, dxin, dy = e["corner"]
     if dz or dxin or dy:
         for sx in (1, -1):
@@ -118,3 +97,26 @@ def _deform_face(P, e, f):
             P[:, 2] += e["cheek"] * w
             P[:, 1] -= e["cheek"] * 0.4 * w
     return P
+
+
+# ------------------------------------------------------------------------------------- look-dev (bpy)
+
+_REST = {}
+
+
+def _get(ob):
+    co = np.empty(len(ob.data.vertices) * 3, np.float32)
+    ob.data.vertices.foreach_get("co", co)
+    return co.reshape(-1, 3).astype(np.float64)
+
+
+def apply(objs, f, kind):
+    """Deform separate part objects (dict name -> object) to `kind` from their rest coordinates."""
+    for name, ob in objs.items():
+        key = ob.as_pointer()
+        if key not in _REST or len(_REST[key]) != len(ob.data.vertices):
+            _REST[key] = _get(ob)
+        P = _REST[key]
+        Q = deform(P, np.full(len(P), name), f, kind)
+        ob.data.vertices.foreach_set("co", Q.astype(np.float32).ravel())
+        ob.data.update()

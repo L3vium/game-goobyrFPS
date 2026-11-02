@@ -69,6 +69,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             (HumanBodyBones.RightLittleProximal, "pinky_01_r"), (HumanBodyBones.RightLittleIntermediate, "pinky_02_r"), (HumanBodyBones.RightLittleDistal, "pinky_03_r"),
         };
 
+        /// <summary>The 0.7.0 cast (Tools/Blender/characters/cast): a separate head mesh with expression blend shapes.</summary>
+        public static bool IsNewCast(GameObject pModel) => pModel != null && FindDeep(pModel.transform, pModel.name + "_Head_LOD0") != null;
+
         [MenuItem("Goobyr/Build/Characters")]
         public static void Build()
         {
@@ -101,6 +104,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (string lFolder in CharacterFolders())
             {
                 string lName = Path.GetFileName(lFolder);
+                bool lNew = IsNewCast(AssetDatabase.LoadAssetAtPath<GameObject>(Fbx(lFolder)));
                 PbrLibrary.PrepareFolder(lFolder);
                 // Hair, brows and lashes carry their coverage in the PNG's alpha.
                 foreach (string lFile in Directory.GetFiles(lFolder, "*_diff.png"))
@@ -125,10 +129,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 foreach (string lSlot in lSlots)
                 {
                     string lPart = lSlot.StartsWith(lName + "_") ? lSlot.Substring(lName.Length + 1) : lSlot;
-                    bool lCard = lPart == "Hair" || lPart == "Brows" || lPart == "Lashes";
+                    // Hair, brows and lashes are alpha cards on the old cast, sculpted solids on the new one.
+                    bool lCard = !lNew && (lPart == "Hair" || lPart == "Brows" || lPart == "Lashes");
                     Material lMaterial = PbrLibrary.MakeMaterial(lFolder, lSlot, $"{lFolder}/M_{lSlot}.mat", lCard ? PbrLibrary.Kind.Cutout : PbrLibrary.Kind.Opaque);
                     if (lMaterial == null) continue;
                     Tune(lMaterial, lPart);
+                    if (lNew) TuneNewCast(lMaterial, lPart);
                     AssetImporter.SourceAssetIdentifier lId = new AssetImporter.SourceAssetIdentifier(typeof(Material), lSlot);
                     if (lImporter.GetExternalObjectMap().TryGetValue(lId, out Object lOld) && lOld == lMaterial) continue;
                     lImporter.AddRemap(lId, lMaterial);
@@ -178,6 +184,35 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             EditorUtility.SetDirty(pMaterial);
         }
 
+        /// <summary>
+        /// The new cast's looks on URP Lit (no subsurface): skin a touch warmer with a soft sheen (its
+        /// roughness map is lower on the nose and lips), team slots white-baked and tinted orange by
+        /// default (HumanBody sets the team colour), sculpted hair a little glossy.
+        /// </summary>
+        private static void TuneNewCast(Material pMaterial, string pPart)
+        {
+            switch (pPart)
+            {
+                case "Body":
+                    pMaterial.SetColor("_BaseColor", new Color(1f, 0.955f, 0.93f));
+                    pMaterial.SetFloat("_Smoothness", 0.78f);
+                    pMaterial.SetFloat("_OcclusionStrength", 0.7f);
+                    break;
+                case "Team":
+                case "Lining":
+                    pMaterial.SetColor("_BaseColor", HumanBody.DEFAULT_TEAM);
+                    break;
+                case "Hair":
+                case "Brows":
+                    pMaterial.SetFloat("_Smoothness", 0.85f);
+                    break;
+                case "Eyes":
+                    pMaterial.SetFloat("_Smoothness", 0.92f);
+                    break;
+            }
+            EditorUtility.SetDirty(pMaterial);
+        }
+
         // ---------------------------------------------------------------- avatars
 
         /// <summary>Humanoid avatars: every character from its own T-posed skeleton, the clips from the reference skeleton.</summary>
@@ -192,10 +227,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 List<SkeletonBone> lSkeleton = TPoseSkeleton(lModel);
                 lImporter.animationType = ModelImporterAnimationType.Human;
                 lImporter.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
-                lImporter.humanDescription = Description(lSkeleton);
+                lImporter.humanDescription = Description(lSkeleton, IsNewCast(lModel));
                 lImporter.importAnimation = false;
                 lImporter.optimizeGameObjects = false;
-                lImporter.importBlendShapes = false;
+                // The new cast's head carries the expressions (Blink, Smile, Surprised, Angry, Scared, Pain, Dead).
+                lImporter.importBlendShapes = true;
                 // The first-person arms are trimmed to the forearms at runtime (Viewmodel): readable.
                 lImporter.isReadable = Path.GetFileName(lFolder) == HumanCast.ARMS;
                 lImporter.importCameras = false;
@@ -212,11 +248,18 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return null;
         }
 
-        private static HumanDescription Description(List<SkeletonBone> pSkeleton)
+        /// <summary>Degrees taken off the arms' "down" range on the new cast: the same clip keeps the arms a little away from the wider body.</summary>
+        private const float ARM_DOWN_MARGIN = 14f;
+
+        private static HumanDescription Description(List<SkeletonBone> pSkeleton, bool pNarrowArms = false)
         {
             List<HumanBone> lHuman = new List<HumanBone>();
             foreach ((HumanBodyBones lBone, string lName) in BONES)
-                lHuman.Add(new HumanBone { humanName = HumanTrait.BoneName[(int)lBone], boneName = lName, limit = new HumanLimit { useDefaultValues = true } });
+            {
+                HumanLimit lLimit = new HumanLimit { useDefaultValues = true };
+                if (pNarrowArms && (lBone == HumanBodyBones.LeftUpperArm || lBone == HumanBodyBones.RightUpperArm)) lLimit = NarrowArm(lBone);
+                lHuman.Add(new HumanBone { humanName = HumanTrait.BoneName[(int)lBone], boneName = lName, limit = lLimit });
+            }
             return new HumanDescription
             {
                 human = lHuman.ToArray(),
@@ -224,6 +267,22 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 upperArmTwist = 0.5f, lowerArmTwist = 0.5f, upperLegTwist = 0.5f, lowerLegTwist = 0.5f,
                 armStretch = 0.05f, legStretch = 0.05f, feetSpacing = 0f, hasTranslationDoF = false
             };
+        }
+
+        /// <summary>Unity's default limits of an upper arm, with the "down" end of the down-up muscle raised.</summary>
+        private static HumanLimit NarrowArm(HumanBodyBones pBone)
+        {
+            Vector3 lMin = Vector3.zero, lMax = Vector3.zero;
+            for (int lDof = 0; lDof < 3; lDof++)
+            {
+                int lMuscle = HumanTrait.MuscleFromBone((int)pBone, lDof);
+                if (lMuscle < 0) continue;
+                float lLow = HumanTrait.GetMuscleDefaultMin(lMuscle), lHigh = HumanTrait.GetMuscleDefaultMax(lMuscle);
+                if (HumanTrait.MuscleName[lMuscle].Contains("Down-Up")) lLow += ARM_DOWN_MARGIN;
+                lMin[lDof] = lLow;
+                lMax[lDof] = lHigh;
+            }
+            return new HumanLimit { useDefaultValues = false, min = lMin, max = lMax, center = Vector3.zero };
         }
 
         /// <summary>

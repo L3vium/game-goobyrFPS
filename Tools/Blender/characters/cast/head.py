@@ -17,7 +17,7 @@ V = lambda *a: np.array(a, dtype=np.float64)
 
 FACE = dict(
     eye_r=0.0205, eye_x=0.0362, eye_y=-0.098, iris=(0.33, 0.22, 0.12), converge=2.0,
-    lid_up=24.0, lid_low=-24.0, lid_tilt=-6.0,           # lid edge elevations (deg), outer-corner tilt (<0 = upturned)
+    lid_up=24.0, lid_low=-21.0, lid_tilt=-6.0,           # lid edge elevations (deg), outer-corner tilt (<0 = upturned)
     cranium=(0.110, 0.128, 0.122), skull_top=1.790, jaw=(0.072, 0.076, 0.064), jaw_square=0.6, chin=1.0, cheek=0.0,
     nose="button", nose_scale=1.0, ears=1.15, lips=1.0, mouth_w=1.0, smile=1.0,
     brow=(1.0, 1.0), brow_angle=0.0, brow_y=0.0,        # (thickness, length) scale, inner raise (m)
@@ -76,14 +76,19 @@ def head_part(f, voxel=0.0012):
     part.add(sdf.Ellipsoid(V(0, -0.030, 1.560), (jx, jy, jz)), 0.05)
     # zygomatic arches under the outer eye corners
     for sx in (1, -1):
-        part.add(sdf.Ellipsoid(V(sx * 0.068, -0.062, 1.588), (0.028, 0.026, 0.017)), 0.025)
-    # mandible: angles + jaw line to a defined chin
+        if f["female"]:
+            part.add(sdf.Ellipsoid(V(sx * 0.064, -0.066, 1.594), (0.025, 0.024, 0.015)), 0.025)
+        else:
+            part.add(sdf.Ellipsoid(V(sx * 0.068, -0.062, 1.588), (0.028, 0.026, 0.017)), 0.025)
+    # mandible: angles + jaw line to a defined chin (smaller, higher and softer on female faces)
     js = f["jaw_square"]
+    fem = 1.0 if f["female"] else 0.0
     for sx in (1, -1):
-        gon = V(sx * (0.053 + 0.006 * js), -0.008, 1.524)
-        part.add(sdf.Sphere(gon, 0.020 + 0.004 * js), 0.03)
-        part.add(sdf.Capsule(gon, V(sx * 0.020, -0.084, 1.498), 0.014 + 0.003 * js), 0.025)
-    part.add(sdf.Ellipsoid(V(0, -0.088, 1.505), (0.026 * f["chin"], 0.024, 0.022 * f["chin"])), 0.02)
+        gon = V(sx * (0.053 + 0.006 * js - 0.004 * fem), -0.008, 1.524 + 0.006 * fem)
+        part.add(sdf.Sphere(gon, 0.020 + 0.004 * js - 0.004 * fem), 0.03)
+        part.add(sdf.Capsule(gon, V(sx * (0.020 - 0.004 * fem), -0.084, 1.498 + 0.002 * fem), 0.014 + 0.003 * js - 0.002 * fem), 0.025)
+    part.add(sdf.Ellipsoid(V(0, -0.088 - 0.002 * fem, 1.505 + 0.002 * fem),
+                           (0.026 * f["chin"] - 0.004 * fem, 0.024 - 0.003 * fem, 0.022 * f["chin"] - 0.003 * fem)), 0.02)
     c = f["cheek"]
     if c > 0:
         for sx in (1, -1):
@@ -100,8 +105,13 @@ def head_part(f, voxel=0.0012):
     lw = f["mouth_w"]
     part.add(sdf.Ellipsoid(V(0, -0.092, 1.538), (0.034 * lw, 0.028, 0.028)), 0.02)
     L = f["lips"]
-    part.add(sdf.Ellipsoid(V(0, -0.1188, 1.5398), (0.0225 * lw, 0.0072 * L, 0.0062 * L)), 0.007)
-    part.add(sdf.Ellipsoid(V(0, -0.1162, 1.5270), (0.0190 * lw, 0.0086 * L, 0.0076 * L)), 0.007)
+    if f["female"]:
+        for sx in (1, -1):
+            part.add(sdf.Ellipsoid(V(sx * 0.0085, -0.1192, 1.5402), (0.0135 * lw, 0.0074 * L, 0.0062 * L), sdf.rot((0, 1, 0), sx * 8)), 0.005)
+        part.add(sdf.Ellipsoid(V(0, -0.1168, 1.5266), (0.0185 * lw, 0.0094 * L, 0.0082 * L)), 0.007)
+    else:
+        part.add(sdf.Ellipsoid(V(0, -0.1188, 1.5398), (0.0225 * lw, 0.0072 * L, 0.0062 * L)), 0.007)
+        part.add(sdf.Ellipsoid(V(0, -0.1162, 1.5270), (0.0190 * lw, 0.0086 * L, 0.0076 * L)), 0.007)
     # nose
     _nose(part, f)
     # upper neck (stays inside the body's neck below the jaw)
@@ -115,7 +125,7 @@ def head_part(f, voxel=0.0012):
     for c in eye_centres(f):
         sx = 1.0 if c[0] > 0 else -1.0
         r_s = f["eye_r"] + 0.0034
-        part.sub(sdf.Ellipsoid(c + V(0, 0, 0.0035), (r_s, r_s, r_s - 0.0028)), 0.007)
+        part.sub(sdf.Ellipsoid(c + V(0, 0, 0.0035), (r_s, r_s, r_s - 0.0028)), 0.004)
     _ear_carve(part, f, root_x)
     # mouth: a closed slit (gentle smile) and the bag behind it (the jaw opens it)
     mw = 0.0258 * lw
@@ -142,8 +152,9 @@ def _nose(part, f):
     n = f["nose_scale"]
     kind = f["nose"]
     if kind == "button":
-        part.add(sdf.RoundCone(V(0, -0.110, 1.608), V(0, -0.128, 1.578), 0.0075 * n, 0.0115 * n), 0.012)
-        part.add(sdf.Sphere(V(0, -0.1335 - 0.004 * (n - 1), 1.5705), 0.0150 * n), 0.01)
+        up = 0.0025 if f["female"] else 0.0
+        part.add(sdf.RoundCone(V(0, -0.110, 1.608), V(0, -0.128, 1.578 + up), 0.0075 * n, 0.0115 * n), 0.012)
+        part.add(sdf.Sphere(V(0, -0.1335 - 0.004 * (n - 1), 1.5705 + up), 0.0150 * n), 0.01)
     elif kind == "long":
         part.add(sdf.RoundCone(V(0, -0.112, 1.620), V(0, -0.137, 1.567), 0.0078 * n, 0.0115 * n), 0.012)
         part.add(sdf.Sphere(V(0, -0.1405, 1.5625), 0.0140 * n), 0.008)
@@ -192,19 +203,19 @@ def lid_parts(f, voxel=0.0004):
         upper.sub(sdf.Sphere(c, r + 0.0006), 0.0)
         upper.inter(sdf.HalfSpace(c, -n_up), 0.0012)
         upper.inter(sdf.HalfSpace(c + V(0, 0.55 * r, 0), (0, 1, 0)), 0.0)
-        for hs in _width_clip(c, r):
+        for hs in _width_clip(c, r, 0.97):
             upper.inter(hs, 0.0)
         upper.meta.update(eye=idx, hinge="up")
         parts.append(upper)
         # lower lid: points below the plane whose front edge sits at elevation `lo` (negative)
         n_lo = tilt @ V(0, math.sin(lo), math.cos(lo))
         lower = sdf.Part("LidLow_" + side, voxel, "Skin")
-        lower.add(sdf.Sphere(c, r + 0.0030))
+        lower.add(sdf.Sphere(c, r + 0.0022))
         lower.sub(sdf.Sphere(c, r + 0.0006), 0.0)
         lower.inter(sdf.HalfSpace(c, n_lo), 0.0010)
         lower.inter(sdf.HalfSpace(c + V(0, 0, -0.62 * r), (0, 0, -1)), 0.0)
         lower.inter(sdf.HalfSpace(c + V(0, 0.55 * r, 0), (0, 1, 0)), 0.0)
-        for hs in _width_clip(c, r, 0.84):
+        for hs in _width_clip(c, r, 0.90):
             lower.inter(hs, 0.0)
         lower.meta.update(eye=idx, hinge="low")
         parts.append(lower)
@@ -232,9 +243,10 @@ def brow_points(f, head, n=10):
     out = []
     ang, lift = f["brow_angle"], f["brow_y"]
     for sx in (1, -1):
-        p0 = (0.0105, 1.6270 + ang + lift)
-        p1 = (0.0390, 1.6490 + lift)
-        p2 = (0.0630 * ln, 1.6310 + lift)
+        arch = 0.004 if f["female"] else 0.0
+        p0 = (0.0110, 1.6275 + ang + lift)
+        p1 = (0.0380, 1.6490 + lift + arch)
+        p2 = (0.0640 * ln, 1.6300 + lift)
         raw = []
         for i in range(n):
             t = i / (n - 1)
@@ -254,19 +266,23 @@ def brow_points(f, head, n=10):
     return out
 
 
-def brow_part(f, head, voxel=0.0007):
+def brow_part(f, head, voxel=0.0006):
+    """Brows: a confident stroke, thickest a third of the way out, tapering to a fine tip, flat on
+    the forehead (no sausage tubes)."""
     th, ln = f["brow"]
     part = sdf.Part("Brows", voxel, "Brows")
-    for pts in brow_points(f, head):
+    for pts in brow_points(f, head, n=14):
         n = len(pts)
         rs = []
         for i in range(n):
             t = i / (n - 1)
-            rs.append((0.0070 + 0.0012 * np.sin(np.pi * min(t * 1.6, 1.0)) - 0.0024 * t ** 2) * th)
+            body = 0.0056 + 0.0018 * np.sin(np.pi * min(t * 1.9, 1.0))
+            taper = 1.0 - 0.78 * np.clip((t - 0.45) / 0.55, 0, 1) ** 1.4
+            rs.append(body * taper * th)
         c = (pts[0] + pts[-1]) * 0.5
         for seg in sdf.tube(pts, rs):
-            part.add(sdf.Scaled(seg, c, np.eye(3), (1.0, 0.78, 1.0)), 0.003)
-
+            part.add(sdf.Scaled(seg, c, np.eye(3), (1.0, 0.56, 1.0)), 0.002)
+    part.meta["flow"] = (1.0, 0.25, 0.25)
     return part
 
 
@@ -303,3 +319,27 @@ def skin_colours(P, f):
     inside = np.linalg.norm((P - V(0, -0.093, 1.531)) / V(0.026, 0.026, 0.0135), axis=1) < 1.0
     col[inside] = np.array([0.28, 0.08, 0.08])
     return np.clip(col, 0, 1)
+
+
+def skin_masks(P, f):
+    """Per-vertex (stubble, oily, 0): stubble over the jaw, chin and upper lip (lips excluded), oily
+    T-zone (nose, lips, centre of the forehead) where the skin is glossier."""
+    P = np.asarray(P, dtype=np.float64)
+    x, y, z = P[:, 0], P[:, 1], P[:, 2]
+
+    def ss(e0, e1, v):
+        t = np.clip((v - e0) / (e1 - e0), 0, 1)
+        return t * t * (3 - 2 * t)
+    st = f.get("stubble", 0.0)
+    beard = ss(1.572, 1.552, z) * ss(0.030, -0.010, y) * ss(1.440, 1.470, z)
+    lip = np.linalg.norm((P - V(0, -0.118, 1.533)) / V(0.030, 0.020, 0.0115), axis=1)
+    beard *= ss(0.85, 1.25, lip)
+    side = ss(0.100, 0.080, np.abs(x))
+    stubble = np.clip(beard * side * st, 0, 1)
+
+    def bump(c, r):
+        d = np.linalg.norm((P - c) / r, axis=1)
+        return np.clip(1.0 - d, 0, 1) ** 1.5
+    oily = np.clip(bump(V(0, -0.140, 1.570), V(0.020, 0.030, 0.035)) + bump(V(0, -0.118, 1.533), V(0.026, 0.020, 0.013))
+                   + 0.6 * bump(V(0, -0.110, 1.672), V(0.030, 0.030, 0.035)), 0, 1)
+    return np.stack([stubble, oily, np.zeros_like(oily)], axis=1)

@@ -235,6 +235,32 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Combat_AccuracyRampsUpCoverCyclesAndSearchFansOut()
+        {
+            float lSettled = NpcRules.HitChance(0.32f, 10f, false, false, true, 10f, 5f, false);
+            Assert.Less(NpcRules.HitChance(0.32f, 10f, false, false, true, 0.2f, 5f, false), lSettled * 0.4f, "the first shots of a fight are wild");
+            Assert.Less(NpcRules.HitChance(0.32f, 10f, false, false, true, 10f, 0.1f, false), lSettled * 0.6f, "a target just found again is hard to hit");
+            Assert.Less(NpcRules.HitChance(0.32f, 30f, false, false, true, 10f, 5f, false), lSettled, "range");
+            Assert.Less(NpcRules.HitChance(0.32f, 10f, true, false, true, 10f, 5f, false), lSettled, "crouched");
+            Assert.Less(NpcRules.HitChance(0.32f, 10f, false, false, false, 10f, 5f, false), lSettled * 0.3f, "firing blind");
+            Assert.LessOrEqual(NpcRules.HitChance(1f, 1f, false, false, true, 10f, 5f, true), 1f);
+
+            Assert.IsFalse(NpcRules.Peeking(0.2f), "ducked first");
+            Assert.IsTrue(NpcRules.Peeking(NpcRules.DUCK + 0.1f), "then up to shoot");
+            Assert.IsFalse(NpcRules.Peeking(NpcRules.DUCK + NpcRules.PEEK + 0.1f), "and down again");
+
+            float lPrevious = 0f;
+            for (int i = 0; i <= 8; i++)
+            {
+                float lRadius = NpcRules.SearchOffset(i, 30f).magnitude;
+                Assert.That(lRadius, Is.InRange(2.9f, 14.1f));
+                Assert.GreaterOrEqual(lRadius, lPrevious - 1e-3f, "the spiral widens");
+                lPrevious = lRadius;
+            }
+            Assert.Greater(Vector3.Distance(NpcRules.SearchOffset(0, 0f), NpcRules.SearchOffset(0, 180f)), 5f, "two searchers start on opposite sides");
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

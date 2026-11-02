@@ -185,6 +185,46 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public static float StopSeconds(bool pHasErrand, float pErrandSeconds, float pRoutePause, float pRandom01)
             => pHasErrand ? pErrandSeconds * (0.85f + 0.3f * pRandom01) : pRoutePause * (0.6f + 0.8f * pRandom01);
 
+        // ---------------------------------------------------------------- combat
+
+        /// <summary>Seconds over which a fight's first shots go from wild to aimed, and over which a re-acquired target is tracked again.</summary>
+        public const float WARM_UP = 4f, TRACK_UP = 1.5f;
+
+        /// <summary>
+        /// The chance an NPC's shot hits: its accuracy at 10 m, falling with distance (up to 1.6x point
+        /// blank), less on a crouched or sprinting target, a quarter firing blind at the last known
+        /// position; wild in the first seconds of a fight (warm-up) and right after it finds the target
+        /// again (it has to track it); snipers are deadly.
+        /// </summary>
+        public static float HitChance(float pAccuracy, float pDistance, bool pCrouched, bool pSprinting, bool pVisible, float pFightingFor, float pTrackingFor, bool pSniper)
+        {
+            float lChance = pAccuracy * Mathf.Clamp(10f / Mathf.Max(3f, pDistance), 0.15f, 1.6f);
+            if (pCrouched) lChance *= 0.75f;
+            if (pSprinting) lChance *= 0.6f;
+            if (!pVisible) lChance *= 0.25f;
+            lChance *= Mathf.Lerp(0.15f, 1f, Mathf.Clamp01(pFightingFor / WARM_UP));
+            if (pVisible) lChance *= Mathf.Lerp(0.35f, 1f, Mathf.Clamp01(pTrackingFor / TRACK_UP));
+            if (pSniper) lChance *= 1.8f;
+            return Mathf.Clamp01(lChance);
+        }
+
+        /// <summary>Seconds ducked and seconds up in a fighter's cycle behind low cover (it shoots only while up).</summary>
+        public const float DUCK = 1.4f, PEEK = 2.2f;
+
+        /// <summary>Behind low cover since <paramref name="pAtCoverFor"/> seconds: is it up and shooting, or ducked?</summary>
+        public static bool Peeking(float pAtCoverFor) => pAtCoverFor % (DUCK + PEEK) >= DUCK;
+
+        /// <summary>
+        /// A searcher's <paramref name="pStep"/>-th look-around spot around the search centre: a widening
+        /// spiral from 3 to 14 m (golden-angle steps), each searcher starting at its own angle so a squad
+        /// fans out instead of bunching up.
+        /// </summary>
+        public static Vector3 SearchOffset(int pStep, float pStartAngle, int pSteps = 8)
+        {
+            float lRadius = Mathf.Lerp(3f, 14f, Mathf.Clamp01(pStep / (float)Mathf.Max(1, pSteps)));
+            return Quaternion.Euler(0f, pStartAngle + pStep * 137.5f, 0f) * Vector3.forward * lRadius;
+        }
+
         // ---------------------------------------------------------------- the phone call
 
         /// <summary>Seconds of real fighting before anyone thinks of the radio.</summary>

@@ -66,6 +66,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public readonly NetworkVariable<float> AimPitch = new NetworkVariable<float>(0f);
         /// <summary>What it is busy with while standing (phone, smoke, looking around...), for the animation.</summary>
         public readonly NetworkVariable<BodyPose> Pose = new NetworkVariable<BodyPose>(BodyPose.None);
+        /// <summary>Ducked behind low cover between two bursts (every machine crouches it).</summary>
+        public readonly NetworkVariable<bool> Ducked = new NetworkVariable<bool>(false);
         /// <summary>The client filling this NPC's gauge or being confronted by it (HUD arcs and status); <see cref="NO_SUSPECT"/> otherwise.</summary>
         public readonly NetworkVariable<ulong> Suspect = new NetworkVariable<ulong>(NO_SUSPECT);
         public const ulong NO_SUSPECT = ulong.MaxValue;
@@ -277,6 +279,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             else if (State.Value == NpcState.Idle && _break != null && _breakUntil > 0f && lStopped) lPose = PoseFor(_break.Activity);
             else if (State.Value == NpcState.Investigate && lStopped) lPose = BodyPose.LookAround;
             else if (State.Value == NpcState.Patrol && lStopped) lPose = PatrolPose();
+            else if (State.Value == NpcState.Search && lStopped) lPose = BodyPose.LookAround;
             if (Pose.Value != lPose) Pose.Value = lPose;
         }
 
@@ -290,7 +293,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _animator.AimPitch = AimPitch.Value;
             _animator.Held = lArmed ? WeaponModels.HeldOf(Weapon) : HeldKind.None;
             _animator.Aiming = lArmed && (lState == NpcState.Engaged || lState == NpcState.Combat);
-            _animator.Crouched = IsServer && InCombat && _cover != null && _cover.Low && !_targetVisible;
+            _animator.Crouched = Ducked.Value && lState == NpcState.Combat;
             _animator.Panic = (lState == NpcState.Flee || lState == NpcState.Report) && IsCrowd;
             _animator.Calling = lState == NpcState.Calling;
             _animator.Pose = Pose.Value;
@@ -355,6 +358,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             if (State.Value == pState) return;
             if (State.Value == NpcState.Calling && pState != NpcState.Calling) Zone?.CallFinished(this, false);
+            Callout(State.Value, pState);
             State.Value = pState;
             _stateTime = 0f;
             bool lHot = pState == NpcState.Engaged || pState == NpcState.Combat || pState == NpcState.Calling;
@@ -493,9 +497,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             if (State.Value == NpcState.Search)
             {
-                _searchCenter = pPoint;
                 _searchUntil = Mathf.Max(_searchUntil, Time.time + GameDatabase.Rules.searchDuration * 0.5f);
-                MoveTo(pPoint, RUN * 0.6f);
+                RecentreSearch(pPoint, RUN * 0.6f);
             }
             else
             {
@@ -674,10 +677,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 case DetectionModel.Confrontation.LostSight:
                     // Slipping away from a confrontation (anywhere it was not allowed) is an admission.
                     Zone?.MarkHostile(_combatTarget, HostileAct.FledConfrontation);
-                    _searchCenter = lPlayer;
-                    _searchUntil = Time.time + GameDatabase.Rules.searchDuration * 0.6f;
-                    SetState(NpcState.Search);
-                    MoveTo(lPlayer, RUN * 0.6f);
+                    StartSearch(lPlayer, GameDatabase.Rules.searchDuration * 0.6f, true);
                     break;
             }
         }
@@ -874,17 +874,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 // Already searching: a new sound well away from the search moves it (a burst of shots doesn't).
                 if ((pPoint - _searchCenter).sqrMagnitude > 36f)
                 {
-                    _searchCenter = pPoint;
                     _searchUntil = Mathf.Max(_searchUntil, Time.time + GameDatabase.Rules.searchDuration * 0.6f);
-                    MoveTo(pPoint, RUN * 0.8f);
+                    RecentreSearch(pPoint, RUN * 0.8f);
                 }
                 return;
             }
             _awareness = Mathf.Max(_awareness, 0.7f);
-            _searchCenter = pPoint;
-            _searchUntil = Time.time + GameDatabase.Rules.searchDuration;
-            SetState(NpcState.Search);
-            MoveTo(pPoint + Random.insideUnitSphere * 4f, RUN);
+            StartSearch(pPoint, GameDatabase.Rules.searchDuration, true);
         }
 
         private void Investigate(Vector3 pPoint, bool pAlarmed)
@@ -1114,9 +1110,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 // The principal is gone: the bodyguard turns into a furious guard.
                 RoleVar.Value = NpcRole.Guard;
                 _home = transform.position;
-                SetState(NpcState.Search);
-                _searchCenter = transform.position;
-                _searchUntil = Time.time + GameDatabase.Rules.searchDuration;
+                StartSearch(transform.position, GameDatabase.Rules.searchDuration, false);
                 return;
             }
             // Wait outside when the principal goes to the toilet.
@@ -1206,9 +1200,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 _combatTarget = lContact?.player;
                 if (lContact == null)
                 {
-                    _searchCenter = _combatTarget != null ? _combatTarget.transform.position : transform.position;
-                    _searchUntil = Time.time + GameDatabase.Rules.searchDuration;
-                    SetState(NpcState.Search);
+                    StartSearch(_combatTarget != null ? _combatTarget.transform.position : transform.position, GameDatabase.Rules.searchDuration, false);
                     return;
                 }
             }
@@ -1217,6 +1209,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             // Visibility comes from the last perception tick, not raycasts every frame.
             _targetVisible = lContact.visibleNow && _combatTarget != null && _combatTargetExposed;
             if (_targetVisible) Zone?.ReportContact(_combatTarget, _combatTarget.transform.position, true);
+            // How long it has kept the target in its sights (a target found again must be tracked again).
+            _trackingFor = _targetVisible ? _trackingFor + dt : 0f;
             float lSinceSeen = Time.time - lContact.lastSeenTime;
 
             if (_wantsAlarm)
@@ -1234,9 +1228,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             // Lost them for a while: the squad sweeps around the last known position.
             if (lSinceSeen > 7f)
             {
-                _searchCenter = lKnown;
-                _searchUntil = Time.time + GameDatabase.Rules.searchDuration;
-                SetState(NpcState.Search);
+                StartSearch(lKnown, GameDatabase.Rules.searchDuration, false);
                 return;
             }
 
@@ -1253,9 +1245,17 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 if (_cover != null) _cover.Occupant = this;
             }
 
-            if (_cover != null)
+            bool lAtCover = false;
+            if (lRole == LevelZone.CombatRole.Push && lSinceSeen > 3f)
+            {
+                // The pusher goes to where the target was last seen, weapon up, to flush it out.
+                if (_cover != null) { if (_cover.Occupant == this) _cover.Occupant = null; _cover = null; }
+                MoveTo(lKnown, RUN * 0.7f);
+            }
+            else if (_cover != null)
             {
                 MoveTo(_cover.transform.position, RUN);
+                lAtCover = Arrived(0.7f);
             }
             else if (lRole == LevelZone.CombatRole.Push || lSinceSeen > 2.5f)
             {
@@ -1265,14 +1265,23 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
             else Stop();
 
+            // Behind low cover: ducked a moment, up for a burst, down again.
+            if (!lAtCover) _atCoverSince = -1f;
+            else if (_atCoverSince < 0f) _atCoverSince = Time.time;
+            bool lDucked = lAtCover && _cover.Low && !NpcRules.Peeking(Time.time - _atCoverSince);
+            if (Ducked.Value != lDucked) Ducked.Value = lDucked;
+
             Vector3 lAimPoint = _targetVisible ? _combatTarget.Chest : lKnown + Vector3.up * 1.1f;
             FaceTowards(lAimPoint, 540f);
             Vector3 lAimDir = lAimPoint - Eye;
             AimPitch.Value = -Mathf.Asin(Mathf.Clamp(lAimDir.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
 
-            // Visible: shoot. Not visible: suppressors keep firing at the last known position.
-            if (_targetVisible || (lRole == LevelZone.CombatRole.Suppress && lSinceSeen < 4f)) TryShoot(dt);
+            // Visible: shoot. Not visible: suppressors keep firing at the last known position. Never while ducked.
+            if (!lDucked && (_targetVisible || (lRole == LevelZone.CombatRole.Suppress && lSinceSeen < 4f))) TryShoot(dt);
         }
+
+        /// <summary>Behind its cover since then (-1: not at cover), and how long it has kept the target in its sights.</summary>
+        private float _atCoverSince = -1f, _trackingFor;
 
         private float PreferredRange()
         {
@@ -1340,17 +1349,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Vector3 lAim = _targetVisible && _combatTarget != null ? _combatTarget.Chest : (Zone?.ContactFor(_combatTarget)?.lastKnown ?? transform.position + transform.forward * 10f) + Vector3.up * 1.1f;
             float lDistance = Vector3.Distance(lMuzzle, lAim);
 
-            // Hit chance: accuracy falls with range, target crouched or moving; suppression rarely hits.
-            float lChance = GameDatabase.Rules.npcAccuracy * Mathf.Clamp(10f / Mathf.Max(3f, lDistance), 0.15f, 1.6f);
-            if (_combatTarget != null)
-            {
-                if (_combatTarget.Crouched.Value) lChance *= 0.75f;
-                if (_combatTarget.Motor != null && _combatTarget.Sprinting.Value) lChance *= 0.6f;
-            }
-            if (!_targetVisible) lChance *= 0.25f;
-            // Warm-up: the first seconds of a fight are wild - time to dive into cover.
-            lChance *= Mathf.Lerp(0.15f, 1f, Mathf.Clamp01((Time.time - _combatStart) / 4f));
-            if (lWeapon.kind == ItemKind.Sniper) lChance *= 1.8f;
+            // Hit chance (NpcRules.HitChance): range, stance, blind fire, a wild warm-up and tracking time.
+            float lChance = NpcRules.HitChance(GameDatabase.Rules.npcAccuracy, lDistance, _combatTarget != null && _combatTarget.Crouched.Value,
+                _combatTarget != null && _combatTarget.Sprinting.Value, _targetVisible, Time.time - _combatStart, _trackingFor, lWeapon.kind == ItemKind.Sniper);
 
             Vector3 lDir = (lAim - lMuzzle).normalized;
             bool lHitIntended = Random.value < lChance;
@@ -1397,19 +1398,77 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private const int MAX_SHOOTERS = 3;
 
+        /// <summary>
+        /// Host: sweep the area around <paramref name="pCenter"/> for <paramref name="pFor"/> seconds,
+        /// weapon up; <paramref name="pRush"/> runs flat out to it first (a shot, a call, a sighting).
+        /// </summary>
+        private void StartSearch(Vector3 pCenter, float pFor, bool pRush)
+        {
+            _searchCenter = pCenter;
+            _searchUntil = Time.time + pFor;
+            _searchStep = 0;
+            _searchLookUntil = 0f;
+            _searchMoving = false;
+            _searchRush = pRush;
+            SetState(NpcState.Search);
+        }
+
+        /// <summary>Host: the search moves to a new spot (a glimpse, a sound): straight there, then the spiral goes on around it.</summary>
+        private void RecentreSearch(Vector3 pCenter, float pSpeed)
+        {
+            _searchCenter = pCenter;
+            _searchLookUntil = 0f;
+            _searchMoving = true;
+            _searchStep = Mathf.Max(_searchStep, 1);
+            MoveTo(pCenter, pSpeed);
+        }
+
+        /// <summary>
+        /// The sweep: a widening spiral of spots around the search centre, each searcher starting at its
+        /// own angle so a squad fans out (<see cref="NpcRules.SearchOffset"/>), a look around at each.
+        /// </summary>
         private void UpdateSearch()
         {
             if (Time.time > _searchUntil)
             {
+                Bark(Barks.Clear);
                 _combatTarget = null;
                 ReturnToDuty();
                 return;
             }
-            if (Arrived(1.5f) || _stateTime < 0.1f)
+            if (Time.time < _searchLookUntil)
             {
-                float lRadius = Mathf.Lerp(3f, 14f, 1f - (_searchUntil - Time.time) / GameDatabase.Rules.searchDuration);
-                Vector2 lRand = Random.insideUnitCircle * lRadius;
-                MoveTo(_searchCenter + new Vector3(lRand.x, 0, lRand.y), RUN * 0.6f);
+                Stop();
+                transform.Rotate(0f, Mathf.Sin(_stateTime * 1.6f) * 110f * Time.deltaTime, 0f);
+                return;
+            }
+            if (_searchLookUntil > 0f || !_searchMoving)
+            {
+                // On to the next spot of the spiral (the first leg flat out when it was called to it).
+                bool lFirst = !_searchMoving;
+                _searchLookUntil = 0f;
+                _searchMoving = true;
+                float lStart = NetworkObjectId * 97UL % 360UL;
+                MoveTo(_searchCenter + NpcRules.SearchOffset(_searchStep++, lStart), lFirst && _searchRush ? RUN : RUN * 0.6f);
+            }
+            else if (Arrived(1.5f)) _searchLookUntil = Time.time + Random.Range(1.4f, 2.6f);
+        }
+
+        private int _searchStep;
+        private float _searchLookUntil;
+        private bool _searchMoving, _searchRush;
+
+        /// <summary>Host: what it shouts as its state changes (rate-limited by <see cref="Bark"/>).</summary>
+        private void Callout(NpcState pFrom, NpcState pTo)
+        {
+            if (Flees) return;
+            switch (pTo)
+            {
+                case NpcState.Engaged: Bark(Barks.Hey); break;
+                case NpcState.Combat: if (pFrom != NpcState.Calling) Bark(Barks.OverThere); break;
+                case NpcState.Search: Bark(Barks.Huh); break;
+                case NpcState.Investigate: Bark(Barks.Huh); break;
+                case NpcState.Calling: Bark(Barks.Radio); break;
             }
         }
 

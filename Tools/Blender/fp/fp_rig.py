@@ -19,6 +19,8 @@ in a ribbed knit cuff. Parts are voxel-unioned, baked to one PBR atlas (pbr_lib)
 capsule distances. When the cast module exists, build_mesh() takes its parts instead.
 """
 import math
+import os
+import sys
 
 import bmesh
 import bpy
@@ -27,6 +29,19 @@ from mathutils import Matrix, Vector
 
 import fp_common as F
 from fp_common import L
+
+# The cast track's shared glove / forearm module (Tools/Blender/characters/cast/glove.py): the hand
+# layout, the glove, the bomber sleeve and the rib cuff of the hero. GOOBYR_FP_PLACEHOLDER=1 builds
+# the placeholder hand of this file instead.
+CAST_DIR = os.path.join(F.ROOT, "Tools", "Blender", "characters", "cast")
+CG = None
+if os.environ.get("GOOBYR_FP_PLACEHOLDER") != "1" and os.path.exists(os.path.join(CAST_DIR, "glove.py")):
+    sys.path.insert(0, CAST_DIR)
+    try:
+        import glove as CG  # noqa: E402
+    except Exception as e:  # the module is optional: the placeholder still builds
+        print("CAST GLOVE UNAVAILABLE:", e)
+        CG = None
 
 SIDES = ("r", "l")
 FINGERS = ("index", "middle", "ring", "pinky")
@@ -48,6 +63,17 @@ FINGER_SPEC = {
 }
 THUMB_SPEC = dict(cmc=(0.008, 0.024, 0.015), dir=(0.80, 0.40, 0.45), lengths=(0.042, 0.033, 0.028),
                   r=(0.0155, 0.0120))
+if CG is not None:
+    # the cast hand's finger radii (base, tip), scaled like its layout
+    for _n in FINGERS:
+        FINGER_SPEC[_n]["r"] = (CG.FINGER_R[_n][0] * CG.SCALE, CG.FINGER_R[_n][-1] * CG.SCALE)
+    THUMB_SPEC["r"] = (CG.FINGER_R["thumb"][0] * CG.SCALE, CG.FINGER_R["thumb"][-1] * CG.SCALE)
+
+
+def cast_frame(side):
+    """The cast module's hand frame for this rig's rest hand (u fingers, v thumb side, w palm)."""
+    f, t, p = hand_frame(side)
+    return CG.frame_from_arm(np.array(wrist(side)), np.array(f), np.array(t), side)
 
 
 def side_x(side):
@@ -119,6 +145,24 @@ def rest_bones():
         for tw, frac in TWIST.items():
             h = el + f * FOREARM * frac
             B[tw + "_" + s] = (h, h + f * 0.05, p, "lowerarm_" + s)
+        if CG is not None:
+            # the cast's shared hand: its layout places the hand and the 15 finger bones
+            segs = CG.bone_segments(cast_frame(s), s)
+            h, tl = segs["hand_" + s]
+            B["hand_" + s] = (Vector(h), Vector(tl), p, "lowerarm_" + s)
+            for name in FINGERS + ("thumb",):
+                parent = "hand_" + s
+                for i in range(3):
+                    bn = f"{name}_0{i + 1}_{s}"
+                    h, tl = segs[bn]
+                    z = p
+                    if name == "thumb":  # the thumb curls across the palm, towards the little finger
+                        d = (Vector(tl) - Vector(h)).normalized()
+                        z = p * 0.55 - t * 0.85
+                        z = (z - d * z.dot(d)).normalized()
+                    B[bn] = (Vector(h), Vector(tl), z, parent)
+                    parent = bn
+            continue
         B["hand_" + s] = (wr, wr + f * HAND, p, "lowerarm_" + s)
         for name in FINGERS:
             spec = FINGER_SPEC[name]
@@ -350,6 +394,8 @@ def build_sleeve(side):
     inner = [bm.verts.new(v.co - (v.co - (sh + f * length)).normalized() * 0.004 + f * -0.008) for v in rows[-1]]
     for k in range(seg):
         bm.faces.new((rows[-1][k], rows[-1][(k + 1) % seg], inner[(k + 1) % seg], inner[k]))
+    # the rings follow the hand frame, which is mirrored (left-handed) on the right arm: face outwards
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     ob = _bm_obj("sleeve_" + side, bm, "sleeve")
     ob.data.shade_smooth()
     return ob
@@ -398,24 +444,116 @@ def build_cuff(side):
         else:
             strip(mid, row_o)
             strip(row_i, mid)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     ob = _bm_obj("cuff_" + side, bm, "cuff")
     ob.data.shade_smooth()
     return ob
 
 
 SPECS = {
-    # dark brown leather, a soft sheen worn lighter on the knuckles
-    "glove": L.spec("brown_leather", (0.085, 0.05, 0.032), 0.12, "tint", 0.55, (0.32, 0.55), 0.0, 0.55,
-                    wear=0.25, wear_color=(0.2, 0.13, 0.08), noise=0.06, bevel_r=0.002),
-    # olive nylon twill of the bomber
-    "sleeve": L.spec("rough_linen", (0.13, 0.15, 0.085), 0.18, "tint", 0.35, (0.42, 0.6), 0.0, 0.35, noise=0.05),
-    # knit rib in a darker olive
-    "cuff": L.spec("wool_boucle", (0.065, 0.075, 0.045), 0.08, "tint", 0.45, (0.8, 0.95), 0.0, 0.6, noise=0.05),
+    # Rook's look (cast_specs.ROOK_LOOKS, sRGB there, linear here, lifted a little for the darker
+    # first-person light): dark brown leather gloves, a soft sheen worn lighter on the knuckles
+    "glove": L.spec("brown_leather", (0.045, 0.021, 0.012), 0.12, "tint", 0.55, (0.34, 0.55), 0.0, 0.55,
+                    wear=0.25, wear_color=(0.12, 0.075, 0.045), noise=0.06, bevel_r=0.002),
+    # olive MA-1 nylon of the bomber
+    "sleeve": L.spec("rough_linen", (0.06, 0.072, 0.024), 0.18, "tint", 0.35, (0.45, 0.62), 0.0, 0.35, noise=0.05),
+    # knit rib, a darker olive: no texture (the library's wool reads as a plaid at this size), a fine grain
+    "cuff": L.spec(None, (0.028, 0.034, 0.013), 0.08, "none", 0.0, (0.82, 0.95), 0.0, 0.0, noise=0.10, grain=0.35),
 }
 
 
+CAST_PARTS = {"Glove": "glove", "Jacket": "sleeve", "Rib": "cuff", "Team": "cuff"}
+# triangle budget per cast part (the SDF meshes come out at 1-2.5 mm voxels: ~370k vertices for both arms)
+CAST_TRIS = {"Glove": 12000, "Jacket": 5000, "Rib": 2500, "Team": 800}
+
+
+def decimate(ob, tris):
+    """Collapse-decimates a part to about `tris` triangles, keeping its vertex groups."""
+    n = len(ob.data.polygons)
+    if n <= tris:
+        return
+    m = ob.modifiers.new("dec", "DECIMATE")
+    m.decimate_type = "COLLAPSE"
+    m.ratio = tris / n
+    m.use_collapse_triangulate = True
+    L.set_active(ob)
+    with bpy.context.temp_override(object=ob, active_object=ob, selected_objects=[ob]):
+        bpy.ops.object.modifier_apply(modifier=m.name)
+
+
+def build_cast_mesh(arm, bake=True, size=2048):
+    """The cast module's hero arm (glove, MA-1 sleeve, rib cuff) on this rig's rest pose, decimated,
+    baked with this file's PBR specs (by its material slots), its weights spread down the twist bones."""
+    parts = []
+    for s in SIDES:
+        for ob in CG.make_fp_arm(s, np.array(shoulder(s)), np.array(elbow(s)), cast_frame(s), team=False):
+            mat = str(ob.get("cast_material", "Jacket"))
+            n = len(ob.data.vertices)
+            decimate(ob, CAST_TRIS.get(mat, 4000))
+            print("CAST PART %s (%s) %d -> %d verts" % (ob.name, mat, n, len(ob.data.vertices)))
+            ob["part"] = CAST_PARTS.get(mat, "sleeve")
+            ob.data.polygons.foreach_set("material_index", [0] * len(ob.data.polygons))
+            parts.append(ob)
+    ob = L.join(parts, F.ASSET)
+    if bake:
+        L.bake_asset(ob, F.ASSET, SPECS, size, ao_strength=0.5, folder=F.OUT)
+    twist_weights(ob)
+    ob.parent = arm
+    mod = ob.modifiers.new("Armature", "ARMATURE")
+    mod.object = arm
+    ob.data.shade_smooth()
+    return ob
+
+
+def twist_weights(ob):
+    """The cast's forearm weight ('lowerarm') shared down the forearm: lowerarm at the elbow, the two
+    twist bones at 40 % and 75 % of the way to the wrist, so a turned hand twists the sleeve evenly."""
+    groups = {g.name: g.index for g in ob.vertex_groups}
+    for s in SIDES:
+        lo = "lowerarm_" + s
+        if lo not in groups:
+            continue
+        for tw in TWIST:
+            if tw + "_" + s not in groups:
+                groups[tw + "_" + s] = ob.vertex_groups.new(name=tw + "_" + s).index
+        el = np.array(elbow(s))
+        f = np.array(arm_dir(s))
+        knots = [0.0, TWIST["lowerarm_twist_01"], TWIST["lowerarm_twist_02"]]
+        names = [lo, "lowerarm_twist_01_" + s, "lowerarm_twist_02_" + s]
+        for v in ob.data.vertices:
+            w_lo = next((g.weight for g in v.groups if g.group == groups[lo]), 0.0)
+            if w_lo <= 0.0:
+                continue
+            u = min(max(float((np.array(v.co) - el) @ f) / FOREARM, 0.0), 1.0)
+            shares = []
+            for i, k in enumerate(knots):
+                lo_k = knots[i - 1] if i > 0 else -1.0
+                hi_k = knots[i + 1] if i + 1 < len(knots) else 2.0
+                tent = (u - lo_k) / (k - lo_k) if u <= k else (hi_k - u) / (hi_k - k)
+                if i == 0 and u <= 0.0:
+                    tent = 1.0
+                if i == len(knots) - 1 and u >= k:
+                    tent = 1.0
+                shares.append(min(max(tent, 0.0), 1.0))
+            total = sum(shares) or 1.0
+            for nm, sh in zip(names, shares):
+                wt = w_lo * sh / total
+                if wt > 0.002:
+                    ob.vertex_groups[groups[nm]].add([v.index], wt, "REPLACE")
+                elif nm != lo:
+                    pass
+            if shares[0] / total < 0.002:
+                ob.vertex_groups[groups[lo]].remove([v.index])
+            else:
+                ob.vertex_groups[groups[lo]].add([v.index], w_lo * shares[0] / total, "REPLACE")
+    print("TWIST WEIGHTS", F.ASSET, len(ob.data.vertices), "verts")
+
+
 def build_mesh(arm, bake=True, size=2048):
-    """Builds, bakes and weights the arms mesh 'FP_Arms' parented to the armature."""
+    """Builds, bakes and weights the arms mesh 'FP_Arms' parented to the armature (the cast module's
+    hero arm when available, else this file's placeholder)."""
+    if CG is not None:
+        return build_cast_mesh(arm, bake, size)
     parts = []
     for s in SIDES:
         parts += [build_glove(s), build_sleeve(s), build_cuff(s)]

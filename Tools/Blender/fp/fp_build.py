@@ -89,36 +89,37 @@ GRIPS = {
         l=dict(c=(0.0155, -0.002, 0.012), fingers=(0.0, -0.62, -0.78), palm=(-1.0, 0.0, 0.1), depth=0.022,
                reach=0.040, slide=-0.004),
         # thumbs forward on the left of the frame, the firing thumb resting over the support thumb
-        thumb_r=dict(swing=(0, 0), start=(20, 0, 0), target=(0.032, -0.064, 0.066)),
-        thumb_l=dict(swing=(0, 0), start=(10, 0, 0), target=(0.028, -0.090, 0.056)),
+        thumb_r=dict(swing=(0, 0), start=(20, 0, 0), target=(0.033, -0.042, 0.072)),
+        thumb_l=dict(swing=(0, 0), start=(10, 0, 0), target=(0.030, -0.100, 0.046)),
         trigger=(0.0, -0.070, 0.056)),
     "W_Smg": dict(
         r=dict(c=(0.0, -0.0095, 0.019), axis=(0.0, -0.166, 0.986), palm=(1.0, -0.35, 0.0), depth=0.041,
                reach=0.060),
         l=dict(c=(0.0, -0.28, 0.008), axis=(0.0, -0.10, 0.995), palm=(-1.0, 0.3, 0.0), depth=0.040, reach=0.060),
-        thumb_r=dict(swing=(-10, 20), start=(20, 25, 20)), thumb_l=dict(swing=(-10, 20), start=(20, 25, 20)),
+        thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.026, -0.012, 0.040)), thumb_l=dict(swing=(-10, 20), start=(20, 25, 20)),
         trigger=(0.0, -0.068, 0.050)),
     "W_Shotgun": dict(
-        r=dict(c=(0.0, -0.02, 0.012), axis=(0.0, -1.0, 0.15), palm=(1.0, 0.0, 0.0), depth=0.040, reach=0.058),
-        l=dict(c=(0.0, -0.4025, 0.028), axis=(0.0, -1.0, 0.0), palm=(0.15, 0.0, 1.0), depth=0.045, reach=0.060),
-        thumb_r=dict(swing=(-10, 25), start=(25, 30, 20)), thumb_l=dict(swing=(5, 0), start=(10, 10, 10)),
+        # the straight stock wrist crosses the palm diagonally: metacarpals forward-down, thumb round onto the left side (low: the big glove sits a hand-width from the eye in ADS)
+        r=dict(c=(0.0, -0.02, 0.008), fingers=(0.0, -0.78, -0.62), palm=(1.0, 0.0, 0.0), depth=0.039, reach=0.060),
+        l=dict(c=(0.0, -0.355, 0.028), axis=(0.0, -1.0, 0.0), palm=(0.15, 0.0, 1.0), depth=0.045, reach=0.060),
+        thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.034, -0.035, 0.020)), thumb_l=dict(swing=(5, 0), start=(10, 10, 10)),
         trigger=(0.0, -0.136, -0.010)),
     "W_Sniper": dict(
-        r=dict(c=(0.0, 0.0, 0.03), axis=(0.0, -0.45, 0.89), palm=(1.0, -0.3, 0.0), depth=0.040, reach=0.060),
-        l=dict(c=(0.0, -0.37, 0.095), axis=(0.0, -1.0, 0.0), palm=(0.15, 0.0, 1.0), depth=0.042, reach=0.058),
-        thumb_r=dict(swing=(-10, 25), start=(25, 30, 20)), thumb_l=dict(swing=(5, 0), start=(10, 10, 10)),
+        r=dict(c=(0.0, -0.01, 0.035), fingers=(0.0, -0.85, -0.53), palm=(1.0, -0.1, 0.0), depth=0.039, reach=0.062),
+        l=dict(c=(0.0, -0.31, 0.095), axis=(0.0, -1.0, 0.0), palm=(0.15, 0.0, 1.0), depth=0.042, reach=0.058),
+        thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.026, -0.03, 0.060)), thumb_l=dict(swing=(5, 0), start=(10, 10, 10)),
         trigger=(0.0, -0.07, 0.04)),
     "W_RocketLauncher": dict(
         r=dict(c=(0.0, 0.0317, -0.022), axis=(0.0, -0.158, 0.987), palm=(1.0, -0.35, 0.0), depth=0.040,
                reach=0.060),
         l=dict(c=(0.0, -0.125, 0.08), axis=(0.0, -1.0, 0.0), palm=(0.25, 0.0, 1.0), depth=0.057, reach=0.058),
-        thumb_r=dict(swing=(-10, 20), start=(20, 25, 20)), thumb_l=dict(swing=(5, 0), start=(10, 10, 10)),
+        thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.026, 0.02, -0.005)), thumb_l=dict(swing=(5, 0), start=(10, 10, 10)),
         trigger=(0.0, -0.005, 0.030)),
     "W_Flamethrower": dict(
         r=dict(c=(0.0, 0.0038, -0.013), axis=(0.0, -0.146, 0.989), palm=(1.0, -0.35, 0.0), depth=0.041,
                reach=0.060),
         l=dict(c=(0.0, -0.255, 0.01), axis=(0.0, 0.0, 1.0), palm=(-1.0, 0.3, 0.0), depth=0.038, reach=0.060),
-        thumb_r=dict(swing=(-10, 20), start=(20, 25, 20)), thumb_l=dict(swing=(-10, 20), start=(20, 25, 20)),
+        thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.030, 0.022, 0.022)), thumb_l=dict(swing=(-10, 20), start=(20, 25, 20)),
         trigger=(0.0, -0.061, 0.030)),
 }
 
@@ -128,28 +129,28 @@ FAMILIES = {
     "Pistol": dict(weapon="W_Pistol", hands="both", poses=dict(
         Hip=dict(sight=(0.07, -0.105, 0.40), turn=(4, -5, -7), chest=0, trig="frame", clav=(12, 4),
                  pole_r=(1.0, -0.6, -0.1), pole_l=(-1.0, -0.6, 0.0)),
-        ADS=dict(sight=(0.0, 0.0, 0.42), turn=(0, 0, 0), chest=0, trig="trigger", clav=(18, 7),
+        ADS=dict(sight=(0.0, 0.0, 0.45), turn=(0, 0, 0), chest=0, trig="trigger", clav=(18, 7),
                  pole_r=(1.0, -0.6, -0.1), pole_l=(-1.0, -0.6, 0.0)),
         Sprint=dict(sight=(0.12, -0.25, 0.32), turn=(38, -22, -35), chest=-4, trig="frame", left="free"))),
     "Smg": dict(weapon="W_Smg", hands="both", poses=dict(
-        Hip=dict(sight=(0.105, -0.115, 0.20), turn=(3, -4, -6), chest=10, trig="frame"),
+        Hip=dict(sight=(0.105, -0.088, 0.26), turn=(2, -5, -7), chest=14, trig="frame", clav_l=(18, 6)),
         ADS=dict(sight=(0.0, 0.0, 0.15), turn=(0, 0, 0), chest=12, trig="trigger"),
         Sprint=dict(sight=(0.07, -0.20, 0.20), turn=(30, -38, -28), chest=14, trig="frame"))),
     "Shotgun": dict(weapon="W_Shotgun", hands="both", poses=dict(
-        Hip=dict(sight=(0.115, -0.12, 0.16), turn=(3, -4, -6), chest=14, trig="frame"),
-        ADS=dict(sight=(0.0, 0.0, 0.12), turn=(0, 0, 0), chest=16, trig="trigger"),
+        Hip=dict(sight=(0.11, -0.092, 0.24), turn=(2, -5, -7), chest=22, trig="frame", clav_l=(24, 6)),
+        ADS=dict(sight=(0.0, 0.0, 0.17), turn=(0, 0, 0), chest=22, trig="trigger", clav_l=(24, 6)),
         Sprint=dict(sight=(0.06, -0.21, 0.18), turn=(28, -38, -28), chest=16, trig="frame"))),
     "Sniper": dict(weapon="W_Sniper", hands="both", poses=dict(
-        Hip=dict(sight=(0.11, -0.10, 0.14), turn=(3, -4, -6), chest=14, trig="frame"),
-        ADS=dict(sight=(0.0, 0.0, 0.09), turn=(0, 0, 0), chest=16, trig="trigger"),
+        Hip=dict(sight=(0.11, -0.088, 0.22), turn=(2, -5, -7), chest=22, trig="frame", clav_l=(24, 6)),
+        ADS=dict(sight=(0.0, 0.0, 0.09), turn=(0, 0, 0), chest=22, trig="trigger", clav_l=(24, 6)),
         Sprint=dict(sight=(0.06, -0.20, 0.17), turn=(28, -38, -28), chest=16, trig="frame"))),
     "Launcher": dict(weapon="W_RocketLauncher", hands="both", poses=dict(
         Hip=dict(sight=(0.13, -0.06, 0.18), turn=(2, -3, -4), chest=14, trig="frame"),
         ADS=dict(sight=(0.0, 0.0, 0.22), turn=(0, 0, 0), chest=16, trig="trigger"),
         Sprint=dict(sight=(0.10, -0.14, 0.12), turn=(20, -30, -22), chest=16, trig="frame"))),
     "Flamer": dict(weapon="W_Flamethrower", hands="both", poses=dict(
-        Hip=dict(sight=(0.10, -0.06, 0.26), turn=(3, -5, -6), chest=10, trig="frame"),
-        ADS=dict(sight=(0.0, 0.0, 0.26), turn=(0, 0, 0), chest=12, trig="trigger"),
+        Hip=dict(sight=(0.10, -0.08, 0.24), turn=(2, -5, -7), chest=18, trig="frame", clav_l=(22, 6)),
+        ADS=dict(sight=(0.0, 0.0, 0.18), turn=(0, 0, 0), chest=18, trig="trigger", clav_l=(22, 6)),
         Sprint=dict(sight=(0.07, -0.16, 0.22), turn=(28, -38, -28), chest=14, trig="frame"))),
 }
 
@@ -163,7 +164,7 @@ OPEN = dict(index=(6, 8, 4), paddle=(8, 10, 6), thumb=(-10, 0, 6, 8, 6))
 CLAW = dict(index=(40, 55, 35), paddle=(45, 60, 40), thumb=(20, 20, 20, 25, 20))
 PINCH = dict(index=(48, 62, 30), paddle=(70, 88, 52), thumb=(18, 32, 30, 22, 16), key=True)
 CUP = dict(index=(30, 38, 22), paddle=(36, 44, 26), thumb=(10, 20, 24, 18, 12))
-WRAP = dict(index=(62, 70, 40), paddle=(66, 74, 44), thumb=(30, 20, 30, 30, 20))
+WRAP = dict(index=(58, 66, 38), paddle=(64, 72, 42), thumb=(-6, 18, 34, 16, 10))
 LOOSE = dict(index=(25, 35, 20), paddle=(32, 44, 26), thumb=(8, 10, 12, 16, 10))
 
 GUARD_R = dict(knuckles=(0.115, -0.10, 0.37), fwd=(-0.18, 0.28, 1.0), palm=(-0.72, -0.55, 0.0), grip=FIST,
@@ -192,7 +193,7 @@ HAND_FAMILIES = {
                            grip=PINCH, pole=(0.6, -1.0, -0.3)), l=LEFT_DOWN))),
     # rocks, bricks, C4, smoke, remote: held in the palm, fingers round it
     "Palm": dict(item="palm", poses=dict(
-        Hip=dict(r=dict(knuckles=(0.125, -0.14, 0.36), fwd=(-0.25, 0.30, 1.0), palm=(-1.0, 0.25, 0.0),
+        Hip=dict(r=dict(knuckles=(0.125, -0.115, 0.37), fwd=(-0.25, 0.35, 1.0), palm=(-1.0, 0.25, 0.0),
                         grip=WRAP, pole=(0.6, -1.0, -0.2)), l=LEFT_DOWN, clav=(4, 2)),
         ADS=dict(r=dict(knuckles=(0.17, 0.0, 0.20), fwd=(-0.2, 0.9, 0.5), palm=(-0.6, 0.0, 0.8),
                         grip=WRAP, pole=(1.0, -0.6, -0.4)),
@@ -412,6 +413,51 @@ def throw_clip(fam):
 for _fam in ("Pinch", "Palm", "Handle"):
     CLIPS[_fam + "_Throw"] = throw_clip(_fam)
 
+# How the support hand holds a magazine (hand-bone space): fingers up its front, base in the palm,
+# the feed end (the magazine's pivot, +Z up its axis) past the fingertips.
+MAG_IN_HAND = dict(at=(0.150, 0.006, 0.024), axis=(1.0, 0.0, 0.0), front=(0.0, 1.0, 0.0))
+MAG_GRIP = dict(index=(14, 18, 10), paddle=(58, 66, 40), thumb=(24, 20, 30, 24, 14))
+
+# Weapon-held clips: the gun's Sight path (Unity space + turn), the right hand on the grip all along,
+# the left hand "grip" (its support grip on the gun), a free hand dict, or ("mag", d, offset) holding the
+# magazine d metres out of the well along its axis (+ an offset in the gun's frame). Events drive the
+# viewmodel: magOut (the gun's magazine goes), magGrab (the one in hand shows), magIn (back in the gun).
+_PH = FAMILIES["Pistol"]["poses"]["Hip"]
+_SH = FAMILIES["Smg"]["poses"]["Hip"]
+RELOADS = {
+    "Pistol_Reload": dict(family="Pistol", length=1.50, events=dict(magOut=0.28, magGrab=0.58, magIn=1.02), keys=[
+        (0.00, dict(sight=_PH["sight"], turn=_PH["turn"], l="grip", clav=(12, 4))),
+        (0.16, dict(sight=(0.05, -0.09, 0.36), turn=(-14, -12, -32), l="grip", clav=(8, 4))),
+        (0.30, dict(sight=(0.05, -0.095, 0.36), turn=(-16, -12, -34),
+                    l=dict(knuckles=(-0.06, -0.20, 0.33), fwd=(0.3, -0.6, 1.0), palm=(1.0, 0.0, 0.2), grip=OPEN,
+                           pole=(-0.6, -1.0, -0.2)))),
+        (0.48, dict(l=dict(knuckles=(-0.17, -0.56, 0.16), fwd=(0.2, -1.0, 0.3), palm=(1.0, 0.0, 0.0), grip=CUP,
+                           pole=(-0.8, -0.4, -0.6)))),
+        (0.60, dict(l=dict(knuckles=(-0.16, -0.54, 0.18), fwd=(0.2, -0.6, 0.6), palm=(1.0, 0.2, 0.0), grip=MAG_GRIP,
+                           pole=(-0.8, -0.4, -0.6)))),
+        (0.84, dict(sight=(0.045, -0.085, 0.37), turn=(-12, -10, -30), l=("mag", 0.075, (0.0, 0.0, -0.01)))),
+        (1.00, dict(l=("mag", 0.0, (0.0, 0.0, 0.0)))),
+        (1.08, dict(sight=(0.045, -0.078, 0.37), turn=(-9, -9, -28), l=("mag", -0.004, (0.0, 0.0, 0.0)))),
+        (1.24, dict(sight=(0.06, -0.10, 0.39), turn=(0, -6, -12), l="grip")),
+        (1.50, dict(sight=_PH["sight"], turn=_PH["turn"], l="grip", clav=(12, 4))),
+    ]),
+    "Smg_Reload": dict(family="Smg", length=2.00, events=dict(magOut=0.42, magGrab=0.42, magIn=1.36), keys=[
+        (0.00, dict(sight=_SH["sight"], turn=_SH["turn"], l="grip", chest=10)),
+        (0.18, dict(sight=(0.07, -0.10, 0.22), turn=(-8, -16, -24), l="grip", chest=8)),
+        (0.42, dict(sight=(0.07, -0.10, 0.23), turn=(-8, -18, -26), l=("mag", 0.0, (0.0, 0.0, 0.0)))),
+        (0.62, dict(l=("mag", 0.13, (0.02, 0.02, -0.02)))),
+        (0.84, dict(l=dict(knuckles=(-0.17, -0.55, 0.17), fwd=(0.2, -1.0, 0.3), palm=(1.0, 0.0, 0.0),
+                           grip=MAG_GRIP, pole=(-0.8, -0.4, -0.6)))),
+        (1.06, dict(l=dict(knuckles=(-0.15, -0.50, 0.19), fwd=(0.2, -0.6, 0.6), palm=(1.0, 0.2, 0.0),
+                           grip=MAG_GRIP, pole=(-0.8, -0.4, -0.6)))),
+        (1.24, dict(sight=(0.07, -0.10, 0.23), turn=(-8, -18, -26), l=("mag", 0.07, (0.0, 0.0, 0.0)))),
+        (1.36, dict(l=("mag", 0.0, (0.0, 0.0, 0.0)))),
+        (1.44, dict(sight=(0.07, -0.095, 0.23), turn=(-6, -17, -24), l=("mag", -0.004, (0.0, 0.0, 0.0)))),
+        (1.70, dict(sight=(0.09, -0.11, 0.21), turn=(0, -8, -4), l="grip", chest=9)),
+        (2.00, dict(sight=_SH["sight"], turn=_SH["turn"], l="grip", chest=10)),
+    ]),
+}
+
 
 class Track:
     """A keyed channel: (time, value) pairs, Catmull-Rom between them (positions, scalars, tuples)."""
@@ -594,6 +640,129 @@ class Builder:
         print("CLIP", name, n + 1, "frames")
         return act, poses
 
+    # ---------------------------------------------------------------- weapon-held clips (reloads)
+    def hold_reference(self, fam):
+        """The family's hip pose solved once: the hands and fingers relative to the gun, reused by its clips."""
+        spec = FAMILIES[fam]["poses"]["Hip"]
+        P, W, points = self.solve_weapon_pose(fam, "Hip", spec)
+        Winv = W.inverted()
+        ref = dict(W=W, points=points, hand_r=Winv @ P.get("hand_r"), hand_l=Winv @ P.get("hand_l"), fingers={})
+        for side in R.SIDES:
+            hm_inv = P.get("hand_" + side).inverted()
+            for name in R.FINGERS + ("thumb",):
+                for i in range(3):
+                    bn = f"{name}_0{i + 1}_{side}"
+                    ref["fingers"][bn] = hm_inv @ P.get(bn)
+        return ref
+
+    def play_weapon_clip(self, name, clip):
+        fam = clip["family"]
+        ref = self.hold_reference(fam)
+        root, points, _ = self.weapon(FAMILIES[fam]["weapon"])
+        sight_local = points["Sight"].translation
+        mag_well = points["MagWell"]
+        keys = clip["keys"]
+        tr = {}
+        for ch in ("sight", "turn", "chest", "clav", "clav_l", "clav_r"):
+            ks = [(t, k[ch]) for t, k in keys if ch in k]
+            if ks:
+                tr[ch] = Track(ks)
+        lkeys = [(t, k["l"]) for t, k in keys if "l" in k]
+        mag_hand = Matrix(((0, 0, 1), (0, 0, 0), (0, 0, 0)))  # placeholder, replaced below
+        mi = MAG_IN_HAND
+        # the magazine's frame in hand-bone space (X = Y x Z, Y = -front, Z = axis)
+        z = Vector(mi["axis"]).normalized()
+        y = -Vector(mi["front"]).normalized()
+        x = y.cross(z)
+        mag_hand = Matrix((x, y, z)).transposed().to_4x4()
+        mag_hand.translation = Vector(mi["at"])
+
+        def W_at(t):
+            rot = F.euler_u(*tr["turn"].at(t))
+            return F.frame(rot, F.u2b(tr["sight"].at(t)) - rot @ sight_local)
+
+        def left_target(spec, W):
+            """(hand matrix, finger locals or grip dict, gun-relative?) for a left-hand key."""
+            if spec == "grip":
+                return W @ ref["hand_l"], ("locals", None), True
+            if isinstance(spec, tuple) and spec[0] == "mag":
+                d, off = spec[1], spec[2]
+                prop = W @ Matrix.Translation(Vector(off)) @ mag_well @ Matrix.Translation((0, 0, -d))
+                return prop @ mag_hand.inverted(), ("grip", MAG_GRIP), True
+            rot = hand_rot(spec["fwd"], spec["palm"])
+            m = rot.to_4x4()
+            m.translation = F.u2b(spec["knuckles"]) - rot.col[1] * 0.095
+            return m, ("grip", spec.get("grip", OPEN)), False
+
+        act = bpy.data.actions.new(name)
+        act.use_fake_user = True
+        self.arm.animation_data.action = act
+        n = int(round(clip["length"] * F.FPS))
+        poses = {}
+        for fr in range(n + 1):
+            t = fr / F.FPS
+            W = W_at(t)
+            root.matrix_world = W
+            P = S.Pose(self.arm)
+            spec = {ch: tr[ch].at(t) for ch in ("chest", "clav", "clav_l", "clav_r") if ch in tr}
+            self.body(P, spec)
+            # right hand: the hip grip, carried by the gun
+            hr = W @ ref["hand_r"]
+            P.arm_ik("r", hr.translation, hr.to_3x3(), F.u2b(POLES["r"]))
+            self.apply_fingers(P, "r", ref)
+            P.set("weapon_r", socket_matrix(W))
+            # left hand: between the two keys around t
+            i = max(j for j in range(len(lkeys)) if lkeys[j][0] <= t) if t >= lkeys[0][0] else 0
+            k0 = lkeys[i]
+            k1 = lkeys[min(i + 1, len(lkeys) - 1)]
+            u = 0.0 if k1[0] <= k0[0] else (t - k0[0]) / (k1[0] - k0[0])
+            u = u * u * (3 - 2 * u)
+            m0, f0, g0 = left_target(k0[1], W)
+            m1, f1, g1 = left_target(k1[1], W)
+            pos = m0.translation.lerp(m1.translation, u)
+            q = m0.to_quaternion().slerp(m1.to_quaternion(), u)
+            hl = q.to_matrix().to_4x4()
+            hl.translation = pos
+            pole = k1[1].get("pole", POLES["l"]) if isinstance(k1[1], dict) else (
+                k0[1].get("pole", POLES["l"]) if isinstance(k0[1], dict) else POLES["l"])
+            P.arm_ik("l", hl.translation, hl.to_3x3(), F.u2b(pole))
+            self.blend_fingers(P, "l", ref, f0, f1, u)
+            P.set("prop_l", socket_matrix(P.get("hand_l") @ mag_hand))
+            P.apply()
+            P.key(fr)
+            poses[fr] = P
+        print("CLIP", name, n + 1, "frames")
+        return act, poses, ref
+
+    @staticmethod
+    def apply_fingers(P, side, ref):
+        hm = P.get("hand_" + side)
+        for name in R.FINGERS + ("thumb",):
+            for i in range(3):
+                bn = f"{name}_0{i + 1}_{side}"
+                P.set(bn, hm @ ref["fingers"][bn])
+
+    def blend_fingers(self, P, side, ref, f0, f1, u):
+        """Fingers between two keys: each as local matrices (stored grip, or a grip dict applied), slerped."""
+        def locals_of(f):
+            if f[0] == "locals":
+                return {bn: m for bn, m in ref["fingers"].items() if bn.endswith("_" + side)}
+            Q = S.Pose(self.arm)
+            Q.P = dict(P.P)
+            set_grip(Q, side, f[1])
+            hm_inv = Q.get("hand_" + side).inverted()
+            return {f"{n}_0{i + 1}_{side}": hm_inv @ Q.get(f"{n}_0{i + 1}_{side}")
+                    for n in R.FINGERS + ("thumb",) for i in range(3)}
+        a, b = locals_of(f0), locals_of(f1)
+        hm = P.get("hand_" + side)
+        for name in R.FINGERS + ("thumb",):
+            for i in range(3):
+                bn = f"{name}_0{i + 1}_{side}"
+                q = a[bn].to_quaternion().slerp(b[bn].to_quaternion(), u)
+                m = q.to_matrix().to_4x4()
+                m.translation = a[bn].translation.lerp(b[bn].translation, u)
+                P.set(bn, hm @ m)
+
     @staticmethod
     def body(P, spec):
         """Chest yaw (bladed stance, + turns the right shoulder back) and shoulders pushed forward /
@@ -722,6 +891,9 @@ class Builder:
 
     def export(self):
         os.makedirs(F.OUT, exist_ok=True)
+        # importing the weapon FBXs set the scene to their 24 fps: the keys are 60 fps frames
+        bpy.context.scene.render.fps = F.FPS
+        bpy.context.scene.render.fps_base = 1.0
         self.arm.animation_data.action = None
         for o in bpy.context.view_layer.objects:
             o.select_set(False)
@@ -792,6 +964,23 @@ def main():
             b.show_item(kind, item_socket(poses[0], kind))
             for tag, t in [(k, v) for k, v in clip.get("events", {}).items()] + [("mid", clip["length"] * 0.45)]:
                 bpy.context.scene.frame_set(int(round(t * F.FPS)))
+                b.preview(f"{name}_{tag}")
+    for name, clip in RELOADS.items():
+        if only and name not in only and clip["family"] not in only:
+            continue
+        b.hide_weapons()
+        act, poses, ref = b.play_weapon_clip(name, clip)
+        b.manifest["clips"][name] = dict(family=clip["family"], length=clip["length"], frames=len(poses),
+                                         events=clip.get("events", {}))
+        for tag, t in [("start", 0.0)] + [(k, v) for k, v in clip.get("events", {}).items()]:
+            fr = int(round(t * F.FPS))
+            b.record_pose(f"{name}@{tag}", poses[fr], frame=fr, clip=name)
+        if preview:
+            root = b.weapon(FAMILIES[clip["family"]]["weapon"])[0]
+            for tag, t in [(k, v) for k, v in clip.get("events", {}).items()] + [("mid", clip["length"] * 0.5)]:
+                fr = int(round(t * F.FPS))
+                bpy.context.scene.frame_set(fr)
+                root.matrix_world = poses[fr].get("weapon_r") @ G_INV.inverted().to_4x4()
                 b.preview(f"{name}_{tag}")
     if "--export" in args:
         b.export()

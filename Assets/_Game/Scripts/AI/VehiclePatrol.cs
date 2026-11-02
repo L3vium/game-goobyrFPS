@@ -97,10 +97,21 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 if (!lPlayer.Health.IsAlive || lPlayer.Hidden.Value || (lPlayer.Crouched.Value && lPlayer.InGrass.Value)) continue;
                 Vector3 lTo = lPlayer.Chest - (_body.position + Vector3.up * 1.4f);
                 if (lTo.magnitude > 22f || Vector3.Angle(_body.forward, lTo) > 50f) continue;
-                if (Physics.Linecast(_body.position + Vector3.up * 1.4f, lPlayer.Chest, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore)) continue;
+                // The social ladder applies to the patrol car too: a calm passer-by in a public street is
+                // not worth a stop - a trespasser, a gun out, odd behaviour or a known hostile is.
+                if (!WorthAStop(lPlayer)) continue;
+                if (!Senses.Clear(_body.position + Vector3.up * 1.4f, lPlayer.Chest)) continue;
                 StopAndDismount(lPlayer);
                 return;
             }
+        }
+
+        private bool WorthAStop(PlayerAvatar pPlayer)
+        {
+            LevelZone lZone = LevelZone.At(_body.position) ?? LevelZone.Get(0);
+            if (lZone != null && lZone.IsHostile(pPlayer)) return true;
+            SecurityTier lTier = SecurityZone.ForPlayer(SecurityZone.At(pPlayer.transform.position, out AccessLevel lNeed), lNeed, pPlayer.Weapons != null ? pPlayer.Weapons.Access : AccessLevel.None, false);
+            return DetectionModel.TierFactor(lTier, Npc.ActsSuspicious(pPlayer)) > 0f;
         }
 
         private void StopAndDismount(PlayerAvatar pSeen)

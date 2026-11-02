@@ -209,8 +209,8 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
             Assert.IsFalse(NpcRules.Reports(false, 5f), "a shot only heard is not something to report");
             Assert.IsTrue(NpcRules.ReporterNeeded(0));
             Assert.IsFalse(NpcRules.ReporterNeeded(NpcRules.MAX_REPORTERS), "one or two go and tell, the rest run");
-            Assert.Less(NpcRules.BreakInterval(true, true, 1f), NpcRules.BreakInterval(true, false, 0f), "staff on its own keeps busy");
-            Assert.Less(NpcRules.BreakInterval(true, false, 1f), NpcRules.BreakInterval(false, false, 1f), "guests wander more than guards leave their posts");
+            Assert.Less(NpcRules.BreakInterval(true, true, 0.5f), NpcRules.BreakInterval(true, false, 0.5f), "staff on its own keeps busy");
+            Assert.Less(NpcRules.BreakInterval(true, false, 0.5f), NpcRules.BreakInterval(false, false, 0.5f), "guests wander more than guards leave their posts");
         }
 
         [Test]

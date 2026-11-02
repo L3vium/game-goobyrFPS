@@ -531,7 +531,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 distance = lTo.magnitude,
                 range = pRules.npcVisionRange * (Role == NpcRole.Lookout ? 1.5f : 1f) * BuildingVolume.LightFactor(lTarget) * (pCombat ? 1.5f : 1f) * (pPlayer.CarriesProof.Value ? 1.2f : 1f) * (Zone != null ? Zone.VisionFactor : 1f),
-                angle = Vector3.Angle(transform.forward, lTo),
+                angle = NpcRules.ConeAngle(transform.forward, lTo, Role == NpcRole.Lookout),
                 halfCone = pRules.npcVisionAngle * 0.5f * (pCombat ? 1.4f : 1f),
                 crouched = pPlayer.Crouched.Value,
                 inGrass = pPlayer.InGrass.Value,
@@ -682,7 +682,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 Vector3 lBody = lOther.transform.position + Vector3.up * 0.3f;
                 float lDistance = Vector3.Distance(Eye, lBody);
                 if (lDistance > 16f * BuildingVolume.LightFactor(lBody)) continue;
-                if (Vector3.Angle(transform.forward, lBody - Eye) > GameDatabase.Rules.npcVisionAngle * 0.5f) continue;
+                if (NpcRules.ConeAngle(transform.forward, lBody - Eye, Role == NpcRole.Lookout) > GameDatabase.Rules.npcVisionAngle * 0.5f) continue;
                 if (!Senses.Clear(Eye, lBody)) continue;
                 _seenBodies.Add(lOther.NetworkObjectId);
                 if (!_reportedBodies.Add(lOther.NetworkObjectId))

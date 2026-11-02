@@ -65,6 +65,24 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return pSelf + lAway.normalized * pDistance;
         }
 
+        /// <summary>How far below / above the horizon a lookout's flat cone reaches (degrees).</summary>
+        public const float LOOKOUT_PITCH_DOWN = 75f, LOOKOUT_PITCH_UP = 40f;
+
+        /// <summary>
+        /// The angle between where an NPC faces and a point, for its vision cone. A lookout on a tower
+        /// or a wall scans the ground below: its cone is flat - only the bearing counts, down to
+        /// <see cref="LOOKOUT_PITCH_DOWN"/> under the horizon (right under its feet it sees nothing).
+        /// </summary>
+        public static float ConeAngle(Vector3 pForward, Vector3 pTo, bool pFlat)
+        {
+            if (!pFlat) return Vector3.Angle(pForward, pTo);
+            Vector3 lFlatTo = new Vector3(pTo.x, 0f, pTo.z), lFlatForward = new Vector3(pForward.x, 0f, pForward.z);
+            float lPitch = Mathf.Atan2(-pTo.y, lFlatTo.magnitude) * Mathf.Rad2Deg;
+            if (lPitch > LOOKOUT_PITCH_DOWN || lPitch < -LOOKOUT_PITCH_UP) return 180f;
+            if (lFlatTo.sqrMagnitude < 0.0001f || lFlatForward.sqrMagnitude < 0.0001f) return 0f;
+            return Vector3.Angle(lFlatForward, lFlatTo);
+        }
+
         // ---------------------------------------------------------------- spotting
 
         public enum SpotReaction : byte { Confront, Fight, Flee }

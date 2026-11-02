@@ -127,6 +127,18 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Lookout_FlatConeSeesTheGroundBelowItsTower()
+        {
+            // A lookout 12 m up, a player 8 m out in front: 56 degrees down - outside a 45-degree half cone in 3-D.
+            Vector3 lTo = new Vector3(0f, -12f, 8f);
+            Assert.Greater(NpcRules.ConeAngle(Vector3.forward, lTo, false), 45f);
+            Assert.Less(NpcRules.ConeAngle(Vector3.forward, lTo, true), 1f, "the lookout scans the ground");
+            Assert.AreEqual(90f, NpcRules.ConeAngle(Vector3.forward, new Vector3(8f, -12f, 0f), true), 0.5f, "the bearing still counts");
+            Assert.AreEqual(180f, NpcRules.ConeAngle(Vector3.forward, new Vector3(0f, -12f, 1f), true), "right under its feet it sees nothing");
+            Assert.AreEqual(180f, NpcRules.ConeAngle(Vector3.forward, new Vector3(0f, 20f, 5f), true), "nor straight up");
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

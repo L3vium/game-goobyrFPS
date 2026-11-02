@@ -105,5 +105,63 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         private static byte Byte(float pValue) => (byte)Mathf.RoundToInt(Mathf.Clamp01(pValue) * 255f);
+
+        /// <summary>
+        /// The land under and beyond the grass: a copy of a terrain layer whose albedo averages
+        /// <paramref name="pLinear"/> (the grass's far colour, <see cref="GrassStyle.FarColor"/>), saved as
+        /// <c>Art/Generated/Grass/&lt;name&gt;.terrainlayer</c>. The shared layer the other maps use is untouched.
+        /// </summary>
+        public static TerrainLayer Turf(TerrainLayer pLayer, Color pLinear, string pName)
+        {
+            if (pLayer == null || pLayer.diffuseTexture == null) return pLayer;
+            Color lAverage = AverageAlbedo(pLayer.diffuseTexture);
+            EditorAssets.EnsureFolder(FOLDER);
+            string lPath = $"{FOLDER}/{pName}.terrainlayer";
+            TerrainLayer lTurf = AssetDatabase.LoadAssetAtPath<TerrainLayer>(lPath);
+            if (lTurf == null)
+            {
+                lTurf = new TerrainLayer();
+                AssetDatabase.CreateAsset(lTurf, lPath);
+            }
+            EditorUtility.CopySerialized(pLayer, lTurf);
+            lTurf.name = pName;
+            lTurf.diffuseRemapMin = Vector4.zero;
+            lTurf.diffuseRemapMax = new Vector4(Scale(pLinear.r, lAverage.r), Scale(pLinear.g, lAverage.g), Scale(pLinear.b, lAverage.b), 1f);
+            EditorUtility.SetDirty(lTurf);
+            return lTurf;
+        }
+
+        private static float Scale(float pTarget, float pAverage) => Mathf.Clamp(pTarget / Mathf.Max(pAverage, 0.004f), 0.02f, 3f);
+
+        private static readonly System.Collections.Generic.Dictionary<string, Color> _averages = new System.Collections.Generic.Dictionary<string, Color>();
+
+        /// <summary>A texture's average colour in linear space, read from its source file (importers keep textures unreadable).</summary>
+        public static Color AverageAlbedo(Texture2D pTexture)
+        {
+            string lPath = AssetDatabase.GetAssetPath(pTexture);
+            if (_averages.TryGetValue(lPath, out Color lCached)) return lCached;
+            Color lAverage = new Color(0.25f, 0.25f, 0.25f, 1f);
+            if (File.Exists(lPath))
+            {
+                Texture2D lImage = new Texture2D(2, 2, TextureFormat.RGBA32, false, false);
+                if (lImage.LoadImage(File.ReadAllBytes(lPath)))
+                {
+                    Color32[] lPixels = lImage.GetPixels32();
+                    double r = 0, g = 0, b = 0;
+                    int n = 0;
+                    for (int i = 0; i < lPixels.Length; i += 7)
+                    {
+                        r += Mathf.GammaToLinearSpace(lPixels[i].r / 255f);
+                        g += Mathf.GammaToLinearSpace(lPixels[i].g / 255f);
+                        b += Mathf.GammaToLinearSpace(lPixels[i].b / 255f);
+                        n++;
+                    }
+                    if (n > 0) lAverage = new Color((float)(r / n), (float)(g / n), (float)(b / n), 1f);
+                }
+                Object.DestroyImmediate(lImage);
+            }
+            _averages[lPath] = lAverage;
+            return lAverage;
+        }
     }
 }

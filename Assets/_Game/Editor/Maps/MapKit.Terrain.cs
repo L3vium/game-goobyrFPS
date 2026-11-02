@@ -37,8 +37,33 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public TerrainLayer[] LandLayers;
         /// <summary>Realistic maps: mesh details (instanced grass, ferns), each with a density 0..1 per world point.</summary>
         public readonly List<(DetailPrototype prototype, System.Func<float, float, float> density, int max)> Details = new List<(DetailPrototype, System.Func<float, float, float>, int)>();
-        /// <summary>Realistic maps: the detail that fills the tall grass fields (null = the stylized blades).</summary>
+        /// <summary>Realistic maps: the detail that fills the tall grass fields (null = the stylized blades). Ignored with <see cref="RealGrass"/>.</summary>
         public DetailPrototype TallGrassDetail;
+        private World.GrassStyle _realGrass;
+        private System.Func<float, float, float> _realDensity;
+        private Ground[] _realTurf, _realDryTurf;
+        private System.Func<float, float, float> _realDryness;
+
+        /// <summary>
+        /// Real grass (GPU blades, <see cref="World.GrassField"/>) over the land, baked by <see cref="Finish"/>.
+        /// <paramref name="pDensity"/> says where it may grow, 0..1 per world point (0 on roads, lots, water
+        /// and steep rock: the masks the grass detail used). <paramref name="pTurf"/> are the ground layers it
+        /// grows on: the density follows how much of them is painted, and they are tinted to the grass's far
+        /// colour so the land does not change colour where the blades end (90 m). <paramref name="pDryTurf"/>
+        /// are layers of dry grass: they carry grass too, drier, tinted to its dry far colour. With no
+        /// layers, the density alone decides and no layer is tinted. <paramref name="pDryness"/> (0 green ..
+        /// 1 straw) overrides the dryness otherwise taken from the dry layers (or a noise). The tall grass
+        /// fields grow tall blades (<see cref="TallGrassDetail"/> is not used). Replaces the instanced grass
+        /// detail: keep ferns and the like as <see cref="Details"/>.
+        /// </summary>
+        public void RealGrass(World.GrassStyle pStyle, System.Func<float, float, float> pDensity, Ground[] pTurf = null, Ground[] pDryTurf = null, System.Func<float, float, float> pDryness = null)
+        {
+            _realGrass = pStyle;
+            _realDensity = pDensity;
+            _realTurf = pTurf;
+            _realDryTurf = pDryTurf;
+            _realDryness = pDryness;
+        }
         private System.Func<float, float, bool> _holes;
         private string LandPath => EditorAssets.SCENES + "/" + Map.sceneName + "_Terrain.asset";
         private const int ALPHA_RESOLUTION = 1024, DETAIL_RESOLUTION = 1024;
@@ -115,6 +140,42 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lMaterial.EnableKeyword("_ALPHATEST_ON");
             EditorUtility.SetDirty(lMaterial);
             return lMaterial;
+        }
+
+        /// <summary>The real grass: its map (weighted by the turf layers), the turf layers tinted, the field on the land.</summary>
+        private void BakeRealGrass()
+        {
+            int lRes = _landData.alphamapResolution, lLayers = _landData.alphamapLayers;
+            float[,,] lAlpha = _landData.GetAlphamaps(0, 0, lRes, lRes);
+            float Weight(Ground[] pGrounds, float pX, float pZ)
+            {
+                if (pGrounds == null) return 0f;
+                int i = Mathf.Clamp(Mathf.FloorToInt((pX - _landOrigin.x) / _landSize * lRes), 0, lRes - 1);
+                int j = Mathf.Clamp(Mathf.FloorToInt((pZ - _landOrigin.z) / _landSize * lRes), 0, lRes - 1);
+                float w = 0f;
+                foreach (Ground g in pGrounds) if ((int)g < lLayers) w += lAlpha[j, i, (int)g];
+                return w;
+            }
+            bool lLayered = _realTurf != null || _realDryTurf != null;
+            System.Func<float, float, float> lDensity = lLayered
+                ? (x, z) => _realDensity(x, z) * Mathf.Clamp01((Weight(_realTurf, x, z) + Weight(_realDryTurf, x, z)) * 1.5f)
+                : _realDensity;
+            System.Func<float, float, float> lDry = _realDryness ?? (_realDryTurf == null ? null : (x, z) =>
+            {
+                float g = Weight(_realTurf, x, z), d = Weight(_realDryTurf, x, z);
+                return Mathf.Clamp01(d / Mathf.Max(0.001f, g + d) * 0.75f + 0.25f * (0.5f + 0.5f * LandShape.Fbm(x, z, 24f, 2, 12.9f)));
+            });
+            GrassBaker.Bake(Land, Map.sceneName, _realGrass, lDensity, null, lDry, _tallGrass.Count > 0 ? (System.Func<float, float, float>)TallGrassDensity : null);
+
+            // The land under and beyond the blades takes their far colour.
+            TerrainLayer[] lTurfed = _landData.terrainLayers;
+            if (_realTurf != null)
+                foreach (Ground g in _realTurf)
+                    if ((int)g < lTurfed.Length) lTurfed[(int)g] = GrassBaker.Turf(lTurfed[(int)g], _realGrass.FarColor, Map.sceneName + "_Turf_" + g);
+            if (_realDryTurf != null)
+                foreach (Ground g in _realDryTurf)
+                    if ((int)g < lTurfed.Length) lTurfed[(int)g] = GrassBaker.Turf(lTurfed[(int)g], _realGrass.FarDryColor, Map.sceneName + "_Turf_" + g);
+            _landData.terrainLayers = lTurfed;
         }
 
         /// <summary>Cuts holes in the terrain where the function says so (cellars, cave mouths): applied by <see cref="Finish"/>.</summary>
@@ -271,7 +332,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 _landData.SetDetailResolution(DETAIL_RESOLUTION, 32);
                 List<DetailPrototype> lPrototypes = new List<DetailPrototype>();
                 foreach (var lDetail in Details) lPrototypes.Add(lDetail.prototype);
-                if (TallGrassDetail != null) lPrototypes.Add(TallGrassDetail);
+                bool lTallDetail = TallGrassDetail != null && _realGrass == null;
+                if (lTallDetail) lPrototypes.Add(TallGrassDetail);
                 _landData.detailPrototypes = lPrototypes.ToArray();
                 for (int d = 0; d < Details.Count; d++)
                 {
@@ -285,7 +347,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         }
                     _landData.SetDetailLayer(0, 0, d, lLayer);
                 }
-                if (TallGrassDetail != null)
+                if (lTallDetail)
                 {
                     int[,] lTall = new int[DETAIL_RESOLUTION, DETAIL_RESOLUTION];
                     for (int z = 0; z < DETAIL_RESOLUTION; z++)
@@ -350,6 +412,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     }
                 _landData.SetHoles(0, 0, lSolid);
             }
+            if (_realGrass != null) BakeRealGrass();
             Land.terrainData = _landData;
             Land.GetComponent<TerrainCollider>().terrainData = _landData;
             Land.Flush();
@@ -371,9 +434,19 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         public LandShape(System.Func<float, float, float> pBase) => _base = pBase;
 
+        /// <summary>
+        /// How much small relief (2-10 m bumps, a few decimetres) is added to the base before the stamps:
+        /// it breaks the smooth ramps of the base and of the stamps' feathers, while pads and roads stay
+        /// flat (they are stamped after). 0 turns it off for a map.
+        /// </summary>
+        public float Detail = 1f;
+
+        /// <summary>The small relief at a point (metres): two octaves, about ±0.2 m, gentle enough for the NavMesh.</summary>
+        public static float DetailNoise(float pX, float pZ) => Fbm(pX, pZ, 8.5f, 2, 41.3f) * 0.16f + Fbm(pX, pZ, 3.4f, 1, 13.7f) * 0.05f;
+
         public float Height(float pX, float pZ)
         {
-            float h = _base(pX, pZ);
+            float h = _base(pX, pZ) + (Detail > 0f ? DetailNoise(pX, pZ) * Detail : 0f);
             Vector2 p = new Vector2(pX, pZ);
             foreach ((Rect lBounds, System.Func<float, float, float, float> lOp) in _stamps)
                 if (lBounds.Contains(p)) h = lOp(pX, pZ, h);

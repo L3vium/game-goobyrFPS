@@ -10,7 +10,7 @@ namespace Com.IsartDigital.GoobyrFPS.World
     [System.Serializable]
     public class GrassStyle
     {
-        public Color root = new Color(0.045f, 0.08f, 0.022f);
+        public Color root = new Color(0.07f, 0.11f, 0.035f);
         public Color tip = new Color(0.3f, 0.47f, 0.13f);
         public Color dry = new Color(0.6f, 0.54f, 0.28f);
         public Color translucency = new Color(0.5f, 0.8f, 0.2f);
@@ -23,6 +23,49 @@ namespace Com.IsartDigital.GoobyrFPS.World
         public float wind = 0.9f;
         [Range(0f, 2f)] public float translucencyAmount = 1f;
         [Range(0f, 1f)] public float gloss = 0.25f;
+
+        /// <summary>
+        /// The colour the meadow has from afar (linear albedo): blades seen whole and lit, roots in their
+        /// shade, a little less saturated than a tip. The terrain's grass layer is tinted to it, so the land
+        /// does not change colour where the blades end (calibrated in the grass test scene).
+        /// </summary>
+        public Color FarColor
+        {
+            get
+            {
+                Color t = tip.linear;
+                return new Color(t.r * 0.9f, t.g * 0.6f, t.b * 1.3f, 1f);
+            }
+        }
+
+        /// <summary>The same for dry grass (the terrain's dry grass layer), linear.</summary>
+        public Color FarDryColor
+        {
+            get
+            {
+                Color d = dry.linear;
+                return new Color(d.r * 0.55f, d.g * 0.52f, d.b * 0.6f, 1f);
+            }
+        }
+
+        /// <summary>San Lázaro: lush humid meadow, broad-bladed, green to yellow-green.</summary>
+        public static GrassStyle Jungle() => new GrassStyle();
+
+        /// <summary>Weisshorn's meadows: short, fine and dense, a cooler green, straw where dry.</summary>
+        public static GrassStyle Alpine() => new GrassStyle
+        {
+            root = new Color(0.06f, 0.1f, 0.045f), tip = new Color(0.27f, 0.42f, 0.17f), dry = new Color(0.6f, 0.56f, 0.38f),
+            translucency = new Color(0.45f, 0.75f, 0.3f), height = 0.36f, heightVariation = 0.4f, tallHeight = 1.4f,
+            bladeWidth = 0.03f, tuftRadius = 0.17f, density = 1.1f, wind = 1f
+        };
+
+        /// <summary>Qasr's oasis: sparse sun-bleached tufts, yellow-green, dry at the edges.</summary>
+        public static GrassStyle Oasis() => new GrassStyle
+        {
+            root = new Color(0.08f, 0.1f, 0.04f), tip = new Color(0.36f, 0.45f, 0.14f), dry = new Color(0.7f, 0.6f, 0.33f),
+            translucency = new Color(0.6f, 0.8f, 0.25f), height = 0.48f, heightVariation = 0.5f, tallHeight = 1.7f,
+            bladeWidth = 0.035f, tuftRadius = 0.18f, density = 0.85f, wind = 0.9f
+        };
     }
 
     /// <summary>

@@ -337,11 +337,18 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             float[] lWarm = { 3f, 0f, 4f, -8f }, lGreen = { -3f, 0f, -5f, 0f }, lSat = { 0f, 0f, 2f, -18f }, lCon = { -2f, 0f, -1f, -6f }, lGust = { 0.7f, 1f, 0.8f, 0.6f };
             for (int i = 0; i < pPresets.Length && i < 4; i++)
             {
+                // Dawn and dusk are back-lit half the time: more sky light in the shade, a little more
+                // exposure, warm lifted shadows, so the ground under a tree against the sun still reads.
+                if (i == 0 || i == 2)
+                {
+                    pPresets[i].ambient *= 1.3f;
+                    pPresets[i].exposure += 0.12f;
+                }
                 pPresets[i].temperature = lTemperature + lWarm[i];
                 pPresets[i].tint = lTint + lGreen[i];
                 pPresets[i].saturation = lSaturation + lSat[i];
                 pPresets[i].contrast = lContrast + lCon[i];
-                pPresets[i].shadows = i == 3 ? new Color(0.92f, 0.98f, 1.12f) : lShadows;
+                pPresets[i].shadows = i == 3 ? new Color(0.92f, 0.98f, 1.12f) : i == 1 ? lShadows : lShadows * new Color(1.1f, 1.06f, 1.02f);
                 pPresets[i].highlights = i == 3 ? new Color(0.98f, 1f, 1.04f) : lHighlights;
                 pPresets[i].wind = lWind * lGust[i];
             }

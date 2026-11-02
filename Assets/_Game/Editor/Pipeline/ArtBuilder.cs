@@ -182,6 +182,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lAsset.shadowNormalBias = 0.6f;
                 // Grade before the tonemapper: highlights roll off instead of clipping to flat colour.
                 lAsset.colorGradingMode = UnityEngine.Rendering.Universal.ColorGradingMode.HighDynamicRange;
+                // A 64-bit HDR buffer: R11G11B10's 5-6 bit mantissas band the sky's and the clouds' soft gradients.
+                lAsset.hdrColorBufferPrecision = UnityEngine.Rendering.Universal.HDRColorBufferPrecision._64Bits;
                 EditorUtility.SetDirty(lAsset);
             }
             AssetDatabase.SaveAssets();

@@ -41,7 +41,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         public static float Ground(float pX, float pZ)
         {
-            float h = 8f + 3.5f * LandShape.Fbm(pX, pZ, 70f, 3, 4.1f) + 1.2f * LandShape.Fbm(pX, pZ, 18f, 2, 8.3f);
+            float h = 8f + 3.5f * LandShape.Fbm(pX, pZ, 70f, 3, 4.1f) + 1.2f * LandShape.Fbm(pX, pZ, 18f, 2, 8.3f) + LandShape.DetailNoise(pX, pZ);
             // A hill to the north, for a view down over the whole meadow.
             float lNorth = Mathf.Clamp01((pZ - 10f) / 110f);
             h += lNorth * lNorth * 20f;
@@ -76,7 +76,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (int x = 0; x < RES; x++)
                     lHeights[z, x] = Mathf.Clamp01(Ground(o.x + x * SIZE / (RES - 1), o.z + z * SIZE / (RES - 1)) / HEIGHT);
             lData.SetHeights(0, 0, lHeights);
-            TerrainLayer lGrass = Own("leafy_grass", 4f, new Vector4(0.24f, 0.5f, 0.24f, 1f)), lDirt = Own("dirt", 4f, Vector4.one), lLeaves = Own("forest_leaves_02", 4f, Vector4.one);
+            // The grass layer is tinted to the grass's far colour exactly as the maps' RealGrass does.
+            GrassStyle lStyle = GrassStyle.Jungle();
+            TerrainLayer lGrass = GrassBaker.Turf(Own("leafy_grass", 4f, Vector4.one), lStyle.FarColor, "GrassTest_Turf_Grass"), lDirt = Own("dirt", 4f, Vector4.one), lLeaves = Own("forest_leaves_02", 4f, Vector4.one);
             lData.terrainLayers = new[] { lGrass, lDirt, lLeaves };
             lData.alphamapResolution = 512;
             float[,,] lAlpha = new float[512, 512, 3];
@@ -137,7 +139,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lTerrain.shadowCastingMode = ShadowCastingMode.TwoSided;
 
             // The grass: dense meadow, thinner and drier on the hill, none on the path, tall in the patch.
-            GrassStyle lStyle = new GrassStyle();
             GrassBaker.Bake(lTerrain, "GrassTest", lStyle,
                 (x, z) =>
                 {

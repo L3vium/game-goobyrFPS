@@ -125,6 +125,18 @@
 - Poly Haven model `namaqualand_boulder_05` (CC0) - https://polyhaven.com/a/namaqualand_boulder_05
 - Poly Haven model `dead_tree_trunk` (CC0) - https://polyhaven.com/a/dead_tree_trunk
 - Poly Haven model `modular_fire_escape` (CC0) - https://polyhaven.com/a/modular_fire_escape
+- Poly Haven texture `bi_stretch` (CC0) - https://polyhaven.com/a/bi_stretch  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `cotton_jersey` (CC0) - https://polyhaven.com/a/cotton_jersey  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `crepe_georgette` (CC0) - https://polyhaven.com/a/crepe_georgette  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `crepe_satin` (CC0) - https://polyhaven.com/a/crepe_satin  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `denim_fabric_05` (CC0) - https://polyhaven.com/a/denim_fabric_05  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `hessian_380` (CC0) - https://polyhaven.com/a/hessian_380  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `jersey_melange` (CC0) - https://polyhaven.com/a/jersey_melange  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `jogging_melange` (CC0) - https://polyhaven.com/a/jogging_melange  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `knitted_fleece` (CC0) - https://polyhaven.com/a/knitted_fleece  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `leather_red_03` (CC0) - https://polyhaven.com/a/leather_red_03  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `poly_wool_herringbone` (CC0) - https://polyhaven.com/a/poly_wool_herringbone  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `stretch_poplin` (CC0) - https://polyhaven.com/a/stretch_poplin  (cast looks, Tools/Blender/characters/cast)
 
 ## Realistic prop pack (Assets/_Game/Art/PBR/Models, built by Tools/Blender/props)
 Converted from Poly Haven models (CC0, decimated / re-pivoted / re-textured):

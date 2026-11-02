@@ -96,6 +96,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Hostiles.Clear();
             _callsMade = 0;
             _callInProgress = false;
+            _nextCallAt = 0f;
             InCombat = false;
         }
 
@@ -223,7 +224,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                         if (lContact.player != null && lContact.player.IsSpawned) lContact.player.ShowGhostRpc(Vector3.zero, false, Index);
                     _contacts.Clear();
                 }
-                else if (!_callInProgress && _callsMade < GameDatabase.Rules.maxCallsPerZone && Time.time - CombatSince > 1.5f && AnyFighting()) AssignCaller();
+                else if (NpcRules.ShouldCall(_callInProgress, _callsMade, GameDatabase.Rules.maxCallsPerZone, Time.time - CombatSince, Fighters(null), Time.time, _nextCallAt)) AssignCaller();
             }
         }
 
@@ -258,13 +259,16 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return lSum.sqrMagnitude > 0.01f ? lSum.normalized : Vector3.zero;
         }
 
-        /// <summary>Someone of the squad is actually fighting (a search alone never calls for help).</summary>
-        private bool AnyFighting()
+        /// <summary>Members actually fighting (shooting, not phoning; a search alone never calls for help), but <paramref name="pExcept"/>.</summary>
+        public int Fighters(Npc pExcept)
         {
+            int lCount = 0;
             foreach (Npc lMember in Members)
-                if (lMember != null && lMember.Health.IsAlive && lMember.State.Value == NpcState.Combat) return true;
-            return false;
+                if (lMember != null && lMember != pExcept && lMember.Health.IsAlive && lMember.State.Value == NpcState.Combat) lCount++;
+            return lCount;
         }
+
+        private float _nextCallAt;
 
         private void AssignCaller()
         {
@@ -274,7 +278,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Vector3 lThreatPos = lThreat != null ? lThreat.lastKnown : transform.position;
             foreach (Npc lMember in Members)
             {
-                if (lMember == null || !lMember.Health.IsAlive || !lMember.InCombat || lMember.Role == NpcRole.Target) continue;
+                if (lMember == null || !lMember.Health.IsAlive || lMember.State.Value != NpcState.Combat || lMember.Role == NpcRole.Target) continue;
                 // The farthest from the fight is the one with time to radio.
                 float lDistance = -Vector3.Distance(lMember.transform.position, lThreatPos);
                 if (lDistance < lBestDistance) { lBestDistance = lDistance; lBest = lMember; }
@@ -288,6 +292,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public void CallFinished(Npc pCaller, bool pCompleted)
         {
             _callInProgress = false;
+            _nextCallAt = Time.time + (pCompleted ? NpcRules.CALL_COOLDOWN : NpcRules.CALL_RETRY);
             if (!pCompleted) return;
             _callsMade++;
             Contact lThreat = BestContact(pCaller.transform.position);

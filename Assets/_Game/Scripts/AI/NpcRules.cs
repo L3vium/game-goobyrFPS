@@ -52,6 +52,24 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return SpotReaction.Confront;
         }
 
+        // ---------------------------------------------------------------- the phone call
+
+        /// <summary>Seconds of real fighting before anyone thinks of the radio.</summary>
+        public const float CALL_DELAY = 1.5f;
+        /// <summary>Seconds after a completed call before the zone's next one; after an interrupted one, before someone tries again.</summary>
+        public const float CALL_COOLDOWN = 30f, CALL_RETRY = 8f;
+
+        /// <summary>
+        /// Does the zone hand someone the radio now? Once a real fight has gone on a moment, never while
+        /// a call is under way or right after one, never past the zone's calls - and never to the last
+        /// one fighting: someone has to keep shooting, so it takes two fighters.
+        /// </summary>
+        public static bool ShouldCall(bool pCallInProgress, int pCallsMade, int pMaxCalls, float pFightingFor, int pFighters, float pNow, float pNextCallAt)
+            => !pCallInProgress && pCallsMade < pMaxCalls && pFightingFor > CALL_DELAY && pFighters >= 2 && pNow >= pNextCallAt;
+
+        /// <summary>A caller drops the phone and fights as soon as nobody else is left fighting.</summary>
+        public static bool KeepsCalling(int pOtherFighters) => pOtherFighters > 0;
+
         // ---------------------------------------------------------------- hearing
 
         /// <summary>An NPC's gunfire is a sound like any other, at most once every this many seconds per shooter.</summary>

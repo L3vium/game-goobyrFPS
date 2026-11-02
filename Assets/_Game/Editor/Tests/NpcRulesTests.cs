@@ -71,6 +71,20 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void PhoneCall_NeverTheLastFighterAndNotTwiceInARow()
+        {
+            Assert.IsTrue(NpcRules.ShouldCall(false, 0, 2, 3f, 2, 100f, 0f));
+            Assert.IsFalse(NpcRules.ShouldCall(false, 0, 2, 3f, 1, 100f, 0f), "a lone fighter keeps shooting");
+            Assert.IsFalse(NpcRules.ShouldCall(true, 0, 2, 3f, 3, 100f, 0f), "one call at a time");
+            Assert.IsFalse(NpcRules.ShouldCall(false, 0, 2, 3f, 3, 100f, 100f + NpcRules.CALL_COOLDOWN), "a cooldown after a call");
+            Assert.IsFalse(NpcRules.ShouldCall(false, 2, 2, 3f, 3, 100f, 0f), "the zone's calls are used up");
+            Assert.IsFalse(NpcRules.ShouldCall(false, 0, 2, 0.5f, 3, 100f, 0f), "not in the first instant of a fight");
+            Assert.IsFalse(NpcRules.KeepsCalling(0), "the last one standing drops the phone");
+            Assert.IsTrue(NpcRules.KeepsCalling(1));
+            Assert.Greater(NpcRules.CALL_COOLDOWN, NpcRules.CALL_RETRY);
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

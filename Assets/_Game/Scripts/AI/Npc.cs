@@ -1304,6 +1304,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private void UpdateCalling(float dt)
         {
+            // Everyone else went down: the radio waits, someone has to shoot back.
+            if (Zone != null && !NpcRules.KeepsCalling(Zone.Fighters(this)))
+            {
+                SetState(NpcState.Combat);
+                _repositionTime = 0f;
+                return;
+            }
             Stop();
             _callTimer -= dt;
             if (_combatTarget != null) FaceTowards(_combatTarget.transform.position);

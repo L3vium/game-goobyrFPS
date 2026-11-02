@@ -24,7 +24,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     /// <item>around the crosshair, one arc per NPC noticing you, pointing at it, growing and warming
     /// with its gauge;</item>
     /// <item>the status chip above the minimap (hidden, concealed, suspicious, spotted, searching,
-    /// combat) and a red chevron over the target, always.</item>
+    /// combat - or "weapon out" with people around, since a drawn gun is noticed) and a red chevron
+    /// over the target, always.</item>
     /// </list>
     /// </summary>
     public class ThreatMarkers : MonoBehaviour
@@ -37,6 +38,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         public static readonly Color Blue = new Color(0.45f, 0.72f, 1f);
 
         private const float SHOW_RANGE = 70f, EDGE = 70f, ARC_RADIUS = 120f;
+        /// <summary>The "weapon out" warning shows while someone is this close.</summary>
+        private const float WATCHED = 35f;
         /// <summary>A reporting witness stays pinned to the screen edge this close.</summary>
         private const float WITNESS_PIN = 60f;
         private const int MAX_ARCS = 8;
@@ -125,6 +128,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
             ThreatStatus lStatus = ThreatStatus.None;
             int lArc = 0;
+            bool lWatched = false;
             Vector3 lCamPos = lCamera.transform.position;
             Npc lTarget = null;
 
@@ -145,6 +149,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                     if (lArc < MAX_ARCS && lFrom >= ThreatStatus.Suspicious) DrawArc(lArc++, lCamera, lNpc.transform.position, lFrom, lGauge);
                 }
                 if (lState == NpcState.Search && lMe != null && lStatus < ThreatStatus.Searching && (lNpc.transform.position - lMe.transform.position).sqrMagnitude < 45f * 45f) lStatus = ThreatStatus.Searching;
+                if (lMe != null && lNpc.Health.IsAlive && (lNpc.transform.position - lMe.transform.position).sqrMagnitude < WATCHED * WATCHED) lWatched = true;
 
                 UpdateMarker(lNpc, lCamera, lCamPos, lMine, lState, lGauge);
             }
@@ -162,7 +167,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 else if (lMe.InGrass.Value && lMe.Crouched.Value) lStatus = ThreatStatus.Concealed;
             }
             Status = lMe != null && lMe.Health.IsAlive ? lStatus : ThreatStatus.None;
-            UpdateChip();
+            // A gun out is noticed (suspicious anywhere, a crime outside public places): say so when people are around.
+            UpdateChip(lWatched && lMe.Health.IsAlive && Npc.WeaponDrawn(lMe));
             UpdateTension();
             UpdateTarget(lCamera, lTarget, lMe);
         }
@@ -322,7 +328,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _tension.volume = Mathf.MoveTowards(_tension.volume, lTarget * Audio.Sfx.Volume, Time.unscaledDeltaTime * (lTarget > _tension.volume ? 0.8f : 0.25f));
         }
 
-        private void UpdateChip()
+        private void UpdateChip(bool pWeaponOut)
         {
             string lText;
             Color lColor;
@@ -339,7 +345,11 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 case ThreatStatus.Searching: lText = "SEARCHING"; lColor = Amber; break;
                 case ThreatStatus.Spotted: lText = "SPOTTED"; lColor = Amber; break;
                 case ThreatStatus.Combat: lText = "COMBAT"; lColor = Red; break;
-                default: _chip.gameObject.SetActive(false); return;
+                default:
+                    if (!pWeaponOut) { _chip.gameObject.SetActive(false); return; }
+                    lText = "WEAPON OUT";
+                    lColor = White;
+                    break;
             }
             _chip.gameObject.SetActive(true);
             _chipText.text = lText;

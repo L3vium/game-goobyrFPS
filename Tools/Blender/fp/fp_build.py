@@ -84,17 +84,17 @@ GRIPS = {
     "W_Pistol": dict(
         # metacarpals along the barrel tipped 8 deg down, palm on the right panel, web under the tang
         r=dict(c=(0.0, -0.0153, 0.028), fingers=(0.0, -0.99, -0.14), palm=(1.0, -0.12, 0.0), depth=0.037,
-               reach=0.066, slide=-0.004),
+               reach=0.066, slide=-0.006),
         # support: palm on the left panel over the firing fingertips, its knuckle line up the front strap so
         # the fingers wrap the firing fingers below the guard, the thumb up the grip to reach forward
         l=dict(c=(0.0, 0.004, 0.0), axis=UP_PISTOL, palm=(-1.0, 0.0, 0.0), depth=0.038, reach=0.051),
         # thumbs forward on the left of the frame, the firing thumb resting over the support thumb
-        thumb_r=dict(swing=(0, 0), start=(20, 0, 0), target=(0.034, -0.050, 0.064)),
-        thumb_l=dict(swing=(0, 0), start=(10, 0, 0), target=(0.032, -0.085, 0.040)),
+        thumb_r=dict(swing=(0, 0), start=(20, 0, 0), target=(0.034, -0.030, 0.078)),
+        thumb_l=dict(swing=(0, 0), start=(10, 0, 0), target=(0.030, -0.060, 0.056)),
         trigger=(0.0, -0.070, 0.056)),
     "W_Smg": dict(
         r=dict(c=(0.0, -0.0095, 0.019), axis=(0.0, -0.166, 0.986), palm=(1.0, -0.35, 0.0), depth=0.041,
-               reach=0.060),
+               reach=0.064, slide=-0.012),
         l=dict(c=(0.0, -0.28, 0.008), axis=(0.0, -0.10, 0.995), palm=(-1.0, 0.3, 0.0), depth=0.040, reach=0.060),
         thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.028, -0.020, 0.022)),
         # the support thumb wraps the front of the magazine/grip on the right instead of standing up
@@ -102,24 +102,26 @@ GRIPS = {
         trigger=(0.0, -0.068, 0.050)),
     "W_Shotgun": dict(
         # the straight stock wrist crosses the palm diagonally: metacarpals forward-down, thumb round onto the left side (low: the big glove sits a hand-width from the eye in ADS)
-        r=dict(c=(0.0, -0.02, 0.008), fingers=(0.0, -0.78, -0.62), palm=(1.0, 0.0, 0.0), depth=0.039, reach=0.060),
+        r=dict(c=(0.0, -0.02, 0.008), fingers=(0.0, -0.78, -0.62), palm=(1.0, 0.0, 0.0), depth=0.039, reach=0.028,
+               slide=-0.030, twist=(25, 0, 0)),
         l=dict(c=(0.0, -0.355, 0.028), axis=(0.0, -1.0, 0.0), palm=(0.15, 0.0, 1.0), depth=0.045, reach=0.060),
         thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.034, -0.035, 0.020)), thumb_l=dict(swing=(5, 0), start=(10, 10, 10)),
         trigger=(0.0, -0.136, -0.010)),
     "W_Sniper": dict(
-        r=dict(c=(0.0, -0.01, 0.035), fingers=(0.0, -0.85, -0.53), palm=(1.0, -0.1, 0.0), depth=0.039, reach=0.062),
+        r=dict(c=(0.0, -0.01, 0.035), fingers=(0.0, -0.85, -0.53), palm=(1.0, -0.1, 0.0), depth=0.039, reach=0.062,
+               slide=-0.010),
         l=dict(c=(0.0, -0.31, 0.095), axis=(0.0, -1.0, 0.0), palm=(0.15, 0.0, 1.0), depth=0.042, reach=0.058),
         thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.026, -0.03, 0.060)), thumb_l=dict(swing=(5, 0), start=(10, 10, 10)),
         trigger=(0.0, -0.07, 0.04)),
     "W_RocketLauncher": dict(
         r=dict(c=(0.0, 0.0317, -0.022), axis=(0.0, -0.158, 0.987), palm=(1.0, -0.35, 0.0), depth=0.040,
-               reach=0.060),
-        l=dict(c=(0.0, -0.125, 0.08), axis=(0.0, -1.0, 0.0), palm=(0.25, 0.0, 1.0), depth=0.057, reach=0.058),
+               reach=0.056, slide=-0.030),
+        l=dict(c=(0.0, -0.17, 0.08), axis=(0.0, -1.0, 0.0), palm=(0.25, 0.0, 1.0), depth=0.070, reach=0.058),
         thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.026, 0.02, -0.005)), thumb_l=dict(swing=(5, 0), start=(10, 10, 10)),
         trigger=(0.0, -0.005, 0.030)),
     "W_Flamethrower": dict(
         r=dict(c=(0.0, 0.0038, -0.013), axis=(0.0, -0.146, 0.989), palm=(1.0, -0.35, 0.0), depth=0.041,
-               reach=0.060),
+               reach=0.060, slide=-0.024),
         l=dict(c=(0.0, -0.255, 0.01), axis=(0.0, 0.0, 1.0), palm=(-1.0, 0.3, 0.0), depth=0.038, reach=0.060),
         thumb_r=dict(swing=(0, 0), start=(20, 10, 10), target=(0.030, 0.022, 0.022)), thumb_l=dict(swing=(-10, 20), start=(20, 25, 20)),
         trigger=(0.0, -0.061, 0.030)),
@@ -141,7 +143,7 @@ FAMILIES = {
         Sprint=dict(sight=(0.07, -0.20, 0.20), turn=(30, -38, -28), chest=14, trig="frame"))),
     "Shotgun": dict(weapon="W_Shotgun", hands="both", poses=dict(
         Hip=dict(sight=(0.11, -0.092, 0.24), turn=(2, -5, -7), chest=22, trig="frame", clav_l=(24, 6)),
-        ADS=dict(sight=(0.0, 0.0, 0.17), turn=(0, 0, 0), chest=22, trig="trigger", clav_l=(24, 6)),
+        ADS=dict(sight=(0.0, 0.0, 0.20), turn=(0, 0, 0), chest=22, trig="trigger", clav_l=(24, 6)),
         Sprint=dict(sight=(0.06, -0.21, 0.18), turn=(28, -38, -28), chest=16, trig="frame"))),
     "Sniper": dict(weapon="W_Sniper", hands="both", poses=dict(
         Hip=dict(sight=(0.11, -0.088, 0.22), turn=(2, -5, -7), chest=22, trig="frame", clav_l=(24, 6)),

@@ -19,7 +19,7 @@
    0.176,
    0.239
   ],
-  "tris": 3048,
+  "tris": 3156,
   "source": "Procedural (Blender Python)",
   "licence": "Original, project-owned"
  },
@@ -67,7 +67,7 @@
    0.176,
    0.416
   ],
-  "tris": 4116,
+  "tris": 4224,
   "source": "Procedural (Blender Python)",
   "licence": "Original, project-owned"
  },
@@ -79,7 +79,7 @@
    0.28,
    0.418
   ],
-  "tris": 5646,
+  "tris": 5718,
   "source": "Procedural (Blender Python)",
   "licence": "Original, project-owned"
  },

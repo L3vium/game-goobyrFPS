@@ -183,14 +183,17 @@ def suit_jacket(B, name="Suit", material="Suit", hem=0.800, ease=0.014, button_z
     for s, sx in (("l", 1), ("r", -1)):
         part.add(sdf.Capsule(V(sx * 0.08, 0.004, 1.420), j["shoulder_" + s] + V(sx * 0.02, 0, 0.038), 0.024), 0.03)
     # the cloth hangs straight from the chest instead of hugging the belly
-    body_l = [pr for pr, k in lumps(B, names=["chest", "back", "waist", "belly", "pec", "bust", "pelvis"])]
-    front = min(p.lo[1] for p in body_l)
-    back = max(p.hi[1] for p in body_l if p.hi[1] < 0.2)
-    rx = max(p.hi[0] for p in body_l) * 0.96
-    ry = (back - front) * 0.5
-    yc = (back + front) * 0.5
-    part.add(sdf.Scaled(sdf.CappedCone(V(0, yc, hem), V(0, yc, 1.28), rx * 1.02, rx * 0.98, 0.03), V(0, yc, 1.0), np.eye(3),
-                        (1.0, ry / rx, 1.0)), 0.05)
+    # the cloth hangs from the chest over the belly: a tilted elliptical cone from the chest's
+    # section (top) to the belly / hips section (hem), so a big belly is draped, not hugged
+    def section(names):
+        ls = [pr for pr, k in lumps(B, names=names)]
+        front, back = min(p.lo[1] for p in ls), max(p.hi[1] for p in ls)
+        return (front + back) * 0.5, (back - front) * 0.5, max(p.hi[0] for p in ls)
+    yt, ryt, rxt = section(["chest", "back", "pec", "bust"])
+    yb, ryb, rxb = section(["belly", "waist", "pelvis", "butt"])
+    sy = 0.5 * (ryt / rxt + ryb / rxb)
+    drape = sdf.CappedCone(V(0, yb, hem), V(0, yt, 1.28), rxb * 0.97, rxt * 0.97, 0.03)
+    part.add(sdf.Scaled(drape, V(0, 0.5 * (yt + yb), 1.0), np.eye(3), (1.0, sy, 1.0)), 0.07)
     part.offset(ease)
     part.inter(sdf.HalfSpace(V(0, 0, hem), (0, 0, -1)), 0.006)
     for s in ("l", "r"):

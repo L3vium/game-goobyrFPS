@@ -957,6 +957,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 // At a stop: its errand, facing the waypoint's way (a chatting pair face each other).
                 Stop();
                 FaceTowards(transform.position + ErrandFacing(this, _errand, _errandForward), 150f);
+                if (_errand != null && _errand.Action == PatrolAction.Chat) SmallTalk(0.45f);
                 return;
             }
             _errand = null;
@@ -974,9 +975,10 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                     {
                         Stop();
                         FaceTowards(transform.position + ErrandFacing(this, lLeader._errand, lLeader._errandForward), 150f);
+                        if (lLeader._errand != null && lLeader._errand.Action == PatrolAction.Chat) SmallTalk(0.45f);
                     }
                 }
-                else if (Vector3.Distance(transform.position, lSpot) > 0.6f) MoveTo(lSpot, PATROL * 1.25f);
+                else if (Vector3.Distance(transform.position, lSpot) > 0.6f) { MoveTo(lSpot, PATROL * 1.25f); SmallTalk(0.06f); }
                 else { Stop(); transform.rotation = Quaternion.RotateTowards(transform.rotation, lLeader.transform.rotation, 120f * Time.deltaTime); }
                 _routeIndex = lLeader._routeIndex;
                 return;
@@ -991,6 +993,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 _routeIndex++;
                 _waitUntil = Time.time + NpcRules.StopSeconds(lStop != null, lStop != null ? lStop.Duration : 0f, _route.Pause, Random.value);
             }
+        }
+
+        /// <summary>Now and then a line of small talk (<paramref name="pPerSecond"/>: chances per second; barks are rate-limited).</summary>
+        private void SmallTalk(float pPerSecond)
+        {
+            if (Random.value < pPerSecond * Time.deltaTime) Bark(Barks.Chatter);
         }
 
         /// <summary>The errand at the stop the patrol stands at (null: a plain pause), and the way its waypoint faces.</summary>

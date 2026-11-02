@@ -1,6 +1,7 @@
 using Com.IsartDigital.GoobyrFPS.AI;
 using Com.IsartDigital.GoobyrFPS.Data;
 using NUnit.Framework;
+using UnityEngine;
 
 // Author : Baptiste Vu Liem
 namespace Com.IsartDigital.GoobyrFPS.Tests
@@ -45,6 +46,28 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
             Assert.IsTrue(NpcRules.ShotNoiseDue(-100f, 0f), "an NPC's first shot is heard");
             Assert.IsFalse(NpcRules.ShotNoiseDue(10f, 10f + NpcRules.SHOT_NOISE_INTERVAL * 0.5f), "rate-limited");
             Assert.IsTrue(NpcRules.ShotNoiseDue(10f, 10f + NpcRules.SHOT_NOISE_INTERVAL));
+        }
+
+        [Test]
+        public void Walls_OnlyStructuralOnesMuffleAndGlassIsSeenThrough()
+        {
+            Assert.IsTrue(NpcRules.IsStructural(false, new Vector3(0.3f, 3f, 6f), false), "a wall");
+            Assert.IsTrue(NpcRules.IsStructural(false, new Vector3(1f, 2.1f, 0.06f), false), "a door");
+            Assert.IsTrue(NpcRules.IsStructural(true, Vector3.one, false), "the ground between them (a hill)");
+            Assert.IsFalse(NpcRules.IsStructural(false, new Vector3(1f, 1f, 1f), false), "a crate");
+            Assert.IsFalse(NpcRules.IsStructural(false, new Vector3(0.5f, 8f, 0.5f), false), "a tree trunk");
+            Assert.IsFalse(NpcRules.IsStructural(false, new Vector3(2f, 1.5f, 4.5f), false), "a car");
+            Assert.IsFalse(NpcRules.IsStructural(false, new Vector3(3f, 1.2f, 0.1f), false), "a fence");
+            Assert.IsFalse(NpcRules.IsStructural(false, new Vector3(20f, 9f, 14f), true), "a building's window panes");
+
+            Assert.IsTrue(NpcRules.IsSeeThrough(NpcRules.GLASS_OBJECT, null, 0, -1), "the generator's glass batch");
+            Assert.IsTrue(NpcRules.IsSeeThrough("Pane", NpcRules.GLASS_MATERIAL + " (Instance)", 0, -1));
+            Assert.IsTrue(NpcRules.IsSeeThrough("Pane", null, 18, 18), "a Glass layer, if the project gets one");
+            Assert.IsFalse(NpcRules.IsSeeThrough("plaster", "M_Plaster", 0, -1));
+
+            // A pistol heard 45 m away in the open still carries through one wall, not through three.
+            Assert.Greater(DetectionModel.Loudness(12f, 45f, 1), 0f);
+            Assert.AreEqual(0f, DetectionModel.Loudness(12f, 45f, 3));
         }
 
         [Test]

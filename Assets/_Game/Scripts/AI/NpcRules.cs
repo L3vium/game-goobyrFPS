@@ -68,6 +68,35 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// </summary>
         public static bool AlwaysResponds(NoiseKind pKind, bool pArmedGuard, bool pCapped) => pKind == NoiseKind.Alarming && pArmedGuard && !pCapped;
 
+        /// <summary>
+        /// Does a collider muffle a sound passing through it? Terrain does, and anything big enough to
+        /// be a wall - at least 1.9 m tall and 0.9 m across: building shells, doors, big rocks,
+        /// containers. Glass, crates, furniture, fences, cars and tree trunks don't.
+        /// </summary>
+        public static bool IsStructural(bool pTerrain, Vector3 pBoundsSize, bool pSeeThrough)
+        {
+            if (pSeeThrough) return false;
+            if (pTerrain) return true;
+            return pBoundsSize.y >= 1.9f && Mathf.Max(pBoundsSize.x, pBoundsSize.z) >= 0.9f;
+        }
+
+        /// <summary>Structural hits closer than this along a ray are one wall (the core, plaster and panelling of one partition).</summary>
+        public const float WALL_MERGE = 0.6f;
+
+        /// <summary>The generated window panes' object and material names (one "glass" batch per building).</summary>
+        public const string GLASS_OBJECT = "glass", GLASS_MATERIAL = "M_WindowGlass";
+
+        /// <summary>
+        /// Can an NPC see through this collider? Window glass: on the Glass layer if the project has
+        /// one (<paramref name="pGlassLayer"/> &gt;= 0), or the building generator's glass batch.
+        /// </summary>
+        public static bool IsSeeThrough(string pObjectName, string pMaterialName, int pLayer, int pGlassLayer)
+        {
+            if (pGlassLayer >= 0 && pLayer == pGlassLayer) return true;
+            if (pObjectName == GLASS_OBJECT) return true;
+            return pMaterialName != null && pMaterialName.StartsWith(GLASS_MATERIAL, System.StringComparison.Ordinal);
+        }
+
         // ---------------------------------------------------------------- weapons in hand
 
         /// <summary>A weapon anyone recognises from across a room: every gun, the rocket launcher, the flamethrower.</summary>

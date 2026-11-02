@@ -144,7 +144,6 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Bodies some NPC already reported: the next to stumble on them is wary, not a new alert.</summary>
         private static readonly HashSet<ulong> _reportedBodies = new HashSet<ulong>();
         private static bool _hearing;
-        private static readonly RaycastHit[] _wallHits = new RaycastHit[8];
         private static readonly List<(Npc npc, float loudness, float distance)> _hearers = new List<(Npc, float, float)>();
 
         private const float WALK = 1.9f, RUN = 4.9f;
@@ -460,15 +459,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return pSource + new Vector3(lOff.x, 0f, lOff.y);
         }
 
-        /// <summary>Walls and floors between two points (each one muffles a sound), up to <see cref="DetectionModel.MAX_WALLS"/>.</summary>
-        private static int WallsBetween(Vector3 pFrom, Vector3 pTo)
-        {
-            Vector3 lDir = pTo - pFrom;
-            float lLength = lDir.magnitude;
-            if (lLength < 0.05f) return 0;
-            int lHits = Physics.RaycastNonAlloc(pFrom, lDir / lLength, _wallHits, lLength, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
-            return Mathf.Min(lHits, DetectionModel.MAX_WALLS);
-        }
+        /// <summary>Structural walls and floors between two points (each one muffles a sound): <see cref="Senses.WallsBetween"/>.</summary>
+        private static int WallsBetween(Vector3 pFrom, Vector3 pTo) => Senses.WallsBetween(pFrom, pTo);
 
         /// <summary>States from which a glimpse of a player makes the NPC stop and stare (<see cref="NpcRules.CanBecomeSuspicious"/>).</summary>
         private bool CanBecomeSuspicious => NpcRules.CanBecomeSuspicious(State.Value, _investigateAlarmed);
@@ -541,8 +533,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             // guard who is searching or fighting someone else. A known hostile gets no such cover.
             float lTier = pWitness || IsHostile(pPlayer) ? 1f : DetectionModel.TierFactor(TierFor(pPlayer), ActsSuspicious(pPlayer));
             if (lTier <= 0f) return 0f;
-            lSight.chestVisible = !Physics.Linecast(lEye, lTarget, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
-            lSight.headVisible = !Physics.Linecast(lEye, pPlayer.Eye, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
+            lSight.chestVisible = Senses.Clear(lEye, lTarget);
+            lSight.headVisible = Senses.Clear(lEye, pPlayer.Eye);
             return DetectionModel.Exposure(lSight) * lTier;
         }
 
@@ -559,7 +551,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 Vector3 lTo = lOther.Eye - Eye;
                 float lDistance = lTo.magnitude;
                 if (lDistance > DetectionModel.WITNESS_RANGE) continue;
-                bool lSight = !Physics.Linecast(Eye, lOther.Eye, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
+                bool lSight = Senses.Clear(Eye, lOther.Eye);
                 if (!DetectionModel.Witnesses(lDistance, Vector3.Angle(transform.forward, lTo), lSight)) continue;
 
                 PlayerAvatar lPlayer = lOther._combatTarget;
@@ -678,7 +670,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 float lDistance = Vector3.Distance(Eye, lBody);
                 if (lDistance > 16f * BuildingVolume.LightFactor(lBody)) continue;
                 if (Vector3.Angle(transform.forward, lBody - Eye) > GameDatabase.Rules.npcVisionAngle * 0.5f) continue;
-                if (Physics.Linecast(Eye, lBody, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore)) continue;
+                if (!Senses.Clear(Eye, lBody)) continue;
                 _seenBodies.Add(lOther.NetworkObjectId);
                 if (!_reportedBodies.Add(lOther.NetworkObjectId))
                 {

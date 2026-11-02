@@ -53,7 +53,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 if (lTo.magnitude > _range || Vector3.Angle(transform.forward, lTo) > _halfAngle) continue;
                 SecurityTier lTier = SecurityZone.ForPlayer(SecurityZone.At(lPlayer.transform.position, out AccessLevel lNeed), lNeed, lPlayer.Weapons != null ? lPlayer.Weapons.Access : AccessLevel.None, false);
                 if (DetectionModel.TierFactor(lTier, Npc.ActsSuspicious(lPlayer)) <= 0.55f) continue;
-                if (Physics.Linecast(transform.position, lPlayer.Chest, Core.GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore)) continue;
+                if (!Senses.Clear(transform.position, lPlayer.Chest)) continue;
                 lCaught = lPlayer;
                 break;
             }

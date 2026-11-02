@@ -432,7 +432,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _nextStepHeard = Time.time + 0.8f;
             Vector3 lGuess = Guess(pPlayer.transform.position, lDistance);
 
-            if (InCombat) { if (lLoudness > 0.5f) Zone?.ReportContact(pPlayer, lGuess, false); return; }
+            if (InCombat) { if (lLoudness > 0.5f && IsHostile(pPlayer)) Zone?.ReportContact(pPlayer, lGuess, false); return; }
             if (OnEdge) { if (lLoudness > 0.4f) HuntToward(lGuess); return; }
             if (!CanBecomeSuspicious) return;
             _suspect = pPlayer;
@@ -484,8 +484,21 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             else _investigatePoint = pPoint;
         }
 
-        /// <summary>See <see cref="DetectionModel.Exposure"/>: distance, cone and edge of vision, light, stance, grass, smoke, walls.</summary>
-        private float Exposure(PlayerAvatar pPlayer, GameRules pRules, bool pCombat)
+        /// <summary>Does its zone know this player to be hostile (<see cref="LevelZone.Hostiles"/>)?</summary>
+        private bool IsHostile(PlayerAvatar pPlayer) => Zone != null && Zone.IsHostile(pPlayer);
+
+        /// <summary>The security tier that counts for this player where they stand, as this NPC judges it (passes, enforcers).</summary>
+        private SecurityTier TierFor(PlayerAvatar pPlayer) => SecurityZone.ForPlayer(SecurityZone.At(pPlayer.transform.position, out AccessLevel lNeed), lNeed, pPlayer.Weapons != null ? pPlayer.Weapons.Access : AccessLevel.None, IsEnforcer);
+
+        /// <summary>Does it see this player right now, wherever they stand (a witness of what they do)?</summary>
+        public bool Sees(PlayerAvatar pPlayer) => pPlayer != null && Health.IsAlive && State.Value != NpcState.KnockedOut && Exposure(pPlayer, GameDatabase.Rules, InCombat || OnEdge, true) > 0f;
+
+        /// <summary>
+        /// See <see cref="DetectionModel.Exposure"/>: distance, cone and edge of vision, light, stance,
+        /// grass, smoke, walls - weighed by the place's tier unless the zone knows the player to be
+        /// hostile or <paramref name="pWitness"/> asks what the eye gets whatever the place.
+        /// </summary>
+        private float Exposure(PlayerAvatar pPlayer, GameRules pRules, bool pCombat, bool pWitness = false)
         {
             if (pPlayer.Hidden.Value) return 0f;
             Vector3 lEye = Eye;
@@ -507,10 +520,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (pPlayer.Submerged.Value && lSight.distance > 3f) return 0f;
             if (lSight.angle > Mathf.Max(lSight.halfCone, DetectionModel.PERIPHERAL_ANGLE) && lSight.distance >= DetectionModel.CLOSE_RANGE) return 0f;
             if (SmokeVolume.Blocks(lEye, lTarget)) return 0f;
-            // The social ladder: a behaving player on the plaza is just another passer-by.
-            SecurityTier lZoneTier = SecurityZone.At(pPlayer.transform.position, out AccessLevel lRequired);
-            SecurityTier lFor = SecurityZone.ForPlayer(lZoneTier, lRequired, pPlayer.Weapons != null ? pPlayer.Weapons.Access : AccessLevel.None, IsEnforcer);
-            float lTier = pCombat ? 1f : DetectionModel.TierFactor(lFor, pPlayer.ActsSuspicious);
+            // The social ladder: a behaving player on the plaza is just another passer-by - even to a
+            // guard who is searching or fighting someone else. A known hostile gets no such cover.
+            float lTier = pWitness || IsHostile(pPlayer) ? 1f : DetectionModel.TierFactor(TierFor(pPlayer), pPlayer.ActsSuspicious);
             if (lTier <= 0f) return 0f;
             lSight.chestVisible = !Physics.Linecast(lEye, lTarget, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
             lSight.headVisible = !Physics.Linecast(lEye, pPlayer.Eye, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
@@ -565,20 +577,19 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 return;
             }
             SpottedRpc();
-            if (!Flees && OnEdge)
+            switch (NpcRules.OnSpotted(Flees, OnEdge, IsHostile(pPlayer), TierFor(pPlayer)))
             {
-                // Already expecting trouble: no confrontation, it opens fire.
-                Zone?.ReportContact(pPlayer, pPlayer.transform.position, true);
-                _reactionUntil = Time.time + 0.35f;
-                EnterCombat();
-                return;
-            }
-            if (Flees)
-            {
-                // A scream: the guards close by come and look.
-                NoiseSystem.Emit(transform.position, 14f, NoiseKind.Suspicious, pPlayer.OwnerClientId);
-                SetState(NpcState.Flee);
-                return;
+                case NpcRules.SpotReaction.Flee:
+                    // A scream: the guards close by come and look.
+                    NoiseSystem.Emit(transform.position, 14f, NoiseKind.Suspicious, pPlayer.OwnerClientId);
+                    SetState(NpcState.Flee);
+                    return;
+                case NpcRules.SpotReaction.Fight:
+                    // A known hostile, or a trespasser while it is already expecting trouble: it opens fire.
+                    Zone?.ReportContact(pPlayer, pPlayer.transform.position, true);
+                    _reactionUntil = Time.time + 0.35f;
+                    EnterCombat();
+                    return;
             }
             _engagedSince = Time.time;
             SetState(NpcState.Engaged);
@@ -597,10 +608,10 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (Vector3.Distance(transform.position, lPlayer) > 6f && lUnseen < 0.5f) MoveTo(lPlayer, WALK);
             else Stop();
 
-            // Aiming a gun at it from close enough is a hostile act.
-            bool lHostile = _combatTarget.Aiming.Value && lUnseen < 0.4f && Vector3.Distance(transform.position, lPlayer) < 25f;
-            // In a restricted area it is an escort: "get out" - leaving ends it, staying 4 s turns it into a fight.
-            SecurityTier lWhere = SecurityZone.ForPlayer(SecurityZone.At(lPlayer, out AccessLevel lNeed), lNeed, _combatTarget.Weapons != null ? _combatTarget.Weapons.Access : AccessLevel.None, IsEnforcer);
+            // Aiming a gun at it from close enough is a hostile act; so is anything the zone already holds against the player.
+            bool lHostile = (_combatTarget.Aiming.Value && lUnseen < 0.4f && Vector3.Distance(transform.position, lPlayer) < 25f) || IsHostile(_combatTarget);
+            // In a restricted area it is an escort: "get out" - leaving ends it, staying turns it into a fight.
+            SecurityTier lWhere = TierFor(_combatTarget);
             if (lWhere == SecurityTier.Public && !lHostile && !_combatTarget.ActsSuspicious)
             {
                 _awareness = 0.4f;
@@ -618,6 +629,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                     _wantsAlarm = Random.value < 0.1f && WorldRegistry.Nearest<AlarmTrigger>(transform.position, 45f, a => a.State == 0) != null;
                     break;
                 case DetectionModel.Confrontation.LostSight:
+                    // Slipping away from a confrontation (anywhere it was not allowed) is an admission.
+                    Zone?.MarkHostile(_combatTarget, HostileAct.FledConfrontation);
                     _searchCenter = lPlayer;
                     _searchUntil = Time.time + GameDatabase.Rules.searchDuration * 0.6f;
                     SetState(NpcState.Search);
@@ -677,6 +690,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// </summary>
         private static void HearAll(NoiseEvent pNoise)
         {
+            // Gunfire and explosions: whoever sees the player who made them knows who did it.
+            if (pNoise.fromPlayer && pNoise.kind == NoiseKind.Alarming) ReportHostileAct(PlayerAvatar.ForClient(pNoise.source), HostileAct.Shot, null);
             _hearers.Clear();
             Vector3 lFrom = pNoise.position + Vector3.up * 0.4f;
             foreach (Npc lNpc in All)
@@ -697,6 +712,30 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 bool lResponder = lGiven < lResponders && lNpc.CanRespond;
                 if (lResponder) lGiven++;
                 lNpc.Hear(pNoise, DetectionModel.React(pNoise.kind, lLoudness, lResponder), lDistance);
+            }
+        }
+
+        private static readonly Dictionary<ulong, float> _lastShotWitnessed = new Dictionary<ulong, float>();
+
+        /// <summary>
+        /// Host: a player did something no zone forgives (shot, killed, punched, took someone down).
+        /// Every armed NPC who sees them do it tells its zone, which treats them as hostile for
+        /// <see cref="HostileMemory.DURATION"/> (<see cref="LevelZone.Hostiles"/>). The victim is not
+        /// a witness here: if it lives, it tells its zone itself.
+        /// </summary>
+        public static void ReportHostileAct(PlayerAvatar pPlayer, HostileAct pAct, Npc pVictim)
+        {
+            if (pPlayer == null || !pPlayer.IsSpawned || !pPlayer.Health.IsAlive) return;
+            // An automatic weapon fires ten times a second: one look round per player every 0.4 s is plenty.
+            if (pAct == HostileAct.Shot)
+            {
+                if (_lastShotWitnessed.TryGetValue(pPlayer.OwnerClientId, out float lLast) && Time.time - lLast < 0.4f && Time.time >= lLast) return;
+                _lastShotWitnessed[pPlayer.OwnerClientId] = Time.time;
+            }
+            foreach (Npc lNpc in All)
+            {
+                if (lNpc == null || lNpc == pVictim || !lNpc.IsServer || lNpc.Zone == null || lNpc.Flees) continue;
+                if (lNpc.Sees(pPlayer)) lNpc.Zone.MarkHostile(pPlayer, pAct);
             }
         }
 
@@ -1008,6 +1047,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private void EnterCombat()
         {
+            // Whoever it fights, its zone now knows: seen means a fight for the next two minutes.
+            if (_combatTarget != null) Zone?.MarkHostile(_combatTarget, HostileAct.Fought);
             SetState(NpcState.Combat);
             _combatStart = Time.time;
             _repositionTime = 0f;
@@ -1249,6 +1290,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             _lastAttacker = pInfo.attacker;
             PlayerAvatar lAttacker = PlayerAvatar.ForClient(pInfo.attacker);
+            // Anyone who saw it happen knows who did it; so does the victim, if it lives (dead men tell no tales).
+            if (lAttacker != null)
+            {
+                HostileAct lAct = pInfo.type == DamageType.Melee ? HostileAct.Punched : HostileAct.Shot;
+                ReportHostileAct(lAttacker, lAct, this);
+                if (Health.Health.Value > 0f && !Flees) Zone?.MarkHostile(lAttacker, lAct);
+            }
             if (Flees) { SetState(NpcState.Flee); return; }
             if (lAttacker != null)
             {
@@ -1266,6 +1314,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             State.Value = pInfo.knockout ? NpcState.KnockedOut : NpcState.Dead;
             if (_cover != null && _cover.Occupant == this) _cover.Occupant = null;
             _agent.enabled = false;
+            // Whoever saw the killer do it tells their zone.
+            ReportHostileAct(PlayerAvatar.ForClient(pInfo.attacker), pInfo.knockout || _silentDeath ? HostileAct.Takedown : HostileAct.Killed, null);
             NoiseSystem.Emit(transform.position, _silentDeath ? 2.5f : pInfo.type == DamageType.Bullet && pInfo.headshot ? 5f : 9f, NoiseKind.Suspicious, pInfo.attacker);
 
             // Guards drop their gun: clearing a room arms you.

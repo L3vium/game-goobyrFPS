@@ -26,5 +26,23 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         /// <summary>Weapon up and expecting trouble (searching, or checking out a shot): sees faster and hunts what it glimpses.</summary>
         public static bool OnEdge(NpcState pState, bool pInvestigateAlarmed) => pState == NpcState.Search || (pState == NpcState.Investigate && pInvestigateAlarmed);
+
+        // ---------------------------------------------------------------- spotting
+
+        public enum SpotReaction : byte { Confront, Fight, Flee }
+
+        /// <summary>
+        /// What an NPC does the moment its gauge fills on a player. The unarmed run. A player its zone
+        /// knows to be hostile (<see cref="HostileMemory"/>) is fought on sight, wherever they stand.
+        /// Someone already hunting fights a trespasser at once. Anyone else is confronted first - and
+        /// in a public place a confrontation of a player who behaves ends without a shot.
+        /// </summary>
+        public static SpotReaction OnSpotted(bool pFlees, bool pOnEdge, bool pKnownHostile, SecurityTier pTier)
+        {
+            if (pFlees) return SpotReaction.Flee;
+            if (pKnownHostile) return SpotReaction.Fight;
+            if (pOnEdge && pTier != SecurityTier.Public) return SpotReaction.Fight;
+            return SpotReaction.Confront;
+        }
     }
 }

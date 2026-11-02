@@ -22,5 +22,31 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
             Assert.IsFalse(NpcRules.OnEdge(NpcState.Investigate, false));
             Assert.IsFalse(NpcRules.OnEdge(NpcState.Patrol, false));
         }
+
+        [Test]
+        public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
+        {
+            HostileMemory lMemory = new HostileMemory();
+            Assert.IsFalse(lMemory.IsHostile(1, 0f));
+            lMemory.Mark(1, 10f);
+            Assert.IsTrue(lMemory.IsHostile(1, 10f + HostileMemory.DURATION - 1f));
+            Assert.IsFalse(lMemory.IsHostile(1, 10f + HostileMemory.DURATION + 1f), "forgotten after a while");
+            Assert.IsFalse(lMemory.IsHostile(2, 20f), "only the player who did it");
+            lMemory.Mark(1, 100f);
+            Assert.IsTrue(lMemory.IsHostile(1, 100f + HostileMemory.DURATION - 1f), "a new act starts the clock again");
+            lMemory.Mark(HostileMemory.NO_PLAYER, 0f);
+            Assert.IsFalse(lMemory.IsHostile(HostileMemory.NO_PLAYER, 1f));
+            Assert.That(HostileMemory.DURATION, Is.InRange(90f, 150f));
+        }
+
+        [Test]
+        public void Spotted_AKnownHostileIsFoughtOnSightEvenInPublic()
+        {
+            Assert.AreEqual(NpcRules.SpotReaction.Fight, NpcRules.OnSpotted(false, false, true, SecurityTier.Public), "seen = combat");
+            Assert.AreEqual(NpcRules.SpotReaction.Confront, NpcRules.OnSpotted(false, false, false, SecurityTier.Public));
+            Assert.AreEqual(NpcRules.SpotReaction.Confront, NpcRules.OnSpotted(false, true, false, SecurityTier.Public), "a searcher does not shoot a passer-by");
+            Assert.AreEqual(NpcRules.SpotReaction.Fight, NpcRules.OnSpotted(false, true, false, SecurityTier.Restricted), "a searcher fights a trespasser");
+            Assert.AreEqual(NpcRules.SpotReaction.Flee, NpcRules.OnSpotted(true, false, true, SecurityTier.Hostile), "the unarmed run");
+        }
     }
 }

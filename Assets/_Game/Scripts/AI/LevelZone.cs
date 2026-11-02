@@ -93,9 +93,26 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             Members.Clear();
             _contacts.Clear();
+            Hostiles.Clear();
             _callsMade = 0;
             _callInProgress = false;
             InCombat = false;
+        }
+
+        /// <summary>
+        /// Players this zone knows to be hostile (seen shooting, killing, punching, taking someone
+        /// down, fleeing a confrontation, or already fighting it): for <see cref="HostileMemory.DURATION"/>
+        /// its NPCs skip the social ladder - seen means a fight.
+        /// </summary>
+        public readonly HostileMemory Hostiles = new HostileMemory();
+
+        public bool IsHostile(PlayerAvatar pPlayer) => pPlayer != null && Hostiles.IsHostile(pPlayer.OwnerClientId, Time.time);
+
+        public void MarkHostile(PlayerAvatar pPlayer, HostileAct pAct)
+        {
+            if (pPlayer == null) return;
+            if (!Hostiles.IsHostile(pPlayer.OwnerClientId, Time.time)) Debug.Log($"[AI] {_zoneName}: {pPlayer.name} is hostile ({pAct})");
+            Hostiles.Mark(pPlayer.OwnerClientId, Time.time);
         }
 
         /// <summary>An NPC sees (or clearly hears) a player: the whole squad learns where.</summary>

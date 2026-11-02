@@ -109,6 +109,14 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Health_TheTargetTakesAFifthMore()
+        {
+            Assert.AreEqual(120f, NpcRules.MaxHealth(NpcRole.Target, 100f), 1e-3f);
+            Assert.AreEqual(100f, NpcRules.MaxHealth(NpcRole.Guard, 100f), 1e-3f);
+            Assert.AreEqual(100f, NpcRules.MaxHealth(NpcRole.Bodyguard, 100f), 1e-3f);
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

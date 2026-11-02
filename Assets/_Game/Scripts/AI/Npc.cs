@@ -167,6 +167,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public void InitServer(NpcRole pRole, int pZone, ItemDefinition pWeapon, PatrolRoute pRoute, Npc pPrincipal, int pTargetProfile, List<ActivityType> pRoutine)
         {
             RoleVar.Value = pRole;
+            // The role arrives after the spawn: health set from it now (the target is tougher).
+            Health.InitHealth(NpcRules.MaxHealth(pRole, GameDatabase.Rules.npcHealth));
             ZoneIndex.Value = pZone;
             WeaponItem.Value = pWeapon != null ? pWeapon.Index : -1;
             TargetProfile.Value = pTargetProfile;
@@ -193,7 +195,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             All.Add(this);
             Health.Team = Damageable.NPC_TEAM;
             Health.HeadCentre = () => _body != null && _body.Head != null && _body.Model.gameObject.activeInHierarchy ? _body.HeadCentre : transform.position + Vector3.up * BodyMetrics.HEAD_CENTRE;
-            Health.InitHealth(GameDatabase.Rules.npcHealth * (Role == NpcRole.Target ? 1.2f : 1f));
+            Health.InitHealth(NpcRules.MaxHealth(Role, GameDatabase.Rules.npcHealth));
             Health.OnDeathClient += HandleDeathClient;
             Health.OnHitClient += HandleHitClient;
             gameObject.AddComponent<Audio.Footsteps>().Init(() => !Health.IsAlive ? 0f : State.Value == NpcState.Combat || State.Value == NpcState.Flee || State.Value == NpcState.Search ? 0.9f : 0.45f);
@@ -212,7 +214,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             else _agent.enabled = false;
 
             Zone = LevelZone.Get(ZoneIndex.Value);
-            RoleVar.OnValueChanged += (_, __) => ApplyLook();
+            RoleVar.OnValueChanged += (_, __) =>
+            {
+                ApplyLook();
+                // Clients learn the role after the spawn too: their max health follows (the host set the real one).
+                if (!IsServer) Health.InitHealth(NpcRules.MaxHealth(Role, GameDatabase.Rules.npcHealth));
+            };
             TargetProfile.OnValueChanged += (_, __) => ApplyLook();
             WeaponItem.OnValueChanged += (_, __) => _visuals?.RefreshWeapon();
             ApplyLook();

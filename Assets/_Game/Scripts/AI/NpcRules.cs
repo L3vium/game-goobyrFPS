@@ -9,6 +9,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
     /// </summary>
     public static class NpcRules
     {
+        /// <summary>The target is tougher than everyone else (it takes a fifth more).</summary>
+        public const float TARGET_HEALTH = 1.2f;
+
+        /// <summary>An NPC's health from its role and the rules' NPC health.</summary>
+        public static float MaxHealth(NpcRole pRole, float pNpcHealth) => pNpcHealth * (pRole == NpcRole.Target ? TARGET_HEALTH : 1f);
+
         // ---------------------------------------------------------------- states
 
         /// <summary>

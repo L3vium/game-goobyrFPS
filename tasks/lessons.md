@@ -67,7 +67,7 @@ Rules I write for myself after a correction. Read at the start of every session.
   nothing can overlap. Screenshot every changed screen.
 - **Generated only, realistic target.** No downloads or packs (user choice): textures, sounds,
   props and humans come from builders, Blender scripts and `generate_3d`.
-- **Unity MCP for this machine is 8082**, not registered as a Claude MCP server: drive it over HTTP.
+- **Unity MCP for this machine is 8084** (was 8082 until 2026-11-02; the user says when it moves), not registered as a Claude MCP server: drive it over HTTP.
 
 ## 2026-10-31 — Caster mode (tournament spectators)
 - **Spectating is a product, not a fallback.** A spectator must be able to join on purpose (even

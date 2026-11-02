@@ -5,14 +5,14 @@
     python Tools/unity_mcp.py <tool> '<json args>'
     python Tools/unity_mcp.py <tool> @args.json
 
-The editor's MCP port is read from UNITY_MCP_PORT (default 8082).
+The editor's MCP port is read from UNITY_MCP_PORT (default 8084).
 """
 import json
 import os
 import sys
 import urllib.request
 
-PORT = int(os.environ.get("UNITY_MCP_PORT", "8082"))
+PORT = int(os.environ.get("UNITY_MCP_PORT", "8084"))
 URL = f"http://localhost:{PORT}/mcp"
 SESSION_FILE = os.path.join(os.path.dirname(__file__), ".unity_mcp_session")
 

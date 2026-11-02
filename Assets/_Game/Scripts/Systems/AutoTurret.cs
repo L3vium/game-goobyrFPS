@@ -31,7 +31,7 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
         [SerializeField] private Transform _muzzle;
         [SerializeField] private LineRenderer _laser;
         [SerializeField] private Renderer _lamp;
-        [SerializeField] private float _range = 24f;
+        [SerializeField] private float _reach = 24f;
         [SerializeField] private float _arc = 75f;
         [SerializeField] private float _damage = 9f;
 
@@ -61,7 +61,7 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
             _muzzle = pMuzzle;
             _laser = pLaser;
             _lamp = pLamp;
-            _range = pRange;
+            _reach = pRange;
             _prompt = "";
         }
 
@@ -141,8 +141,8 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
         {
             if (_laser == null) return;
             Vector3 lFrom = _muzzle.position;
-            Vector3 lTo = lFrom + _muzzle.forward * _range;
-            if (Physics.Raycast(lFrom, _muzzle.forward, out RaycastHit lHit, _range, ~0, QueryTriggerInteraction.Ignore)) lTo = lHit.point;
+            Vector3 lTo = lFrom + _muzzle.forward * _reach;
+            if (Physics.Raycast(lFrom, _muzzle.forward, out RaycastHit lHit, _reach, ~0, QueryTriggerInteraction.Ignore)) lTo = lHit.point;
             _laser.SetPosition(0, lFrom);
             _laser.SetPosition(1, lTo);
         }
@@ -152,7 +152,7 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
         {
             pAim = Vector3.zero;
             Damageable lBest = null;
-            float lBestDistance = _range;
+            float lBestDistance = _reach;
             if (!Turned)
             {
                 foreach (PlayerAvatar lPlayer in PlayerAvatar.All)
@@ -226,7 +226,7 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
         {
             if (_muzzle == null) return;
             Vector3 lFrom = _muzzle.position;
-            Vector3 lTo = (_target != null ? _aimPoint : lFrom + _muzzle.forward * _range) + Random.insideUnitSphere * 0.25f;
+            Vector3 lTo = (_target != null ? _aimPoint : lFrom + _muzzle.forward * _reach) + Random.insideUnitSphere * 0.25f;
             Effects.Muzzle(lFrom, _muzzle.forward, 0.8f);
             Effects.Tracer(lFrom, lTo, Turned ? new Color(0.5f, 1f, 0.6f, 0.9f) : new Color(1f, 0.55f, 0.4f, 0.9f));
             Effects.Impact(lTo, (lFrom - lTo).normalized, new Color(0.75f, 0.7f, 0.6f));
@@ -251,7 +251,7 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
         private void OnDrawGizmosSelected()
         {
             Gizmos.color = new Color(1f, 0.2f, 0.1f, 0.4f);
-            Gizmos.DrawWireSphere(transform.position, _range);
+            Gizmos.DrawWireSphere(transform.position, _reach);
         }
     }
 }

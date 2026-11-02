@@ -58,8 +58,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                                       || Motion.Value == MotionState.Climb || Motion.Value == MotionState.Hang || Motion.Value == MotionState.Vault || Motion.Value == MotionState.Mantle;
 
         /// <summary>Eye position as the NPCs and the camera see it.</summary>
-        public Vector3 Eye => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? 0.98f : 1.74f);
-        public Vector3 Chest => transform.position + Vector3.up * (Crouched.Value ? 0.6f : 1.1f);
+        public Vector3 Eye => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? BodyMetrics.CROUCH_EYE : BodyMetrics.EYE);
+        public Vector3 Chest => transform.position + Vector3.up * (Crouched.Value ? BodyMetrics.CROUCH_CHEST : BodyMetrics.CHEST);
 
         private float _yaw, _pitch;
         private float _bobPhase, _bobAmount;
@@ -81,7 +81,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public override void OnNetworkSpawn()
         {
             All.Add(this);
-            Health.HeadHeight = 1.3f;
+            Health.HeadCentre = () => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? BodyMetrics.CROUCH_HEAD_CENTRE : BodyMetrics.HEAD_CENTRE);
             Health.InitHealth(GameDatabase.Rules.playerHealth);
             Health.OnHitClient += HandleHit;
             gameObject.AddComponent<Audio.Footsteps>().Init(

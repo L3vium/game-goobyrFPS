@@ -87,7 +87,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private bool Flees => IsTarget || IsCrowd;
         public LevelZone Zone { get; private set; }
         public ItemDefinition Weapon => GameDatabase.Item(WeaponItem.Value);
-        public Vector3 Eye => transform.position + Vector3.up * 1.55f * transform.localScale.y;
+        public Vector3 Eye => transform.position + Vector3.up * BodyMetrics.EYE * transform.localScale.y;
 
         private NavMeshAgent _agent;
         private HumanBody _body;
@@ -190,7 +190,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             All.Add(this);
             Health.Team = Damageable.NPC_TEAM;
-            Health.HeadHeight = 1.3f;
+            Health.HeadCentre = () => _body != null && _body.Head != null && _body.Model.gameObject.activeInHierarchy ? _body.HeadCentre : transform.position + Vector3.up * BodyMetrics.HEAD_CENTRE;
             Health.InitHealth(GameDatabase.Rules.npcHealth * (Role == NpcRole.Target ? 1.2f : 1f));
             Health.OnDeathClient += HandleDeathClient;
             Health.OnHitClient += HandleHitClient;

@@ -278,6 +278,10 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
 - Interactables are scene objects numbered identically on every machine (`WorldRegistry`, sorted by
   position) and routed through `MapSession`; only dynamic things are NetworkObjects.
 - Patrol cars move as a function of the match clock, so they need no transform sync.
+- One body size for everything (`Core/BodyMetrics`): eyes at 1.60 m (0.90 crouched), chest 1.15,
+  a 0.16 m head sphere at 1.64, a 1.80 m capsule. The player's camera, `Npc.Eye`, headshots (the
+  head bone when the body has one), cover peeks and markers read it, and every character model is
+  scaled on its rest pose so its eyes sit at 1.60 m - you look people in the eye.
 - One MonoBehaviour per file named after it (scene/prefab serialization).
 - Never `AddComponent` a component that another `RequireComponent` already brings.
 - Adding a TextMeshPro turns the Transform into a RectTransform: re-read `transform` after.

@@ -54,8 +54,8 @@ namespace Com.IsartDigital.GoobyrFPS.Core
         public float MaxHealth { get; private set; } = 100f;
         /// <summary>Team used for friendly fire. NPCs are on their own team (-2).</summary>
         public int Team { get; set; } = NPC_TEAM;
-        /// <summary>Height above the transform where the head starts (headshots).</summary>
-        public float HeadHeight { get; set; } = 1.3f;
+        /// <summary>Where the head is now (headshots): the body's head bone when it has one, else the standing contract height.</summary>
+        public Func<Vector3> HeadCentre { get; set; }
 
         public const int NPC_TEAM = -2;
 
@@ -80,7 +80,14 @@ namespace Com.IsartDigital.GoobyrFPS.Core
             }
         }
 
-        public bool IsHeadshot(Vector3 pPoint) => pPoint.y - transform.position.y > HeadHeight * transform.lossyScale.y;
+        /// <summary>A hit on the head: within the head's width and no lower than the chin (a hat or hair counts).</summary>
+        public bool IsHeadshot(Vector3 pPoint)
+        {
+            Vector3 lHead = HeadCentre != null ? HeadCentre() : transform.position + Vector3.up * BodyMetrics.HEAD_CENTRE * transform.lossyScale.y;
+            float lRadius = BodyMetrics.HEAD_RADIUS * transform.lossyScale.y;
+            Vector3 lOffset = pPoint - lHead;
+            return lOffset.y > -lRadius && lOffset.x * lOffset.x + lOffset.z * lOffset.z < lRadius * lRadius * 2.5f;
+        }
 
         /// <summary>Host only. Returns true if the hit killed.</summary>
         public bool ApplyDamage(DamageInfo pInfo)

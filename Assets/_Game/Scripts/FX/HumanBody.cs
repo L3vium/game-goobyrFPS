@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Com.IsartDigital.GoobyrFPS.Core;
 using Com.IsartDigital.GoobyrFPS.Data;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -20,7 +21,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         [SerializeField] private bool _buildOnAwake = true;
         [SerializeField] private AnimatorCullingMode _culling = AnimatorCullingMode.CullUpdateTransforms;
 
-        public const float HEIGHT = 1.8f;
+        public const float HEIGHT = BodyMetrics.HEIGHT;
 
         public string Character => _character;
         /// <summary>Players animate even off screen (their shadow, the spectators); NPCs only when seen.</summary>
@@ -28,6 +29,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public Transform Model { get; private set; }
         public Animator Animator { get; private set; }
         public Transform Head { get; private set; }
+        /// <summary>Centre of the head now (headshots, markers): just above the head bone, or the standing contract height.</summary>
+        public Vector3 HeadCentre => Head != null ? Head.position + Vector3.up * (BodyMetrics.HEAD_BONE_TO_EYE + 0.02f) * Model.lossyScale.y : transform.position + Vector3.up * BodyMetrics.HEAD_CENTRE;
         public Transform Hips { get; private set; }
         public Transform Chest { get; private set; }
         public Transform HandL { get; private set; }
@@ -101,6 +104,13 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             lModel.AddComponent<HumanIK>().Target = GetComponent<HumanAnimator>();
 
             Head = Bone(HumanBodyBones.Head);
+            // Every body's eyes at the shared eye height (the player's camera looks people in the eye):
+            // measured on the rest pose, before the Animator has posed anything.
+            if (Head != null)
+            {
+                float lEye = (Head.position.y - Model.position.y) / Mathf.Max(0.01f, Model.lossyScale.y) + BodyMetrics.HEAD_BONE_TO_EYE;
+                Model.localScale = Vector3.one * _scale * Mathf.Clamp(BodyMetrics.EYE / Mathf.Max(0.5f, lEye), 0.8f, 1.25f);
+            }
             Hips = Bone(HumanBodyBones.Hips);
             Chest = Bone(HumanBodyBones.UpperChest) ?? Bone(HumanBodyBones.Chest);
             HandL = Bone(HumanBodyBones.LeftHand);

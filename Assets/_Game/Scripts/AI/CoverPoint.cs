@@ -28,17 +28,17 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Is a threat at <paramref name="pThreat"/> blocked from someone crouched/standing here?</summary>
         public bool CoversFrom(Vector3 pThreat)
         {
-            Vector3 lEye = transform.position + Vector3.up * (_low ? 0.9f : 1.5f);
-            return Physics.Linecast(lEye, pThreat + Vector3.up * 1.2f, Core.GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
+            Vector3 lEye = transform.position + Vector3.up * (_low ? Core.BodyMetrics.CROUCH_EYE : Core.BodyMetrics.EYE);
+            return Physics.Linecast(lEye, pThreat + Vector3.up * Core.BodyMetrics.CHEST, Core.GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
         }
 
         /// <summary>Can someone here see the threat by standing up or leaning out?</summary>
         public bool CanPeek(Vector3 pThreat)
         {
-            Vector3 lUp = transform.position + Vector3.up * 1.65f;
-            Vector3 lSide = transform.position + Vector3.up * 1.4f + transform.right * 0.7f;
-            Vector3 lOther = transform.position + Vector3.up * 1.4f - transform.right * 0.7f;
-            Vector3 lTo = pThreat + Vector3.up * 1.2f;
+            Vector3 lUp = transform.position + Vector3.up * Core.BodyMetrics.EYE;
+            Vector3 lSide = transform.position + Vector3.up * (Core.BodyMetrics.EYE - 0.2f) + transform.right * 0.7f;
+            Vector3 lOther = transform.position + Vector3.up * (Core.BodyMetrics.EYE - 0.2f) - transform.right * 0.7f;
+            Vector3 lTo = pThreat + Vector3.up * Core.BodyMetrics.CHEST;
             int lMask = Core.GameLayers.SightBlockMask;
             return !Physics.Linecast(lUp, lTo, lMask, QueryTriggerInteraction.Ignore)
                 || !Physics.Linecast(lSide, lTo, lMask, QueryTriggerInteraction.Ignore)

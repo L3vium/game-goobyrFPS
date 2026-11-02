@@ -181,8 +181,14 @@ def main():
         job = json.loads(res["result"]["content"][0]["text"])["data"]["job_id"]
         for _ in range(200):
             time.sleep(3)
-            res = call("tools/call", {"name": "get_test_job", "arguments": {"job_id": job, "include_failed_tests": True}})
-            data = json.loads(res["result"]["content"][0]["text"])["data"]
+            try:
+                res = call("tools/call", {"name": "get_test_job", "arguments": {"job_id": job, "include_failed_tests": True}})
+                data = json.loads(res["result"]["content"][0]["text"])["data"]
+            except Exception:
+                data = None
+            if not data:
+                # the editor is busy (domain reload while the run starts): ask again
+                continue
             if data["status"] != "running":
                 summary = (data.get("result") or {}).get("summary")
                 print(data["status"], json.dumps(summary))

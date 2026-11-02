@@ -339,7 +339,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private void SetGait(Vector3 pLocal, float pSpeed, int pMaxTier, Vector4 pRing1, Vector4 pRing2, float pSprint, float dt, out float pPace, float pMaxPace)
         {
             Vector2 lDir = pSpeed > 0.05f ? new Vector2(pLocal.x, pLocal.z) / pSpeed : Vector2.up;
-            float lStride = _animator.humanScale / REF_SCALE;
+            // humanScale is the avatar's own size; the body's model scale (normalised heights) comes on top.
+            float lStride = _animator.humanScale / REF_SCALE * _animator.transform.lossyScale.y;
             float s1 = Directional(pRing1, lDir) * lStride, s2 = Mathf.Max(Directional(pRing2, lDir) * lStride, s1 * 1.05f);
             float s3 = pSprint > 0f ? Mathf.Max(pSprint * lStride, s2 * 1.05f) : s2;
             // A short walker hurrying (an NPC's brisk walk) breaks into the run ring rather than scurrying.

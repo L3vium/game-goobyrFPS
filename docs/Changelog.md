@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Everyone is the same size: your eyes are at the height of everyone else's (the crowd no longer
+  looks like children, the bodyguards no longer tower over you), and headshots follow the head.
 - The HUD tells you when you are TRESPASSING or in a HOSTILE AREA. Sentry guns only fire on
   trespassers, never in public areas.
 - Fresh snow sparkles: ice crystals glint in the sun and twinkle as you move.

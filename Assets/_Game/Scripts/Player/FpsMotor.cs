@@ -67,10 +67,11 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         [SerializeField] private float _gravity = -24f;
 
         [Header("Heights")]
-        [SerializeField] private float _standHeight = 1.86f;
-        [SerializeField] private float _crouchHeight = 1.1f;
-        [SerializeField] private float _crawlHeight = 0.74f;
-        [SerializeField] private float _eyeOffset = 0.12f;
+        // Capsule heights and the eye below the top: the shared body contract (Core/BodyMetrics).
+        private const float STAND_HEIGHT = BodyMetrics.CAPSULE;
+        private const float CROUCH_HEIGHT = BodyMetrics.CROUCH_CAPSULE;
+        private const float CRAWL_HEIGHT = BodyMetrics.CRAWL_CAPSULE;
+        private const float EYE_OFFSET = BodyMetrics.CAPSULE - BodyMetrics.EYE;
 
         [Header("Slides")]
         [SerializeField] private float _slideCooldown = 0.55f;
@@ -107,7 +108,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public bool Sliding => _crouchSliding;
         public Vector3 Velocity => _velocity;
         public float PlanarSpeed => new Vector3(_velocity.x, 0, _velocity.z).magnitude;
-        public float EyeHeight => _controller.height - _eyeOffset;
+        public float EyeHeight => _controller.height - EYE_OFFSET;
         /// <summary>Camera offset that eases step-ups (stairs, kerbs) instead of popping the view.</summary>
         public float StepSmoothing => _stepOffset;
         public bool InGrass => _grassCount > 0;
@@ -325,9 +326,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 OnSlide?.Invoke(lFromSprint ? 1f : 0.5f);
             }
 
-            Crouched = _wantCrouch || _crouchSliding || !CanFit(_standHeight);
+            Crouched = _wantCrouch || _crouchSliding || !CanFit(STAND_HEIGHT);
             // A crouch that doesn't fit ahead (a vent, a crawlspace) goes down on all fours; it stays so until a crouch fits again.
-            Crawling = Crouched && !_crouchSliding && ((pInput.y > 0.2f && LowCeilingAhead()) || (Crawling && !CanFit(_crouchHeight)));
+            Crawling = Crouched && !_crouchSliding && ((pInput.y > 0.2f && LowCeilingAhead()) || (Crawling && !CanFit(CROUCH_HEIGHT)));
 
             float lSpeed = (Crawling ? _crawlSpeed : Crouched ? _crouchSpeed : Sprinting ? _sprintSpeed : _walkSpeed) * SpeedMultiplier;
             if (Aiming) lSpeed *= 0.65f;
@@ -481,17 +482,17 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             float lRadius = _controller.radius * 0.9f;
             Vector3 lFeet = transform.position + Vector3.up * (lRadius + 0.06f);
-            bool lCrouchBlocked = Physics.CapsuleCast(lFeet, transform.position + Vector3.up * (_crouchHeight - lRadius), lRadius, transform.forward, 0.6f, LedgeMask, QueryTriggerInteraction.Ignore);
+            bool lCrouchBlocked = Physics.CapsuleCast(lFeet, transform.position + Vector3.up * (CROUCH_HEIGHT - lRadius), lRadius, transform.forward, 0.6f, LedgeMask, QueryTriggerInteraction.Ignore);
             if (!lCrouchBlocked) return false;
-            return !Physics.CapsuleCast(lFeet, transform.position + Vector3.up * (_crawlHeight - lRadius), lRadius, transform.forward, 0.6f, LedgeMask, QueryTriggerInteraction.Ignore);
+            return !Physics.CapsuleCast(lFeet, transform.position + Vector3.up * (CRAWL_HEIGHT - lRadius), lRadius, transform.forward, 0.6f, LedgeMask, QueryTriggerInteraction.Ignore);
         }
 
         private void UpdateHeight(float dt)
         {
-            float lTarget = Mode == MotorMode.Hidden ? _crouchHeight
-                : Crawling ? _crawlHeight
-                : Crouched || Mode == MotorMode.Mantle ? _crouchHeight
-                : _standHeight;
+            float lTarget = Mode == MotorMode.Hidden ? CROUCH_HEIGHT
+                : Crawling ? CRAWL_HEIGHT
+                : Crouched || Mode == MotorMode.Mantle ? CROUCH_HEIGHT
+                : STAND_HEIGHT;
             float lHeight = Mathf.MoveTowards(_controller.height, lTarget, dt * 6f);
             _controller.height = lHeight;
             _controller.center = new Vector3(0, lHeight * 0.5f, 0);
@@ -558,7 +559,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         private bool FitsCrouched(Vector3 pFeet, float pRadiusFactor = 0.9f)
         {
             float lRadius = _controller.radius * pRadiusFactor;
-            return !Physics.CheckCapsule(pFeet + Vector3.up * (lRadius + 0.06f), pFeet + Vector3.up * (_crouchHeight - lRadius), lRadius, LedgeMask, QueryTriggerInteraction.Ignore);
+            return !Physics.CheckCapsule(pFeet + Vector3.up * (lRadius + 0.06f), pFeet + Vector3.up * (CROUCH_HEIGHT - lRadius), lRadius, LedgeMask, QueryTriggerInteraction.Ignore);
         }
 
         /// <summary>Where a body stands on a ledge: just inside its edge, or centred on a thin top.</summary>
@@ -626,7 +627,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             Vector3 lFeet = HangPosition(pLedge);
             // The body hangs against the wall: there must be room for it there.
             float lRadius = _controller.radius * 0.85f;
-            if (Physics.CheckCapsule(lFeet + Vector3.up * (lRadius + 0.05f), lFeet + Vector3.up * (_standHeight - lRadius - 0.1f), lRadius, LedgeMask, QueryTriggerInteraction.Ignore)) return false;
+            if (Physics.CheckCapsule(lFeet + Vector3.up * (lRadius + 0.05f), lFeet + Vector3.up * (STAND_HEIGHT - lRadius - 0.1f), lRadius, LedgeMask, QueryTriggerInteraction.Ignore)) return false;
             _hang = pLedge;
             _velocity = Vector3.zero;
             _crouchSliding = false;

@@ -255,7 +255,10 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
   lead the hands during the action; small items ride in the hand; fists hold a guard (the punch
   clip's first frame). The overlay camera renders with post-processing (same exposure and
   tonemapping as the world) and the arms get their own slightly darker skin instances and white shirt
-  cuffs; shoulders sit low and back so the forearms rise from the bottom of the screen.
+  cuffs; shoulders sit low and back so the forearms rise from the bottom of the screen. The arms
+  mesh is trimmed at runtime to the forearms (triangles skinned to the clavicles and upper arms
+  dropped: no sleeve openings in the corners); long guns turn the arms 12° towards the gun side;
+  fists hold the punch clip's contact frame with the thumbs folded over the fingers.
 - The contract portrait (`UI/PortraitStudio`), the title key art and the app icon
   (`Goobyr/Build/Icon`, a camera render) use the same bodies.
 

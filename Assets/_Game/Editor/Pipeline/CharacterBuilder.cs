@@ -196,6 +196,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lImporter.importAnimation = false;
                 lImporter.optimizeGameObjects = false;
                 lImporter.importBlendShapes = false;
+                // The first-person arms are trimmed to the forearms at runtime (Viewmodel): readable.
+                lImporter.isReadable = Path.GetFileName(lFolder) == HumanCast.ARMS;
                 lImporter.importCameras = false;
                 lImporter.importLights = false;
                 lImporter.SaveAndReimport();

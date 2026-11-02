@@ -31,7 +31,6 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private int _builtItem = -2;
         private HeldKind _held;
         private ItemDefinition _item;
-        private bool _placed;
         private float _sightHeight;
         private Renderer[] _armRenderers = new Renderer[0];
 
@@ -44,6 +43,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private int _armsState;
         private Quaternion _rightRotation = Quaternion.identity, _leftRotation = Quaternion.identity;
         private Vector3 _leftTarget;
+        private float _yaw;
 
         private static RuntimeAnimatorController _controller;
 
@@ -51,7 +51,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public static Vector3 PISTOL_HIP = new Vector3(0.12f, -0.17f, 0.44f), PISTOL_TURN = new Vector3(0f, -2f, 0f);
         public static Vector3 RIFLE_HIP = new Vector3(0.13f, -0.17f, 0.34f), RIFLE_TURN = new Vector3(0f, -1.5f, 0f);
         public static Vector3 ITEM_HIP = new Vector3(0.14f, -0.13f, 0.34f), ITEM_TURN = new Vector3(-10f, -12f, 8f);
-        public static Vector3 FISTS = new Vector3(0.15f, -0.17f, 0.37f), FIST_LEFT = new Vector3(0f, 0.015f, 0.05f), FIST_TURN = new Vector3(-12f, -8f, -65f);
+        public static Vector3 FISTS = new Vector3(0.16f, -0.12f, 0.36f), FIST_LEFT = new Vector3(0f, 0.015f, 0.05f), FIST_TURN = new Vector3(-20f, -10f, 25f);
         public static float PISTOL_ADS_Z = 0.36f, RIFLE_ADS_Z = 0.3f;
 
         public Transform Muzzle { get; private set; }
@@ -72,6 +72,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             CameraRig lRig = CameraRig.Ensure();
             // The arms must go through the same exposure and tonemapping as the world, or they burn white.
             UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(lRig.ViewCamera).renderPostProcessing = true;
+            // The shoulders and upper sleeves sit beside and behind the eye: clipped, only the forearms
+            // and hands (from ~0.2 m out) are drawn.
+            lRig.ViewCamera.nearClipPlane = NEAR_CLIP;
             GameObject lRoot = new GameObject("Viewmodel");
             lRoot.transform.SetParent(lRig.ViewmodelRoot, false);
             Viewmodel lView = lRoot.AddComponent<Viewmodel>();
@@ -109,6 +112,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             }
             Cuff(HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand);
             Cuff(HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand);
+            foreach (SkinnedMeshRenderer lSkin in lArms.GetComponentsInChildren<SkinnedMeshRenderer>()) lSkin.sharedMesh = Forearms(lSkin);
             _armRenderers = lArms.GetComponentsInChildren<Renderer>();
             // Arms half a metre from the eye catch the full sun the world around them is shaded from:
             // their own instances, skin a little darker and less glossy, so they read as skin, not white.
@@ -137,9 +141,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             Vector3 lAlong = lArm.InverseTransformPoint(lHand.position);
             GameObject lCuff = new GameObject("Cuff");
             lCuff.transform.SetParent(lArm, false);
-            lCuff.transform.localPosition = lAlong * 0.86f;
+            lCuff.transform.localPosition = lAlong * 0.93f;
             lCuff.transform.localRotation = Quaternion.FromToRotation(Vector3.up, lAlong.normalized);
-            lCuff.transform.localScale = new Vector3(0.068f, 0.035f, 0.058f) / Mathf.Max(0.01f, lArm.lossyScale.x);
+            lCuff.transform.localScale = new Vector3(0.074f, 0.03f, 0.064f) / Mathf.Max(0.01f, lArm.lossyScale.x);
             lCuff.AddComponent<MeshFilter>().sharedMesh = HumanBody.BandMesh();
             MeshRenderer lRenderer = lCuff.AddComponent<MeshRenderer>();
             Material lMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
@@ -193,7 +197,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private void PlayHold(float pFade)
         {
             if (_animator != null) _animator.SetFloat(HumanAnimator.PACE, _held == HeldKind.None ? 0f : 1f);
-            Play(HoldState, pFade, _held == HeldKind.None ? 0.04f : 0f);
+            // Fists: the punch clip held at its contact frame, where the fingers are clenched.
+            Play(HoldState, pFade, _held == HeldKind.None ? 0.3f : 0f);
         }
 
         private void Rebuild(ItemDefinition pItem)
@@ -338,14 +343,25 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (_arms == null || _animator == null) return;
             Transform lHead = _animator.GetBoneTransform(HumanBodyBones.Head);
             if (lHead == null) return;
+            // Long guns: the body turns a little to the gun side, the support shoulder comes forward.
+            _yaw = Mathf.MoveTowards(_yaw, _held == HeldKind.Rifle ? RIFLE_YAW : 0f, Time.deltaTime * 60f);
+            Quaternion lTurn = Quaternion.Euler(0f, _yaw, 0f);
+            if (Quaternion.Angle(_arms.localRotation, lTurn) > 0.01f)
+            {
+                // Turn about the eye, not the feet.
+                Vector3 lPivot = transform.InverseTransformPoint(lHead.TransformPoint(HumanRig.Instance.eyeInHead));
+                _arms.localPosition = lPivot + lTurn * Quaternion.Inverse(_arms.localRotation) * (_arms.localPosition - lPivot);
+                _arms.localRotation = lTurn;
+            }
             Vector3 lEye = transform.InverseTransformPoint(lHead.TransformPoint(HumanRig.Instance.eyeInHead));
             Vector3 lError = lEye - SHOULDER_DROP;
             if (lError.sqrMagnitude > 0.000001f) _arms.localPosition -= lError;
-            _placed = true;
         }
 
         /// <summary>Shoulders lower and further back than real: the forearms rise into the view from the bottom corners instead of hiding the hands.</summary>
         public static Vector3 SHOULDER_DROP = new Vector3(0f, 0.2f, 0.24f);
+        public static float RIFLE_YAW = 12f, NEAR_CLIP = 0.06f, FIST_AMOUNT = 0f;
+        public static Vector2 THUMB_BEND = new Vector2(100f, 80f);
         /// <summary>Elbows down and in: the forearms rise from the bottom of the screen, not across it.</summary>
         public static Vector3 RIGHT_ELBOW = new Vector3(0.3f, -0.62f, 0.1f), LEFT_ELBOW = new Vector3(-0.18f, -0.65f, 0.18f);
 
@@ -405,6 +421,110 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (_animator == null || _arms == null || !_arms.gameObject.activeInHierarchy) return;
             Turn(HumanBodyBones.RightHand, _rightRotation, _ikRight);
             Turn(HumanBodyBones.LeftHand, _leftRotation, _ikLeft);
+            if (_held == HeldKind.None && _punchT >= 1f)
+            {
+                Fist(true, _ikRight);
+                Fist(false, _ikLeft);
+            }
+        }
+
+        private static readonly HumanBodyBones[][] FINGERS =
+        {
+            new[] { HumanBodyBones.RightIndexProximal, HumanBodyBones.RightIndexIntermediate, HumanBodyBones.RightIndexDistal },
+            new[] { HumanBodyBones.RightMiddleProximal, HumanBodyBones.RightMiddleIntermediate, HumanBodyBones.RightMiddleDistal },
+            new[] { HumanBodyBones.RightRingProximal, HumanBodyBones.RightRingIntermediate, HumanBodyBones.RightRingDistal },
+            new[] { HumanBodyBones.RightLittleProximal, HumanBodyBones.RightLittleIntermediate, HumanBodyBones.RightLittleDistal },
+            new[] { HumanBodyBones.LeftIndexProximal, HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.LeftIndexDistal },
+            new[] { HumanBodyBones.LeftMiddleProximal, HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.LeftMiddleDistal },
+            new[] { HumanBodyBones.LeftRingProximal, HumanBodyBones.LeftRingIntermediate, HumanBodyBones.LeftRingDistal },
+            new[] { HumanBodyBones.LeftLittleProximal, HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.LeftLittleDistal },
+        };
+        private static readonly float[] FIST_CURL = { 85f, 95f, 60f };
+
+        /// <summary>
+        /// Closes a hand into a fist on top of the clip: every phalanx curls towards the palm (about the
+        /// axis across the finger and the palm normal), the thumb folds over the fingers.
+        /// </summary>
+        private void Fist(bool pRight, float pWeight)
+        {
+            if (pWeight <= 0.01f) return;
+            Transform lHand = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightHand : HumanBodyBones.LeftHand);
+            Transform lIndex = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightIndexProximal : HumanBodyBones.LeftIndexProximal);
+            Transform lLittle = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightLittleProximal : HumanBodyBones.LeftLittleProximal);
+            Transform lMiddle = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightMiddleProximal : HumanBodyBones.LeftMiddleProximal);
+            if (lHand == null || lIndex == null || lLittle == null || lMiddle == null) return;
+            Vector3 lUp = (lIndex.position - lLittle.position).normalized, lForward = (lMiddle.position - lHand.position).normalized;
+            Vector3 lPalm = Vector3.Cross(lUp, lForward).normalized * (pRight ? -1f : 1f);
+            for (int f = pRight ? 0 : 4; f < (pRight ? 4 : 8) && FIST_AMOUNT > 0f; f++)
+                for (int j = 0; j < 3; j++)
+                {
+                    Transform lBone = _animator.GetBoneTransform(FINGERS[f][j]);
+                    Transform lChild = j < 2 ? _animator.GetBoneTransform(FINGERS[f][j + 1]) : null;
+                    if (lBone == null) continue;
+                    Vector3 lAlong = lChild != null ? (lChild.position - lBone.position).normalized : lBone.rotation * Vector3.up;
+                    Vector3 lAxis = Vector3.Cross(lAlong, lPalm);
+                    if (lAxis.sqrMagnitude < 0.0001f) continue;
+                    lBone.rotation = Quaternion.AngleAxis(FIST_CURL[j] * pWeight * FIST_AMOUNT, lAxis.normalized) * lBone.rotation;
+                }
+            // The thumb lies across the front of the curled index and middle fingers.
+            Transform lThumb1 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightThumbProximal : HumanBodyBones.LeftThumbProximal);
+            Transform lThumb2 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightThumbIntermediate : HumanBodyBones.LeftThumbIntermediate);
+            Transform lIndex2 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightIndexIntermediate : HumanBodyBones.LeftIndexIntermediate);
+            Transform lMiddle2 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightMiddleIntermediate : HumanBodyBones.LeftMiddleIntermediate);
+            if (lThumb1 == null || lThumb2 == null || lIndex2 == null || lMiddle2 == null) return;
+            Vector3 lCurrent = (lThumb2.position - lThumb1.position).normalized;
+            Vector3 lTarget = (Vector3.Lerp(lIndex2.position, lMiddle2.position, 0.35f) + lPalm * 0.012f - lThumb1.position).normalized;
+            lThumb1.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lCurrent, lTarget), pWeight) * lThumb1.rotation;
+            Transform lThumb3 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightThumbDistal : HumanBodyBones.LeftThumbDistal);
+            Vector3 lFold = Vector3.Cross((lThumb2.position - lThumb1.position).normalized, lPalm);
+            if (lFold.sqrMagnitude > 0.0001f)
+            {
+                lThumb2.rotation = Quaternion.AngleAxis(THUMB_BEND.x * pWeight, lFold.normalized) * lThumb2.rotation;
+                if (lThumb3 != null) lThumb3.rotation = Quaternion.AngleAxis(THUMB_BEND.y * pWeight, lFold.normalized) * lThumb3.rotation;
+            }
+        }
+
+        private static readonly System.Collections.Generic.Dictionary<Mesh, Mesh> _forearms = new System.Collections.Generic.Dictionary<Mesh, Mesh>();
+
+        /// <summary>
+        /// The arms mesh without what sits beside and behind the eye (shoulders, upper sleeves): the
+        /// triangles skinned mostly to the clavicles, upper arms or spine are dropped, so only the
+        /// forearms, cuffs and hands show at the bottom of the view. Needs the mesh readable.
+        /// </summary>
+        private static Mesh Forearms(SkinnedMeshRenderer pSkin)
+        {
+            Mesh lSource = pSkin.sharedMesh;
+            if (lSource == null || !lSource.isReadable) return lSource;
+            if (_forearms.TryGetValue(lSource, out Mesh lCached)) return lCached;
+            bool[] lDrop = new bool[pSkin.bones.Length];
+            for (int i = 0; i < lDrop.Length; i++)
+            {
+                string n = pSkin.bones[i] != null ? pSkin.bones[i].name : "";
+                lDrop[i] = n.StartsWith("upperarm") || n.StartsWith("clavicle") || n.StartsWith("spine") || n.StartsWith("neck") || n == "pelvis";
+            }
+            BoneWeight[] lWeights = lSource.boneWeights;
+            Mesh lMesh = Object.Instantiate(lSource);
+            lMesh.name = lSource.name + "_Forearms";
+            for (int sub = 0; sub < lSource.subMeshCount; sub++)
+            {
+                int[] lTris = lSource.GetTriangles(sub);
+                System.Collections.Generic.List<int> lKeep = new System.Collections.Generic.List<int>(lTris.Length);
+                for (int t = 0; t < lTris.Length; t += 3)
+                {
+                    int lUpper = 0;
+                    for (int k = 0; k < 3; k++)
+                    {
+                        BoneWeight w = lWeights[lTris[t + k]];
+                        float lShare = (lDrop[w.boneIndex0] ? w.weight0 : 0f) + (lDrop[w.boneIndex1] ? w.weight1 : 0f) + (lDrop[w.boneIndex2] ? w.weight2 : 0f) + (lDrop[w.boneIndex3] ? w.weight3 : 0f);
+                        if (lShare > 0.5f) lUpper++;
+                    }
+                    if (lUpper >= 2) continue;
+                    lKeep.Add(lTris[t]); lKeep.Add(lTris[t + 1]); lKeep.Add(lTris[t + 2]);
+                }
+                lMesh.SetTriangles(lKeep, sub);
+            }
+            _forearms[lSource] = lMesh;
+            return lMesh;
         }
 
         private void Turn(HumanBodyBones pBone, Quaternion pRotation, float pWeight)

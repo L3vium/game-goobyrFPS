@@ -77,8 +77,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public bool InCombat => State.Value == NpcState.Combat || State.Value == NpcState.Calling;
         /// <summary>Confronting, fighting or searching: what the minimap, instinct and HUD show as a threat.</summary>
         public bool IsAlerted => InCombat || State.Value == NpcState.Engaged || State.Value == NpcState.Search;
-        /// <summary>Weapon up and expecting trouble (searching, or checking out a shot): sees faster and fires on sight.</summary>
-        private bool OnEdge => State.Value == NpcState.Search || (State.Value == NpcState.Investigate && _investigateAlarmed);
+        /// <summary>Weapon up and expecting trouble (searching, or checking out a shot): sees faster and hunts what it glimpses (<see cref="NpcRules.OnEdge"/>).</summary>
+        private bool OnEdge => NpcRules.OnEdge(State.Value, _investigateAlarmed);
         /// <summary>Going about its business: the states a sound or a glimpse can interrupt.</summary>
         private bool OnDuty => State.Value == NpcState.Idle || State.Value == NpcState.Patrol || State.Value == NpcState.Routine || State.Value == NpcState.Escort;
         public bool IsTarget => Role == NpcRole.Target;
@@ -399,6 +399,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 if (lBest == _combatTarget) _lastSawTarget = Time.time;
                 if (State.Value == NpcState.Engaged) { }
                 else if (_awareness >= 1f) Spot(lBest);
+                else if (OnEdge) HuntToward(lBest.transform.position);
                 else if (CanBecomeSuspicious)
                 {
                     if (_awareness > DetectionModel.INVESTIGATE && State.Value != NpcState.Investigate) Investigate(lBest.transform.position, false);
@@ -432,7 +433,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Vector3 lGuess = Guess(pPlayer.transform.position, lDistance);
 
             if (InCombat) { if (lLoudness > 0.5f) Zone?.ReportContact(pPlayer, lGuess, false); return; }
-            if (State.Value == NpcState.Search) { if (lLoudness > 0.4f) { _searchCenter = lGuess; MoveTo(lGuess, RUN * 0.6f); } return; }
+            if (OnEdge) { if (lLoudness > 0.4f) HuntToward(lGuess); return; }
             if (!CanBecomeSuspicious) return;
             _suspect = pPlayer;
             if (DetectionModel.React(NoiseKind.Footstep, lLoudness, true) == DetectionModel.Heard.Investigate && State.Value != NpcState.Investigate) Investigate(lGuess, false);
@@ -465,8 +466,23 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return Mathf.Min(lHits, DetectionModel.MAX_WALLS);
         }
 
-        /// <summary>States from which a glimpse of a player makes the NPC stop and stare.</summary>
-        private bool CanBecomeSuspicious => !InCombat && State.Value != NpcState.Engaged && State.Value != NpcState.Flee && State.Value != NpcState.Sick;
+        /// <summary>States from which a glimpse of a player makes the NPC stop and stare (<see cref="NpcRules.CanBecomeSuspicious"/>).</summary>
+        private bool CanBecomeSuspicious => NpcRules.CanBecomeSuspicious(State.Value, _investigateAlarmed);
+
+        /// <summary>
+        /// A glimpse or a close sound while hunting (searching, or running to a shot): it heads
+        /// straight for it, weapon up - it never turns into a calm look around.
+        /// </summary>
+        private void HuntToward(Vector3 pPoint)
+        {
+            if (State.Value == NpcState.Search)
+            {
+                _searchCenter = pPoint;
+                _searchUntil = Mathf.Max(_searchUntil, Time.time + GameDatabase.Rules.searchDuration * 0.5f);
+                MoveTo(pPoint, RUN * 0.6f);
+            }
+            else _investigatePoint = pPoint;
+        }
 
         /// <summary>See <see cref="DetectionModel.Exposure"/>: distance, cone and edge of vision, light, stance, grass, smoke, walls.</summary>
         private float Exposure(PlayerAvatar pPlayer, GameRules pRules, bool pCombat)

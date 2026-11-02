@@ -43,8 +43,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
     /// The contract's time of day, picked by the host in the briefing
     /// (<see cref="LobbyState.TimeOfDay"/>) and applied on every machine: the sun's angle and colour
     /// (a cold moon at night), the sky's gradient and clouds, ambient light and reflections taken
-    /// from that sky, the volumetric fog's density and glow, the exposure, the colour grade, the wind
-    /// and the street lamps.
+    /// from that sky (and local reflection probes, <see cref="World.RoomProbes"/>), the volumetric fog's
+    /// density and glow, the exposure, the colour grade, the wind and the street lamps.
     /// <para>
     /// The look of each biome lives in <see cref="PresetsFor"/>: the presets are rebuilt from it when
     /// the map loads, so a change to a look reaches every map without rebuilding them. Maps built
@@ -110,6 +110,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private void Start()
         {
             if (LobbyState.Instance != null) LobbyState.Instance.TimeOfDay.OnValueChanged += HandleChanged;
+            // Local reflections: probes per building floor and round the streets, captured at load.
+            if (GetComponent<World.RoomProbes>() == null) gameObject.AddComponent<World.RoomProbes>();
             Apply(LobbyState.Instance != null ? LobbyState.Instance.TimeOfDay.Value : 1);
         }
 
@@ -175,6 +177,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _balance.tint.Override(p.tint);
             _split.shadows.Override(new Vector4(p.shadows.r, p.shadows.g, p.shadows.b, 0f));
             _split.highlights.Override(new Vector4(p.highlights.r, p.highlights.g, p.highlights.b, 0f));
+
+            // The reflections are captured again under the new light.
+            if (World.RoomProbes.Instance != null) World.RoomProbes.Instance.Refresh();
 
             // The prevailing wind of the biome, from the map's sun heading.
             Vector3 lWind = Quaternion.Euler(0f, _heading + 35f, 0f) * Vector3.forward;

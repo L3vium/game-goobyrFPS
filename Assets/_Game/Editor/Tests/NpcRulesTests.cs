@@ -1,4 +1,5 @@
 using Com.IsartDigital.GoobyrFPS.AI;
+using Com.IsartDigital.GoobyrFPS.Data;
 using NUnit.Framework;
 
 // Author : Baptiste Vu Liem
@@ -47,6 +48,23 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
             Assert.AreEqual(NpcRules.SpotReaction.Confront, NpcRules.OnSpotted(false, true, false, SecurityTier.Public), "a searcher does not shoot a passer-by");
             Assert.AreEqual(NpcRules.SpotReaction.Fight, NpcRules.OnSpotted(false, true, false, SecurityTier.Restricted), "a searcher fights a trespasser");
             Assert.AreEqual(NpcRules.SpotReaction.Flee, NpcRules.OnSpotted(true, false, true, SecurityTier.Hostile), "the unarmed run");
+        }
+
+        [Test]
+        public void GunInHand_SuspiciousAnywhereACrimeOutsidePublicPlaces()
+        {
+            foreach (ItemKind lGun in new[] { ItemKind.Pistol, ItemKind.SilencedPistol, ItemKind.Smg, ItemKind.Shotgun, ItemKind.Sniper, ItemKind.RocketLauncher, ItemKind.Flamethrower })
+                Assert.IsTrue(NpcRules.IsVisibleWeapon(lGun), lGun.ToString());
+            foreach (ItemKind lOther in new[] { ItemKind.Fists, ItemKind.Coin, ItemKind.Keycard, ItemKind.Poison, ItemKind.Brick })
+                Assert.IsFalse(NpcRules.IsVisibleWeapon(lOther), lOther.ToString());
+
+            Assert.Greater(DetectionModel.TierFactor(SecurityTier.Public, NpcRules.ActsSuspicious(false, true)), 0f, "a gun out on the plaza is noticed");
+            Assert.AreEqual(0f, DetectionModel.TierFactor(SecurityTier.Public, NpcRules.ActsSuspicious(false, false)), "a calm unarmed passer-by is not");
+            Assert.IsTrue(NpcRules.IsCrime(SecurityTier.Restricted, true));
+            Assert.IsTrue(NpcRules.IsCrime(SecurityTier.Hostile, true));
+            Assert.IsFalse(NpcRules.IsCrime(SecurityTier.Public, true), "in public it is suspicious, not a crime: the confrontation is the chance to put it away");
+            Assert.IsFalse(NpcRules.IsCrime(SecurityTier.Hostile, false));
+            Assert.AreEqual(NpcRules.SpotReaction.Fight, NpcRules.OnSpotted(false, false, false, SecurityTier.Restricted, true), "an armed trespasser is fought, not escorted");
         }
     }
 }

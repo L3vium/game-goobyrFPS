@@ -490,6 +490,19 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>The security tier that counts for this player where they stand, as this NPC judges it (passes, enforcers).</summary>
         private SecurityTier TierFor(PlayerAvatar pPlayer) => SecurityZone.ForPlayer(SecurityZone.At(pPlayer.transform.position, out AccessLevel lNeed), lNeed, pPlayer.Weapons != null ? pPlayer.Weapons.Access : AccessLevel.None, IsEnforcer);
 
+        /// <summary>The player has a weapon out (any gun, the launcher, the flamethrower): suspicious anywhere, a crime outside public places.</summary>
+        public static bool WeaponDrawn(PlayerAvatar pPlayer)
+        {
+            ItemDefinition lHeld = pPlayer.Weapons != null ? pPlayer.Weapons.HeldItem : null;
+            return lHeld != null && NpcRules.IsVisibleWeapon(lHeld.kind);
+        }
+
+        /// <summary>What gives a player away even in a public place (<see cref="NpcRules.ActsSuspicious"/>).</summary>
+        public static bool ActsSuspicious(PlayerAvatar pPlayer) => NpcRules.ActsSuspicious(pPlayer.ActsSuspicious, WeaponDrawn(pPlayer));
+
+        /// <summary>Is this player committing a crime where they stand, as this NPC judges it (a weapon out outside public places)?</summary>
+        private bool CommitsCrime(PlayerAvatar pPlayer) => !Flees && NpcRules.IsCrime(TierFor(pPlayer), WeaponDrawn(pPlayer));
+
         /// <summary>Does it see this player right now, wherever they stand (a witness of what they do)?</summary>
         public bool Sees(PlayerAvatar pPlayer) => pPlayer != null && Health.IsAlive && State.Value != NpcState.KnockedOut && Exposure(pPlayer, GameDatabase.Rules, InCombat || OnEdge, true) > 0f;
 
@@ -522,7 +535,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (SmokeVolume.Blocks(lEye, lTarget)) return 0f;
             // The social ladder: a behaving player on the plaza is just another passer-by - even to a
             // guard who is searching or fighting someone else. A known hostile gets no such cover.
-            float lTier = pWitness || IsHostile(pPlayer) ? 1f : DetectionModel.TierFactor(TierFor(pPlayer), pPlayer.ActsSuspicious);
+            float lTier = pWitness || IsHostile(pPlayer) ? 1f : DetectionModel.TierFactor(TierFor(pPlayer), ActsSuspicious(pPlayer));
             if (lTier <= 0f) return 0f;
             lSight.chestVisible = !Physics.Linecast(lEye, lTarget, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
             lSight.headVisible = !Physics.Linecast(lEye, pPlayer.Eye, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
@@ -577,7 +590,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 return;
             }
             SpottedRpc();
-            switch (NpcRules.OnSpotted(Flees, OnEdge, IsHostile(pPlayer), TierFor(pPlayer)))
+            bool lCrime = CommitsCrime(pPlayer);
+            if (lCrime) Zone?.MarkHostile(pPlayer, HostileAct.DrawnGun);
+            switch (NpcRules.OnSpotted(Flees, OnEdge, IsHostile(pPlayer), TierFor(pPlayer), lCrime))
             {
                 case NpcRules.SpotReaction.Flee:
                     // A scream: the guards close by come and look.
@@ -608,11 +623,14 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (Vector3.Distance(transform.position, lPlayer) > 6f && lUnseen < 0.5f) MoveTo(lPlayer, WALK);
             else Stop();
 
-            // Aiming a gun at it from close enough is a hostile act; so is anything the zone already holds against the player.
-            bool lHostile = (_combatTarget.Aiming.Value && lUnseen < 0.4f && Vector3.Distance(transform.position, lPlayer) < 25f) || IsHostile(_combatTarget);
+            // Aiming a gun at it from close enough is a hostile act; so is drawing one where it is a crime, and
+            // anything the zone already holds against the player.
+            bool lHostile = (_combatTarget.Aiming.Value && lUnseen < 0.4f && Vector3.Distance(transform.position, lPlayer) < 25f)
+                            || (lUnseen < 0.4f && CommitsCrime(_combatTarget)) || IsHostile(_combatTarget);
             // In a restricted area it is an escort: "get out" - leaving ends it, staying turns it into a fight.
+            // In a public place it ends as soon as the player behaves (a gun put away).
             SecurityTier lWhere = TierFor(_combatTarget);
-            if (lWhere == SecurityTier.Public && !lHostile && !_combatTarget.ActsSuspicious)
+            if (lWhere == SecurityTier.Public && !lHostile && !ActsSuspicious(_combatTarget))
             {
                 _awareness = 0.4f;
                 ReturnToDuty();

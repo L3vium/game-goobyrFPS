@@ -37,12 +37,28 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// Someone already hunting fights a trespasser at once. Anyone else is confronted first - and
         /// in a public place a confrontation of a player who behaves ends without a shot.
         /// </summary>
-        public static SpotReaction OnSpotted(bool pFlees, bool pOnEdge, bool pKnownHostile, SecurityTier pTier)
+        public static SpotReaction OnSpotted(bool pFlees, bool pOnEdge, bool pKnownHostile, SecurityTier pTier, bool pCrime = false)
         {
             if (pFlees) return SpotReaction.Flee;
-            if (pKnownHostile) return SpotReaction.Fight;
+            if (pKnownHostile || pCrime) return SpotReaction.Fight;
             if (pOnEdge && pTier != SecurityTier.Public) return SpotReaction.Fight;
             return SpotReaction.Confront;
         }
+
+        // ---------------------------------------------------------------- weapons in hand
+
+        /// <summary>A weapon anyone recognises from across a room: every gun, the rocket launcher, the flamethrower.</summary>
+        public static bool IsVisibleWeapon(Data.ItemKind pKind) => pKind is Data.ItemKind.Pistol or Data.ItemKind.SilencedPistol or Data.ItemKind.Smg
+            or Data.ItemKind.Shotgun or Data.ItemKind.Sniper or Data.ItemKind.RocketLauncher or Data.ItemKind.Flamethrower;
+
+        /// <summary>Behaviour that gives a player away even in a public place: what the player does (aiming, sprinting, climbing, the proof) or a weapon in hand.</summary>
+        public static bool ActsSuspicious(bool pBehaviour, bool pWeaponDrawn) => pBehaviour || pWeaponDrawn;
+
+        /// <summary>
+        /// A weapon out anywhere but a public place is a crime for an armed guard who sees it: it
+        /// fights, no confrontation. In a public place it is only suspicious - the confrontation is
+        /// the chance to put it away.
+        /// </summary>
+        public static bool IsCrime(SecurityTier pTier, bool pWeaponDrawn) => pWeaponDrawn && pTier != SecurityTier.Public;
     }
 }

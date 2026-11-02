@@ -27,6 +27,13 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Weapon up and expecting trouble (searching, or checking out a shot): sees faster and hunts what it glimpses.</summary>
         public static bool OnEdge(NpcState pState, bool pInvestigateAlarmed) => pState == NpcState.Search || (pState == NpcState.Investigate && pInvestigateAlarmed);
 
+        /// <summary>
+        /// States in which the NPC turns itself toward something (its aim, the player it stares at or
+        /// confronts, the caller's threat) while it may still be walking: the NavMeshAgent must not
+        /// steer its rotation then, or it swings the body back along the path and the aim with it.
+        /// </summary>
+        public static bool AimsManually(NpcState pState) => pState is NpcState.Engaged or NpcState.Combat or NpcState.Calling or NpcState.Suspicious;
+
         // ---------------------------------------------------------------- spotting
 
         public enum SpotReaction : byte { Confront, Fight, Flee }

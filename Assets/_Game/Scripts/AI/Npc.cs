@@ -297,6 +297,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             float dt = Time.deltaTime;
             _stateTime += dt;
             UpdatePose();
+            // Aiming or staring: the body turns to the target, not along the path (the agent would fight the aim).
+            bool lSteers = !NpcRules.AimsManually(State.Value) && !(Time.time < _glanceUntil && OnDuty);
+            if (_agent.updateRotation != lSteers) _agent.updateRotation = lSteers;
 
             _perceptionTimer -= dt;
             if (_perceptionTimer <= 0f)

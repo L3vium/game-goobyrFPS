@@ -25,6 +25,15 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
         }
 
         [Test]
+        public void Aiming_TheAgentNeverSteersTheBody()
+        {
+            foreach (NpcState lState in new[] { NpcState.Engaged, NpcState.Combat, NpcState.Calling, NpcState.Suspicious })
+                Assert.IsTrue(NpcRules.AimsManually(lState), lState + " turns to its target");
+            foreach (NpcState lState in new[] { NpcState.Idle, NpcState.Patrol, NpcState.Routine, NpcState.Search, NpcState.Investigate, NpcState.Flee })
+                Assert.IsFalse(NpcRules.AimsManually(lState), lState + " faces where it walks");
+        }
+
+        [Test]
         public void HostileMemory_RemembersThePlayerForAboutTwoMinutes()
         {
             HostileMemory lMemory = new HostileMemory();

@@ -26,8 +26,9 @@ namespace Com.IsartDigital.GoobyrFPS.World
 
         /// <summary>
         /// The colour the meadow has from afar (linear albedo): blades seen whole and lit, roots in their
-        /// shade, a little less saturated than a tip. The terrain's grass layer is tinted to it, so the land
-        /// does not change colour where the blades end (calibrated in the grass test scene).
+        /// shade, a little less saturated than a tip. The terrain takes it where the grass grows
+        /// (<c>Goobyr/TerrainLit</c>, through <see cref="GrassField"/>'s published map), so the land does not
+        /// change colour where the blades end (calibrated in the grass test scene).
         /// </summary>
         public Color FarColor
         {
@@ -38,7 +39,7 @@ namespace Com.IsartDigital.GoobyrFPS.World
             }
         }
 
-        /// <summary>The same for dry grass (the terrain's dry grass layer), linear.</summary>
+        /// <summary>The same for dry grass (where the map says dry), linear.</summary>
         public Color FarDryColor
         {
             get
@@ -77,7 +78,9 @@ namespace Com.IsartDigital.GoobyrFPS.World
     /// with distance, and fills the instance buffers of two indirect draws: tufts of curved blades near
     /// the camera, 4-blade cards beyond <see cref="CardDistance"/>. <c>Goobyr/Grass</c> builds and shades
     /// the blades (wind from <see cref="Wind"/>, trampling from <see cref="GrassTrample"/>). Nothing is
-    /// stored per blade: the same hash gives the same meadow every frame and on every machine.
+    /// stored per blade: the same hash gives the same meadow every frame and on every machine. The field
+    /// also publishes its map and far colours to the terrain shader, which paints the ground under and
+    /// beyond the blades in the meadow's colour.
     /// </summary>
     [ExecuteAlways]
     public class GrassField : MonoBehaviour
@@ -99,6 +102,14 @@ namespace Com.IsartDigital.GoobyrFPS.World
         /// <summary>Far cards in the motion-vector pass (TAA keeps their sway sharp; off saves a vertex pass).</summary>
         public static bool FarMotion = true;
         private bool _farPrepass, _farMotion = true;
+        /// <summary>
+        /// A position or size the culling can take: finite and within 100 km of the origin. Every
+        /// procedural draw (grass, snow glints) and every trampling source is checked, so one NaN or a
+        /// body flung to infinity cannot hand the culling an invalid box.
+        /// </summary>
+        public static bool IsSane(Vector3 v) => IsSane(v.x) && IsSane(v.y) && IsSane(v.z);
+        private static bool IsSane(float f) => !float.IsNaN(f) && !float.IsInfinity(f) && f > -1e5f && f < 1e5f;
+
         public static int LastNear { get; private set; }
         public static int LastFar { get; private set; }
         private static UnityEngine.Profiling.CustomSampler _sampler;
@@ -118,7 +129,7 @@ namespace Com.IsartDigital.GoobyrFPS.World
         [SerializeField] private ComputeShader _trample;
 
         [Header("Distances")]
-        [Tooltip("No grass past this distance (m): the terrain's grass layer takes over.")] public float FarDistance = 90f;
+        [Tooltip("No grass past this distance (m): the ground, in the meadow's colour, takes over.")] public float FarDistance = 90f;
         [Tooltip("Tufts become 4-blade cards around this distance (m).")] public float CardDistance = 22f;
         [Tooltip("Every slot is kept up to this distance (m), then fewer and wider.")] public float ThinStart = 16f;
         public float ThinExponent = 1.25f;
@@ -158,6 +169,8 @@ namespace Com.IsartDigital.GoobyrFPS.World
         private static readonly int ID_INSTANCES = Shader.PropertyToID("_GrassInstances");
         private static readonly int ID_WIND = Shader.PropertyToID("_GoobyrWind"), ID_WIND_TIME = Shader.PropertyToID("_GoobyrWindTime");
         private static readonly int ID_TRAMPLE = Shader.PropertyToID("_GrassTrample"), ID_TRAMPLE_AREA = Shader.PropertyToID("_GrassTrampleArea");
+        private static readonly int ID_GROUND_MAP = Shader.PropertyToID("_GoobyrGrassMap"), ID_GROUND_ON = Shader.PropertyToID("_GoobyrGrassOn");
+        private static readonly int ID_GROUND_FAR = Shader.PropertyToID("_GoobyrGrassFar"), ID_GROUND_DRY = Shader.PropertyToID("_GoobyrGrassFarDry");
 
         /// <summary>Sets the field up (the builder): the terrain, the baked map and chunk heights, the shaders.</summary>
         public void Setup(Terrain pTerrain, Texture2D pMap, GrassStyle pStyle, float pChunkSize, int pChunks, Vector2[] pChunkHeights, Shader pShader, ComputeShader pCull, ComputeShader pTrample)
@@ -172,7 +185,11 @@ namespace Com.IsartDigital.GoobyrFPS.World
             _cull = pCull;
             _trample = pTrample;
             Release();
-            if (isActiveAndEnabled) Prepare();
+            if (isActiveAndEnabled)
+            {
+                Prepare();
+                PublishGround();
+            }
         }
 
         private void OnEnable()
@@ -180,6 +197,7 @@ namespace Com.IsartDigital.GoobyrFPS.World
             All.Add(this);
             RenderPipelineManager.beginCameraRendering += OnBeginCamera;
             Prepare();
+            PublishGround();
         }
 
         private void OnDisable()
@@ -187,11 +205,29 @@ namespace Com.IsartDigital.GoobyrFPS.World
             All.Remove(this);
             RenderPipelineManager.beginCameraRendering -= OnBeginCamera;
             Release();
+            if (All.Count > 0) All[All.Count - 1].PublishGround();
+            else Shader.SetGlobalFloat(ID_GROUND_ON, 0f);
         }
 
         private void OnValidate()
         {
             if (_nearMaterial != null) ApplyStyle();
+            if (isActiveAndEnabled) PublishGround();
+        }
+
+        /// <summary>
+        /// Tells <c>Goobyr/TerrainLit</c> where this field grows (its map covers the terrain's UV square) and
+        /// the meadow's colours from afar: the ground under and beyond the blades takes them, so nothing
+        /// changes colour where the blades end, while lots, paths and rock keep their own. One field per
+        /// scene: the last one enabled is the one published.
+        /// </summary>
+        private void PublishGround()
+        {
+            if (_map == null || _style == null) return;
+            Shader.SetGlobalTexture(ID_GROUND_MAP, _map);
+            Shader.SetGlobalVector(ID_GROUND_FAR, _style.FarColor);
+            Shader.SetGlobalVector(ID_GROUND_DRY, _style.FarDryColor);
+            Shader.SetGlobalFloat(ID_GROUND_ON, 1f);
         }
 
         private bool Ready => _terrain != null && _terrain.terrainData != null && _map != null && _shader != null && _cull != null && _chunkHeights != null && _chunkHeights.Length == _chunks * _chunks && _chunks > 0;
@@ -288,11 +324,14 @@ namespace Com.IsartDigital.GoobyrFPS.World
             if ((pCamera.cullingMask & (1 << gameObject.layer)) == 0) return;
             if (pCamera.TryGetComponent(out UniversalAdditionalCameraData lData) && lData.renderType == CameraRenderType.Overlay) return;
             if (OnlyCamera != null && pCamera != OnlyCamera) return;
+            // A camera thrown somewhere absurd (NaN, a ragdoll flung away) draws no grass: its bounds would
+            // be invalid for the culling.
+            if (!IsSane(pCamera.transform.position) || !(pCamera.farClipPlane > 0f)) return;
             if (_nearMaterial == null) Prepare();
             _watch.Restart();
 
             int lCount = CullChunks(pCamera, out Bounds lBounds);
-            if (lCount > 0) Submit(pContext, pCamera, lCount, lBounds);
+            if (lCount > 0 && IsSane(lBounds.center) && IsSane(lBounds.size)) Submit(pContext, pCamera, lCount, lBounds);
 
             _watch.Stop();
             float lMs = (float)_watch.Elapsed.TotalMilliseconds;

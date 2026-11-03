@@ -1,5 +1,5 @@
 // Author : Baptiste Vu Liem
-// Goobyr/TerrainLit: URP 17.3's TerrainLit.shader (Unity Companion License) with the anti-tiling splat mix of GoobyrTerrainPasses.hlsl.
+// Goobyr/TerrainLit: URP 17.6's TerrainLit.shader (Unity Companion License) with the anti-tiling splat mix of GoobyrTerrainPasses.hlsl.
 Shader "Goobyr/TerrainLit"
 {
     Properties
@@ -74,9 +74,14 @@ Shader "Goobyr/TerrainLit"
             #pragma multi_compile _ _LIGHT_LAYERS
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
             #pragma multi_compile _ EVALUATE_SH_MIXED EVALUATE_SH_VERTEX
+#if defined(UNITY_PLATFORM_META_QUEST)
+            #pragma multi_compile _ META_QUEST_ORTHO_PROJ
+            #pragma multi_compile _ META_QUEST_NO_SPOTLIGHTS_LIGHT_LOOP
+#endif
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
             #pragma multi_compile_fragment _ _REFLECTION_PROBE_ATLAS
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_REFLECTION
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
             #pragma multi_compile_fragment _ _SCREEN_SPACE_IRRADIANCE
@@ -165,6 +170,7 @@ Shader "Goobyr/TerrainLit"
             //#pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             //#pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_REFLECTION
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile_fragment _ _DBUFFER_MRT1 _DBUFFER_MRT2 _DBUFFER_MRT3
             #pragma multi_compile_fragment _ _RENDER_PASS_ENABLED
@@ -241,6 +247,8 @@ Shader "Goobyr/TerrainLit"
             #pragma fragment DepthNormalOnlyFragment
 
             #pragma shader_feature_local _NORMALMAP
+            #pragma multi_compile _ _WRITE_SMOOTHNESS
+            #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/RenderingLayers.hlsl"
 
             #pragma multi_compile_instancing

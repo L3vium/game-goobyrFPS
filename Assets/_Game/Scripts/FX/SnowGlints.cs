@@ -56,6 +56,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             Camera lCamera = Camera.main;
             if (lCamera == null || _material == null) return;
             Vector3 lEye = lCamera.transform.position;
+            if (!World.GrassField.IsSane(lEye)) return;
             Vector2Int lCentre = new Vector2Int(Mathf.FloorToInt(lEye.x / TILE), Mathf.FloorToInt(lEye.z / TILE));
             if (lCentre != _centre)
             {

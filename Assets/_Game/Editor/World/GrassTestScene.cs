@@ -76,9 +76,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (int x = 0; x < RES; x++)
                     lHeights[z, x] = Mathf.Clamp01(Ground(o.x + x * SIZE / (RES - 1), o.z + z * SIZE / (RES - 1)) / HEIGHT);
             lData.SetHeights(0, 0, lHeights);
-            // The grass layer is tinted to the grass's far colour exactly as the maps' RealGrass does.
+            // The ground where grass grows takes the meadow's far colour in the terrain shader, as on the maps.
             GrassStyle lStyle = GrassStyle.Jungle();
-            TerrainLayer lGrass = GrassBaker.Turf(Own("leafy_grass", 4f, Vector4.one), lStyle.FarColor, "GrassTest_Turf_Grass"), lDirt = Own("dirt", 4f, Vector4.one), lLeaves = Own("forest_leaves_02", 4f, Vector4.one);
+            TerrainLayer lGrass = Own("leafy_grass", 4f, Vector4.one), lDirt = Own("dirt", 4f, Vector4.one), lLeaves = Own("forest_leaves_02", 4f, Vector4.one);
             lData.terrainLayers = new[] { lGrass, lDirt, lLeaves };
             lData.alphamapResolution = 512;
             float[,,] lAlpha = new float[512, 512, 3];

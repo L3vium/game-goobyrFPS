@@ -1,5 +1,5 @@
 // Author : Baptiste Vu Liem
-// Hidden/Goobyr/TerrainLit (Basemap Gen): URP 17.3's TerrainLitBasemapGen.shader (Unity Companion License) with the anti-tiling splat mix of GoobyrTerrainPasses.hlsl.
+// Hidden/Goobyr/TerrainLit (Basemap Gen): URP 17.6's TerrainLitBasemapGen.shader (Unity Companion License) with the anti-tiling splat mix of GoobyrTerrainPasses.hlsl.
 Shader "Hidden/Goobyr/TerrainLit (Basemap Gen)"
 {
     Properties

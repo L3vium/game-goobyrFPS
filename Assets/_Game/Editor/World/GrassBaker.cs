@@ -53,7 +53,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lImporter.sRGBTexture = false;
             lImporter.alphaSource = TextureImporterAlphaSource.FromInput;
             lImporter.alphaIsTransparency = false;
-            lImporter.mipmapEnabled = false;
+            // Mipmaps for the terrain shader, which reads the map from afar; the cull compute reads level 0.
+            lImporter.mipmapEnabled = true;
             lImporter.wrapMode = TextureWrapMode.Clamp;
             lImporter.filterMode = FilterMode.Bilinear;
             lImporter.maxTextureSize = RESOLUTION;
@@ -107,61 +108,54 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private static byte Byte(float pValue) => (byte)Mathf.RoundToInt(Mathf.Clamp01(pValue) * 255f);
 
         /// <summary>
-        /// The land under and beyond the grass: a copy of a terrain layer whose albedo averages
-        /// <paramref name="pLinear"/> (the grass's far colour, <see cref="GrassStyle.FarColor"/>), saved as
-        /// <c>Art/Generated/Grass/&lt;name&gt;.terrainlayer</c>. The shared layer the other maps use is untouched.
+        /// Migration for maps baked while the grass's far colour was baked into tinted copies of their turf
+        /// layers (<c>&lt;map&gt;_Turf_&lt;Ground&gt;.terrainlayer</c>, before the terrain shader painted the
+        /// meadow itself): each copy gets its source layer's colour back (the map's own copy of the layer,
+        /// else the shared one), and every grass map gets mipmaps. Idempotent; map builds no longer make
+        /// turf copies, so the next rebuild drops them.
         /// </summary>
-        public static TerrainLayer Turf(TerrainLayer pLayer, Color pLinear, string pName)
+        public static string Untint()
         {
-            if (pLayer == null || pLayer.diffuseTexture == null) return pLayer;
-            Color lAverage = AverageAlbedo(pLayer.diffuseTexture);
-            EditorAssets.EnsureFolder(FOLDER);
-            string lPath = $"{FOLDER}/{pName}.terrainlayer";
-            TerrainLayer lTurf = AssetDatabase.LoadAssetAtPath<TerrainLayer>(lPath);
-            if (lTurf == null)
+            System.Text.StringBuilder lReport = new System.Text.StringBuilder();
+            string[] lAll = AssetDatabase.FindAssets("t:TerrainLayer");
+            foreach (string lGuid in AssetDatabase.FindAssets("t:TerrainLayer", new[] { FOLDER }))
             {
-                lTurf = new TerrainLayer();
-                AssetDatabase.CreateAsset(lTurf, lPath);
-            }
-            EditorUtility.CopySerialized(pLayer, lTurf);
-            lTurf.name = pName;
-            lTurf.diffuseRemapMin = Vector4.zero;
-            lTurf.diffuseRemapMax = new Vector4(Scale(pLinear.r, lAverage.r), Scale(pLinear.g, lAverage.g), Scale(pLinear.b, lAverage.b), 1f);
-            EditorUtility.SetDirty(lTurf);
-            return lTurf;
-        }
-
-        private static float Scale(float pTarget, float pAverage) => Mathf.Clamp(pTarget / Mathf.Max(pAverage, 0.004f), 0.02f, 3f);
-
-        private static readonly System.Collections.Generic.Dictionary<string, Color> _averages = new System.Collections.Generic.Dictionary<string, Color>();
-
-        /// <summary>A texture's average colour in linear space, read from its source file (importers keep textures unreadable).</summary>
-        public static Color AverageAlbedo(Texture2D pTexture)
-        {
-            string lPath = AssetDatabase.GetAssetPath(pTexture);
-            if (_averages.TryGetValue(lPath, out Color lCached)) return lCached;
-            Color lAverage = new Color(0.25f, 0.25f, 0.25f, 1f);
-            if (File.Exists(lPath))
-            {
-                Texture2D lImage = new Texture2D(2, 2, TextureFormat.RGBA32, false, false);
-                if (lImage.LoadImage(File.ReadAllBytes(lPath)))
+                TerrainLayer lTurf = AssetDatabase.LoadAssetAtPath<TerrainLayer>(AssetDatabase.GUIDToAssetPath(lGuid));
+                int lCut = lTurf != null ? lTurf.name.IndexOf("_Turf_", System.StringComparison.Ordinal) : -1;
+                if (lCut <= 0) continue;
+                string lMap = lTurf.name.Substring(0, lCut);
+                TerrainLayer lSource = null;
+                foreach (string g in lAll)
                 {
-                    Color32[] lPixels = lImage.GetPixels32();
-                    double r = 0, g = 0, b = 0;
-                    int n = 0;
-                    for (int i = 0; i < lPixels.Length; i += 7)
-                    {
-                        r += Mathf.GammaToLinearSpace(lPixels[i].r / 255f);
-                        g += Mathf.GammaToLinearSpace(lPixels[i].g / 255f);
-                        b += Mathf.GammaToLinearSpace(lPixels[i].b / 255f);
-                        n++;
-                    }
-                    if (n > 0) lAverage = new Color((float)(r / n), (float)(g / n), (float)(b / n), 1f);
+                    string lPath = AssetDatabase.GUIDToAssetPath(g);
+                    if (lPath.StartsWith(FOLDER)) continue;
+                    TerrainLayer l = AssetDatabase.LoadAssetAtPath<TerrainLayer>(lPath);
+                    if (l == null || l.diffuseTexture != lTurf.diffuseTexture || l.tileSize != lTurf.tileSize) continue;
+                    bool lOwn = l.name.EndsWith("_" + lMap) || l.name.StartsWith(lMap + "_");
+                    if (lSource == null || lOwn) lSource = l;
+                    if (lOwn) break;
                 }
-                Object.DestroyImmediate(lImage);
+                Vector4 lMin = lSource != null ? lSource.diffuseRemapMin : Vector4.zero, lMax = lSource != null ? lSource.diffuseRemapMax : Vector4.one;
+                if (lTurf.diffuseRemapMin != lMin || lTurf.diffuseRemapMax != lMax)
+                {
+                    lTurf.diffuseRemapMin = lMin;
+                    lTurf.diffuseRemapMax = lMax;
+                    EditorUtility.SetDirty(lTurf);
+                    AssetDatabase.SaveAssetIfDirty(lTurf);
+                }
+                lReport.Append(lTurf.name + " <- " + (lSource != null ? lSource.name : "white") + " " + lMax + "\n");
             }
-            _averages[lPath] = lAverage;
-            return lAverage;
+            foreach (string lGuid in AssetDatabase.FindAssets("t:Texture2D", new[] { FOLDER }))
+            {
+                string lPath = AssetDatabase.GUIDToAssetPath(lGuid);
+                if (!Path.GetFileNameWithoutExtension(lPath).EndsWith("_Grass")) continue;
+                TextureImporter lImporter = AssetImporter.GetAtPath(lPath) as TextureImporter;
+                if (lImporter == null || lImporter.mipmapEnabled) continue;
+                lImporter.mipmapEnabled = true;
+                lImporter.SaveAndReimport();
+                lReport.Append(lPath + ": mipmaps\n");
+            }
+            return lReport.ToString();
         }
     }
 }

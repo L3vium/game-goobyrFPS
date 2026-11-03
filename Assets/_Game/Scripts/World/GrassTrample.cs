@@ -107,6 +107,7 @@ namespace Com.IsartDigital.GoobyrFPS.World
             // The window snaps to whole texels so the pressed grass does not swim as it follows.
             float lTexel = AREA / SIZE;
             Vector3 p = lCenter.transform.position;
+            if (!GrassField.IsSane(p)) return;
             Vector2Int lCorner = new Vector2Int(Mathf.FloorToInt((p.x - AREA * 0.5f) / lTexel), Mathf.FloorToInt((p.z - AREA * 0.5f) / lTexel));
             Vector2Int lShift = _fresh ? new Vector2Int(SIZE * 4, SIZE * 4) : lCorner - _corner;
             _corner = lCorner;
@@ -175,7 +176,7 @@ namespace Com.IsartDigital.GoobyrFPS.World
             Rect lWindow = new Rect(pOrigin.x - 2f, pOrigin.y - 2f, AREA + 4f, AREA + 4f);
             void Put(Transform pTransform, Vector3 pPosition, float pRadius, float pStrength)
             {
-                if (n >= MAX_SOURCES || !lWindow.Contains(new Vector2(pPosition.x, pPosition.z))) return;
+                if (n >= MAX_SOURCES || !GrassField.IsSane(pPosition) || !(pRadius > 0f) || pRadius > 50f || !lWindow.Contains(new Vector2(pPosition.x, pPosition.z))) return;
                 Vector3 lStride = Vector3.zero;
                 if (pTransform != null)
                 {

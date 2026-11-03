@@ -48,11 +48,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// Real grass (GPU blades, <see cref="World.GrassField"/>) over the land, baked by <see cref="Finish"/>.
         /// <paramref name="pDensity"/> says where it may grow, 0..1 per world point (0 on roads, lots, water
         /// and steep rock: the masks the grass detail used). <paramref name="pTurf"/> are the ground layers it
-        /// grows on: the density follows how much of them is painted, and they are tinted to the grass's far
-        /// colour so the land does not change colour where the blades end (90 m). <paramref name="pDryTurf"/>
-        /// are layers of dry grass: they carry grass too, drier, tinted to its dry far colour. With no
-        /// layers, the density alone decides and no layer is tinted. <paramref name="pDryness"/> (0 green ..
-        /// 1 straw) overrides the dryness otherwise taken from the dry layers (or a noise). The tall grass
+        /// grows on: the density follows how much of them is painted. <paramref name="pDryTurf"/> are layers
+        /// of dry grass: they carry grass too, drier. With no layers, the density alone decides.
+        /// <paramref name="pDryness"/> (0 green .. 1 straw) overrides the dryness otherwise taken from the dry
+        /// layers (or a noise). Wherever grass grows, the terrain shader paints the ground in the meadow's
+        /// colour from afar (the field publishes its map), so the land does not change colour where the
+        /// blades end (90 m); the layers keep their own colour where none grows (lots, paths). The tall grass
         /// fields grow tall blades (<see cref="TallGrassDetail"/> is not used). Replaces the instanced grass
         /// detail: keep ferns and the like as <see cref="Details"/>.
         /// </summary>
@@ -149,7 +150,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return lMaterial;
         }
 
-        /// <summary>The real grass: its map (weighted by the turf layers), the turf layers tinted, the field on the land.</summary>
+        /// <summary>The real grass: its map (weighted by the turf layers) and the field on the land.</summary>
         private void BakeRealGrass()
         {
             int lRes = _landData.alphamapResolution, lLayers = _landData.alphamapLayers;
@@ -173,16 +174,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 return Mathf.Clamp01(d / Mathf.Max(0.001f, g + d) * 0.75f + 0.25f * (0.5f + 0.5f * LandShape.Fbm(x, z, 24f, 2, 12.9f)));
             });
             GrassBaker.Bake(Land, Map.sceneName, _realGrass, lDensity, null, lDry, _tallGrass.Count > 0 ? (System.Func<float, float, float>)TallGrassDensity : null);
-
-            // The land under and beyond the blades takes their far colour.
-            TerrainLayer[] lTurfed = _landData.terrainLayers;
-            if (_realTurf != null)
-                foreach (Ground g in _realTurf)
-                    if ((int)g < lTurfed.Length) lTurfed[(int)g] = GrassBaker.Turf(lTurfed[(int)g], _realGrass.FarColor, Map.sceneName + "_Turf_" + g);
-            if (_realDryTurf != null)
-                foreach (Ground g in _realDryTurf)
-                    if ((int)g < lTurfed.Length) lTurfed[(int)g] = GrassBaker.Turf(lTurfed[(int)g], _realGrass.FarDryColor, Map.sceneName + "_Turf_" + g);
-            _landData.terrainLayers = lTurfed;
         }
 
         /// <summary>Cuts holes in the terrain where the function says so (cellars, cave mouths): applied by <see cref="Finish"/>.</summary>

@@ -1,5 +1,5 @@
 // Author : Baptiste Vu Liem
-// Hidden/Goobyr/TerrainLit (Add Pass): URP 17.3's TerrainLitAdd.shader (Unity Companion License) with the anti-tiling splat mix of GoobyrTerrainPasses.hlsl.
+// Hidden/Goobyr/TerrainLit (Add Pass): URP 17.6's TerrainLitAdd.shader (Unity Companion License) with the anti-tiling splat mix of GoobyrTerrainPasses.hlsl.
 Shader "Hidden/Goobyr/TerrainLit (Add Pass)"
 {
     Properties
@@ -68,9 +68,14 @@ Shader "Hidden/Goobyr/TerrainLit (Add Pass)"
             #pragma multi_compile _ SHADOWS_SHADOWMASK
             #pragma multi_compile _ _LIGHT_LAYERS
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
+#if defined(UNITY_PLATFORM_META_QUEST)
+            #pragma multi_compile _ META_QUEST_ORTHO_PROJ
+            #pragma multi_compile _ META_QUEST_NO_SPOTLIGHTS_LIGHT_LOOP
+#endif
             #pragma multi_compile_fragment _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile_fragment _ _REFLECTION_PROBE_BLENDING
             #pragma multi_compile_fragment _ _REFLECTION_PROBE_ATLAS
+            #pragma multi_compile_fragment _ _SCREEN_SPACE_REFLECTION
             #pragma multi_compile_fragment _ _SHADOWS_SOFT _SHADOWS_SOFT_LOW _SHADOWS_SOFT_MEDIUM _SHADOWS_SOFT_HIGH
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
             #pragma multi_compile_fragment _ _LIGHT_COOKIES

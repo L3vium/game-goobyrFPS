@@ -1,8 +1,9 @@
 // Author : Baptiste Vu Liem
-// Goobyr/TerrainLit: URP 17.3's TerrainLitPasses.hlsl (Unity Companion License) with one change in
+// Goobyr/TerrainLit: URP 17.6's TerrainLitPasses.hlsl (Unity Companion License) with one change in
 // SplatmapMix. Terrain layers repeat every few metres; each one is also sampled at a larger, rotated
 // scale and the two are mixed by a slow noise, and the mix gets a broad brightness and hue variation,
-// so neither the tile nor the field reads as a pattern from a distance.
+// so neither the tile nor the field reads as a pattern from a distance. Where the real grass grows
+// (World.GrassField publishes its map), the ground takes the meadow's colour from afar.
 
 #ifndef UNIVERSAL_TERRAIN_LIT_PASSES_INCLUDED
 #define UNIVERSAL_TERRAIN_LIT_PASSES_INCLUDED
@@ -129,7 +130,7 @@ void InitializeBakedGIData(Varyings IN, inout InputData inputData)
     #endif
 
 #if defined(_SCREEN_SPACE_IRRADIANCE)
-    inputData.bakedGI = SAMPLE_GI(_ScreenSpaceIrradiance, inputData.positionCS.xy);
+    inputData.bakedGI = SAMPLE_GI(_ScreenSpaceIrradiance, inputData.positionCS.xy, inputData.normalWS);
 #elif defined(DYNAMICLIGHTMAP_ON)
     inputData.bakedGI = SAMPLE_GI(IN.uvMainAndLM.zw, IN.dynamicLightmapUV, SH, inputData.normalWS);
     inputData.shadowMask = SAMPLE_SHADOWMASK(IN.uvMainAndLM.zw);
@@ -189,6 +190,15 @@ half GoobyrTerrainNoise(float2 p)
 // The second sampling of a layer: 0.27x its tiling, turned by 27 degrees, offset.
 float2 GoobyrFarUV(float2 uv) { return float2(uv.x * 0.891 - uv.y * 0.454, uv.x * 0.454 + uv.y * 0.891) * 0.27 + float2(0.37, 0.61); }
 
+// ---------------------------------------------------------------- Goobyr: the meadow seen from afar
+// Published by World.GrassField for its terrain: its grass map (R density, B dryness; it covers the
+// terrain's UV square) and the grass's linear colours from afar. _GoobyrGrassOn is 0 without a field.
+TEXTURE2D(_GoobyrGrassMap);
+SAMPLER(sampler_GoobyrGrassMap);
+float _GoobyrGrassOn;
+float4 _GoobyrGrassFar;
+float4 _GoobyrGrassFarDry;
+
 void SplatmapMix(float4 uvMainAndLM, float4 uvSplat01, float4 uvSplat23, inout half4 splatControl, out half weight, out half4 mixedDiffuse, out half4 defaultSmoothness, inout half3 mixedNormal)
 {
     half4 diffAlbedo[4];
@@ -214,13 +224,26 @@ void SplatmapMix(float4 uvMainAndLM, float4 uvSplat01, float4 uvSplat23, inout h
     diffAlbedo[3].rgb = lerp(diffAlbedo[3].rgb, SAMPLE_TEXTURE2D(_Splat3, sampler_Splat0, GoobyrFarUV(uvSplat23.zw)).rgb, lFarMix.w);
 #endif
 
-    // This might be a bit of a gamble -- the assumption here is that if the diffuseMap has no
-    // alpha channel, then diffAlbedo[n].a = 1.0 (and _DiffuseHasAlphaN = 0.0)
-    // Prior to coming in, _SmoothnessN is actually set to max(_DiffuseHasAlphaN, _SmoothnessN)
-    // This means that if we have an alpha channel, _SmoothnessN is locked to 1.0 and
-    // otherwise, the true slider value is passed down and diffAlbedo[n].a == 1.0.
-    defaultSmoothness = half4(diffAlbedo[0].a, diffAlbedo[1].a, diffAlbedo[2].a, diffAlbedo[3].a);
-    defaultSmoothness *= half4(_Smoothness0, _Smoothness1, _Smoothness2, _Smoothness3);
+    half4 diffuseAlpha = half4(diffAlbedo[0].a, diffAlbedo[1].a, diffAlbedo[2].a, diffAlbedo[3].a);
+    half4 smoothnessConstants = half4(_Smoothness0, _Smoothness1, _Smoothness2, _Smoothness3);
+    half4 smoothnessSources = half4(_SmoothnessSource0, _SmoothnessSource1, _SmoothnessSource2, _SmoothnessSource3);
+
+    // Process each layer's smoothness based on its source mode.
+    defaultSmoothness.r = (smoothnessSources.r < 0.5) ? diffuseAlpha.r * smoothnessConstants.r : // kConstantMultipliedByDiffuseAlpha
+                          (smoothnessSources.r < 1.5) ? diffuseAlpha.r :                         // kDiffuseAlphaChannel
+                          smoothnessConstants.r;                                                 // kConstant
+    
+    defaultSmoothness.g = (smoothnessSources.g < 0.5) ? diffuseAlpha.g * smoothnessConstants.g :
+                          (smoothnessSources.g < 1.5) ? diffuseAlpha.g :
+                          smoothnessConstants.g;
+    
+    defaultSmoothness.b = (smoothnessSources.b < 0.5) ? diffuseAlpha.b * smoothnessConstants.b :
+                          (smoothnessSources.b < 1.5) ? diffuseAlpha.b :
+                          smoothnessConstants.b;
+    
+    defaultSmoothness.a = (smoothnessSources.a < 0.5) ? diffuseAlpha.a * smoothnessConstants.a :
+                          (smoothnessSources.a < 1.5) ? diffuseAlpha.a :
+                          smoothnessConstants.a;
 
 #ifndef _TERRAIN_BLEND_HEIGHT // density blending
     if(_NumLayersCount <= 4)
@@ -253,6 +276,23 @@ void SplatmapMix(float4 uvMainAndLM, float4 uvSplat01, float4 uvSplat23, inout h
     mixedDiffuse += diffAlbedo[3] * half4(_DiffuseRemapScale3.rgb * splatControl.aaa, 1.0h);
 
     NormalMapMix(uvSplat01, uvSplat23, splatControl, mixedNormal);
+
+    // Goobyr: where the real grass grows, the ground takes the meadow's colour from afar while keeping its
+    // texture's detail (the mix over the layers' own average colours, their last mip), so nothing changes
+    // colour where the blades end; where no grass grows (lots, paths, rock) the layers keep their colour.
+    if (_GoobyrGrassOn > 0.5)
+    {
+        half4 lGrass = SAMPLE_TEXTURE2D(_GoobyrGrassMap, sampler_GoobyrGrassMap, uvMainAndLM.xy);
+        // From afar, blades hide about as much ground as the map's density (sparse tufts barely tint it).
+        half lCover = smoothstep(0.0h, 0.75h, lGrass.r);
+        half3 lAverage = SAMPLE_TEXTURE2D_LOD(_Splat0, sampler_Splat0, uvSplat01.xy, 12).rgb * _DiffuseRemapScale0.rgb * splatControl.r
+                       + SAMPLE_TEXTURE2D_LOD(_Splat1, sampler_Splat0, uvSplat01.zw, 12).rgb * _DiffuseRemapScale1.rgb * splatControl.g
+                       + SAMPLE_TEXTURE2D_LOD(_Splat2, sampler_Splat0, uvSplat23.xy, 12).rgb * _DiffuseRemapScale2.rgb * splatControl.b
+                       + SAMPLE_TEXTURE2D_LOD(_Splat3, sampler_Splat0, uvSplat23.zw, 12).rgb * _DiffuseRemapScale3.rgb * splatControl.a;
+        // The pass's share of the weights (1 once normalized; the raw sum when baking the basemap).
+        half3 lMeadow = lerp(_GoobyrGrassFar.rgb, _GoobyrGrassFarDry.rgb, lGrass.b) * dot(splatControl, 1.0h);
+        mixedDiffuse.rgb = lerp(mixedDiffuse.rgb, min(mixedDiffuse.rgb / max(lAverage, 0.004h), 4.0h) * lMeadow, lCover);
+    }
 
     // Goobyr: broad variation of the field (patches of tens of metres a little lighter or darker, warmer or cooler).
     half lMacro = GoobyrTerrainNoise(uvMainAndLM.xy * 9.0) * 0.6h + GoobyrTerrainNoise(uvMainAndLM.xy * 23.0 + 7.3) * 0.4h;
@@ -402,7 +442,7 @@ Varyings SplatmapVert(Attributes v)
     return o;
 }
 
-void ComputeMasks(out half4 masks[4], half4 hasMask, Varyings IN)
+void ComputeMasks(out half4 masks[4], half4 hasMask, float4 uvSplat01, float4 uvSplat23)
 {
     masks[0] = 0.5h;
     masks[1] = 0.5h;
@@ -410,10 +450,10 @@ void ComputeMasks(out half4 masks[4], half4 hasMask, Varyings IN)
     masks[3] = 0.5h;
 
 #ifdef _MASKMAP
-    masks[0] = lerp(masks[0], SAMPLE_TEXTURE2D(_Mask0, sampler_Mask0, IN.uvSplat01.xy), hasMask.x);
-    masks[1] = lerp(masks[1], SAMPLE_TEXTURE2D(_Mask1, sampler_Mask0, IN.uvSplat01.zw), hasMask.y);
-    masks[2] = lerp(masks[2], SAMPLE_TEXTURE2D(_Mask2, sampler_Mask0, IN.uvSplat23.xy), hasMask.z);
-    masks[3] = lerp(masks[3], SAMPLE_TEXTURE2D(_Mask3, sampler_Mask0, IN.uvSplat23.zw), hasMask.w);
+    masks[0] = lerp(masks[0], SAMPLE_TEXTURE2D(_Mask0, sampler_Mask0, uvSplat01.xy), hasMask.x);
+    masks[1] = lerp(masks[1], SAMPLE_TEXTURE2D(_Mask1, sampler_Mask0, uvSplat01.zw), hasMask.y);
+    masks[2] = lerp(masks[2], SAMPLE_TEXTURE2D(_Mask2, sampler_Mask0, uvSplat23.xy), hasMask.z);
+    masks[3] = lerp(masks[3], SAMPLE_TEXTURE2D(_Mask3, sampler_Mask0, uvSplat23.zw), hasMask.w);
 #endif
 
     masks[0] *= _MaskMapRemapScale0.rgba;
@@ -455,7 +495,7 @@ void SplatmapFragment(
 
     half4 hasMask = half4(_LayerHasMask0, _LayerHasMask1, _LayerHasMask2, _LayerHasMask3);
     half4 masks[4];
-    ComputeMasks(masks, hasMask, IN);
+    ComputeMasks(masks, hasMask, IN.uvSplat01, IN.uvSplat23);
 
     float2 splatUV = (IN.uvMainAndLM.xy * (_Control_TexelSize.zw - 1.0f) + 0.5f) * _Control_TexelSize.xy;
     half4 splatControl = SAMPLE_TEXTURE2D(_Control, sampler_Control, splatUV);

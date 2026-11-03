@@ -1426,6 +1426,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// </summary>
         private void StartSearch(Vector3 pCenter, float pFor, bool pRush)
         {
+            _searchChecked.Clear();
+            _searchSpot = null;
             _searchCenter = pCenter;
             _searchUntil = Time.time + pFor;
             _searchStep = 0;
@@ -1438,6 +1440,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Host: the search moves to a new spot (a glimpse, a sound): straight there, then the spiral goes on around it.</summary>
         private void RecentreSearch(Vector3 pCenter, float pSpeed)
         {
+            _searchSpot = null;
             _searchCenter = pCenter;
             _searchLookUntil = 0f;
             _searchMoving = true;
@@ -1473,12 +1476,67 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 float lStart = NetworkObjectId * 97UL % 360UL;
                 MoveTo(_searchCenter + NpcRules.SearchOffset(_searchStep++, lStart), lFirst && _searchRush ? RUN : RUN * 0.6f);
             }
-            else if (Arrived(1.5f)) _searchLookUntil = Time.time + Random.Range(1.4f, 2.6f);
+            else if (_searchSpot != null)
+            {
+                if (!Arrived(0.8f)) return;
+                OpenHidingSpot(_searchSpot);
+                _searchSpot = null;
+                _searchLookUntil = Time.time + Random.Range(0.8f, 1.4f);
+            }
+            else if (Arrived(1.5f))
+            {
+                // Now and then a closet, a dumpster or a crate on the way gets opened.
+                Systems.HidingSpot lSpot = NearestUncheckedSpot(SEARCH_SPOT_REACH);
+                if (lSpot != null && Random.value < SEARCH_SPOT_CHANCE)
+                {
+                    _searchSpot = lSpot;
+                    _searchChecked.Add(lSpot);
+                    MoveTo(lSpot.ExitPosition, WALK * 1.15f);
+                }
+                else _searchLookUntil = Time.time + Random.Range(1.4f, 2.6f);
+            }
         }
+
+        private const float SEARCH_SPOT_REACH = 7f;
+        private const float SEARCH_SPOT_CHANCE = 0.6f;
 
         private int _searchStep;
         private float _searchLookUntil;
         private bool _searchMoving, _searchRush;
+        private Systems.HidingSpot _searchSpot;
+        private readonly HashSet<Systems.HidingSpot> _searchChecked = new HashSet<Systems.HidingSpot>();
+
+        private Systems.HidingSpot NearestUncheckedSpot(float pReach)
+        {
+            Systems.HidingSpot lBest = null;
+            float lBestDistance = pReach * pReach;
+            foreach (Systems.HidingSpot lSpot in Systems.HidingSpot.All)
+            {
+                if (_searchChecked.Contains(lSpot)) continue;
+                float lDistance = (lSpot.ExitPosition - transform.position).sqrMagnitude;
+                if (lDistance < lBestDistance && (lSpot.ExitPosition - _searchCenter).sqrMagnitude < 15f * 15f)
+                {
+                    lBest = lSpot;
+                    lBestDistance = lDistance;
+                }
+            }
+            return lBest;
+        }
+
+        /// <summary>Host: a searcher opens a hiding spot; whoever hides inside is pulled out and spotted.</summary>
+        private void OpenHidingSpot(Systems.HidingSpot pSpot)
+        {
+            FaceTowards(pSpot.InsidePosition, 720f);
+            foreach (PlayerAvatar lPlayer in PlayerAvatar.All)
+            {
+                if (lPlayer == null || !lPlayer.IsSpawned || !lPlayer.Health.IsAlive || !lPlayer.Hidden.Value) continue;
+                if ((lPlayer.transform.position - pSpot.InsidePosition).sqrMagnitude > 1.2f * 1.2f) continue;
+                lPlayer.PullOutOfHidingRpc();
+                Bark(Barks.Hey);
+                Spot(lPlayer);
+                return;
+            }
+        }
 
         /// <summary>Host: what it shouts as its state changes (rate-limited by <see cref="Bark"/>).</summary>
         private void Callout(NpcState pFrom, NpcState pTo)

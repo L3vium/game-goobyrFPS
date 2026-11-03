@@ -40,12 +40,33 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public ItemDefinition HeldItem => ItemIn(Selected.Value);
         public bool HoldsWeapon => HeldItem != null && HeldItem.slot == ItemSlot.Weapon;
         public float AdsFov => _aiming && HeldItem != null && HeldItem.IsGun ? HeldItem.adsFov : 0f;
+        /// <summary>Owner: the held weapon is raised (guns, the launcher, the flamethrower).</summary>
+        public bool IsAiming => _aiming;
         public float LookSensitivityFactor => _aiming && HeldItem != null ? Mathf.Clamp(HeldItem.adsFov / 78f, 0.25f, 1f) : 1f;
         public bool Scoped => _aiming && HeldItem != null && HeldItem.kind == ItemKind.Sniper;
 
         private float _nextFire;
         private float _nextMelee;
+        private float _nextMeleeServer;
         private float _nextScroll;
+        // Owner: a punch or takedown in flight - resolved at the clip's contact time, not on the click.
+        private bool _strikePending;
+        private float _strikeAt;
+        private Viewmodel.MeleeMove _strikeMove;
+        private bool _nextCross;
+        private bool _predictedHit;
+        // Owner: a throw in flight - the item leaves at the clip's release time.
+        private int _throwSlot = -1;
+        private float _throwAt;
+
+        /// <summary>Melee reach: a sphere this wide swept this far from the eye (owner prediction and host).</summary>
+        public const float MELEE_RADIUS = 0.35f, MELEE_RANGE = 1.7f;
+        /// <summary>Owner cooldown between swings; the host refuses swings closer than its own minimum.</summary>
+        public const float MELEE_COOLDOWN = 0.42f, TAKEDOWN_COOLDOWN = 1.1f, MELEE_MIN_INTERVAL = 0.3f;
+        /// <summary>Predicted contact: how long the arms freeze, and the camera's jolt.</summary>
+        public const float HIT_STOP = 0.07f;
+        /// <summary>Tools only (first-person shots): aim as if the button were held.</summary>
+        public static bool ForceAim;
         private ThrowArc _arc;
         private bool _aiming;
         private int _lastGadget = 2;
@@ -111,6 +132,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (!IsOwner || !Avatar.Health.IsAlive) { if (_arc != null) _arc.Hide(); return; }
             if (Avatar.Motor.Mode == MotorMode.Hidden || Avatar.Motor.Mode == MotorMode.Zipline) { _aiming = false; if (_arc != null) _arc.Hide(); return; }
 
+            if (_strikePending && Time.time >= _strikeAt) Strike();
+            if (_throwSlot >= 0 && Time.time >= _throwAt) Release();
+
             int lSlot = GameInput.SlotPressed;
             if (lSlot >= 0) Select(lSlot);
             float lScroll = GameInput.Scroll;
@@ -122,7 +146,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
 
             // Right click raises the weapon (aims); only then does left click fire. Lowered, left click punches.
             ItemDefinition lHeld = HeldItem;
-            _aiming = GameInput.Aim && lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher || lHeld.kind == ItemKind.Flamethrower);
+            _aiming = (GameInput.Aim || ForceAim) && lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher || lHeld.kind == ItemKind.Flamethrower);
             Avatar.Motor.Aiming = _aiming;
             if (Avatar.Aiming.Value != _aiming) Avatar.Aiming.Value = _aiming;
 
@@ -251,22 +275,91 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             _ => "shot_pistol"
         };
 
+        /// <summary>
+        /// Left click with nothing raised (or the melee key): the punch plays at once - jab and cross
+        /// alternating bare-handed, a left jab holding something, the takedown on an unaware NPC from
+        /// behind - and the hit is resolved at the clip's contact time (<see cref="Strike"/>).
+        /// </summary>
         private void TryMelee()
         {
-            if (Time.time < _nextMelee) return;
-            _nextMelee = Time.time + 0.55f;
-            View?.PlayPunch();
+            if (Time.time < _nextMelee || _strikePending || _throwSlot >= 0) return;
+            Viewmodel.MeleeMove lMove;
+            if (PredictTakedown()) lMove = Viewmodel.MeleeMove.Takedown;
+            else if (HeldItem == null) { lMove = _nextCross ? Viewmodel.MeleeMove.Cross : Viewmodel.MeleeMove.Jab; _nextCross = !_nextCross; }
+            else lMove = Viewmodel.MeleeMove.Jab;
+            float lStrike = View != null ? View.PlayMelee(lMove) : Viewmodel.DefaultStrike(lMove);
+            _nextMelee = Time.time + (lMove == Viewmodel.MeleeMove.Takedown ? TAKEDOWN_COOLDOWN : MELEE_COOLDOWN);
+            _strikePending = true;
+            _strikeAt = Time.time + lStrike;
+            _strikeMove = lMove;
             Sfx.Play("swing", transform.position, 0.6f);
-            MeleeRpc(Avatar.AimOrigin, Avatar.AimDirection);
+            SwingRpc();
+        }
+
+        /// <summary>The same test the host makes: an NPC that hasn't noticed us, seen from behind, in reach.</summary>
+        private bool PredictTakedown()
+        {
+            if (!Physics.SphereCast(Avatar.AimOrigin, MELEE_RADIUS, Avatar.AimDirection, out RaycastHit lHit, MELEE_RANGE, GameLayers.CharacterMask, QueryTriggerInteraction.Ignore)) return false;
+            Npc lNpc = lHit.collider.GetComponentInParent<Npc>();
+            if (lNpc == null || !lNpc.Health.IsAlive) return false;
+            float lFromBack = Vector3.Angle(lNpc.transform.forward, Vector3.ProjectOnPlane(Avatar.AimDirection, Vector3.up));
+            return DetectionModel.CanTakedown(lFromBack, lNpc.Gauge, lNpc.IsAlerted);
+        }
+
+        /// <summary>
+        /// Contact: the owner predicts the hit (arms freeze for a beat, the camera jolts, the victim
+        /// squashes, the punch is heard) and sends the swing to the host, which judges it.
+        /// </summary>
+        private void Strike()
+        {
+            _strikePending = false;
+            Vector3 lOrigin = Avatar.AimOrigin, lDirection = Avatar.AimDirection;
+            _predictedHit = false;
+            if (Physics.SphereCast(lOrigin, MELEE_RADIUS, lDirection, out RaycastHit lHit, MELEE_RANGE, GameLayers.CharacterMask, QueryTriggerInteraction.Ignore))
+            {
+                Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
+                if (lTarget != null && lTarget != Avatar.Health && lTarget.IsAlive)
+                {
+                    _predictedHit = true;
+                    bool lTakedown = _strikeMove == Viewmodel.MeleeMove.Takedown;
+                    View?.HitStop(lTakedown ? HIT_STOP * 1.6f : HIT_STOP);
+                    CameraRig.Instance?.Kick(lTakedown ? new Vector3(1.5f, 0f, 0f) : new Vector3(-1.6f, _strikeMove == Viewmodel.MeleeMove.Jab ? 1.1f : -1.4f, _strikeMove == Viewmodel.MeleeMove.Jab ? -1.2f : 1.5f));
+                    if (!lTakedown)
+                    {
+                        Juice.Shake(0.08f);
+                        SquashBody(lTarget.transform);
+                        Sfx.Play("punch", lHit.point, 1f, 20f);
+                        Effects.Fluff(lHit.point, -lDirection, Color.white, false);
+                        UI.Hud.Hitmarker(false);
+                    }
+                }
+            }
+            MeleeRpc(lOrigin, lDirection);
         }
 
         private void ThrowGadget(int pSlot)
         {
             ItemDefinition lItem = ItemIn(pSlot);
-            if (lItem == null || lItem.slot != ItemSlot.Gadget || !lItem.IsThrowable) return;
-            View?.PlayThrow();
+            if (lItem == null || lItem.slot != ItemSlot.Gadget || !lItem.IsThrowable || _throwSlot >= 0 || _strikePending) return;
             Sfx.Play("throw", transform.position, 0.6f);
-            ThrowRpc(pSlot, Avatar.AimOrigin + Avatar.AimDirection * 0.5f, Avatar.AimDirection);
+            ThrowAnimRpc();
+            if (pSlot != Selected.Value)
+            {
+                // Quick throw of a gadget not in hand (throw key): it goes at once.
+                ThrowRpc(pSlot, Avatar.AimOrigin + Avatar.AimDirection * 0.5f, Avatar.AimDirection);
+                return;
+            }
+            // The held item leaves the hand at the clip's release, aimed where the player looks then.
+            float lRelease = View != null ? View.PlayThrow() : 0.2f;
+            _throwSlot = pSlot;
+            _throwAt = Time.time + lRelease;
+        }
+
+        private void Release()
+        {
+            int lSlot = _throwSlot;
+            _throwSlot = -1;
+            ThrowRpc(lSlot, Avatar.AimOrigin + Avatar.AimDirection * 0.5f, Avatar.AimDirection);
         }
 
         // ---------------------------------------------------------------- host
@@ -347,12 +440,20 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             Sfx.Play("reload", transform.position, 0.6f, 15f);
         }
 
+        /// <summary>
+        /// Host: a swing at its contact time. Like <see cref="FireRpc"/>, the host checks the rate (no
+        /// swing closer than <see cref="MELEE_MIN_INTERVAL"/> to the last) and the origin (a reported
+        /// eye more than 4 m from the body is replaced by the real eye); reach is the host's own.
+        /// </summary>
         [Rpc(SendTo.Server)]
         private void MeleeRpc(Vector3 pOrigin, Vector3 pDirection)
         {
-            if (!Avatar.Health.IsAlive) return;
-            SwingRpc();
-            if (!Physics.SphereCast(pOrigin, 0.35f, pDirection, out RaycastHit lHit, 1.7f, GameLayers.CharacterMask, QueryTriggerInteraction.Ignore)) return;
+            if (!Avatar.Health.IsAlive || Time.time < _nextMeleeServer) return;
+            _nextMeleeServer = Time.time + MELEE_MIN_INTERVAL;
+            if (Vector3.Distance(pOrigin, transform.position) > 4f) pOrigin = Avatar.Eye;
+            if (pDirection.sqrMagnitude < 0.0001f) return;
+            pDirection.Normalize();
+            if (!Physics.SphereCast(pOrigin, MELEE_RADIUS, pDirection, out RaycastHit lHit, MELEE_RANGE, GameLayers.CharacterMask, QueryTriggerInteraction.Ignore)) return;
             Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
             if (lTarget == null || lTarget == Avatar.Health) return;
 
@@ -374,10 +475,21 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 attacker = OwnerClientId, attackerTeam = Avatar.Team.Value
             });
             NoiseSystem.Emit(lHit.point, 6f, NoiseKind.Suspicious, OwnerClientId);
-            PunchFeedbackRpc(lHit.point, pDirection);
+            NetworkObject lVictim = lTarget.GetComponent<NetworkObject>();
+            PunchFeedbackRpc(lHit.point, pDirection, lVictim != null ? new NetworkObjectReference(lVictim) : default);
         }
 
-        /// <summary>Everyone else sees the agent swing (a punch or the start of a takedown).</summary>
+        /// <summary>The punched body squashes (Feel) - its visual body, never the root that carries the collider.</summary>
+        private static void SquashBody(Transform pRoot)
+        {
+            HumanBody lBody = pRoot.GetComponentInChildren<HumanBody>();
+            Juice.Squash(lBody != null ? lBody.transform : pRoot, 0.35f, 0.3f);
+        }
+
+        /// <summary>
+        /// Sent by the owner when the swing starts: everyone else sees the agent's third-person swing (a
+        /// punch or the start of a takedown) in step with the first-person clip, not at its contact.
+        /// </summary>
         [Rpc(SendTo.NotOwner)]
         private void SwingRpc() => Avatar.Animator?.Punch();
 
@@ -391,11 +503,17 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (IsOwner) { Juice.Takedown(); UI.Hud.Hitmarker(true); }
         }
 
+        /// <summary>
+        /// Everyone: a punch landed. The owner already felt it (predicted at contact) unless the
+        /// prediction missed; the others get the puff, the sound and the victim's squash.
+        /// </summary>
         [Rpc(SendTo.Everyone)]
-        private void PunchFeedbackRpc(Vector3 pPoint, Vector3 pDirection)
+        private void PunchFeedbackRpc(Vector3 pPoint, Vector3 pDirection, NetworkObjectReference pVictim)
         {
+            if (IsOwner && _predictedHit) return;
             Effects.Fluff(pPoint, -pDirection, Color.white, false);
             Sfx.Play("punch", pPoint, 1f, 20f);
+            if (pVictim.TryGet(out NetworkObject lVictim)) SquashBody(lVictim.transform);
             if (IsOwner) { Juice.Shake(0.15f); UI.Hud.Hitmarker(false); }
         }
 
@@ -409,7 +527,6 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (Vector3.Distance(pOrigin, transform.position) > 4f) pOrigin = Avatar.Eye;
 
             NetworkObject lThrown = ThrownItem.Spawn(lItem, pOrigin, pDirection, OwnerClientId, Avatar.Team.Value);
-            ThrowAnimRpc();
             if (lItem.kind == ItemKind.C4 && lThrown != null) _charges.Add(lThrown);
             ConsumeServer(pSlot);
         }

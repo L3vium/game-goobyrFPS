@@ -8,51 +8,59 @@ using UnityEngine;
 namespace Com.IsartDigital.GoobyrFPS.Weapons
 {
     /// <summary>
-    /// The first-person arms (Chr_Arms: suit sleeves and hands) and the held item, drawn by the
-    /// overlay camera.
+    /// The first-person arms and the held item, drawn by the overlay camera.
     /// <para>
-    /// A gun is posed procedurally in front of the camera - hip or aimed down the sights (its sight
-    /// line on the screen centre), sway from the mouse and the movement, bob, recoil, lowered while
-    /// sprinting, dropped while switching - and the hands are put on it by IK with the grips the
-    /// character builder measured (<see cref="HumanRig"/>), so they always hold it right. The arms'
-    /// Animator (<c>Characters/Arms</c>, arms-only mask: the shoulders never move) plays the aim
-    /// clips for the fingers and elbows, and the reload, punch and throw clips, during which the
-    /// clip leads the hands. Small items ride in the right hand.
+    /// Every pose is authored (<see cref="ViewmodelArms"/>, <c>Tools/Blender/fp</c>): for each family of
+    /// held item the arms hold it at the hip, aimed down the sights and sprinting, with the hands on
+    /// the real grips; the item is parented at identity to the socket bone, so it sits exactly where
+    /// it was authored. A generic Animator blends the three poses (direct blend weights from code) and
+    /// plays the authored actions on top (jab, cross, takedown, throws; reloads where authored). No IK.
+    /// </para>
+    /// <para>
+    /// Code adds the feel: sway from the mouse and the movement, bob, recoil pivoting about the sight,
+    /// the drop of a weapon switch, the procedural reloads; and a last correction slides the rig so the
+    /// Sight stays exactly on the screen centre while aiming.
     /// </para>
     /// </summary>
     public class Viewmodel : MonoBehaviour
     {
+        public enum MeleeMove { Jab, Cross, Takedown }
+
         private WeaponHolder _holder;
-        private Transform _pivot;
-        private Transform _model;
+        private ViewmodelArms _set;
+        private Transform _rig;
         private Transform _arms;
         private Animator _animator;
-        private Transform _handSocket;
-        private int _builtItem = -2;
-        private HeldKind _held;
-        private ItemDefinition _item;
-        private float _sightHeight;
+        private Transform _socket;
+        private Transform _prop;
+        private Transform _model;
+        private Transform _sight;
+        private Transform _mag;
+        private GameObject _propMag;
+        private float _magOutAt = -1f, _magGrabAt = -1f, _magInAt = -1f;
+        private bool _magDropped;
         private Renderer[] _armRenderers = new Renderer[0];
+
+        private int _builtItem = -2;
+        private ItemDefinition _item;
+        private string _family = "";
+        private ViewmodelArms.Family _familyData;
 
         private Vector3 _sway, _swayVel;
         private Vector3 _kickPos, _kickRot;
-        private float _switchT = 1f, _reloadT = 1f, _reloadDuration = 1f, _punchT = 1f, _throwT = 1f;
-        private float _bob;
-        private float _ads;
-        private float _ikRight = 1f, _ikLeft = 1f;
-        private int _armsState;
-        private Quaternion _rightRotation = Quaternion.identity, _leftRotation = Quaternion.identity;
-        private Vector3 _leftTarget;
-        private float _yaw;
+        private float _bob, _ads, _sprint;
+        private float _switchT = 1f, _reloadT = 1f, _reloadDuration = 1f;
+        private string _action = "";
+        private int _actionLayer;
+        private float _actionEnd, _freezeUntil;
+        private float _hiddenUntil = -1f;
 
-        private static RuntimeAnimatorController _controller;
-
-        // Poses of the held item in camera space (metres, degrees).
-        public static Vector3 PISTOL_HIP = new Vector3(0.12f, -0.17f, 0.44f), PISTOL_TURN = new Vector3(0f, -2f, 0f);
-        public static Vector3 RIFLE_HIP = new Vector3(0.13f, -0.17f, 0.34f), RIFLE_TURN = new Vector3(0f, -1.5f, 0f);
-        public static Vector3 ITEM_HIP = new Vector3(0.14f, -0.13f, 0.34f), ITEM_TURN = new Vector3(-10f, -12f, 8f);
-        public static Vector3 FISTS = new Vector3(0.16f, -0.12f, 0.36f), FIST_LEFT = new Vector3(0f, 0.015f, 0.05f), FIST_TURN = new Vector3(-20f, -10f, 25f);
-        public static float PISTOL_ADS_Z = 0.36f, RIFLE_ADS_Z = 0.3f;
+        /// <summary>The overlay camera's near plane: the shoulders and upper sleeves behind the eye are cut.</summary>
+        public const float NEAR_CLIP = 0.06f;
+        /// <summary>Blend times (s): into and out of an action, pose weights.</summary>
+        public const float ACTION_IN = 0.05f, ACTION_OUT = 0.14f, ADS_SPEED = 6.5f, SPRINT_SPEED = 5f;
+        /// <summary>Tools only (first-person shots): keep the arms drawn while scoped.</summary>
+        public static bool ShowScoped;
 
         public Transform Muzzle { get; private set; }
         public Vector3 MuzzlePosition
@@ -72,170 +80,280 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             CameraRig lRig = CameraRig.Ensure();
             // The arms must go through the same exposure and tonemapping as the world, or they burn white.
             UnityEngine.Rendering.Universal.CameraExtensions.GetUniversalAdditionalCameraData(lRig.ViewCamera).renderPostProcessing = true;
-            // The shoulders and upper sleeves sit beside and behind the eye: clipped, only the forearms
-            // and hands (from ~0.2 m out) are drawn.
             lRig.ViewCamera.nearClipPlane = NEAR_CLIP;
+            lRig.ViewCamera.fieldOfView = CameraRig.VIEW_FOV;
             GameObject lRoot = new GameObject("Viewmodel");
             lRoot.transform.SetParent(lRig.ViewmodelRoot, false);
             Viewmodel lView = lRoot.AddComponent<Viewmodel>();
             lView._holder = pHolder;
-            lView._pivot = new GameObject("Pivot").transform;
-            lView._pivot.SetParent(lRoot.transform, false);
+            lView._rig = new GameObject("Rig").transform;
+            lView._rig.SetParent(lRoot.transform, false);
             lView.BuildArms();
             GameLayers.SetRecursive(lRoot, GameLayers.LOCAL_VIEW);
-            foreach (Renderer lRenderer in lRoot.GetComponentsInChildren<Renderer>()) lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             return lView;
         }
 
         private void BuildArms()
         {
-            GameObject lSource = ArtRegistry.Get(HumanCast.ARMS);
-            if (lSource == null) return;
-            GameObject lArms = Instantiate(lSource, transform, false);
+            _set = ViewmodelArms.Instance;
+            if (_set == null || _set.model == null) { Debug.LogWarning("[Viewmodel] no first-person arms (Goobyr/Build/First Person Arms)"); return; }
+            GameObject lArms = Instantiate(_set.model, _rig, false);
             lArms.name = "Arms";
             _arms = lArms.transform;
             _animator = lArms.GetComponent<Animator>();
-            if (_controller == null) _controller = Resources.Load<RuntimeAnimatorController>("Characters/Arms");
-            if (_animator != null)
-            {
-                _animator.runtimeAnimatorController = _controller;
-                _animator.applyRootMotion = false;
-                _animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
-                lArms.AddComponent<ViewmodelIK>().View = this;
-                Transform lHand = _animator.GetBoneTransform(HumanBodyBones.RightHand);
-                if (lHand != null)
-                {
-                    _handSocket = new GameObject("HandSocket").transform;
-                    _handSocket.SetParent(lHand, false);
-                    _handSocket.SetLocalPositionAndRotation(HumanRig.Instance.pinchPosition, HumanRig.Instance.pistol.handRotation);
-                }
-            }
-            Cuff(HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand);
-            Cuff(HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand);
-            foreach (SkinnedMeshRenderer lSkin in lArms.GetComponentsInChildren<SkinnedMeshRenderer>()) lSkin.sharedMesh = Forearms(lSkin);
+            if (_animator == null) _animator = lArms.AddComponent<Animator>();
+            _animator.runtimeAnimatorController = _set.controller;
+            _animator.applyRootMotion = false;
+            _animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            _animator.updateMode = AnimatorUpdateMode.Normal;
+            _socket = FindDeep(_arms, ViewmodelArms.SOCKET);
+            _prop = FindDeep(_arms, ViewmodelArms.PROP);
             _armRenderers = lArms.GetComponentsInChildren<Renderer>();
-            // Arms half a metre from the eye catch the full sun the world around them is shaded from:
-            // their own instances, skin a little darker and less glossy, so they read as skin, not white.
-            foreach (Renderer lRenderer in _armRenderers)
-            {
-                Material[] lMaterials = lRenderer.materials;
-                foreach (Material lMaterial in lMaterials)
-                {
-                    bool lSkin = lMaterial.name.Contains("Body");
-                    lMaterial.SetColor("_BaseColor", lSkin ? new Color(0.68f, 0.62f, 0.6f) : new Color(0.8f, 0.8f, 0.82f));
-                    lMaterial.SetFloat("_Smoothness", lSkin ? 0.35f : 0.3f);
-                }
-                lRenderer.materials = lMaterials;
-            }
             foreach (Renderer lRenderer in _armRenderers)
             {
                 if (lRenderer is SkinnedMeshRenderer lSkin) { lSkin.updateWhenOffscreen = true; lSkin.skinnedMotionVectors = false; }
             }
+            PrepareRenderers(_armRenderers, _shaded);
         }
 
-        /// <summary>A white shirt cuff showing past the suit sleeve at the wrist.</summary>
-        private void Cuff(HumanBodyBones pForearm, HumanBodyBones pHand)
+        /// <summary>
+        /// First-person renderers live inside the owner's own (shadow-only) body: they cast no shadow and
+        /// take none, or the body's shadow would blacken an arm. Their own instances of the materials so
+        /// the rig can dim them when the eye is out of the sun (<see cref="UpdateShade"/>).
+        /// </summary>
+        private void PrepareRenderers(Renderer[] pRenderers, System.Collections.Generic.List<(Material material, Color color)> pList)
         {
-            Transform lArm = _animator != null ? _animator.GetBoneTransform(pForearm) : null, lHand = _animator != null ? _animator.GetBoneTransform(pHand) : null;
-            if (lArm == null || lHand == null) return;
-            Vector3 lAlong = lArm.InverseTransformPoint(lHand.position);
-            GameObject lCuff = new GameObject("Cuff");
-            lCuff.transform.SetParent(lArm, false);
-            lCuff.transform.localPosition = lAlong * 0.93f;
-            lCuff.transform.localRotation = Quaternion.FromToRotation(Vector3.up, lAlong.normalized);
-            lCuff.transform.localScale = new Vector3(0.074f, 0.03f, 0.064f) / Mathf.Max(0.01f, lArm.lossyScale.x);
-            lCuff.AddComponent<MeshFilter>().sharedMesh = HumanBody.BandMesh();
-            MeshRenderer lRenderer = lCuff.AddComponent<MeshRenderer>();
-            Material lMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            lMaterial.SetColor("_BaseColor", new Color(0.78f, 0.79f, 0.8f));
-            lMaterial.SetFloat("_Smoothness", 0.25f);
-            lMaterial.SetFloat("_Cull", 0f);
-            lRenderer.sharedMaterial = lMaterial;
+            foreach (Renderer lRenderer in pRenderers)
+            {
+                lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                lRenderer.receiveShadows = false;
+                Material[] lMaterials = lRenderer.materials;
+                foreach (Material lMaterial in lMaterials)
+                {
+                    if (lMaterial.HasProperty("_ReceiveShadows")) lMaterial.SetFloat("_ReceiveShadows", 0f);
+                    lMaterial.EnableKeyword("_RECEIVE_SHADOWS_OFF");
+                    if (lMaterial.HasProperty("_BaseColor")) pList.Add((lMaterial, lMaterial.GetColor("_BaseColor")));
+                }
+                lRenderer.materials = lMaterials;
+            }
+            _appliedShade = -1f;
         }
 
-        public void Kick(float pAmount)
+        private readonly System.Collections.Generic.List<(Material material, Color color)> _shaded = new System.Collections.Generic.List<(Material, Color)>();
+        private readonly System.Collections.Generic.List<(Material material, Color color)> _shadedModel = new System.Collections.Generic.List<(Material, Color)>();
+        private float _shade = 1f, _appliedShade = -1f;
+        /// <summary>How dark the arms and the held item get when the sun is blocked at the eye.</summary>
+        public const float SHADE = 0.42f;
+
+        /// <summary>The arms take no world shadow: they dim themselves when the sun is hidden from the eye.</summary>
+        private void UpdateShade(float pDt)
         {
-            _kickPos += new Vector3(0, 0.008f, -0.045f) * pAmount;
-            _kickRot += new Vector3(-5f, Random.Range(-1.2f, 1.2f), Random.Range(-2.5f, 2.5f)) * pAmount;
-            Play(_held == HeldKind.Rifle ? HumanAnimator.S_FIRE_RIFLE : HumanAnimator.S_FIRE_PISTOL, 0.02f);
+            Light lSun = RenderSettings.sun;
+            bool lLit = true;
+            if (lSun != null && lSun.isActiveAndEnabled && lSun.type == LightType.Directional)
+            {
+                Vector3 lEye = transform.position;
+                lLit = !Physics.Raycast(lEye, -lSun.transform.forward, 400f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore);
+            }
+            _shade = Mathf.MoveTowards(_shade, lLit ? 1f : SHADE, pDt * 2.5f);
+            if (Mathf.Abs(_shade - _appliedShade) < 0.004f) return;
+            _appliedShade = _shade;
+            foreach (System.Collections.Generic.List<(Material material, Color color)> lList in new[] { _shaded, _shadedModel })
+                foreach ((Material lMaterial, Color c) in lList)
+                    if (lMaterial != null) lMaterial.SetColor("_BaseColor", new Color(c.r * _shade, c.g * _shade, c.b * _shade, c.a));
         }
 
-        public void PlaySwitch() => _switchT = 0f;
-        public void PlayReload(float pDuration)
+        private static Transform FindDeep(Transform pRoot, string pName)
         {
-            _reloadT = 0f;
-            _reloadDuration = pDuration;
-            if (_animator != null) _animator.SetFloat(HumanAnimator.PACE, 2f / Mathf.Max(0.5f, pDuration));
-            Play(HumanAnimator.S_RELOAD, 0.1f);
+            if (pRoot.name == pName) return pRoot;
+            foreach (Transform lChild in pRoot)
+            {
+                Transform lFound = FindDeep(lChild, pName);
+                if (lFound != null) return lFound;
+            }
+            return null;
         }
 
-        public void PlayPunch()
-        {
-            _punchT = 0f;
-            if (_animator != null) _animator.SetFloat(HumanAnimator.PACE, 1.7f);
-            Play(HumanAnimator.S_PUNCH, 0.05f);
-        }
-
-        public void PlayThrow()
-        {
-            _throwT = 0f;
-            if (_animator != null) _animator.SetFloat(HumanAnimator.PACE, 1.6f);
-            Play(HumanAnimator.S_THROW, 0.05f, 0.35f);
-        }
-
-        private void Play(string pState, float pFade, float pOffset = 0f)
-        {
-            if (_animator == null || !_animator.isActiveAndEnabled) return;
-            _armsState = Animator.StringToHash(pState);
-            _animator.CrossFadeInFixedTime(_armsState, pFade, 0, pOffset);
-        }
-
-        /// <summary>The idle hold of the current item.</summary>
-        private string HoldState => _held == HeldKind.Rifle ? HumanAnimator.S_AIM_RIFLE : _held == HeldKind.Pistol ? HumanAnimator.S_AIM_PISTOL : _held == HeldKind.None ? HumanAnimator.S_PUNCH : HumanAnimator.S_PISTOL_READY;
-
-        /// <summary>Back to the idle hold: fists hold the punch clip's opening guard (its fingers make the fists).</summary>
-        private void PlayHold(float pFade)
-        {
-            if (_animator != null) _animator.SetFloat(HumanAnimator.PACE, _held == HeldKind.None ? 0f : 1f);
-            // Fists: the punch clip held at its contact frame, where the fingers are clenched.
-            Play(HoldState, pFade, _held == HeldKind.None ? 0.3f : 0f);
-        }
+        // ---------------------------------------------------------------- held item
 
         private void Rebuild(ItemDefinition pItem)
         {
             _builtItem = pItem != null ? pItem.Index : -1;
             _item = pItem;
-            _held = WeaponModels.HeldOf(pItem);
             if (_model != null) Destroy(_model.gameObject);
+            if (_propMag != null) Destroy(_propMag);
+            foreach ((Material lMaterial, Color _) in _shadedModel) if (lMaterial != null) Destroy(lMaterial);
+            _shadedModel.Clear();
             _model = null;
+            _mag = null;
+            _propMag = null;
+            _magOutAt = _magGrabAt = _magInAt = -1f;
+            _sight = null;
             Muzzle = null;
-            _sightHeight = 0.1f;
-            if (pItem != null)
+            _hiddenUntil = -1f;
+            _releaseAt = -1f;
+            StopAction(0.05f);
+
+            _family = ViewmodelArms.FamilyOf(pItem);
+            if (_set != null && _set.TryFamily(_family, out _familyData))
             {
-                // Guns sit on the pivot (the hands follow them); small items ride in the hand.
-                bool lGun = _held == HeldKind.Pistol || _held == HeldKind.Rifle;
-                Transform lParent = lGun || _handSocket == null ? _pivot : _handSocket;
-                GameObject lModel = WeaponModels.Build(pItem, lParent, GameLayers.LOCAL_VIEW);
-                _model = lModel.transform;
-                Muzzle = _model.Find("Muzzle");
-                _sightHeight = SightHeight(pItem, Muzzle);
-                foreach (Renderer lRenderer in lModel.GetComponentsInChildren<Renderer>()) lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                if (_animator != null) _animator.runtimeAnimatorController = _familyData.controller != null ? (RuntimeAnimatorController)_familyData.controller : _set.controller;
             }
-            PlayHold(0.15f);
+            else _familyData = default;
+
+            if (pItem != null && _socket != null)
+            {
+                GameObject lModel = WeaponModels.Build(pItem, _socket, GameLayers.LOCAL_VIEW);
+                _model = lModel.transform;
+                HoldAdjust(pItem, _model);
+                Muzzle = _model.Find("Muzzle");
+                _sight = _model.Find("Sight");
+                _mag = _model.Find("Mag");
+                // The magazine the support hand carries in a reload: a copy of the gun's, on prop_l.
+                if (_mag != null && _prop != null && _familyData.authoredReload)
+                {
+                    _propMag = Instantiate(_mag.gameObject, _prop, false);
+                    _propMag.name = "MagInHand";
+                    _propMag.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                    _propMag.SetActive(false);
+                }
+                PrepareRenderers(lModel.GetComponentsInChildren<Renderer>(true), _shadedModel);
+            }
         }
 
-        /// <summary>Height of the sight line above the grip: the top of the slide for pistols, the rail for long guns.</summary>
-        private static float SightHeight(ItemDefinition pItem, Transform pMuzzle)
+        /// <summary>
+        /// Authored reload: the gun's magazine leaves at magOut (dropping out of view if no hand holds it),
+        /// the one in the support hand shows from magGrab, and it is the gun's again from magIn.
+        /// </summary>
+        private void UpdateMagazine()
         {
-            float lBore = pMuzzle != null ? pMuzzle.localPosition.y : 0.08f;
-            return pItem.kind switch
+            if (_mag == null || _magInAt < 0f) return;
+            float lNow = Time.time;
+            bool lOut = lNow >= _magOutAt && lNow < _magInAt;
+            bool lInHand = lNow >= _magGrabAt && lNow < _magInAt;
+            if (lOut && !_magDropped)
             {
-                ItemKind.Pistol or ItemKind.SilencedPistol => lBore,
-                ItemKind.Smg => lBore + 0.05f,
-                ItemKind.Shotgun => lBore + 0.03f,
-                _ => lBore + 0.04f
-            };
+                _magDropped = true;
+                // Released with nothing holding it (a pistol): it falls away.
+                if (_magGrabAt > _magOutAt + 0.05f) MagazineDrop.Spawn(_mag, transform);
+            }
+            if (_mag.gameObject.activeSelf == lOut) _mag.gameObject.SetActive(!lOut);
+            if (_propMag != null && _propMag.activeSelf != lInHand) _propMag.SetActive(lInHand);
+            if (lNow >= _magInAt) { _magOutAt = _magGrabAt = _magInAt = -1f; _magDropped = false; }
         }
+
+        /// <summary>
+        /// Small items share a hand pose per family, but not a shape: each one is turned and shifted in
+        /// the socket so the hand holds it by the right part (a card by its end, a vial upright, a bottle
+        /// by the neck). Guns have their Grip on the socket at identity.
+        /// </summary>
+        private static void HoldAdjust(ItemDefinition pItem, Transform pModel)
+        {
+            Vector3 lOffset;
+            Vector3 lTurn;
+            switch (pItem.kind)
+            {
+                case ItemKind.Keycard: case ItemKind.StaffPass: lOffset = new Vector3(0f, 0f, 0.03f); lTurn = new Vector3(90f, 0f, 0f); break;
+                case ItemKind.Invitation: case ItemKind.CodeNote: lOffset = new Vector3(0f, 0f, 0.05f); lTurn = new Vector3(90f, 0f, 0f); break;
+                case ItemKind.Poison: case ItemKind.EmeticPoison: lOffset = new Vector3(0f, 0f, 0.01f); lTurn = new Vector3(90f, 0f, 0f); break;
+                case ItemKind.Crowbar: lOffset = new Vector3(0f, 0.12f, 0f); lTurn = new Vector3(-90f, 0f, 0f); break;
+                case ItemKind.Bottle: lOffset = Vector3.zero; lTurn = new Vector3(-90f, 0f, 0f); break;
+                case ItemKind.Brick: case ItemKind.C4: lOffset = new Vector3(0f, 0f, 0.04f); lTurn = Vector3.zero; break;
+                default: return;
+            }
+            pModel.localRotation = Quaternion.Euler(lTurn) * pModel.localRotation;
+            pModel.localPosition = Quaternion.Euler(lTurn) * pModel.localPosition + lOffset;
+        }
+
+        // ---------------------------------------------------------------- actions (called by WeaponHolder)
+
+        /// <summary>Recoil: a kick back and up, rotating about the sight (or the hand).</summary>
+        public void Kick(float pAmount)
+        {
+            _kickPos += new Vector3(0f, 0.004f, -0.035f) * pAmount;
+            _kickRot += new Vector3(-4.5f, Random.Range(-1f, 1f), Random.Range(-2f, 2f)) * pAmount;
+        }
+
+        public void PlaySwitch() => _switchT = 0f;
+
+        /// <summary>
+        /// Plays a punch or the takedown and returns how long until its contact (the authored strike
+        /// time), when the caller resolves the hit. Bare hands: jab and cross on the whole body; holding
+        /// something: a quick left jab while the right hand keeps the item.
+        /// </summary>
+        public float PlayMelee(MeleeMove pMove)
+        {
+            string lClip = pMove == MeleeMove.Jab ? ViewmodelArms.S_JAB : pMove == MeleeMove.Cross ? ViewmodelArms.S_CROSS : ViewmodelArms.S_TAKEDOWN;
+            float lStrike = _set != null ? _set.Event(lClip, "strike", DefaultStrike(pMove)) : DefaultStrike(pMove);
+            if (pMove == MeleeMove.Takedown)
+            {
+                // Both hands grab: the held item is put away for the takedown and raised again after.
+                float lLength = _set != null ? _set.Length(ViewmodelArms.S_TAKEDOWN, 1.1f) : 1.1f;
+                if (_model != null) _hiddenUntil = Time.time + lLength - 0.15f;
+                PlayAction(ViewmodelArms.S_TAKEDOWN, ViewmodelArms.LAYER_ACTION, 1f, lLength);
+            }
+            else if (_item != null) PlayAction(ViewmodelArms.S_JAB, ViewmodelArms.LAYER_LEFT, 1f, _set != null ? _set.Length(ViewmodelArms.S_JAB, 0.5f) : 0.5f);
+            else PlayAction(lClip, ViewmodelArms.LAYER_ACTION, 1f, _set != null ? _set.Length(lClip, 0.5f) : 0.5f);
+            return lStrike;
+        }
+
+        public static float DefaultStrike(MeleeMove pMove) => pMove == MeleeMove.Takedown ? 0.3f : pMove == MeleeMove.Cross ? 0.18f : 0.16f;
+
+        /// <summary>Predicted hit-stop: the arms freeze for a beat on contact (the game clock never slows).</summary>
+        public void HitStop(float pSeconds) => _freezeUntil = Mathf.Max(_freezeUntil, Time.unscaledTime + pSeconds);
+
+        /// <summary>The throw of the held item; returns the time until it leaves the hand.</summary>
+        public float PlayThrow()
+        {
+            string lClip = _family + "_" + ViewmodelArms.S_THROW;
+            float lRelease = _set != null ? _set.Event(lClip, "release", 0.27f) : 0.27f;
+            float lLength = _familyData.throwLength > 0f ? _familyData.throwLength : 0.66f;
+            if (_familyData.throwLength > 0f) PlayAction(ViewmodelArms.S_THROW, ViewmodelArms.LAYER_ACTION, 1f, lLength);
+            // The item leaves the hand at the release; the next one (if any) comes up with the switch drop.
+            _hiddenUntil = Time.time + lLength;
+            _releaseAt = Time.time + lRelease;
+            return lRelease;
+        }
+
+        private float _releaseAt = -1f;
+
+        public void PlayReload(float pDuration)
+        {
+            _reloadT = 0f;
+            _reloadDuration = Mathf.Max(0.2f, pDuration);
+            if (_familyData.authoredReload && _familyData.reloadLength > 0f)
+            {
+                _reloadT = 1f;
+                float lSpeed = _familyData.reloadLength / _reloadDuration;
+                PlayAction(ViewmodelArms.S_RELOAD, ViewmodelArms.LAYER_ACTION, lSpeed, _reloadDuration);
+                string lClip = _family + "_" + ViewmodelArms.S_RELOAD;
+                float lNow = Time.time;
+                _magOutAt = lNow + _set.Event(lClip, "magOut", 0.3f) / lSpeed;
+                _magGrabAt = lNow + _set.Event(lClip, "magGrab", 0.6f) / lSpeed;
+                _magInAt = lNow + _set.Event(lClip, "magIn", 1.0f) / lSpeed;
+                _magDropped = false;
+            }
+        }
+
+        private void PlayAction(string pState, int pLayer, float pSpeed, float pDuration)
+        {
+            if (_animator == null || !_animator.isActiveAndEnabled) return;
+            if (_action != "" && _actionLayer != pLayer) _animator.CrossFadeInFixedTime(ViewmodelArms.S_EMPTY, ACTION_IN, _actionLayer);
+            _animator.SetFloat(ViewmodelArms.P_SPEED, pSpeed);
+            _animator.CrossFadeInFixedTime(pState, ACTION_IN, pLayer, 0f);
+            _action = pState;
+            _actionLayer = pLayer;
+            _actionEnd = Time.time + pDuration;
+        }
+
+        private void StopAction(float pFade)
+        {
+            if (_action == "" || _animator == null || !_animator.isActiveAndEnabled) { _action = ""; return; }
+            _animator.CrossFadeInFixedTime(ViewmodelArms.S_EMPTY, pFade, _actionLayer);
+            _action = "";
+        }
+
+        // ---------------------------------------------------------------- frame
 
         private void Update()
         {
@@ -244,365 +362,127 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             ItemDefinition lItem = _holder.HeldItem;
             int lIndex = lItem != null ? lItem.Index : -1;
             if (lIndex != _builtItem) { Rebuild(lItem); _switchT = 0f; }
-            PlaceArms();
 
             bool lAlive = lAvatar.Health.IsAlive && lAvatar.Motor.Mode != MotorMode.Hidden;
-            bool lShown = lAlive && !_holder.Scoped && lAvatar.Motor.Mode != MotorMode.Climb && lAvatar.Motor.Mode != MotorMode.LedgeHang;
-            _pivot.gameObject.SetActive(lShown);
-            if (_arms != null) _arms.gameObject.SetActive(lShown);
-            if (!lShown) return;
+            bool lShown = lAlive && (!_holder.Scoped || ShowScoped) && lAvatar.Motor.Mode != MotorMode.Climb && lAvatar.Motor.Mode != MotorMode.LedgeHang;
+            _rig.gameObject.SetActive(lShown);
+            if (!lShown || _animator == null) return;
 
             float dt = Time.deltaTime;
-            Vector2 lLook = GameInput.Look;
-            Vector3 lTargetSway = new Vector3(-lLook.x * 0.0008f, -lLook.y * 0.0008f, 0);
-            Vector3 lLocalVel = lAvatar.transform.InverseTransformDirection(lAvatar.Motor.Velocity);
-            lTargetSway += new Vector3(-lLocalVel.x * 0.0035f, -lLocalVel.y * 0.0025f, -lLocalVel.z * 0.0015f);
-            _swayVel += ((lTargetSway - _sway) * 160f - _swayVel * 16f) * dt;
-            _sway += _swayVel * dt;
-            _sway = Vector3.ClampMagnitude(_sway, 0.05f);
+            bool lAiming = _holder.IsAiming;
+            _ads = Mathf.MoveTowards(_ads, lAiming ? 1f : 0f, dt * ADS_SPEED);
+            _sprint = Mathf.MoveTowards(_sprint, lAvatar.Motor.Sprinting && !lAiming && _action == "" ? 1f : 0f, dt * SPRINT_SPEED);
+            float lAds = Ease(_ads), lSprint = Ease(_sprint);
+            _animator.SetFloat(ViewmodelArms.P_ADS, lAds);
+            _animator.SetFloat(ViewmodelArms.P_SPRINT, (1f - lAds) * lSprint);
+            _animator.SetFloat(ViewmodelArms.P_HIP, (1f - lAds) * (1f - lSprint));
 
-            _kickPos = Vector3.Lerp(_kickPos, Vector3.zero, 1f - Mathf.Exp(-14f * dt));
-            _kickRot = Vector3.Lerp(_kickRot, Vector3.zero, 1f - Mathf.Exp(-12f * dt));
+            // Back to the poses once an action is done; hit-stop freezes the arms only.
+            if (_action != "" && Time.time >= _actionEnd - ACTION_OUT) StopAction(ACTION_OUT);
+            _animator.speed = Time.unscaledTime < _freezeUntil ? 0f : 1f;
 
-            float lSpeed = lAvatar.Motor.Grounded ? lAvatar.Motor.PlanarSpeed : 0f;
-            _bob += lSpeed * dt * 1.9f;
-            bool lAiming = _holder.AdsFov > 0f;
-            _ads = Mathf.MoveTowards(_ads, lAiming ? 1f : 0f, dt * 6f);
-            float lAds = Ease(_ads);
-            float lBobScale = Mathf.Lerp(1f, 0.15f, lAds) * Mathf.Clamp01(lSpeed / 6f);
-            Vector3 lBob = new Vector3(Mathf.Cos(_bob) * 0.01f, Mathf.Abs(Mathf.Sin(_bob)) * 0.012f, 0) * lBobScale;
+            UpdateMagazine();
+            UpdateShade(dt);
 
-            // Hip and sights: the sight line on the screen centre when aiming.
-            Vector3 lHip, lSight;
-            Quaternion lHipTurn;
-            switch (_held)
+            // A thrown or put-away item: hidden from its release until the action is over, then raised.
+            if (_model != null)
             {
-                case HeldKind.Pistol:
-                    lHip = PISTOL_HIP; lHipTurn = Quaternion.Euler(PISTOL_TURN);
-                    lSight = new Vector3(0f, -_sightHeight, PISTOL_ADS_Z);
-                    break;
-                case HeldKind.Rifle:
-                    lHip = RIFLE_HIP; lHipTurn = Quaternion.Euler(RIFLE_TURN);
-                    lSight = new Vector3(0f, -_sightHeight, RIFLE_ADS_Z);
-                    break;
-                case HeldKind.None:
-                    lHip = FISTS; lHipTurn = Quaternion.Euler(FIST_TURN);
-                    lSight = lHip;
-                    break;
-                default:
-                    lHip = ITEM_HIP; lHipTurn = Quaternion.Euler(ITEM_TURN);
-                    lSight = lHip;
-                    break;
+                bool lHide = (_releaseAt > 0f && Time.time >= _releaseAt && Time.time < _hiddenUntil) || (_releaseAt <= 0f && Time.time < _hiddenUntil);
+                if (_model.gameObject.activeSelf == lHide) _model.gameObject.SetActive(!lHide);
+                if (_hiddenUntil > 0f && Time.time >= _hiddenUntil) { _hiddenUntil = -1f; _releaseAt = -1f; PlaySwitch(); }
             }
-            Vector3 lPos = Vector3.Lerp(lHip, lSight, lAds) + _sway * (1f - lAds * 0.75f) + lBob + _kickPos;
-            Quaternion lRot = Quaternion.Slerp(lHipTurn, Quaternion.identity, lAds) * Quaternion.Euler(_kickRot + new Vector3(-_sway.y * 200f, _sway.x * 200f, _sway.x * 250f) * (1f - lAds * 0.75f));
-
-            // Sprint lowers and turns the gun in, slides cant it.
-            float lSprint = lAvatar.Motor.Sprinting && !lAiming ? 1f : 0f;
-            lPos += new Vector3(-0.03f, -0.05f, -0.03f) * lSprint;
-            lRot *= Quaternion.Euler(new Vector3(14f, -22f, 10f) * lSprint);
-            if (lAvatar.Motor.Sliding) lRot *= Quaternion.Euler(0, 0, 10f);
-
-            _switchT = Mathf.MoveTowards(_switchT, 1f, dt * 3.5f);
-            lPos += Vector3.down * (1f - Ease(_switchT)) * 0.25f;
-            lRot *= Quaternion.Euler((1f - Ease(_switchT)) * 35f, 0, 0);
-
-            _reloadT = Mathf.MoveTowards(_reloadT, 1f, dt / Mathf.Max(0.1f, _reloadDuration));
-            float lReload = Mathf.Sin(_reloadT * Mathf.PI);
-            lPos += new Vector3(-0.03f, -0.05f, -0.02f) * lReload;
-            lRot *= Quaternion.Euler(lReload * 18f, lReload * -10f, lReload * -28f);
-
-            _punchT = Mathf.MoveTowards(_punchT, 1f, dt * 1.5f);
-            _throwT = Mathf.MoveTowards(_throwT, 1f, dt * 1.4f);
-
-            _pivot.localPosition = lPos;
-            _pivot.localRotation = lRot;
-
-            // Back to the hold once an action clip is done.
-            if (_punchT >= 1f && _throwT >= 1f && _reloadT >= 1f && _animator != null && (_armsState != Animator.StringToHash(HoldState) || (_held == HeldKind.None && _animator.GetFloat(HumanAnimator.PACE) > 0f))
-                && (_animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.9f || _armsState != Animator.StringToHash(HumanAnimator.S_PUNCH)) && !_animator.IsInTransition(0))
-            {
-                PlayHold(0.2f);
-            }
-
-            // How much the IK leads the hands: the clip takes over for the actions.
-            bool lGun = _held == HeldKind.Pistol || _held == HeldKind.Rifle;
-            float lRightTarget = _punchT < 1f || _throwT < 1f ? 0f : 1f;
-            float lLeftTarget = (lGun || _held == HeldKind.None) && _reloadT >= 1f && _punchT >= 1f ? 1f : 0f;
-            _ikRight = Mathf.MoveTowards(_ikRight, lRightTarget, dt * 8f);
-            _ikLeft = Mathf.MoveTowards(_ikLeft, lLeftTarget, dt * 6f);
-        }
-
-        /// <summary>
-        /// Keeps the arms' eyes on the camera: the arms-only mask leaves the body in the avatar's
-        /// default pose, so the offset is measured on the evaluated pose (it settles after a frame and
-        /// stays, the shoulders never move).
-        /// </summary>
-        private void PlaceArms()
-        {
-            if (_arms == null || _animator == null) return;
-            Transform lHead = _animator.GetBoneTransform(HumanBodyBones.Head);
-            if (lHead == null) return;
-            // Long guns: the body turns a little to the gun side, the support shoulder comes forward.
-            _yaw = Mathf.MoveTowards(_yaw, _held == HeldKind.Rifle ? RIFLE_YAW : 0f, Time.deltaTime * 60f);
-            Quaternion lTurn = Quaternion.Euler(0f, _yaw, 0f);
-            if (Quaternion.Angle(_arms.localRotation, lTurn) > 0.01f)
-            {
-                // Turn about the eye, not the feet.
-                Vector3 lPivot = transform.InverseTransformPoint(lHead.TransformPoint(HumanRig.Instance.eyeInHead));
-                _arms.localPosition = lPivot + lTurn * Quaternion.Inverse(_arms.localRotation) * (_arms.localPosition - lPivot);
-                _arms.localRotation = lTurn;
-            }
-            Vector3 lEye = transform.InverseTransformPoint(lHead.TransformPoint(HumanRig.Instance.eyeInHead));
-            Vector3 lError = lEye - SHOULDER_DROP;
-            if (lError.sqrMagnitude > 0.000001f) _arms.localPosition -= lError;
-        }
-
-        /// <summary>Shoulders lower and further back than real: the forearms rise into the view from the bottom corners instead of hiding the hands.</summary>
-        public static Vector3 SHOULDER_DROP = new Vector3(0f, 0.2f, 0.24f);
-        public static float RIFLE_YAW = 12f, NEAR_CLIP = 0.06f, FIST_AMOUNT = 0f;
-        public static Vector2 THUMB_BEND = new Vector2(100f, 80f);
-        /// <summary>Support-hand fingers as a share of the fist curl: pistol (around the firing hand), long guns.</summary>
-        public static Vector2 SUPPORT_CURL = new Vector2(0.7f, 0.65f);
-        /// <summary>Elbows down and in: the forearms rise from the bottom of the screen, not across it.</summary>
-        public static Vector3 RIGHT_ELBOW = new Vector3(0.3f, -0.62f, 0.1f), LEFT_ELBOW = new Vector3(-0.18f, -0.65f, 0.18f);
-
-        /// <summary>The hands on the item (called from the arms' IK pass).</summary>
-        public void OnIK()
-        {
-            if (_animator == null) return;
-            HumanRig lRig = HumanRig.Instance;
-            bool lGun = _held == HeldKind.Pistol || _held == HeldKind.Rifle;
-            HumanRig.Grip lGrip = lRig.For(_held);
-            Quaternion lHandRotation;
-            Vector3 lHandPosition;
-            if (lGun)
-            {
-                lHandRotation = _pivot.rotation * Quaternion.Inverse(lGrip.handRotation);
-                lHandPosition = _pivot.position - lHandRotation * lGrip.handPosition;
-            }
-            else if (_held == HeldKind.None)
-            {
-                // Fists up: the right fist at the pivot, the left one mirrored and a little forward.
-                lHandRotation = _pivot.rotation * Quaternion.Inverse(lRig.pistol.handRotation);
-                lHandPosition = _pivot.position - lHandRotation * lRig.pistol.handPosition;
-                Vector3 lLeftPivot = transform.TransformPoint(Vector3.Scale(_pivot.localPosition, new Vector3(-1f, 1f, 1f)) + FIST_LEFT);
-                Quaternion lLeftFist = transform.rotation * Quaternion.Euler(Vector3.Scale(_pivot.localEulerAngles, new Vector3(1f, -1f, -1f))) * lRig.leftFistRotation;
-                _leftRotation = Quaternion.Inverse(transform.rotation) * lLeftFist;
-                _leftTarget = lLeftPivot - lLeftFist * lRig.leftPalm;
-            }
-            else
-            {
-                // A small item (or the empty hand): the palm at the pivot, item between the fingers.
-                lHandRotation = _pivot.rotation * Quaternion.Inverse(lRig.pinchRotation);
-                lHandPosition = _pivot.position - lHandRotation * lRig.pinchPosition;
-            }
-            // Position by IK (the wrist), rotation written on the bone after the pass (LateUpdate):
-            // the grips are measured on the raw bones, not in the humanoid goal space.
-            _rightRotation = Quaternion.Inverse(transform.rotation) * lHandRotation;
-            if (_held != HeldKind.None)
-            {
-                _leftRotation = Quaternion.Inverse(transform.rotation) * (_pivot.rotation * lGrip.supportRotation);
-                _leftTarget = _pivot.position + _pivot.rotation * lRig.SupportFor(_held, Muzzle);
-            }
-            _animator.SetIKPositionWeight(AvatarIKGoal.RightHand, _ikRight);
-            _animator.SetIKRotationWeight(AvatarIKGoal.RightHand, 0f);
-            _animator.SetIKPosition(AvatarIKGoal.RightHand, lHandPosition);
-            _animator.SetIKHintPositionWeight(AvatarIKHint.RightElbow, _ikRight * 0.9f);
-            _animator.SetIKHintPosition(AvatarIKHint.RightElbow, transform.TransformPoint(RIGHT_ELBOW));
-
-            _animator.SetIKPositionWeight(AvatarIKGoal.LeftHand, _ikLeft);
-            _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
-            _animator.SetIKPosition(AvatarIKGoal.LeftHand, _leftTarget);
-            _animator.SetIKHintPositionWeight(AvatarIKHint.LeftElbow, _ikLeft * 0.9f);
-            _animator.SetIKHintPosition(AvatarIKHint.LeftElbow, transform.TransformPoint(LEFT_ELBOW));
         }
 
         private void LateUpdate()
         {
-            if (_animator == null || _arms == null || !_arms.gameObject.activeInHierarchy) return;
-            Turn(HumanBodyBones.RightHand, _rightRotation, _ikRight);
-            Turn(HumanBodyBones.LeftHand, _leftRotation, _ikLeft);
-            if (_held == HeldKind.None && _punchT >= 1f)
+            if (_holder == null || _arms == null || !_rig.gameObject.activeInHierarchy) return;
+            PlayerAvatar lAvatar = _holder.Avatar;
+            float dt = Time.deltaTime;
+
+            // Sway: the arms lag the look and the movement a little (much less when aiming).
+            Vector2 lLook = GameInput.Look;
+            Vector3 lTargetSway = new Vector3(-lLook.x * 0.0007f, -lLook.y * 0.0007f, 0f);
+            Vector3 lLocalVel = lAvatar.transform.InverseTransformDirection(lAvatar.Motor.Velocity);
+            lTargetSway += new Vector3(-lLocalVel.x * 0.003f, -lLocalVel.y * 0.002f, -lLocalVel.z * 0.0012f);
+            _swayVel += ((lTargetSway - _sway) * 160f - _swayVel * 16f) * dt;
+            _sway += _swayVel * dt;
+            _sway = Vector3.ClampMagnitude(_sway, 0.045f);
+            _kickPos = Vector3.Lerp(_kickPos, Vector3.zero, 1f - Mathf.Exp(-14f * dt));
+            _kickRot = Vector3.Lerp(_kickRot, Vector3.zero, 1f - Mathf.Exp(-12f * dt));
+
+            float lAds = Ease(_ads);
+            float lSpeed = lAvatar.Motor.Grounded ? lAvatar.Motor.PlanarSpeed : 0f;
+            _bob += lSpeed * dt * 1.9f;
+            float lBobScale = Mathf.Lerp(1f, 0.12f, lAds) * Mathf.Clamp01(lSpeed / 6f);
+            Vector3 lBob = new Vector3(Mathf.Cos(_bob) * 0.009f, Mathf.Abs(Mathf.Sin(_bob)) * 0.011f, 0f) * lBobScale;
+            float lFree = 1f - lAds * 0.8f;
+
+            Vector3 lPos = _sway * lFree + lBob;
+            Quaternion lRot = Quaternion.Euler(new Vector3(-_sway.y * 180f, _sway.x * 180f, _sway.x * 220f) * lFree);
+
+            // Switch: the new item comes up from below; a procedural reload dips and rolls it.
+            _switchT = Mathf.MoveTowards(_switchT, 1f, dt * 3.2f);
+            float lDrop = 1f - Ease(_switchT);
+            lPos += Vector3.down * lDrop * 0.22f;
+            lRot *= Quaternion.Euler(lDrop * 32f, 0f, 0f);
+            _reloadT = Mathf.MoveTowards(_reloadT, 1f, dt / _reloadDuration);
+            float lReload = Mathf.Sin(_reloadT * Mathf.PI);
+            lPos += new Vector3(-0.025f, -0.045f, -0.02f) * lReload;
+            lRot *= Quaternion.Euler(lReload * 16f, lReload * -8f, lReload * -26f);
+            if (lAvatar.Motor.Sliding) lRot *= Quaternion.Euler(0f, 0f, 8f);
+
+            _rig.localPosition = lPos;
+            _rig.localRotation = lRot;
+
+            // Aimed: square the sight line with the view and slide it onto the screen centre (the poses
+            // are authored there; this takes out blends, sway and bob).
+            if (_sight != null && lAds > 0.001f)
             {
-                Fist(true, _ikRight);
-                Fist(false, _ikLeft);
+                Vector3 lDir = transform.InverseTransformDirection(_sight.forward);
+                Quaternion lSquare = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lDir, Vector3.forward), lAds);
+                Vector3 lSight = transform.InverseTransformPoint(_sight.position);
+                _rig.localRotation = lSquare * _rig.localRotation;
+                _rig.localPosition = lSight + lSquare * (_rig.localPosition - lSight);
+                lSight = transform.InverseTransformPoint(_sight.position);
+                _rig.localPosition -= new Vector3(lSight.x, lSight.y, 0f) * lAds;
             }
-            else if ((_held == HeldKind.Pistol || _held == HeldKind.Rifle) && _reloadT >= 1f) Support(_ikLeft);
-        }
 
-        /// <summary>
-        /// The support hand on a gun: its fingers close to a share of the fist around the firing hand
-        /// (pistol) or the magazine well / fore-end (long guns) - curled to a target per phalanx, so the
-        /// clip's own curl is not added twice - and the thumb lies forward along the frame, under the slide.
-        /// </summary>
-        private void Support(float pWeight)
-        {
-            if (pWeight <= 0.01f || !HandAxes(false, out Vector3 lForward, out Vector3 lPalm)) return;
-            float lShare = (_held == HeldKind.Pistol ? SUPPORT_CURL.x : SUPPORT_CURL.y) * pWeight;
-            for (int f = 4; f < 8; f++) CurlTo(f, lForward, lPalm, lShare);
-
-            Vector3 lAlongFrame = _pivot.forward;
-            HumanBodyBones[] lThumb = { HumanBodyBones.LeftThumbProximal, HumanBodyBones.LeftThumbIntermediate, HumanBodyBones.LeftThumbDistal };
-            for (int j = 0; j < 3; j++)
-            {
-                Transform lBone = _animator.GetBoneTransform(lThumb[j]);
-                if (lBone == null) continue;
-                Vector3 lAlong = lBone.rotation * Vector3.up;
-                // The base turns most of the way, the joints straighten it onto the frame line.
-                float lAmount = (j == 0 ? 0.75f : 0.9f) * pWeight;
-                lBone.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lAlong, lAlongFrame), lAmount) * lBone.rotation;
-            }
-        }
-
-        /// <summary>A hand's forward (wrist to knuckles) and palm normal, from its bones.</summary>
-        private bool HandAxes(bool pRight, out Vector3 pForward, out Vector3 pPalm)
-        {
-            pForward = pPalm = Vector3.zero;
-            Transform lHand = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightHand : HumanBodyBones.LeftHand);
-            Transform lIndex = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightIndexProximal : HumanBodyBones.LeftIndexProximal);
-            Transform lLittle = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightLittleProximal : HumanBodyBones.LeftLittleProximal);
-            Transform lMiddle = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightMiddleProximal : HumanBodyBones.LeftMiddleProximal);
-            if (lHand == null || lIndex == null || lLittle == null || lMiddle == null) return false;
-            Vector3 lUp = (lIndex.position - lLittle.position).normalized;
-            pForward = (lMiddle.position - lHand.position).normalized;
-            pPalm = Vector3.Cross(lUp, pForward).normalized * (pRight ? -1f : 1f);
-            return true;
-        }
-
-        /// <summary>
-        /// Bends one finger to a share of the fist curl: each phalanx turns towards the palm until its
-        /// angle to the previous one (the hand for the first) reaches its target, whatever the clip did.
-        /// </summary>
-        private void CurlTo(int pFinger, Vector3 pForward, Vector3 pPalm, float pShare)
-        {
-            Vector3 lParent = pForward;
-            for (int j = 0; j < 3; j++)
-            {
-                Transform lBone = _animator.GetBoneTransform(FINGERS[pFinger][j]);
-                if (lBone == null) return;
-                Vector3 lAlong = lBone.rotation * Vector3.up;
-                Vector3 lAxis = Vector3.Cross(lParent, pPalm);
-                if (lAxis.sqrMagnitude < 0.0001f) return;
-                lAxis.Normalize();
-                float lBent = Vector3.SignedAngle(lParent, lAlong, lAxis);
-                lBone.rotation = Quaternion.AngleAxis(FIST_CURL[j] * pShare - lBent, lAxis) * lBone.rotation;
-                lParent = lBone.rotation * Vector3.up;
-            }
-        }
-
-        private static readonly HumanBodyBones[][] FINGERS =
-        {
-            new[] { HumanBodyBones.RightIndexProximal, HumanBodyBones.RightIndexIntermediate, HumanBodyBones.RightIndexDistal },
-            new[] { HumanBodyBones.RightMiddleProximal, HumanBodyBones.RightMiddleIntermediate, HumanBodyBones.RightMiddleDistal },
-            new[] { HumanBodyBones.RightRingProximal, HumanBodyBones.RightRingIntermediate, HumanBodyBones.RightRingDistal },
-            new[] { HumanBodyBones.RightLittleProximal, HumanBodyBones.RightLittleIntermediate, HumanBodyBones.RightLittleDistal },
-            new[] { HumanBodyBones.LeftIndexProximal, HumanBodyBones.LeftIndexIntermediate, HumanBodyBones.LeftIndexDistal },
-            new[] { HumanBodyBones.LeftMiddleProximal, HumanBodyBones.LeftMiddleIntermediate, HumanBodyBones.LeftMiddleDistal },
-            new[] { HumanBodyBones.LeftRingProximal, HumanBodyBones.LeftRingIntermediate, HumanBodyBones.LeftRingDistal },
-            new[] { HumanBodyBones.LeftLittleProximal, HumanBodyBones.LeftLittleIntermediate, HumanBodyBones.LeftLittleDistal },
-        };
-        private static readonly float[] FIST_CURL = { 85f, 95f, 60f };
-
-        /// <summary>
-        /// Closes a hand into a fist on top of the clip: every phalanx curls towards the palm (about the
-        /// axis across the finger and the palm normal), the thumb folds over the fingers.
-        /// </summary>
-        private void Fist(bool pRight, float pWeight)
-        {
-            if (pWeight <= 0.01f) return;
-            Transform lHand = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightHand : HumanBodyBones.LeftHand);
-            Transform lIndex = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightIndexProximal : HumanBodyBones.LeftIndexProximal);
-            Transform lLittle = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightLittleProximal : HumanBodyBones.LeftLittleProximal);
-            Transform lMiddle = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightMiddleProximal : HumanBodyBones.LeftMiddleProximal);
-            if (lHand == null || lIndex == null || lLittle == null || lMiddle == null) return;
-            Vector3 lUp = (lIndex.position - lLittle.position).normalized, lForward = (lMiddle.position - lHand.position).normalized;
-            Vector3 lPalm = Vector3.Cross(lUp, lForward).normalized * (pRight ? -1f : 1f);
-            for (int f = pRight ? 0 : 4; f < (pRight ? 4 : 8) && FIST_AMOUNT > 0f; f++)
-                for (int j = 0; j < 3; j++)
-                {
-                    Transform lBone = _animator.GetBoneTransform(FINGERS[f][j]);
-                    Transform lChild = j < 2 ? _animator.GetBoneTransform(FINGERS[f][j + 1]) : null;
-                    if (lBone == null) continue;
-                    Vector3 lAlong = lChild != null ? (lChild.position - lBone.position).normalized : lBone.rotation * Vector3.up;
-                    Vector3 lAxis = Vector3.Cross(lAlong, lPalm);
-                    if (lAxis.sqrMagnitude < 0.0001f) continue;
-                    lBone.rotation = Quaternion.AngleAxis(FIST_CURL[j] * pWeight * FIST_AMOUNT, lAxis.normalized) * lBone.rotation;
-                }
-            // The thumb lies across the front of the curled index and middle fingers.
-            Transform lThumb1 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightThumbProximal : HumanBodyBones.LeftThumbProximal);
-            Transform lThumb2 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightThumbIntermediate : HumanBodyBones.LeftThumbIntermediate);
-            Transform lIndex2 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightIndexIntermediate : HumanBodyBones.LeftIndexIntermediate);
-            Transform lMiddle2 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightMiddleIntermediate : HumanBodyBones.LeftMiddleIntermediate);
-            if (lThumb1 == null || lThumb2 == null || lIndex2 == null || lMiddle2 == null) return;
-            Vector3 lCurrent = (lThumb2.position - lThumb1.position).normalized;
-            Vector3 lTarget = (Vector3.Lerp(lIndex2.position, lMiddle2.position, 0.35f) + lPalm * 0.012f - lThumb1.position).normalized;
-            lThumb1.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lCurrent, lTarget), pWeight) * lThumb1.rotation;
-            Transform lThumb3 = _animator.GetBoneTransform(pRight ? HumanBodyBones.RightThumbDistal : HumanBodyBones.LeftThumbDistal);
-            Vector3 lFold = Vector3.Cross((lThumb2.position - lThumb1.position).normalized, lPalm);
-            if (lFold.sqrMagnitude > 0.0001f)
-            {
-                lThumb2.rotation = Quaternion.AngleAxis(THUMB_BEND.x * pWeight, lFold.normalized) * lThumb2.rotation;
-                if (lThumb3 != null) lThumb3.rotation = Quaternion.AngleAxis(THUMB_BEND.y * pWeight, lFold.normalized) * lThumb3.rotation;
-            }
-        }
-
-        private static readonly System.Collections.Generic.Dictionary<Mesh, Mesh> _forearms = new System.Collections.Generic.Dictionary<Mesh, Mesh>();
-
-        /// <summary>
-        /// The arms mesh without what sits beside and behind the eye (shoulders, upper sleeves): the
-        /// triangles skinned mostly to the clavicles, upper arms or spine are dropped, so only the
-        /// forearms, cuffs and hands show at the bottom of the view. Needs the mesh readable.
-        /// </summary>
-        private static Mesh Forearms(SkinnedMeshRenderer pSkin)
-        {
-            Mesh lSource = pSkin.sharedMesh;
-            if (lSource == null || !lSource.isReadable) return lSource;
-            if (_forearms.TryGetValue(lSource, out Mesh lCached)) return lCached;
-            bool[] lDrop = new bool[pSkin.bones.Length];
-            for (int i = 0; i < lDrop.Length; i++)
-            {
-                string n = pSkin.bones[i] != null ? pSkin.bones[i].name : "";
-                lDrop[i] = n.StartsWith("upperarm") || n.StartsWith("clavicle") || n.StartsWith("spine") || n.StartsWith("neck") || n == "pelvis";
-            }
-            BoneWeight[] lWeights = lSource.boneWeights;
-            Mesh lMesh = Object.Instantiate(lSource);
-            lMesh.name = lSource.name + "_Forearms";
-            for (int sub = 0; sub < lSource.subMeshCount; sub++)
-            {
-                int[] lTris = lSource.GetTriangles(sub);
-                System.Collections.Generic.List<int> lKeep = new System.Collections.Generic.List<int>(lTris.Length);
-                for (int t = 0; t < lTris.Length; t += 3)
-                {
-                    int lUpper = 0;
-                    for (int k = 0; k < 3; k++)
-                    {
-                        BoneWeight w = lWeights[lTris[t + k]];
-                        float lShare = (lDrop[w.boneIndex0] ? w.weight0 : 0f) + (lDrop[w.boneIndex1] ? w.weight1 : 0f) + (lDrop[w.boneIndex2] ? w.weight2 : 0f) + (lDrop[w.boneIndex3] ? w.weight3 : 0f);
-                        if (lShare > 0.5f) lUpper++;
-                    }
-                    if (lUpper >= 2) continue;
-                    lKeep.Add(lTris[t]); lKeep.Add(lTris[t + 1]); lKeep.Add(lTris[t + 2]);
-                }
-                lMesh.SetTriangles(lKeep, sub);
-            }
-            _forearms[lSource] = lMesh;
-            return lMesh;
-        }
-
-        private void Turn(HumanBodyBones pBone, Quaternion pRotation, float pWeight)
-        {
-            Transform lBone = _animator.GetBoneTransform(pBone);
-            if (lBone != null && pWeight > 0.001f) lBone.rotation = Quaternion.Slerp(lBone.rotation, transform.rotation * pRotation, pWeight);
+            // Recoil turns the rig about the sight (or the hand): the muzzle flips, the sight stays put.
+            Transform lPivotPoint = _sight != null ? _sight : _socket;
+            Vector3 lPivot = lPivotPoint != null ? transform.InverseTransformPoint(lPivotPoint.position) : new Vector3(0f, -0.1f, 0.35f);
+            Quaternion lKick = Quaternion.Euler(_kickRot);
+            _rig.localRotation = lKick * _rig.localRotation;
+            _rig.localPosition = lPivot + lKick * (_rig.localPosition - lPivot) + _kickPos;
         }
 
         private static float Ease(float t) => 1f - (1f - t) * (1f - t) * (1f - t);
     }
 
-    /// <summary>Forwards the first-person arms' IK pass to the <see cref="Viewmodel"/>.</summary>
-    public class ViewmodelIK : MonoBehaviour
+    /// <summary>A released magazine falling out of the first-person view (a copy, gone in half a second).</summary>
+    public class MagazineDrop : MonoBehaviour
     {
-        public Viewmodel View { get; set; }
-        private void OnAnimatorIK(int pLayer) { if (View != null) View.OnIK(); }
+        private Vector3 _velocity;
+        private Vector3 _spin;
+        private float _life = 0.6f;
+
+        public static void Spawn(Transform pMagazine, Transform pViewSpace)
+        {
+            GameObject lCopy = Instantiate(pMagazine.gameObject, pMagazine.position, pMagazine.rotation, pViewSpace);
+            lCopy.name = "DroppedMag";
+            MagazineDrop lDrop = lCopy.AddComponent<MagazineDrop>();
+            lDrop._velocity = pViewSpace.InverseTransformDirection(Vector3.down) * 0.6f;
+            lDrop._spin = new Vector3(Random.Range(-90f, 90f), 0f, Random.Range(-140f, 140f));
+        }
+
+        private void Update()
+        {
+            float dt = Time.deltaTime;
+            Vector3 lDown = transform.parent != null ? transform.parent.InverseTransformDirection(Vector3.down) : Vector3.down;
+            _velocity += lDown * 9.81f * dt;
+            transform.localPosition += _velocity * dt;
+            transform.localRotation = Quaternion.Euler(_spin * dt) * transform.localRotation;
+            _life -= dt;
+            if (_life <= 0f) Destroy(gameObject);
+        }
     }
 }

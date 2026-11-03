@@ -201,8 +201,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     pMaterial.SetColor("_BaseColor", new Color(1f, 0.955f, 0.93f));
                     pMaterial.SetFloat("_Smoothness", 1f);
                     pMaterial.SetFloat("_OcclusionStrength", 0.5f);
-                    // The baked pores and stubble alias into a mottle under a hard sun at full strength.
-                    pMaterial.SetFloat("_BumpScale", 0.45f);
+                    // The baked pores and stubble (+-0.3 on the normals) alias into a mottle under a hard sun: a whisper.
+                    pMaterial.SetFloat("_BumpScale", 0.2f);
                     break;
                 case "Team":
                 case "Lining":

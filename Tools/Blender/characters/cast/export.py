@@ -253,8 +253,11 @@ def push_pull(a, valid):
     sums = ap.reshape(H // 2, 2, W // 2, 2, -1).sum((1, 3))
     n = vp.reshape(H // 2, 2, W // 2, 2).sum((1, 3))
     coarse = push_pull(sums / np.maximum(n, 1e-9)[..., None], n > 0)
-    up = np.repeat(np.repeat(coarse, 2, 0), 2, 1)[:h, :w]
-    return np.where(valid[..., None], a, up)
+    up = np.repeat(np.repeat(coarse, 2, 0), 2, 1)
+    # soften the 2x blocks (a 3x3 box) so filled patches carry no stair-steps
+    pad = np.pad(up, ((1, 1), (1, 1), (0, 0)), mode="edge")
+    up = sum(pad[dy:dy + H, dx:dx + W] for dy in range(3) for dx in range(3)) / 9.0
+    return np.where(valid[..., None], a, up[:h, :w])
 
 
 def fill_misses(out):
@@ -263,8 +266,11 @@ def fill_misses(out):
     miss = (out["DIFFUSE"][..., :3] <= 0.0).all(-1)
     if not miss.any():
         return out
-    for kind in out:
+    for kind in ("DIFFUSE", "ROUGHNESS"):
         out[kind] = push_pull(out[kind].astype(np.float64), ~miss).astype(np.float32)
+    # a miss is a low-res face poking out through the layer above: open to the sky, flat
+    out["AO"][miss] = 1.0
+    out["NORMAL"][miss] = (0.5, 0.5, 1.0, 1.0)
     return out
 
 
@@ -544,7 +550,9 @@ def export(name, preview=False):
             save_np(img["NORMAL"][..., :3], prefix + "_nor_gl.png", True, "PNG")
             ao = img["AO"][..., 0]
             # skin: only a whisper of baked AO (lids, brows and hair shells darken the face otherwise)
-            ao = ao * 0.25 + 0.75 if slot == "Body" else ao * 0.5 + 0.5
+            # garments: under the scarf, the lining or a strap the high-res AO is black, and the decimated
+            # layer above does not always cover the same texels - keep it a soft shade
+            ao = ao * 0.25 + 0.75 if slot == "Body" else ao * 0.4 + 0.6
             arm = np.stack([np.clip(ao, 0, 1), img["ROUGHNESS"][..., 0],
                             np.full(diff.shape[:2], metal)], -1)
             save_np(arm, prefix + "_arm.jpg", True, "JPEG")

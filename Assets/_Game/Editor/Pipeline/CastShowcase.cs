@@ -228,7 +228,17 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private IEnumerator Shot(string pName, Vector3 pFrom, Vector3 pTo, float pFov = 30f, int pW = 1000, int pH = 1000)
         {
             yield return new WaitForEndOfFrame();
-            MapShots.Shot(Path.Combine(OutputFolder, pName + ".png"), pFrom, pTo, pFov, pW, pH);
+            Capture(Path.Combine(OutputFolder, pName + ".png"), pFrom, pTo, pFov, pW, pH);
+        }
+
+        /// <summary>A map shot without the local player's first-person arms (they float in the world seen from outside).</summary>
+        private static void Capture(string pPath, Vector3 pFrom, Vector3 pTo, float pFov, int pW, int pH)
+        {
+            List<Renderer> lHidden = new List<Renderer>();
+            foreach (Renderer lRenderer in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+                if (lRenderer.enabled && lRenderer.gameObject.layer == GameLayers.LOCAL_VIEW) { lRenderer.enabled = false; lHidden.Add(lRenderer); }
+            MapShots.Shot(pPath, pFrom, pTo, pFov, pW, pH);
+            foreach (Renderer lRenderer in lHidden) if (lRenderer != null) lRenderer.enabled = true;
         }
 
         /// <summary>Close-ups of different characters of the crowd and the guards, and one wide group shot.</summary>
@@ -393,7 +403,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         lShot = true;
                         Vector3 lAt = lGo.transform.position + Vector3.up * (lCrouch ? 0.7f : 1.0f);
                         Vector3 lFrom = lAt + Quaternion.Euler(0f, 25f, 0f) * lGo.transform.forward * 3.2f + Vector3.up * 0.3f;
-                        MapShots.Shot(Path.Combine(OutputFolder, $"drill_{lName}.png"), lFrom, lAt, 42f, 900, 900);
+                        Capture(Path.Combine(OutputFolder, $"drill_{lName}.png"), lFrom, lAt, 42f, 900, 900);
                     }
                 }
                 List<float> lStance = new List<float>();

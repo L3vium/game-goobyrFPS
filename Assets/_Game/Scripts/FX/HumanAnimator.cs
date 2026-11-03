@@ -355,8 +355,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 }
             }
             int lTier = Sprinting && pLocal.z > 0.5f * pSpeed ? 3 : pSpeed > RUN_FROM ? 2 : 1;
-            // The pace may reach 2.5: quick little steps when the motor outruns the clip (TABS-ish scurry).
-            SetGait(pLocal, pSpeed, lTier, WALK, RUN, SPRINT, dt, out pPace, 2.5f);
+            // The pace may reach 3: quick little steps when the motor outruns the clip (TABS-ish scurry); the
+            // player's 4.4 m/s strafe needs ~2.8 on the side-run clips.
+            SetGait(pLocal, pSpeed, lTier, WALK, RUN, SPRINT, dt, out pPace, 3f);
             return S_LOCOMOTION;
         }
 

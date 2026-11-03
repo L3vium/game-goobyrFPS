@@ -121,7 +121,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             SphereCollider lSkull = lHead.gameObject.AddComponent<SphereCollider>();
             lSkull.radius = lSkullRadius / Mathf.Max(0.01f, lHead.lossyScale.x);
             lSkull.center = lHead.InverseTransformPoint(lHead.position + lUp * lSkullRadius * 0.8f + pForward * 0.02f);
-            Ball(lHeadBody, lChestBody, lHead, (lHead.position - lNeck.position).normalized, pRight, 55f, 50f, 42f);
+            // The whole neck bends at this one joint and the cast's face is its own mesh: past ~35 deg the seam
+            // under the jaw opens, so the head flops a little less than the limbs.
+            Ball(lHeadBody, lChestBody, lHead, (lHead.position - lNeck.position).normalized, pRight, 40f, 36f, 32f);
             Head = lHead;
 
             // Limbs: radii from the bone lengths (the body's own metrics), joints looser than real.

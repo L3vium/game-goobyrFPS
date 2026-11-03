@@ -84,6 +84,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             Animator lAnimator = lStudio._body.Animator;
             if (lAnimator != null) lAnimator.Update(0.5f);
             Transform lHead = lStudio._body.Head;
+            // Chin up for the photo: the idle's head hangs a little; the neck straightens it (this render only).
+            Transform lNeck = lAnimator != null && lAnimator.isHuman ? lAnimator.GetBoneTransform(HumanBodyBones.Neck) : null;
+            if (lHead != null && lNeck != null)
+            {
+                Quaternion lFix = Quaternion.FromToRotation(lHead.position - lNeck.position, Vector3.up);
+                lNeck.rotation = Quaternion.Slerp(Quaternion.identity, lFix, 0.85f) * lNeck.rotation;
+            }
             Vector3 lFace = lHead != null ? lHead.position + Vector3.up * 0.04f : lStudio.transform.position + Vector3.up * 1.6f;
             Transform lSubject = lStudio._body.transform;
             Vector3 lFront = lSubject.forward * 2.6f + lSubject.right * -0.7f;

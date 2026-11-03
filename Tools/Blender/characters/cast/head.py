@@ -210,12 +210,13 @@ def lid_parts(f, voxel=0.0004):
         # lower lid: points below the plane whose front edge sits at elevation `lo` (negative)
         n_lo = tilt @ V(0, math.sin(lo), math.cos(lo))
         lower = sdf.Part("LidLow_" + side, voxel, "Skin")
-        lower.add(sdf.Sphere(c, r + 0.0022))
+        # it reaches down and sideways under the socket rim (r + 0.0034), so no eyeball shows below it
+        lower.add(sdf.Sphere(c, r + 0.0029))
         lower.sub(sdf.Sphere(c, r + 0.0006), 0.0)
         lower.inter(sdf.HalfSpace(c, n_lo), 0.0010)
-        lower.inter(sdf.HalfSpace(c + V(0, 0, -0.62 * r), (0, 0, -1)), 0.0)
+        lower.inter(sdf.HalfSpace(c + V(0, 0, -0.97 * r), (0, 0, -1)), 0.0)
         lower.inter(sdf.HalfSpace(c + V(0, 0.55 * r, 0), (0, 1, 0)), 0.0)
-        for hs in _width_clip(c, r, 0.90):
+        for hs in _width_clip(c, r, 0.98):
             lower.inter(hs, 0.0)
         lower.meta.update(eye=idx, hinge="low")
         parts.append(lower)

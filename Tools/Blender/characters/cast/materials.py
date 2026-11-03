@@ -252,7 +252,7 @@ def skin(mat, tone, rough=0.58):
     vec = b.coords(1.0)
     nz = b.noise(vec, 90.0, 6.0, 0.6)
     v = b.math("SUBTRACT", nz.outputs[0], 0.5)
-    v = b.math("MULTIPLY", v, 0.12)
+    v = b.math("MULTIPLY", v, 0.06)   # a whisper: stronger reads as dirt once baked and lit by a hard sun
     v = b.math("ADD", v, 1.0)
     cr = b.n("ShaderNodeCombineColor")
     for i in range(3):

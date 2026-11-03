@@ -41,7 +41,7 @@ LOD_RATIOS = (("_LOD1", 0.40), ("_LOD2", 0.15))
 FINAL = {"Skin": "Body"}
 HEAD_PARTS = set(faces.FACE_PARTS) | {"Eye_l", "Eye_r"}
 RIGID_HEAD = ("Hair", "Hat", "Shades", "Brows", "Beard", "Lid", "Lash", "Eye_", "Earring")
-BOOST = {"Head": 2.6, "Hand": 1.6, "Glove": 1.6, "Hair": 1.25, "Brows": 3.5, "Beard": 1.3, "Lid": 2.4, "Lash": 2.0}
+BOOST = {"Head": 3.6, "Hand": 1.6, "Glove": 1.6, "Hair": 1.25, "Brows": 3.5, "Beard": 1.3, "Lid": 2.4, "Lash": 2.0}
 RES = {"Body": 1024, "Jacket": 1024, "Trousers": 1024, "Hair": 512, "Shirt": 1024, "Suit": 1024, "Dress": 1024,
        "Parka": 1024, "Tee": 512, "Scarf": 512, "Glove": 512, "Boots": 512, "Shoes": 512, "Rib": 512, "Vest": 512,
        "Apron": 512, "Waistcoat": 512, "Hat": 512, "Lining": 256}
@@ -239,6 +239,35 @@ def bake_setup():
     sc.render.bake.target = "IMAGE_TEXTURES"
 
 
+def push_pull(a, valid):
+    """Fills the invalid pixels of a (H x W x C) from the valid ones: averaged down a 2x pyramid and
+    pulled back up (holes take their surroundings' colour, smoothly)."""
+    h, w = valid.shape
+    if valid.all() or not valid.any():
+        return a if valid.any() else np.broadcast_to(a.reshape(-1, a.shape[-1]).mean(0), a.shape).copy()
+    H, W = h + h % 2, w + w % 2
+    ap = np.zeros((H, W, a.shape[2]), np.float64)
+    vp = np.zeros((H, W), np.float64)
+    ap[:h, :w] = a * valid[..., None]
+    vp[:h, :w] = valid
+    sums = ap.reshape(H // 2, 2, W // 2, 2, -1).sum((1, 3))
+    n = vp.reshape(H // 2, 2, W // 2, 2).sum((1, 3))
+    coarse = push_pull(sums / np.maximum(n, 1e-9)[..., None], n > 0)
+    up = np.repeat(np.repeat(coarse, 2, 0), 2, 1)[:h, :w]
+    return np.where(valid[..., None], a, up)
+
+
+def fill_misses(out):
+    """Texels whose bake rays found nothing (a decimated garment poking through the layer over it,
+    where the high-res faces were culled) come back pure black: they take their neighbours' values."""
+    miss = (out["DIFFUSE"][..., :3] <= 0.0).all(-1)
+    if not miss.any():
+        return out
+    for kind in out:
+        out[kind] = push_pull(out[kind].astype(np.float64), ~miss).astype(np.float32)
+    return out
+
+
 def bake_slot(slot_ob, sources, slot, res):
     """Bakes into four images on the slot object (sources selected, slot object active)."""
     mat = bpy.data.materials.new("Bake_" + slot)
@@ -262,7 +291,7 @@ def bake_slot(slot_ob, sources, slot, res):
             kw.update(normal_space="TANGENT", normal_r="POS_X", normal_g="POS_Y", normal_b="POS_Z")
         bpy.ops.object.bake(**kw)
         out[kind] = image_np(img)
-    return out
+    return fill_misses(out)
 
 
 def eye_texture(iris, res=256, dead=False):

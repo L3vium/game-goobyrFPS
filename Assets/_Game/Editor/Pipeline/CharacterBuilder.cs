@@ -201,6 +201,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     pMaterial.SetColor("_BaseColor", new Color(1f, 0.955f, 0.93f));
                     pMaterial.SetFloat("_Smoothness", 1f);
                     pMaterial.SetFloat("_OcclusionStrength", 0.5f);
+                    // The baked pores and stubble alias into a mottle under a hard sun at full strength.
+                    pMaterial.SetFloat("_BumpScale", 0.45f);
                     break;
                 case "Team":
                 case "Lining":
@@ -236,6 +238,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lImporter.optimizeGameObjects = false;
                 // The new cast's head carries the expressions (Blink, Smile, Surprised, Angry, Scared, Pain, Dead).
                 lImporter.importBlendShapes = true;
+                // Their normals stay the base mesh's: Unity's recalculated blend-shape normals flip hundreds
+                // of still vertices (cheek and jaw smudges as soon as a blink starts).
+                lImporter.importBlendShapeNormals = ModelImporterNormals.None;
                 // The first-person arms are trimmed to the forearms at runtime (Viewmodel): readable.
                 lImporter.isReadable = Path.GetFileName(lFolder) == HumanCast.ARMS;
                 lImporter.importCameras = false;

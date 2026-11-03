@@ -83,6 +83,10 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
         public Vector3 MeasuredVelocity => _velocity;
         public bool Airborne => _airborne;
+        /// <summary>The base layer state (hash of S_LOCOMOTION, S_PANIC, ...), for checks and tools.</summary>
+        public int BaseState => _baseState;
+        /// <summary>Whether a foot (0 left, 1 right) is held where it landed by the foot lock.</summary>
+        public bool FootLocked(int pIndex) => _footLocked[pIndex] && _footWeight > 0.5f;
 
         private HumanBody _body;
         private Animator _animator;
@@ -329,12 +333,12 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
             if (Crouched)
             {
-                SetGait(pLocal, pSpeed, 1, CROUCH, CROUCH, 0f, dt, out pPace, 2.2f);
+                SetGait(pLocal, pSpeed, 1, CROUCH, CROUCH, 0f, dt, out pPace, 3.3f);
                 return S_CROUCH;
             }
             if (Panic && pSpeed > 1f)
             {
-                pPace = Mathf.Clamp(pSpeed / (PANIC * _animator.humanScale / REF_SCALE), 0.7f, 1.8f);
+                pPace = Mathf.Clamp(pSpeed / (PANIC * _animator.humanScale / REF_SCALE * _animator.transform.lossyScale.y), 0.7f, 1.8f);
                 return S_PANIC;
             }
             if (pSpeed < 0.25f && Pose != BodyPose.None)
@@ -587,7 +591,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                     _footRelease[pIndex] = -lOff;   // ease back onto the clip over a few frames
                 }
             }
-            else if (lDown && lSpeed < PLANT_SPEED)
+            // A matched stance foot is near still in the world while the swinging one moves at about twice the
+            // body's speed: at a run (and a sped-up strafe whose clip plants loosely) the bar rises with the body's speed.
+            else if (lDown && lSpeed < Mathf.Max(PLANT_SPEED, 0.6f * new Vector2(_velocity.x, _velocity.z).magnitude))
             {
                 _footLocked[pIndex] = true;
                 _footLock[pIndex] = pTarget;

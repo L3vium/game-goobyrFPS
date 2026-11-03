@@ -92,6 +92,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lOutside.transform.SetParent(K.Markers, false);
             lOutside.AddComponent<SecurityOutside>().Setup(OutsideTier);
             Dress();
+            CrowdSpots();
             KeyLoops();
             Errands();
             K.AfterNavMesh = CrowdExits;
@@ -476,6 +477,38 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lAdded++;
             }
             if (lAdded > 0) Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} guarded buildings got an interior patrol loop");
+        }
+
+        /// <summary>
+        /// Every crowd has places to drift to between stints: next to a guest or a member of staff with
+        /// fewer than two break spots (drink, dining, garden, smoke, phone, idle, inspect) within 25 m in
+        /// its zone, an idle spot and a call or a smoke 4-7 m away (put on the NavMesh, on that floor, at
+        /// the end of the build).
+        /// </summary>
+        private void CrowdSpots()
+        {
+            List<(Vector3 at, int zone)> lSpots = new List<(Vector3, int)>();
+            foreach (ActivityNode lNode in Object.FindObjectsByType<ActivityNode>(FindObjectsSortMode.None))
+                if (lNode.Activity is Data.ActivityType.Drink or Data.ActivityType.Dining or Data.ActivityType.Garden or Data.ActivityType.Smoke or Data.ActivityType.Phone or Data.ActivityType.Idle or Data.ActivityType.Inspect)
+                    lSpots.Add((lNode.transform.position, lNode.Zone));
+            int lAdded = 0;
+            foreach (NpcSpawnPoint lSpawn in Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
+            {
+                if (lSpawn.Role != NpcRole.Worker) continue;
+                Vector3 p = lSpawn.transform.position;
+                int lNear = 0;
+                foreach ((Vector3 lAt, int lZone) in lSpots) if (lZone == lSpawn.Zone && Vector3.Distance(lAt, p) < 25f) lNear++;
+                for (int k = lNear; k < 2; k++)
+                {
+                    float a = p.x * 0.37f + p.z * 0.21f + k * 2.4f;
+                    Vector3 lSpot = p + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (4f + k * 3f);
+                    Data.ActivityType lType = k == 0 ? Data.ActivityType.Idle : ((lAdded & 1) == 0 ? Data.ActivityType.Phone : Data.ActivityType.Smoke);
+                    K.Activity(lType, lSpot, a * Mathf.Rad2Deg, lSpawn.Zone, 14f);
+                    lSpots.Add((lSpot, lSpawn.Zone));
+                    lAdded++;
+                }
+            }
+            if (lAdded > 0) Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} break spots added round the crowds");
         }
 
         /// <summary>

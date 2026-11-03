@@ -294,8 +294,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 float r = Mathf.Max(lKey.Size.x, lKey.Size.z);
                 lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_aerial_key.png"), c + new Vector3(-r * 0.9f, r * 0.85f, -r * 1.1f), c, 55f)).Append('\n');
                 // Four times of day on the key building, from a clear point on its approach.
-                Vector3 lFrom = MapShots.Eye(c.x - lKey.Size.x * 0.4f, c.z - lKey.Size.z * 0.5f - r * 0.75f, 3.5f);
+                // A clear view of the building from its front, a little above the ground.
                 Vector3 lTo = c + Vector3.up * 2f;
+                View(lTo, -lKey.transform.forward + lKey.transform.right * 0.6f, r * 0.9f, 6f, out Vector3 lFrom);
                 string[] lNames = { "dawn", "noon", "dusk", "night" };
                 for (int t = 0; t < 4; t++)
                 {
@@ -314,8 +315,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (lSeen.Exists(o => Vector3.Distance(o, p) < 40f)) continue;
                 lSeen.Add(p);
                 Vector3 lOut = -d.transform.forward;
-                Vector3 lFrom = p + lOut * 6.5f + Vector3.Cross(Vector3.up, lOut) * 2.5f;
-                lFrom.y = p.y - 0.1f;
+                // From across the street, with a clear line to the poster (else the next poster).
+                if (!View(p, lOut + Vector3.Cross(Vector3.up, lOut) * 0.35f, 6.5f, 0f, out Vector3 lFrom)) continue;
                 lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_street{n++}.png"), lFrom, p + Vector3.down * 0.5f, 62f)).Append('\n');
             }
             // A dressed corner of the key building (quoins or a chamfer), from the ground.
@@ -368,6 +369,23 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_npc{shot}_{lIn}.png"), lFrom, lCentre, 60f)).Append('\n');
             }
             return lLog.ToString();
+        }
+
+        /// <summary>
+        /// Into the sun over open ground: from eye height at (x, z), facing the sun's bearing and looking a
+        /// little down, so the sun sits just above the frame (snow glints, back-lit grass).
+        /// </summary>
+        public static string SunShot(string pPath, float pX, float pZ, float pPitch = 9f)
+        {
+            Light lSun = RenderSettings.sun;
+            if (lSun == null) foreach (Light l in Object.FindObjectsByType<Light>(FindObjectsSortMode.None)) if (l.type == LightType.Directional) { lSun = l; break; }
+            Vector3 lToSun = lSun != null ? -lSun.transform.forward : Vector3.forward;
+            lToSun.y = 0f;
+            if (lToSun.sqrMagnitude < 0.001f) lToSun = Vector3.forward;
+            lToSun.Normalize();
+            Vector3 lFrom = Eye(pX, pZ, 1.7f);
+            Vector3 lLook = Quaternion.AngleAxis(pPitch, Vector3.Cross(Vector3.up, lToSun)) * lToSun;
+            return Shot(pPath, lFrom, lFrom + lLook * 20f, 66f);
         }
 
         /// <summary>A point <paramref name="pUp"/> metres over the land (terrain only, not roofs).</summary>

@@ -8,9 +8,11 @@ There are no disguises — it is stealth (sight, sound, cover, grass, smoke, dar
 it goes loud, everyone is lethal both ways. Maps follow Hitman's **social ladder** instead
 (`AI/SecurityZone`, `DetectionModel.TierFactor`): in **public** places (streets, plazas, the
 market, the gala floor) a player who behaves - no gun raised, not sprinting, not climbing walls,
-not carrying the proof - is just another passer-by; in **restricted** areas (staff corridors,
-yards) guards notice at 55 % speed and confront before shooting; **hostile** areas (compounds,
-VIP floors, bunkers) are trespassing with full detection.
+not carrying the proof, no weapon in hand - is just another passer-by; in **restricted** areas
+(staff corridors, yards) guards notice at 80 % speed, warn you, then shoot (about 3-4 s after first
+sight); **hostile** areas (compounds, VIP floors, bunkers) are trespassing with full detection and
+fire on sight after a short reaction. Whoever has done something visible - shot, killed, punched,
+fled a confrontation - is a known hostile in that zone for two minutes, whatever the tier.
 
 ## Modes
 - **Free-for-all** — everyone for themselves.
@@ -45,19 +47,24 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
 - **Land** (`RealMap`, `MapKit.Terrain`): a relief function shaped by `LandShape` stamps (graded
   roads, building pads, terraces, mesas, gorges), PBR ground layers per biome (`PbrLibrary.Layer`),
   holes cut over cellars and tunnel mouths, `Veg_*` trees, bushes and rocks as terrain trees
-  (`VegLibrary`: LOD groups, trunk colliders), instanced `Veg_*` grass details, 8-12 tall grass
-  fields with hiding triggers, invisible map edges, a `TimeOfDay` with the biome's presets.
+  (`VegLibrary`: LOD groups, trunk colliders, shadows, cross-faded LODs), real GPU grass
+  (`MapKit.RealGrass`, see **World rendering**) with `Veg_*` ferns as details, 8-12 tall grass
+  fields with hiding triggers, invisible map edges, a `TimeOfDay` with the biome's presets. The
+  terrain uses pixel error 1 and a small relief (`LandShape.Detail`, two octaves of about ±0.2 m
+  under the stamps, so pads and roads stay flat), and cliff meshes use the triplanar `Goobyr/Rock`
+  shader (strata of alternating tones, snow on up-facing ledges).
   Cliff faces (over 52°) carry big boulders sunk into them so walls read broken, not stretched;
   bare rock starts at a per-map slope (snow maps keep snow higher). Tunnels get timber-framed,
   lantern-lit mouths with boulders where they reach the open; rivers and falls use a faster,
   choppier copy of the water material. Snow maps get falling snow (`FX/SnowFall`, fading indoors)
   and sparkling snow (`FX/SnowGlints` + `Goobyr/SnowGlint`): ice crystals scattered on snow
   terrain and snowy meshes in 6 m tiles around the camera, each a tiny star that flashes when its
-  facet mirrors the sun into the eye.
+  facet mirrors the sun into the eye (sparse and sharp: about 265 stars toward the sun at 1080p).
 - **Buildings** (`ArchSpec` → `ArchBuilder`): rooms on a 0.5 m grid per floor; walls found on the
   room boundaries (two-leaf facades: plaster outside, painted plaster inside; partitions; arcades
   with columns and arches; parapets; balustrades over voids); doors with casings and open leaves,
-  windows with frames, glass, 0.3 m+ stone sills and shutters; slabs with stair wells; straight
+  windows with frames, glass (`Goobyr/WindowGlass`: clear, Fresnel reflection, a dim interior-mapped
+  room where nothing is built behind it), 0.3 m+ stone sills and shutters; slabs with stair wells; straight
   and dogleg stairs (visible steps on a plastered soffit between stringers, smooth ramp colliders,
   ≤ 0.18 m risers) and **grand stairs** (marble treads, a carpet runner, turned balustrades and
   newels on both sides); hip, gable and shed roofs with eaves and snow; flat roofs with parapets;
@@ -89,35 +96,85 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   busiest groups of NPCs.
 
 ## Systems
-- **AI** (`AI/Npc`, rules in `AI/DetectionModel`): sight is a 90° cone out to 20 m (lookouts
-  30 m) with an edge-of-vision band out to 75° that fills three times slower, weighed by distance,
-  light (power cut), stance, grass, smoke and walls; anyone closer than 2.2 m is felt. Three stages:
-  **suspicious** (the gauge fills, the NPC stops and stares, walks over past half, forgets when it
-  drains), **engaged** (gauge full: weapon up, it walks over and shouts for 2 s - break line of sight
-  for 1.2 s and it searches instead; aim at it and it fires at once), **combat** (it shoots). A fight
-  stays contained: another NPC joins only if it sees the player, sees the confrontation or the fight
-  within 18 m, or gets the phone call. **Hearing** (`DetectionModel.Loudness`): every sound has a
-  reach in the open (silenced 9 m, pistol 45 m, explosion 90 m...), each wall or floor in between
-  cuts it to 40 %, and only the 1-3 NPCs who hear it best go and look (`Responders`) - at a walk for
-  a distraction, weapon up for gunfire - while the others only turn their heads. A sound never gives
-  a position: they head for a guess a few metres off. Footsteps follow the player's real speed and
-  stance (silent standing still, 1.5 m crouched, 5 m walking, 14 m sprinting, 8 m sliding) and are
-  muffled by walls too. A searching or alarmed NPC fills its gauge twice as fast and opens fire on
-  sight (no confrontation); a searcher that is shot fights back. Bodies: the first to find one radios
-  it in, its two nearest mates come to secure the area and the zone sees further for 90 s; later
-  finders are only wary. Guards and staff take breaks at activities near their post (smoke, phone,
-  drink, a look around), the windows a player waits for. Zone squads
-  (`LevelZone`) share the *last known position* among the NPCs that joined, hand out suppress /
-  flank / push roles over scored cover points, then search around that position. NPCs never track a
-  player they cannot see - the hunted player sees their own "shadow" at the believed position.
-  Fights warm up (wild first shots). Once someone in a zone fights, one fighter phones for help
-  (icon + ring): when the call ends, the six nearest mates within 60 m of the caller search the last
-  known position and reinforcements arrive. Kill the caller first. Patrols walk slowly (1.15 m/s) and come
-  in groups of up to five on one route: the first still on its round leads, the others follow in a
-  column of twos. Crowds (unarmed `Worker` NPCs around a scene) scream (guards close by come and
-  look) and run. The alarm flare (rarely fired, by a guard who runs to it once a fight starts) puts every zone on
-  edge and sends its four nearest guards to the flare; the rest hold their posts. Patrol
-  cars spot players with their headlights, brake and drop two guards.
+- **AI** (`AI/Npc`; the decisions are pure functions in `AI/NpcRules` and the senses' numbers in
+  `AI/DetectionModel`, both covered by EditMode tests): sight is a 90° cone out to 20 m (lookouts
+  30 m, with a flat cone of 40° up to 75° down, so they see the ground below their tower) with an
+  edge-of-vision band out to 75° that fills three times slower, weighed by distance, light (power
+  cut), stance, grass, smoke and walls; guards see through window glass (bullets still stop on
+  it); anyone closer than 2.2 m is felt. Three stages: **suspicious** (the
+  gauge fills, the NPC stops and stares, walks over past half, forgets when it drains), **engaged**
+  (gauge full: weapon up, it walks over and shouts; in public places break line of sight for 1.2 s
+  and it searches instead; aim at it and it fires at once), **combat** (it shoots). *Hunting never
+  downgrades*: a searcher or an alarmed responder that glimpses a player heads for the glimpse
+  weapon up and opens fire (no confrontation); a searcher that is shot fights back; a full gauge is
+  a fight.
+  - **Social ladder timeline.** Suspicious behaviour is aiming, sprinting, climbing, carrying the
+    proof or a **visible weapon in hand** (a weapon out outside public places is a crime, fought
+    without a warning; on the plaza a guard walks up and asks you to holster it). Restricted: gauge
+    factor 0.8, a 1.6 s warning, the first shot at the reaction time (about 3-4 s after first
+    sight); hostile: fight on sight; public: a calm, unarmed player is never shot.
+  - **Zone hostile memory** (`LevelZone.Hostiles`, `AI/HostileMemory`, 120 s): set by witnessed
+    gunfire and explosions, kills, punches, takedowns, a surviving victim, fleeing a confrontation
+    outside public places, a drawn gun where it is a crime and any fight (`Npc.ReportHostileAct`,
+    armed witnesses who see the player). A known hostile skips the tier factor and the
+    confrontation: seen means shot, wherever they stand. Everyone else keeps the tier rules, even
+    beside a fight.
+  - **Hearing** (`DetectionModel.Loudness`; walls are counted by `AI/Senses.WallsBetween`: only
+    terrain and colliders at least 1.9 m tall and 0.9 m across count, the leaves of one partition
+    once): every sound has a reach in the open (silenced 9 m, pistol 45 m, explosion 90 m...), each
+    wall or floor in between cuts it to 40 %, and only the 1-3 NPCs who hear it best go and look
+    (`Responders`) - at a walk for a distraction, weapon up for gunfire - while the others only turn
+    their heads. Guards' own gunfire is an alarming noise too (once per 1.5 s per shooter) and every
+    armed guard that hears gunfire responds (`NpcRules.AlwaysResponds`); the far siren stays capped
+    for everyone. A sound never gives a position: they head for a guess a few metres off. Footsteps
+    follow the player's real speed and stance (silent standing still, 1.5 m crouched, 5 m walking,
+    14 m sprinting, 8 m sliding). Hearing is re-entrant (a scream during a shot has its own hearer
+    list).
+  - **Combat.** `NpcRules.HitChance` (range, stance, blind fire, a 4 s warm-up and a 1.5 s tracking
+    ramp after losing you: wild first shots); low cover cycles 1.4 s ducked and 2.2 s up (shots
+    only while up; `Npc.Ducked` is networked so clients crouch it too). Zone squads (`LevelZone`)
+    share the *last known position* among the NPCs that joined and hand out suppress / flank / push
+    roles over scored cover points (a pusher goes to the last known position after 3 s unseen),
+    then search: a golden-angle spiral 3-14 m round the centre, each searcher from its own angle,
+    looking around at every spot. NPCs never track a player they cannot see - the hunted player sees
+    their own "shadow" at the believed position. `NavMeshAgent.updateRotation` is off while an NPC
+    aims or stares, so guards aim properly while they move. Armed guards that patrol, investigate,
+    search or fight carry unshadowed torches at night (`NpcVisuals`).
+  - **Calls and bodies.** Once someone in a zone fights, one fighter phones for help (icon + ring;
+    two fighters at least, 30 s between calls, 8 s after a cut one; a caller left alone drops the
+    phone): when the call ends, the six nearest mates within 60 m of the caller search the last
+    known position and reinforcements arrive. Kill the caller first. A body is radioed in by the
+    first to find it, its two nearest mates come to secure the area and the zone sees further for
+    90 s; later finders are only wary. The alarm flare (rarely fired, by a guard who runs to it once
+    a fight starts) puts every zone on edge and sends its four nearest guards to it. Patrol cars
+    spot players with their headlights, brake and drop two guards. A fight stays contained: another
+    NPC joins only if it sees the player, sees the confrontation or the fight within 18 m, or gets
+    the phone call.
+  - **Civilians** (unarmed `Worker` NPCs; `AI/Npc.Crowd`): a startle (0.6 s, a scream, a 14 m
+    suspicious noise), then a run for the best `ExitPoint` (`NpcRules.ExitScore`: never past the
+    threat, a penalty for running close to it, a NavMesh path for the two best); they cower within
+    5 m of the threat or with nowhere to go. Panic spreads within 10 m with line of sight, once per
+    incident (`AI/IncidentLog`: alarms within 20 m and 20 s are one incident), each a beat later: a
+    stampede. A **witness** (`NpcState.Report`) who sees a crime, a body or a gun out runs to the
+    nearest free armed guard within 45 m, tells it face to face (1.6 s), and the guard searches the
+    spot weapon up, radios bodies in and marks the culprit hostile; with no guard near it flees.
+    `UI/ThreatMarkers` shows a pulsing amber "!" over the witness (pinned to the screen edge within
+    60 m) and a WITNESS toast.
+  - **Exits, errands and patrols.** Map builders place `ExitPoint`s round every crowd and public
+    area (`AiPlacement.Exit`: two or more on opposite sides, 20-60 m out). Guests and staff
+    wander (the bar, the buffet, the garden, a smoke, a call); guards and staff take breaks at
+    activities near their post (smoke, phone, drink, a look around), the windows a player waits for.
+    Patrol waypoints carry errands (`AI/PatrolStop`, `PatrolAction`: pause, look around, chat,
+    smoke, phone, check a door, lean, watch). Patrols walk slowly (1.15 m/s) and come in groups of
+    up to five on one route: the leader walks at the head, a second member at its shoulder
+    (`NpcRules.FormationSlot`), the rest in pairs behind; at a stop the others stand by the leader
+    and mirror its errand. `PatrolPlanner` generates interior loops (an errand per room type, a door
+    check at each locked door) and town loops.
+  - **Barks** (`AI/Npc.Barks`, `Editor/Audio/SfxBuilder.Barks`): formant-synthesised gibberish
+    (`bark_<voice>_<kind>`, 22 kHz) in four voices (low and mid for guards, high and squeak for the
+    crowd too), spoken on state changes ("huh?", "hey!", "over there!", screams, "help!", "clear",
+    radio and small talk), rate-limited per NPC and five a second map-wide. `Npc.LastBark` and
+    `LastBarkTime` are readable on every machine for faces.
 - **Systemic props** (`Systems/`): fire spreads between flammables and is put out by sprinkler
   zones; breakers cut a building's lights (and an NPC comes to fix it); chandeliers drop when
   their chain is shot; poisonable drinks (lethal, or emetic → the drinker runs to a toilet,
@@ -135,7 +192,7 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   where only the cable leads; hacking it turns the laser green and the guns on guards and targets
   (staff and guests are spared), the kills credited to the hacker. Every machine aims the guns
   with the same rules; only the host fires.
-- **Player** (eyes at 1.74 m, 0.98 m crouched): walk, sprint (held), crouch (held; crouching while moving slides,
+- **Player** (eyes at 1.60 m, 0.90 m crouched, `Core/BodyMetrics`): walk, sprint (held), crouch (held; crouching while moving slides,
   much further out of a sprint and faster downhill), crawl (crouched where a crouch doesn't fit:
   vents, crawlspaces), jump, zipline, hide, swim, and **parkour** (`FpsMotor`): jump in front of
   anything 0.45-2.4 m high to mantle onto it - the ledge is probed at six heights and four depths past
@@ -188,7 +245,9 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   your threat status with a stinger when spotted and a hit when it turns to combat. Sounds fade
   logarithmically with distance.
 - **Juice**: trauma screen shake, chromatic aberration / bloom / exposure pulses, hurt vignette,
-  hit-stop and slow-motion on takedowns (solo), and on world objects through Feel (`FX/FeelFx`,
+  hit-stop and slow-motion on takedowns (solo), a punch landing on contact (the arms freeze for
+  70 ms - an Animator pause, never `Time.timeScale` - the camera takes a spring jolt through
+  `CameraRig.Kick`, and the victim squashes on every machine), and on world objects through Feel (`FX/FeelFx`,
   MMF_Player built at runtime): the white hit flash on people and props (MMF_Flicker) and a
   subtle squash and stretch (MMF_SquashAndStretch) on hits, pickups, throws, jump pads and
   devices switched on; blood and dust puffs, explosions with fireball, shockwave, debris and
@@ -198,6 +257,66 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   Steam invites work too (Facepunch transport, App ID 480 for now); LAN/IP and solo through Unity Transport. The agent name is the typed nickname, else the
   Steam persona. Proximity voice chat on Steam Voice, relayed by
   the host to players within 30 m (host toggle in the lobby; push-to-talk B or open mic).
+
+## World rendering
+Shared by every map and applied at load, so a look change does not need a map rebuild unless noted.
+- **Grade.** `Settings/PC_RPAsset` grades in HDR (before the ACES tonemapper) on a 64-bit HDR buffer
+  (no banding in sky gradients). The map's volume profile (`ArtBuilder.VolumeProfileFor`) is a calm
+  base, rewritten in place so its GUID survives `Goobyr/Build/Materials`. `FX/TimeOfDay` grades each
+  biome and hour on top (`TimePreset`: temperature, tint, saturation, contrast, split-toned shadows
+  and highlights, wind): warm and humid jungle, golden desert (calmed: temperature 3, saturation -8),
+  cool and crisp snow; dawn and dusk are warm and bright, nights moonlit and readable, shade keeps sky
+  light under the canopy. The presets are code (`TimeOfDay.PresetsFor(biome, heading)`), rebuilt when a
+  map loads; maps built before 0.7.0 are recognised from their noon sun.
+- **Sky** (`Art/Shaders/Sky.shader`): a computed gradient, a sun with a halo and a raymarched slab of
+  clouds - five-octave coverage with eroded edges, lit toward the sun with a second extinction and a
+  powder term, blue-grey bellies, a silver lining round the sun - jittered per frame (TAA averages
+  it) and dithered, computed in float.
+- **Wind** (`World/Wind`, `Art/Shaders/GoobyrWind.hlsl`): one global field (direction, strength,
+  gusts of value-noise patches drifting downwind) written once per frame, in edit mode too. Grass
+  and `Goobyr/Foliage` read it, so a gust visibly travels. **Foliage** is URP Forward+ lit, alpha-clipped
+  and two-sided with translucency, reads the Blender vertex colours (R occlusion, G branch phase,
+  B wind weight), has shadow / depth / motion-vector passes (TAA sees the sway) and dithered LOD
+  cross-fade; vegetation prefabs cast shadows from LOD0/1 (`VegLibrary.TuneAll`). Cutout textures
+  keep their coverage through the mip chain.
+- **Real grass** (`World/GrassField`, `GrassCull.compute`, `Goobyr/Grass`): stateless and
+  GPU-procedural. The builder (`Editor/World/GrassBaker`, called by `MapKit.RealGrass`) bakes a
+  1024² map over the terrain (R density, G height, B dryness, A tall grass) and the ground's height
+  range per 16 m chunk; every edge (roads, walls, water, slopes, painted layers) is feathered over
+  about 1.5 m. For every camera the chunks within 90 m are culled on the CPU, and the compute pass
+  visits a 0.28 m slot grid in them (hash, jitter, rank, variation), thins slots by rank with
+  distance without popping, evaluates wind and trampling once per tuft, frustum-culls and writes the
+  instance buffers: two `Graphics.RenderMeshIndirect` draws, near tufts (10 curved blades, 4 far out)
+  and far 4-blade cards. Shading: bent normals, translucency, root-to-tip occlusion (a floor of 0.55
+  and the ground's normal at the root, so a low camera sees lit roots, not a black comb), per-tuft hue,
+  the map's dryness, sun shadows received, Forward+ lights, SSAO; near tufts go through the
+  depth-normals prepass and both bands through motion vectors. Per-map looks are
+  `GrassStyle.Jungle()/Alpine()/Oasis()`; tall hiding grass grows 1.4-1.9 m blades; `K.Covered(x, z)`
+  tells a grass mask where something built stands, and a per-point height makes lawns of 8 cm.
+  Cost at 1080p on the dev laptop: about +0.5 ms GPU, 0.05 ms CPU (`Logs/grass_bench.json`, the
+  budget is 1.5 ms on a GTX 1660). Procedural draws only hand the culling finite bounds within 100 km
+  (`GrassField.IsSane`).
+- **Trampling** (`World/GrassTrample`, `GrassBender`): a 64 m window round the main camera (25 cm
+  texels, ping-pong) pressed by players, NPCs and dropped items; pressed grass stands back up over
+  about 2.5 s and an item keeps a patch flat so it can be found.
+- **Terrain** (`Goobyr/TerrainLit`, `Art/Shaders/Terrain`, on `M_LandPbr`): URP 17.6's TerrainLit
+  with one change in the splat mix - each natural layer is also sampled at 0.27x its tiling, turned
+  by 27° and mixed in by a slow noise, so fields and slopes do not show a grid - plus the meadow's
+  colour where real grass grows (the ground keeps its colour where the blades end at 90 m) and a
+  broad brightness and hue variation. Asphalt and cobble keep one scale. The add pass and the basemap
+  generation share the mix. There is no height blend (URP only does it with four layers or fewer; the
+  maps use eight).
+- **Rock and glass.** `Goobyr/Rock` (`PbrLibrary.Rock`): world-space triplanar at two scales,
+  horizontal strata of alternating tones with dark seams, snow on up-facing ledges. `Goobyr/WindowGlass`
+  (`PbrLibrary.WindowGlass`): see **Buildings**.
+- **Reflections** (`World/RoomProbes`, added by `TimeOfDay`): one box-projected realtime probe per
+  building floor (up to 160) plus up to 48 street probes on a 48 m grid near buildings, 64² HDR,
+  captured two per frame at load and again when the time of day changes. Indoor diffuse ambient still
+  comes from the sky's SH; adaptive probe volumes with sky occlusion would fix it and are not baked
+  (every rebuild of a generated map would need a multi-minute bake).
+- **Textures.** Colour maps (`_diff`, `_diffa`) import as BC7 on PC; a texture is an ARM, normal or
+  alpha map only when its name *ends* with the suffix (`PbrLibrary.IsMap`), and packed `_ms` maps are
+  linear.
 
 ## Casters (tournament spectators)
 A player can join a room as a **caster**: no avatar, no team, never counted by the rules, the
@@ -258,28 +377,58 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
   from the pose it died in (realistic mass split, hinge limits from the current bend), keeping its
   speed and taking the blow at the hit point; capped at 45. A takedown victim struggles in the choke
   (`Takedown_Victim`) before going limp.
-- **First person** (`Weapons/Viewmodel`): Chr_Arms (sleeves and hands) under the camera, arms-only
-  mask; the gun is posed procedurally (hip, sights on the screen centre, sway, bob, recoil, sprint,
-  switch) and the hands are put on it by IK with the measured grips; reload, punch and throw clips
-  lead the hands during the action; small items ride in the hand; fists hold a guard (the punch
-  clip's first frame). The overlay camera renders with post-processing (same exposure and
-  tonemapping as the world) and the arms get their own slightly darker skin instances and white shirt
-  cuffs; shoulders sit low and back so the forearms rise from the bottom of the screen. The arms
-  mesh is trimmed at runtime to the forearms (triangles skinned to the clavicles and upper arms
-  dropped: no sleeve openings in the corners); long guns turn the arms 12° towards the gun side;
-  fists hold the punch clip's contact frame with the thumbs folded over the fingers.
+- **First person** (`Weapons/Viewmodel`, `Weapons/ViewmodelArms`): authored, no IK. The arms are one
+  generic rig rooted at the eye (`Art/FirstPerson/FP_Arms.fbx`, built by `Goobyr/Build/First Person
+  Arms` from `Tools/Blender/fp`): the cast's glove under Rook's olive MA-1 sleeve with its rib cuff
+  (`Tools/Blender/characters/cast/glove.py`, decimated, one baked PBR set; no armband, the upper arm is
+  out of view), two forearm twist bones, and the sockets `weapon_r` (under the right hand) and `prop_l`.
+  Poses are made weapon-first and baked as clips: the gun is placed by its `Sight` point (on the
+  camera axis when aimed), the hands are put on the real grip and fore-end geometry by two-bone IK,
+  the fingers close until their pads touch the gun's mesh, the trigger finger lies on the trigger when
+  aiming and along the frame otherwise. Families (Pistol, Smg, Shotgun, Sniper, Launcher, Flamer,
+  Pinch, Palm, Handle, Fists) each have Hip, ADS and Sprint; clips are Jab, Cross, Takedown and a throw
+  per item family. Every gun model carries `Grip`, `Muzzle`, `Sight`, `ForeGrip` and `MagWell` points
+  (source of truth: `Tools/Blender/props/build_weapons.py`), pistols and the SMG keep their magazine as
+  a child mesh `Mag`.
+  - **Unity side.** The arms controller (`Art/Resources/FirstPerson/FP_Arms.controller`) has a direct
+    Pose blend (Hip / ADS / Sprint, weights from code), a Left layer (the jab thrown while the right
+    hand holds something) and an Action layer (jab, cross, takedown, reload, throw), one override
+    controller per family; `ViewmodelArms` ties model, controllers and the pose manifest together.
+    The held model is parented to `weapon_r` at identity. Code adds sway, bob, the switch drop,
+    procedural reloads for the families without an authored one, and recoil that rotates the rig about
+    the Sight (the sight stays put, the muzzle flips); a LateUpdate correction squares the sight line with
+    the view and slides it onto the screen centre in proportion to the aim blend. Authored reloads move
+    the gun's `Mag` to `prop_l` and back. The overlay camera draws at 48° vertical
+    (`CameraRig.VIEW_FOV`, the FOV the poses are authored for) with post-processing, as the world.
+  - **Punch.** The owner plays the clip at once and tells the others (the third-person `Punch`
+    trigger), then resolves at the clip's contact time (jab 0.16 s, cross 0.18 s, takedown grab
+    0.30 s): a predicted hit freezes the arms for 70 ms, jolts the camera and squashes the victim, then
+    `MeleeRpc` goes to the host, which checks it like `FireRpc` (minimum 0.3 s between swings, a
+    reported eye more than 4 m from the body replaced by the real one) and judges punch or takedown as
+    before. `PunchFeedbackRpc` carries the victim so every machine squashes it (the owner skips what
+    it predicted). Bare hands alternate jab and cross, holding something is a left jab, an unaware NPC
+    from behind gets the takedown clip with the held item put away. Throws leave the hand at the clip's
+    release (0.27 s).
+  - **Tests.** `FpPoseTests` (EditMode) samples every pose of `fp_poses.json` and checks the socket
+    (1 mm, 0.2°) and the Sight (1 mm, on the camera axis when aimed);
+    `Goobyr/Test/First Person Shots (San Lazaro)` renders the review set (hip and ADS per gun, fists,
+    jab, cross, takedown, reloads, throwables) at 16:9 and 21:9 into `Logs/fp_shots`.
 - The contract portrait (`UI/PortraitStudio`), the title key art and the app icon
   (`Goobyr/Build/Icon`, a camera render) use the same bodies.
 
 ## Architecture invariants
 - Host-authoritative: AI, damage, match state, inventory, pickups, proof, fire, systems. Player
   movement is owner-authoritative (NetworkTransform owner mode); shots are predicted by the owner
-  and re-traced by the host with the same spread seed.
+  and re-traced by the host with the same spread seed. Punches work the same way: the owner plays the
+  clip and a predicted hit, `MeleeRpc` asks the host, which re-checks the swing and judges it. The AI's
+  senses, hostile memory (`LevelZone.Hostiles`), witnesses, squads and calls run on the host only;
+  clients get the state, pose and ducking as network variables (`Npc.State`, `Pose`, `Ducked`) and
+  voice the barks locally (`LastBark`).
 - Interactables are scene objects numbered identically on every machine (`WorldRegistry`, sorted by
   position) and routed through `MapSession`; only dynamic things are NetworkObjects.
 - Patrol cars move as a function of the match clock, so they need no transform sync.
 - One body size for everything (`Core/BodyMetrics`): eyes at 1.60 m (0.90 crouched), chest 1.15,
-  a 0.16 m head sphere at 1.64, a 1.80 m capsule. The player's camera, `Npc.Eye`, headshots (the
+  a 0.16 m head sphere at 1.64 (0.94 crouched), a 1.80 m capsule (1.10 crouched, 0.74 crawling). The player's camera, `Npc.Eye`, headshots (the
   head bone when the body has one), cover peeks and markers read it, and every character model is
   scaled on its rest pose so its eyes sit at 1.60 m - you look people in the eye.
 - One MonoBehaviour per file named after it (scene/prefab serialization).
@@ -309,6 +458,16 @@ overlaps. The briefing shows the map card (its plan), the mode as explicit cards
 1v1v1v1, teams, co-op), the agents in aligned columns, the room code with a copy button.
 
 ## Tests and tools
-- `Goobyr → GD Tool` (Ctrl+Shift+G) for tuning, `Goobyr → Validate Maps`, EditMode tests in
-  `Assets/_Game/Editor/Tests`.
+- `Goobyr → GD Tool` (Ctrl+Shift+G) for tuning, `Goobyr → Validate Maps` (which includes the AI patrol
+  audit, also `Goobyr/Validate/AI Patrols`), EditMode tests in `Assets/_Game/Editor/Tests`: `NpcRulesTests`,
+  `DetectionModelTests`, `PatrolPlannerTests` (the AI's pure rules and the patrol planner) and `FpPoseTests`
+  (every authored first-person pose against `fp_poses.json`).
+- Play-mode checks, run through the editor menu: `Goobyr/Test/AI Scenarios` (scripted guard and crowd
+  scenarios, results in `Logs/ai_scenarios.json`), `Goobyr/Test/AI Showcase (San Lazaro)` (frame strips of
+  a guard engaging and a crowd stampeding, `Logs/ai_showcase`), `Goobyr/Test/First Person Shots (San
+  Lazaro)` (`Logs/fp_shots`). The test tools run their coroutines on `AI/CoroutineHost`.
+- World review: `Goobyr/Debug/Grass Test Scene` builds `Scenes/World/GrassTest.unity`,
+  `Goobyr/Debug/Grass Benchmark` plays it at 1080p with grass on against off and writes
+  `Logs/grass_bench.json` (GPU and CPU time per pass, tufts and cards drawn); `Wind.Freeze` holds the wind
+  for review shots; `Goobyr/Build/Vegetation` and `Goobyr/Build/First Person Arms` rebuild those assets.
 - Command line: `-solo <map> <mode>`, `-host`, `-join <ip>`.

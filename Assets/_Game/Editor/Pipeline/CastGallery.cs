@@ -22,7 +22,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// </summary>
     public static class CastGallery
     {
-        public static readonly string[] BODIES = { "Chr_Rook", "Chr_Base_Slim", "Chr_Base_Average", "Chr_Base_Heavy" };
+        /// <summary>The hero, the three bases, and the clips' reference body as a control.</summary>
+        public static readonly string[] BODIES = { "Chr_Rook", "Chr_Base_Slim", "Chr_Base_Average", "Chr_Base_Heavy", CharacterBuilder.REFERENCE };
         private const string OUT_DIR = "Logs/cast_g2";
         private const int FRAMES = 6, THUMB_W = 150, THUMB_H = 200;
 
@@ -122,6 +123,50 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return lGo;
         }
 
+        /// <summary>
+        /// Static copies of a model's skinned meshes, re-baked on demand: a synchronous Camera.Render in
+        /// the editor would otherwise draw the skins in their last player-loop pose (the bind pose).
+        /// </summary>
+        private sealed class Proxies : System.IDisposable
+        {
+            private readonly List<(SkinnedMeshRenderer skin, GameObject go, Mesh mesh)> _items = new List<(SkinnedMeshRenderer, GameObject, Mesh)>();
+            public readonly List<Renderer> Renderers = new List<Renderer>();
+            public Proxies(GameObject pRoot, Scene pScene)
+            {
+                foreach (SkinnedMeshRenderer lSkin in pRoot.GetComponentsInChildren<SkinnedMeshRenderer>())
+                {
+                    if (!lSkin.enabled) continue;
+                    GameObject lGo = new GameObject("Proxy_" + lSkin.name);
+                    SceneManager.MoveGameObjectToScene(lGo, pScene);
+                    Mesh lMesh = new Mesh();
+                    lGo.AddComponent<MeshFilter>().sharedMesh = lMesh;
+                    MeshRenderer lRenderer = lGo.AddComponent<MeshRenderer>();
+                    lRenderer.sharedMaterials = lSkin.sharedMaterials;
+                    lSkin.forceRenderingOff = true;
+                    _items.Add((lSkin, lGo, lMesh));
+                    Renderers.Add(lRenderer);
+                }
+            }
+            public void Update()
+            {
+                foreach ((SkinnedMeshRenderer lSkin, GameObject lGo, Mesh lMesh) in _items)
+                {
+                    lSkin.BakeMesh(lMesh, true);
+                    lMesh.RecalculateBounds();
+                    lGo.transform.SetPositionAndRotation(lSkin.transform.position, lSkin.transform.rotation);
+                }
+            }
+            public void Dispose()
+            {
+                foreach ((SkinnedMeshRenderer lSkin, GameObject lGo, Mesh lMesh) in _items)
+                {
+                    if (lSkin != null) lSkin.forceRenderingOff = false;
+                    Object.DestroyImmediate(lGo);
+                    Object.DestroyImmediate(lMesh);
+                }
+            }
+        }
+
         private sealed class Pose : System.IDisposable
         {
             private PlayableGraph _graph;
@@ -161,6 +206,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Transform lHips = lAnimator.GetBoneTransform(HumanBodyBones.Hips), lChest = lAnimator.GetBoneTransform(HumanBodyBones.UpperChest) ?? lAnimator.GetBoneTransform(HumanBodyBones.Chest);
             Transform lFootL = lAnimator.GetBoneTransform(HumanBodyBones.LeftFoot), lFootR = lAnimator.GetBoneTransform(HumanBodyBones.RightFoot);
             Classify(lMain, out int[] lHandVerts, out int[] lTorsoVerts, out int[] lHandSide);
+            Proxies lProxies = new Proxies(lGo, pScene);
             Mesh lBaked = new Mesh();
             StringBuilder lJson = new StringBuilder();
             lJson.Append($"{{\"name\":\"{pSource.name}\",\"humanScale\":{F(lAnimator.humanScale)},\"clips\":[");
@@ -178,7 +224,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     {
                         float t = lClip.length * (f + 0.5f) / FRAMES;
                         lPose.At(t);
-                        Frame(pCamera, lGo);
+                        lProxies.Update();
+                        Frame(pCamera, lProxies.Renderers);
                         Texture2D lShot = Shoot(pCamera, THUMB_W, THUMB_H);
                         lStrip.SetPixels(f * THUMB_W, 0, THUMB_W, THUMB_H, lShot.GetPixels());
                         Object.DestroyImmediate(lShot);
@@ -211,16 +258,17 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
             lJson.Append($"],\"worstHandPenetrationRaw\":{F(lWorstRaw)},\"worstHandPenetrationIK\":{F(lWorstIK)},\"worstFootSlide\":{F(lWorstSlide)}}}");
             Object.DestroyImmediate(lBaked);
+            lProxies.Dispose();
             Object.DestroyImmediate(lGo);
             return lJson.ToString();
         }
 
         private static string F(float pValue) => pValue.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
 
-        private static void Frame(Camera pCamera, GameObject pGo)
+        private static void Frame(Camera pCamera, List<Renderer> pRenderers)
         {
-            Bounds lBounds = new Bounds(pGo.transform.position + Vector3.up * 0.9f, Vector3.one * 0.5f);
-            foreach (Renderer lRenderer in pGo.GetComponentsInChildren<Renderer>()) if (lRenderer.enabled) lBounds.Encapsulate(lRenderer.bounds);
+            Bounds lBounds = new Bounds(Vector3.up * 0.9f, Vector3.one * 0.5f);
+            foreach (Renderer lRenderer in pRenderers) lBounds.Encapsulate(lRenderer.bounds);
             pCamera.orthographic = true;
             pCamera.orthographicSize = Mathf.Max(lBounds.extents.y, lBounds.extents.x * THUMB_H / THUMB_W) * 1.08f;
             Vector3 lView = Quaternion.Euler(8f, 215f, 0f) * Vector3.forward;
@@ -345,7 +393,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 GameObject lWeapon = null;
                 if (lClip != null && lHand != null)
                 {
-                    using (Pose lPose = new Pose(lAnimator, lClip)) lPose.At(lClip.length * 0.5f);
+                    Pose lPose = new Pose(lAnimator, lClip);
+                    lPose.At(lClip.length * 0.5f);
+                    Proxies lProxies = new Proxies(lGo, pScene);
+                    lProxies.Update();
                     if (lWeaponSource != null)
                     {
                         HumanRig.Grip lGrip = HumanRig.Instance.For(c == 0 ? HeldKind.Pistol : HeldKind.Rifle);
@@ -365,6 +416,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                         File.WriteAllBytes($"{OUT_DIR}/grip_{lParts[1]}_{(lFrom.x > 0 ? "right" : "left")}.png", lShot.EncodeToPNG());
                         Object.DestroyImmediate(lShot);
                     }
+                    // the whole body in the aim pose, three-quarter view
+                    Frame(pCamera, lProxies.Renderers);
+                    pCamera.orthographic = true;
+                    Texture2D lFull = Shoot(pCamera, 600, 800);
+                    File.WriteAllBytes($"{OUT_DIR}/grip_{lParts[1]}_body.png", lFull.EncodeToPNG());
+                    Object.DestroyImmediate(lFull);
+                    lProxies.Dispose();
+                    lPose.Dispose();
                 }
                 lJson.Append(c > 0 ? "," : "").Append($"{{\"clip\":\"{lParts[0]}\",\"weapon\":\"{lParts[1]}\",\"found\":{(lWeaponSource != null ? "true" : "false")}}}");
                 Object.DestroyImmediate(lGo);

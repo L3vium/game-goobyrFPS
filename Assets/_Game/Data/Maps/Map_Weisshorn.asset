@@ -14,9 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.MapDefinition
   displayName: Weisshorn
   sceneName: Map_Weisshorn
-  description: 'An alpine gala night: the chalet village by the frozen lake, the
-    pistes and the chairlift, the Grand Hotel on its platform and the cold-war observatory
-    on the summit.'
+  description: 'An alpine gala night: the chalet village by the frozen lake, the pistes and the chairlift, the Grand Hotel on its platform and the cold-war observatory on the summit.'
   zoneNames:
   - Sankt Anna
   - Ski Area & Observatory
@@ -54,8 +52,7 @@ MonoBehaviour:
   planStorey: 3.6
   targets:
   - displayName: Mara Lindqvist
-    dossier: The banker. Fondue at the Gasthaus before the gala, always the same
-      table.
+    dossier: The banker. Fondue at the Gasthaus before the gala, always the same table.
     zone: 0
     bodyColor: {r: 0.12156863, g: 0.38039216, b: 0.5529412, a: 1}
     hat: 3
@@ -63,7 +60,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 2
-    routine: 05000000010000000600000000000000
+    routine: 05000000010000000600000000000000i
     enabled: 1
   - displayName: Mayor Gerhard Moll
     dossier: Sold the mountain to the hotel, one permit at a time.
@@ -74,7 +71,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 5
-    routine: 0b000000050000000300000002000000
+    routine: 0b000000050000000300000002000000i
     enabled: 1
   - displayName: Lotte Brenner
     dossier: The landlady. Hears everything the skiers say.
@@ -85,7 +82,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 0
-    routine: 03000000010000000700000004000000
+    routine: 03000000010000000700000004000000i
     enabled: 1
   - displayName: Inspector Rainer Huber
     dossier: The gendarme who never sees the snowcats at night.
@@ -96,7 +93,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 4
-    routine: 08000000070000000900000006000000
+    routine: 08000000070000000900000006000000i
     enabled: 1
   - displayName: Pascal Imboden
     dossier: Rents skis. Rents other things to the hotel's guests.
@@ -107,7 +104,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 0
-    routine: 0a000000000000000100000005000000
+    routine: 0a000000000000000100000005000000i
     enabled: 1
   - displayName: Viktor Sorel
     dossier: Arms dealer. Cable car, bunker, the bar, a cigar on the terrace.
@@ -118,7 +115,7 @@ MonoBehaviour:
     character: 
     bodyguards: 3
     proof: 2
-    routine: 08000000060000000700000001000000
+    routine: 08000000060000000700000001000000i
     enabled: 1
   - displayName: Dr. Elias Frey
     dossier: Runs the observatory. The telescope looks at the hotel.
@@ -129,7 +126,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 0
-    routine: 03000000090000000500000002000000
+    routine: 03000000090000000500000002000000i
     enabled: 1
   - displayName: Captain Lars Wenger
     dossier: Commands the bunker for whoever pays this winter.
@@ -140,7 +137,7 @@ MonoBehaviour:
     character: 
     bodyguards: 3
     proof: 3
-    routine: 08000000030000000a00000007000000
+    routine: 08000000030000000a00000007000000i
     enabled: 1
   - displayName: Annika Roth
     dossier: Ski instructor and courier. The pistes are her office.
@@ -151,7 +148,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 0
-    routine: 0a000000010000000b00000000000000
+    routine: 0a000000010000000b00000000000000i
     enabled: 1
   - displayName: Bruno Gasser
     dossier: Drives the groomer. Moves crates nobody declares.
@@ -162,7 +159,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 5
-    routine: 08000000040000000700000002000000
+    routine: 08000000040000000700000002000000i
     enabled: 1
   - displayName: Konrad Aschauer
     dossier: The host. Suite, cinema, the speech under the chandelier, the sauna.
@@ -173,7 +170,7 @@ MonoBehaviour:
     character: 
     bodyguards: 3
     proof: 1
-    routine: 03000000000000000b0000000a000000
+    routine: 03000000000000000b0000000a000000i
     enabled: 1
   - displayName: Chief Brandt
     dossier: Hotel security. Inspects everything, trusts nothing.
@@ -184,7 +181,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 3
-    routine: 03000000080000000700000006000000
+    routine: 03000000080000000700000006000000i
     enabled: 1
   - displayName: Sabine Aschauer
     dossier: The host's wife. The real owner of the hotel.
@@ -195,7 +192,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 1
-    routine: 01000000040000000500000002000000
+    routine: 01000000040000000500000002000000i
     enabled: 1
   - displayName: Dmitri Volkov
     dossier: VIP guest. Buys the observatory's data.
@@ -206,7 +203,7 @@ MonoBehaviour:
     character: 
     bodyguards: 3
     proof: 2
-    routine: 01000000060000000900000005000000
+    routine: 01000000060000000900000005000000i
     enabled: 1
   - displayName: Celeste Morel
     dossier: The gala singer. Carries messages in her songs.
@@ -217,5 +214,5 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 0
-    routine: 0b000000010000000200000000000000
+    routine: 0b000000010000000200000000000000i
     enabled: 1

@@ -325,8 +325,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                     lShadows = new Color(0.95f, 1f, 1f); lHighlights = new Color(1.03f, 1.01f, 0.95f);
                     break;
                 case Biome.Desert:
-                    lTemperature = 8f; lTint = 0f; lSaturation = 8f; lContrast = 14f; lWind = 0.5f;
-                    lShadows = new Color(0.95f, 0.96f, 1.05f); lHighlights = new Color(1.05f, 1.02f, 0.93f);
+                    // Calm: ochre stone and sand are saturated already; a neutral-cool shadow keeps them from banding orange.
+                    lTemperature = 3f; lTint = 0f; lSaturation = -8f; lContrast = 6f; lWind = 0.5f;
+                    lShadows = new Color(0.97f, 0.99f, 1.05f); lHighlights = new Color(1.02f, 1.01f, 0.98f);
                     break;
                 default:
                     lTemperature = -4f; lTint = 1f; lSaturation = 6f; lContrast = 15f; lWind = 0.6f;

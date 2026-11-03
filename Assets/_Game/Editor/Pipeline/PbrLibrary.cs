@@ -81,6 +81,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 AssetDatabase.CreateAsset(lMaterial, lPath);
             }
             else lMaterial.CopyPropertiesFromMaterial(lBase);
+            // An albedo multiplier above ~1.15 blows a photographed texture out (saturated, banded mortar):
+            // brighter tints keep their hue and are scaled down.
+            float lMax = Mathf.Max(pTint.r, Mathf.Max(pTint.g, pTint.b));
+            if (lMax > 1.15f) pTint = new Color(pTint.r * 1.15f / lMax, pTint.g * 1.15f / lMax, pTint.b * 1.15f / lMax, pTint.a);
             lMaterial.SetColor("_BaseColor", pTint);
             EditorUtility.SetDirty(lMaterial);
             return lMaterial;
@@ -324,6 +328,64 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             pMaterial.doubleSidedGI = lLeaf;
             pMaterial.enableInstancing = true;
             EditorUtility.SetDirty(pMaterial);
+        }
+
+        /// <summary>
+        /// Rock for large cliff faces (<c>Goobyr/Rock</c>): a surface set (<c>rock_face</c>, <c>cliff_side</c>,
+        /// <c>aerial_rocks_02</c>...) projected triplanar in world space at two scales, tinted in horizontal
+        /// strata of <paramref name="pStrata"/> metres alternating <paramref name="pToneA"/> and
+        /// <paramref name="pToneB"/>, with snow on the ledges for <paramref name="pSnow"/> &gt; 0 (0.4 a
+        /// dusting, 0.7 snowy). Needs no UVs. Cached as <c>M_Rock_&lt;id&gt;_&lt;suffix&gt;</c>.
+        /// </summary>
+        public static Material Rock(string pId, Color pToneA, Color pToneB, float pSnow, string pSuffix, float pTile = 6f, float pStrata = 3.5f)
+        {
+            if (Surface(pId) == null) return null;
+            string lDir = $"{ROOT}/Textures/{pId}";
+            string lPath = $"{MATERIALS}/M_Rock_{pId}_{pSuffix}.mat";
+            Shader lShader = Shader.Find("Goobyr/Rock");
+            if (lShader == null) return null;
+            Material lMaterial = AssetDatabase.LoadAssetAtPath<Material>(lPath);
+            if (lMaterial == null)
+            {
+                lMaterial = new Material(lShader);
+                AssetDatabase.CreateAsset(lMaterial, lPath);
+            }
+            else if (lMaterial.shader != lShader) lMaterial.shader = lShader;
+            string lDiff = Find(lDir, pId, "diff"), lNormal = Find(lDir, pId, "nor_gl"), lMs = Find(lDir, pId, "ms");
+            lMaterial.SetTexture("_BaseMap", lDiff != null ? AssetDatabase.LoadAssetAtPath<Texture2D>(lDiff) : null);
+            lMaterial.SetTexture("_BumpMap", lNormal != null ? AssetDatabase.LoadAssetAtPath<Texture2D>(lNormal) : null);
+            lMaterial.SetTexture("_MaskMap", lMs != null ? AssetDatabase.LoadAssetAtPath<Texture2D>(lMs) : null);
+            lMaterial.SetFloat("_Tile", pTile);
+            lMaterial.SetColor("_StrataA", pToneA);
+            lMaterial.SetColor("_StrataB", pToneB);
+            lMaterial.SetFloat("_StrataHeight", pStrata);
+            lMaterial.SetFloat("_SnowAmount", Mathf.Clamp01(pSnow));
+            if (pSnow > 0f && Surface("snow_02") != null)
+            {
+                string lSnow = Find($"{ROOT}/Textures/snow_02", "snow_02", "diff");
+                if (lSnow != null) lMaterial.SetTexture("_SnowMap", AssetDatabase.LoadAssetAtPath<Texture2D>(lSnow));
+            }
+            lMaterial.enableInstancing = true;
+            EditorUtility.SetDirty(lMaterial);
+            return lMaterial;
+        }
+
+        /// <summary>
+        /// Window glass (<c>Goobyr/WindowGlass</c>): clear and a little dark, a Fresnel-only reflection, and a
+        /// dim room with curtains where the pane looks into nothing. Switches a material over in place (the
+        /// maps' <c>M_WindowGlass</c> keeps its GUID); the shader's own properties do not collide with URP
+        /// Lit's, so a builder that still sets Lit values on it changes nothing.
+        /// </summary>
+        public static Material WindowGlass(Material pMaterial)
+        {
+            Shader lShader = Shader.Find("Goobyr/WindowGlass");
+            if (pMaterial == null || lShader == null) return pMaterial;
+            if (pMaterial.shader != lShader) pMaterial.shader = lShader;
+            pMaterial.shaderKeywords = new string[0];
+            pMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            pMaterial.enableInstancing = true;
+            EditorUtility.SetDirty(pMaterial);
+            return pMaterial;
         }
 
         // ---------------------------------------------------------------- materials

@@ -197,14 +197,18 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         // ---------------------------------------------------------------- clips: strips, penetration, foot slide
 
+        /// <summary>Locomotion clips with HumanAnimator's ground speed for them (m/s on the reference scale) and direction.</summary>
         private static readonly Dictionary<string, (float speed, Vector3 dir)> LOCOMOTION = new Dictionary<string, (float, Vector3)>
         {
-            { "Walk_F", (1.29f, Vector3.forward) }, { "Walk_B", (1.61f, Vector3.back) }, { "Walk_L", (1.70f, Vector3.left) }, { "Walk_R", (1.70f, Vector3.right) },
-            { "Run_F", (3.05f, Vector3.forward) }, { "Run_L", (1.90f, Vector3.left) }, { "Run_R", (1.90f, Vector3.right) }, { "Sprint_F", (3.79f, Vector3.forward) },
-            { "CrouchWalk_F", (1.12f, Vector3.forward) }, { "CrouchWalk_B", (1.12f, Vector3.back) }, { "CrouchWalk_L", (0.9f, Vector3.left) }, { "CrouchWalk_R", (0.9f, Vector3.right) },
-            { "Run_Panic", (3.07f, Vector3.forward) },
+            { "Walk_F", (HumanAnimator.WALK.x, Vector3.forward) }, { "Walk_B", (HumanAnimator.WALK.y, Vector3.back) },
+            { "Walk_L", (HumanAnimator.WALK.z, Vector3.left) }, { "Walk_R", (HumanAnimator.WALK.w, Vector3.right) },
+            { "Run_F", (HumanAnimator.RUN.x, Vector3.forward) }, { "Run_L", (HumanAnimator.RUN.z, Vector3.left) }, { "Run_R", (HumanAnimator.RUN.w, Vector3.right) },
+            { "Sprint_F", (HumanAnimator.SPRINT, Vector3.forward) },
+            { "CrouchWalk_F", (HumanAnimator.CROUCH.x, Vector3.forward) }, { "CrouchWalk_B", (HumanAnimator.CROUCH.y, Vector3.back) },
+            { "CrouchWalk_L", (HumanAnimator.CROUCH.z, Vector3.left) }, { "CrouchWalk_R", (HumanAnimator.CROUCH.w, Vector3.right) },
+            { "Run_Panic", (HumanAnimator.PANIC, Vector3.forward) },
         };
-        private const float REF_SCALE = 1.074f;
+        private const float REF_SCALE = HumanAnimator.REF_SCALE;
 
         private static string Body(Scene pScene, Camera pCamera, GameObject pSource, ClipInfo[] pClips)
         {
@@ -257,8 +261,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 string lSlide = "null";
                 if (LOCOMOTION.TryGetValue(lInfo.name, out (float speed, Vector3 dir) lLoco))
                 {
-                    float lValue = FootSlide(lAnimator, lClip, lFootL, lFootR, lLoco.speed * lAnimator.humanScale / REF_SCALE, lLoco.dir);
-                    lSlide = lValue.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+                    float lValue = FootSlide(lAnimator, lClip, lFootL, lFootR, lLoco.speed * lAnimator.humanScale / REF_SCALE, lLoco.dir, out float lGround);
+                    lSlide = lValue.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)
+                             + ",\"groundSpeedAtRefScale\":" + F(lGround * REF_SCALE / lAnimator.humanScale);
                     lWorstSlide = Mathf.Max(lWorstSlide, lValue);
                 }
                 lWorstRaw = Mathf.Max(lWorstRaw, lRaw);
@@ -353,8 +358,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// Median horizontal speed of a planted foot (within 2 cm of its lowest point in the clip) when the
         /// clip plays at its nominal ground speed: the body moves at that speed, the planted foot should not.
         /// </summary>
-        private static float FootSlide(Animator pAnimator, AnimationClip pClip, Transform pFootL, Transform pFootR, float pSpeed, Vector3 pDir)
+        private static float FootSlide(Animator pAnimator, AnimationClip pClip, Transform pFootL, Transform pFootR, float pSpeed, Vector3 pDir, out float pGround)
         {
+            pGround = 0f;
+            List<float> lGrounds = new List<float>();
             const int STEPS = 120;
             Vector3[][] lFeet = { new Vector3[STEPS + 1], new Vector3[STEPS + 1] };
             using (Pose lPose = new Pose(pAnimator, pClip))
@@ -375,12 +382,16 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (int i = 0; i < STEPS; i++)
                 {
                     if (lFoot[i].y > lLow + 0.02f || lFoot[i + 1].y > lLow + 0.02f) continue;
-                    Vector3 lWorld = (lFoot[i + 1] - lFoot[i]) / lDt + pDir * pSpeed;
+                    Vector3 lLocal = (lFoot[i + 1] - lFoot[i]) / lDt;
+                    lGrounds.Add(-Vector3.Dot(lLocal, pDir));
+                    Vector3 lWorld = lLocal + pDir * pSpeed;
                     lWorld.y = 0f;
                     lSpeeds.Add(lWorld.magnitude);
                 }
             }
             if (lSpeeds.Count == 0) return 0f;
+            lGrounds.Sort();
+            pGround = lGrounds[lGrounds.Count / 2];
             lSpeeds.Sort();
             return lSpeeds[lSpeeds.Count / 2];
         }

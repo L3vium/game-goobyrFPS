@@ -46,16 +46,17 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private static readonly int MoveXId = Animator.StringToHash(MOVE_X), MoveZId = Animator.StringToHash(MOVE_Z), PaceId = Animator.StringToHash(PACE);
         private static readonly int HangXId = Animator.StringToHash(HANG_X), SwimId = Animator.StringToHash(SWIM);
 
-        // Ground speed of each clip (m/s), measured on the stance foot of the reference body (Chr_Agent,
-        // human scale REF_SCALE); a body's stride scales with its own human scale. The pace parameter
+        // Ground speed of each clip (m/s): the median planted-foot speed measured on the cast's hero (Chr_Rook,
+        // Goobyr/Cast/G2 Gallery), expressed at human scale REF_SCALE; a body's stride scales with its own human scale. The pace parameter
         // plays a clip at speed / its ground speed so the planted foot does not slide.
-        private static readonly Vector4 WALK = new Vector4(1.29f, 1.61f, 1.70f, 1.70f);   // forward, back, left, right
+        public static readonly Vector4 WALK = new Vector4(1.086f, 1.445f, 1.602f, 1.604f);   // forward, back, left, right
         // The backward run ring is the walk-back clip played faster (the backpedal clip is slower than the walk).
-        private static readonly Vector4 RUN = new Vector4(3.05f, 1.61f, 1.90f, 1.90f);
-        private const float SPRINT = 3.79f;
-        private static readonly Vector4 CROUCH = new Vector4(1.12f, 1.12f, 0.9f, 0.9f);
-        private const float CRAWL = 0.58f, PANIC = 3.07f, SWIM_SPEED = 1.1f, LADDER = 0.36f, SHIMMY = 0.22f;
-        private const float REF_SCALE = 1.074f;
+        public static readonly Vector4 RUN = new Vector4(2.930f, 1.445f, 1.765f, 1.768f);
+        public const float SPRINT = 3.664f;
+        public static readonly Vector4 CROUCH = new Vector4(1.033f, 1.042f, 0.725f, 0.716f);
+        public const float PANIC = 2.935f;
+        private const float CRAWL = 0.58f, SWIM_SPEED = 1.1f, LADDER = 0.36f, SHIMMY = 0.22f;
+        public const float REF_SCALE = 1.074f;
         /// <summary>Above this a non-sprinting character shows the run ring.</summary>
         private const float RUN_FROM = 2.7f;
 

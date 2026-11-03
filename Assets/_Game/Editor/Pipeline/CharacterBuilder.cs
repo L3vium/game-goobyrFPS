@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Com.IsartDigital.GoobyrFPS.Core;
 using Com.IsartDigital.GoobyrFPS.FX;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -29,6 +30,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public const string ANIM_DIR = DIR + "/Animations";
         public const string OUT = EditorAssets.ROOT + "/Art/Resources/Characters";
         public const string REFERENCE = "Chr_Agent";
+        /// <summary>The body the grips are measured on: the cast's shared glove hand (falls back to the clips' reference).</summary>
+        public const string GRIP_REFERENCE = "Chr_Rook";
         /// <summary>The clip whose avatar every other clip copies (all clips share its hierarchy).</summary>
         public const string REFERENCE_CLIP = "Idle";
 
@@ -194,9 +197,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             switch (pPart)
             {
                 case "Body":
+                    // The roughness map gives ~0.42 smoothness, ~0.5 on the nose and lips.
                     pMaterial.SetColor("_BaseColor", new Color(1f, 0.955f, 0.93f));
-                    pMaterial.SetFloat("_Smoothness", 0.78f);
-                    pMaterial.SetFloat("_OcclusionStrength", 0.7f);
+                    pMaterial.SetFloat("_Smoothness", 1f);
+                    pMaterial.SetFloat("_OcclusionStrength", 0.5f);
                     break;
                 case "Team":
                 case "Lining":
@@ -249,7 +253,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         /// <summary>Degrees taken off the arms' "down" range on the new cast: the same clip keeps the arms a little away from the wider body.</summary>
-        private const float ARM_DOWN_MARGIN = 14f;
+        private const float ARM_DOWN_MARGIN = 22f;
 
         private static HumanDescription Description(List<SkeletonBone> pSkeleton, bool pNarrowArms = false)
         {
@@ -645,7 +649,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public static void Calibrate()
         {
             HumanRig lRig = EditorAssets.LoadOrCreate<HumanRig>(OUT + "/HumanRig.asset");
-            GameObject lModel = AssetDatabase.LoadAssetAtPath<GameObject>(Fbx($"{DIR}/{REFERENCE}"));
+            GameObject lModel = AssetDatabase.LoadAssetAtPath<GameObject>(Fbx($"{DIR}/{GRIP_REFERENCE}"))
+                                ?? AssetDatabase.LoadAssetAtPath<GameObject>(Fbx($"{DIR}/{REFERENCE}"));
             GameObject lInstance = Object.Instantiate(lModel);
             try
             {
@@ -699,7 +704,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lRig.pinchRotation = lWeaponInHand;
 
                 Transform lHead = lAnimator.GetBoneTransform(HumanBodyBones.Head);
-                lRig.eyeInHead = lHead.InverseTransformPoint(lHead.position + Vector3.up * 0.085f + Vector3.forward * 0.1f);
+                bool lNew = IsNewCast(lModel);
+                lRig.eyeInHead = lHead.InverseTransformPoint(lHead.position + Vector3.up * (lNew ? BodyMetrics.HEAD_BONE_TO_EYE : 0.085f) + Vector3.forward * 0.1f);
             }
             finally { Object.DestroyImmediate(lInstance); }
             EditorUtility.SetDirty(lRig);

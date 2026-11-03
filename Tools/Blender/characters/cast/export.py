@@ -235,7 +235,7 @@ def bake_setup():
     sc.render.bake.use_selected_to_active = True
     sc.render.bake.cage_extrusion = 0.006
     sc.render.bake.max_ray_distance = 0.03
-    sc.render.bake.margin = 6
+    sc.render.bake.margin = 16
     sc.render.bake.target = "IMAGE_TEXTURES"
 
 
@@ -255,7 +255,7 @@ def bake_slot(slot_ob, sources, slot, res):
         tex.image = img
         sc.cycles.samples = samples
         ctx(slot_ob, sources + [slot_ob])
-        kw = dict(type=kind, use_selected_to_active=True, cage_extrusion=0.006, max_ray_distance=0.03, margin=6)
+        kw = dict(type=kind, use_selected_to_active=True, cage_extrusion=0.006, max_ray_distance=0.03, margin=16, margin_type="EXTEND")
         if kind == "DIFFUSE":
             kw["pass_filter"] = {"COLOR"}
         if kind == "NORMAL":
@@ -513,7 +513,10 @@ def export(name, preview=False):
                 diff = np.repeat(lum[..., None], 3, axis=2)
             save_np(diff, prefix + "_diff.jpg", fmt="JPEG")
             save_np(img["NORMAL"][..., :3], prefix + "_nor_gl.png", True, "PNG")
-            arm = np.stack([np.clip(img["AO"][..., 0] * 0.85 + 0.15, 0, 1), img["ROUGHNESS"][..., 0],
+            ao = img["AO"][..., 0]
+            # skin: only a whisper of baked AO (lids, brows and hair shells darken the face otherwise)
+            ao = ao * 0.25 + 0.75 if slot == "Body" else ao * 0.5 + 0.5
+            arm = np.stack([np.clip(ao, 0, 1), img["ROUGHNESS"][..., 0],
                             np.full(diff.shape[:2], metal)], -1)
             save_np(arm, prefix + "_arm.jpg", True, "JPEG")
             log("baked", slot, res, "%.1fs" % (time.time() - t))

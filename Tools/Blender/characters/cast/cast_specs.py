@@ -74,7 +74,7 @@ CAST = {
     "Chr_Rook": dict(
         title="Rook", role="Hero (player), male", body="hero",
         face=dict(iris=(0.30, 0.44, 0.22), brow=(1.22, 1.05), jaw_square=0.7, nose="button", nose_scale=1.02,
-                  smile=1.3, skin=SKIN["light"], freckles=0.6, blush=0.4, jaw=(0.066, 0.075, 0.063), ears=1.0, stubble=0.55),
+                  smile=1.3, skin=SKIN["light"], freckles=0.6, blush=0.4, jaw=(0.066, 0.075, 0.063), ears=1.0, stubble=0.35),
         hair="quiff", hair_colour=HAIR["copper"], brow_colour=(0.46, 0.18, 0.07),
         outfit=ROOK_OUTFIT, looks=ROOK_LOOKS,
     ),

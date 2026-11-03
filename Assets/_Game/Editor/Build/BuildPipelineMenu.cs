@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using Com.IsartDigital.GoobyrFPS.Data;
+using Com.IsartDigital.GoobyrFPS.FX;
 using Com.IsartDigital.GoobyrFPS.UI;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
@@ -79,12 +80,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             bool lRendered = false;
             try
             {
-                GameObject lSource = AssetDatabase.LoadAssetAtPath<GameObject>(CharacterBuilder.DIR + "/Chr_Agent/Chr_Agent.fbx");
+                GameObject lSource = AssetDatabase.LoadAssetAtPath<GameObject>($"{CharacterBuilder.DIR}/{HumanCast.AGENT}/{HumanCast.AGENT}.fbx")
+                                     ?? AssetDatabase.LoadAssetAtPath<GameObject>(CharacterBuilder.DIR + "/Chr_Agent/Chr_Agent.fbx");
                 GameObject lAgent = Object.Instantiate(lSource);
                 SceneManager.MoveGameObjectToScene(lAgent, lScene);
                 // Full detail only: no LOD switching in a one-off render.
                 Object.DestroyImmediate(lAgent.GetComponent<LODGroup>());
-                foreach (SkinnedMeshRenderer lSkin in lAgent.GetComponentsInChildren<SkinnedMeshRenderer>()) if (lSkin.name.EndsWith("_LOD1")) Object.DestroyImmediate(lSkin.gameObject);
+                foreach (SkinnedMeshRenderer lSkin in lAgent.GetComponentsInChildren<SkinnedMeshRenderer>()) if (lSkin.name.EndsWith("_LOD1") || lSkin.name.EndsWith("_LOD2")) Object.DestroyImmediate(lSkin.gameObject);
                 AnimationClip lIdle = CharacterBuilder.Clip("Idle");
                 if (lIdle != null) lIdle.SampleAnimation(lAgent, 0f);
                 lAgent.transform.SetPositionAndRotation(Vector3.zero, Quaternion.Euler(0f, 160f, 0f));

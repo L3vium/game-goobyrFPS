@@ -42,7 +42,24 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             if ((_weaponModel == null || _weaponModel.transform.parent == null) && _npc.Weapon != null && _npc.Health.IsAlive) RefreshWeapon(true);
             UpdateTorch();
+            UpdateSurprise();
             if (!_npc.Health.IsAlive) enabled = false;
+        }
+
+        private NpcState _lastState = NpcState.Idle;
+        private HumanAnimator _animator;
+
+        /// <summary>The face's surprise (local, cosmetic) when the NPC spots something: calm -> alert.</summary>
+        private void UpdateSurprise()
+        {
+            NpcState lState = _npc.State.Value;
+            if (lState == _lastState) return;
+            bool lWasCalm = _lastState == NpcState.Idle || _lastState == NpcState.Patrol || _lastState == NpcState.Routine || _lastState == NpcState.Escort;
+            bool lAlert = lState == NpcState.Suspicious || lState == NpcState.Engaged || lState == NpcState.Combat || lState == NpcState.Flee;
+            _lastState = lState;
+            if (!lWasCalm || !lAlert) return;
+            if (_animator == null) _animator = GetComponentInChildren<HumanAnimator>();
+            if (_animator != null) _animator.Surprise();
         }
 
         private const int NIGHT = 3;

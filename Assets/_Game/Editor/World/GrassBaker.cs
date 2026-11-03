@@ -31,15 +31,27 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             pHeight ??= (x, z) => Mathf.Clamp01(0.5f + 0.35f * LandShape.Fbm(x, z, 9f, 2, 31.7f));
             pDry ??= (x, z) => Mathf.Clamp01(0.25f + 0.6f * LandShape.Fbm(x, z, 24f, 2, 12.9f));
 
-            Color32[] lPixels = new Color32[RESOLUTION * RESOLUTION];
+            float[] lRaw = new float[RESOLUTION * RESOLUTION];
             for (int j = 0; j < RESOLUTION; j++)
                 for (int i = 0; i < RESOLUTION; i++)
                 {
                     float x = o.x + (i + 0.5f) / RESOLUTION * lSize.x, z = o.z + (j + 0.5f) / RESOLUTION * lSize.z;
-                    float d = Mathf.Clamp01(pDensity(x, z));
-                    lPixels[j * RESOLUTION + i] = d <= 0f
-                        ? new Color32(0, 0, 0, 0)
-                        : new Color32(Byte(d), Byte(pHeight(x, z)), Byte(pDry(x, z)), Byte(pTall != null ? pTall(x, z) : 0f));
+                    lRaw[j * RESOLUTION + i] = Mathf.Clamp01(pDensity(x, z));
+                }
+            // Every edge feathered inward (roads, walls, water, slopes, turf): the density is the smaller of
+            // itself and its blur over ~1.5 m, so grass thins and shortens toward any edge but never leaks
+            // past it.
+            float[] lSoft = Blur(lRaw, Mathf.Max(1, Mathf.RoundToInt(1.5f / (lSize.x / RESOLUTION))));
+            Color32[] lPixels = new Color32[RESOLUTION * RESOLUTION];
+            for (int j = 0; j < RESOLUTION; j++)
+                for (int i = 0; i < RESOLUTION; i++)
+                {
+                    int k = j * RESOLUTION + i;
+                    float d = Mathf.Min(lRaw[k], lSoft[k]);
+                    if (d <= 0.004f) { lPixels[k] = new Color32(0, 0, 0, 0); continue; }
+                    float x = o.x + (i + 0.5f) / RESOLUTION * lSize.x, z = o.z + (j + 0.5f) / RESOLUTION * lSize.z;
+                    float lEdge = Mathf.Lerp(0.6f, 1f, Mathf.Clamp01(lSoft[k] / Mathf.Max(lRaw[k], 0.001f)));
+                    lPixels[k] = new Color32(Byte(d), Byte(pHeight(x, z) * lEdge), Byte(pDry(x, z)), Byte(pTall != null ? pTall(x, z) : 0f));
                 }
             EditorAssets.EnsureFolder(FOLDER);
             string lPath = $"{FOLDER}/{pName}_Grass.png";
@@ -103,6 +115,35 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             EditorUtility.SetDirty(lField);
             Debug.Log($"[Build] {pName} grass: {lFull}/{lRanges.Length} chunks of {lChunk:F1} m with grass");
             return lField;
+        }
+
+        /// <summary>A square box blur of a RESOLUTION² map (two separable passes, clamped at the borders).</summary>
+        private static float[] Blur(float[] pMap, int pRadius)
+        {
+            int n = RESOLUTION;
+            float[] a = new float[n * n], b = new float[n * n];
+            float lNorm = 1f / (pRadius * 2 + 1);
+            for (int j = 0; j < n; j++)
+            {
+                float lSum = 0f;
+                for (int k = -pRadius; k <= pRadius; k++) lSum += pMap[j * n + Mathf.Clamp(k, 0, n - 1)];
+                for (int i = 0; i < n; i++)
+                {
+                    a[j * n + i] = lSum * lNorm;
+                    lSum += pMap[j * n + Mathf.Min(i + pRadius + 1, n - 1)] - pMap[j * n + Mathf.Max(i - pRadius, 0)];
+                }
+            }
+            for (int i = 0; i < n; i++)
+            {
+                float lSum = 0f;
+                for (int k = -pRadius; k <= pRadius; k++) lSum += a[Mathf.Clamp(k, 0, n - 1) * n + i];
+                for (int j = 0; j < n; j++)
+                {
+                    b[j * n + i] = lSum * lNorm;
+                    lSum += a[Mathf.Min(j + pRadius + 1, n - 1) * n + i] - a[Mathf.Max(j - pRadius, 0) * n + i];
+                }
+            }
+            return b;
         }
 
         private static byte Byte(float pValue) => (byte)Mathf.RoundToInt(Mathf.Clamp01(pValue) * 255f);

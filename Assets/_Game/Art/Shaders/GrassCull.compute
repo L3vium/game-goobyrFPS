@@ -102,7 +102,8 @@ void Cull(uint3 id : SV_DispatchThreadID)
 
     float lVariation = U01(h3);
     float lTall = lMap.a;
-    float lHeight = _Style.x * (0.55 + 0.9 * lMap.g) * (1.0 + (lVariation - 0.5) * _Style.y);
+    // Map height 0 is a mown lawn (15 %), 0.5 the style's height, 1 half again as tall.
+    float lHeight = _Style.x * (lMap.g < 0.5 ? lerp(0.15, 1.0, lMap.g * 2.0) : lerp(1.0, 1.45, lMap.g * 2.0 - 1.0)) * (1.0 + (lVariation - 0.5) * _Style.y);
     lHeight = lerp(lHeight, _Style.z * (0.8 + 0.4 * lVariation), lTall);
 
     // Frustum: a sphere round the tuft (generous, for the wind and the widened far cards).

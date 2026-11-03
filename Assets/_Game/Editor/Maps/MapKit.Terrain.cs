@@ -42,7 +42,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private World.GrassStyle _realGrass;
         private System.Func<float, float, float> _realDensity;
         private Ground[] _realTurf, _realDryTurf;
-        private System.Func<float, float, float> _realDryness;
+        private System.Func<float, float, float> _realDryness, _realHeight;
 
         /// <summary>
         /// Real grass (GPU blades, <see cref="World.GrassField"/>) over the land, baked by <see cref="Finish"/>.
@@ -57,8 +57,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// fields grow tall blades (<see cref="TallGrassDetail"/> is not used). Replaces the instanced grass
         /// detail: keep ferns and the like as <see cref="Details"/>.
         /// </summary>
-        public void RealGrass(World.GrassStyle pStyle, System.Func<float, float, float> pDensity, Ground[] pTurf = null, Ground[] pDryTurf = null, System.Func<float, float, float> pDryness = null)
+        /// <param name="pHeight">Blade height per point, 0..1 (0.5 = the style's height, 0.15-0.25 a mown lawn,
+        /// null = a gentle noise); multiplied down toward the meadow's edge either way.</param>
+        public void RealGrass(World.GrassStyle pStyle, System.Func<float, float, float> pDensity, Ground[] pTurf = null, Ground[] pDryTurf = null, System.Func<float, float, float> pDryness = null, System.Func<float, float, float> pHeight = null)
         {
+            _realHeight = pHeight;
             _realGrass = pStyle;
             _realDensity = pDensity;
             _realTurf = pTurf;
@@ -171,7 +174,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             System.Func<float, float, float> lInside = (x, z) => !lLayered ? 1f
                 : Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(((Weight(lTurf, x, z) + Weight(lDryTurf, x, z)) * 1.5f - 0.15f + 0.3f * LandShape.Fbm(x, z, 3.5f, 2, 17.3f)) / 0.85f));
             System.Func<float, float, float> lDensity = (x, z) => _realDensity(x, z) * lInside(x, z);
-            System.Func<float, float, float> lHeight = (x, z) => Mathf.Clamp01((0.5f + 0.35f * LandShape.Fbm(x, z, 9f, 2, 31.7f)) * Mathf.Lerp(0.55f, 1f, lInside(x, z)));
+            System.Func<float, float, float> lHeight = (x, z) => Mathf.Clamp01((_realHeight != null ? _realHeight(x, z) : 0.5f + 0.35f * LandShape.Fbm(x, z, 9f, 2, 31.7f)) * Mathf.Lerp(0.55f, 1f, lInside(x, z)));
             System.Func<float, float, float> lDry = _realDryness ?? (_realDryTurf == null ? null : (x, z) =>
             {
                 float g = Weight(lTurf, x, z), d = Weight(lDryTurf, x, z);
@@ -219,6 +222,29 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private Vector2 LandPoint(int pX, int pZ, int pResolution) => new Vector2(_landOrigin.x + (pX + 0.5f) / pResolution * _landSize, _landOrigin.z + (pZ + 0.5f) / pResolution * _landSize);
 
         /// <summary>Slope in degrees at a world point.</summary>
+        /// <summary>
+        /// Is the ground at a point covered by something built (a floor, a wall, paving, a step: any world
+        /// collider other than the land within 0.25 m above it)? For grass masks: use it instead of a whole
+        /// lot's <c>Built</c> rectangle, so gardens, lawns and verges inside a lot grow grass and only what
+        /// stands on the ground stops it. Raycasts the colliders built so far (call from <c>Details</c>).
+        /// </summary>
+        public bool Covered(float pX, float pZ)
+        {
+            if (!_physicsSynced) { Physics.SyncTransforms(); _physicsSynced = true; }
+            float lGround = GroundAt(pX, pZ);
+            Vector3 lFrom = new Vector3(pX, lGround + 40f, pZ);
+            int lHits = Physics.RaycastNonAlloc(lFrom, Vector3.down, _coverHits, 40.4f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < lHits; i++)
+                if (!(_coverHits[i].collider is TerrainCollider) && _coverHits[i].point.y > lGround - 0.3f && _coverHits[i].point.y < lGround + 0.25f) return true;
+            // Under a roof or a floor above (arcades, porches) no grass either.
+            for (int i = 0; i < lHits; i++)
+                if (!(_coverHits[i].collider is TerrainCollider) && _coverHits[i].point.y >= lGround + 0.25f && _coverHits[i].point.y < lGround + 6f) return true;
+            return false;
+        }
+
+        private bool _physicsSynced;
+        private readonly RaycastHit[] _coverHits = new RaycastHit[8];
+
         public float LandSlope(float pX, float pZ) => _landData.GetSteepness((pX - _landOrigin.x) / _landSize, (pZ - _landOrigin.z) / _landSize);
 
         /// <summary>

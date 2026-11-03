@@ -37,6 +37,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             StringBuilder lReport = new StringBuilder("{\n");
             ClipInfo[] lClips = JsonUtility.FromJson<ClipList>("{\"clips\":" + File.ReadAllText(CharacterBuilder.ANIM_DIR + "/clips.json") + "}").clips;
             Scene lScene = EditorSceneManager.NewPreviewScene();
+            // Shaders compile synchronously, or the shots show the cyan async-compilation placeholder.
+            bool lAsync = ShaderUtil.allowAsyncCompilation;
+            ShaderUtil.allowAsyncCompilation = false;
             try
             {
                 Light(lScene);
@@ -55,7 +58,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lReport.Append("\"grips\": ").Append(Grips(lScene, lCamera)).Append(",\n");
                 lReport.Append("\"ragdolls\": ").Append(Ragdolls(lScene)).Append("\n}\n");
             }
-            finally { EditorSceneManager.ClosePreviewScene(lScene); }
+            finally { EditorSceneManager.ClosePreviewScene(lScene); ShaderUtil.allowAsyncCompilation = lAsync; }
             File.WriteAllText(OUT_DIR + "/report.json", lReport.ToString());
             Debug.Log($"[G2] gallery and report written to {Path.GetFullPath(OUT_DIR)}");
         }
@@ -167,21 +170,29 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             }
         }
 
+        /// <summary>
+        /// A clip sampled on a model through the editor's AnimationMode (humanoid retargeting included;
+        /// works in preview scenes, unlike a manually evaluated PlayableGraph). Disposing restores the pose.
+        /// </summary>
         private sealed class Pose : System.IDisposable
         {
-            private PlayableGraph _graph;
-            private AnimationClipPlayable _clip;
+            private readonly GameObject _go;
+            private readonly AnimationClip _clip;
+            private readonly bool _started;
             public Pose(Animator pAnimator, AnimationClip pClip)
             {
-                _graph = PlayableGraph.Create("G2");
-                _graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
-                AnimationPlayableOutput lOut = AnimationPlayableOutput.Create(_graph, "out", pAnimator);
-                _clip = AnimationClipPlayable.Create(_graph, pClip);
-                _clip.SetApplyFootIK(true);
-                lOut.SetSourcePlayable(_clip);
+                _go = pAnimator.gameObject;
+                _clip = pClip;
+                _started = !AnimationMode.InAnimationMode();
+                if (_started) AnimationMode.StartAnimationMode();
             }
-            public void At(float pTime) { _clip.SetTime(pTime); _graph.Evaluate(); }
-            public void Dispose() { if (_graph.IsValid()) _graph.Destroy(); }
+            public void At(float pTime)
+            {
+                AnimationMode.BeginSampling();
+                AnimationMode.SampleAnimationClip(_go, _clip, pTime);
+                AnimationMode.EndSampling();
+            }
+            public void Dispose() { if (_started && AnimationMode.InAnimationMode()) AnimationMode.StopAnimationMode(); }
         }
 
         // ---------------------------------------------------------------- clips: strips, penetration, foot slide

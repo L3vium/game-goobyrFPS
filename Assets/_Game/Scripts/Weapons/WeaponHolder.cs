@@ -70,6 +70,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private ThrowArc _arc;
         private bool _aiming;
         private int _lastGadget = 2;
+        /// <summary>Owner: still to put the gun away once the starting loadout has arrived (a drawn gun is suspicious).</summary>
+        private bool _holsterOnSpawn;
         private GameObject _thirdPersonModel;
         private int _thirdPersonItem = -2;
         private GameObject _flameFx;
@@ -93,6 +95,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             {
                 View = Viewmodel.Create(this);
                 Selected.Value = 0;
+                _holsterOnSpawn = true;
             }
             Avatar.Health.OnDeathServer += HandleDeathServer;
             Selected.OnValueChanged += (_, __) => RefreshThirdPerson();
@@ -132,6 +135,12 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (!IsOwner || !Avatar.Health.IsAlive) { if (_arc != null) _arc.Hide(); return; }
             if (Avatar.Motor.Mode == MotorMode.Hidden || Avatar.Motor.Mode == MotorMode.Zipline) { _aiming = false; if (_arc != null) _arc.Hide(); return; }
 
+            if (_holsterOnSpawn && Slots.Count >= SLOT_COUNT)
+            {
+                // Spawn with bare fists: the first empty weapon slot (the loadout stays one wheel turn away).
+                _holsterOnSpawn = false;
+                for (int i = 0; i < WEAPON_SLOTS; i++) if (SlotAt(i).IsEmpty) { Select(i); break; }
+            }
             if (_strikePending && Time.time >= _strikeAt) Strike();
             if (_throwSlot >= 0 && Time.time >= _throwAt) Release();
 

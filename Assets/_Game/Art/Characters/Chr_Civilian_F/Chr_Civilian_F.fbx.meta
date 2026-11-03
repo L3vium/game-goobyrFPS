@@ -1,7 +1,7 @@
 fileFormatVersion: 2
 guid: ac520df4cb9cc9d4e8a30e95d5af3cd6
 ModelImporter:
-  serializedVersion: 24200
+  serializedVersion: 24600
   internalIDToNameTable: []
   externalObjects:
   - first:
@@ -49,6 +49,7 @@ ModelImporter:
     materialName: 0
     materialSearch: 1
     materialLocation: 1
+    searchTexturesGlobally: 1
   animations:
     legacyGenerateAnimations: 4
     bakeSimulation: 0
@@ -80,6 +81,8 @@ ModelImporter:
     addColliders: 0
     useSRGBMaterialColor: 1
     sortHierarchyByName: 1
+    preBakeConvexCollisionMesh: 0
+    preBakeTriangleCollisionMesh: 0
     importPhysicalCameras: 1
     importVisibility: 1
     importBlendShapes: 1
@@ -101,6 +104,8 @@ ModelImporter:
     generateMeshLods: 0
     meshLodGenerationFlags: 0
     maximumMeshLod: -1
+    importUVs: -1
+    importVertexColors: 1
     meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
@@ -120,6 +125,7 @@ ModelImporter:
     legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
     blendShapeNormalImportMode: 1
     normalSmoothingSource: 0
+    calculateBlendshapeNormalsDeltaFromImportedNormals: 1
   referencedClips: []
   importAnimation: 0
   humanDescription:
@@ -590,12 +596,12 @@ ModelImporter:
     - name: lowerarm_l
       parentName: 
       position: {x: 0.000000057916623, y: 0.22044481, z: 0.000000022817403}
-      rotation: {x: -0.000000052154054, y: 0.01390278, z: 0.00000006288609, w: 0.9999034}
+      rotation: {x: -0.000000014901159, y: 0.013902845, z: -0.00000021347657, w: 0.9999034}
       scale: {x: 1.0000001, y: 1, z: 1}
     - name: hand_l
       parentName: 
       position: {x: 0.000000073807314, y: 0.2061336, z: -0.000000007450581}
-      rotation: {x: 0.057940997, y: -0.41513738, z: 0.016048213, w: 0.9077699}
+      rotation: {x: 0.057941258, y: -0.4151373, z: 0.016048968, w: 0.90777}
       scale: {x: 1, y: 1, z: 1}
     - name: index_01_l
       parentName: 
@@ -685,12 +691,12 @@ ModelImporter:
     - name: lowerarm_r
       parentName: 
       position: {x: -0.000000057916623, y: 0.22044481, z: 0.000000022817403}
-      rotation: {x: -0.000000052154054, y: -0.01390278, z: -0.00000006288609, w: 0.9999034}
+      rotation: {x: -0.000000014901159, y: -0.013902845, z: 0.00000021347657, w: 0.9999034}
       scale: {x: 1.0000001, y: 1, z: 1}
     - name: hand_r
       parentName: 
       position: {x: -0.000000073807314, y: 0.2061336, z: -0.000000007450581}
-      rotation: {x: 0.057940997, y: 0.41513738, z: -0.016048213, w: 0.9077699}
+      rotation: {x: 0.057941258, y: 0.4151373, z: -0.016048968, w: 0.90777}
       scale: {x: 1, y: 1, z: 1}
     - name: index_01_r
       parentName: 
@@ -780,12 +786,12 @@ ModelImporter:
     - name: thigh_l
       parentName: 
       position: {x: -0.09049304, y: -0.015564476, z: -0.010881403}
-      rotation: {x: 0.92523044, y: -0.07075461, z: 0.21498567, w: -0.3045056}
+      rotation: {x: 0.92523044, y: -0.07075463, z: 0.21498568, w: -0.30450556}
       scale: {x: 0.99999994, y: 1.0000001, z: 1.0000004}
     - name: calf_l
       parentName: 
       position: {x: -0.000000006519258, y: 0.34403086, z: 0.000000003259629}
-      rotation: {x: 0.00000008940696, y: -0.2225993, z: 0.00000003003515, w: 0.9749101}
+      rotation: {x: 0.000000119209275, y: -0.22259928, z: 0.000000017927958, w: 0.97491}
       scale: {x: 1, y: 0.99999994, z: 0.99999994}
     - name: foot_l
       parentName: 
@@ -800,12 +806,12 @@ ModelImporter:
     - name: thigh_r
       parentName: 
       position: {x: 0.09049304, y: -0.015564476, z: -0.010881403}
-      rotation: {x: 0.92523044, y: 0.07075461, z: -0.21498567, w: -0.3045056}
+      rotation: {x: 0.92523044, y: 0.07075463, z: -0.21498568, w: -0.30450556}
       scale: {x: 0.99999994, y: 1.0000001, z: 1.0000004}
     - name: calf_r
       parentName: 
       position: {x: 0.000000006519258, y: 0.34403086, z: 0.000000003259629}
-      rotation: {x: 0.00000008940696, y: 0.2225993, z: -0.00000003003515, w: 0.9749101}
+      rotation: {x: 0.000000119209275, y: 0.22259928, z: -0.000000017927958, w: 0.97491}
       scale: {x: 1, y: 0.99999994, z: 0.99999994}
     - name: foot_r
       parentName: 

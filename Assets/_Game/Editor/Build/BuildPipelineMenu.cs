@@ -91,7 +91,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (lIdle != null) lIdle.SampleAnimation(lAgent, 0f);
                 lAgent.transform.SetPositionAndRotation(Vector3.zero, Quaternion.Euler(0f, 160f, 0f));
                 Transform lHead = lAgent.GetComponent<Animator>().GetBoneTransform(HumanBodyBones.Head);
-                Vector3 lFace = lHead.position + Vector3.up * 0.05f;
+                Vector3 lFace = lHead.position + Vector3.up * 0.1f;
 
                 // Warm key from the camera's right, a hard cold rim from behind on both edges, a faint fill.
                 IconLight(lScene, Quaternion.Euler(22f, -35f, 0f), new Color(1f, 0.84f, 0.68f), 1.7f);

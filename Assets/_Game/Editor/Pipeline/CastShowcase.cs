@@ -228,6 +228,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             _player.Motor.Teleport(lHit.position + Vector3.up * 0.1f, 0f);
             yield return new WaitForSeconds(0.3f);
             NoiseSystem.Emit(_player.Eye, 40f, NoiseKind.Alarming, _player.OwnerClientId);
+            yield return Measure(4f);
             Vector3 lCam = lCentre + (lHit.position - lCentre).normalized * 9f + Vector3.up * 4f;
             for (int i = 0; i < 6; i++)
             {
@@ -235,6 +236,63 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 yield return Shot($"flee_{i:00}", lCam, lCentre + Vector3.up, 55f, 1600, 900);
             }
             Log("flee: shot fired near " + lCentre.ToString("F0"));
+        }
+
+        /// <summary>
+        /// In-game check of the running bodies near the player (foot IK and hand push-out active): the
+        /// world speed of planted feet, and how close the hand bones come to the torso axis.
+        /// </summary>
+        private IEnumerator Measure(float pSeconds)
+        {
+            List<HumanBody> lBodies = new List<HumanBody>();
+            foreach (Npc lNpc in Npc.All)
+            {
+                if (lNpc == null || !lNpc.Health.IsAlive || (lNpc.transform.position - _player.transform.position).sqrMagnitude > 30f * 30f) continue;
+                HumanBody lBody = lNpc.GetComponentInChildren<HumanBody>();
+                if (lBody != null && lBody.Animator != null && lBody.Animator.isHuman) lBodies.Add(lBody);
+            }
+            Dictionary<Transform, Vector3> lLast = new Dictionary<Transform, Vector3>();
+            List<float> lSlides = new List<float>(), lHands = new List<float>();
+            float lEnd = Time.time + pSeconds;
+            while (Time.time < lEnd)
+            {
+                yield return new WaitForEndOfFrame();
+                float dt = Mathf.Max(Time.deltaTime, 0.0001f);
+                foreach (HumanBody lBody in lBodies)
+                {
+                    if (lBody == null || lBody.Animator == null) continue;
+                    float lScale = lBody.Model != null ? lBody.Model.lossyScale.y : 1f;
+                    Vector3 lMove = lBody.transform.position - (lLast.TryGetValue(lBody.transform, out Vector3 lPrevBody) ? lPrevBody : lBody.transform.position);
+                    bool lMoving = lMove.magnitude / dt > 0.8f;
+                    lLast[lBody.transform] = lBody.transform.position;
+                    foreach (HumanBodyBones lBone in new[] { HumanBodyBones.LeftFoot, HumanBodyBones.RightFoot })
+                    {
+                        Transform lFoot = lBody.Animator.GetBoneTransform(lBone);
+                        if (lFoot == null) continue;
+                        bool lHad = lLast.TryGetValue(lFoot, out Vector3 lPrev);
+                        lLast[lFoot] = lFoot.position;
+                        if (!lHad || !lMoving || lFoot.position.y - lBody.transform.position.y > 0.12f * lScale || lPrev.y - lBody.transform.position.y > 0.12f * lScale) continue;
+                        Vector3 lD = lFoot.position - lPrev;
+                        lD.y = 0f;
+                        lSlides.Add(lD.magnitude / dt);
+                    }
+                    if (lBody.Hips == null || lBody.Chest == null) continue;
+                    foreach (Transform lHand in new[] { lBody.HandL, lBody.HandR })
+                    {
+                        if (lHand == null) continue;
+                        Vector3 lAxis = lBody.Chest.position - lBody.Hips.position;
+                        float t = Mathf.Clamp01(Vector3.Dot(lHand.position - lBody.Hips.position, lAxis) / Mathf.Max(lAxis.sqrMagnitude, 1e-4f));
+                        Vector3 lAway = lHand.position - (lBody.Hips.position + lAxis * t);
+                        lAway.y = 0f;
+                        lHands.Add(lAway.magnitude / lScale);
+                    }
+                }
+            }
+            lSlides.Sort();
+            lHands.Sort();
+            float lMedian = lSlides.Count > 0 ? lSlides[lSlides.Count / 2] : -1f;
+            float lP10 = lHands.Count > 0 ? lHands[lHands.Count / 10] : -1f, lMin = lHands.Count > 0 ? lHands[0] : -1f;
+            Log($"in-game measure over {pSeconds:0}s, {lBodies.Count} bodies near the player: planted-foot world speed median {lMedian:0.000} m/s ({lSlides.Count} samples); hand bone to torso axis min {lMin:0.000} m, 10th percentile {lP10:0.000} m (push-out radius {0.15f:0.00} m)");
         }
 
         /// <summary>A crowd member dies on the spot: the ragdoll falls and the face shows X eyes.</summary>

@@ -554,12 +554,47 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             float lGround = lHit.point.y - transform.position.y;
             if (lGround < -0.5f || lGround > 0.5f) { _animator.SetIKPositionWeight(pGoal, 0f); _animator.SetIKRotationWeight(pGoal, 0f); return 0f; }
             Vector3 lTarget = new Vector3(lFoot.x, lHit.point.y + Mathf.Max(lLift, 0.06f), lFoot.z);
+            lTarget = LockFoot(pGoal == AvatarIKGoal.LeftFoot ? 0 : 1, lTarget, lLift);
             Quaternion lSlope = Quaternion.FromToRotation(Vector3.up, Vector3.Slerp(Vector3.up, lHit.normal, 0.8f));
             _animator.SetIKPositionWeight(pGoal, _footWeight);
             _animator.SetIKRotationWeight(pGoal, _footWeight * Mathf.Clamp01(1f - lLift * 6f));
             _animator.SetIKPosition(pGoal, lTarget + Vector3.up * -_pelvisOffset * 0f);
             _animator.SetIKRotation(pGoal, lSlope * lRotation);
             return lGround;
+        }
+
+        // Foot locking: a foot that is down and nearly still in the clip stays where it landed in the
+        // world until it lifts (the in-place clips' planted foot otherwise drifts with the hips' sway).
+        private readonly Vector3[] _footLock = new Vector3[2], _footPrevious = new Vector3[2], _footRelease = new Vector3[2];
+        private readonly bool[] _footLocked = new bool[2];
+        private const float PLANT_HEIGHT = 0.11f, PLANT_SPEED = 1.1f, LOCK_REACH = 0.22f;
+
+        private Vector3 LockFoot(int pIndex, Vector3 pTarget, float pLift)
+        {
+            float dt = Mathf.Max(Time.deltaTime, 0.0001f);
+            Vector3 lDelta = pTarget - _footPrevious[pIndex];
+            lDelta.y = 0f;
+            float lSpeed = lDelta.magnitude / dt;
+            _footPrevious[pIndex] = pTarget;
+            bool lDown = pLift < PLANT_HEIGHT * Mathf.Max(0.5f, transform.lossyScale.y);
+            if (_footLocked[pIndex])
+            {
+                Vector3 lOff = pTarget - _footLock[pIndex];
+                lOff.y = 0f;
+                if (!lDown || lOff.magnitude > LOCK_REACH)
+                {
+                    _footLocked[pIndex] = false;
+                    _footRelease[pIndex] = -lOff;   // ease back onto the clip over a few frames
+                }
+            }
+            else if (lDown && lSpeed < PLANT_SPEED)
+            {
+                _footLocked[pIndex] = true;
+                _footLock[pIndex] = pTarget;
+            }
+            if (_footLocked[pIndex]) return new Vector3(_footLock[pIndex].x, pTarget.y, _footLock[pIndex].z);
+            _footRelease[pIndex] = Vector3.MoveTowards(_footRelease[pIndex], Vector3.zero, dt * 2.5f);
+            return pTarget + _footRelease[pIndex];
         }
 
         private bool IsNearCamera(float pRange)

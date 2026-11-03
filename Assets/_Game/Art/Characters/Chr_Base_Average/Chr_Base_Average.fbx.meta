@@ -1,7 +1,7 @@
 fileFormatVersion: 2
 guid: e6a8a02258ee9f04db30adb247e9a89f
 ModelImporter:
-  serializedVersion: 24200
+  serializedVersion: 24600
   internalIDToNameTable: []
   externalObjects:
   - first:
@@ -59,6 +59,7 @@ ModelImporter:
     materialName: 0
     materialSearch: 1
     materialLocation: 1
+    searchTexturesGlobally: 1
   animations:
     legacyGenerateAnimations: 4
     bakeSimulation: 0
@@ -91,6 +92,8 @@ ModelImporter:
     addColliders: 0
     useSRGBMaterialColor: 1
     sortHierarchyByName: 1
+    preBakeConvexCollisionMesh: 0
+    preBakeTriangleCollisionMesh: 0
     importPhysicalCameras: 1
     importVisibility: 1
     importBlendShapes: 1
@@ -112,6 +115,8 @@ ModelImporter:
     generateMeshLods: 0
     meshLodGenerationFlags: 0
     maximumMeshLod: -1
+    importUVs: -1
+    importVertexColors: 1
     meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
@@ -131,6 +136,7 @@ ModelImporter:
     legacyComputeAllNormalsFromSmoothingGroupsWhenMeshHasBlendShapes: 0
     blendShapeNormalImportMode: 1
     normalSmoothingSource: 0
+    calculateBlendshapeNormalsDeltaFromImportedNormals: 1
   referencedClips: []
   importAnimation: 0
   humanDescription:
@@ -195,7 +201,7 @@ ModelImporter:
     - boneName: upperarm_l
       humanName: LeftUpperArm
       limit:
-        min: {x: -90, y: -100, z: -46}
+        min: {x: -90, y: -100, z: -38}
         max: {x: 90, y: 100, z: 100}
         value: {x: 0, y: 0, z: 0}
         length: 0
@@ -227,7 +233,7 @@ ModelImporter:
     - boneName: upperarm_r
       humanName: RightUpperArm
       limit:
-        min: {x: -90, y: -100, z: -46}
+        min: {x: -90, y: -100, z: -38}
         max: {x: 90, y: 100, z: 100}
         value: {x: 0, y: 0, z: 0}
         length: 0
@@ -601,12 +607,12 @@ ModelImporter:
     - name: lowerarm_l
       parentName: 
       position: {x: 0.000000029498858, y: 0.29999998, z: 0.0000000055796874}
-      rotation: {x: -0.000000029802315, y: -0.031757627, z: 0.00000005611217, w: 0.9994956}
+      rotation: {x: 0.000000007450579, y: -0.031757664, z: -0.00000036042175, w: 0.9994956}
       scale: {x: 0.99999994, y: 0.99999994, z: 0.99999994}
     - name: hand_l
       parentName: 
       position: {x: 4.9557913e-11, y: 0.265, z: -6.62463e-10}
-      rotation: {x: -0.011556442, y: -0.44181788, z: 0.023308128, w: 0.89672744}
+      rotation: {x: -0.011556504, y: -0.4418179, z: 0.023308136, w: 0.89672744}
       scale: {x: 0.99999994, y: 0.99999994, z: 1}
     - name: index_01_l
       parentName: 
@@ -691,17 +697,17 @@ ModelImporter:
     - name: upperarm_r
       parentName: 
       position: {x: 0.00000012746997, y: 0.16713469, z: -0.0000000037050998}
-      rotation: {x: 0.068484604, y: 0.0026749892, z: 0.041182175, w: 0.9967983}
+      rotation: {x: 0.068484604, y: 0.0026749857, z: 0.04118224, w: 0.9967983}
       scale: {x: 1, y: 1.0000001, z: 1}
     - name: lowerarm_r
       parentName: 
       position: {x: 0.00000002976186, y: 0.29999995, z: 1.8736379e-10}
-      rotation: {x: -0, y: 0.031757724, z: -0.00000006170011, w: 0.9994957}
+      rotation: {x: -0.000000007450578, y: 0.03175764, z: -0.00000030361105, w: 0.9994956}
       scale: {x: 1, y: 1, z: 1.0000001}
     - name: hand_r
       parentName: 
       position: {x: 0.000000029817357, y: 0.26500005, z: 4.5992476e-10}
-      rotation: {x: -0.011556691, y: 0.44181785, z: -0.023307687, w: 0.89672756}
+      rotation: {x: -0.011556636, y: 0.44181782, z: -0.023307689, w: 0.89672756}
       scale: {x: 1, y: 1, z: 1.0000001}
     - name: index_01_r
       parentName: 
@@ -796,7 +802,7 @@ ModelImporter:
     - name: calf_l
       parentName: 
       position: {x: 0.000000012450117, y: 0.41021937, z: 0.0000000028832716}
-      rotation: {x: -0.00000016391276, y: -0.24591328, z: 0.000000026950143, w: 0.96929187}
+      rotation: {x: -0.00000018626451, y: -0.24591328, z: 0.000000023690518, w: 0.96929187}
       scale: {x: 0.99999994, y: 1, z: 0.9999999}
     - name: foot_l
       parentName: 
@@ -816,7 +822,7 @@ ModelImporter:
     - name: calf_r
       parentName: 
       position: {x: 0.0000000019539272, y: 0.41021943, z: 0.000000002775741}
-      rotation: {x: -0.00000016391276, y: 0.24591328, z: -0.00000006912159, w: 0.9692918}
+      rotation: {x: -0.00000018626453, y: 0.24591328, z: -0.00000006583287, w: 0.96929187}
       scale: {x: 1, y: 1.0000001, z: 1.0000001}
     - name: foot_r
       parentName: 

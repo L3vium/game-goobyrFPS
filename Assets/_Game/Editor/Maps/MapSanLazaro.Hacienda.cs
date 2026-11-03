@@ -17,7 +17,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             _casa = CasaSpec(CASA, 0f);
             Lot(_casa, 2f, Ground.Cobble);
+            // The gravel drive from the frisk gate to the portico.
+            Road(4f, Ground.Asphalt, new Vector2(78f, 76f), new Vector2(94f, 85f), new Vector2(108f, 94f));
             _garage = Facing("Garage", new Vector2(140f, 124f), PAD_Y, 3, 12f, 11f, ArchStyles.Colonial(new Color(0.96f, 0.95f, 0.91f), "casa"), ZONE_HACIENDA);
+            _garage.style.chimneys = 0;
             _garage.Room("GarageBay", 0, 0, 0, 12, 11, RoomType.Garage, SecurityTier.Restricted, AccessLevel.Staff);
             _garage.Door(0, 6f, 0, DoorKind.Doorway, 4.5f).height = 3.2f;
             _garage.Door(0, 12f, 8f, DoorKind.Door, 1.1f);
@@ -119,7 +122,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lLinesRoot.transform.SetParent(K.Props, false);
             lLines.Flush(lLinesRoot.transform, "SanLazaro_LaundryLines");
             ArchOutdoor.Sign(A, G(108f, 139f, 0f), 180f, "Solo personal");
-            ArchOutdoor.Sign(A, C(37f, 0, 32.6f, 1.6f), 180f, "Cocina - Solo personal", false);
+            // Flat on the casa's north wall, beside the kitchen yard door (clear of its jamb and the corner quoins).
+            ArchOutdoor.Sign(A, C(38.2f, 0, 32.02f, 1.6f), 180f, "Cocina - Solo personal", false);
             // The frisk lane at the main gate: a guard booth, rope lines, the sign.
             ArchOutdoor.GuardBooth(A, G(80.5f, 72.5f, 0f), 180f, false);
             ArchOutdoor.RopeLine(A, G(73f, 71f, 0f), G(73f, 78f, 0f));

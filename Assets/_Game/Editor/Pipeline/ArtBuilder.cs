@@ -69,17 +69,39 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Material lGlint = EditorAssets.Material(EditorAssets.ART_RESOURCES + "/M_SnowGlint.mat", Shader.Find("Goobyr/SnowGlint"));
             lGlint.shader = Shader.Find("Goobyr/SnowGlint");
             lGlint.enableInstancing = true;
+            // Sparse, bright stars at 1080p toward the sun: facets within ~13° of the mirror angle flash.
+            lGlint.SetFloat("_Size", 0.06f);
+            lGlint.SetFloat("_Sharpness", 200f);
+            lGlint.SetFloat("_Intensity", 60f);
+            lGlint.SetFloat("_FadeFar", 45f);
             EditorUtility.SetDirty(lGlint);
             return lGlint;
         }
 
-        /// <summary>The map's post stack: atmosphere (volumetric fog), white balance, grading, bloom, vignette.</summary>
+        /// <summary>
+        /// The map's post stack: atmosphere (volumetric fog), white balance, grading, bloom, vignette,
+        /// ACES. Graded in HDR (before the tonemapper), so contrast and saturation are kept calm: the
+        /// map's <see cref="FX.TimeOfDay"/> grades each biome and hour on top of this base. The
+        /// profile is rewritten in place (same asset, same GUID), so the saved map scenes take a new
+        /// grade without being rebuilt.
+        /// </summary>
         public static VolumeProfile VolumeProfileFor(MapDefinition pMap)
         {
             string lPath = EditorAssets.ROOT + "/Art/Generated/Volume_" + pMap.sceneName + ".asset";
-            AssetDatabase.DeleteAsset(lPath);
-            VolumeProfile lProfile = ScriptableObject.CreateInstance<VolumeProfile>();
-            AssetDatabase.CreateAsset(lProfile, lPath);
+            VolumeProfile lProfile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(lPath);
+            if (lProfile == null)
+            {
+                lProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+                AssetDatabase.CreateAsset(lProfile, lPath);
+            }
+            else
+            {
+                foreach (VolumeComponent lOld in lProfile.components.ToArray())
+                {
+                    lProfile.components.Remove(lOld);
+                    Object.DestroyImmediate(lOld, true);
+                }
+            }
 
             FX.Rendering.GoobyrAtmosphere lAtmosphere = Add<FX.Rendering.GoobyrAtmosphere>(lProfile);
             lAtmosphere.density.Override(pMap.volumetricDensity);
@@ -93,8 +115,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lBalance.temperature.Override(pMap.temperature);
             lBalance.tint.Override(pMap.tint);
             UnityEngine.Rendering.Universal.ColorAdjustments lColor = Add<UnityEngine.Rendering.Universal.ColorAdjustments>(lProfile);
-            lColor.saturation.Override(pMap.saturation);
-            lColor.contrast.Override(pMap.contrast);
+            lColor.saturation.Override(pMap.saturation * CALM);
+            lColor.contrast.Override(pMap.contrast * CALM);
             lColor.postExposure.Override(pMap.postExposure);
             UnityEngine.Rendering.Universal.ShadowsMidtonesHighlights lSmh = Add<UnityEngine.Rendering.Universal.ShadowsMidtonesHighlights>(lProfile);
             lSmh.shadows.Override(new Vector4(pMap.shadowsTint.r, pMap.shadowsTint.g, pMap.shadowsTint.b, 0f));
@@ -111,6 +133,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             EditorUtility.SetDirty(lProfile);
             return lProfile;
         }
+
+        /// <summary>How much of the map definition's contrast and saturation survives grading in HDR (they were tuned for LDR).</summary>
+        private const float CALM = 0.4f;
 
         private static T Add<T>(VolumeProfile pProfile) where T : VolumeComponent
         {
@@ -160,6 +185,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lAsset.mainLightShadowmapResolution = 4096;
                 lAsset.shadowDepthBias = 0.6f;
                 lAsset.shadowNormalBias = 0.6f;
+                // Grade before the tonemapper: highlights roll off instead of clipping to flat colour.
+                lAsset.colorGradingMode = UnityEngine.Rendering.Universal.ColorGradingMode.HighDynamicRange;
+                // A 64-bit HDR buffer: R11G11B10's 5-6 bit mantissas band the sky's and the clouds' soft gradients.
+                lAsset.hdrColorBufferPrecision = UnityEngine.Rendering.Universal.HDRColorBufferPrecision._64Bits;
                 EditorUtility.SetDirty(lAsset);
             }
             AssetDatabase.SaveAssets();
@@ -182,7 +211,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 SerializedObject lRendererData = new SerializedObject(pRenderer);
                 SerializedProperty lMap = lRendererData.FindProperty("m_RendererFeatureMap");
                 lMap.arraySize++;
-                lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = lFeature.GetInstanceID();
+                lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = AssetDatabase.TryGetGUIDAndLocalFileIdentifier(lFeature, out string _, out long lFileId) ? lFileId : 0;
                 lRendererData.ApplyModifiedPropertiesWithoutUndo();
             }
             SerializedObject lSerialized = new SerializedObject(lFeature);
@@ -202,7 +231,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             SerializedObject lRendererData = new SerializedObject(pRenderer);
             SerializedProperty lMap = lRendererData.FindProperty("m_RendererFeatureMap");
             lMap.arraySize++;
-            lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = lFeature.GetInstanceID();
+            lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = AssetDatabase.TryGetGUIDAndLocalFileIdentifier(lFeature, out string _, out long lFileId) ? lFileId : 0;
             lRendererData.ApplyModifiedPropertiesWithoutUndo();
             lFeature.Create();
             EditorUtility.SetDirty(pRenderer);

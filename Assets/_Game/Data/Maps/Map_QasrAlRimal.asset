@@ -14,9 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.MapDefinition
   displayName: Qasr al-Rimal
   sceneName: Map_QasrAlRimal
-  description: 'An oasis town on audience day: the souk under the Great Mesa, a palm
-    grove and its dry wadi, the governor''s citadel on the rock and a radar on the
-    Little Mesa.'
+  description: 'An oasis town on audience day: the souk under the Great Mesa, a palm grove and its dry wadi, the governor''s citadel on the rock and a radar on the Little Mesa.'
   zoneNames:
   - Ain Zarqa
   - Grove, Wadi & Radar
@@ -54,8 +52,7 @@ MonoBehaviour:
   planStorey: 3.6
   targets:
   - displayName: Selin Arda
-    dossier: Arms buyer. Bus station, tea house, caravanserai, never sits far from
-      a brazier.
+    dossier: Arms buyer. Bus station, tea house, caravanserai, never sits far from a brazier.
     zone: 0
     bodyColor: {r: 0.49019608, g: 0.23529412, b: 0.59607846, a: 1}
     hat: 3
@@ -63,7 +60,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 2
-    routine: 080000000b0000000600000001000000
+    routine: 080000000b0000000600000001000000i
     enabled: 1
   - displayName: Hajj Mansour
     dossier: Gold dealer of the covered souk. Weighs everything twice.
@@ -74,7 +71,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 1
-    routine: 03000000010000000500000002000000
+    routine: 03000000010000000500000002000000i
     enabled: 1
   - displayName: Sheikh Badr al-Fahim
     dossier: Caravan master. Every truck in the oasis pays him.
@@ -85,7 +82,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 5
-    routine: 0a000000050000000600000007000000
+    routine: 0a000000050000000600000007000000i
     enabled: 1
   - displayName: Captain Farid Lahlou
     dossier: Town police. Sells the citadel the names of petitioners.
@@ -96,7 +93,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 4
-    routine: 03000000070000000800000004000000
+    routine: 03000000070000000800000004000000i
     enabled: 1
   - displayName: Mona Haddad
     dossier: Runs the souk's smugglers from the minaret's shadow.
@@ -107,7 +104,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 0
-    routine: 01000000000000000900000005000000
+    routine: 01000000000000000900000005000000i
     enabled: 1
   - displayName: Colonel Rashed
     dossier: Commands the radar. Walks the rope bridge to the keep every hour.
@@ -118,7 +115,7 @@ MonoBehaviour:
     character: 
     bodyguards: 3
     proof: 3
-    routine: 0300000009000000000000000a000000
+    routine: 0300000009000000000000000a000000i
     enabled: 1
   - displayName: Adjutant Karim
     dossier: The colonel's shadow. Sees through every pass.
@@ -129,7 +126,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 4
-    routine: 08000000060000000700000005000000
+    routine: 08000000060000000700000005000000i
     enabled: 1
   - displayName: Dr. Nabil Sayegh
     dossier: Radar engineer. The dish is his and nobody else's.
@@ -140,7 +137,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 2
-    routine: 030000000a0000000100000002000000
+    routine: 030000000a0000000100000002000000i
     enabled: 1
   - displayName: Foreman Youssef
     dossier: Runs the date press and the tithe scale.
@@ -151,7 +148,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 5
-    routine: 08000000040000000b00000007000000
+    routine: 08000000040000000b00000007000000i
     enabled: 1
   - displayName: Layla Bennani
     dossier: Buys the oasis's water rights, one well at a time.
@@ -162,7 +159,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 0
-    routine: 01000000040000000600000005000000
+    routine: 01000000040000000600000005000000i
     enabled: 1
   - displayName: Governor Nasser al-Hadd
     dossier: Study, war room, the throne, tea on the pool terrace.
@@ -173,7 +170,7 @@ MonoBehaviour:
     character: 
     bodyguards: 3
     proof: 1
-    routine: 030000000b0000000100000005000000
+    routine: 030000000b0000000100000005000000i
     enabled: 1
   - displayName: Treasurer Idris
     dossier: Counts the vault, the archive and the tithe.
@@ -184,7 +181,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 5
-    routine: 03000000080000000600000002000000
+    routine: 03000000080000000600000002000000i
     enabled: 1
   - displayName: Chamberlain Aziz
     dossier: Keeps the doors of the keep and the secrets behind them.
@@ -195,7 +192,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 3
-    routine: 08000000050000000600000007000000
+    routine: 08000000050000000600000007000000i
     enabled: 1
   - displayName: Samira al-Hadd
     dossier: The governor's daughter. Holds court on the roof.
@@ -206,7 +203,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 1
-    routine: 01000000040000000500000002000000
+    routine: 01000000040000000500000002000000i
     enabled: 1
   - displayName: General Halim Darwish
     dossier: Visiting with an army for sale.
@@ -217,5 +214,5 @@ MonoBehaviour:
     character: 
     bodyguards: 3
     proof: 0
-    routine: 0b0000000a0000000900000001000000
+    routine: 0b0000000a0000000900000001000000i
     enabled: 1

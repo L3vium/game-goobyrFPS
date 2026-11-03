@@ -41,7 +41,58 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void LateUpdate()
         {
             if ((_weaponModel == null || _weaponModel.transform.parent == null) && _npc.Weapon != null && _npc.Health.IsAlive) RefreshWeapon(true);
+            UpdateTorch();
+            UpdateSurprise();
             if (!_npc.Health.IsAlive) enabled = false;
+        }
+
+        private NpcState _lastState = NpcState.Idle;
+        private HumanAnimator _animator;
+
+        /// <summary>The face's surprise (local, cosmetic) when the NPC spots something: calm -> alert.</summary>
+        private void UpdateSurprise()
+        {
+            NpcState lState = _npc.State.Value;
+            if (lState == _lastState) return;
+            bool lWasCalm = _lastState == NpcState.Idle || _lastState == NpcState.Patrol || _lastState == NpcState.Routine || _lastState == NpcState.Escort;
+            bool lAlert = lState == NpcState.Suspicious || lState == NpcState.Engaged || lState == NpcState.Combat || lState == NpcState.Flee;
+            _lastState = lState;
+            if (!lWasCalm || !lAlert) return;
+            if (_animator == null) _animator = GetComponentInChildren<HumanAnimator>();
+            if (_animator != null) _animator.Surprise();
+        }
+
+        private const int NIGHT = 3;
+        private Light _torch;
+
+        /// <summary>
+        /// At night a guard on the move - patrolling, checking something out, searching, fighting -
+        /// carries a torch along its aim: the beams sweeping the dark show the player where the hunt is.
+        /// </summary>
+        private void UpdateTorch()
+        {
+            NpcState lState = _npc.State.Value;
+            bool lOn = _npc.Health.IsAlive && _npc.Weapon != null && !_npc.IsCrowd && !_npc.IsTarget
+                       && TimeOfDay.Instance != null && TimeOfDay.Instance.Current == NIGHT
+                       && (lState == NpcState.Patrol || lState == NpcState.Investigate || lState == NpcState.Search || lState == NpcState.Engaged || lState == NpcState.Combat);
+            if (lOn && _torch == null)
+            {
+                _torch = new GameObject("Torch").AddComponent<Light>();
+                _torch.transform.SetParent(transform, false);
+                _torch.type = LightType.Spot;
+                _torch.range = 20f;
+                _torch.spotAngle = 44f;
+                _torch.innerSpotAngle = 18f;
+                _torch.intensity = 7f;
+                _torch.color = new Color(1f, 0.94f, 0.82f);
+                _torch.shadows = LightShadows.None;
+            }
+            if (_torch == null) return;
+            if (_torch.enabled != lOn) _torch.enabled = lOn;
+            if (!lOn) return;
+            float lScale = transform.localScale.y;
+            _torch.transform.position = transform.position + transform.up * (1.35f * lScale) + transform.forward * 0.35f + transform.right * 0.15f;
+            _torch.transform.rotation = transform.rotation * Quaternion.Euler(_npc.AimPitch.Value + 8f, 0f, 0f);
         }
     }
 

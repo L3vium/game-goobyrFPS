@@ -18,6 +18,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public static ArchSpec CasaSpec(Vector3 pOrigin, float pYaw)
         {
             ArchSpec c = new ArchSpec { name = "CasaLaCumbre", origin = pOrigin, yaw = pYaw, size = new Vector2(40, 32), style = ArchStyles.Grand(ArchStyles.Colonial(new Color(0.96f, 0.95f, 0.91f), "casa"), new Color(0.95f, 0.88f, 0.72f), "casa"), zone = ZONE_HACIENDA };
+            c.style.quoins = true;
             const SecurityTier P = SecurityTier.Public, R = SecurityTier.Restricted, H = SecurityTier.Hostile;
             const AccessLevel Gu = AccessLevel.Guest, St = AccessLevel.Staff, Se = AccessLevel.Security, Pr = AccessLevel.Private, No = AccessLevel.None;
             _ = P;
@@ -132,7 +133,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (Rect r in PatioRing()) { ArchRoom lUpper = c.Room("UpperGallery", 2, r.xMin, r.yMin, r.xMax, r.yMax, RoomType.Gallery, R, St); lUpper.arcade = true; }
             c.Door(2, 10, 28); c.Door(2, 20, 28); c.Door(2, 30, 28); c.Door(2, 35, 24);
             c.Door(2, 3, 24); c.Door(2, 35, 14); c.Door(2, 5, 14);
-            c.Door(2, 10, 19); c.Door(2, 30, 19); c.Door(2, 15, 6); c.Door(2, 25, 6); c.Door(2, 15, 24);
+            c.Door(2, 10, 19); c.Door(2, 30, 19); c.Door(2, 15, 6); c.Secure(2, 25, 6, SecureDoor.Lock.Padlock, false, "Sewing-room door"); c.Door(2, 15, 24);
             c.Door(2, 10, 3); c.Door(2, 30, 3);
             c.balconies.Add(new ArchBalcony { floor = 2, at = new Vector2(15, 0), width = 2.4f });
             c.balconies.Add(new ArchBalcony { floor = 2, at = new Vector2(25, 0), width = 2.4f });
@@ -168,6 +169,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lHood.grilles.Add((5, new Vector3Int(0, 1, 0), "Roof vent"));
             c.ducts.Add(lHood);
 
+            // Floor kept free for the sentry guns and their hidden terminals (MapSanLazaro.Security).
+            c.reserved.Add((-2, new Rect(24.3f, 10.6f, 1.4f, 1.2f)));
+            c.reserved.Add((-1, new Rect(27.4f, 30.3f, 2.4f, 1.2f)));
+            c.reserved.Add((1, new Rect(23.05f, 30.3f, 1.4f, 1.2f)));
+            c.reserved.Add((1, new Rect(10.3f, 30.3f, 1.4f, 1.2f)));
+            c.reserved.Add((2, new Rect(20.1f, 0.5f, 2.2f, 1.6f)));
             c.cornices.Add(1);
             c.cornices.Add(2);
             c.drains.Add(new ArchDrain { at = new Vector2(0, 20.5f), topFloor = 1, poi = "North drainpipe" });

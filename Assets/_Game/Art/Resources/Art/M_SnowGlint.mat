@@ -25,10 +25,10 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _FadeFar: 30
-    - _Intensity: 14
-    - _Sharpness: 900
-    - _Size: 0.03
+    - _FadeFar: 45
+    - _Intensity: 60
+    - _Sharpness: 200
+    - _Size: 0.06
     m_Colors:
     - _Tint: {r: 0.92, g: 0.96, b: 1, a: 1}
   m_BuildTextureStacks: []

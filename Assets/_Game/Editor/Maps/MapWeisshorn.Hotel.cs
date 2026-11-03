@@ -20,8 +20,20 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lStyle.plinth = ArchLib.Surface("stone_wall", 2.5f);
             lStyle.windowSpacing = 3.2f;
             lStyle.trim = ArchLib.Tinted("stone_wall", new Color(0.92f, 0.9f, 0.86f), "alp_trim", 2f);
+            lStyle.quoins = true;
+            lStyle.chimneys = 4;
             lStyle = ArchStyles.Grand(lStyle, new Color(0.86f, 0.8f, 0.68f), "hotel");
+            // Facade variety, decoration only: flower boxes and Juliet rails off the VIP floor, dormers, a shutter colour per wing.
+            lStyle.flowerBoxes = true;
+            lStyle.dormers = 3;
+            lStyle.shutterWings = new[]
+            {
+                ArchLib.Tinted("wooden_planks", new Color(0.55f, 0.12f, 0.1f), "alp_shutter", 1.2f),
+                ArchLib.Tinted("wooden_planks", new Color(0.16f, 0.34f, 0.2f), "alp_shutter_green", 1.2f),
+                ArchLib.Tinted("wooden_planks", new Color(0.2f, 0.3f, 0.45f), "alp_shutter_blue", 1.2f)
+            };
             ArchSpec h = new ArchSpec { name = "GrandHotel", origin = pOrigin, size = new Vector2(70, 30), storey = 4f, style = lStyle, zone = ZONE_HOTEL, plinth = 1.2f, cutLand = true };
+            h.plainFloors.Add(4);
             const SecurityTier R = SecurityTier.Restricted, H = SecurityTier.Hostile;
             const AccessLevel Gu = AccessLevel.Guest, St = AccessLevel.Staff, Se = AccessLevel.Security, Pr = AccessLevel.Private, No = AccessLevel.None;
             ArchMat lStone = ArchLib.Surface("stone_wall", 2.5f);
@@ -165,6 +177,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lDumb.grilles.Add((0, new Vector3Int(1, 0, 0), "Dumbwaiter"));
             h.ducts.Add(lDumb);
 
+            // Floor kept free for the sentry guns and the attic terminal (MapWeisshorn.Security).
+            h.reserved.Add((4, new Rect(24.3f, 0.5f, 1.4f, 1.4f)));
+            h.reserved.Add((4, new Rect(38.3f, 28.3f, 1.4f, 1.25f)));
+            h.reserved.Add((5, new Rect(1.8f, 28.3f, 2.6f, 1.25f)));
             h.cornices.Add(3); h.cornices.Add(4); h.cornices.Add(5);
             h.drains.Add(new ArchDrain { at = new Vector2(1.5f, 0), topFloor = 3, poi = "South drainpipe" });
             h.drains.Add(new ArchDrain { at = new Vector2(0, 8f), topFloor = 4 });

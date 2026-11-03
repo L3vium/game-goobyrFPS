@@ -19,11 +19,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     /// <list type="bullet">
     /// <item>above each NPC, a diamond: an outline filling white → amber with its gauge, amber "!"
     /// when it confronts, red "!" in combat, "?" while searching, a phone with a countdown ring while
-    /// it calls (kill it first); the alerted ones stay pinned to the screen edge when off-screen;</item>
+    /// it calls (kill it first), a pulsing amber "!" over a witness running to a guard (stop it); the
+    /// alerted ones and the witnesses stay pinned to the screen edge when off-screen;</item>
     /// <item>around the crosshair, one arc per NPC noticing you, pointing at it, growing and warming
     /// with its gauge;</item>
     /// <item>the status chip above the minimap (hidden, concealed, suspicious, spotted, searching,
-    /// combat) and a red chevron over the target, always.</item>
+    /// combat - or "weapon out" with people around, since a drawn gun is noticed) and a red chevron
+    /// over the target, always.</item>
     /// </list>
     /// </summary>
     public class ThreatMarkers : MonoBehaviour
@@ -36,6 +38,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         public static readonly Color Blue = new Color(0.45f, 0.72f, 1f);
 
         private const float SHOW_RANGE = 70f, EDGE = 70f, ARC_RADIUS = 120f;
+        /// <summary>The "weapon out" warning shows while someone is this close.</summary>
+        private const float WATCHED = 35f;
+        /// <summary>A reporting witness stays pinned to the screen edge this close.</summary>
+        private const float WITNESS_PIN = 60f;
         private const int MAX_ARCS = 8;
 
         private class Marker
@@ -122,6 +128,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
             ThreatStatus lStatus = ThreatStatus.None;
             int lArc = 0;
+            bool lWatched = false;
             Vector3 lCamPos = lCamera.transform.position;
             Npc lTarget = null;
 
@@ -142,6 +149,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                     if (lArc < MAX_ARCS && lFrom >= ThreatStatus.Suspicious) DrawArc(lArc++, lCamera, lNpc.transform.position, lFrom, lGauge);
                 }
                 if (lState == NpcState.Search && lMe != null && lStatus < ThreatStatus.Searching && (lNpc.transform.position - lMe.transform.position).sqrMagnitude < 45f * 45f) lStatus = ThreatStatus.Searching;
+                if (lMe != null && lNpc.Health.IsAlive && (lNpc.transform.position - lMe.transform.position).sqrMagnitude < WATCHED * WATCHED) lWatched = true;
 
                 UpdateMarker(lNpc, lCamera, lCamPos, lMine, lState, lGauge);
             }
@@ -159,7 +167,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 else if (lMe.InGrass.Value && lMe.Crouched.Value) lStatus = ThreatStatus.Concealed;
             }
             Status = lMe != null && lMe.Health.IsAlive ? lStatus : ThreatStatus.None;
-            UpdateChip();
+            // A gun out is noticed (suspicious anywhere, a crime outside public places): say so when people are around.
+            UpdateChip(lWatched && lMe.Health.IsAlive && Npc.WeaponDrawn(lMe));
             UpdateTension();
             UpdateTarget(lCamera, lTarget, lMe);
         }
@@ -171,13 +180,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
             bool lAlive = pNpc.Health.IsAlive;
             bool lAlert = lAlive && (pState == NpcState.Engaged || pState == NpcState.Combat || pState == NpcState.Calling);
-            bool lShow = lAlive ? lAlert || pState == NpcState.Search || pGauge > 0.02f || pState == NpcState.Flee || pState == NpcState.Sick : pState == NpcState.KnockedOut;
+            bool lShow = lAlive ? lAlert || pState == NpcState.Search || pGauge > 0.02f || pState == NpcState.Flee || pState == NpcState.Sick || pState == NpcState.Report : pState == NpcState.KnockedOut;
             Vector3 lHead = pNpc.transform.position + Vector3.up * (Core.BodyMetrics.MARKER * pNpc.transform.localScale.y);
             float lDistance = Vector3.Distance(pCamPos, lHead);
             if (!lShow || lDistance > (pState == NpcState.KnockedOut ? 20f : SHOW_RANGE)) { lMarker.root.gameObject.SetActive(false); return; }
 
-            // Alerted NPCs that concern you stay pinned to the screen edge.
-            bool lPin = lAlert && (pMine || pState == NpcState.Calling);
+            // Alerted NPCs that concern you stay pinned to the screen edge - and a witness running to a guard, while there is time to stop it.
+            bool lPin = (lAlert && (pMine || pState == NpcState.Calling)) || (lAlive && pState == NpcState.Report && lDistance < WITNESS_PIN);
             if (!Place(lMarker.root, pCamera, lHead, lPin)) { lMarker.root.gameObject.SetActive(false); return; }
             lMarker.root.gameObject.SetActive(true);
             float lScale = Mathf.Lerp(1.1f, 0.65f, Mathf.InverseLerp(4f, SHOW_RANGE, lDistance));
@@ -204,6 +213,11 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                     break;
                 case NpcState.Search:
                     Paint(lMarker, new Color(0.03f, 0.03f, 0.04f, 0.7f), Amber, null, "?", Amber);
+                    break;
+                case NpcState.Report:
+                    // A witness running to tell a guard: a pulsing amber "!" - intercept it.
+                    Paint(lMarker, new Color(0.03f, 0.03f, 0.04f, 0.85f), Amber, null, "!", Amber);
+                    lScale *= 1.05f + Mathf.Sin(Time.time * 9f) * 0.08f;
                     break;
                 case NpcState.Flee:
                     Paint(lMarker, new Color(0.03f, 0.03f, 0.04f, 0.6f), White, null, "!!", White);
@@ -314,7 +328,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _tension.volume = Mathf.MoveTowards(_tension.volume, lTarget * Audio.Sfx.Volume, Time.unscaledDeltaTime * (lTarget > _tension.volume ? 0.8f : 0.25f));
         }
 
-        private void UpdateChip()
+        private void UpdateChip(bool pWeaponOut)
         {
             string lText;
             Color lColor;
@@ -331,7 +345,11 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 case ThreatStatus.Searching: lText = "SEARCHING"; lColor = Amber; break;
                 case ThreatStatus.Spotted: lText = "SPOTTED"; lColor = Amber; break;
                 case ThreatStatus.Combat: lText = "COMBAT"; lColor = Red; break;
-                default: _chip.gameObject.SetActive(false); return;
+                default:
+                    if (!pWeaponOut) { _chip.gameObject.SetActive(false); return; }
+                    lText = "WEAPON OUT";
+                    lColor = White;
+                    break;
             }
             _chip.gameObject.SetActive(true);
             _chipText.text = lText;

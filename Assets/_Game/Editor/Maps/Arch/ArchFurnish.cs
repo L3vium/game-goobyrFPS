@@ -59,7 +59,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 case RoomType.Plant: return new[] { I("Furn_Shelves_Metal", true), I("Prop_Generator") };
                 case RoomType.Classroom: return new[] { I("Furn_Bookshelf", true), I("Furn_Desk") };
                 case RoomType.Ballroom: return new[] { I("Furn_PianoGrand"), I("Furn_PottedPlant"), I("Furn_BarCounter"), I("Furn_PottedPlant"), I("Furn_Sofa"), I("Furn_FloorLamp") };
-                default: return new Item[0];
+                case RoomType.Stair: case RoomType.Terrace: return new Item[0];
+                default: return new[] { I("Furn_Cabinet", true), I("Furn_PottedPlant"), I("Furn_Shelves_Metal", true), I("Prop_Crate_Wood"), I("Furn_Armchair"), I("Furn_FloorLamp") };
             }
         }
 
@@ -70,7 +71,35 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             System.Random lRandom = new System.Random(pBuilding.spec.name.GetHashCode());
             foreach ((int f, Rect r) in pBuilding.spec.reserved) pBuilding.used.Add((f, r));
             foreach (ArchRoom lRoom in pBuilding.spec.rooms)
+            {
                 if (!lRoom.noFurniture && !lRoom.open) Room(pKit, pBuilding, lRoom, pZone, lRandom);
+                else if (lRoom.open && !lRoom.isVoid && lRoom.floor >= 0 && (lRoom.type == RoomType.Terrace || lRoom.type == RoomType.Loggia || lRoom.type == RoomType.Belvedere))
+                    Spots(pKit, pBuilding, lRoom, pZone, ActivityType.Smoke, ActivityType.Idle);
+            }
+        }
+
+        /// <summary>
+        /// The places staff and guests drift to between their stints, and guards take a break at: up to
+        /// one spot per type given, on free floor in the room (tried at its middle, then a quarter of the
+        /// way to each wall), kept free of later furniture.
+        /// </summary>
+        private static void Spots(ArchKit pKit, ArchResult b, ArchRoom pRoom, int pZone, params ActivityType[] pTypes)
+        {
+            Vector2 c = pRoom.rect.center;
+            float qx = pRoom.rect.width * 0.25f, qz = pRoom.rect.height * 0.25f;
+            Vector2[] lTries = { c, c + new Vector2(qx, 0f), c - new Vector2(qx, 0f), c + new Vector2(0f, qz), c - new Vector2(0f, qz), c + new Vector2(qx, qz), c - new Vector2(qx, qz) };
+            int lNext = 0;
+            foreach (ActivityType lType in pTypes)
+                for (; lNext < lTries.Length; lNext++)
+                {
+                    Vector2 p = lTries[lNext];
+                    Rect lFoot = new Rect(p.x - 0.35f, p.y - 0.35f, 0.7f, 0.7f);
+                    if (!Free(b, pRoom, lFoot, false)) continue;
+                    b.used.Add((pRoom.floor, lFoot));
+                    pKit.K.Activity(lType, b.At(p.x, pRoom.floor, p.y, 0.05f), b.Yaw(lNext * 90f), pZone, 14f);
+                    lNext++;
+                    break;
+                }
         }
 
         private static bool Free(ArchResult b, ArchRoom pRoom, Rect pFoot, bool pTall)
@@ -127,6 +156,58 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// Finds and reserves the first free wall spot for a footprint of pSize (width along the wall, depth
+        /// out of it). Returns the world position of its back-centre on the floor and the world yaw, or false.
+        /// </summary>
+        public static bool WallSpot(ArchResult b, ArchRoom pRoom, Vector2 pSize, bool pTall, System.Random pRandom, out Vector3 pWorld, out float pYaw)
+        {
+            int lStart = pRandom.Next(4);
+            Rect lRoomRect = new Rect(pRoom.rect.xMin + 0.25f, pRoom.rect.yMin + 0.25f, pRoom.rect.width - 0.5f, pRoom.rect.height - 0.5f);
+            for (int k = 0; k < 4; k++)
+            {
+                int lSide = (lStart + k) % 4;
+                float lFrom = lSide % 2 == 0 ? lRoomRect.xMin : lRoomRect.yMin, lTo = lSide % 2 == 0 ? lRoomRect.xMax : lRoomRect.yMax;
+                for (float a = lFrom + pSize.x * 0.5f + 0.1f + (float)pRandom.NextDouble() * 0.6f; a < lTo - pSize.x * 0.5f; a += 0.35f)
+                {
+                    Rect lFoot = Foot(lRoomRect, lSide, a, pSize, out Vector2 lCenter, out float lYaw);
+                    if (!Free(b, pRoom, lFoot, pTall)) continue;
+                    b.used.Add((pRoom.floor, lFoot));
+                    pWorld = b.At(lCenter.x, pRoom.floor, lCenter.y, 0f);
+                    pYaw = b.Yaw(lYaw);
+                    return true;
+                }
+            }
+            pWorld = Vector3.zero;
+            pYaw = 0f;
+            return false;
+        }
+
+        /// <summary>
+        /// Finds and reserves a free floor footprint of pSize anywhere in a room (a 0.5 m grid scanned from a
+        /// random start): the world centre on the floor and the world yaw (along the room's x), or false.
+        /// </summary>
+        public static bool FloorSpot(ArchResult b, ArchRoom pRoom, Vector2 pSize, System.Random pRandom, out Vector3 pWorld, out float pYaw)
+        {
+            Rect R = pRoom.rect;
+            int nx = Mathf.Max(1, Mathf.FloorToInt((R.width - pSize.x) / 0.5f)), nz = Mathf.Max(1, Mathf.FloorToInt((R.height - pSize.y) / 0.5f));
+            int lStart = pRandom.Next(nx * nz);
+            for (int k = 0; k < nx * nz; k++)
+            {
+                int i = (lStart + k) % (nx * nz);
+                Vector2 c = new Vector2(R.xMin + pSize.x * 0.5f + (i % nx) * 0.5f + 0.25f, R.yMin + pSize.y * 0.5f + (i / nx) * 0.5f + 0.25f);
+                Rect lFoot = new Rect(c.x - pSize.x * 0.5f, c.y - pSize.y * 0.5f, pSize.x, pSize.y);
+                if (!Free(b, pRoom, lFoot, false)) continue;
+                b.used.Add((pRoom.floor, lFoot));
+                pWorld = b.At(c.x, pRoom.floor, c.y, 0f);
+                pYaw = b.Yaw(0f);
+                return true;
+            }
+            pWorld = Vector3.zero;
+            pYaw = 0f;
+            return false;
         }
 
         /// <summary>Places a model free-standing at a local point (yaw local) if the spot is free.</summary>
@@ -328,21 +409,271 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // A pedestal fan in kitchens, guard rooms, messes and big offices (a distraction a guard walks over to switch off).
             if (pRoom.type == RoomType.Kitchen || pRoom.type == RoomType.GuardRoom || pRoom.type == RoomType.Mess || pRoom.type == RoomType.Barracks || (pRoom.type == RoomType.Office && W * D > 40f))
                 AgainstWall(pKit, b, pRoom, "Furn_PottedPlant", false, r, (k, p, y) => k.Distraction("fan", p, y));
+            // Where the room's people go between their stints (a drink, a call, a look at the goods).
+            switch (pRoom.type)
+            {
+                case RoomType.Lobby: case RoomType.Hall: Spots(pKit, b, pRoom, pZone, ActivityType.Idle, ActivityType.Phone); break;
+                case RoomType.Bar: Spots(pKit, b, pRoom, pZone, ActivityType.Idle, ActivityType.Drink); break;
+                case RoomType.Ballroom: Spots(pKit, b, pRoom, pZone, ActivityType.Idle, ActivityType.Dining, ActivityType.Idle); break;
+                case RoomType.Salon: case RoomType.Living: Spots(pKit, b, pRoom, pZone, ActivityType.Idle, ActivityType.Phone); break;
+                case RoomType.Dining: case RoomType.Mess: Spots(pKit, b, pRoom, pZone, ActivityType.Dining, ActivityType.Idle); break;
+                case RoomType.Kitchen: Spots(pKit, b, pRoom, pZone, ActivityType.Inspect, ActivityType.Idle); break;
+                case RoomType.Spa: case RoomType.Gym: case RoomType.Clinic: Spots(pKit, b, pRoom, pZone, ActivityType.Idle); break;
+                case RoomType.Shop: Spots(pKit, b, pRoom, pZone, ActivityType.Inspect, ActivityType.Inspect); break;
+                case RoomType.Church: case RoomType.Chapel: Spots(pKit, b, pRoom, pZone, ActivityType.Idle); break;
+                case RoomType.GuardRoom: case RoomType.Barracks: Spots(pKit, b, pRoom, pZone, ActivityType.Smoke); break;
+                case RoomType.Office: Spots(pKit, b, pRoom, pZone, ActivityType.Phone); break;
+            }
             // Line the walls: the room's pieces, again and again until the perimeter is dressed.
             Item[] lItems = WallItems(pRoom.type);
-            int lWanted = Mathf.Min(16, Mathf.RoundToInt((W + D) * 2f / 2.6f)), lMisses = 0, lPlaced = 0;
+            int lWanted = Mathf.Clamp(Mathf.RoundToInt((W + D) * 2f / 2.2f), W * D >= 12f ? 8 : 4, 18), lMisses = 0, lPlaced = 0;
             for (int k = 0; lItems.Length > 0 && lPlaced < lWanted && lMisses < lItems.Length + 2; k++)
             {
                 Item lItem = lItems[k % lItems.Length];
                 if (AgainstWall(pKit, b, pRoom, lItem.model, lItem.tall, r) != null) { lPlaced++; lMisses = 0; }
                 else lMisses++;
             }
+            CentreGroup(pKit, b, pRoom, pZone, r);
+            WallDressing(pKit, b, pRoom, r);
             // A throwable in every room with a purpose.
             if (pRoom.type != RoomType.Stair && pRoom.type != RoomType.Corridor)
             {
                 Vector2 p = new Vector2(Mathf.Lerp(pRoom.rect.xMin + 0.9f, pRoom.rect.xMax - 0.9f, (float)r.NextDouble()), Mathf.Lerp(pRoom.rect.yMin + 0.9f, pRoom.rect.yMax - 0.9f, (float)r.NextDouble()));
                 if (Free(b, pRoom, new Rect(p.x - 0.2f, p.y - 0.2f, 0.4f, 0.4f), false)) pKit.Throwable(b.At(p.x, pRoom.floor, p.y, 0.05f));
                 else pKit.Throwable(b.At(c.x, pRoom.floor, c.y, 0.05f));
+            }
+        }
+
+        /// <summary>
+        /// The middle of a big room is not left empty: a rug, a low table and floor cushions under hanging
+        /// lanterns in the sitting rooms and halls of a Moorish house; a table and chairs in guard rooms
+        /// and messes; stacks of crates, sacks and barrels in stores, cellars, cisterns and plant rooms; a
+        /// workbench in garages and workshops. Placed only where the floor is free.
+        /// </summary>
+        private static void CentreGroup(ArchKit pKit, ArchResult b, ArchRoom pRoom, int pZone, System.Random r)
+        {
+            RoomType t = pRoom.type;
+            Rect R = pRoom.rect;
+            if (R.width * R.height < 24f || R.width < 4f || R.height < 4f) return;
+            bool lWide = R.width >= R.height;
+            float lCeiling = b.Storey - b.spec.slab;
+            bool lSitting = t == RoomType.Hall || t == RoomType.Lobby || t == RoomType.Salon || t == RoomType.Living || t == RoomType.Study || t == RoomType.Office || t == RoomType.Gallery || t == RoomType.Mess || t == RoomType.Dining;
+            int lGroups = Mathf.Clamp(Mathf.RoundToInt(Mathf.Max(R.width, R.height) / 9f), 1, 3);
+            for (int g = 0; g < lGroups; g++)
+            {
+                float u = (g + 0.5f) / lGroups;
+                Vector2 c = lWide ? new Vector2(Mathf.Lerp(R.xMin, R.xMax, u), R.center.y) : new Vector2(R.center.x, Mathf.Lerp(R.yMin, R.yMax, u));
+                if (lSitting && b.spec.style.moorish)
+                {
+                    Rect lFoot = new Rect(c.x - 1.6f, c.y - 1.6f, 3.2f, 3.2f);
+                    if (!Free(b, pRoom, lFoot, false)) continue;
+                    b.used.Add((pRoom.floor, lFoot));
+                    pKit.Model("Furn_Rug", b.At(c.x, pRoom.floor, c.y, 0f), b.Yaw(lWide ? 0f : 90f), b.interior, ArchLib.Collide.None);
+                    ArchMat lBrass = ArchLib.Brass, lWood = ArchLib.Tinted("dark_wooden_planks", new Color(0.7f, 0.55f, 0.4f), "cedar", 1f);
+                    Color[] lCloth = { new Color(0.65f, 0.15f, 0.12f), new Color(0.15f, 0.35f, 0.5f), new Color(0.8f, 0.6f, 0.2f) };
+                    pKit.BoxObject("LowTable", b.At(c.x, pRoom.floor, c.y, 0f), b.Yaw(0f), b.interior, 0, true,
+                        (lBrass, new Vector3(0, 0.38f, 0), new Vector3(1f, 0.04f, 1f)),
+                        (lWood, new Vector3(0, 0.18f, 0), new Vector3(0.8f, 0.36f, 0.8f)));
+                    for (int k = 0; k < 4; k++)
+                    {
+                        Vector3 lOff = Quaternion.Euler(0, k * 90f, 0) * new Vector3(0, 0, 1.15f);
+                        ArchMat lCushion = ArchLib.Tinted("velour_velvet", lCloth[(k + g) % 3], "cushion_" + ((k + g) % 3), 1f);
+                        pKit.BoxObject("Cushion", b.At(c.x + lOff.x, pRoom.floor, c.y + lOff.z, 0f), b.Yaw(k * 90f), b.interior, 0, false,
+                            (lCushion, new Vector3(0, 0.1f, 0), new Vector3(0.75f, 0.2f, 0.75f)),
+                            (lCushion, new Vector3(0, 0.35f, 0.32f), new Vector3(0.7f, 0.4f, 0.14f)));
+                    }
+                    foreach (float s in new[] { -1.2f, 1.2f })
+                    {
+                        Vector2 lL = lWide ? new Vector2(c.x + s, c.y) : new Vector2(c.x, c.y + s);
+                        pKit.BoxObject("Lantern", b.At(lL.x, pRoom.floor, lL.y, lCeiling - 1.1f), 0f, b.interior, 0, false,
+                            (ArchLib.Iron, new Vector3(0, 0.75f, 0), new Vector3(0.02f, 0.7f, 0.02f)),
+                            (lBrass, new Vector3(0, 0.36f, 0), new Vector3(0.32f, 0.08f, 0.32f)),
+                            (ArchLib.LampGlow, new Vector3(0, 0.15f, 0), new Vector3(0.24f, 0.34f, 0.24f)),
+                            (lBrass, new Vector3(0, -0.05f, 0), new Vector3(0.28f, 0.06f, 0.28f)));
+                    }
+                }
+                else if (t == RoomType.GuardRoom || t == RoomType.Barracks || t == RoomType.Mess || (lSitting && !b.spec.style.moorish && t != RoomType.Hall && t != RoomType.Lobby && t != RoomType.Gallery))
+                {
+                    if (!At(pKit, b, pRoom, "Furn_DiningTable", c, lWide ? 0f : 90f)) continue;
+                    for (int k = 0; k < 4; k++)
+                    {
+                        float lAlong = (k % 2 - 0.5f) * 1.0f, lSide = k < 2 ? -0.85f : 0.85f;
+                        At(pKit, b, pRoom, "Furn_DiningChair", c + (lWide ? new Vector2(lAlong, lSide) : new Vector2(lSide, lAlong)), lWide ? (k < 2 ? 0f : 180f) : (k < 2 ? 90f : -90f), false);
+                    }
+                }
+                else if (t == RoomType.Store || t == RoomType.Cellar || t == RoomType.Plant || t == RoomType.ColdRoom || t == RoomType.CoalStore || t == RoomType.Armoury || t == RoomType.Vault || t == RoomType.Pantry || t == RoomType.WineCellar)
+                {
+                    Rect lFoot = new Rect(c.x - 1.3f, c.y - 1.3f, 2.6f, 2.6f);
+                    if (!Free(b, pRoom, lFoot, false)) continue;
+                    b.used.Add((pRoom.floor, lFoot));
+                    pKit.CrateStack(b.At(c.x, pRoom.floor, c.y, 0f), b.Yaw((float)r.NextDouble() * 90f), 3 + r.Next(3), t == RoomType.Armoury || t == RoomType.Vault);
+                }
+                else if (t == RoomType.Garage || t == RoomType.Workshop || t == RoomType.Hangar || t == RoomType.Laundry)
+                {
+                    Rect lFoot = new Rect(c.x - 1.2f, c.y - 0.6f, 2.4f, 1.2f);
+                    if (!Free(b, pRoom, lFoot, false)) continue;
+                    b.used.Add((pRoom.floor, lFoot));
+                    Workbench(pKit, b.At(c.x, pRoom.floor, c.y, 0f), b.Yaw(lWide ? 0f : 90f), b.interior);
+                }
+            }
+        }
+
+        /// <summary>Plank shelving against a cellar wall: uprights, four boards, jars and boxes, a lantern over it.</summary>
+        private static void WallShelf(ArchKit pKit, Vector3 pAt, float pYaw, Transform pParent, System.Random r, float pHeight)
+        {
+            ArchMat lWood = ArchLib.Surface("rough_wood", 1f);
+            ArchMat lClay = ArchLib.PlainMat("Terracotta", new Color(0.62f, 0.33f, 0.2f), 0.2f, 0f);
+            ArchMat lSack = ArchLib.Surface("hessian_230", 2f);
+            var lParts = new System.Collections.Generic.List<(ArchMat, Vector3, Vector3)>
+            {
+                (lWood, new Vector3(-0.58f, pHeight * 0.5f, 0.18f), new Vector3(0.05f, pHeight, 0.34f)),
+                (lWood, new Vector3(0.58f, pHeight * 0.5f, 0.18f), new Vector3(0.05f, pHeight, 0.34f))
+            };
+            for (int k = 0; k < 4; k++)
+            {
+                float y = 0.12f + k * (pHeight - 0.2f) / 3f;
+                lParts.Add((lWood, new Vector3(0, y, 0.18f), new Vector3(1.2f, 0.03f, 0.34f)));
+                for (float x = -0.42f; x < 0.45f; x += 0.28f)
+                {
+                    int lPick = r.Next(4);
+                    if (lPick == 0) continue;
+                    if (lPick == 1) lParts.Add((lClay, new Vector3(x, y + 0.13f, 0.18f), new Vector3(0.16f, 0.24f, 0.16f)));
+                    else if (lPick == 2) lParts.Add((lWood, new Vector3(x, y + 0.1f, 0.18f), new Vector3(0.24f, 0.18f, 0.26f)));
+                    else lParts.Add((lSack, new Vector3(x, y + 0.11f, 0.17f), new Vector3(0.24f, 0.2f, 0.22f)));
+                }
+            }
+            lParts.Add((ArchLib.Iron, new Vector3(0, pHeight + 0.22f, 0.06f), new Vector3(0.05f, 0.05f, 0.12f)));
+            lParts.Add((ArchLib.LampGlow, new Vector3(0, pHeight + 0.1f, 0.12f), new Vector3(0.12f, 0.18f, 0.12f)));
+            pKit.BoxObject("CellarShelf", pAt, pYaw, pParent, 0, true, lParts.ToArray());
+        }
+
+        /// <summary>A workbench: a thick top on trestles, a vice, tools, a toolbox below.</summary>
+        public static void Workbench(ArchKit pKit, Vector3 pAt, float pYaw, Transform pParent)
+        {
+            ArchMat lTop = ArchLib.Surface("rough_wood", 1f), lSteel = ArchLib.Galvanised;
+            pKit.BoxObject("Workbench", pAt, pYaw, pParent, 0, true,
+                (lTop, new Vector3(0, 0.88f, 0), new Vector3(2.2f, 0.08f, 0.8f)),
+                (lSteel, new Vector3(-0.95f, 0.42f, 0), new Vector3(0.08f, 0.84f, 0.7f)),
+                (lSteel, new Vector3(0.95f, 0.42f, 0), new Vector3(0.08f, 0.84f, 0.7f)),
+                (lTop, new Vector3(0, 0.18f, 0), new Vector3(1.8f, 0.04f, 0.6f)),
+                (ArchLib.Iron, new Vector3(0.8f, 0.98f, 0.25f), new Vector3(0.2f, 0.14f, 0.14f)),
+                (ArchLib.PlainMat("ToolboxRed", new Color(0.6f, 0.08f, 0.06f), 0.4f, 0.3f), new Vector3(-0.4f, 0.32f, 0), new Vector3(0.5f, 0.24f, 0.26f)),
+                (lSteel, new Vector3(0.2f, 0.95f, -0.1f), new Vector3(0.4f, 0.05f, 0.05f)));
+        }
+
+        private static readonly Color[][] CANVASES =
+        {
+            new[] { new Color(0.55f, 0.68f, 0.82f), new Color(0.36f, 0.45f, 0.26f), new Color(0.22f, 0.3f, 0.2f) },
+            new[] { new Color(0.85f, 0.62f, 0.38f), new Color(0.55f, 0.35f, 0.2f), new Color(0.3f, 0.18f, 0.12f) },
+            new[] { new Color(0.2f, 0.22f, 0.3f), new Color(0.6f, 0.52f, 0.4f), new Color(0.75f, 0.2f, 0.15f) },
+            new[] { new Color(0.75f, 0.78f, 0.8f), new Color(0.45f, 0.5f, 0.55f), new Color(0.15f, 0.2f, 0.28f) }
+        };
+
+        /// <summary>
+        /// The walls of a room people live or work in: framed paintings between the openings (gilt in the
+        /// grand rooms, dark wood elsewhere), brass sconces glowing beside them, curtains at the windows of
+        /// guest rooms, and a chandelier in halls, salons, dining rooms and stair halls of 30 m2 and more.
+        /// </summary>
+        private static void WallDressing(ArchKit pKit, ArchResult b, ArchRoom pRoom, System.Random r)
+        {
+            RoomType t = pRoom.type;
+            bool lGrand = ArchSpec.IsGuest(t) || t == RoomType.Hall || t == RoomType.Lobby || t == RoomType.Study || t == RoomType.Office || t == RoomType.Library || t == RoomType.Bedroom || t == RoomType.Suite || t == RoomType.Dining || t == RoomType.Corridor || t == RoomType.Gallery || t == RoomType.Stair;
+            bool lWork = t == RoomType.GuardRoom || t == RoomType.Barracks || t == RoomType.Mess || t == RoomType.Police || t == RoomType.Radio || t == RoomType.Security || t == RoomType.Kitchen || t == RoomType.Shop || t == RoomType.Bar || t == RoomType.Clinic || t == RoomType.Classroom || t == RoomType.Living;
+            // Below ground, every room is dressed too: plank shelving with jars and boxes, an iron lantern.
+            bool lCellar = pRoom.floor < 0 && !lGrand && !lWork && t != RoomType.Stair && t != RoomType.Corridor;
+            if (!lGrand && !lWork && !lCellar) return;
+            Rect R = pRoom.rect;
+            float lCeiling = b.Storey - b.spec.slab;
+            ArchMat lFrame = lGrand && ArchSpec.IsGuest(t) ? ArchLib.Brass : ArchLib.Surface("dark_wooden_planks", 1f);
+            int lPaintings = 0, lMax = Mathf.Clamp(Mathf.RoundToInt((R.width + R.height) / 3f), 1, 6);
+            for (int lSide = 0; lSide < 4 && lPaintings < lMax; lSide++)
+            {
+                bool lAlongX = lSide % 2 == 0;
+                float lLine = lSide == 0 ? R.yMin : lSide == 1 ? R.xMax : lSide == 2 ? R.yMax : R.xMin;
+                float lIn = lSide == 0 || lSide == 3 ? 1f : -1f;
+                // The wall's inner face: a facade is thick, a partition thin.
+                bool lShared = b.spec.rooms.Exists(o => o != pRoom && o.floor == pRoom.floor && !o.isVoid && (lAlongX
+                    ? Mathf.Abs((lSide == 0 ? o.rect.yMax : o.rect.yMin) - lLine) < 0.05f && o.rect.xMax > R.xMin + 0.5f && o.rect.xMin < R.xMax - 0.5f
+                    : Mathf.Abs((lSide == 1 ? o.rect.xMin : o.rect.xMax) - lLine) < 0.05f && o.rect.yMax > R.yMin + 0.5f && o.rect.yMin < R.yMax - 0.5f));
+                float lFace = lLine + lIn * ((lShared ? 0.08f : b.spec.style.outerThickness) + 0.02f);
+                float lFrom = (lAlongX ? R.xMin : R.yMin) + 1.0f, lTo = (lAlongX ? R.xMax : R.yMax) - 1.0f;
+                for (float a = lFrom + (float)r.NextDouble() * 0.6f; a < lTo && lPaintings < lMax; a += 2.6f)
+                {
+                    Vector2 lSpot = lAlongX ? new Vector2(a, lFace + lIn * 0.4f) : new Vector2(lFace + lIn * 0.4f, a);
+                    Rect lProbe = new Rect(lSpot.x - 0.75f, lSpot.y - 0.75f, 1.5f, 1.5f);
+                    bool lFree = true;
+                    foreach ((int f, Rect k, bool d) in b.keepClear) if (f == pRoom.floor && k.Overlaps(lProbe)) { lFree = false; break; }
+                    if (lFree) foreach ((int f, Rect u) in b.used) if (f == pRoom.floor && u.Overlaps(lProbe)) { lFree = false; break; }
+                    if (lFree) foreach (ArchStair st in b.spec.stairs) if ((st.fromFloor == pRoom.floor || st.fromFloor + 1 == pRoom.floor) && st.rect.Overlaps(lProbe)) { lFree = false; break; }
+                    if (!lFree) continue;
+                    if (lCellar)
+                    {
+                        float lShelfYaw = lSide == 0 ? 0f : lSide == 1 ? -90f : lSide == 2 ? 180f : 90f;
+                        Vector2 lFoot = lAlongX ? new Vector2(a, lFace + lIn * 0.02f) : new Vector2(lFace + lIn * 0.02f, a);
+                        b.used.Add((pRoom.floor, new Rect(lSpot.x - 0.7f, lSpot.y - 0.7f, 1.4f, 1.4f)));
+                        WallShelf(pKit, b.At(lFoot.x, pRoom.floor, lFoot.y, 0f), b.Yaw(lShelfYaw), b.interior, r, Mathf.Min(1.9f, lCeiling - 0.3f));
+                        lPaintings++;
+                        continue;
+                    }
+                    // A painting: frame, a landscape in three bands, hung at eye height.
+                    Color[] c = CANVASES[r.Next(CANVASES.Length)];
+                    float w = 0.7f + (float)r.NextDouble() * 0.5f, h = w * (0.7f + (float)r.NextDouble() * 0.35f), y = Mathf.Min(1.65f, lCeiling - h * 0.5f - 0.35f);
+                    float lYaw = lSide == 0 ? 0f : lSide == 1 ? -90f : lSide == 2 ? 180f : 90f;
+                    Vector2 lHang = lAlongX ? new Vector2(a, lFace + lIn * 0.02f) : new Vector2(lFace + lIn * 0.02f, a);
+                    pKit.BoxObject("Painting", b.At(lHang.x, pRoom.floor, lHang.y, y), b.Yaw(lYaw), b.interior, 0, false,
+                        (lFrame, new Vector3(0, 0, 0.02f), new Vector3(w + 0.1f, h + 0.1f, 0.04f)),
+                        (ArchLib.PlainMat("Canvas_" + ColorUtility.ToHtmlStringRGB(c[0]), c[0], 0.15f, 0f), new Vector3(0, h * 0.2f, 0.045f), new Vector3(w, h * 0.6f, 0.01f)),
+                        (ArchLib.PlainMat("Canvas_" + ColorUtility.ToHtmlStringRGB(c[1]), c[1], 0.15f, 0f), new Vector3(0, -h * 0.25f, 0.046f), new Vector3(w, h * 0.5f, 0.01f)),
+                        (ArchLib.PlainMat("Canvas_" + ColorUtility.ToHtmlStringRGB(c[2]), c[2], 0.15f, 0f), new Vector3(w * 0.15f, -h * 0.05f, 0.047f), new Vector3(w * 0.45f, h * 0.35f, 0.01f)));
+                    // Two brass sconces either side in the grand rooms.
+                    if (lGrand && R.width * R.height > 15f)
+                        foreach (float lOff in new[] { -w * 0.5f - 0.35f, w * 0.5f + 0.35f })
+                        {
+                            Vector2 lS = lAlongX ? new Vector2(a + lOff, lFace + lIn * 0.02f) : new Vector2(lFace + lIn * 0.02f, a + lOff);
+                            pKit.BoxObject("Sconce", b.At(lS.x, pRoom.floor, lS.y, y + 0.25f), b.Yaw(lYaw), b.interior, 0, false,
+                                (ArchLib.Brass, new Vector3(0, 0, 0.04f), new Vector3(0.08f, 0.16f, 0.08f)),
+                                (ArchLib.LampGlow, new Vector3(0, 0.14f, 0.07f), new Vector3(0.09f, 0.12f, 0.09f)));
+                        }
+                    lPaintings++;
+                }
+            }
+            // Curtains either side of the windows of guest rooms.
+            if (ArchSpec.IsGuest(t) || t == RoomType.Bedroom || t == RoomType.Suite || t == RoomType.Study)
+            {
+                ArchMat lCloth = ArchLib.Tinted("velour_velvet", new Color(0.55f, 0.12f, 0.12f), "curtain", 1f);
+                foreach ((int f, Rect k, bool d) in b.keepClear)
+                {
+                    if (d || f != pRoom.floor || !k.Overlaps(R)) continue;
+                    bool lOnZ = Mathf.Abs(k.center.y - R.yMin) < 0.5f || Mathf.Abs(k.center.y - R.yMax) < 0.5f;
+                    bool lOnX = Mathf.Abs(k.center.x - R.xMin) < 0.5f || Mathf.Abs(k.center.x - R.xMax) < 0.5f;
+                    if (lOnZ == lOnX) continue;
+                    float lIn = lOnZ ? (k.center.y < R.center.y ? 1f : -1f) : (k.center.x < R.center.x ? 1f : -1f);
+                    float lWall = lOnZ ? k.center.y : k.center.x;
+                    float lInner = lWall + lIn * (b.spec.style.outerThickness + 0.07f);
+                    float lA = lOnZ ? k.xMin : k.yMin, lB = lOnZ ? k.xMax : k.yMax;
+                    foreach (float lAt in new[] { lA - 0.12f, lB + 0.12f })
+                    {
+                        Vector3 lPos = lOnZ ? b.At(lAt, pRoom.floor, lInner, 0f) : b.At(lInner, pRoom.floor, lAt, 0f);
+                        pKit.BoxObject("Curtain", lPos, b.Yaw(lOnZ ? 0f : 90f), b.interior, 0, false,
+                            (lCloth, new Vector3(0, (lCeiling - 0.15f) * 0.5f, 0), lOnZ ? new Vector3(0.34f, lCeiling - 0.15f, 0.08f) : new Vector3(0.08f, lCeiling - 0.15f, 0.34f)));
+                    }
+                }
+            }
+            // A chandelier over the big halls, salons, dining rooms and stair halls (lit stairs).
+            bool lHall = t == RoomType.Hall || t == RoomType.Lobby || t == RoomType.Salon || t == RoomType.Dining || t == RoomType.Stair || t == RoomType.Gallery;
+            if (lHall && R.width * R.height >= 30f && pRoom.floor >= 0 && !b.interior.Find("Chandelier_" + pRoom.name))
+            {
+                bool lTall = b.spec.rooms.Exists(o => o.floor == pRoom.floor + 1 && (o.noFloor || o.isVoid) && o.rect.Overlaps(R));
+                float lHook = (lTall ? 2f : 1f) * b.Storey - b.spec.slab - 0.05f;
+                // One per 12 m of the long side: a lobby gets a row of them.
+                int lCount = Mathf.Clamp(Mathf.RoundToInt(Mathf.Max(R.width, R.height) / 12f), 1, 4);
+                for (int i = 0; i < lCount; i++)
+                {
+                    float u = (i + 0.5f) / lCount;
+                    Vector2 lAt = R.width >= R.height ? new Vector2(Mathf.Lerp(R.xMin, R.xMax, u), R.center.y) : new Vector2(R.center.x, Mathf.Lerp(R.yMin, R.yMax, u));
+                    pKit.Chandelier(b.At(lAt.x, pRoom.floor, lAt.y, lHook), Mathf.Min(1.4f, lHook - 2.6f));
+                }
+                new GameObject("Chandelier_" + pRoom.name).transform.SetParent(b.interior, false);
             }
         }
 

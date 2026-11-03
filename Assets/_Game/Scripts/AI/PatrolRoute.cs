@@ -46,7 +46,14 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         }
 
         public int Count => transform.childCount;
-        public Vector3 Point(int pIndex) => transform.GetChild(((pIndex % Count) + Count) % Count).position;
+        public Vector3 Point(int pIndex) => Waypoint(pIndex).position;
+        public Transform Waypoint(int pIndex) => transform.GetChild(((pIndex % Count) + Count) % Count);
+
+        /// <summary>The errand at a waypoint (look around, chat, smoke, check a door...), or null for a plain pause.</summary>
+        public PatrolStop StopAt(int pIndex) => Count == 0 ? null : Waypoint(pIndex).GetComponent<PatrolStop>();
+
+        /// <summary>Members on the route (alive or not), for pairs that walk and chat.</summary>
+        public IReadOnlyList<Npc> Members => _members;
 
         public void Setup(float pPause) => _pause = pPause;
 

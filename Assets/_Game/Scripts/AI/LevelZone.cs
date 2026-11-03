@@ -46,6 +46,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             public float lastSeenTime;
             public bool visibleNow;
             public float lastGhostSend;
+            /// <summary>What the hunted player was last told: is their shadow shown?</summary>
+            public bool ghostShown;
         }
 
         public readonly List<Npc> Members = new List<Npc>();
@@ -93,9 +95,27 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             Members.Clear();
             _contacts.Clear();
+            Hostiles.Clear();
             _callsMade = 0;
             _callInProgress = false;
+            _nextCallAt = 0f;
             InCombat = false;
+        }
+
+        /// <summary>
+        /// Players this zone knows to be hostile (seen shooting, killing, punching, taking someone
+        /// down, fleeing a confrontation, or already fighting it): for <see cref="HostileMemory.DURATION"/>
+        /// its NPCs skip the social ladder - seen means a fight.
+        /// </summary>
+        public readonly HostileMemory Hostiles = new HostileMemory();
+
+        public bool IsHostile(PlayerAvatar pPlayer) => pPlayer != null && Hostiles.IsHostile(pPlayer.OwnerClientId, Time.time);
+
+        public void MarkHostile(PlayerAvatar pPlayer, HostileAct pAct)
+        {
+            if (pPlayer == null) return;
+            if (!Hostiles.IsHostile(pPlayer.OwnerClientId, Time.time)) Debug.Log($"[AI] {_zoneName}: {pPlayer.name} is hostile ({pAct})");
+            Hostiles.Mark(pPlayer.OwnerClientId, Time.time);
         }
 
         /// <summary>An NPC sees (or clearly hears) a player: the whole squad learns where.</summary>
@@ -180,15 +200,16 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 _visibilityResetTime = Time.time + 0.5f;
                 foreach (Contact lContact in _contacts.Values)
                 {
-                    bool lWasVisible = lContact.visibleNow;
                     lContact.visibleNow = Time.time - lContact.lastSeenTime < 0.45f;
                     if (lContact.player == null || !lContact.player.IsSpawned) continue;
 
-                    // The hunted player sees their "shadow" where the squad believes they are.
+                    // The hunted player sees their "shadow" where the squad believes they are: sent when it
+                    // appears or goes, then once a second while shown (it follows the squad's belief).
                     bool lShowGhost = !lContact.visibleNow && Time.time - lContact.lastSeenTime < GameDatabase.Rules.searchDuration;
-                    if (lShowGhost != lWasVisible || Time.time - lContact.lastGhostSend > 1f)
+                    if (NpcRules.GhostSendDue(lShowGhost, lContact.ghostShown, Time.time - lContact.lastGhostSend))
                     {
                         lContact.lastGhostSend = Time.time;
+                        lContact.ghostShown = lShowGhost;
                         lContact.player.ShowGhostRpc(lContact.lastKnown, lShowGhost, Index);
                     }
                 }
@@ -206,7 +227,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                         if (lContact.player != null && lContact.player.IsSpawned) lContact.player.ShowGhostRpc(Vector3.zero, false, Index);
                     _contacts.Clear();
                 }
-                else if (!_callInProgress && _callsMade < GameDatabase.Rules.maxCallsPerZone && Time.time - CombatSince > 1.5f && AnyFighting()) AssignCaller();
+                else if (NpcRules.ShouldCall(_callInProgress, _callsMade, GameDatabase.Rules.maxCallsPerZone, Time.time - CombatSince, Fighters(null), Time.time, _nextCallAt)) AssignCaller();
             }
         }
 
@@ -241,13 +262,16 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return lSum.sqrMagnitude > 0.01f ? lSum.normalized : Vector3.zero;
         }
 
-        /// <summary>Someone of the squad is actually fighting (a search alone never calls for help).</summary>
-        private bool AnyFighting()
+        /// <summary>Members actually fighting (shooting, not phoning; a search alone never calls for help), but <paramref name="pExcept"/>.</summary>
+        public int Fighters(Npc pExcept)
         {
+            int lCount = 0;
             foreach (Npc lMember in Members)
-                if (lMember != null && lMember.Health.IsAlive && lMember.State.Value == NpcState.Combat) return true;
-            return false;
+                if (lMember != null && lMember != pExcept && lMember.Health.IsAlive && lMember.State.Value == NpcState.Combat) lCount++;
+            return lCount;
         }
+
+        private float _nextCallAt;
 
         private void AssignCaller()
         {
@@ -257,7 +281,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Vector3 lThreatPos = lThreat != null ? lThreat.lastKnown : transform.position;
             foreach (Npc lMember in Members)
             {
-                if (lMember == null || !lMember.Health.IsAlive || !lMember.InCombat || lMember.Role == NpcRole.Target) continue;
+                if (lMember == null || !lMember.Health.IsAlive || lMember.State.Value != NpcState.Combat || lMember.Role == NpcRole.Target) continue;
                 // The farthest from the fight is the one with time to radio.
                 float lDistance = -Vector3.Distance(lMember.transform.position, lThreatPos);
                 if (lDistance < lBestDistance) { lBestDistance = lDistance; lBest = lMember; }
@@ -271,6 +295,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public void CallFinished(Npc pCaller, bool pCompleted)
         {
             _callInProgress = false;
+            _nextCallAt = Time.time + (pCompleted ? NpcRules.CALL_COOLDOWN : NpcRules.CALL_RETRY);
             if (!pCompleted) return;
             _callsMade++;
             Contact lThreat = BestContact(pCaller.transform.position);
@@ -317,7 +342,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 lZone.ReportThreatPoint(pPoint, 4, 150f);
             }
             // The siren itself: heard far, but only as a sound (the nearest few look, the rest glance).
-            NoiseSystem.Emit(pPoint, 120f, NoiseKind.Alarming, ulong.MaxValue, false);
+            NoiseSystem.Emit(pPoint, 120f, NoiseKind.Alarming, ulong.MaxValue, false, true);
         }
 
         public static void Reset() => GlobalAlarm = false;

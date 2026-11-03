@@ -40,6 +40,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         [MenuItem("Goobyr/Build/Map Weisshorn")]
         public static void BuildMenu() => new MapWeisshorn().Build();
 
+        protected override (bool north, bool east, bool south, bool west) RockEdges => (true, true, false, true);
+
         protected override float Relief(float x, float z)
         {
             float h;
@@ -61,7 +63,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return h;
         }
 
-        protected override ArchMat CliffMaterial => ArchLib.Surface("rock_face", 8f);
+        private static ArchMat _alpine;
+        protected override ArchMat CliffMaterial => _alpine != null && _alpine.material != null ? _alpine : _alpine = new ArchMat("rock_alpine", PbrLibrary.Rock("rock_face", new Color(0.62f, 0.6f, 0.58f), new Color(0.5f, 0.47f, 0.45f), 0.6f, "alpine"), 6f);
+        protected override bool ScreeRocks => false;
+        protected override (float band, float ledges, bool columns, bool buttresses, bool snow) Strata => (4f, 0.4f, false, true, true);
+        protected override float BackdropHeight(float x, float z) => 110f + Mathf.Max(0f, LandShape.Fbm(x, z, 300f, 4, 8.3f)) * 260f + LandShape.Ridged(x, z, 140f, 4, 2.7f) * 120f;
+        protected override ArchMat BackdropLow => ArchLib.Tinted("rock_face", new Color(0.55f, 0.57f, 0.62f), "alpine_far", 60f);
+        protected override ArchMat BackdropHigh => ArchLib.Surface("snow_02", 50f);
+        protected override float BackdropSnowLine => 190f;
 
         protected override float Woods(float x, float z, float h)
         {
@@ -79,20 +88,19 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         protected override string TreeAt(float x, float z, float h, float pRoll, System.Random r, out float pScale)
         {
             pScale = 0.8f + (float)r.NextDouble() * 0.4f;
-            if (h > 85f) return pRoll < 0.6f ? (r.NextDouble() < 0.5 ? "Veg_Rock_A" : "Veg_Rock_C") : null;
+            if (h > 85f) return pRoll < 0.3f ? "Veg_SnowBush" : null;
             if (pRoll < 0.3f) return "Veg_Fir_Snowy_Large";
             if (pRoll < 0.55f) return "Veg_Fir_Snowy_Medium";
             if (pRoll < 0.7f) return "Veg_Fir_Medium";
             if (pRoll < 0.78f) return "Veg_Fir_Small";
             if (pRoll < 0.84f) return "Veg_Birch";
             if (pRoll < 0.93f) return "Veg_SnowBush";
-            pScale = 2f + (float)r.NextDouble() * 3f;
-            return r.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A";
+            return null;
         }
 
         protected override TerrainLayer[] Layers() => new[]
         {
-            PbrLibrary.Layer("snow_02", 4f), PbrLibrary.Layer("snow_field_aerial", 8f), PbrLibrary.Layer("forest_ground_04", 4f),
+            PbrLibrary.Layer("snow_02", 4f), Tint(PbrLibrary.Layer("leafy_grass", 4f), new Color(0.78f, 0.9f, 0.68f)), PbrLibrary.Layer("forest_ground_04", 4f),
             PbrLibrary.Layer("gravel_road", 4f), PbrLibrary.Layer("rock_face", 8f), PbrLibrary.Layer("rocky_terrain_02", 6f),
             PbrLibrary.Layer("asphalt_02", 5f), PbrLibrary.Layer("cobblestone_floor_01", 3f)
         };
@@ -102,17 +110,39 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         protected override void NaturalGround(float x, float z, float h, float pSlope, float[] w)
         {
             float n = LandShape.Fbm(x, z, 25f, 3, 1.7f);
-            w[(int)Ground.Grass] = 2f + n;
-            w[(int)Ground.DryGrass] = Mathf.Clamp01(0.3f - n) * 2f + Mathf.Clamp01((h - 70f) / 10f) * 3f;
+            float lMeadow = Meadow(x, z, h, pSlope);
+            // The Grass slot is snow, the DryGrass slot the pastures the snow has left.
+            w[(int)Ground.Grass] = (2f + n) * (1f - lMeadow) + Mathf.Clamp01((h - 70f) / 10f) * 3f;
+            w[(int)Ground.DryGrass] = lMeadow * 6f;
             w[(int)Ground.ForestFloor] = Mathf.Clamp01(Woods(x, z, h) - 0.7f) * 1.5f;
             w[(int)Ground.Sand] = Mathf.Clamp01((pSlope - 40f) / 10f) * 2f;
         }
 
+        /// <summary>
+        /// Snow-free pasture (0..1): the sunny valley floor and the lower slopes melt first, in patches;
+        /// the pistes, the frozen lake's shore, everything above about 24 m and every steep bank stay white.
+        /// </summary>
+        private static float Meadow(float x, float z, float h, float pSlope)
+        {
+            if (z > 40f || h > 24f || pSlope > 26f) return 0f;
+            bool lPiste = z > -100f && z < 70f && (Mathf.Abs(x - 20f + z * 0.15f) < 22f || Mathf.Abs(x + 45f - z * 0.1f) < 16f || Mathf.Abs(x - 75f) < 12f);
+            if (lPiste || LandShape.RectDistance(LAKE, x, z) < 45f) return 0f;
+            float n = LandShape.Fbm(x, z, 22f, 3, 3.3f);
+            float lLow = Mathf.Clamp01((24f - h) / 10f), lGentle = Mathf.Clamp01((26f - pSlope) / 10f);
+            return Mathf.Clamp01((lLow * lGentle - 0.35f + n * 0.9f) * 2.2f);
+        }
+
+        /// <summary>The hiding fields grow on the pastures only (tall grass out of the snow would read wrong).</summary>
+        protected override bool TallGrassAllowed(float x, float z) => Meadow(x, z, K.GroundAt(x, z), K.LandSlope(x, z)) > 0.6f;
+
         protected override void Details()
         {
-            DetailPrototype lGrass = VegLibrary.Detail("Veg_Grass_Alpine", 0.7f, 1.1f, new Color(0.95f, 0.97f, 1f), new Color(0.9f, 0.9f, 0.85f));
-            if (lGrass != null) K.Details.Add((lGrass, (x, z) => Built(x, z) || K.LandSlope(x, z) > 30f || K.GroundAt(x, z) < 0.3f ? 0f : Mathf.Clamp01(LandShape.Fbm(x, z, 14f, 2, 6f) - 0.1f) * 0.6f, 4));
-            K.TallGrassDetail = VegLibrary.Detail("Veg_TallGrass_Alpine", 0.9f, 1.25f, Color.white, new Color(0.9f, 0.88f, 0.8f));
+            // Real grass (alpine style) on the pastures the snow has left; the snow keeps its white.
+            K.RealGrass(World.GrassStyle.Alpine(),
+                (x, z) => K.Covered(x, z) || OnStreet(x, z, 0.3f) >= 0 || K.LandSlope(x, z) > 30f || K.GroundAt(x, z) < 0.05f ? 0f : 1f,
+                new[] { Ground.DryGrass }, null, null,
+                (x, z) => Built(x, z) ? 0.15f : Mathf.Clamp01(0.5f + 0.3f * LandShape.Fbm(x, z, 9f, 2, 31.7f)));
+            K.TallGrassDetail = null;
         }
 
         // ================================================================ plan
@@ -158,8 +188,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             DressSki();
             DressHotel();
             Tunnels();
+            Security();
             Snow();
+            Apron();
             Matches();
+            Beats();
+            Exits();
         }
 
         private void Lake()

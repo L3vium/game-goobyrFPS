@@ -124,7 +124,7 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
         {
             Vector3 lLocalDir;
             if (_target != null) lLocalDir = _yaw.parent.InverseTransformDirection(_aimPoint - _pitch.position);
-            else lLocalDir = _restYaw * Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.4f + GetInstanceID()) * _arc * 0.8f, 0f) * Vector3.forward;
+            else lLocalDir = _restYaw * Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.4f + GetHashCode()) * _arc * 0.8f, 0f) * Vector3.forward;
 
             float lYaw = Mathf.Atan2(lLocalDir.x, lLocalDir.z) * Mathf.Rad2Deg;
             float lRest = _restYaw.eulerAngles.y;

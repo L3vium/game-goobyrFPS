@@ -17,7 +17,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// <see cref="Plan"/> (pads, roads, before the land exists) and <see cref="Dress"/> (buildings,
     /// props, NPCs, markers).
     /// </summary>
-    public abstract class RealMap : MapBuilderBase
+    public abstract partial class RealMap : MapBuilderBase
     {
         protected const float HALF = 250f, SIZE = 500f;
         protected virtual float MinY => -30f;
@@ -36,8 +36,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private readonly List<(Rect rect, Ground ground)> _pads = new List<(Rect, Ground)>();
         private readonly List<(Vector2 center, Vector2 size, float yaw, Ground ground)> _turnedPads = new List<(Vector2, Vector2, float, Ground)>();
         private readonly List<(Matrix4x4 toLocal, Rect rect)> _cellarHoles = new List<(Matrix4x4, Rect)>();
-        private readonly List<(Vector3 a, Vector3 b, float radius)> _caveHoles = new List<(Vector3, Vector3, float)>();
+        private readonly List<(Vector3 a, Vector3 b, float radius, float height)> _caveHoles = new List<(Vector3, Vector3, float, float)>();
         private bool[,] _built;
+        private readonly List<ArchResult> _buildings = new List<ArchResult>();
         private const float MASK_CELL = 2f;
 
         protected abstract TimeOfDay.Biome Biome { get; }
@@ -73,9 +74,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             ArchBuilder.MeshPrefix = K.Map.sceneName;
             // The sky material and the volume profile of the map come from the art pass.
             if (ArtBuilder.Sky(K.Map) == null) ArtBuilder.Build();
-            Shape = new LandShape(Relief);
+            Shape = new LandShape(EdgeRelief);
             Plan();
-            K.LandLayers = Untinted(Layers());
+            K.LandLayers = Own(Untinted(Layers()));
             K.PlanStorey = 3.6f;
             K.AfterLight = (pSun, pSky) =>
             {
@@ -91,12 +92,21 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lOutside.transform.SetParent(K.Markers, false);
             lOutside.AddComponent<SecurityOutside>().Setup(OutsideTier);
             Dress();
+            DressTurretRooms();
+            CrowdSpots();
+            KeyLoops();
+            Errands();
+            K.AfterNavMesh = CrowdExits;
             TopUpThrowables(160);
             K.LandHoles(HoleAt);
             PlantTallGrass();
             Details();
             Vegetate();
             CliffSkin();
+            CliffStrata();
+            Backdrop();
+            PairLoneGuards();
+            EntryLamps();
             Edges();
             K.CoverSpacing = 1.8f;
             K.DistanceCulling();
@@ -159,6 +169,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             ArchResult r = ArchBuilder.Build(pSpec, K.Env);
             ArchFurnish.Furnish(A, r, pZone);
+            _buildings.Add(r);
             Matrix4x4 lToLocal = r.root.worldToLocalMatrix;
             if (pSpec.cutLand) _cellarHoles.Add((lToLocal, new Rect(0.3f, 0.3f, pSpec.size.x - 0.6f, pSpec.size.y - 0.6f)));
             foreach (ArchRoom lRoom in pSpec.rooms)
@@ -167,7 +178,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         /// <summary>A cut in the land along a cave tunnel's mouth (where its tube breaks the surface).</summary>
-        protected void CaveHole(Vector3 pA, Vector3 pB, float pRadius) => _caveHoles.Add((pA, pB, pRadius));
+        protected void CaveHole(Vector3 pA, Vector3 pB, float pRadius, float pHeight = 3.6f) => _caveHoles.Add((pA, pB, pRadius, pHeight));
 
         private bool HoleAt(float pX, float pZ)
         {
@@ -176,16 +187,18 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Vector3 l = lToLocal.MultiplyPoint3x4(new Vector3(pX, 0f, pZ));
                 if (lRect.Contains(new Vector2(l.x, l.z))) return true;
             }
-            foreach ((Vector3 a, Vector3 b, float lRadius) in _caveHoles)
+            foreach ((Vector3 a, Vector3 b, float lRadius, float lHeight) in _caveHoles)
             {
                 Vector2 a2 = new Vector2(a.x, a.z), b2 = new Vector2(b.x, b.z), p2 = new Vector2(pX, pZ);
                 Vector2 ab = b2 - a2;
-                float t = Mathf.Clamp01(Vector2.Dot(p2 - a2, ab) / Mathf.Max(0.001f, ab.sqrMagnitude));
+                float t = Vector2.Dot(p2 - a2, ab) / Mathf.Max(0.001f, ab.sqrMagnitude);
+                // Never in front of the mouth: the open ground there stays whole.
+                if (t < 0f || t > 1f) continue;
                 if (Vector2.Distance(p2, a2 + ab * t) > lRadius) continue;
                 float lFloor = Mathf.Lerp(a.y, b.y, t);
                 float lGround = K.GroundAt(pX, pZ);
                 // Only where the land lies inside the tube's height: the mouth, not the hill above it.
-                if (lGround > lFloor - 0.6f && lGround < lFloor + 3.6f) return true;
+                if (lGround > lFloor - 0.6f && lGround < lFloor + lHeight - 0.3f) return true;
             }
             return false;
         }
@@ -263,6 +276,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return w;
         }
 
+        /// <summary>Where a hiding field of tall grass may grow (a map with snow keeps them to its pastures).</summary>
+        protected virtual bool TallGrassAllowed(float pX, float pZ) => true;
+
         private void PlantTallGrass()
         {
             System.Random lRandom = new System.Random(K.Map.sceneName.GetHashCode() + 77);
@@ -271,7 +287,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (float z = -HALF + 30f; z < HALF - 30f; z += 9f)
                 {
                     Vector2 p = new Vector2(x + (float)lRandom.NextDouble() * 5f, z + (float)lRandom.NextDouble() * 5f);
-                    if (Built(p.x, p.y) || K.GroundAt(p.x, p.y) < WaterLevel + 0.8f || K.LandSlope(p.x, p.y) > 20f) continue;
+                    if (Built(p.x, p.y) || K.GroundAt(p.x, p.y) < WaterLevel + 0.8f || K.LandSlope(p.x, p.y) > 20f || !TallGrassAllowed(p.x, p.y)) continue;
                     float lToBuilt = DistanceToBuilt(p, 40f);
                     if (lToBuilt < 5f || lToBuilt > 28f) continue;
                     lCandidates.Add((p, 1f - Mathf.Abs(lToBuilt - 12f) / 20f + (float)lRandom.NextDouble() * 0.35f));
@@ -317,10 +333,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     if (lSlope > 38f)
                     {
                         // Scree slopes: boulders break up the rock faces.
-                        if (lSlope < 52f && lRandom.NextDouble() < 0.05) K.LandTree(lRandom.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A", px, pz, 1.5f + (float)lRandom.NextDouble() * 2f);
-                        // Cliff walls: big boulders half sunk into the face give a broken, layered silhouette
-                        // and hide the terrain texture stretched down the steep slope.
-                        else if (lSlope >= 52f && lRandom.NextDouble() < 0.2) CliffBoulder(CliffRock(lRandom), px, pz, 4f + (float)lRandom.NextDouble() * 6f, lRandom);
+                        if (ScreeRocks && lSlope < 52f && lRandom.NextDouble() < 0.05) K.LandTree(lRandom.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A", px, pz, 1.5f + (float)lRandom.NextDouble() * 2f);
+                        // Cliff walls are dressed by CliffStrata (ledges, columns, talus) in the cliff rock.
                         continue;
                     }
                     float lWoods = Woods(px, pz, h);
@@ -329,6 +343,292 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     string lPiece = TreeAt(px, pz, h, lRoll / Mathf.Max(0.01f, lWoods), lRandom, out float lScale);
                     if (!string.IsNullOrEmpty(lPiece)) K.LandTree(lPiece, px, pz, lScale);
                 }
+        }
+
+        // ---------------------------------------------------------------- patrols and exits
+
+        /// <summary>
+        /// A patrol beat through town (the AI placement API): <paramref name="pSize"/> guards walking a loop
+        /// of world points (6-10 along roads and squares), pausing <paramref name="pPause"/> s at plain
+        /// stops. The errands follow a street beat: a pair stops to chat at the first corner, one has a
+        /// smoke or takes a call half-way, and every other corner is a look around.
+        /// </summary>
+        protected PatrolRoute Beat(string pName, int pZone, int pSize, Data.ItemKind pWeapon, float pPause, params Vector3[] pPoints)
+        {
+            if (pPoints == null || pPoints.Length < 2) return null;
+            int lHash = 7;
+            foreach (char ch in pName) lHash = lHash * 31 + ch;
+            int lBreak = pPoints.Length / 2;
+            PatrolPoint[] lPoints = new PatrolPoint[pPoints.Length];
+            for (int i = 0; i < pPoints.Length; i++)
+            {
+                if (i == 0) lPoints[i] = AiPlacement.At(pPoints[i], pSize >= 2 ? PatrolAction.Chat : PatrolAction.LookAround, pSize >= 2 ? 10f : 6f);
+                else if (i == lBreak) lPoints[i] = AiPlacement.At(pPoints[i], (lHash & 1) == 0 ? PatrolAction.Smoke : PatrolAction.Phone, 10f);
+                else if (i % 2 == 0) lPoints[i] = AiPlacement.At(pPoints[i], PatrolAction.LookAround, 5f);
+                else lPoints[i] = pPoints[i];
+            }
+            return Beat(pName, pZone, pSize, pWeapon, pPause, lPoints);
+        }
+
+        /// <summary>A patrol on waypoints that already carry their errands; the route is named Route_<paramref name="pName"/>.</summary>
+        protected PatrolRoute Beat(string pName, int pZone, int pSize, Data.ItemKind pWeapon, float pPause, params PatrolPoint[] pPoints)
+        {
+            PatrolRoute lRoute = AiPlacement.Patrol(K.Markers, pZone, pSize, pWeapon, pPause, pPoints);
+            lRoute.name = "Route_" + pName;
+            return lRoute;
+        }
+
+        /// <summary>
+        /// A loop through a building: (x, floor, z) stops in building coordinates. Each stop does what the
+        /// room it is in calls for (<see cref="PatrolPlanner.ErrandFor"/>: a smoke in the guard room, a
+        /// chat in the kitchen, a watch at the vault, a lean on the terrace); corridors are walked with a
+        /// look round every third stop, and a stop close to a locked door tries it.
+        /// </summary>
+        protected PatrolRoute Loop(ArchResult b, string pName, int pZone, int pSize, Data.ItemKind pWeapon, float pPause, params Vector3[] pLocal)
+        {
+            PatrolPoint[] lPoints = new PatrolPoint[pLocal.Length];
+            for (int i = 0; i < pLocal.Length; i++)
+            {
+                int f = Mathf.RoundToInt(pLocal[i].y);
+                Vector2 lAt = new Vector2(pLocal[i].x, pLocal[i].z);
+                Vector3 lWorld = b.At(lAt.x, f, lAt.y, 0.05f);
+                lPoints[i] = lWorld;
+                ArchDoor lLocked = b.spec.doors.Find(d => d.floor == f && d.kind == DoorKind.Secure && !d.npcPass && Vector2.Distance(d.at, lAt) < 3.5f);
+                if (lLocked != null)
+                {
+                    Vector3 lDoor = b.At(lLocked.at.x, f, lLocked.at.y, 0.05f);
+                    Vector3 lAway = lWorld - lDoor;
+                    lAway.y = 0f;
+                    if (lAway.sqrMagnitude > 0.04f)
+                    {
+                        lAway.Normalize();
+                        lPoints[i] = AiPlacement.At(lDoor + lAway * 1.1f, PatrolAction.CheckDoor, 4f, Quaternion.LookRotation(-lAway).eulerAngles.y);
+                        continue;
+                    }
+                }
+                ArchRoom lRoom = b.spec.rooms.Find(r => r.floor == f && !r.isVoid && r.rect.Contains(lAt));
+                PatrolAction lErrand = lRoom != null ? PatrolPlanner.ErrandFor(lRoom.type) : PatrolAction.LookAround;
+                if (lErrand == PatrolAction.Chat && pSize < 2) lErrand = PatrolAction.LookAround;
+                if (lErrand == PatrolAction.Pause) { if (i % 3 == 0) lPoints[i] = AiPlacement.At(lWorld, PatrolAction.LookAround, 5f); }
+                else lPoints[i] = AiPlacement.At(lWorld, lErrand, lErrand == PatrolAction.Smoke ? 12f : lErrand == PatrolAction.Chat ? 10f : lErrand == PatrolAction.LookAround ? 5f : 8f);
+            }
+            return Beat(b.spec.name + "_" + pName, pZone, pSize, pWeapon, pPause, lPoints);
+        }
+
+        /// <summary>
+        /// A way off the map (a gate, a dock, a bus stop, a trail) for every zone's crowd: the AI's
+        /// <see cref="ExitPoint"/>, named ExitPoint_label, facing away from the map's middle.
+        /// </summary>
+        protected ExitPoint ExitAt(Vector3 pPosition, string pLabel)
+        {
+            Vector3 lOut = new Vector3(pPosition.x, 0f, pPosition.z);
+            ExitPoint lExit = AiPlacement.Exit(K.Markers, pPosition, lOut.sqrMagnitude > 1f ? Quaternion.LookRotation(lOut).eulerAngles.y : 0f, -1);
+            lExit.name = "ExitPoint_" + pLabel;
+            return lExit;
+        }
+
+        /// <summary>
+        /// Every guarded building without a loop of its own (3+ posts inside, no route mostly inside it)
+        /// gets one from <see cref="PatrolPlanner.InteriorLoop"/> on its busiest floor, walked by one more
+        /// guard of its zone - no guarded house is a set of statues.
+        /// </summary>
+        private void KeyLoops()
+        {
+            NpcSpawnPoint[] lSpawns = Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None);
+            PatrolRoute[] lRoutes = Object.FindObjectsByType<PatrolRoute>(FindObjectsSortMode.None);
+            int lAdded = 0;
+            foreach (ArchResult b in _buildings)
+            {
+                if (b.volume == null || b.spec.shut) continue;
+                Dictionary<int, int> lPerFloor = new Dictionary<int, int>();
+                int lPosts = 0;
+                foreach (NpcSpawnPoint lSpawn in lSpawns)
+                {
+                    if (lSpawn.Role == NpcRole.Worker || !b.volume.Contains(lSpawn.transform.position + Vector3.up)) continue;
+                    lPosts++;
+                    int f = Mathf.RoundToInt((b.root.InverseTransformPoint(lSpawn.transform.position).y) / b.spec.storey);
+                    lPerFloor[f] = lPerFloor.TryGetValue(f, out int n) ? n + 1 : 1;
+                }
+                if (lPosts < PatrolAudit.KEY_POSTS) continue;
+                bool lHasLoop = false;
+                foreach (PatrolRoute lRoute in lRoutes)
+                {
+                    int lInside = 0;
+                    foreach (Transform lPoint in lRoute.transform) if (b.volume.Contains(lPoint.position + Vector3.up)) lInside++;
+                    if (lRoute.transform.childCount > 1 && lInside * 2 > lRoute.transform.childCount) { lHasLoop = true; break; }
+                }
+                if (lHasLoop) continue;
+                List<int> lFloors = new List<int>(lPerFloor.Keys);
+                lFloors.Sort((u, v) => lPerFloor[v].CompareTo(lPerFloor[u]));
+                for (int f = b.spec.MinFloor; f <= b.spec.MaxFloor; f++) if (!lFloors.Contains(f)) lFloors.Add(f);
+                PatrolPoint[] lLoop = null;
+                foreach (int f in lFloors) { lLoop = PatrolPlanner.InteriorLoop(b, f, 6); if (lLoop != null) break; }
+                if (lLoop == null)
+                {
+                    // One room: pace it, corner to corner, looking round.
+                    int lFloor = lFloors.Count > 0 ? lFloors[0] : 0;
+                    ArchRoom lBig = null;
+                    foreach (ArchRoom lRoom in b.spec.rooms)
+                        if (lRoom.floor == lFloor && !lRoom.isVoid && !lRoom.noFloor && (lBig == null || lRoom.rect.width * lRoom.rect.height > lBig.rect.width * lBig.rect.height)) lBig = lRoom;
+                    if (lBig == null || lBig.rect.width < 2.6f || lBig.rect.height < 2.6f) { Debug.LogWarning($"[Build] {b.spec.name}: {lPosts} posts but no room to pace for a patrol loop"); continue; }
+                    Rect q = new Rect(lBig.rect.xMin + 1.1f, lBig.rect.yMin + 1.1f, lBig.rect.width - 2.2f, lBig.rect.height - 2.2f);
+                    lLoop = new[]
+                    {
+                        AiPlacement.At(b.At(q.xMin, lFloor, q.yMin, 0.05f), PatrolAction.LookAround, 5f), (PatrolPoint)b.At(q.xMax, lFloor, q.yMin, 0.05f),
+                        AiPlacement.At(b.At(q.xMax, lFloor, q.yMax, 0.05f), PatrolAction.LookAround, 5f), (PatrolPoint)b.At(q.xMin, lFloor, q.yMax, 0.05f)
+                    };
+                }
+                Beat(b.spec.name + "_Rounds", b.spec.zone, 1, Data.ItemKind.Pistol, 3f, lLoop);
+                lAdded++;
+            }
+            if (lAdded > 0) Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} guarded buildings got an interior patrol loop");
+        }
+
+        /// <summary>
+        /// Every crowd has places to drift to between stints: next to a guest or a member of staff with
+        /// fewer than two break spots (drink, dining, garden, smoke, phone, idle, inspect) within 25 m in
+        /// its zone, an idle spot and a call or a smoke 4-7 m away (put on the NavMesh, on that floor, at
+        /// the end of the build).
+        /// </summary>
+        private void CrowdSpots()
+        {
+            List<(Vector3 at, int zone)> lSpots = new List<(Vector3, int)>();
+            foreach (ActivityNode lNode in Object.FindObjectsByType<ActivityNode>(FindObjectsSortMode.None))
+                if (lNode.Activity is Data.ActivityType.Drink or Data.ActivityType.Dining or Data.ActivityType.Garden or Data.ActivityType.Smoke or Data.ActivityType.Phone or Data.ActivityType.Idle or Data.ActivityType.Inspect)
+                    lSpots.Add((lNode.transform.position, lNode.Zone));
+            int lAdded = 0;
+            foreach (NpcSpawnPoint lSpawn in Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
+            {
+                if (lSpawn.Role != NpcRole.Worker) continue;
+                Vector3 p = lSpawn.transform.position;
+                int lNear = 0;
+                foreach ((Vector3 lAt, int lZone) in lSpots) if (lZone == lSpawn.Zone && Vector3.Distance(lAt, p) < 25f) lNear++;
+                for (int k = lNear; k < 2; k++)
+                {
+                    float a = p.x * 0.37f + p.z * 0.21f + k * 2.4f;
+                    Vector3 lSpot = p + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (4f + k * 3f);
+                    Data.ActivityType lType = k == 0 ? Data.ActivityType.Idle : ((lAdded & 1) == 0 ? Data.ActivityType.Phone : Data.ActivityType.Smoke);
+                    K.Activity(lType, lSpot, a * Mathf.Rad2Deg, lSpawn.Zone, 14f);
+                    lSpots.Add((lSpot, lSpawn.Zone));
+                    lAdded++;
+                }
+            }
+            if (lAdded > 0) Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} break spots added round the crowds");
+        }
+
+        /// <summary>
+        /// Routes laid without errands (the older kit patrols round the walls and the yards) get a street
+        /// beat's: a look around at the first stop and every other one, a smoke or a call half-way.
+        /// </summary>
+        private void Errands()
+        {
+            int lGiven = 0;
+            foreach (PatrolRoute lRoute in Object.FindObjectsByType<PatrolRoute>(FindObjectsSortMode.None))
+            {
+                if (lRoute.Count < 2 || lRoute.GetComponentInChildren<PatrolStop>() != null) continue;
+                int lBreak = lRoute.Count / 2;
+                for (int i = 0; i < lRoute.Count; i++)
+                {
+                    if (i == lBreak && lRoute.Count >= 3) AiPlacement.Stop(lRoute, i, (lGiven & 1) == 0 ? PatrolAction.Smoke : PatrolAction.Phone, 10f);
+                    else if (i % 2 == 0) AiPlacement.Stop(lRoute, i, PatrolAction.LookAround, 5f);
+                }
+                lGiven++;
+            }
+            if (lGiven > 0) Debug.Log($"[Build] {K.Map.sceneName}: errands given to {lGiven} older patrol routes");
+        }
+
+        /// <summary>
+        /// Two ways out for every crowd (staff or guests within 15 m of each other, same zone): reachable
+        /// NavMesh points 25-55 m away, outdoors, on opposite sides, public ground first - where a
+        /// panicked guest runs when trouble starts (<see cref="ExitPoint"/>, after the NavMesh bake).
+        /// </summary>
+        private void CrowdExits()
+        {
+            List<NpcSpawnPoint> lCrowd = new List<NpcSpawnPoint>();
+            foreach (NpcSpawnPoint lSpawn in Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None)) if (lSpawn.Role == NpcRole.Worker) lCrowd.Add(lSpawn);
+            Systems.BuildingVolume[] lVolumes = Object.FindObjectsByType<Systems.BuildingVolume>(FindObjectsSortMode.None);
+            SecurityZone[] lZones = Object.FindObjectsByType<SecurityZone>(FindObjectsSortMode.None);
+            List<ExitPoint> lExits = new List<ExitPoint>(Object.FindObjectsByType<ExitPoint>(FindObjectsSortMode.None));
+            UnityEngine.AI.NavMeshPath lPath = new UnityEngine.AI.NavMeshPath();
+            bool[] lTaken = new bool[lCrowd.Count];
+            int lGroups = 0, lPlaced = 0;
+            for (int i = 0; i < lCrowd.Count; i++)
+            {
+                if (lTaken[i]) continue;
+                List<int> lGroup = new List<int> { i };
+                lTaken[i] = true;
+                for (int g = 0; g < lGroup.Count; g++)
+                    for (int j = 0; j < lCrowd.Count; j++)
+                        if (!lTaken[j] && lCrowd[j].Zone == lCrowd[i].Zone && Vector3.Distance(lCrowd[j].transform.position, lCrowd[lGroup[g]].transform.position) < 15f) { lTaken[j] = true; lGroup.Add(j); }
+                if (lGroup.Count < 3) continue;
+                lGroups++;
+                int lZone = lCrowd[i].Zone;
+                Vector3 lMiddle = Vector3.zero;
+                foreach (int k in lGroup) lMiddle += lCrowd[k].transform.position;
+                lMiddle /= lGroup.Count;
+                // From the member closest to the middle (it stands on the NavMesh).
+                Vector3 lFrom = lCrowd[lGroup[0]].transform.position;
+                foreach (int k in lGroup) if ((lCrowd[k].transform.position - lMiddle).sqrMagnitude < (lFrom - lMiddle).sqrMagnitude) lFrom = lCrowd[k].transform.position;
+                if (!UnityEngine.AI.NavMesh.SamplePosition(lFrom, out UnityEngine.AI.NavMeshHit lStart, 2f, UnityEngine.AI.NavMesh.AllAreas)) continue;
+                // Exits this crowd already has (its zone's or anyone's) within 60 m count.
+                List<Vector3> lHave = new List<Vector3>();
+                foreach (ExitPoint lExit in lExits) if ((lExit.Zone < 0 || lExit.Zone == lZone) && Vector3.Distance(lExit.transform.position, lMiddle) < 60f) lHave.Add(lExit.transform.position);
+                List<(Vector3 at, Vector3 dir, float score)> lCandidates = new List<(Vector3, Vector3, float)>();
+                foreach (float lRadius in new[] { 28f, 40f, 52f })
+                    for (int k = 0; k < 16; k++)
+                    {
+                        float a = k * Mathf.PI / 8f + lRadius * 0.01f;
+                        Vector3 lDir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                        // Probe at the land's height there (a crowd upstairs runs down and out).
+                        Vector3 lProbe = lMiddle + lDir * lRadius;
+                        lProbe.y = Shape.Height(lProbe.x, lProbe.z) + 0.5f;
+                        if (!UnityEngine.AI.NavMesh.SamplePosition(lProbe, out UnityEngine.AI.NavMeshHit lHit, 4f, UnityEngine.AI.NavMesh.AllAreas)) continue;
+                        bool lIndoors = false;
+                        foreach (Systems.BuildingVolume lVolume in lVolumes) if (lVolume.Contains(lHit.position + Vector3.up)) { lIndoors = true; break; }
+                        if (lIndoors) continue;
+                        if (!UnityEngine.AI.NavMesh.CalculatePath(lStart.position, lHit.position, UnityEngine.AI.NavMesh.AllAreas, lPath) || lPath.status != UnityEngine.AI.NavMeshPathStatus.PathComplete) continue;
+                        float lLength = 0f;
+                        for (int c = 1; c < lPath.corners.Length; c++) lLength += Vector3.Distance(lPath.corners[c - 1], lPath.corners[c]);
+                        Vector3 lFlat = lHit.position - lMiddle;
+                        lFlat.y = 0f;
+                        if (lLength < 20f || lLength > lFlat.magnitude * 2.8f + 20f) continue;
+                        bool lPublic = TierAt(lZones, lHit.position) == SecurityTier.Public;
+                        lCandidates.Add((lHit.position, lFlat.normalized, Mathf.Abs(lLength - 40f) + (lPublic ? 0f : 25f)));
+                    }
+                if (lCandidates.Count == 0) { Debug.LogWarning($"[Build] crowd of {lGroup.Count} at {lMiddle:F0} (zone {lZone}): no way out found"); continue; }
+                lCandidates.Sort((u, v) => u.score.CompareTo(v.score));
+                List<(Vector3 at, Vector3 dir)> lPicked = new List<(Vector3, Vector3)>();
+                foreach (Vector3 lOld in lHave) { Vector3 d = lOld - lMiddle; d.y = 0f; if (d.sqrMagnitude > 1f) lPicked.Add((lOld, d.normalized)); }
+                int lWanted = 2;
+                foreach ((Vector3 lAt, Vector3 lDir, float lScore) in lCandidates)
+                {
+                    if (lPicked.Count >= lWanted) break;
+                    int lAway = 0;
+                    foreach ((Vector3 at, Vector3 dir) lOther in lPicked) if (Vector3.Angle(lOther.dir, lDir) >= 110f) lAway++;
+                    bool lClose = lPicked.Exists(p => Vector3.Angle(p.dir, lDir) < 60f);
+                    if (lClose) continue;
+                    if (lPicked.Count > 0 && lAway == 0) continue;
+                    ExitPoint lExit = AiPlacement.Exit(K.Markers, lAt, Quaternion.LookRotation(lDir).eulerAngles.y, lZone);
+                    lExit.name = "ExitPoint_Crowd" + lZone + "_" + lPlaced;
+                    lExits.Add(lExit);
+                    lPicked.Add((lAt, lDir));
+                    lPlaced++;
+                }
+            }
+            Debug.Log($"[Build] {K.Map.sceneName}: {lPlaced} crowd exits for {lGroups} crowds");
+        }
+
+        private SecurityTier TierAt(SecurityZone[] pZones, Vector3 pPoint)
+        {
+            bool lInside = false;
+            SecurityTier lTier = SecurityTier.Public;
+            foreach (SecurityZone lZone in pZones)
+            {
+                if (!lZone.Contains(pPoint)) continue;
+                if (!lInside || lZone.Tier > lTier) lTier = lZone.Tier;
+                lInside = true;
+            }
+            return lInside ? lTier : OutsideTier;
         }
 
         // ---------------------------------------------------------------- security: turrets, terminals, cables
@@ -477,6 +777,204 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private Transform _cliffRocks;
 
+        /// <summary>The biome's rock models may lie on scree (the orange boulders don't belong on alpine slopes).</summary>
+        protected virtual bool ScreeRocks => true;
+        /// <summary>How the cliff walls are layered: strata spacing (m), ledge chance, basalt columns, buttresses, snow on the ledges.</summary>
+        protected virtual (float band, float ledges, bool columns, bool buttresses, bool snow) Strata => (3.5f, 0.35f, false, true, false);
+        /// <summary>The land beyond the map box (distant peaks, mesas, hills): height at a point, and the rock / high materials.</summary>
+        protected virtual float BackdropHeight(float pX, float pZ) => 40f + LandShape.Fbm(pX, pZ, 260f, 4, 4.2f) * 70f;
+        protected virtual ArchMat BackdropLow => ArchLib.Surface("rock_face", 40f);
+        protected virtual ArchMat BackdropHigh => ArchLib.Surface("rock_face", 40f);
+        protected virtual float BackdropSnowLine => 9999f;
+
+        /// <summary>
+        /// Layered rock on the cliff walls instead of boulder wallpaper: horizontal strata ledges snapped
+        /// to the biome's bands along the contour (snow on them where it snows), basalt column clusters or
+        /// buttresses against the face, and talus blocks at the foot. Render-only meshes in 64 m chunks.
+        /// </summary>
+        private void CliffStrata()
+        {
+            if (K.Land == null) return;
+            (float lBand, float lLedges, bool lColumns, bool lButtresses, bool lSnow) = Strata;
+            ArchMat lRock = CliffMaterial;
+            System.Random r = new System.Random(K.Map.sceneName.Length * 7919 + 13);
+            Transform lRoot = K.Group("CliffStrata", K.Env);
+            Vector3 lOrigin = K.Land.transform.position;
+            TerrainData lData = K.Land.terrainData;
+            Vector3 Out(float x, float z)
+            {
+                Vector3 n = lData.GetInterpolatedNormal((x - lOrigin.x) / lData.size.x, (z - lOrigin.z) / lData.size.z);
+                n.y = 0f;
+                return n.sqrMagnitude > 0.0001f ? n.normalized : Vector3.forward;
+            }
+            int lCount = 0;
+            const float CHUNK = 64f, STEP = 3f;
+            for (float cx = -HALF; cx < HALF; cx += CHUNK)
+                for (float cz = -HALF; cz < HALF; cz += CHUNK)
+                {
+                    ArchMesh lMesh = new ArchMesh();
+                    bool lAny = false;
+                    for (float x = cx; x < cx + CHUNK; x += STEP)
+                        for (float z = cz; z < cz + CHUNK; z += STEP)
+                        {
+                            float px = x + (float)r.NextDouble() * STEP, pz = z + (float)r.NextDouble() * STEP;
+                            if (Built(px, pz) || HoleAt(px, pz)) continue;
+                            float lSlope = K.LandSlope(px, pz), h = K.GroundAt(px, pz);
+                            if (h < WaterLevel + 0.3f) continue;
+                            Vector3 lOut = Out(px, pz), lAlong = Vector3.Cross(Vector3.up, lOut);
+                            if (lSlope >= 50f)
+                            {
+                                if (r.NextDouble() < lLedges)
+                                {
+                                    // A stratum: a slab along the contour at the nearest band line, jutting out of the face.
+                                    float y = Mathf.Round(h / lBand) * lBand;
+                                    if (Mathf.Abs(y - h) > lBand * 0.5f) y = h;
+                                    float lLength = 3.5f + (float)r.NextDouble() * 4f, lThick = 0.35f + (float)r.NextDouble() * 0.6f, lDepth = 1.1f + (float)r.NextDouble() * 1.1f;
+                                    Vector3 lAt = new Vector3(px, y, pz) + lOut * (lDepth * 0.25f);
+                                    Quaternion lTurn = Quaternion.LookRotation(lOut) * Quaternion.Euler(((float)r.NextDouble() - 0.5f) * 6f, 0f, ((float)r.NextDouble() - 0.5f) * 5f);
+                                    lMesh.Box(lRock, lAt, new Vector3(lLength, lThick, lDepth), lTurn, false);
+                                    if (lSnow) lMesh.Box(ArchLib.Snow, lAt + lTurn * new Vector3(0f, lThick * 0.5f + 0.06f, 0.05f), new Vector3(lLength * 0.92f, 0.12f, lDepth * 0.85f), lTurn, false);
+                                    lAny = true; lCount++;
+                                }
+                                if (lColumns && r.NextDouble() < 0.1)
+                                {
+                                    // Basalt organ pipes: a cluster of hexagonal columns standing against the face.
+                                    int n = 3 + r.Next(5);
+                                    for (int k = 0; k < n; k++)
+                                    {
+                                        float lRadius = 0.45f + (float)r.NextDouble() * 0.3f, lHeight = 5f + (float)r.NextDouble() * 8f;
+                                        Vector3 lBase = new Vector3(px, h - 1.5f, pz) + lAlong * ((k - n * 0.5f) * lRadius * 1.75f) + lOut * (0.3f + (float)r.NextDouble() * 0.4f);
+                                        lMesh.Cylinder(lRock, lBase, lRadius, lHeight, 6, false, true);
+                                    }
+                                    lAny = true; lCount++;
+                                }
+                                else if (lButtresses && r.NextDouble() < 0.06)
+                                {
+                                    // A buttress: a pillar of rock standing proud of the wall.
+                                    float lHeight = 5f + (float)r.NextDouble() * 7f, lWide = 1.4f + (float)r.NextDouble() * 1.4f;
+                                    lMesh.Box(lRock, new Vector3(px, h - 1f + lHeight * 0.5f, pz) + lOut * (lWide * 0.3f), new Vector3(lWide, lHeight, lWide * 0.8f), Quaternion.LookRotation(lOut) * Quaternion.Euler(0f, 0f, ((float)r.NextDouble() - 0.5f) * 8f), false);
+                                    lAny = true; lCount++;
+                                }
+                            }
+                            else if (lSlope > 26f && lSlope < 46f && r.NextDouble() < 0.18 && K.LandSlope(px - lOut.x * 5f, pz - lOut.z * 5f) >= 50f)
+                            {
+                                // Talus at the foot of the wall: fallen blocks, half buried.
+                                int n = 1 + r.Next(3);
+                                for (int k = 0; k < n; k++)
+                                {
+                                    float s = 0.4f + (float)r.NextDouble() * 1.1f;
+                                    float qx = px + ((float)r.NextDouble() - 0.5f) * 2.5f, qz = pz + ((float)r.NextDouble() - 0.5f) * 2.5f;
+                                    Quaternion lTurn = Quaternion.Euler((float)r.NextDouble() * 40f - 20f, (float)r.NextDouble() * 360f, (float)r.NextDouble() * 40f - 20f);
+                                    Vector3 lAt = new Vector3(qx, K.GroundAt(qx, qz) + s * 0.2f, qz);
+                                    lMesh.Box(lRock, lAt, new Vector3(s * 1.3f, s * 0.8f, s), lTurn, false);
+                                    if (lSnow) lMesh.Box(ArchLib.Snow, lAt + Vector3.up * (s * 0.42f), new Vector3(s * 1.1f, 0.1f, s * 0.8f), Quaternion.Euler(0f, lTurn.eulerAngles.y, 0f), false);
+                                }
+                                lAny = true; lCount++;
+                            }
+                        }
+                    if (lAny) lMesh.Flush(lRoot, K.Map.sceneName + "_Strata_" + (int)cx + "_" + (int)cz, 0, true);
+                }
+            Debug.Log($"[Build] {K.Map.sceneName}: {lCount} strata, columns, buttresses and talus");
+        }
+
+        /// <summary>
+        /// The land beyond the map box, so the edges read as country rather than walls: a ring of terrain
+        /// from just outside the box to 1.5 km (sunk under the map inside the box), shaped by the map's
+        /// <see cref="BackdropHeight"/>, rock below its snow (or high) line. No colliders.
+        /// </summary>
+        private void Backdrop()
+        {
+            Transform lRoot = K.Group("Backdrop", K.Env);
+            ArchMesh lMesh = new ArchMesh();
+            const int ANGLES = 120;
+            float[] lRadii = { 230f, 255f, 285f, 320f, 370f, 430f, 510f, 610f, 740f, 900f, 1100f, 1350f, 1600f };
+            Vector3 Point(int a, int i)
+            {
+                float lAngle = a * Mathf.PI * 2f / ANGLES, rr = lRadii[i];
+                float x = Mathf.Cos(lAngle) * rr, z = Mathf.Sin(lAngle) * rr;
+                float h = BackdropHeight(x, z) * Mathf.Clamp01((rr - 250f) / 160f) + MinY * (1f - Mathf.Clamp01((rr - 250f) / 160f));
+                if (Mathf.Abs(x) < HALF + 4f && Mathf.Abs(z) < HALF + 4f) h = Mathf.Min(h, MinY - 30f);
+                return new Vector3(x, h, z);
+            }
+            for (int a = 0; a < ANGLES; a++)
+                for (int i = 0; i < lRadii.Length - 1; i++)
+                {
+                    Vector3 p0 = Point(a, i), p1 = Point(a + 1, i), p2 = Point(a + 1, i + 1), p3 = Point(a, i + 1);
+                    float lMean = (p0.y + p1.y + p2.y + p3.y) * 0.25f;
+                    lMesh.Quad(lMean > BackdropSnowLine ? BackdropHigh : BackdropLow, p0, p3, p2, p1, false);
+                }
+            lMesh.Flush(lRoot, K.Map.sceneName + "_Backdrop", 0, true);
+        }
+
+        /// <summary>
+        /// Every stealth entry shows itself from its approach (C4): a caged bulb over each vent grille,
+        /// coal chute, hatch, well shaft, tunnel mouth and drop ladder on the pause map, lit at night.
+        /// </summary>
+        private void EntryLamps()
+        {
+            int n = 0;
+            Transform lEntryRoot = null;
+            foreach (MapPoi lPoi in Object.FindObjectsByType<MapPoi>(FindObjectsSortMode.None))
+            {
+                string lLabel = lPoi.Label ?? "";
+                bool lEntry = lPoi.Type == MapPoi.Kind.Vent || lPoi.Type == MapPoi.Kind.Underground || lPoi.Type == MapPoi.Kind.Shortcut
+                    || System.Text.RegularExpressions.Regex.IsMatch(lLabel, "chute|well|qanat|cave|crevasse|bay|boarded|hatch|ladder|duct|window", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (!lEntry || n >= 24) continue;
+                Vector3 p = lPoi.transform.position + Vector3.up * 1.9f;
+                // On a post when the entry is near the ground, else a bulb on a bracket against the wall.
+                float lGround = K.GroundAt(p.x, p.z), lPole = p.y - lGround;
+                if (lEntryRoot == null) lEntryRoot = K.Group("EntryLamps", K.Env);
+                List<(ArchMat, Vector3, Vector3)> lParts = new List<(ArchMat, Vector3, Vector3)>();
+                bool lPost = lPole > 0.5f && lPole < 3.2f;
+                if (lPost)
+                {
+                    lParts.Add((ArchLib.Iron, new Vector3(0, 0.25f, 0), new Vector3(0.16f, 0.5f, 0.16f)));
+                    lParts.Add((ArchLib.Iron, new Vector3(0, lPole * 0.5f, 0), new Vector3(0.07f, lPole, 0.07f)));
+                }
+                ArchLib.LanternParts(lParts, new Vector3(0, lPost ? lPole : -0.2f, 0));
+                A.BoxObject(lPost ? "EntryLampPost" : "EntryLamp", lPost ? new Vector3(p.x, lGround, p.z) : p, 0f, lEntryRoot, 0, lPost, lParts.ToArray());
+                Light lLight = new GameObject("EntryLight").AddComponent<Light>();
+                lLight.transform.SetParent(K.Lights, false);
+                lLight.transform.position = p + Vector3.down * 0.2f;
+                lLight.type = LightType.Point;
+                lLight.range = 6f;
+                lLight.intensity = 1.4f;
+                lLight.color = new Color(1f, 0.78f, 0.5f);
+                lLight.shadows = LightShadows.None;
+                n++;
+            }
+            Debug.Log($"[Build] {K.Map.sceneName}: {n} entry lamps");
+        }
+
+        /// <summary>
+        /// A guard alone on a street or in a clearing gets a partner (C7): an armed post outdoors with no
+        /// other armed NPC within 8 m gets a second guard 1.6 m beside it, facing the same way.
+        /// </summary>
+        private void PairLoneGuards()
+        {
+            List<NpcSpawnPoint> lArmed = new List<NpcSpawnPoint>();
+            foreach (NpcSpawnPoint lSpawn in Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
+                if (lSpawn.Role != NpcRole.Worker && lSpawn.Role != NpcRole.Target) lArmed.Add(lSpawn);
+            Systems.BuildingVolume[] lVolumes = Object.FindObjectsByType<Systems.BuildingVolume>(FindObjectsSortMode.None);
+            int lAdded = 0;
+            foreach (NpcSpawnPoint lGuard in lArmed.ToArray())
+            {
+                if (lGuard.Role != NpcRole.Guard) continue;
+                Vector3 p = lGuard.transform.position;
+                bool lInside = false;
+                foreach (Systems.BuildingVolume v in lVolumes) if (v.Contains(p + Vector3.up)) { lInside = true; break; }
+                if (lInside) continue;
+                bool lAlone = true;
+                foreach (NpcSpawnPoint o in lArmed) if (o != lGuard && Vector3.Distance(o.transform.position, p) < 8f) { lAlone = false; break; }
+                if (!lAlone) continue;
+                Vector3 lBeside = p + lGuard.transform.right * 1.6f;
+                NpcSpawnPoint lMate = A.Npc(NpcRole.Guard, new Vector3(lBeside.x, K.GroundAt(lBeside.x, lBeside.z) + 0.05f, lBeside.z), lGuard.transform.eulerAngles.y - 20f, lGuard.Zone, Data.ItemKind.Pistol);
+                lArmed.Add(lMate);
+                lAdded++;
+            }
+            if (lAdded > 0) Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} lone guards paired");
+        }
+
         private void Edges()
         {
             for (int s = 0; s < 4; s++)
@@ -571,8 +1069,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lHolder.transform.position = lLamp;
                 lBulb.Flush(lHolder.transform, "Arch_CaveLantern");
             }
-            CaveHole(pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth * 0.6f);
-            CaveHole(pPath[pPath.Length - 1], pPath[Mathf.Max(0, pPath.Length - 2)], pWidth * 0.6f);
+            CaveHole(pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth * 0.48f, pHeight);
+            CaveHole(pPath[pPath.Length - 1], pPath[Mathf.Max(0, pPath.Length - 2)], pWidth * 0.48f, pHeight);
             Mouth(lRoot, pName + "_A", pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth, pHeight);
             Mouth(lRoot, pName + "_B", pPath[pPath.Length - 1], pPath[Mathf.Max(0, pPath.Length - 2)], pWidth, pHeight);
         }
@@ -673,6 +1171,34 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         private static readonly System.Collections.Generic.HashSet<TerrainLayer> _tinted = new System.Collections.Generic.HashSet<TerrainLayer>();
+
+        /// <summary>
+        /// This map's own copy of each terrain layer (<c>TL_&lt;id&gt;_&lt;scene&gt;</c>, next to the shared one), so
+        /// another map's build - which sets the shared layer's tiling - cannot change this map's ground.
+        /// </summary>
+        private TerrainLayer[] Own(TerrainLayer[] pLayers)
+        {
+            if (pLayers == null) return null;
+            TerrainLayer[] lOwn = new TerrainLayer[pLayers.Length];
+            for (int i = 0; i < pLayers.Length; i++)
+            {
+                TerrainLayer lLayer = pLayers[i];
+                string lPath = lLayer != null ? UnityEditor.AssetDatabase.GetAssetPath(lLayer) : null;
+                if (string.IsNullOrEmpty(lPath)) { lOwn[i] = lLayer; continue; }
+                string lOwnPath = lPath.Replace(".terrainlayer", "_" + K.Map.sceneName + ".terrainlayer");
+                TerrainLayer lCopy = UnityEditor.AssetDatabase.LoadAssetAtPath<TerrainLayer>(lOwnPath);
+                if (lCopy == null)
+                {
+                    lCopy = new TerrainLayer();
+                    UnityEditor.AssetDatabase.CreateAsset(lCopy, lOwnPath);
+                }
+                UnityEditor.EditorUtility.CopySerialized(lLayer, lCopy);
+                lCopy.name = System.IO.Path.GetFileNameWithoutExtension(lOwnPath);
+                UnityEditor.EditorUtility.SetDirty(lCopy);
+                lOwn[i] = lCopy;
+            }
+            return lOwn;
+        }
 
         /// <summary>Clears any albedo remap left on the shared layers (older builds tinted them in place).</summary>
         private static TerrainLayer[] Untinted(TerrainLayer[] pLayers)

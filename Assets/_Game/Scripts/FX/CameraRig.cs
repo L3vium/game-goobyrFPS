@@ -24,6 +24,15 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public Transform ViewmodelRoot { get; private set; }
         public float BaseFov { get; set; } = 78f;
 
+        /// <summary>
+        /// Vertical field of view of the overlay camera that draws the first-person arms - the one the
+        /// arm poses are authored for (<c>Tools/Blender/fp</c>, GOOBYR_FP_FOV): narrow enough that only
+        /// the forearms enter from the bottom corners. The sights stay centred whatever the world FOV.
+        /// </summary>
+        public const float VIEW_FOV = 48f;
+
+        private Vector3 _kick, _kickVelocity;
+
         private Volume _volume;
         private Bloom _bloom;
         private ChromaticAberration _aberration;
@@ -83,7 +92,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             ViewCamera = lView.AddComponent<Camera>();
             ViewCamera.nearClipPlane = 0.01f;
             ViewCamera.farClipPlane = 10f;
-            ViewCamera.fieldOfView = 60f;
+            ViewCamera.fieldOfView = VIEW_FOV;
             ViewCamera.cullingMask = 1 << GameLayers.LOCAL_VIEW;
             ViewCamera.clearFlags = CameraClearFlags.Depth;
             UniversalAdditionalCameraData lViewData = ViewCamera.GetUniversalAdditionalCameraData();
@@ -129,8 +138,20 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             float t = Time.time * 22f;
             Vector3 lOffset = new Vector3(Mathf.PerlinNoise(_seed, t) - 0.5f, Mathf.PerlinNoise(_seed + 3f, t) - 0.5f, 0f) * lShake * 0.35f;
             Vector3 lAngles = new Vector3(Mathf.PerlinNoise(_seed + 7f, t) - 0.5f, Mathf.PerlinNoise(_seed + 11f, t) - 0.5f, Mathf.PerlinNoise(_seed + 13f, t) - 0.5f) * lShake * 9f;
-            WorldCamera.transform.SetPositionAndRotation(pPosition + pRotation * lOffset, pRotation * Quaternion.Euler(lAngles));
+            // Kick: a stiff, slightly underdamped spring back to rest (punch contact, takedown grab).
+            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
+            _kickVelocity += (-_kick * KICK_STIFFNESS - _kickVelocity * KICK_DAMPING) * dt;
+            _kick += _kickVelocity * dt;
+            WorldCamera.transform.SetPositionAndRotation(pPosition + pRotation * lOffset, pRotation * Quaternion.Euler(lAngles + _kick));
         }
+
+        public const float KICK_STIFFNESS = 420f, KICK_DAMPING = 26f;
+
+        /// <summary>
+        /// Jolts the view by a rotation (degrees: x pitch, y yaw, z roll) that springs back within about
+        /// a fifth of a second - a hit felt in the camera without touching the game clock.
+        /// </summary>
+        public void Kick(Vector3 pDegrees) => _kickVelocity += pDegrees * KICK_STIFFNESS * 0.06f;
 
         public void SetTargetFov(float pFov) => _fovTarget = pFov;
 

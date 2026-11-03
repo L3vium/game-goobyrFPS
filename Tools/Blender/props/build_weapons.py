@@ -2,9 +2,19 @@
 """Procedural realistic weapons and throwables (W_*), baked PBR (see pbr_lib).
 
     blender -b --factory-startup --python Tools/Blender/props/build_weapons.py -- [W_Pistol ...]
+    (GOOBYR_PROPS_OUT=<staging folder> to export outside Assets, then copy in under the editor lock)
 
 Barrel / front along Blender -Y (Unity +Z), up +Z, pivot at the hand ("Grip" empty at origin),
 "Muzzle" empty at the barrel tip. Throwables are pivoted at their centre.
+
+Guns also carry the points the first-person poses are authored on (Tools/Blender/fp):
+  * "Sight"    - the rear end of the sight line, on the bore's vertical plane: aimed down the sights
+                 it sits on the camera axis, the line running along the barrel (-Y here, +Z in Unity);
+  * "ForeGrip" - the centre of what the support hand holds (fore-end, pump, vertical grip, wand
+                 grip; for pistols the support palm on the left grip panel);
+  * "MagWell"  - where the magazine (or shell, rocket, fuel) goes in, its local +Z up the insertion axis.
+Pistols and the SMG keep their magazine as a child mesh "Mag" (pivot on the MagWell) so a reload
+can take it out.
 """
 import math
 import os
@@ -65,9 +75,13 @@ def _pistol_parts(suppressed=False):
                      (0.010, 0.006)], 0.0012, mat="grip", bv=0.0004, plane="YZ")
         L.place(g, (x, 0, 0))
         P.append(g)
-    # magazine base plate
-    P.append(extrude([(0.030, -0.086), (0.067, -0.082), (0.069, -0.092), (0.029, -0.095)], 0.030, mat="frame",
-                     bv=0.0015))
+    # magazine (child "Mag"): base plate + the steel body up the raked grip (hidden inside when seated)
+    MAG = [extrude([(0.030, -0.086), (0.067, -0.082), (0.069, -0.092), (0.029, -0.095)], 0.030, mat="frame",
+                   bv=0.0015),
+           box((0.021, 0.027, 0.112),
+               (0, PISTOL_MAG[1] - 0.056 * math.sin(math.radians(PISTOL_RAKE)),
+                PISTOL_MAG[2] + 0.056 * math.cos(math.radians(PISTOL_RAKE))),
+               (PISTOL_RAKE, 0, 0), mat="magbody", bv=0.0015)]
     # trigger + safety blade
     P.append(extrude([(-0.031, 0.036), (-0.026, 0.036), (-0.023, 0.028), (-0.025, 0.021), (-0.029, 0.0205),
                       (-0.028, 0.026)], 0.0055, mat="frame", bv=0.0007))
@@ -97,15 +111,31 @@ def _pistol_parts(suppressed=False):
         "dot": spec(None, (0.015, 0.015, 0.015), rough=(0.6, 0.7)),
         "suppressor": S("gunmetal", color=(0.04, 0.04, 0.042), wear=0.35, rough=(0.4, 0.6)),
         "engrave": S("steel", color=(0.3, 0.3, 0.31), scratch=0.0),
+        "magbody": S("blued", color=(0.07, 0.07, 0.075), wear=0.6),
     }
-    return P, specs, muzzle_y
+    return P, MAG, specs, muzzle_y
+
+
+# Pistol magazine: well centre at the bottom of the grip, and the grip's rake (degrees back from vertical).
+PISTOL_MAG = (0.0, 0.0465, -0.086)
+PISTOL_RAKE = 16.0
+# Sight line: over the rear blade, level with the front post's top (parallel to the bore at 0.0615).
+PISTOL_SIGHT = (0.0, 0.026, 0.080)
 
 
 def build_pistol(name, suppressed):
-    P, specs, my = _pistol_parts(suppressed)
+    P, MAG, specs, my = _pistol_parts(suppressed)
     grip = (0, 0.040, -0.030)
+
+    def rel(p):
+        return (p[0] - grip[0], p[1] - grip[1], p[2] - grip[2])
     return L.finalize(name, P, specs, "weapon", size=2048, view="weapon", pivot=grip,
-                      empties={"Grip": (0, 0, 0), "Muzzle": (0, my - grip[1], 0.0615 - grip[2])})
+                      children={"Mag": (MAG, PISTOL_MAG)}, bake_apart={"Mag": (0.4, 0, 0)},
+                      empties={"Grip": (0, 0, 0), "Muzzle": (0, my - grip[1], 0.0615 - grip[2]),
+                               "Sight": rel(PISTOL_SIGHT),
+                               # support palm on the left grip panel (Blender +X is the gun's left)
+                               "ForeGrip": rel((0.0155, 0.031, -0.036)),
+                               "MagWell": (rel(PISTOL_MAG), (PISTOL_RAKE, 0, 0))})
 
 
 # =================================================================== SMG (MP5K-style)
@@ -133,7 +163,10 @@ def build_smg():
                  (0, -0.223, 0.096), (90, 0, 0), mat="receiver")
     P.append(ring)
     P.append(box((0.002, 0.004, 0.012), (0, -0.228, 0.094), mat="receiver", bv=0.0004))
-    P.append(cyl(0.013, 0.022, (0, 0.10, 0.088), (0, 90, 0), mat="receiver", n=20, bv=0.002))
+    # rear diopter drum with its aperture on the sight line (the front post tip, z 0.099)
+    drum = cyl(0.013, 0.022, (0, 0.10, 0.088), (0, 90, 0), mat="receiver", n=20, bv=0.002)
+    boolean(drum, cyl(0.0028, 0.05, (0, 0.10, SMG_SIGHT[2]), (90, 0, 0), mat="_cut", n=16, bv=0))
+    P.append(drum)
     P.append(box((0.026, 0.03, 0.012), (0, 0.10, 0.076), mat="receiver", bv=0.002))
     # top rail (claw mount)
     rail = box((0.021, 0.20, 0.008), (0, -0.04, 0.077), mat="steel", bv=0.0008)
@@ -178,7 +211,7 @@ def build_smg():
     mag = extrude(mag_pts_front + [(mag_pts_front[-1][0] - 0.002, mag_pts_front[-1][1] - 0.008),
                                    (mag_pts_back[-1][0] + 0.002, mag_pts_back[-1][1] - 0.008)]
                   + list(reversed(mag_pts_back)), 0.022, mat="mag", bv=0.002)
-    P.append(mag)
+    MAG = [mag]  # child "Mag", pivot at the top of the magazine in the well
     # vertical foregrip
     P.append(lathe([(0.0, 0.0), (0.016, 0.0), (0.018, 0.006), (0.016, 0.012), (0.0165, 0.04), (0.015, 0.075),
                     (0.018, 0.085), (0.018, 0.09), (0.0, 0.09)], 24, (0, -0.205, -0.075), (0, 0, 0),
@@ -193,8 +226,22 @@ def build_smg():
         "dark": spec(None, (0.01, 0.01, 0.01), rough=(0.6, 0.7)),
     }
     grip = (0, 0.075, -0.045)
+
+    def rel(p):
+        return (p[0] - grip[0], p[1] - grip[1], p[2] - grip[2])
     return L.finalize("W_Smg", P, specs, "weapon", size=2048, view="weapon", pivot=grip,
-                      empties={"Grip": (0, 0, 0), "Muzzle": (0, -0.2435 - grip[1], 0.040 - grip[2])})
+                      children={"Mag": (MAG, SMG_MAG)}, bake_apart={"Mag": (0.4, 0, 0)},
+                      empties={"Grip": (0, 0, 0), "Muzzle": (0, -0.2435 - grip[1], 0.040 - grip[2]),
+                               "Sight": rel(SMG_SIGHT),
+                               # middle of the vertical foregrip (z -0.075 .. 0.015)
+                               "ForeGrip": rel((0, -0.205, -0.03)),
+                               # the curved magazine leaves the well tilted ~5 degrees forward
+                               "MagWell": (rel(SMG_MAG), (-5.0, 0, 0))})
+
+
+# Sight line through the drum's aperture onto the front post's tip; magazine top in the well.
+SMG_SIGHT = (0.0, 0.10, 0.099)
+SMG_MAG = (0.0, -0.035, 0.0)
 
 
 # =================================================================== shotgun (pump)
@@ -260,8 +307,19 @@ def build_shotgun():
         "bead": S("brass"),
     }
     grip = (0, 0.15, -0.0)
+
+    def rel(p):
+        return (p[0] - grip[0], p[1] - grip[1], p[2] - grip[2])
     return L.finalize("W_Shotgun", P, specs, "weapon", size=2048, view="weapon", pivot=grip,
-                      empties={"Grip": (0, 0, 0), "Muzzle": (0, -0.61 - grip[1], bz - grip[2])})
+                      empties={"Grip": (0, 0, 0), "Muzzle": (0, -0.61 - grip[1], bz - grip[2]),
+                               # the comb line: the eye 45 mm over the receiver's top rear, looking down
+                               # 3.7 deg onto the bead (0, -0.605, 0.068) - aimed, the stock and the
+                               # firing hand sit low in the view instead of under the eye
+                               "Sight": (rel((0, 0.10, 0.1135)), (3.7, 0, 0)),
+                               # middle of the pump (y -0.15 .. -0.355, axis bz - 0.022)
+                               "ForeGrip": rel((0, -0.2525, bz - 0.022)),
+                               # loading port under the receiver, shells pushed up into the tube
+                               "MagWell": (rel((0, -0.03, 0.004)), (0, 0, 0))})
 
 
 # =================================================================== RPG-7 style launcher
@@ -319,8 +377,17 @@ def build_rocket():
         "steel": S("steel"),
     }
     grip = (0, -0.045, -0.08)
+
+    def rel(p):
+        return (p[0] - grip[0], p[1] - grip[1], p[2] - grip[2])
     return L.finalize("W_RocketLauncher", P, specs, "weapon", size=2048, view="weapon", pivot=grip,
-                      empties={"Grip": (0, 0, 0), "Muzzle": (0, wy + 0.05 - 0.39 - grip[1], tz - grip[2])})
+                      empties={"Grip": (0, 0, 0), "Muzzle": (0, wy + 0.05 - 0.39 - grip[1], tz - grip[2]),
+                               # over the rear sight block onto the front post (tops 0.058 / 0.062)
+                               "Sight": rel((0, -0.03, 0.060)),
+                               # under the front heat guard
+                               "ForeGrip": rel((0, -0.17, tz - 0.033)),
+                               # the warhead goes in at the front of the tube, pushed backwards (+Y)
+                               "MagWell": (rel((0, -0.40, tz)), (-90, 0, 0))})
 
 
 # =================================================================== flamethrower
@@ -388,8 +455,17 @@ def build_flamer():
         "glass": S("glass"),
     }
     grip = (0, 0.075, wz - 0.07)
+
+    def rel(p):
+        return (p[0] - grip[0], p[1] - grip[1], p[2] - grip[2])
     return L.finalize("W_Flamethrower", P, specs, "weapon", size=2048, view="weapon", pivot=grip,
-                      empties={"Grip": (0, 0, 0), "Muzzle": (0, -0.52 - grip[1], wz - grip[2])})
+                      empties={"Grip": (0, 0, 0), "Muzzle": (0, -0.52 - grip[1], wz - grip[2]),
+                               # no sights: a line 2.5 cm over the valve body, looking over the igniter
+                               "Sight": rel((0, 0.10, wz + 0.05)),
+                               # middle of the wand's front grip (z wz-0.11 .. wz-0.01)
+                               "ForeGrip": rel((0, -0.18, wz - 0.06)),
+                               # the tank's valve
+                               "MagWell": (rel((0, 0.235, wz - 0.085)), (-90, 0, 0))})
 
 
 # =================================================================== throwables / gadgets

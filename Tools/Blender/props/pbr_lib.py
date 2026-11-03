@@ -36,6 +36,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 PBR = os.path.join(ROOT, "Assets", "_Game", "Art", "PBR")
 MODELS = os.path.join(PBR, "Models")
+# Where builds write (FBX, textures, manifest): Assets by default, a staging folder when
+# GOOBYR_PROPS_OUT is set (exports are copied into Assets under the editor lock). Sources
+# (Poly Haven models and textures) are always read from Assets.
+OUT_MODELS = os.environ.get("GOOBYR_PROPS_OUT") or MODELS
 TEXTURES = os.path.join(PBR, "Textures")
 PARTS_DIR = os.path.join(HERE, "manifest_parts")
 PREVIEW_DIR = os.environ.get("GOOBYR_PREVIEW_DIR") or os.path.join(
@@ -874,7 +878,7 @@ def _bake(ob, kind, img, mats, samples, **kw):
 
 def bake_asset(ob, name, specs, size=1024, ao_strength=0.55, folder=None):
     """ob: joined mesh whose placeholder materials are '__<part>'. Returns final slot list."""
-    folder = folder or os.path.join(MODELS, name)
+    folder = folder or os.path.join(OUT_MODELS, name)
     os.makedirs(folder, exist_ok=True)
     sc = bpy.context.scene
     gpu_cycles(sc)
@@ -970,7 +974,7 @@ def merge_slots(ob):
 
 def tile_asset(ob, name, specs, folder=None, res=1024):
     """Tiling mode: per-material processed copies of the Poly Haven maps and world-scaled UVs."""
-    folder = folder or os.path.join(MODELS, name)
+    folder = folder or os.path.join(OUT_MODELS, name)
     os.makedirs(folder, exist_ok=True)
     me = ob.data
     smart_uv(ob, margin=0.002, angle=50.0)
@@ -1026,17 +1030,29 @@ def tile_asset(ob, name, specs, folder=None, res=1024):
 
 
 # ------------------------------------------------------------------ export / preview / manifest
-def add_empty(name, parent, loc):
+def add_empty(name, parent, loc, rot=None):
+    """An empty under `parent`; rot = XYZ Euler degrees (its local axes in the asset's frame)."""
     e = link(bpy.data.objects.new(name, None))
     e.empty_display_type = "PLAIN_AXES"
     e.empty_display_size = 0.03
     e.parent = parent
     e.location = loc
+    if rot is not None:
+        e.rotation_euler = tuple(math.radians(a) for a in rot)
     return e
 
 
+def add_empties(parent, empties):
+    """empties: {Name: (x, y, z)} or {Name: ((x, y, z), (rx, ry, rz))}."""
+    for en, val in (empties or {}).items():
+        if len(val) == 2 and hasattr(val[0], "__len__"):
+            add_empty(en, parent, val[0], val[1])
+        else:
+            add_empty(en, parent, val)
+
+
 def export_fbx(root, name, folder=None):
-    folder = folder or os.path.join(MODELS, name)
+    folder = folder or os.path.join(OUT_MODELS, name)
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, name + ".fbx")
     for o in bpy.context.view_layer.objects:
@@ -1079,7 +1095,8 @@ def merge_manifest():
                 out.append(json.load(f))
     order = ["weapon", "throwable", "system", "architecture", "prop", "furniture", "vehicle"]
     out.sort(key=lambda e: (order.index(e["category"]) if e["category"] in order else 99, e["name"]))
-    path = os.path.join(MODELS, "props_manifest.json")
+    os.makedirs(OUT_MODELS, exist_ok=True)
+    path = os.path.join(OUT_MODELS, "props_manifest.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=1)
     return path
@@ -1179,22 +1196,27 @@ def run(builders, default_category):
 
 def finalize(name, parts, specs, category, source="Procedural (Blender Python)", licence="Original, project-owned",
              mode="bake", size=1024, view="prop", empties=None, children=None, max_tris=None, smooth_angle=35.0,
-             pivot=None, notes="", post=None):
+             pivot=None, notes="", post=None, bake_apart=None):
     """Join parts, normals, texture (bake/tile), empties, export, preview, manifest.
     children: {ChildName: (list_of_parts, pivot_xyz)} -> separate meshes parented to the root
-    (e.g. wardrobe doors). empties: {Name: (x,y,z)}."""
-    folder = os.path.join(MODELS, name)
+    (e.g. wardrobe doors). empties: {Name: (x,y,z)} or {Name: ((x,y,z), (rx,ry,rz))}.
+    bake_apart: {ChildName: (dx,dy,dz)} -> that child is moved away while the atlas is baked (a
+    magazine hidden inside a grip would otherwise bake black ambient occlusion), then put back."""
+    folder = os.path.join(OUT_MODELS, name)
+    bake_apart = bake_apart or {}
     groups = [(name, parts, None)]
     for cname, (cparts, cpivot) in (children or {}).items():
         groups.append((cname, cparts, cpivot))
     # tag faces with group index then join everything for a shared atlas
     allp = []
-    for gi, (_, gparts, _) in enumerate(groups):
+    for gi, (gname, gparts, _) in enumerate(groups):
         for p in gparts:
             if p is None:
                 continue
             attr = p.data.attributes.new("grp", "INT", "FACE")
             attr.data.foreach_set("value", [gi] * len(p.data.polygons))
+            if gname in bake_apart:
+                p.data.transform(Matrix.Translation(Vector(bake_apart[gname])))
             allp.append(p)
     ob = join(allp, name)
     if pivot is not None:
@@ -1228,6 +1250,8 @@ def finalize(name, parts, specs, category, source="Procedural (Blender Python)",
             child.name = cname
             child.data.name = cname
             pv = Vector(cpivot) - (Vector(pivot) if pivot else Vector())
+            if cname in bake_apart:
+                child.data.transform(Matrix.Translation(-Vector(bake_apart[cname])))
             child.data.transform(Matrix.Translation(-pv))
             child.parent = ob
             child.location = pv
@@ -1247,8 +1271,7 @@ def finalize(name, parts, specs, category, source="Procedural (Blender Python)",
     for o in objs:
         if "grp" in o.data.attributes:
             o.data.attributes.remove(o.data.attributes["grp"])
-    for en, loc in (empties or {}).items():
-        add_empty(en, ob, loc)
+    add_empties(ob, empties)
     export_fbx(ob, name, folder)
     entry = write_part(name, category, objs, source, licence, notes)
     preview(objs, name, view)

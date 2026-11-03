@@ -242,3 +242,39 @@ the greenhouse (kitchen hands), the crowbar in the garage (instructors).
 - **Reuse:** chalet street = cover, chase, snowmobile extraction; pistes = route, ski-jump vs
   spire duel; ballroom = social approach, chandelier kill, dumbwaiter escape. **Extractions:**
   helicopter (ballroom roof), cable car, snowmobile, funicular.
+
+
+## 9. Security: sentry guns, terminals, cameras, distractions (0.7.0)
+| Group | Guns | Terminal (hidden) | Cable | Way to the terminal without passing a gun |
+|---|---|---|---|---|
+| **VIP floor** (L4) | presidential gun facing the keypad door (balcony behind it); banker's-suite gun facing the corridor door (balcony outside its arc) | attic desk (L5, north wall), 36 m away | up the suites' outer walls, along the roof-walk parapets, into the attic along its east and north walls | the **crevasse window** (ice wall), the **spa-garden drop ladder** window, the roof door |
+| **Observatory** | command-level gun (-2) over the stair foot, the desk and the escape-tunnel door; bunker gun (-1) over both stairs | **antenna hut** desk, ~25 m away | up the east wall through both floors, out of the back wall, along the ground to the hut | the hut's door or the **mast ladder** side, never through the bunker |
+
+- **Accident opportunity.** Hack the attic terminal while **Konrad Aschauer** works in the
+  presidential suite (4 min, Office): the gun covers his desk. The banker's gun covers suite B3 where
+  **Mara Lindqvist** ends her loop. At the observatory, the hut terminal turns the command gun on
+  **Viktor Sorel** during his 4 min in the bunker.
+- **Cameras (10):** the VIP corridor, the observatory hall and bunker, the service-road barrier, plus
+  the earlier set; blind spots: the attic, the antenna hut's mast side.
+- **Distractions:** PCs on the booth, lab, command, landlord and office desks; fans in the kitchens,
+  canteen and guard posts; hoses at the delivery yard, the spa garden, behind the Gasthaus and at the
+  groomer garage.
+
+## 10. Patrols, crowds, break spots, facades (0.7.0)
+- **Grand Hotel, a loop on every floor:** *Underbelly* (L0: service corridor, laundry, boiler, snowcat
+  bay), *StaffTier* (L1: staff corridor, canteen, kitchens, the security office's door), *Lobby* (L2,
+  a pair round the feature stair and the reception), *SuitesRing* and *VipRing* (L3/L4 round the atrium;
+  the VIP pair walks past the keypad doors and tries them), *RoofWalk* (L5 parapets and the clock room);
+  a pair in the delivery yard. Stops do their room's errand: a smoke in the guard posts, a watch at the
+  security office, a lean on the roof walk, a chat in the canteen.
+- **Village:** pairs on the chalet street (x -90 to 84, clear of the chairlift start) and round the
+  church square; the lake shore is left quiet for the boathouse start (50 m rule). **Ski:** the hamlet
+  loop between the mid-station and the groomer garage; the observatory bunker loop.
+- **Errands on street beats:** a chat at the first corner, a smoke or a call half-way, a look around
+  at every other corner. Older routes (the pistes, the summit, the hotel terraces) got the same.
+- **Crowds:** every group of guests or staff has two ways out, outdoors and on opposite sides, besides
+  the map exits (bus stop, funicular, snowmobile, boathouse, glacier trail, cable car, chairlift).
+  Break spots in every lobby, bar, salon, dining room, kitchen, spa and on the terraces.
+- **Facades:** the hotel has dressed-stone quoins, a moulded cornice and stepped string courses; the
+  stone chalets and the church quoins; the timber chalets chamfered corners; rising damp at the foot of
+  every wall, streaks under the sills, posters on the chalet street.

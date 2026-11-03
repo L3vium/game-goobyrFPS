@@ -41,7 +41,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void Update()
         {
             if (Off) return;
-            transform.localRotation = _rest * Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.35f + GetInstanceID()) * _sweep, 0f);
+            transform.localRotation = _rest * Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.35f + GetHashCode()) * _sweep, 0f);
             if (Unity.Netcode.NetworkManager.Singleton == null || !Unity.Netcode.NetworkManager.Singleton.IsServer) return;
             _cooldown -= Time.deltaTime;
 
@@ -52,8 +52,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 Vector3 lTo = lPlayer.Chest - transform.position;
                 if (lTo.magnitude > _range || Vector3.Angle(transform.forward, lTo) > _halfAngle) continue;
                 SecurityTier lTier = SecurityZone.ForPlayer(SecurityZone.At(lPlayer.transform.position, out AccessLevel lNeed), lNeed, lPlayer.Weapons != null ? lPlayer.Weapons.Access : AccessLevel.None, false);
-                if (DetectionModel.TierFactor(lTier, lPlayer.ActsSuspicious) <= 0.55f) continue;
-                if (Physics.Linecast(transform.position, lPlayer.Chest, Core.GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore)) continue;
+                // A camera reports trespassers in hostile areas and suspicious behaviour anywhere (a gun out, climbing...).
+                if (lTier != SecurityTier.Hostile && !Npc.ActsSuspicious(lPlayer)) continue;
+                if (!Senses.Clear(transform.position, lPlayer.Chest)) continue;
                 lCaught = lPlayer;
                 break;
             }

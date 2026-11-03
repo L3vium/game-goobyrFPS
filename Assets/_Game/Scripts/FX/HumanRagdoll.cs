@@ -42,6 +42,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             Transform lModel = pBody.Detach();
             lModel.name = "Ragdoll_" + lCharacter.root.name;
             lAnimator.enabled = false;
+            HumanFace lFace = lModel.GetComponent<HumanFace>();
+            if (lFace != null) lFace.Die();
             HumanRagdoll lRagdoll = lModel.gameObject.AddComponent<HumanRagdoll>();
             _alive.Enqueue(lRagdoll);
             GameLayers.SetRecursive(lModel.gameObject, GameLayers.RAGDOLL);
@@ -52,12 +54,14 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             foreach (Rigidbody lRigidbody in lRagdoll._bodies) lRigidbody.linearVelocity = pVelocity;
             if (pImpulse.sqrMagnitude > 0.0001f)
             {
-                // Most of the blow on the part that was hit, the rest spread so the whole body reacts.
-                // (a bullet's 9 N.s turns into a stagger of the whole body and a shove of the part hit).
+                // Goofy deaths: a little shove of the whole body, most of the blow as spin - the part hit
+                // takes it off-centre and the body turns about the pelvis (capped so nobody flies away).
                 Rigidbody lHit = lRagdoll.Closest(pPoint);
                 foreach (Rigidbody lRigidbody in lRagdoll._bodies)
-                    lRigidbody.AddForce(pImpulse * 5f * (lRigidbody.mass / MASS), ForceMode.Impulse);
-                if (lHit != null) lHit.AddForceAtPosition(pImpulse * 3f, pPoint, ForceMode.Impulse);
+                    lRigidbody.AddForce(pImpulse * 3f * (lRigidbody.mass / MASS), ForceMode.Impulse);
+                if (lHit != null) lHit.AddForceAtPosition(pImpulse * 3.5f, pPoint, ForceMode.Impulse);
+                Vector3 lSpin = Vector3.Cross(Vector3.up, pImpulse.normalized) * Mathf.Clamp(pImpulse.magnitude * 1.6f, 4f, 18f);
+                if (lRagdoll.Pelvis != null) lRagdoll.Pelvis.AddTorque(lSpin + Random.insideUnitSphere * 3f, ForceMode.VelocityChange);
             }
             return lRagdoll;
         }
@@ -110,21 +114,28 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             FitBox(lChestBox, lSpine, (lChestTop + lChestBottom) * 0.5f, pRight * Vector3.Distance(lArmL.position, lArmR.position) * 0.85f, lUp * Vector3.Distance(lChestTop, lChestBottom), pForward * 0.22f);
             Ball(lChestBody, Pelvis, lSpine, (lChest.position - lSpine.position).normalized, pRight, 22f, 18f, 12f);
 
-            Rigidbody lHeadBody = Body(lHead, 0.075f);
+            // The big head of the cast: heavier (wobbly falls) but within 10:1 of the chest; its sphere
+            // sized from the head bone to the top of the skull.
+            float lSkullRadius = Mathf.Clamp((BodyMetrics.HEIGHT - BodyMetrics.EYE + BodyMetrics.HEAD_BONE_TO_EYE) * 0.5f * lPelvis.lossyScale.y / Mathf.Max(0.01f, lPelvis.localScale.y), 0.09f, 0.15f);
+            Rigidbody lHeadBody = Body(lHead, 0.11f);
             SphereCollider lSkull = lHead.gameObject.AddComponent<SphereCollider>();
-            lSkull.radius = 0.11f / Mathf.Max(0.01f, lHead.lossyScale.x);
-            lSkull.center = lHead.InverseTransformPoint(lHead.position + lUp * 0.08f + pForward * 0.02f);
-            Ball(lHeadBody, lChestBody, lHead, (lHead.position - lNeck.position).normalized, pRight, 40f, 35f, 30f);
+            lSkull.radius = lSkullRadius / Mathf.Max(0.01f, lHead.lossyScale.x);
+            lSkull.center = lHead.InverseTransformPoint(lHead.position + lUp * lSkullRadius * 0.8f + pForward * 0.02f);
+            // The whole neck bends at this one joint and the cast's face is its own mesh: past ~35 deg the seam
+            // under the jaw opens, so the head flops a little less than the limbs.
+            Ball(lHeadBody, lChestBody, lHead, (lHead.position - lNeck.position).normalized, pRight, 40f, 36f, 32f);
             Head = lHead;
 
-            Limb(lArmL, lForeL, lChestBody, 0.027f, 0.055f, pRight, 70f, 80f, 60f, out Rigidbody lUpperL);
-            Hinge(lForeL, lHandL, lUpperL, lArmL, 0.022f, 0.045f, -pRight, 145f);
-            Limb(lArmR, lForeR, lChestBody, 0.027f, 0.055f, pRight, 70f, 80f, 60f, out Rigidbody lUpperR);
-            Hinge(lForeR, lHandR, lUpperR, lArmR, 0.022f, 0.045f, -pRight, 145f);
-            Limb(lThighL, lCalfL, Pelvis, 0.1f, 0.085f, pRight, 35f, 75f, 40f, out Rigidbody lLegL);
-            Hinge(lCalfL, lToesL != null ? lToesL : lFootL, lLegL, lThighL, 0.06f, 0.06f, pRight, 140f);
-            Limb(lThighR, lCalfR, Pelvis, 0.1f, 0.085f, pRight, 35f, 75f, 40f, out Rigidbody lLegR);
-            Hinge(lCalfR, lToesR != null ? lToesR : lFootR, lLegR, lThighR, 0.06f, 0.06f, pRight, 140f);
+            // Limbs: radii from the bone lengths (the body's own metrics), joints looser than real.
+            float R(Transform a, Transform b, float k, float min, float max) => Mathf.Clamp(Vector3.Distance(a.position, b.position) * k, min, max);
+            Limb(lArmL, lForeL, lChestBody, 0.027f, R(lArmL, lForeL, 0.19f, 0.04f, 0.075f), pRight, 85f, 100f, 75f, out Rigidbody lUpperL);
+            Hinge(lForeL, lHandL, lUpperL, lArmL, 0.022f, R(lForeL, lHandL, 0.17f, 0.035f, 0.06f), -pRight, 150f);
+            Limb(lArmR, lForeR, lChestBody, 0.027f, R(lArmR, lForeR, 0.19f, 0.04f, 0.075f), pRight, 85f, 100f, 75f, out Rigidbody lUpperR);
+            Hinge(lForeR, lHandR, lUpperR, lArmR, 0.022f, R(lForeR, lHandR, 0.17f, 0.035f, 0.06f), -pRight, 150f);
+            Limb(lThighL, lCalfL, Pelvis, 0.1f, R(lThighL, lCalfL, 0.20f, 0.065f, 0.11f), pRight, 45f, 85f, 50f, out Rigidbody lLegL);
+            Hinge(lCalfL, lToesL != null ? lToesL : lFootL, lLegL, lThighL, 0.06f, R(lCalfL, lFootL, 0.14f, 0.045f, 0.075f), pRight, 145f);
+            Limb(lThighR, lCalfR, Pelvis, 0.1f, R(lThighR, lCalfR, 0.20f, 0.065f, 0.11f), pRight, 45f, 85f, 50f, out Rigidbody lLegR);
+            Hinge(lCalfR, lToesR != null ? lToesR : lFootR, lLegR, lThighR, 0.06f, R(lCalfR, lFootR, 0.14f, 0.045f, 0.075f), pRight, 145f);
 
             // No self-collision: the parts start overlapping at the joints and would push each other apart.
             Collider[] lColliders = GetComponentsInChildren<Collider>();
@@ -137,7 +148,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             Rigidbody lBody = pBone.gameObject.AddComponent<Rigidbody>();
             lBody.mass = MASS * pShare;
             lBody.linearDamping = 0.05f;
-            lBody.angularDamping = 0.6f;
+            lBody.angularDamping = 0.45f;
+            lBody.sleepThreshold = 0.06f;
             lBody.interpolation = RigidbodyInterpolation.Interpolate;
             lBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             lBody.solverIterations = 12;

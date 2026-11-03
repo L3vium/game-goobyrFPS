@@ -46,16 +46,17 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private static readonly int MoveXId = Animator.StringToHash(MOVE_X), MoveZId = Animator.StringToHash(MOVE_Z), PaceId = Animator.StringToHash(PACE);
         private static readonly int HangXId = Animator.StringToHash(HANG_X), SwimId = Animator.StringToHash(SWIM);
 
-        // Ground speed of each clip (m/s), measured on the stance foot of the reference body (Chr_Agent,
-        // human scale REF_SCALE); a body's stride scales with its own human scale. The pace parameter
+        // Ground speed of each clip (m/s): the median planted-foot speed measured on the cast's hero (Chr_Rook,
+        // Goobyr/Cast/G2 Gallery), expressed at human scale REF_SCALE; a body's stride scales with its own human scale. The pace parameter
         // plays a clip at speed / its ground speed so the planted foot does not slide.
-        private static readonly Vector4 WALK = new Vector4(1.29f, 1.61f, 1.70f, 1.70f);   // forward, back, left, right
+        public static readonly Vector4 WALK = new Vector4(1.086f, 1.445f, 1.602f, 1.604f);   // forward, back, left, right
         // The backward run ring is the walk-back clip played faster (the backpedal clip is slower than the walk).
-        private static readonly Vector4 RUN = new Vector4(3.05f, 1.61f, 1.90f, 1.90f);
-        private const float SPRINT = 3.79f;
-        private static readonly Vector4 CROUCH = new Vector4(1.12f, 1.12f, 0.9f, 0.9f);
-        private const float CRAWL = 0.58f, PANIC = 3.07f, SWIM_SPEED = 1.1f, LADDER = 0.36f, SHIMMY = 0.22f;
-        private const float REF_SCALE = 1.074f;
+        public static readonly Vector4 RUN = new Vector4(2.930f, 1.445f, 1.765f, 1.768f);
+        public const float SPRINT = 3.664f;
+        public static readonly Vector4 CROUCH = new Vector4(1.033f, 1.042f, 0.725f, 0.716f);
+        public const float PANIC = 2.935f;
+        private const float CRAWL = 0.58f, SWIM_SPEED = 1.1f, LADDER = 0.36f, SHIMMY = 0.22f;
+        public const float REF_SCALE = 1.074f;
         /// <summary>Above this a non-sprinting character shows the run ring.</summary>
         private const float RUN_FROM = 2.7f;
 
@@ -82,6 +83,10 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
         public Vector3 MeasuredVelocity => _velocity;
         public bool Airborne => _airborne;
+        /// <summary>The base layer state (hash of S_LOCOMOTION, S_PANIC, ...), for checks and tools.</summary>
+        public int BaseState => _baseState;
+        /// <summary>Whether a foot (0 left, 1 right) is held where it landed by the foot lock.</summary>
+        public bool FootLocked(int pIndex) => _footLocked[pIndex] && _footWeight > 0.5f;
 
         private HumanBody _body;
         private Animator _animator;
@@ -164,6 +169,11 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             if (_animator == null || !_animator.isActiveAndEnabled) return;
             bool lFromBack = Vector3.Dot(pWorldDirection, transform.forward) > 0f;
             _animator.CrossFadeInFixedTime(lFromBack ? S_HIT_B : S_HIT_F, 0.04f, HIT, 0f);
+            if (_body != null)
+            {
+                if (_body.Face != null) _body.Face.React(FaceMood.Pain, 0.7f);
+                if (_body.Wobble != null) _body.Wobble.Kick(pWorldDirection, 1f);
+            }
         }
 
         /// <summary>The owner jumped (remote players infer it from the vertical speed).</summary>
@@ -210,7 +220,23 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _lastMotion = Motion;
 
             UpdateUpper(lState, dt);
+            UpdateFace(lState);
         }
+
+        /// <summary>The standing expression from what the body does (local only).</summary>
+        private void UpdateFace(string pBase)
+        {
+            HumanFace lFace = _body != null ? _body.Face : null;
+            if (lFace == null) return;
+            bool lGun = Held == HeldKind.Pistol || Held == HeldKind.Rifle;
+            if (Panic || pBase == S_COWER) lFace.Mood = FaceMood.Scared;
+            else if (lGun && Aiming) lFace.Mood = FaceMood.Angry;
+            else if (Pose == BodyPose.Smoke || Pose == BodyPose.Phone || Calling) lFace.Mood = FaceMood.Smile;
+            else lFace.Mood = FaceMood.Neutral;
+        }
+
+        /// <summary>A short surprise on the face (an NPC spotting something), for the AI to call.</summary>
+        public void Surprise() { if (_body != null && _body.Face != null) _body.Face.React(FaceMood.Surprised, 0.9f); }
 
         private void MeasureVelocity(float dt)
         {
@@ -263,6 +289,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                     _airborne = false;
                     // A real drop gets the landing absorb, unless already running on.
                     if (_fallSpeed > 5.5f && new Vector2(_velocity.x, _velocity.z).magnitude < 2.5f) _landUntil = Time.time + 0.45f;
+                    if (_body != null && _body.Wobble != null && _fallSpeed > 2.5f) _body.Wobble.Kick(transform.forward, Mathf.Clamp(_fallSpeed / 6f, 0.3f, 1.5f));
                 }
             }
         }
@@ -306,12 +333,12 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
             if (Crouched)
             {
-                SetGait(pLocal, pSpeed, 1, CROUCH, CROUCH, 0f, dt, out pPace, 2.2f);
+                SetGait(pLocal, pSpeed, 1, CROUCH, CROUCH, 0f, dt, out pPace, 3.3f);
                 return S_CROUCH;
             }
             if (Panic && pSpeed > 1f)
             {
-                pPace = Mathf.Clamp(pSpeed / (PANIC * _animator.humanScale / REF_SCALE), 0.7f, 1.8f);
+                pPace = Mathf.Clamp(pSpeed / (PANIC * _animator.humanScale / REF_SCALE * _animator.transform.lossyScale.y), 0.7f, 1.8f);
                 return S_PANIC;
             }
             if (pSpeed < 0.25f && Pose != BodyPose.None)
@@ -328,7 +355,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 }
             }
             int lTier = Sprinting && pLocal.z > 0.5f * pSpeed ? 3 : pSpeed > RUN_FROM ? 2 : 1;
-            SetGait(pLocal, pSpeed, lTier, WALK, RUN, SPRINT, dt, out pPace, 2f);
+            // The pace may reach 3: quick little steps when the motor outruns the clip (TABS-ish scurry); the
+            // player's 4.4 m/s strafe needs ~2.8 on the side-run clips.
+            SetGait(pLocal, pSpeed, lTier, WALK, RUN, SPRINT, dt, out pPace, 3f);
             return S_LOCOMOTION;
         }
 
@@ -452,7 +481,44 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 _animator.SetIKRotationWeight(AvatarIKGoal.LeftHand, 0f);
                 _animator.SetIKPosition(AvatarIKGoal.LeftHand, lSocket.TransformPoint(HumanRig.Instance.SupportFor(Held, lMuzzle)));
             }
+            if (lNear) PushHandsOut();
         }
+
+        /// <summary>
+        /// Keeps the hands out of the body: a hand goal inside the head sphere or the torso capsule is
+        /// pushed back onto its surface (the mocap was taken on slimmer bodies). Not for poses whose
+        /// hands belong at the head (phone, smoke) or while the support hand holds a gun.
+        /// </summary>
+        private void PushHandsOut()
+        {
+            if (_body.Hips == null || _body.Head == null || Pose == BodyPose.Phone || Pose == BodyPose.Smoke || Calling) return;
+            if (_baseState == Animator.StringToHash(S_TAKEDOWN_ATTACKER) || _baseState == Animator.StringToHash(S_TAKEDOWN_VICTIM)) return;
+            float lScale = _body.Model != null ? _body.Model.lossyScale.y : 1f;
+            Vector3 lHead = _body.HeadCentre;
+            Vector3 lBottom = _body.Hips.position + Vector3.up * 0.02f * lScale;
+            Vector3 lTop = _body.Chest != null ? _body.Chest.position : lBottom + Vector3.up * 0.35f * lScale;
+            foreach (AvatarIKGoal lGoal in HANDS)
+            {
+                if (lGoal == AvatarIKGoal.LeftHand && _supportWeight > 0.3f) continue;
+                Vector3 lHand = _animator.GetIKPosition(lGoal), lOut = lHand;
+                Vector3 lAxis = lTop - lBottom;
+                float t = Mathf.Clamp01(Vector3.Dot(lOut - lBottom, lAxis) / Mathf.Max(lAxis.sqrMagnitude, 1e-4f));
+                Vector3 lOnAxis = lBottom + lAxis * t, lAway = lOut - lOnAxis;
+                lAway.y = 0f;
+                float lRadius = TORSO_RADIUS * lScale;
+                if (lAway.sqrMagnitude < lRadius * lRadius) lOut = lOnAxis + new Vector3(0f, lOut.y - lOnAxis.y, 0f) + (lAway.sqrMagnitude > 1e-6f ? lAway.normalized : transform.right) * lRadius;
+                Vector3 lFromHead = lOut - lHead;
+                float lHeadRadius = BodyMetrics.HEAD_RADIUS * 0.9f * lScale;
+                if (lFromHead.sqrMagnitude < lHeadRadius * lHeadRadius) lOut = lHead + (lFromHead.sqrMagnitude > 1e-6f ? lFromHead.normalized : transform.forward) * lHeadRadius;
+                if ((lOut - lHand).sqrMagnitude < 1e-6f) continue;
+                _animator.SetIKPositionWeight(lGoal, 1f);
+                _animator.SetIKPosition(lGoal, lOut);
+            }
+        }
+
+        private static readonly AvatarIKGoal[] HANDS = { AvatarIKGoal.LeftHand, AvatarIKGoal.RightHand };
+        /// <summary>Radius of the torso capsule the hands are kept out of (metres at model scale 1).</summary>
+        private const float TORSO_RADIUS = 0.15f;
 
         /// <summary>The support hand's rotation on the bone itself (the grips are measured on raw bones, not in the IK goal space).</summary>
         private void LateUpdate()
@@ -493,12 +559,49 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             float lGround = lHit.point.y - transform.position.y;
             if (lGround < -0.5f || lGround > 0.5f) { _animator.SetIKPositionWeight(pGoal, 0f); _animator.SetIKRotationWeight(pGoal, 0f); return 0f; }
             Vector3 lTarget = new Vector3(lFoot.x, lHit.point.y + Mathf.Max(lLift, 0.06f), lFoot.z);
+            lTarget = LockFoot(pGoal == AvatarIKGoal.LeftFoot ? 0 : 1, lTarget, lLift);
             Quaternion lSlope = Quaternion.FromToRotation(Vector3.up, Vector3.Slerp(Vector3.up, lHit.normal, 0.8f));
             _animator.SetIKPositionWeight(pGoal, _footWeight);
             _animator.SetIKRotationWeight(pGoal, _footWeight * Mathf.Clamp01(1f - lLift * 6f));
             _animator.SetIKPosition(pGoal, lTarget + Vector3.up * -_pelvisOffset * 0f);
             _animator.SetIKRotation(pGoal, lSlope * lRotation);
             return lGround;
+        }
+
+        // Foot locking: a foot that is down and nearly still in the clip stays where it landed in the
+        // world until it lifts (the in-place clips' planted foot otherwise drifts with the hips' sway).
+        private readonly Vector3[] _footLock = new Vector3[2], _footPrevious = new Vector3[2], _footRelease = new Vector3[2];
+        private readonly bool[] _footLocked = new bool[2];
+        private const float PLANT_HEIGHT = 0.11f, PLANT_SPEED = 1.1f, LOCK_REACH = 0.22f;
+
+        private Vector3 LockFoot(int pIndex, Vector3 pTarget, float pLift)
+        {
+            float dt = Mathf.Max(Time.deltaTime, 0.0001f);
+            Vector3 lDelta = pTarget - _footPrevious[pIndex];
+            lDelta.y = 0f;
+            float lSpeed = lDelta.magnitude / dt;
+            _footPrevious[pIndex] = pTarget;
+            bool lDown = pLift < PLANT_HEIGHT * Mathf.Max(0.5f, transform.lossyScale.y);
+            if (_footLocked[pIndex])
+            {
+                Vector3 lOff = pTarget - _footLock[pIndex];
+                lOff.y = 0f;
+                if (!lDown || lOff.magnitude > LOCK_REACH)
+                {
+                    _footLocked[pIndex] = false;
+                    _footRelease[pIndex] = -lOff;   // ease back onto the clip over a few frames
+                }
+            }
+            // A matched stance foot is near still in the world while the swinging one moves at about twice the
+            // body's speed: at a run (and a sped-up strafe whose clip plants loosely) the bar rises with the body's speed.
+            else if (lDown && lSpeed < Mathf.Max(PLANT_SPEED, 0.6f * new Vector2(_velocity.x, _velocity.z).magnitude))
+            {
+                _footLocked[pIndex] = true;
+                _footLock[pIndex] = pTarget;
+            }
+            if (_footLocked[pIndex]) return new Vector3(_footLock[pIndex].x, pTarget.y, _footLock[pIndex].z);
+            _footRelease[pIndex] = Vector3.MoveTowards(_footRelease[pIndex], Vector3.zero, dt * 2.5f);
+            return pTarget + _footRelease[pIndex];
         }
 
         private bool IsNearCamera(float pRange)

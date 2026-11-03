@@ -8,7 +8,7 @@ using UnityEngine.Rendering.Universal;
 // Author : Baptiste Vu Liem
 namespace Com.IsartDigital.GoobyrFPS.FX
 {
-    /// <summary>One lighting state of a map: sun, sky, fog and exposure.</summary>
+    /// <summary>One lighting state of a map: sun, sky, fog, exposure, colour grade and wind.</summary>
     [Serializable]
     public struct TimePreset
     {
@@ -26,14 +26,31 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         [Range(0f, 1f)] public float lamps;
         /// <summary>How much of the sky lights the world (ambient).</summary>
         public float ambient;
+
+        /// <summary>White balance: temperature (negative cooler, positive warmer) and tint (negative greener, positive more magenta).</summary>
+        [Header("Grade (HDR, before the ACES tonemapper)")]
+        public float temperature, tint;
+        public float saturation, contrast;
+        /// <summary>Split toning: colour multipliers of the shadows and of the highlights (white = neutral).</summary>
+        public Color shadows, highlights;
+
+        /// <summary>0 calm, 0.5 a breeze, 1 a strong wind.</summary>
+        [Header("Wind")]
+        public float wind;
     }
 
     /// <summary>
     /// The contract's time of day, picked by the host in the briefing
     /// (<see cref="LobbyState.TimeOfDay"/>) and applied on every machine: the sun's angle and colour
     /// (a cold moon at night), the sky's gradient and clouds, ambient light and reflections taken
-    /// from that sky, the volumetric fog's density and glow, the exposure, and the street lamps.
-    /// The map builder writes one preset per time for the map's biome.
+    /// from that sky (and local reflection probes, <see cref="World.RoomProbes"/>), the volumetric fog's
+    /// density and glow, the exposure, the colour grade, the wind and the street lamps.
+    /// <para>
+    /// The look of each biome lives in <see cref="PresetsFor"/>: the presets are rebuilt from it when
+    /// the map loads, so a change to a look reaches every map without rebuilding them. Maps built
+    /// before the presets carried a grade only stored the presets; their biome is recognised from the
+    /// noon sun.
+    /// </para>
     /// </summary>
     public class TimeOfDay : MonoBehaviour
     {
@@ -42,20 +59,42 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         [SerializeField] private TimePreset[] _presets = new TimePreset[4];
         [SerializeField] private Light _sun;
         [SerializeField] private Material _sky;
+        [SerializeField] private bool _hasBiome;
+        [SerializeField] private Biome _biome;
+        [SerializeField] private float _heading;
 
         public static TimeOfDay Instance { get; private set; }
         public int Current { get; private set; } = -1;
+        public Biome MapBiome => _biome;
 
         private Material _skyInstance;
         private Volume _volume;
         private GoobyrAtmosphere _atmosphere;
         private ColorAdjustments _adjust;
+        private WhiteBalance _balance;
+        private ShadowsMidtonesHighlights _split;
+        private bool _fresh;
 
+        /// <summary>Sets the map's sun, sky and biome look (presets rebuilt from <see cref="PresetsFor"/>).</summary>
+        public void Setup(Light pSun, Material pSky, Biome pBiome, float pHeading)
+        {
+            _sun = pSun;
+            _sky = pSky;
+            _biome = pBiome;
+            _heading = pHeading;
+            _hasBiome = true;
+            _presets = PresetsFor(pBiome, pHeading);
+            _fresh = true;
+        }
+
+        /// <summary>Sets explicit presets; when they are a biome's (<see cref="PresetsFor"/>), the biome is remembered so later looks reach this map.</summary>
         public void Setup(Light pSun, Material pSky, TimePreset[] pPresets)
         {
             _sun = pSun;
             _sky = pSky;
             _presets = pPresets;
+            _hasBiome = Recognise(pPresets, out _biome, out _heading);
+            _fresh = true;
         }
 
         private void Awake() => Instance = this;
@@ -71,13 +110,25 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private void Start()
         {
             if (LobbyState.Instance != null) LobbyState.Instance.TimeOfDay.OnValueChanged += HandleChanged;
+            // Local reflections: probes per building floor and round the streets, captured at load.
+            if (GetComponent<World.RoomProbes>() == null) gameObject.AddComponent<World.RoomProbes>();
             Apply(LobbyState.Instance != null ? LobbyState.Instance.TimeOfDay.Value : 1);
         }
 
         private void HandleChanged(int pOld, int pNew) => Apply(pNew);
 
+        /// <summary>Rebuilds the presets from the biome's current look (once per load).</summary>
+        private void Refresh()
+        {
+            if (_fresh) return;
+            _fresh = true;
+            if (!_hasBiome) _hasBiome = Recognise(_presets, out _biome, out _heading);
+            if (_hasBiome) _presets = PresetsFor(_biome, _heading);
+        }
+
         public void Apply(int pIndex)
         {
+            Refresh();
             if (_presets == null || _presets.Length == 0) return;
             pIndex = Mathf.Clamp(pIndex, 0, _presets.Length - 1);
             Current = pIndex;
@@ -88,7 +139,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 _sun.transform.rotation = Quaternion.Euler(p.sun.x, p.sun.y, 0f);
                 _sun.color = p.sunColor;
                 _sun.intensity = p.sunIntensity;
-                _sun.shadowStrength = pIndex == 3 ? 0.6f : 0.85f;
+                _sun.shadowStrength = pIndex == 3 ? 0.7f : 0.9f;
                 RenderSettings.sun = _sun;
             }
 
@@ -120,6 +171,19 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _atmosphere.ambientColor.Override(p.fogAmbient);
             _atmosphere.sunScattering.Override(p.fogSun);
             _adjust.postExposure.Override(p.exposure);
+            _adjust.contrast.Override(p.contrast);
+            _adjust.saturation.Override(p.saturation);
+            _balance.temperature.Override(p.temperature);
+            _balance.tint.Override(p.tint);
+            _split.shadows.Override(new Vector4(p.shadows.r, p.shadows.g, p.shadows.b, 0f));
+            _split.highlights.Override(new Vector4(p.highlights.r, p.highlights.g, p.highlights.b, 0f));
+
+            // The reflections are captured again under the new light.
+            if (World.RoomProbes.Instance != null) World.RoomProbes.Instance.Refresh();
+
+            // The prevailing wind of the biome, from the map's sun heading.
+            Vector3 lWind = Quaternion.Euler(0f, _heading + 35f, 0f) * Vector3.forward;
+            World.Wind.Set(new Vector2(lWind.x, lWind.z), p.wind, _biome == Biome.Jungle ? 0.55f : 0.8f);
 
             foreach (Light lLight in FindObjectsByType<Light>(FindObjectsSortMode.None))
             {
@@ -168,6 +232,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             VolumeProfile lProfile = ScriptableObject.CreateInstance<VolumeProfile>();
             _atmosphere = lProfile.Add<GoobyrAtmosphere>(false);
             _adjust = lProfile.Add<ColorAdjustments>(false);
+            _balance = lProfile.Add<WhiteBalance>(false);
+            _split = lProfile.Add<ShadowsMidtonesHighlights>(false);
             _volume.profile = lProfile;
         }
 
@@ -175,9 +241,34 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
         public enum Biome { Jungle, Desert, Snow }
 
-        /// <summary>Dawn, noon, dusk and night for a biome (warm humid haze, dry glare, cold blue light).</summary>
+        /// <summary>Elevation and heading offset of each biome's noon sun (how older maps are recognised).</summary>
+        private static readonly Vector2[] NOON = { new Vector2(62f, 20f), new Vector2(68f, 15f), new Vector2(32f, 10f) };
+
+        /// <summary>The biome (and the map's sun heading) whose presets these are, from their noon sun.</summary>
+        private static bool Recognise(TimePreset[] pPresets, out Biome pBiome, out float pHeading)
+        {
+            pBiome = Biome.Jungle;
+            pHeading = 0f;
+            if (pPresets == null || pPresets.Length < 2) return false;
+            for (int b = 0; b < NOON.Length; b++)
+            {
+                if (Mathf.Abs(pPresets[1].sun.x - NOON[b].x) > 0.5f) continue;
+                pBiome = (Biome)b;
+                pHeading = pPresets[1].sun.y - NOON[b].y;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Dawn, noon, dusk and night for a biome: jungle warm and humid (soft haze, green-gold
+        /// light), desert golden (dry glare, cool shadows), snow cool and crisp (clean whites, blue
+        /// shadows). The grade keeps each biome's identity at every hour; dawn and dusk stay bright
+        /// enough to play, the night is moonlit and readable.
+        /// </summary>
         public static TimePreset[] PresetsFor(Biome pBiome, float pHeading)
         {
+            Vector2 lNoon = NOON[(int)pBiome];
             TimePreset Make(float pElevation, float pYaw, Color pSun, float pIntensity, Color pZenith, Color pHorizon, Color pHaze, float pCover, float pFog, Color pFogAmbient, float pFogSun, float pExposure, float pLamps, float pAmbient) => new TimePreset
             {
                 sun = new Vector2(pElevation, pHeading + pYaw), sunColor = pSun, sunIntensity = pIntensity,
@@ -186,33 +277,81 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 cloudCoverage = pCover, fogDensity = pFog, fogAmbient = pFogAmbient, fogSun = pFogSun,
                 exposure = pExposure, lamps = pLamps, ambient = pAmbient
             };
-
+            TimePreset[] lPresets;
             switch (pBiome)
             {
                 case Biome.Jungle:
-                    return new[]
+                    lPresets = new[]
                     {
-                        Make(8f, -80f, new Color(1f, 0.72f, 0.5f), 1.6f, new Color(0.32f, 0.45f, 0.66f), new Color(0.98f, 0.78f, 0.62f), new Color(1f, 0.7f, 0.45f), 0.45f, 0.022f, new Color(0.6f, 0.62f, 0.62f), 2.6f, 0.3f, 0.6f, 0.9f),
-                        Make(62f, 20f, new Color(1f, 0.96f, 0.88f), 2.6f, new Color(0.22f, 0.45f, 0.82f), new Color(0.78f, 0.86f, 0.9f), new Color(1f, 0.93f, 0.8f), 0.55f, 0.008f, new Color(0.62f, 0.7f, 0.74f), 1.4f, 0f, 0f, 1f),
-                        Make(7f, 95f, new Color(1f, 0.55f, 0.32f), 1.7f, new Color(0.28f, 0.3f, 0.55f), new Color(1f, 0.6f, 0.42f), new Color(1f, 0.5f, 0.3f), 0.5f, 0.016f, new Color(0.6f, 0.48f, 0.45f), 3f, 0.25f, 0.8f, 0.8f),
-                        Make(38f, 160f, new Color(0.55f, 0.65f, 0.95f), 0.25f, new Color(0.02f, 0.03f, 0.07f), new Color(0.08f, 0.1f, 0.16f), new Color(0.3f, 0.35f, 0.5f), 0.35f, 0.012f, new Color(0.07f, 0.09f, 0.14f), 1.2f, 0.6f, 1f, 0.55f)
+                        Make(9f, -80f, new Color(1f, 0.76f, 0.56f), 2.4f, new Color(0.36f, 0.5f, 0.72f), new Color(0.98f, 0.82f, 0.66f), new Color(1f, 0.74f, 0.5f), 0.45f, 0.018f, new Color(0.62f, 0.64f, 0.6f), 2.4f, 0.75f, 0.6f, 1.05f),
+                        Make(lNoon.x, lNoon.y, new Color(1f, 0.96f, 0.88f), 2.8f, new Color(0.24f, 0.47f, 0.82f), new Color(0.8f, 0.87f, 0.9f), new Color(1f, 0.93f, 0.8f), 0.55f, 0.007f, new Color(0.64f, 0.72f, 0.74f), 1.4f, 0.25f, 0f, 1.05f),
+                        Make(8f, 95f, new Color(1f, 0.62f, 0.38f), 2.5f, new Color(0.32f, 0.36f, 0.6f), new Color(1f, 0.66f, 0.46f), new Color(1f, 0.56f, 0.34f), 0.5f, 0.014f, new Color(0.62f, 0.54f, 0.48f), 2.8f, 0.7f, 0.8f, 1f),
+                        Make(38f, 160f, new Color(0.6f, 0.7f, 1f), 0.45f, new Color(0.03f, 0.05f, 0.1f), new Color(0.1f, 0.13f, 0.2f), new Color(0.32f, 0.38f, 0.52f), 0.35f, 0.01f, new Color(0.09f, 0.12f, 0.17f), 1.2f, 1.25f, 1f, 0.8f)
                     };
+                    break;
                 case Biome.Desert:
-                    return new[]
+                    lPresets = new[]
                     {
-                        Make(6f, -85f, new Color(1f, 0.7f, 0.48f), 1.8f, new Color(0.35f, 0.5f, 0.75f), new Color(1f, 0.8f, 0.62f), new Color(1f, 0.72f, 0.48f), 0.15f, 0.010f, new Color(0.75f, 0.66f, 0.58f), 2.4f, 0.2f, 0.5f, 0.9f),
-                        Make(68f, 15f, new Color(1f, 0.95f, 0.85f), 3.1f, new Color(0.18f, 0.42f, 0.85f), new Color(0.9f, 0.88f, 0.82f), new Color(1f, 0.95f, 0.85f), 0.08f, 0.004f, new Color(0.85f, 0.8f, 0.72f), 1f, -0.2f, 0f, 1.05f),
-                        Make(6f, 92f, new Color(1f, 0.5f, 0.28f), 1.9f, new Color(0.3f, 0.32f, 0.6f), new Color(1f, 0.58f, 0.38f), new Color(1f, 0.48f, 0.25f), 0.2f, 0.009f, new Color(0.7f, 0.5f, 0.42f), 3f, 0.2f, 0.8f, 0.8f),
-                        Make(42f, 170f, new Color(0.6f, 0.68f, 0.95f), 0.3f, new Color(0.02f, 0.03f, 0.08f), new Color(0.09f, 0.1f, 0.16f), new Color(0.3f, 0.34f, 0.5f), 0.05f, 0.004f, new Color(0.08f, 0.09f, 0.14f), 1f, 0.6f, 1f, 0.55f)
+                        Make(7f, -85f, new Color(1f, 0.74f, 0.52f), 2.6f, new Color(0.38f, 0.54f, 0.78f), new Color(1f, 0.82f, 0.66f), new Color(1f, 0.74f, 0.5f), 0.15f, 0.009f, new Color(0.76f, 0.68f, 0.6f), 2.2f, 0.6f, 0.5f, 1.05f),
+                        Make(lNoon.x, lNoon.y, new Color(1f, 0.95f, 0.85f), 3.1f, new Color(0.2f, 0.44f, 0.85f), new Color(0.9f, 0.88f, 0.82f), new Color(1f, 0.95f, 0.85f), 0.08f, 0.004f, new Color(0.85f, 0.8f, 0.72f), 1f, -0.1f, 0f, 1.05f),
+                        Make(7f, 92f, new Color(1f, 0.58f, 0.34f), 2.6f, new Color(0.34f, 0.38f, 0.62f), new Color(1f, 0.64f, 0.44f), new Color(1f, 0.54f, 0.3f), 0.2f, 0.008f, new Color(0.72f, 0.56f, 0.46f), 2.6f, 0.6f, 0.8f, 1f),
+                        Make(42f, 170f, new Color(0.62f, 0.7f, 1f), 0.5f, new Color(0.03f, 0.05f, 0.1f), new Color(0.11f, 0.13f, 0.2f), new Color(0.32f, 0.36f, 0.52f), 0.05f, 0.004f, new Color(0.1f, 0.11f, 0.17f), 1f, 1.2f, 1f, 0.8f)
                     };
+                    break;
                 default:
-                    return new[]
+                    lPresets = new[]
                     {
-                        Make(5f, -75f, new Color(1f, 0.75f, 0.62f), 1.5f, new Color(0.35f, 0.45f, 0.7f), new Color(1f, 0.82f, 0.75f), new Color(1f, 0.75f, 0.6f), 0.4f, 0.014f, new Color(0.75f, 0.75f, 0.82f), 2.4f, 0.1f, 0.6f, 1f),
-                        Make(32f, 10f, new Color(1f, 0.97f, 0.94f), 2.2f, new Color(0.3f, 0.48f, 0.78f), new Color(0.86f, 0.9f, 0.95f), new Color(1f, 0.97f, 0.92f), 0.5f, 0.007f, new Color(0.78f, 0.82f, 0.9f), 1.2f, -0.35f, 0f, 1.1f),
-                        Make(5f, 100f, new Color(1f, 0.6f, 0.5f), 1.5f, new Color(0.3f, 0.32f, 0.58f), new Color(1f, 0.66f, 0.62f), new Color(1f, 0.58f, 0.5f), 0.45f, 0.012f, new Color(0.72f, 0.6f, 0.65f), 2.6f, 0.05f, 0.8f, 0.9f),
-                        Make(35f, 165f, new Color(0.6f, 0.7f, 1f), 0.35f, new Color(0.02f, 0.03f, 0.08f), new Color(0.1f, 0.12f, 0.18f), new Color(0.35f, 0.4f, 0.55f), 0.3f, 0.01f, new Color(0.1f, 0.12f, 0.18f), 1.1f, 0.7f, 1f, 0.7f)
+                        Make(6f, -75f, new Color(1f, 0.8f, 0.66f), 2.2f, new Color(0.38f, 0.5f, 0.74f), new Color(1f, 0.86f, 0.78f), new Color(1f, 0.8f, 0.66f), 0.4f, 0.012f, new Color(0.76f, 0.78f, 0.84f), 2.2f, 0.45f, 0.6f, 1.05f),
+                        Make(lNoon.x, lNoon.y, new Color(1f, 0.97f, 0.94f), 2.4f, new Color(0.3f, 0.5f, 0.8f), new Color(0.86f, 0.9f, 0.95f), new Color(1f, 0.97f, 0.92f), 0.5f, 0.006f, new Color(0.8f, 0.84f, 0.9f), 1.2f, -0.25f, 0f, 1.1f),
+                        Make(6f, 100f, new Color(1f, 0.66f, 0.52f), 2.2f, new Color(0.32f, 0.38f, 0.62f), new Color(1f, 0.72f, 0.64f), new Color(1f, 0.64f, 0.52f), 0.45f, 0.011f, new Color(0.74f, 0.68f, 0.7f), 2.4f, 0.45f, 0.8f, 1f),
+                        Make(35f, 165f, new Color(0.62f, 0.72f, 1f), 0.55f, new Color(0.03f, 0.05f, 0.1f), new Color(0.12f, 0.15f, 0.22f), new Color(0.36f, 0.42f, 0.56f), 0.3f, 0.009f, new Color(0.12f, 0.14f, 0.2f), 1.1f, 1.1f, 1f, 0.85f)
                     };
+                    break;
+            }
+            Grade(pBiome, lPresets);
+            return lPresets;
+        }
+
+        /// <summary>The colour grade and the wind of each preset: the biome's identity, nudged per hour.</summary>
+        private static void Grade(Biome pBiome, TimePreset[] pPresets)
+        {
+            // Biome identity: white balance, tint, saturation, contrast, shadow and highlight tones, wind.
+            float lTemperature, lTint, lSaturation, lContrast, lWind;
+            Color lShadows, lHighlights;
+            switch (pBiome)
+            {
+                case Biome.Jungle:
+                    lTemperature = 4f; lTint = 0f; lSaturation = 13f; lContrast = 14f; lWind = 0.35f;
+                    lShadows = new Color(0.95f, 1f, 1f); lHighlights = new Color(1.03f, 1.01f, 0.95f);
+                    break;
+                case Biome.Desert:
+                    // Calm: ochre stone and sand are saturated already; a neutral-cool shadow keeps them from banding orange.
+                    lTemperature = 3f; lTint = 0f; lSaturation = -8f; lContrast = 6f; lWind = 0.5f;
+                    lShadows = new Color(0.97f, 0.99f, 1.05f); lHighlights = new Color(1.02f, 1.01f, 0.98f);
+                    break;
+                default:
+                    lTemperature = -4f; lTint = 1f; lSaturation = 6f; lContrast = 15f; lWind = 0.6f;
+                    lShadows = new Color(0.95f, 0.98f, 1.06f); lHighlights = new Color(1f, 1f, 1.01f);
+                    break;
+            }
+            // Per hour: dawn and dusk warmer and less magenta, the night cooler, desaturated, with lifted blue shadows.
+            float[] lWarm = { 3f, 0f, 4f, -8f }, lGreen = { -3f, 0f, -5f, 0f }, lSat = { 0f, 0f, 2f, -18f }, lCon = { -2f, 0f, -1f, -6f }, lGust = { 0.7f, 1f, 0.8f, 0.6f };
+            for (int i = 0; i < pPresets.Length && i < 4; i++)
+            {
+                // Dawn and dusk are back-lit half the time: more sky light in the shade, a little more
+                // exposure, warm lifted shadows, so the ground under a tree against the sun still reads.
+                if (i == 0 || i == 2)
+                {
+                    pPresets[i].ambient *= 1.3f;
+                    pPresets[i].exposure += 0.12f;
+                }
+                pPresets[i].temperature = lTemperature + lWarm[i];
+                pPresets[i].tint = lTint + lGreen[i];
+                pPresets[i].saturation = lSaturation + lSat[i];
+                pPresets[i].contrast = lContrast + lCon[i];
+                pPresets[i].shadows = i == 3 ? new Color(0.92f, 0.98f, 1.12f) : i == 1 ? lShadows : lShadows * new Color(1.1f, 1.06f, 1.02f);
+                pPresets[i].highlights = i == 3 ? new Color(0.98f, 1f, 1.04f) : lHighlights;
+                pPresets[i].wind = lWind * lGust[i];
             }
         }
     }

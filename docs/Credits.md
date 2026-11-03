@@ -125,6 +125,18 @@
 - Poly Haven model `namaqualand_boulder_05` (CC0) - https://polyhaven.com/a/namaqualand_boulder_05
 - Poly Haven model `dead_tree_trunk` (CC0) - https://polyhaven.com/a/dead_tree_trunk
 - Poly Haven model `modular_fire_escape` (CC0) - https://polyhaven.com/a/modular_fire_escape
+- Poly Haven texture `bi_stretch` (CC0) - https://polyhaven.com/a/bi_stretch  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `cotton_jersey` (CC0) - https://polyhaven.com/a/cotton_jersey  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `crepe_georgette` (CC0) - https://polyhaven.com/a/crepe_georgette  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `crepe_satin` (CC0) - https://polyhaven.com/a/crepe_satin  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `denim_fabric_05` (CC0) - https://polyhaven.com/a/denim_fabric_05  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `hessian_380` (CC0) - https://polyhaven.com/a/hessian_380  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `jersey_melange` (CC0) - https://polyhaven.com/a/jersey_melange  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `jogging_melange` (CC0) - https://polyhaven.com/a/jogging_melange  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `knitted_fleece` (CC0) - https://polyhaven.com/a/knitted_fleece  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `leather_red_03` (CC0) - https://polyhaven.com/a/leather_red_03  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `poly_wool_herringbone` (CC0) - https://polyhaven.com/a/poly_wool_herringbone  (cast looks, Tools/Blender/characters/cast)
+- Poly Haven texture `stretch_poplin` (CC0) - https://polyhaven.com/a/stretch_poplin  (cast looks, Tools/Blender/characters/cast)
 
 ## Realistic prop pack (Assets/_Game/Art/PBR/Models, built by Tools/Blender/props)
 Converted from Poly Haven models (CC0, decimated / re-pivoted / re-textured):
@@ -187,3 +199,16 @@ Built by `Tools/Blender/characters/*.py` (original project scripts). Sources and
   143_23, 143_39, 143_40.
 - Hand-keyed clips (aim, fire, reload, hang/shimmy/climb-up, mantle, slide, swim idle, takedown pair, hit reacts, lean,
   crouch idle, look-around layer), procedural camouflage, the earpiece mesh and all recolours are original project work.
+
+## Unity Technologies (Unity Companion License)
+- `Goobyr/TerrainLit`, `Hidden/Goobyr/TerrainLit (Add Pass)`, `Hidden/Goobyr/TerrainLit (Basemap Gen)` and
+  `GoobyrTerrainPasses.hlsl` (`Assets/_Game/Art/Shaders/Terrain`) are derived from the Universal Render
+  Pipeline 17.6 terrain shaders (`TerrainLit.shader`, `TerrainLitAdd.shader`, `TerrainLitBasemapGen.shader`,
+  `TerrainLitPasses.hlsl`), (c) Unity Technologies, used under the Unity Companion License for Unity-dependent
+  projects. Changed: the anti-tiling splat mix, the meadow colour where real grass grows, and a broad
+  brightness and hue variation. https://unity.com/legal/licenses/unity-companion-license
+- The other custom shaders (`Goobyr/Foliage`, `Goobyr/Grass`, `Goobyr/Rock`, `Goobyr/WindowGlass`,
+  `Goobyr/SnowGlint`, the sky and the grass compute shaders) are original project work; they call URP's
+  shader library (lighting, shadows, Forward+) and are not copies of it.
+- The NPC barks (`bark_<voice>_<kind>`) are synthesised at build time by `SfxBuilder` (formant synthesis);
+  no recorded speech is used.

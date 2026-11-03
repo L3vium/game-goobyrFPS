@@ -29,6 +29,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             int k = _houseCount++;
             ArchStyle lStyle = ArchStyles.Colonial(FACADES[k % FACADES.Length], "p" + (k % FACADES.Length), SHUTTERS[(k / 2) % SHUTTERS.Length]);
             lStyle.outerThickness = 0.4f;
+            lStyle.posters = true;
             ArchSpec h = Facing("House" + k + (pEnterable ? "_" + pRole : ""), pFront, PUEBLO_Y, pFacing, pWidth, pDepth, lStyle, ZONE_PUEBLO);
             h.shut = !pEnterable;
             h.plinth = 1.4f;
@@ -36,14 +37,21 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (!pEnterable)
             {
                 for (int f = 0; f < pFloors; f++) h.Room("Shut" + f, f, 0, 0, pWidth, pDepth, RoomType.Bedroom, SecurityTier.Restricted).noFurniture = true;
-                h.Door(0, pWidth * 0.5f, 0, DoorKind.Door, 1.2f);
+                h.Door(0, pWidth * 0.5f, 0, DoorKind.Door, 1.2f).sign = k % 5 == 2 ? "SE ARRIENDA" : null;
             }
             else
             {
                 float lSplit = Mathf.Round(pDepth * 0.55f * 2f) / 2f;
                 h.Room("Front", 0, 0, 0, pWidth, lSplit, lFront, SecurityTier.Public);
                 h.Room("Kitchen", 0, 0, lSplit, pWidth, pDepth, RoomType.Kitchen, SecurityTier.Restricted);
-                h.Door(0, pWidth * 0.5f, 0, pRole == "shop" || pRole == "bar" ? DoorKind.Double : DoorKind.Door, pRole == "shop" || pRole == "bar" ? 2.0f : 1.2f);
+                h.Door(0, pWidth * 0.5f, 0, pRole == "shop" || pRole == "bar" ? DoorKind.Double : DoorKind.Door, pRole == "shop" || pRole == "bar" ? 2.0f : 1.2f).sign = pRole switch
+                {
+                    "shop" => new[] { "PANADERÍA", "MISCELÁNEA", "FERRETERÍA", "DROGUERÍA", "TIENDA" }[k % 5],
+                    "bar" => new[] { "BILLARES", "CAFÉ BAR", "LA TERTULIA" }[k % 3],
+                    "office" => "NOTARÍA",
+                    "clinic" => "CONSULTORIO",
+                    _ => null
+                };
                 h.Door(0, pWidth * 0.3f, lSplit);
                 h.Door(0, pWidth * 0.75f, pDepth, DoorKind.Door, 1.1f);
                 if (pFloors > 1)
@@ -72,6 +80,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             // The church on the plaza's north side: nave, sacristy, bell tower with its deck.
             ArchStyle lChurchStyle = ArchStyles.Colonial(new Color(0.99f, 0.98f, 0.95f), "church");
+            lChurchStyle.quoins = true;
+            lChurchStyle.chimneys = 0;
             _church = Facing("Iglesia", new Vector2(-30f, -124f), PUEBLO_Y, 2, 20f, 26f, lChurchStyle, ZONE_PUEBLO);
             ArchSpec c = _church;
             c.Tall("Nave", 0, 3, 6, 0, 20, 26, RoomType.Church, SecurityTier.Public);

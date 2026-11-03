@@ -99,6 +99,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             for (int i = 1; i <= 3; i++) Write("footstep_" + i, Mix(Tone(0.08f, 130f + i * 20f, 80f, 0.4f, 30f), Noise(0.07f, 0.3f, 1200f + i * 200f, 30f)));
             // The realistic set overwrites the gameplay sounds above (guns, body, steps) and adds the rest.
             RealisticSet();
+            // ===== AI barks (Track D): the NPCs' gibberish voices (SfxBuilder.Barks, also Goobyr/Build/Barks).
+            BarkSet();
 
             AssetDatabase.Refresh();
             Debug.Log("[Build] sound effects");

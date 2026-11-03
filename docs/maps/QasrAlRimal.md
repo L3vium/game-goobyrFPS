@@ -229,3 +229,34 @@ cooler (servants), oleander (farmers).
 - **Reuse:** souk = cover, chase, bus extraction; wadi = route, Needle-vs-gantry duel, disposal;
   audience hall = social approach, throne kill, niche escape. **Extractions:** helicopter (keep
   roof), car, bus, qanat.
+
+
+## 9. Security: sentry guns, terminals, cameras, distractions (0.7.0)
+| Group | Guns | Terminal (hidden) | Cable | Way to the terminal without passing a gun |
+|---|---|---|---|---|
+| **Cellar** | vault gun (east wall) over the keypad and monitoring doors and the vault desk; armoury gun over its keycard door | cooler plant desk (west wall), 22-25 m away | up the vault's east wall, through the armoury, along the plant's north and west ceilings | the **wind-tower duct** (roof → plant grille) or the cistern landing (qanat well shaft) |
+| **Governor's floors** | war-room gun (F2) over both doors and the map table; study gun (F3) over the study door | the **roof hut** west of the light well, 32 m away | up the war room and the study, onto the roof, along the north parapet, round the wind tower, into the hut | the **second-court scaffold** and the wind-tower rungs, the roof zipline from the kasbah, or the service stair |
+
+- **Accident opportunity.** Hack the roof-hut terminal while **Governor Nasser al-Hadd** is in the war
+  room (3 min at the map table) or his study (4 min): the guns turn on him. In the cellar, the plant
+  terminal does the same to **Treasurer Idris** at the vault desk.
+- **Cameras (10):** citadel gate, second-court gate, the vault corridor (monitoring), the war-room
+  door (radio room), plus the earlier set; blind spots: the cooler plant, the roof hut's west side.
+- **Distractions:** PCs in the scribes', counting, war-room, anteroom, study, press and bus offices
+  and the radar consoles; fans in the kitchen, mess and guard rooms; hoses on the keep's west (third
+  court) and east (second court) walls, the date press and the caravanserai.
+
+## 10. Patrols, crowds, break spots, facades (0.7.0)
+- **The keep, a loop on every floor:** *Cellar* (-1: the ring past the vault and the armoury),
+  *Ground* (0: a pair round the inner court), *WellGallery1-3* (the light-well galleries), *KeepRoof*.
+- **Citadel:** pairs in the first, second and third courts; **town:** pairs in the souk, round the well
+  plaza and along the bus road; **grove:** a pair through the palms. Older kit patrols (the citadel
+  walls, the radar compound) now do errands.
+- **Errands on street beats:** a chat at the first corner, a smoke or a call half-way, a look around
+  at every other corner; inside, each stop does its room's errand (a watch at the vault, a smoke in the
+  guard rooms).
+- **Crowds:** two ways out per crowd (the souk, the tea house, the well plaza, the caravanserai),
+  outdoors and on opposite sides, besides the map exits (bus station, caravan road, dune edge, grove
+  ford, canyon trail, the bus). Break spots in the tea house, the caravanserai, the keep's halls.
+- **Facades:** the keep, the bastions and the gate towers have dressed-stone quoins; the adobe houses
+  chamfered corners, rising damp, streaks under the sills and posters on the souk's street fronts.

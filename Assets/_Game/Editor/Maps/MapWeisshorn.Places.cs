@@ -18,6 +18,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             int k = _chaletCount++;
             ArchStyle lStyle = ArchStyles.Alpine(k % 3 != 0);
+            lStyle.posters = true;
             ArchSpec h = Facing("Chalet" + k + (pEnterable ? "_" + pRole : ""), pFront, VILLAGE_Y, pFacing, pWidth, pDepth, lStyle, ZONE_VILLAGE);
             h.shut = !pEnterable;
             h.plinth = 1.2f;
@@ -33,7 +34,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 float lSplit = Mathf.Round(pDepth * 0.55f * 2f) / 2f;
                 h.Room("Front", 0, 0, 0, pWidth, lSplit, pRole == "shop" ? RoomType.Shop : pRole == "bar" ? RoomType.Bar : RoomType.Living, SecurityTier.Public).wallMat = lStone;
                 h.Room("Back", 0, 0, lSplit, pWidth, pDepth, RoomType.Kitchen, SecurityTier.Restricted).wallMat = lStone;
-                h.Door(0, pWidth * 0.5f, 0, DoorKind.Door, 1.4f);
+                h.Door(0, pWidth * 0.5f, 0, DoorKind.Door, 1.4f).sign = pRole switch
+                {
+                    "shop" => new[] { "BÄCKEREI", "SPORT HAUS", "METZGEREI", "APOTHEKE", "KÄSEREI" }[k % 5],
+                    "bar" => new[] { "STÜBLI", "BAR" }[k % 2],
+                    _ => null
+                };
                 h.Door(0, pWidth * 0.3f, lSplit);
                 h.Door(0, pWidth * 0.75f, pDepth, DoorKind.Door, 1.1f);
                 h.Stair(0, 0.9f, pDepth - 1.5f, pWidth - 1.1f, pDepth - 0.45f, 3, false);
@@ -63,6 +69,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // Church and spire, Gasthaus and cellar, ski rental, valley station, boathouse.
             _church = Facing("Kirche", new Vector2(-20f, -118f), VILLAGE_Y, 2, 14f, 22f, ArchStyles.Alpine(false), ZONE_VILLAGE);
             _church.style.facade = ArchLib.Tinted("painted_plaster_wall", new Color(0.97f, 0.96f, 0.93f), "kirche", 3.5f);
+            _church.style.chimneys = 0;
             _church.Tall("Nave", 0, 3, 0, 5, 14, 22, RoomType.Church, SecurityTier.Public);
             for (int f = 0; f <= 4; f++) _church.Room("Spire" + f, f, 4, 0, 10, 5, RoomType.Stair, SecurityTier.Restricted).noFurniture = true;
             ArchRoom lBelfry = _church.Room("SpireBelfry", 5, 4, 0, 10, 5, RoomType.Belvedere, SecurityTier.Restricted); lBelfry.arcade = true;
@@ -147,12 +154,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             o.Stair(-2, 2f, 2f, 4.4f, 8f, 0, false);
             o.Secure(-1, 9, 7, SecureDoor.Lock.Keycard, true);
             o.Door(-2, 0, 11, DoorKind.Door, 1.3f).poi = "Escape tunnel";
+            o.reserved.Add((-2, new Rect(16.2f, 12.3f, 1.4f, 1.4f)));
+            o.reserved.Add((-1, new Rect(0.3f, 12.3f, 1.4f, 1.4f)));
             Lot(o, 4f, Ground.Asphalt);
             _antenna = Facing("AntennaHut", OBSERVATORY + new Vector2(-24f, 6f), SUMMIT_Y, 1, 6f, 5f, ArchStyles.Timber("corrugated_iron_02"), ZONE_SKI);
             _antenna.style.snow = true;
             _antenna.Room("AntennaRoom", 0, 0, 0, 6, 5, RoomType.Radio, SecurityTier.Hostile, AccessLevel.Security);
             _antenna.Door(0, 3, 0, DoorKind.Door, 1.1f);
             _antenna.Roof(0, -0.01f, -0.01f, 6.01f, 5.01f, RoofKind.Shed, true, 14f);
+            _antenna.reserved.Add((0, new Rect(1.8f, 3.5f, 2.4f, 1.25f)));
             Lot(_antenna, 2f, Ground.Dirt);
             _cableTop = Facing("CableCarTop", OBSERVATORY + new Vector2(22f, -18f), SUMMIT_Y, 2, 8f, 6f, ArchStyles.Industrial(), ZONE_SKI);
             _cableTop.style.snow = true;

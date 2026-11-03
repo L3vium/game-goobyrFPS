@@ -13,18 +13,18 @@ MonoBehaviour:
   m_Name: HumanRig
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.HumanRig
   pistol:
-    handPosition: {x: 0.021021493, y: 0.056053407, z: -0.00014363416}
-    handRotation: {x: -0.32176185, y: 0.65484995, z: 0.61623085, w: 0.29648048}
-    supportPosition: {x: -0.0113769155, y: -0.13546214, z: -0.043949522}
-    supportRotation: {x: 0.21998723, y: -0.86784446, z: -0.36819965, w: 0.25076038}
+    handPosition: {x: 0.0152913565, y: 0.051961627, z: 0.0068396395}
+    handRotation: {x: -0.36195076, y: 0.5707468, z: 0.6813319, w: 0.28111702}
+    supportPosition: {x: -0.015844299, y: -0.13175663, z: -0.03900884}
+    supportRotation: {x: 0.12090739, y: -0.85631967, z: -0.41663256, w: 0.28020605}
   rifle:
-    handPosition: {x: 0.021021493, y: 0.056053407, z: -0.00014363416}
-    handRotation: {x: -0.32176185, y: 0.65484995, z: 0.61623085, w: 0.29648048}
-    supportPosition: {x: -0.035710853, y: -0.0894205, z: 0.29679722}
-    supportRotation: {x: -0.052026223, y: -0.46285182, z: -0.4529317, w: 0.7602069}
+    handPosition: {x: 0.0152913565, y: 0.051961627, z: 0.0068396395}
+    handRotation: {x: -0.36195076, y: 0.5707468, z: 0.6813319, w: 0.28111702}
+    supportPosition: {x: -0.031250708, y: -0.086297475, z: 0.3021313}
+    supportRotation: {x: -0.1571629, y: -0.43459442, z: -0.42244604, w: 0.77972233}
   foreEnd: 0.3
-  pinchPosition: {x: -0.0146244485, y: 0.095305085, z: 0.034629658}
-  pinchRotation: {x: -0.32176185, y: 0.65484995, z: 0.61623085, w: 0.29648048}
-  leftFistRotation: {x: -0.32176185, y: -0.65484995, z: -0.61623085, w: -0.29648048}
-  leftPalm: {x: -0.011147295, y: 0.055157237, z: -0.012701385}
-  eyeInHead: {x: 0, y: 0.08437103, z: 0.10053125}
+  pinchPosition: {x: -0.022488672, y: 0.08060095, z: 0.044622675}
+  pinchRotation: {x: -0.36195076, y: 0.5707468, z: 0.6813319, w: 0.28111702}
+  leftFistRotation: {x: -0.36195028, y: -0.570748, z: -0.6813316, w: -0.28111595}
+  leftPalm: {x: -0.006012401, y: 0.051479965, z: -0.0061862115}
+  eyeInHead: {x: 3.996803e-15, y: 0.039999735, z: 0.100000024}

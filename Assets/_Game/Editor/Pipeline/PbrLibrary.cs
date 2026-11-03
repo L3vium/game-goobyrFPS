@@ -81,6 +81,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 AssetDatabase.CreateAsset(lMaterial, lPath);
             }
             else lMaterial.CopyPropertiesFromMaterial(lBase);
+            // An albedo multiplier above ~1.15 blows a photographed texture out (saturated, banded mortar):
+            // brighter tints keep their hue and are scaled down.
+            float lMax = Mathf.Max(pTint.r, Mathf.Max(pTint.g, pTint.b));
+            if (lMax > 1.15f) pTint = new Color(pTint.r * 1.15f / lMax, pTint.g * 1.15f / lMax, pTint.b * 1.15f / lMax, pTint.a);
             lMaterial.SetColor("_BaseColor", pTint);
             EditorUtility.SetDirty(lMaterial);
             return lMaterial;
@@ -163,13 +167,37 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (lImporter == null) continue;
                 string lName = Path.GetFileNameWithoutExtension(lPath).ToLowerInvariant();
                 bool lChanged = false;
-                bool lNormal = lName.Contains("_nor_gl");
-                bool lLinear = lNormal || lName.Contains("_arm") || lName.EndsWith("_ms") || lName.Contains("_alpha");
+                bool lNormal = IsMap(lName, "nor_gl");
+                bool lLinear = lNormal || IsMap(lName, "arm") || lName.EndsWith("_ms") || IsMap(lName, "alpha");
                 if (lNormal && lImporter.textureType != TextureImporterType.NormalMap) { lImporter.textureType = TextureImporterType.NormalMap; lChanged = true; }
                 if (lImporter.sRGBTexture == lLinear) { lImporter.sRGBTexture = !lLinear; lChanged = true; }
                 if (lImporter.maxTextureSize != 2048) { lImporter.maxTextureSize = 2048; lChanged = true; }
                 if (lImporter.anisoLevel != 8) { lImporter.anisoLevel = 8; lChanged = true; }
-                if (lName.Contains("_diffa") && !lImporter.alphaIsTransparency) { lImporter.alphaIsTransparency = true; lImporter.mipMapsPreserveCoverage = true; lImporter.alphaTestReferenceValue = 0.45f; lChanged = true; }
+                // Alpha-tested cards (leaves, fronds, grass, impostors): mips keep the alpha coverage of the
+                // full-size texture, so a canopy stays a canopy at a distance instead of thinning to twigs.
+                bool lCutout = IsMap(lName, "diffa") || (IsMap(lName, "diff") && Path.GetExtension(lPath).ToLowerInvariant() == ".png" && LooksLikeCard(lName) && lImporter.DoesSourceTextureHaveAlpha());
+                // Colour maps compress to BC7 on PC (BC1/DXT5 band and smear the subtle colour of ground and bark),
+                // at the importer's own size.
+                if (!lLinear && (IsMap(lName, "diff") || IsMap(lName, "diffa")))
+                {
+                    TextureImporterPlatformSettings lPc = lImporter.GetPlatformTextureSettings("Standalone");
+                    if (!lPc.overridden || lPc.format != TextureImporterFormat.BC7 || lPc.maxTextureSize != lImporter.maxTextureSize)
+                    {
+                        lPc.overridden = true;
+                        lPc.format = TextureImporterFormat.BC7;
+                        lPc.maxTextureSize = lImporter.maxTextureSize;
+                        lPc.compressionQuality = 50;
+                        lImporter.SetPlatformTextureSettings(lPc);
+                        lChanged = true;
+                    }
+                }
+                if (lCutout && (!lImporter.alphaIsTransparency || !lImporter.mipMapsPreserveCoverage || !Mathf.Approximately(lImporter.alphaTestReferenceValue, CUTOFF)))
+                {
+                    lImporter.alphaIsTransparency = true;
+                    lImporter.mipMapsPreserveCoverage = true;
+                    lImporter.alphaTestReferenceValue = CUTOFF;
+                    lChanged = true;
+                }
                 if (lChanged) lImporter.SaveAndReimport();
             }
 
@@ -178,10 +206,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 string lName = Path.GetFileNameWithoutExtension(lFile);
                 int lIndex = lName.LastIndexOf("_arm", System.StringComparison.OrdinalIgnoreCase);
-                // Only ARM textures (<prefix>_arm or <prefix>_arm_2k), not "..._Arms..." names or materials.
+                // Only ARM textures (<prefix>_arm or <prefix>_arm_2k), not "..._Arms..." or "FP_Arm_diff".
                 string lExt = Path.GetExtension(lFile).ToLowerInvariant();
-                if (lIndex <= 0 || (lExt != ".png" && lExt != ".jpg" && lExt != ".jpeg" && lExt != ".tga")) continue;
-                if (lName.Length > lIndex + 4 && lName[lIndex + 4] != '_') continue;
+                if (lIndex <= 0 || (lExt != ".png" && lExt != ".jpg" && lExt != ".jpeg" && lExt != ".tga") || !IsMap(lName, "arm")) continue;
                 string lPrefix = lName.Substring(0, lIndex);
                 string lOut = $"{Unix(pDir)}/{lPrefix}_ms.png";
                 if (File.Exists(lOut)) continue;
@@ -192,14 +219,28 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (string lFile in Directory.GetFiles(pDir))
             {
                 string lName = Path.GetFileNameWithoutExtension(lFile);
-                int lIndex = lName.IndexOf("_alpha", System.StringComparison.OrdinalIgnoreCase);
-                if (lIndex <= 0 || Path.GetExtension(lFile).ToLowerInvariant() == ".meta") continue;
+                int lIndex = lName.LastIndexOf("_alpha", System.StringComparison.OrdinalIgnoreCase);
+                if (lIndex <= 0 || Path.GetExtension(lFile).ToLowerInvariant() == ".meta" || !IsMap(lName, "alpha")) continue;
                 string lPrefix = lName.Substring(0, lIndex);
                 string lDiff = Find(pDir, lPrefix, "diff");
                 string lOut = $"{Unix(pDir)}/{lPrefix}_diffa.png";
                 if (lDiff == null || File.Exists(lOut)) continue;
                 MergeAlpha(lDiff, Unix(lFile), lOut);
             }
+        }
+
+        /// <summary>
+        /// Is a texture this map (<c>&lt;prefix&gt;_arm</c>, <c>&lt;prefix&gt;_arm_2k</c>...)? Only the name's own
+        /// suffix counts: <c>FP_Arms_body_diff</c> or <c>Chr_Rook_Arms_diff</c> are colour maps, not ARM maps.
+        /// </summary>
+        public static bool IsMap(string pName, string pMap)
+        {
+            string lName = pName.ToLowerInvariant(), lToken = "_" + pMap.ToLowerInvariant();
+            if (lName.EndsWith(lToken)) return true;
+            int i = lName.LastIndexOf(lToken + "_", System.StringComparison.Ordinal);
+            if (i < 0) return false;
+            string lRest = lName.Substring(i + lToken.Length + 1);
+            return lRest.Length > 1 && lRest.EndsWith("k") && lRest.Substring(0, lRest.Length - 1).All(char.IsDigit);
         }
 
         private static Texture2D Read(string pPath)
@@ -251,7 +292,100 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Object.DestroyImmediate(lAlpha);
             AssetDatabase.ImportAsset(pOut);
             TextureImporter lImporter = AssetImporter.GetAtPath(pOut) as TextureImporter;
-            if (lImporter != null) { lImporter.alphaIsTransparency = true; lImporter.mipMapsPreserveCoverage = true; lImporter.alphaTestReferenceValue = 0.45f; lImporter.maxTextureSize = 2048; lImporter.SaveAndReimport(); }
+            if (lImporter != null) { lImporter.alphaIsTransparency = true; lImporter.mipMapsPreserveCoverage = true; lImporter.alphaTestReferenceValue = CUTOFF; lImporter.maxTextureSize = 2048; lImporter.SaveAndReimport(); }
+        }
+
+        /// <summary>The alpha-test threshold of every cutout material and of its textures' coverage-preserving mips.</summary>
+        public const float CUTOFF = 0.45f;
+
+        /// <summary>
+        /// Turns a plant's material (a <c>Veg_*</c> model's bark, stem, leaves or impostor card) into
+        /// <c>Goobyr/Foliage</c>: the same maps, swayed by the world's wind (from the model's vertex
+        /// colours, see <c>Tools/Blender/vegetation/veg_lib.py</c>), with light glowing through the
+        /// leaves. <paramref name="pBend"/> is how far the crown leans at full wind (metres).
+        /// </summary>
+        public static void Foliage(Material pMaterial, float pBend)
+        {
+            Shader lFoliage = Shader.Find("Goobyr/Foliage");
+            if (pMaterial == null || lFoliage == null) return;
+            // Cutout (leaves, fronds, cards) or solid (bark, stems), whatever shader it had before.
+            bool lLeaf = pMaterial.shader == lFoliage ? pMaterial.IsKeywordEnabled("_ALPHATEST_ON") : pMaterial.HasProperty("_AlphaClip") && pMaterial.GetFloat("_AlphaClip") > 0.5f;
+            bool lCard = pMaterial.name.ToLowerInvariant().EndsWith("_card");
+            pMaterial.shader = lFoliage;
+            pMaterial.SetFloat("_AlphaClip", lLeaf ? 1f : 0f);
+            if (lLeaf) pMaterial.EnableKeyword("_ALPHATEST_ON"); else pMaterial.DisableKeyword("_ALPHATEST_ON");
+            if (pMaterial.GetTexture("_BumpMap") != null) pMaterial.EnableKeyword("_NORMALMAP"); else pMaterial.DisableKeyword("_NORMALMAP");
+            pMaterial.SetFloat("_Cutoff", CUTOFF);
+            pMaterial.SetFloat("_Cull", lLeaf ? 0f : 2f);
+            pMaterial.SetFloat("_Translucency", lLeaf ? (lCard ? 0.45f : 0.75f) : 0f);
+            pMaterial.SetFloat("_WindBend", pBend);
+            pMaterial.SetFloat("_WindFlutter", lLeaf && !lCard ? 0.5f : 0f);
+            pMaterial.SetFloat("_VertexAO", lCard ? 0f : 0.5f);
+            // Leaves keep a soft sheen, not a mirror of the blue sky.
+            pMaterial.SetFloat("_Smoothness", lLeaf ? 0.55f : 1f);
+            pMaterial.SetOverrideTag("RenderType", lLeaf ? "TransparentCutout" : "Opaque");
+            pMaterial.renderQueue = lLeaf ? (int)UnityEngine.Rendering.RenderQueue.AlphaTest : (int)UnityEngine.Rendering.RenderQueue.Geometry;
+            pMaterial.doubleSidedGI = lLeaf;
+            pMaterial.enableInstancing = true;
+            EditorUtility.SetDirty(pMaterial);
+        }
+
+        /// <summary>
+        /// Rock for large cliff faces (<c>Goobyr/Rock</c>): a surface set (<c>rock_face</c>, <c>cliff_side</c>,
+        /// <c>aerial_rocks_02</c>...) projected triplanar in world space at two scales, tinted in horizontal
+        /// strata of <paramref name="pStrata"/> metres alternating <paramref name="pToneA"/> and
+        /// <paramref name="pToneB"/>, with snow on the ledges for <paramref name="pSnow"/> &gt; 0 (0.4 a
+        /// dusting, 0.7 snowy). Needs no UVs. Cached as <c>M_Rock_&lt;id&gt;_&lt;suffix&gt;</c>.
+        /// </summary>
+        public static Material Rock(string pId, Color pToneA, Color pToneB, float pSnow, string pSuffix, float pTile = 6f, float pStrata = 3.5f)
+        {
+            if (Surface(pId) == null) return null;
+            string lDir = $"{ROOT}/Textures/{pId}";
+            string lPath = $"{MATERIALS}/M_Rock_{pId}_{pSuffix}.mat";
+            Shader lShader = Shader.Find("Goobyr/Rock");
+            if (lShader == null) return null;
+            Material lMaterial = AssetDatabase.LoadAssetAtPath<Material>(lPath);
+            if (lMaterial == null)
+            {
+                lMaterial = new Material(lShader);
+                AssetDatabase.CreateAsset(lMaterial, lPath);
+            }
+            else if (lMaterial.shader != lShader) lMaterial.shader = lShader;
+            string lDiff = Find(lDir, pId, "diff"), lNormal = Find(lDir, pId, "nor_gl"), lMs = Find(lDir, pId, "ms");
+            lMaterial.SetTexture("_BaseMap", lDiff != null ? AssetDatabase.LoadAssetAtPath<Texture2D>(lDiff) : null);
+            lMaterial.SetTexture("_BumpMap", lNormal != null ? AssetDatabase.LoadAssetAtPath<Texture2D>(lNormal) : null);
+            lMaterial.SetTexture("_MaskMap", lMs != null ? AssetDatabase.LoadAssetAtPath<Texture2D>(lMs) : null);
+            lMaterial.SetFloat("_Tile", pTile);
+            lMaterial.SetColor("_StrataA", pToneA);
+            lMaterial.SetColor("_StrataB", pToneB);
+            lMaterial.SetFloat("_StrataHeight", pStrata);
+            lMaterial.SetFloat("_SnowAmount", Mathf.Clamp01(pSnow));
+            if (pSnow > 0f && Surface("snow_02") != null)
+            {
+                string lSnow = Find($"{ROOT}/Textures/snow_02", "snow_02", "diff");
+                if (lSnow != null) lMaterial.SetTexture("_SnowMap", AssetDatabase.LoadAssetAtPath<Texture2D>(lSnow));
+            }
+            lMaterial.enableInstancing = true;
+            EditorUtility.SetDirty(lMaterial);
+            return lMaterial;
+        }
+
+        /// <summary>
+        /// Window glass (<c>Goobyr/WindowGlass</c>): clear and a little dark, a Fresnel-only reflection, and a
+        /// dim room with curtains where the pane looks into nothing. Switches a material over in place (the
+        /// maps' <c>M_WindowGlass</c> keeps its GUID); the shader's own properties do not collide with URP
+        /// Lit's, so a builder that still sets Lit values on it changes nothing.
+        /// </summary>
+        public static Material WindowGlass(Material pMaterial)
+        {
+            Shader lShader = Shader.Find("Goobyr/WindowGlass");
+            if (pMaterial == null || lShader == null) return pMaterial;
+            if (pMaterial.shader != lShader) pMaterial.shader = lShader;
+            pMaterial.shaderKeywords = new string[0];
+            pMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            pMaterial.enableInstancing = true;
+            EditorUtility.SetDirty(pMaterial);
+            return pMaterial;
         }
 
         // ---------------------------------------------------------------- materials
@@ -366,6 +500,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (lPair.Key.type == typeof(Material)) lSlots.Add(lPair.Key.name);
 
             bool lChanged = false;
+            float lBend = IsPlant(lAsset) ? PlantBend(ModelHeight(lFbx)) : 0f;
             foreach (string lSlot in lSlots)
             {
                 string lPrefix = BestPrefix(pDir, lSlot);
@@ -374,6 +509,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Kind lKind = lLower.Contains("glass") || lLower.Contains("window") ? Kind.Glass : LooksLikeCard(lSlot) ? Kind.Cutout : Kind.Opaque;
                 Material lMaterial = MakeMaterial(pDir, lPrefix, $"{Unix(pDir)}/M_{lSlot}.mat", lKind);
                 if (lMaterial == null) continue;
+                if (lBend > 0f) Foliage(lMaterial, lBend);
                 AssetImporter.SourceAssetIdentifier lId = new AssetImporter.SourceAssetIdentifier(typeof(Material), lSlot);
                 if (lImporter.GetExternalObjectMap().TryGetValue(lId, out Object lOld) && lOld == lMaterial) continue;
                 lImporter.AddRemap(lId, lMaterial);
@@ -382,6 +518,26 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (lImporter.importAnimation && !lFbx.Contains("/Characters/")) { lImporter.importAnimation = false; lChanged = true; }
             if (lChanged) lImporter.SaveAndReimport();
             return true;
+        }
+
+        /// <summary>Plants sway in the wind (<see cref="Foliage"/>); rocks and logs do not.</summary>
+        public static bool IsPlant(string pAsset) => pAsset.StartsWith("Veg_") && !pAsset.Contains("Rock") && !pAsset.Contains("Log");
+
+        /// <summary>How far a plant's crown leans at full wind: a few centimetres for a fern, half a metre for a canopy tree.</summary>
+        public static float PlantBend(float pHeight) => 0.05f + 0.025f * Mathf.Max(0f, pHeight);
+
+        /// <summary>Height of a model's renderers (all LODs), 0 if it has none.</summary>
+        public static float ModelHeight(string pFbx)
+        {
+            GameObject lModel = AssetDatabase.LoadAssetAtPath<GameObject>(pFbx);
+            if (lModel == null) return 0f;
+            Bounds? lBounds = null;
+            foreach (Renderer lRenderer in lModel.GetComponentsInChildren<Renderer>())
+            {
+                if (lBounds == null) lBounds = lRenderer.bounds;
+                else { Bounds b = lBounds.Value; b.Encapsulate(lRenderer.bounds); lBounds = b; }
+            }
+            return lBounds?.size.y ?? 0f;
         }
 
         /// <summary>The texture prefix that belongs to a material slot: the slot name itself, or the longest prefix it starts with.</summary>

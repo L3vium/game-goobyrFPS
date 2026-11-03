@@ -325,6 +325,15 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         [Rpc(SendTo.Owner)]
         public void NotifyRpc(string pWhat, string pWhere) => UI.Hud.Notify(pWhat, pWhere, UI.ThreatMarkers.Amber);
 
+        /// <summary>Host → owner: a searcher opened the hiding spot this player is in; out they come.</summary>
+        [Rpc(SendTo.Owner)]
+        public void PullOutOfHidingRpc()
+        {
+            if (Motor.Mode != MotorMode.Hidden) return;
+            Juice.Squash(Motor.HidingSpot.transform, 0.3f);
+            Motor.ExitHidingSpot();
+        }
+
         [Rpc(SendTo.Server)]
         private void FallDamageRpc(float pDamage)
         {

@@ -14,9 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.MapDefinition
   displayName: "San L\xE1zaro"
   sceneName: Map_SanLazaro
-  description: 'A Colombian river town on fiesta day: the plaza and the church, five
-    coffee terraces climbing to an airstrip on the ridge, and the white Hacienda
-    La Cumbre with its mirador over the gorge.'
+  description: 'A Colombian river town on fiesta day: the plaza and the church, five coffee terraces climbing to an airstrip on the ridge, and the white Hacienda La Cumbre with its mirador over the gorge.'
   zoneNames:
   - Pueblo
   - Cafetal & Airstrip
@@ -54,8 +52,7 @@ MonoBehaviour:
   planStorey: 3.6
   targets:
   - displayName: "Do\xF1a Celestina Ruiz"
-    dossier: Sponsors the fiesta, launders the cartel's coffee money. Stage, cantina,
-      bell deck, dock.
+    dossier: Sponsors the fiesta, launders the cartel's coffee money. Stage, cantina, bell deck, dock.
     zone: 0
     bodyColor: {r: 0.7529412, g: 0.22352941, b: 0.16862746, a: 1}
     hat: 0
@@ -63,7 +60,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 1
-    routine: 0b000000010000000900000000000000
+    routine: 0b000000010000000900000000000000i
     enabled: 1
   - displayName: Fabio 'El Mono' Rengifo
     dossier: Owns the cantina and the smugglers' cave under it.
@@ -74,7 +71,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 5
-    routine: 01000000050000000300000002000000
+    routine: 01000000050000000300000002000000i
     enabled: 1
   - displayName: Inspector Gilma Pardo
     dossier: The pueblo's police chief. Paid by everyone.
@@ -85,7 +82,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 4
-    routine: 03000000060000000800000007000000
+    routine: 03000000060000000800000007000000i
     enabled: 1
   - displayName: "Wilber Casta\xF1o"
     dossier: Boatman. Runs the river for whoever pays.
@@ -96,7 +93,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 0
-    routine: 000000000a0000000700000001000000
+    routine: 000000000a0000000700000001000000i
     enabled: 1
   - displayName: Mayor Hernando Lozada
     dossier: Opens the fiesta, signs whatever the hacienda sends down.
@@ -107,7 +104,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 3
-    routine: 0b000000050000000600000004000000
+    routine: 0b000000050000000600000004000000i
     enabled: 1
   - displayName: Ilse Varga
     dossier: The buyer. Flies in, tastes the coffee, buys the rest.
@@ -118,7 +115,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 2
-    routine: 08000000060000000100000005000000
+    routine: 08000000060000000100000005000000i
     enabled: 1
   - displayName: Captain Rodrigo Duarte
     dossier: Commands the airstrip's sicarios. Sees through every pass.
@@ -129,7 +126,7 @@ MonoBehaviour:
     character: 
     bodyguards: 3
     proof: 3
-    routine: 0900000008000000070000000a000000
+    routine: 0900000008000000070000000a000000i
     enabled: 1
   - displayName: "Nelson Arbel\xE1ez"
     dossier: The capataz. Every picker owes him a week.
@@ -140,7 +137,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 0
-    routine: 040000000b0000000700000002000000
+    routine: 040000000b0000000700000002000000i
     enabled: 1
   - displayName: Lucho Guerrero
     dossier: Pilot. Never sober on the ground.
@@ -151,7 +148,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 0
-    routine: 0500000008000000010000000a000000
+    routine: 0500000008000000010000000a000000i
     enabled: 1
   - displayName: "Dra. Amparo Rinc\xF3n"
     dossier: The chemist behind the 'fungicide'.
@@ -162,7 +159,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 5
-    routine: 03000000040000000100000002000000
+    routine: 03000000040000000100000002000000i
     enabled: 1
   - displayName: Don Ramiro Elizalde
     dossier: "The patr\xF3n. Study, toast on the loggia, chapel, dinner."
@@ -173,7 +170,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 1
-    routine: 030000000b0000000000000005000000
+    routine: 030000000b0000000000000005000000i
     enabled: 1
   - displayName: Teodoro Aranda
     dossier: The accountant. Counts the vault, drinks his coffee, checks the wine.
@@ -184,7 +181,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 5
-    routine: 03000000010000000800000002000000
+    routine: 03000000010000000800000002000000i
     enabled: 1
   - displayName: Valentina Elizalde
     dossier: The heir. Runs the reception like a campaign.
@@ -195,7 +192,7 @@ MonoBehaviour:
     character: 
     bodyguards: 2
     proof: 1
-    routine: 04000000010000000500000006000000
+    routine: 04000000010000000500000006000000i
     enabled: 1
   - displayName: Celso Ibarra
     dossier: The mayordomo. Knows every door and who opens it.
@@ -206,7 +203,7 @@ MonoBehaviour:
     character: 
     bodyguards: 1
     proof: 3
-    routine: 08000000060000000500000007000000
+    routine: 08000000060000000500000007000000i
     enabled: 1
   - displayName: "Senator Octavio Pe\xF1alosa"
     dossier: Guest of honour. Sells the valley's roads.
@@ -217,5 +214,5 @@ MonoBehaviour:
     character: 
     bodyguards: 3
     proof: 2
-    routine: 0b000000010000000400000002000000
+    routine: 0b000000010000000400000002000000i
     enabled: 1

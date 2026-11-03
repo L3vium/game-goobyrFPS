@@ -99,6 +99,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             public List<Bounds> cutters = new List<Bounds>();
             public List<Bounds> shafts = new List<Bounds>();
             public List<Seg> segs = new List<Seg>();
+            /// <summary>Rain streaks to project under window sills: building-local face point, outward normal, width.</summary>
+            public List<(Vector3 face, Vector3 outward, float width)> streaks = new List<(Vector3, Vector3, float)>();
+            /// <summary>Bare ground-floor wall at eye level, facing the street: building-local face point, outward normal.</summary>
+            public List<(Vector3 face, Vector3 outward)> posterSpots = new List<(Vector3, Vector3)>();
         }
 
         public static ArchResult Build(ArchSpec pSpec, Transform pParent)
@@ -158,6 +162,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (ArchDrain d in pSpec.drains) Drain(c, d);
             foreach (ArchHatch h in pSpec.hatches) Hatch(c, h);
             c.mesh.Flush(r.shell, MeshPrefix + "_" + pSpec.name);
+            Weathering(c);
 
             if (!pSpec.shut)
             {
@@ -420,6 +425,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (Opening o in lOpenings) { lCuts.Add(Mathf.Clamp(o.s0, s.a, s.b)); lCuts.Add(Mathf.Clamp(o.s1, s.a, s.b)); }
             lCuts.Sort();
             float lT = lKind == WallKind.Facade ? st.outerThickness : PARTITION;
+            // Outer corners of plain facades are chamfered (a narrow 45 degree face that catches the light);
+            // dressed-stone buildings get quoins instead.
+            float lChamfer = lKind == WallKind.Facade && !st.quoins && s.floor >= 0 ? Mathf.Clamp(lT - 0.17f, 0f, 0.09f) : 0f;
+            bool lConvexA = lChamfer > 0.03f && ConvexEnd(c, s, lSide, true), lConvexB = lChamfer > 0.03f && ConvexEnd(c, s, lSide, false);
             for (int k = 0; k < lCuts.Count - 1; k++)
             {
                 float p = lCuts[k], q = lCuts[k + 1];
@@ -447,7 +456,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     }
                     else
                     {
-                        SegBox(c, s, n, p, q, y0 + v.x, y0 + v.y, -lT + 0.15f, 0f, lOuter, true, lSkipA, lSkipB);
+                        bool lCutA = lConvexA && lSkipA && q - p > lChamfer * 3f, lCutB = lConvexB && lSkipB && q - p > lChamfer * 3f;
+                        SegBox(c, s, n, lCutA ? p + lChamfer : p, lCutB ? q - lChamfer : q, y0 + v.x, y0 + v.y, -lT + 0.15f, 0f, lOuter, true, lSkipA, lSkipB);
+                        if (s.vertical && lCutA) Chamfer(c, s, n, true, lChamfer, y0 + v.x, y0 + v.y, lOuter);
+                        if (s.vertical && lCutB) Chamfer(c, s, n, false, lChamfer, y0 + v.x, y0 + v.y, lOuter);
                         if (lOwner.isVoid || lOwner.open) SegBox(c, s, n, p, q, y0 + Mathf.Max(0f, v.x), y0 + v.y, -lT, -lT + 0.15f, InnerFor(c, lOwner), true, lSkipA, lSkipB);
                         else Leaf(c, s, n, p, q, y0 + Mathf.Max(0f, v.x), y0 + v.y, -lT + 0.15f, -lT, lOwner, lSkipA, lSkipB);
                     }
@@ -463,14 +475,145 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lDoorOpenings.Sort((u, v) => u.s0.CompareTo(v.s0));
                 foreach (Opening o in lDoorOpenings)
                 {
-                    SegBox(c, s, n, lCursorS, o.s0, y0 - c.spec.plinth, y0 + lPlinthTop, -0.05f, 0.05f, st.plinth);
+                    PlinthRun(c, s, n, lCursorS, o.s0, y0 - c.spec.plinth, y0 + lPlinthTop, st.plinth);
                     lCursorS = o.s1;
                 }
-                SegBox(c, s, n, lCursorS, s.b + 0.06f, y0 - c.spec.plinth, y0 + lPlinthTop, -0.05f, 0.05f, st.plinth);
+                PlinthRun(c, s, n, lCursorS, s.b + 0.06f, y0 - c.spec.plinth, y0 + lPlinthTop, st.plinth);
+            }
+
+            // Bare wall at eye level on a street front: a spot for a poster.
+            if (lKind == WallKind.Facade && lOther == null && s.floor == 0 && st.posters)
+            {
+                lOpenings.Sort((u, v) => u.s0.CompareTo(v.s0));
+                float lFrom = s.a + 0.5f;
+                foreach (Opening o in lOpenings)
+                {
+                    if (o.y1 < 1.1f || o.y0 > 2.4f) continue;
+                    if (o.s0 - 0.25f - lFrom >= 0.9f) c.posterSpots.Add((P(s, n, (lFrom + o.s0 - 0.25f) * 0.5f, y0 + 1.7f, 0f), (s.vertical ? Vector3.right : Vector3.forward) * n));
+                    lFrom = Mathf.Max(lFrom, o.s1 + 0.25f);
+                }
+                if (s.b - 0.5f - lFrom >= 0.9f) c.posterSpots.Add((P(s, n, (lFrom + s.b - 0.5f) * 0.5f, y0 + 1.7f, 0f), (s.vertical ? Vector3.right : Vector3.forward) * n));
             }
 
             foreach ((ArchDoor d, float sa) in lDoors) DoorGeometry(c, s, n, lKind, d, sa, y0, lOwner, lOther);
             foreach ((ArchWindow w, float sa) in lWindows) WindowFrame(c, s, n, w, sa, y0, lOwner);
+            if (lKind == WallKind.Facade && st.quoins && s.floor >= 0) Quoins(c, s, n, lSide, y0, H);
+        }
+
+        /// <summary>
+        /// A Moorish opening: the rectangular hole closed at the top into a horseshoe arch (masonry fills in
+        /// the upper corners), an alfiz frame round it, a stone sill, and on upper floors every other window
+        /// a mashrabiya oriel - a wooden lattice box standing out of the wall - instead of shutters.
+        /// </summary>
+        private static void MoorishWindow(Ctx c, Seg s, float n, ArchWindow w, float sa, float y0, float s0, float s1, float b, float t, float pBottom, float lT)
+        {
+            ArchStyle st = c.spec.style;
+            if (w.kind == WindowKind.Open || w.kind == WindowKind.Glazed || w.kind == WindowKind.French || w.kind == WindowKind.Boarded) c.result.keepClear.Add((s.floor, ClearRect(s, n, s0, s1, lT, 0.6f), false));
+            float lHalf = (s1 - s0) * 0.5f, lArch = Mathf.Min(lHalf * 1.1f, 0.75f), lSpring = t - lArch;
+            ArchMat lWall = st.facade;
+            const int BANDS = 7;
+            for (int k = 0; k < BANDS; k++)
+            {
+                float y = lSpring + lArch * k / BANDS, y1 = lSpring + lArch * (k + 1) / BANDS, lMid = (y + y1) * 0.5f;
+                float u = Mathf.Clamp01((lMid - lSpring) / lArch);
+                // A horseshoe: the arch a little wider than the jambs just above the springing, then closing.
+                float lOpen = lHalf * Mathf.Sqrt(Mathf.Max(0f, 1f - u * u)) * (u < 0.35f ? 1.08f : 1f);
+                float lFill = Mathf.Clamp(lHalf - lOpen, 0f, lHalf);
+                if (lFill > 0.01f)
+                {
+                    SegBox(c, s, n, s0, s0 + lFill, y, y1, -lT, 0f, lWall, false);
+                    SegBox(c, s, n, s1 - lFill, s1, y, y1, -lT, 0f, lWall, false);
+                }
+                SegBox(c, s, n, s0 + lFill - 0.06f, s0 + lFill, y, y1, -0.01f, 0.03f, st.trim, false);
+                SegBox(c, s, n, s1 - lFill, s1 - lFill + 0.06f, y, y1, -0.01f, 0.03f, st.trim, false);
+            }
+            // The alfiz: a rectangular frame enclosing the arch.
+            SegBox(c, s, n, s0 - 0.2f, s0 - 0.12f, lSpring - 0.1f, t + 0.2f, -0.01f, 0.04f, st.trim, false);
+            SegBox(c, s, n, s1 + 0.12f, s1 + 0.2f, lSpring - 0.1f, t + 0.2f, -0.01f, 0.04f, st.trim, false);
+            SegBox(c, s, n, s0 - 0.2f, s1 + 0.2f, t + 0.12f, t + 0.2f, -0.01f, 0.04f, st.trim, false);
+            if (pBottom > 0.05f) SegBox(c, s, n, s0 - 0.1f, s1 + 0.1f, b - 0.07f, b, -lT - 0.02f, 0.1f, st.trim);
+            bool lStreetOriel = s.floor == 0 && pBottom > 0.9f && string.IsNullOrEmpty(w.poi) && w.kind != WindowKind.Slit && Mathf.Abs(Mathf.RoundToInt(sa * 1.7f + s.line)) % 5 == 0;
+            if (s.floor == 0 && pBottom > 0.05f && !lStreetOriel && string.IsNullOrEmpty(w.poi) && w.kind != WindowKind.Open && w.kind != WindowKind.French)
+            {
+                // A grille of square iron bars in front of the opening, a rail top and bottom.
+                for (float x = s0 + 0.1f; x < s1 - 0.05f; x += 0.13f) SegBox(c, s, n, x, x + 0.022f, b + 0.02f, lSpring + lArch * 0.35f, 0.05f, 0.072f, ArchLib.Iron, false);
+                foreach (float y in new[] { b + 0.12f, lSpring - 0.1f }) SegBox(c, s, n, s0 + 0.02f, s1 - 0.02f, y, y + 0.03f, 0.045f, 0.077f, ArchLib.Iron, false);
+            }
+            bool lOriel = (s.floor >= 1 || lStreetOriel) && pBottom > 0.05f && ((int)(sa * 3.1f) + s.floor) % 2 == 0 && w.kind != WindowKind.Slit;
+            if (lStreetOriel) lOriel = true;
+            if (!lOriel) return;
+            ArchMat lWood = st.shutter ?? st.door ?? st.trim;
+            float o0 = s0 - 0.12f, o1 = s1 + 0.12f, ob = b - 0.25f, ot = lSpring + 0.1f, D = 0.42f;
+            // Base corbel, roof cap, corner posts.
+            SegBox(c, s, n, o0 - 0.05f, o1 + 0.05f, ob - 0.12f, ob, 0f, D + 0.04f, lWood);
+            SegBox(c, s, n, o0 - 0.08f, o1 + 0.08f, ot, ot + 0.1f, 0f, D + 0.08f, lWood, false);
+            foreach (float e in new[] { o0, o1 - 0.06f }) SegBox(c, s, n, e, e + 0.06f, ob, ot, D - 0.06f, D, lWood, false);
+            // The lattice: thin turned bars both ways on the front and the two cheeks.
+            for (float x = o0 + 0.14f; x < o1 - 0.08f; x += 0.14f) SegBox(c, s, n, x, x + 0.025f, ob, ot, D - 0.04f, D - 0.015f, lWood, false);
+            for (float y = ob + 0.14f; y < ot - 0.05f; y += 0.14f)
+            {
+                SegBox(c, s, n, o0, o1, y, y + 0.025f, D - 0.04f, D - 0.015f, lWood, false);
+                SegBox(c, s, n, o0, o0 + 0.025f, y, y + 0.025f, 0f, D, lWood, false);
+                SegBox(c, s, n, o1 - 0.025f, o1, y, y + 0.025f, 0f, D, lWood, false);
+            }
+            // A solid panel low down (the seat inside), so the oriel can be leaned on from the room.
+            SegBox(c, s, n, o0, o1, ob, ob + 0.5f, D - 0.05f, D - 0.03f, lWood, true);
+        }
+
+        /// <summary>A plinth course with a weathered cap: the base, then a thin projecting coping on top.</summary>
+        private static void PlinthRun(Ctx c, Seg s, float n, float s0, float s1, float yb, float yt, ArchMat pMat)
+        {
+            SegBox(c, s, n, s0, s1, yb, yt - 0.06f, -0.05f, 0.05f, pMat);
+            SegBox(c, s, n, s0 - 0.03f, s1 + 0.03f, yt - 0.06f, yt, -0.05f, 0.08f, pMat);
+        }
+
+        /// <summary>True when the owner's side does not carry on past this end of the segment (an outer corner).</summary>
+        private static bool ConvexEnd(Ctx c, Seg s, int pSide, bool pStart)
+        {
+            int lLine = Mathf.RoundToInt(s.line / CELL) + (pSide < 0 ? -1 : 0);
+            int lAlong = Mathf.RoundToInt((pStart ? s.a : s.b) / CELL) + (pStart ? -1 : 0);
+            return (s.vertical ? Owner(c, s.floor, lLine, lAlong) : Owner(c, s.floor, lAlong, lLine)) < 0;
+        }
+
+        /// <summary>
+        /// The 45 degree face across a chamfered outer corner, from the trimmed end of this facade to the
+        /// trimmed end of the perpendicular one (drawn by the vertical walls only, once per corner).
+        /// </summary>
+        private static void Chamfer(Ctx c, Seg s, float n, bool pStart, float pSize, float y0, float y1, ArchMat pMat)
+        {
+            float lEnd = pStart ? s.a : s.b, lIn = pStart ? pSize : -pSize;
+            Vector3 a = P(s, n, lEnd + lIn, y0, 0f), b = P(s, n, lEnd + lIn, y1, 0f), cc = P(s, n, lEnd, y1, -pSize), d = P(s, n, lEnd, y0, -pSize);
+            Vector3 lAlong = s.vertical ? Vector3.forward : Vector3.right;
+            Vector3 lOut = (s.vertical ? Vector3.right : Vector3.forward) * n + (pStart ? -lAlong : lAlong);
+            if (Vector3.Dot(Vector3.Cross(cc - a, b - a), lOut) < 0f) c.mesh.Quad(pMat, d, cc, b, a, false);
+            else c.mesh.Quad(pMat, a, b, cc, d, false);
+        }
+
+        /// <summary>
+        /// Dressed-stone quoins at the building's outer corners: 0.36 m courses with a mortar joint,
+        /// alternating long and short faces (the two walls of a corner alternate the other way round), on
+        /// each facade end where the owner's side does not carry on (a convex corner). The vertical walls'
+        /// blocks wrap the arris so the corner reads as one stone.
+        /// </summary>
+        private static void Quoins(Ctx c, Seg s, float n, int pSide, float y0, float H)
+        {
+            const float COURSE = 0.4f, PROUD = 0.035f;
+            ArchMat lStone = c.spec.style.trim;
+            foreach (bool lStart in new[] { true, false })
+            {
+                float lEnd = lStart ? s.a : s.b;
+                if (!ConvexEnd(c, s, pSide, lStart)) continue;
+                float lWrap = s.vertical ? PROUD : 0f;
+                int m0 = Mathf.CeilToInt((y0 - 0.02f) / COURSE), m1 = Mathf.FloorToInt((y0 + H - 0.38f) / COURSE);
+                for (int m = m0; m <= m1; m++)
+                {
+                    float y = m * COURSE + 0.02f;
+                    if (s.floor == 0 && c.spec.style.plinth != null && y < 0.5f) continue;
+                    float w = ((m + (s.vertical ? 1 : 0)) & 1) == 0 ? 0.55f : 0.32f;
+                    float s0 = lStart ? lEnd - lWrap : lEnd - w, s1 = lStart ? lEnd + w : lEnd + lWrap;
+                    SegBox(c, s, n, s0, s1, y, y + COURSE - 0.04f, -0.01f, PROUD, lStone, false);
+                }
+            }
         }
 
         private static void WindowGeometry(ArchWindow w, float pStorey, out float pBottom, out float pTop)
@@ -533,32 +676,76 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 SegBox(c, s, n, s0, s1, b + (t - b) * 0.62f, b + (t - b) * 0.62f + 0.05f, fd0 + 0.01f, fd1 - 0.01f, lFrame, false);
             }
             if (lGlass) SegBox(c, s, n, s0 + 0.05f, s1 - 0.05f, b + 0.03f, t - 0.05f, -lT * 0.55f - 0.012f, -lT * 0.55f + 0.012f, ArchLib.Glass, true);
-            // A deep stone sill (a hangable ledge) and the surround.
+            if (st.moorish) { MoorishWindow(c, s, n, w, sa, y0, s0, s1, b, t, lBottom, lT); return; }
+            // A deep stone sill (a hangable ledge) and the surround; rain streaks under every other one.
             if (lBottom > 0.05f)
+            {
                 SegBox(c, s, n, s0 - 0.1f, s1 + 0.1f, b - 0.07f, b, -lT - 0.02f, 0.14f, st.trim);
+                if (st.weathered && (s.floor > 0 || lBottom > 1.2f) && (Mathf.RoundToInt(sa * 1.7f) + s.floor) % 2 == 0)
+                    c.streaks.Add((P(s, n, sa, b - 0.82f, 0f), (s.vertical ? Vector3.right : Vector3.forward) * n, w.width + 0.3f));
+            }
             SegBox(c, s, n, s0 - 0.16f, s1 + 0.16f, t, t + 0.2f, -0.01f, 0.05f, st.trim);
+            SegBox(c, s, n, s0 - 0.2f, s1 + 0.2f, t + 0.2f, t + 0.26f, -0.01f, 0.09f, st.trim, false);
             SegBox(c, s, n, s0 - 0.14f, s0, b, t, -0.01f, 0.035f, st.trim);
             SegBox(c, s, n, s1, s1 + 0.14f, b, t, -0.01f, 0.035f, st.trim);
             // Shutters: open flat on the facade, or shut in the opening.
             if (st.shutters && st.shutter != null && w.kind != WindowKind.Slit && w.kind != WindowKind.Small)
             {
                 float lLeaf = w.width * 0.5f;
+                ArchMat lShutter = st.shutter;
+                if (st.shutterWings != null && st.shutterWings.Length > 0)
+                {
+                    float lX = s.vertical ? s.line : sa;
+                    lShutter = st.shutterWings[Mathf.Clamp(Mathf.FloorToInt(lX / (c.spec.size.x / st.shutterWings.Length)), 0, st.shutterWings.Length - 1)];
+                }
                 if (w.kind == WindowKind.Shuttered)
                 {
-                    SegBox(c, s, n, s0, s1, b, t, -0.09f, -0.04f, st.shutter, true);
-                    for (float y = b + 0.15f; y < t - 0.1f; y += 0.16f) SegBox(c, s, n, s0, s1, y, y + 0.05f, -0.04f, -0.02f, st.shutter, false);
+                    SegBox(c, s, n, s0, s1, b, t, -0.09f, -0.04f, lShutter, true);
+                    for (float y = b + 0.15f; y < t - 0.1f; y += 0.16f) SegBox(c, s, n, s0, s1, y, y + 0.05f, -0.04f, -0.02f, lShutter, false);
                 }
                 else
                 {
-                    SegBox(c, s, n, s0 - 0.16f - lLeaf, s0 - 0.16f, b, t, 0.035f, 0.075f, st.shutter, false);
-                    SegBox(c, s, n, s1 + 0.16f, s1 + 0.16f + lLeaf, b, t, 0.035f, 0.075f, st.shutter, false);
+                    SegBox(c, s, n, s0 - 0.16f - lLeaf, s0 - 0.16f, b, t, 0.035f, 0.075f, lShutter, false);
+                    SegBox(c, s, n, s1 + 0.16f, s1 + 0.16f + lLeaf, b, t, 0.035f, 0.075f, lShutter, false);
                 }
             }
+            if (st.flowerBoxes && s.floor >= 1 && !c.spec.plainFloors.Contains(s.floor) && lBottom > 0.5f && !w.balcony && string.IsNullOrEmpty(w.poi)
+                && (w.kind == WindowKind.Glazed || w.kind == WindowKind.Shuttered))
+                WindowBox(c, s, n, sa, s0, s1, b);
             if (w.kind == WindowKind.Boarded)
                 for (int k = 0; k < 3; k++) SegBox(c, s, n, s0 - 0.08f, s1 + 0.08f, b + 0.2f + k * 0.5f, b + 0.4f + k * 0.5f, 0.0f, 0.04f, st.door ?? st.trim, true);
             if (w.balcony == false && w.kind == WindowKind.French) RailBetween(c, s, n, s0, s1, b, 0.02f);
             if (w.kind == WindowKind.Open || w.kind == WindowKind.Glazed || w.kind == WindowKind.French || w.kind == WindowKind.Boarded) c.result.keepClear.Add((s.floor, ClearRect(s, n, s0, s1, lT, 0.6f), false));
             if (!string.IsNullOrEmpty(w.poi)) Poi(c, P(s, n, sa, b + 0.5f, 0.3f), w.poi, MapPoi.Kind.Entrance);
+        }
+
+        /// <summary>
+        /// Under an upper-floor window, decoration only (no collider, nothing to climb): two windows in three
+        /// get a timber flower box of geraniums on brackets, the third a Juliet balcony (a 0.28 m slab and an
+        /// iron rail).
+        /// </summary>
+        private static void WindowBox(Ctx c, Seg s, float n, float sa, float s0, float s1, float b)
+        {
+            ArchStyle st = c.spec.style;
+            int lPick = Mathf.Abs(Mathf.RoundToInt(sa * 1.3f) + s.floor * 2 + Mathf.RoundToInt(s.line));
+            if (lPick % 3 == 2)
+            {
+                SegBox(c, s, n, s0 - 0.2f, s1 + 0.2f, b - 0.14f, b - 0.07f, 0.14f, 0.28f, st.trim, false);
+                SegBox(c, s, n, s0 - 0.2f, s1 + 0.2f, b + 0.86f, b + 0.9f, 0.24f, 0.27f, ArchLib.Iron, false);
+                for (float x = s0 - 0.18f; x <= s1 + 0.19f; x += 0.12f) SegBox(c, s, n, x, x + 0.018f, b - 0.07f, b + 0.86f, 0.245f, 0.263f, ArchLib.Iron, false);
+                return;
+            }
+            ArchMat lWood = st.shutter ?? st.door ?? st.trim, lLeaves = ArchLib.PlainMat("Geranium_Leaf", new Color(0.18f, 0.36f, 0.12f), 0.2f, 0f);
+            Color[] lBloom = { new Color(0.85f, 0.08f, 0.1f), new Color(0.95f, 0.35f, 0.55f), new Color(0.95f, 0.95f, 0.9f) };
+            ArchMat lFlower = ArchLib.PlainMat("Geranium_" + (lPick % 3), lBloom[(lPick + s.floor) % 3], 0.3f, 0f);
+            SegBox(c, s, n, s0 - 0.05f, s1 + 0.05f, b - 0.32f, b - 0.08f, 0.15f, 0.36f, lWood, false);
+            foreach (float e in new[] { s0 + 0.1f, s1 - 0.14f }) SegBox(c, s, n, e, e + 0.04f, b - 0.5f, b - 0.32f, 0f, 0.3f, ArchLib.Iron, false);
+            SegBox(c, s, n, s0 - 0.02f, s1 + 0.02f, b - 0.08f, b + 0.08f, 0.17f, 0.36f, lLeaves, false);
+            for (float x = s0 + 0.02f; x < s1 - 0.04f; x += 0.15f)
+            {
+                float lUp = ((Mathf.RoundToInt(x * 13f) & 1) == 0) ? 0.05f : 0f;
+                SegBox(c, s, n, x, x + 0.09f, b + 0.06f + lUp, b + 0.15f + lUp, 0.2f + lUp, 0.31f + lUp, lFlower, false);
+            }
         }
 
         /// <summary>The floor area in front of an opening, inside the room (local xz).</summary>
@@ -596,7 +783,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 // Threshold step and a stone surround outside.
                 SegBox(c, s, n, s0 - 0.05f, s1 + 0.05f, y0 - 0.15f, y0 + 0.02f, -lT, 0.25f, st.trim);
-                SegBox(c, s, n, s0 - 0.22f, s1 + 0.22f, t, t + 0.28f, -0.01f, 0.06f, st.trim);
+                SegBox(c, s, n, s0 - 0.22f, s1 + 0.22f, t + 0.1f, t + 0.28f, -0.01f, 0.06f, st.trim);
+                SegBox(c, s, n, s0 - 0.26f, s1 + 0.26f, t + 0.28f, t + 0.34f, -0.01f, 0.1f, st.trim, false);
+                SegBox(c, s, n, s0 - 0.22f, s0 - 0.1f, y0 + 0.02f, t + 0.1f, -0.01f, 0.05f, st.trim);
+                SegBox(c, s, n, s1 + 0.1f, s1 + 0.22f, y0 + 0.02f, t + 0.1f, -0.01f, 0.05f, st.trim);
+                if (!string.IsNullOrEmpty(d.sign)) SignBoard(c, s, n, d, sa, t);
+                if (st.moorish && s.floor == 0) MoorishStreetDoor(c, s, n, d, sa, y0, s0, s1, t);
             }
             c.result.keepClear.Add((s.floor, ClearRect(s, n, s0 - 0.3f, s1 + 0.3f, lT, 1.2f), true));
             ArchMat lLeafMat = st.door ?? st.trim;
@@ -626,6 +818,82 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 }
             }
             if (!string.IsNullOrEmpty(d.poi)) Poi(c, P(s, n, sa, b + 1f, 0.6f), d.poi, MapPoi.Kind.Entrance);
+        }
+
+        /// <summary>
+        /// The street side of a Moorish door: a wider second step bedded in the ground, then by turns a
+        /// striped cloth awning or a timber hood with a tiled cap (not over a sign), an iron lantern on a
+        /// bracket beside it, and a potted plant either side where the ground meets the step.
+        /// </summary>
+        private static void MoorishStreetDoor(Ctx c, Seg s, float n, ArchDoor d, float sa, float y0, float s0, float s1, float t)
+        {
+            ArchStyle st = c.spec.style;
+            int lPick = Mathf.Abs(Mathf.RoundToInt(sa * 7.3f + s.line * 3.1f + c.spec.name.Length));
+            SegBox(c, s, n, s0 - 0.3f, s1 + 0.3f, y0 - 0.6f, y0 - 0.14f, 0.2f, 0.6f, st.trim);
+            Vector3 lOut = (s.vertical ? Vector3.right : Vector3.forward) * n;
+            float w = s1 - s0 + 0.9f;
+            if (string.IsNullOrEmpty(d.sign))
+            {
+                if (lPick % 2 == 0)
+                {
+                    Color[] lStripes = { new Color(0.75f, 0.2f, 0.15f), new Color(0.2f, 0.4f, 0.55f), new Color(0.2f, 0.45f, 0.3f) };
+                    ArchMat lCloth = ArchLib.Tinted("rough_linen", lStripes[lPick % 3], "awning_" + (lPick % 3), 1f);
+                    c.mesh.Box(lCloth, P(s, n, sa, t + 0.32f, 0.5f), new Vector3(w, 0.03f, 1.05f), Quaternion.LookRotation(lOut) * Quaternion.Euler(20f, 0f, 0f), false);
+                    c.mesh.Box(lCloth, P(s, n, sa, t + 0.05f, 0.98f), new Vector3(w, 0.22f, 0.02f), Quaternion.LookRotation(lOut), false);
+                    foreach (float e in new[] { sa - w * 0.5f + 0.05f, sa + w * 0.5f - 0.05f })
+                        c.mesh.Box(ArchLib.Iron, P(s, n, e, t + 0.3f, 0.5f), new Vector3(0.02f, 0.02f, 1.0f), Quaternion.LookRotation(lOut) * Quaternion.Euler(20f, 0f, 0f), false);
+                }
+                else
+                {
+                    ArchMat lWood = st.door ?? st.trim, lTiles = ArchLib.Surface("clay_roof_tiles_02", 1f);
+                    foreach (float e in new[] { sa - w * 0.5f + 0.1f, sa + w * 0.5f - 0.16f })
+                        SegBox(c, s, n, e, e + 0.06f, t + 0.12f, t + 0.42f, 0f, 0.55f, lWood, false);
+                    SegBox(c, s, n, sa - w * 0.5f, sa + w * 0.5f, t + 0.42f, t + 0.5f, 0f, 0.65f, lWood, false);
+                    c.mesh.Box(lTiles, P(s, n, sa, t + 0.6f, 0.34f), new Vector3(w + 0.1f, 0.05f, 0.78f), Quaternion.LookRotation(lOut) * Quaternion.Euler(16f, 0f, 0f), false);
+                }
+            }
+            // The lantern on its bracket, on the side away from the street's next door.
+            float lSide = lPick % 4 < 2 ? s1 + 0.42f : s0 - 0.42f;
+            SegBox(c, s, n, lSide - 0.025f, lSide + 0.025f, t - 0.05f, t + 0.0f, 0f, 0.42f, ArchLib.Iron, false);
+            SegBox(c, s, n, lSide - 0.06f, lSide + 0.06f, t - 0.2f, t + 0.05f, 0f, 0.03f, ArchLib.Iron, false);
+            List<(ArchMat, Vector3, Vector3)> lLamp = new List<(ArchMat, Vector3, Vector3)>();
+            ArchLib.LanternParts(lLamp, P(s, n, lSide, t - 0.52f, 0.38f));
+            lLamp.Add((ArchLib.Iron, P(s, n, lSide, t - 0.06f, 0.38f), new Vector3(0.015f, 0.04f, 0.015f)));
+            foreach ((ArchMat m, Vector3 lAt, Vector3 lSize) in lLamp) c.mesh.Box(m, lAt, lSize, false);
+            // Potted plants either side, standing on whatever ground is there.
+            Transform lProps = Child(c.result.root, "StreetProps");
+            foreach (float e in new[] { s0 - 0.6f, s1 + 0.6f })
+            {
+                if (Mathf.Abs(e - lSide) < 0.3f && lPick % 3 == 0) continue;
+                Vector3 lAt = c.result.root.TransformPoint(P(s, n, e, y0 + 1.5f, 0.42f));
+                if (!Physics.Raycast(lAt, Vector3.down, out RaycastHit lHit, 3f)) continue;
+                float lFloor = c.result.root.TransformPoint(new Vector3(0, y0, 0)).y;
+                if (Mathf.Abs(lHit.point.y - lFloor) > 0.45f) continue;
+                ArchLib.Place("Furn_PottedPlant", lProps, lHit.point, c.result.root.eulerAngles.y + lPick * 37f, ArchLib.Collide.Box);
+            }
+        }
+
+        /// <summary>
+        /// A painted sign over a street door: a wooden board standing on the lintel's cap (4:1, at most 2 m
+        /// wide), its face a quad with the sign's lit material (<see cref="ArchSigns"/>).
+        /// </summary>
+        private static void SignBoard(Ctx c, Seg s, float n, ArchDoor d, float sa, float t)
+        {
+            Material lSign = ArchSigns.For(d.sign);
+            if (lSign == null) return;
+            float w = Mathf.Clamp(d.width + 0.9f, 1.5f, 2f), h = w * 0.25f, b = t + 0.42f;
+            SegBox(c, s, n, sa - w * 0.5f - 0.04f, sa + w * 0.5f + 0.04f, b - 0.04f, b + h + 0.04f, 0.02f, 0.09f, c.spec.style.door ?? c.spec.style.trim, false);
+            GameObject lFace = new GameObject("Sign_" + d.sign);
+            lFace.transform.SetParent(c.result.shell, false);
+            Vector3 lOut = (s.vertical ? Vector3.right : Vector3.forward) * n;
+            lFace.transform.localPosition = P(s, n, sa, b + h * 0.5f, 0.092f);
+            lFace.transform.localRotation = Quaternion.LookRotation(-lOut, Vector3.up);
+            lFace.transform.localScale = new Vector3(w, h, 1f);
+            lFace.AddComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+            MeshRenderer lRenderer = lFace.AddComponent<MeshRenderer>();
+            lRenderer.sharedMaterial = lSign;
+            lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lFace.isStatic = true;
         }
 
         /// <summary>A shut door that needs a tool: hinge, leaf (interactable), keypad, NavMesh obstacle.</summary>
@@ -919,6 +1187,21 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         public static ArchMat FloorFor(ArchStyle st, ArchRoom pRoom)
         {
+            if (st.moorish)
+                switch (pRoom.type)
+                {
+                    case RoomType.Hall: case RoomType.Lobby: case RoomType.Salon: case RoomType.Dining: case RoomType.Study: case RoomType.Suite: case RoomType.Bedroom:
+                    case RoomType.Office: case RoomType.Living: case RoomType.Library: case RoomType.Gallery: case RoomType.Shop: case RoomType.Bar: case RoomType.Church: case RoomType.Chapel:
+                        return ArchLib.Tinted("large_floor_tiles_02", new Color(0.55f, 0.78f, 0.78f), "zellige", 1.2f);
+                    case RoomType.GuardRoom: case RoomType.Barracks: case RoomType.Mess: case RoomType.Dormitory: case RoomType.Attic:
+                        return ArchLib.Surface("old_planks_02", 2f);
+                    case RoomType.Terrace: case RoomType.Loggia: case RoomType.Belvedere:
+                        return ArchLib.Tinted("large_floor_tiles_02", new Color(0.95f, 0.62f, 0.45f), "terracotta", 1.5f);
+                    case RoomType.Kitchen: case RoomType.Pantry: case RoomType.Bath: case RoomType.Laundry: case RoomType.Clinic: case RoomType.Spa:
+                        return ArchLib.Tinted("large_floor_tiles_02", new Color(0.9f, 0.85f, 0.75f), "plaster_tile", 2f);
+                    default:
+                        return ArchLib.Tinted("large_sandstone_blocks", new Color(0.85f, 0.78f, 0.68f), "flags", 1.6f);
+                }
             switch (pRoom.type)
             {
                 case RoomType.Kitchen: case RoomType.Pantry: case RoomType.Bath: case RoomType.Laundry: case RoomType.Spa: case RoomType.Clinic:
@@ -1146,6 +1429,46 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 float lBack = lLowFar ? 0f : lDepth;
                 c.mesh.DoubleQuad(lGable, new Vector3(0, yBase, lBack), new Vector3(lLen, yBase, lBack), new Vector3(lLen, Mathf.Max(w0, w1), lBack), new Vector3(0, Mathf.Max(w0, w1), lBack));
             }
+            if (pRoof.kind != RoofKind.Shed)
+            {
+                // Ridge tiles (snowed over on snowy roofs) and the chimney stacks, rising from the roof's floor.
+                float lRidge0 = x0, lRidge1 = x1;
+                if (pRoof.kind == RoofKind.Hip) { float lIn = Mathf.Min(lHalf, (x1 - x0) * 0.5f); lRidge0 = x0 + lIn; lRidge1 = x1 - lIn; }
+                if (lRidge1 - lRidge0 > 0.2f)
+                    c.mesh.BoxMinMax(st.snow ? ArchLib.Snow : lTile, new Vector3(lRidge0, lRidgeY - 0.04f, zm - 0.15f), new Vector3(lRidge1, lRidgeY + (st.snow ? 0.17f : 0.11f), zm + 0.15f), false);
+                int lStacks = st.chimneys > 0 && pRoof.onFloor >= 0 && lDepth > 3f ? Mathf.Clamp(Mathf.RoundToInt(lLen / 14f), 1, st.chimneys) : 0;
+                for (int k = 0; k < lStacks; k++)
+                {
+                    float cx = lRidge1 - lRidge0 > 2f ? Mathf.Lerp(lRidge0 + 0.9f, lRidge1 - 0.9f, (k + 0.5f) / lStacks) : (x0 + x1) * 0.5f;
+                    float cz = zm + ((k & 1) == 0 ? 0.95f : -0.95f), lTop = lRidgeY + 0.95f;
+                    c.mesh.BoxMinMax(st.plinth ?? st.trim, new Vector3(cx - 0.36f, yBase, cz - 0.36f), new Vector3(cx + 0.36f, lTop, cz + 0.36f));
+                    c.mesh.BoxMinMax(st.trim, new Vector3(cx - 0.45f, lTop, cz - 0.45f), new Vector3(cx + 0.45f, lTop + 0.09f, cz + 0.45f), false);
+                    c.mesh.BoxMinMax(st.trim, new Vector3(cx - 0.13f, lTop + 0.09f, cz - 0.13f), new Vector3(cx + 0.13f, lTop + 0.36f, cz + 0.13f), false);
+                }
+            }
+            if (st.dormers > 0 && pRoof.kind != RoofKind.Shed && pRoof.onFloor >= 0 && lLen > 8f && tan > 0.4f)
+            {
+                // Dormers: a small gabled window box rising out of each slope, its back buried in the roof.
+                int lDormers = Mathf.Min(st.dormers, Mathf.FloorToInt(lLen / 8f));
+                float lFrom = pRoof.kind == RoofKind.Hip ? Mathf.Min(lHalf, (x1 - x0) * 0.5f) + 1.2f : 1.6f;
+                for (int k = 0; k < lDormers; k++)
+                {
+                    float cx = Mathf.Lerp(lFrom, lLen - lFrom, (k + 0.5f) / lDormers);
+                    foreach (bool lFar in new[] { false, true })
+                    {
+                        float zf = lFar ? lDepth - 0.7f : 0.7f, lSign = lFar ? -1f : 1f;
+                        float yf = ye + (lFar ? z1 - zf : zf - z0) * tan, h = 1.35f, lBack = h / tan + 0.4f;
+                        float za = lFar ? zf - lBack : zf, zb = lFar ? zf : zf + lBack;
+                        c.mesh.BoxMinMax(lGable, new Vector3(cx - 0.75f, yf - 0.1f, za), new Vector3(cx + 0.75f, yf + h, zb), false);
+                        c.mesh.BoxMinMax(st.frame ?? st.trim, new Vector3(cx - 0.5f, yf + 0.15f, zf - 0.05f * lSign - 0.02f), new Vector3(cx + 0.5f, yf + h - 0.15f, zf - 0.05f * lSign + 0.02f), false);
+                        c.mesh.BoxMinMax(ArchLib.Glass, new Vector3(cx - 0.42f, yf + 0.22f, zf - 0.07f * lSign - 0.01f), new Vector3(cx + 0.42f, yf + h - 0.22f, zf - 0.07f * lSign + 0.01f), false);
+                        float lRoofTop = yf + h + 0.55f, zc = (za + zb) * 0.5f, lRun = zb - za + 0.3f;
+                        foreach (float side in new[] { -1f, 1f })
+                            c.mesh.Box(lTile, new Vector3(cx + side * 0.42f, (yf + h + lRoofTop) * 0.5f, zc), new Vector3(0.95f, 0.06f, lRun), Quaternion.Euler(0f, 0f, -side * 36f), false);
+                        if (st.snow) c.mesh.Box(ArchLib.Snow, new Vector3(cx, lRoofTop + 0.04f, zc), new Vector3(0.22f, 0.1f, lRun), false);
+                    }
+                }
+            }
             // Fascia and gutter along the eaves.
             c.mesh.BoxMinMax(st.trim, new Vector3(x0, ye - 0.22f, z0 - 0.04f), new Vector3(x1, ye + 0.02f, z0 + 0.02f), false);
             if (pRoof.kind != RoofKind.Shed) c.mesh.BoxMinMax(st.trim, new Vector3(x0, ye - 0.22f, z1 - 0.02f), new Vector3(x1, ye + 0.02f, z1 + 0.04f), false);
@@ -1164,8 +1487,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 WallKind lKind = Classify(c, s, out int lSide, out ArchRoom lOwner, out ArchRoom lOther);
                 if (lKind != WallKind.Facade || lOther != null) continue;
                 float n = lSide < 0 ? 1f : -1f;
-                SegBox(c, s, n, s.a - 0.4f, s.b + 0.4f, y - 0.1f, y + 0.16f, -0.02f, 0.4f, st.trim);
-                SegBox(c, s, n, s.a - 0.3f, s.b + 0.3f, y - 0.22f, y - 0.1f, -0.02f, 0.25f, st.trim);
+                // A moulded profile stepping back to the wall: corona, cyma, bed mould, fillet.
+                SegBox(c, s, n, s.a - 0.42f, s.b + 0.42f, y + 0.06f, y + 0.16f, -0.02f, 0.42f, st.trim);
+                SegBox(c, s, n, s.a - 0.36f, s.b + 0.36f, y - 0.06f, y + 0.06f, -0.02f, 0.34f, st.trim);
+                SegBox(c, s, n, s.a - 0.28f, s.b + 0.28f, y - 0.16f, y - 0.06f, -0.02f, 0.22f, st.trim);
+                SegBox(c, s, n, s.a - 0.2f, s.b + 0.2f, y - 0.24f, y - 0.16f, -0.02f, 0.11f, st.trim, false);
             }
         }
 
@@ -1180,8 +1506,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 WallKind lKind = Classify(c, s, out int lSide, out ArchRoom lOwner, out ArchRoom lOther);
                 if (lKind != WallKind.Facade || lOther != null) continue;
                 float n = lSide < 0 ? 1f : -1f;
-                SegBox(c, s, n, s.a - 0.3f, s.b + 0.3f, y - 0.06f, y + 0.12f, -0.02f, 0.3f, st.trim);
-                SegBox(c, s, n, s.a - 0.22f, s.b + 0.22f, y - 0.16f, y - 0.06f, -0.02f, 0.18f, st.trim);
+                // A stepped band: a thin weathering on top, the ledge, a fillet under it.
+                SegBox(c, s, n, s.a - 0.3f, s.b + 0.3f, y + 0.06f, y + 0.12f, -0.02f, 0.3f, st.trim);
+                SegBox(c, s, n, s.a - 0.27f, s.b + 0.27f, y - 0.06f, y + 0.06f, -0.02f, 0.26f, st.trim);
+                SegBox(c, s, n, s.a - 0.22f, s.b + 0.22f, y - 0.16f, y - 0.06f, -0.02f, 0.16f, st.trim, false);
             }
         }
 
@@ -1214,6 +1542,23 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 SegBox(c, s, n, k, k + 0.25f, y - 0.55f, y - 0.22f, 0f, d * 0.45f, st.trim);
                 SegBox(c, s, n, k, k + 0.25f, y - 0.8f, y - 0.55f, 0f, d * 0.2f, st.trim);
+            }
+            if (st.moorish)
+            {
+                ArchMat lWood = st.shutter ?? st.door ?? st.trim;
+                SegBox(c, s, n, s0, s1, y + 2.3f, y + 2.42f, -0.05f, d + 0.1f, lWood);
+                foreach (float e in new[] { s0, s1 - 0.08f }) SegBox(c, s, n, e, e + 0.08f, y + 0.04f, y + 2.3f, d - 0.08f, d, lWood);
+                for (float k = s0 + 0.14f; k < s1 - 0.1f; k += 0.14f) SegBox(c, s, n, k, k + 0.025f, y + 0.6f, y + 2.3f, d - 0.05f, d - 0.025f, lWood, false);
+                for (float yy = y + 0.74f; yy < y + 2.28f; yy += 0.14f) SegBox(c, s, n, s0, s1, yy, yy + 0.025f, d - 0.05f, d - 0.025f, lWood, false);
+                SegBox(c, s, n, s0, s1, y + 0.04f, y + 0.6f, d - 0.06f, d - 0.02f, lWood);
+                for (float k = 0.14f; k < d - 0.06f; k += 0.14f)
+                {
+                    SegBox(c, s, n, s0, s0 + 0.025f, y + 0.6f, y + 2.3f, k, k + 0.025f, lWood, false);
+                    SegBox(c, s, n, s1 - 0.025f, s1, y + 0.6f, y + 2.3f, k, k + 0.025f, lWood, false);
+                }
+                SegBox(c, s, n, s0, s0 + 0.04f, y + 0.04f, y + 0.6f, 0f, d, lWood);
+                SegBox(c, s, n, s1 - 0.04f, s1, y + 0.04f, y + 0.6f, 0f, d, lWood);
+                return;
             }
             // Wrought-iron railing: top rail, bottom rail, bars, posts; collision by invisible panels.
             SegBox(c, s, n, s0, s1, y + 0.98f, y + 1.05f, d - 0.07f, d, ArchLib.Iron, false);
@@ -1318,7 +1663,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private static void Hatch(Ctx c, ArchHatch h)
         {
             if (!FacadeAt(c, 0, h.at, out Seg s, out float n, out float sa) && !FacadeAt(c, Mathf.Max(0, c.minF), h.at, out s, out n, out sa)) return;
-            ArchMat lCurb = ArchLib.Surface("concrete_wall_008", 1.5f), lLid = ArchLib.Surface("painted_metal_shutter", 1f);
+            ArchMat lCurb = ArchLib.Tinted("large_sandstone_blocks", new Color(0.62f, 0.58f, 0.54f), "curb", 1f), lLid = ArchLib.Surface("rusty_metal_02", 1f);
             SegBox(c, s, n, sa - 0.75f, sa + 0.75f, -0.1f, 0.25f, 0f, 1.1f, lCurb);
             // Two lids leaning from the wall (0.6 m up) to the curb.
             for (int k = 0; k < 2; k++)
@@ -1423,6 +1768,60 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lGrille.AddComponent<NavMeshModifier>().ignoreFromBuild = true;
             lCover.AddComponent<VentCover>().Setup(lGrille);
             Poi(c, pFaceLocal, string.IsNullOrEmpty(pPoi) ? "Vent" : pPoi, MapPoi.Kind.Vent);
+        }
+
+        // ---------------------------------------------------------------- weathering
+
+        /// <summary>
+        /// URP decals on the outside: rising damp along the foot of every ground-floor facade (in pieces
+        /// of at most 5 m, overlapping, every other one mirrored), rain streaks under half the window
+        /// sills, a hairline crack on about a fifth of the facade runs.
+        /// </summary>
+        private static void Weathering(Ctx c)
+        {
+            if (!c.spec.style.weathered) return;
+            Transform lRoot = c.result.root, lDecals = Child(lRoot, "Decals");
+            int lSeed = 17;
+            foreach (char ch in c.spec.name) lSeed = lSeed * 31 + ch;
+            System.Random r = new System.Random(lSeed);
+            foreach (Seg s in c.segs)
+            {
+                if (s.floor < 0 || s.b - s.a < 1.5f) continue;
+                WallKind lKind = Classify(c, s, out int lSide, out ArchRoom lOwner, out ArchRoom lOther);
+                if (lKind != WallKind.Facade || lOther != null) continue;
+                float n = lSide < 0 ? 1f : -1f;
+                Vector3 lOut = lRoot.TransformDirection((s.vertical ? Vector3.right : Vector3.forward) * n);
+                float y0 = FloorY(c, s.floor), lLength = s.b - s.a;
+                if (s.floor == 0)
+                {
+                    int lPieces = Mathf.CeilToInt(lLength / 5f);
+                    float lPiece = lLength / lPieces;
+                    for (int k = 0; k < lPieces; k++)
+                        ArchDecals.Place(lDecals, ArchDecals.Grime, lRoot.TransformPoint(P(s, n, s.a + lPiece * (k + 0.5f), y0 + 0.5f, 0f)), lOut,
+                            Mathf.Min(lLength, lPiece * 1.25f), 1.2f, 0.25f, 0.1f, ((k + s.line * 2f) % 2f) >= 1f);
+                    if (c.spec.style.moorish)
+                        for (int k = 0; k < lPieces; k++)
+                            ArchDecals.Place(lDecals, ArchDecals.Grime, lRoot.TransformPoint(P(s, n, s.a + lPiece * (k + 0.5f) + 0.6f, y0 + 0.3f, 0f)), lOut,
+                                Mathf.Min(lLength, lPiece * 1.1f), 0.7f, 0.25f, 0.1f, ((k + s.line * 2f) % 2f) < 1f);
+                }
+                if (r.NextDouble() < 0.2)
+                {
+                    float lAt = Mathf.Lerp(s.a + 0.8f, s.b - 0.8f, (float)r.NextDouble());
+                    ArchDecals.Place(lDecals, ArchDecals.Crack, lRoot.TransformPoint(P(s, n, lAt, y0 + 1.6f + (float)r.NextDouble() * 1.2f, 0f)), lOut, 1.1f, 1.4f, 0.1f, 0.1f, r.NextDouble() < 0.5);
+                }
+            }
+            foreach ((Vector3 lFace, Vector3 lOutward, float lWidth) in c.streaks)
+                ArchDecals.Place(lDecals, ArchDecals.Streak, lRoot.TransformPoint(lFace), lRoot.TransformDirection(lOutward), lWidth, 1.5f, 0.2f, 0.1f, r.NextDouble() < 0.5);
+            // One or two posters on a street front, at eye level.
+            int lPosters = c.posterSpots.Count == 0 ? 0 : 1 + (r.NextDouble() < 0.4 ? 1 : 0);
+            for (int k = 0; k < lPosters && c.posterSpots.Count > 0; k++)
+            {
+                int i = r.Next(c.posterSpots.Count);
+                (Vector3 lFace, Vector3 lOutward) = c.posterSpots[i];
+                c.posterSpots.RemoveAt(i);
+                Vector3 lAlong = Vector3.Cross(Vector3.up, lOutward) * (((float)r.NextDouble() - 0.5f) * 0.3f);
+                ArchDecals.Place(lDecals, ArchDecals.Poster(r.Next(ArchDecals.POSTERS)), lRoot.TransformPoint(lFace + lAlong + Vector3.up * (((float)r.NextDouble() - 0.5f) * 0.2f)), lRoot.TransformDirection(lOutward), 0.62f, 0.88f, 0.08f, 0.08f);
+            }
         }
 
         // ---------------------------------------------------------------- lights, zones, markers

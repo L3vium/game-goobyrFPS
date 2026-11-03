@@ -54,6 +54,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         // ================================================================ land
 
+        protected override (bool north, bool east, bool south, bool west) RockEdges => (true, false, true, true);
+
         protected override float Relief(float x, float z)
         {
             // Base: the valley climbs north from the river town to the hacienda hill.
@@ -87,7 +89,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>Sightlines kept open through the canopy: plaza and dock to the mirador.</summary>
         private static readonly Vector2[] VIEW_PLAZA = { new Vector2(-5f, -150f), new Vector2(123f, 124f) }, VIEW_DOCK = { new Vector2(-30f, -200f), new Vector2(123f, 124f) };
 
-        protected override ArchMat CliffMaterial => ArchLib.Tinted("rock_face", new Color(0.55f, 0.55f, 0.58f), "basalt", 7f);
+        private static ArchMat _basalt;
+        protected override ArchMat CliffMaterial => _basalt != null && _basalt.material != null ? _basalt : _basalt = new ArchMat("rock_basalt", PbrLibrary.Rock("rock_face", new Color(0.5f, 0.5f, 0.52f), new Color(0.38f, 0.38f, 0.4f), 0f, "basalt", 5f, 4f), 5f);
+        protected override (float band, float ledges, bool columns, bool buttresses, bool snow) Strata => (3.2f, 0.3f, true, false, false);
+        protected override float BackdropHeight(float x, float z) => 50f + Mathf.Max(0f, LandShape.Fbm(x, z, 240f, 4, 3.1f)) * 160f + LandShape.Ridged(x, z, 120f, 3, 5.5f) * 25f;
+        protected override ArchMat BackdropLow => ArchLib.Tinted("forest_leaves_02", new Color(0.55f, 0.75f, 0.45f), "jungle_far", 60f);
+        protected override ArchMat BackdropHigh => ArchLib.Tinted("rock_face", new Color(0.45f, 0.5f, 0.45f), "basalt_far", 60f);
+        protected override float BackdropSnowLine => 150f;
 
         protected override float Woods(float x, float z, float h)
         {
@@ -145,11 +153,16 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         protected override void Details()
         {
-            DetailPrototype lGrass = VegLibrary.Detail("Veg_Grass_Jungle", 0.8f, 1.3f, new Color(0.85f, 0.95f, 0.8f), new Color(0.95f, 0.9f, 0.7f));
+            // Real grass (the world track's GPU blades) on the grass and dry-grass layers, tinted to the
+            // blades' far colour; the hiding fields grow tall blades. Ferns stay instanced details.
+            K.RealGrass(World.GrassStyle.Jungle(),
+                (x, z) => K.Covered(x, z) || OnStreet(x, z, 0.3f) >= 0 || K.GroundAt(x, z) < WATER_Y + 0.4f || K.LandSlope(x, z) > 34f ? 0f
+                    : Mathf.Clamp01(0.8f + 0.35f * LandShape.Fbm(x, z, 20f, 2, 9.1f)),
+                new[] { Ground.Grass }, new[] { Ground.DryGrass }, null,
+                (x, z) => Built(x, z) ? 0.12f + 0.06f * LandShape.Fbm(x, z, 6f, 1, 2.2f) : Mathf.Clamp01(0.5f + 0.35f * LandShape.Fbm(x, z, 9f, 2, 31.7f)));
             DetailPrototype lFern = VegLibrary.Detail("Veg_Fern", 0.8f, 1.4f, Color.white, new Color(0.9f, 0.95f, 0.85f));
-            if (lGrass != null) K.Details.Add((lGrass, (x, z) => Built(x, z) || K.GroundAt(x, z) < WATER_Y + 0.4f || K.LandSlope(x, z) > 34f ? 0f : Mathf.Clamp01(0.5f + LandShape.Fbm(x, z, 20f, 2, 9.1f)), 6));
             if (lFern != null) K.Details.Add((lFern, (x, z) => Built(x, z) || K.GroundAt(x, z) < WATER_Y + 0.4f || K.LandSlope(x, z) > 38f ? 0f : Mathf.Clamp01(Woods(x, z, K.GroundAt(x, z)) - 0.6f + LandShape.Fbm(x, z, 14f, 2, 4.4f) * 0.5f) * 1.2f, 3));
-            K.TallGrassDetail = VegLibrary.Detail("Veg_TallGrass_Jungle", 0.9f, 1.25f, Color.white, new Color(0.95f, 0.92f, 0.75f));
+            K.TallGrassDetail = null;
         }
 
         // ================================================================ plan
@@ -202,7 +215,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             DressAirstrip();
             DressHacienda();
             Caves();
+            Security();
+            Grounds();
             Matches();
+            Beats();
+            Exits();
         }
 
         /// <summary>A cluster of basalt columns (hexagonal prisms, 0.5 to 0.9 m) rising from the ground round a point.</summary>

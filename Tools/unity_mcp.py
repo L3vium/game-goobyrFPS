@@ -5,7 +5,7 @@
     python Tools/unity_mcp.py <tool> '<json args>'
     python Tools/unity_mcp.py <tool> @args.json
 
-The editor's MCP port is read from UNITY_MCP_PORT (default 8084).
+The editor's MCP port is read from UNITY_MCP_PORT (default 8080).
 
 Several agents share one editor. Each one sets UNITY_MCP_AGENT=<name> (its own MCP session, so
 replies never cross) and holds the editor lock for anything that changes the editor's state:
@@ -24,7 +24,7 @@ import sys
 import time
 import urllib.request
 
-PORT = int(os.environ.get("UNITY_MCP_PORT", "8084"))
+PORT = int(os.environ.get("UNITY_MCP_PORT", "8080"))
 URL = f"http://localhost:{PORT}/mcp"
 AGENT = os.environ.get("UNITY_MCP_AGENT", "main")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -33,31 +33,71 @@ LOCK_FILE = os.path.join(HERE, ".unity_editor_lock")
 HEAVY = {"refresh_unity", "run_tests", "manage_scene", "execute_menu_item", "manage_editor", "manage_asset", "manage_prefabs"}
 
 
-def _lock_state():
-    """(owner, until, what) of the editor lock, or None when free or expired."""
+QUEUE_FILE = os.path.join(HERE, ".unity_editor_queue")
+MAX_HOLD_WHEN_WAITED = 20 * 60   # a holder can't renew past this while others wait
+WAITER_ALIVE = 180               # a waiter who hasn't asked again for this long has given up
+
+
+def _lock_data():
     try:
         with open(LOCK_FILE, encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError):
         return None
-    if data.get("until", 0) < time.time():
-        return None
-    return data.get("owner"), data["until"], data.get("what", "")
+    return data if data.get("until", 0) >= time.time() else None
+
+
+def _lock_state():
+    """(owner, until, what) of the editor lock, or None when free or expired."""
+    data = _lock_data()
+    return None if data is None else (data.get("owner"), data["until"], data.get("what", ""))
+
+
+def _queue(update=None, remove=None):
+    """Waiting agents, oldest first: {agent: {first, last}}; only those who asked recently count."""
+    try:
+        with open(QUEUE_FILE, encoding="utf-8") as f:
+            queue = json.load(f)
+    except (OSError, ValueError):
+        queue = {}
+    now = time.time()
+    queue = {k: v for k, v in queue.items() if now - v.get("last", 0) < WAITER_ALIVE}
+    if update:
+        queue.setdefault(update, {"first": now})["last"] = now
+    if remove:
+        queue.pop(remove, None)
+    if update or remove:
+        with open(QUEUE_FILE, "w", encoding="utf-8") as f:
+            json.dump(queue, f)
+    return sorted(queue, key=lambda k: queue[k]["first"])
 
 
 def lock(minutes, what=""):
-    state = _lock_state()
-    if state and state[0] != AGENT:
-        print(f"LOCKED by {state[0]} until {time.strftime('%H:%M:%S', time.localtime(state[1]))} ({state[2]})")
+    data = _lock_data()
+    now = time.time()
+    if data and data.get("owner") != AGENT:
+        order = _queue(update=AGENT)
+        print(f"LOCKED by {data['owner']} until {time.strftime('%H:%M:%S', time.localtime(data['until']))} ({data.get('what', '')});"
+              f" you are #{order.index(AGENT) + 1} in the queue {order} - do offline work and ask again within 3 min to keep your place")
         sys.exit(3)
+    waiting = [a for a in _queue() if a != AGENT]
+    if data is None and waiting and _queue().index(waiting[0]) < (_queue().index(AGENT) if AGENT in _queue() else 99):
+        _queue(update=AGENT)
+        print(f"free, but {waiting[0]} is first in the queue {_queue()}; ask again in a minute")
+        sys.exit(3)
+    since = data.get("since", now) if data else now
+    if data and waiting and now - since > MAX_HOLD_WHEN_WAITED:
+        print(f"you have held the editor {int((now - since) / 60)} min and {waiting} are waiting: finish your step, unlock, and queue again")
+        sys.exit(4)
     tmp = LOCK_FILE + "." + AGENT
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump({"owner": AGENT, "until": time.time() + minutes * 60, "what": what}, f)
+        json.dump({"owner": AGENT, "until": now + minutes * 60, "what": what, "since": since}, f)
     os.replace(tmp, LOCK_FILE)
     state = _lock_state()
     if not state or state[0] != AGENT:
         print("lost the race for the lock, try again")
         sys.exit(3)
+    _queue(remove=AGENT)
     print(f"locked by {AGENT} for {minutes} min ({what})")
 
 
@@ -156,7 +196,6 @@ def main():
         return
     if sys.argv[1] in ("compile", "wait"):
         # refresh + compile, wait until the editor is idle, then print the console errors
-        import time
         if sys.argv[1] == "compile":
             call("tools/call", {"name": "refresh_unity", "arguments": {"compile": "request"}})
         time.sleep(3)
@@ -176,7 +215,6 @@ def main():
         return
     if sys.argv[1] == "tests":
         # run the EditMode tests, wait, print the summary and the failures
-        import time
         res = call("tools/call", {"name": "run_tests", "arguments": {"mode": "EditMode"}})
         job = json.loads(res["result"]["content"][0]["text"])["data"]["job_id"]
         for _ in range(200):

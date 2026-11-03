@@ -37,6 +37,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public Transform HandR { get; private set; }
         public Transform WeaponSocket { get; private set; }
         public Renderer[] Renderers { get; private set; } = new Renderer[0];
+        /// <summary>The expression driver (new cast only, null on the old MPFB bodies).</summary>
+        public HumanFace Face { get; private set; }
+        public HumanWobble Wobble { get; private set; }
         public bool Built { get; private set; }
         public Color TeamColor { get; private set; }
 
@@ -121,30 +124,63 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _socketKind = (HeldKind)255;
             SetHeld(HeldKind.Pistol);
 
-            List<Renderer> lAll = new List<Renderer>(), lNear = new List<Renderer>(), lFar = new List<Renderer>();
+            List<Renderer> lAll = new List<Renderer>(), lNear = new List<Renderer>(), lFar = new List<Renderer>(), lFarthest = new List<Renderer>();
+            bool lOwnTeamSlots = false;
             foreach (SkinnedMeshRenderer lSkin in lModel.GetComponentsInChildren<SkinnedMeshRenderer>(true))
             {
                 lAll.Add(lSkin);
                 lSkin.updateWhenOffscreen = false;
                 lSkin.skinnedMotionVectors = true;
-                (lSkin.name.EndsWith("_LOD1") ? lFar : lNear).Add(lSkin);
+                (lSkin.name.EndsWith("_LOD2") ? lFarthest : lSkin.name.EndsWith("_LOD1") ? lFar : lNear).Add(lSkin);
+                lOwnTeamSlots |= TintTeam(lSkin, TeamColor);
             }
-            Renderer lBand = TeamColor.a > 0.01f ? Armband(TeamColor) : null;
+            // The new cast wears the team colour on its own slots (lining, facings, armband); the old one gets a band.
+            Renderer lBand = TeamColor.a > 0.01f && !lOwnTeamSlots ? Armband(TeamColor) : null;
             if (lBand != null) lNear.Add(lBand);
             if (lFar.Count > 0)
             {
                 LODGroup lLods = lModel.GetComponent<LODGroup>();
                 if (lLods == null) lLods = lModel.AddComponent<LODGroup>();
-                lLods.SetLODs(new[] { new LOD(0.08f, lNear.ToArray()), new LOD(0.004f, lFar.ToArray()) });
+                lLods.SetLODs(lFarthest.Count > 0
+                    ? new[] { new LOD(0.12f, lNear.ToArray()), new LOD(0.035f, lFar.ToArray()), new LOD(0.004f, lFarthest.ToArray()) }
+                    : new[] { new LOD(0.08f, lNear.ToArray()), new LOD(0.004f, lFar.ToArray()) });
                 lLods.RecalculateBounds();
             }
             foreach (Renderer lRenderer in lNear) if (!lAll.Contains(lRenderer)) lAll.Add(lRenderer);
             Renderers = lAll.ToArray();
 
             ApplyShadow();
+            Face = lModel.AddComponent<HumanFace>();
+            if (!Face.Init(Model)) { if (Application.isPlaying) Destroy(Face); else DestroyImmediate(Face); Face = null; }
+            Wobble = lModel.AddComponent<HumanWobble>();
+            Wobble.Init(Animator, lNear.Count > 0 ? lNear[0] : null);
             Model.gameObject.SetActive(_visible);
             HumanAnimator lDriver = GetComponent<HumanAnimator>();
             if (lDriver != null) lDriver.Bind(Animator);
+        }
+
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        /// <summary>Team colour of the hero's own slots; the sheet's orange when there is no team.</summary>
+        public static readonly Color DEFAULT_TEAM = new Color(0.96f, 0.42f, 0.07f);
+
+        /// <summary>Tints the slots named *_Team / *_Lining of a renderer; true when it has any.</summary>
+        private static bool TintTeam(Renderer pRenderer, Color pTeam)
+        {
+            bool lAny = false;
+            Material[] lMaterials = pRenderer.sharedMaterials;
+            for (int i = 0; i < lMaterials.Length; i++)
+            {
+                if (lMaterials[i] == null) continue;
+                string lName = lMaterials[i].name;
+                if (!lName.EndsWith("_Team") && !lName.EndsWith("_Lining")) continue;
+                lAny = true;
+                _block ??= new MaterialPropertyBlock();
+                pRenderer.GetPropertyBlock(_block, i);
+                Color lColor = pTeam.a > 0.01f ? pTeam : DEFAULT_TEAM;
+                _block.SetColor(BaseColorId, new Color(lColor.r, lColor.g, lColor.b, 1f));
+                pRenderer.SetPropertyBlock(_block, i);
+            }
+            return lAny;
         }
 
         private Transform Bone(HumanBodyBones pBone) => Animator != null && Animator.isHuman ? Animator.GetBoneTransform(pBone) : null;
@@ -261,7 +297,10 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             Flash(0f);
             lModel.SetParent(null, true);
             HumanIK lIK = lModel.GetComponent<HumanIK>();
-            if (lIK != null) Destroy(lIK);
+            if (lIK != null) { if (Application.isPlaying) Destroy(lIK); else DestroyImmediate(lIK); }
+            if (Wobble != null) { if (Application.isPlaying) Destroy(Wobble); else DestroyImmediate(Wobble); }
+            Face = null;
+            Wobble = null;
             Model = null;
             Animator = null;
             Head = Hips = Chest = HandL = HandR = WeaponSocket = null;

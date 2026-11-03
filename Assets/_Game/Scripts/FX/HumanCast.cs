@@ -9,15 +9,20 @@ namespace Com.IsartDigital.GoobyrFPS.FX
     public enum CharacterBiome { Jungle, Desert, Snow }
 
     /// <summary>
-    /// Who wears which body: agents by seat (suit, man or woman), guards by the map's climate,
-    /// bodyguards in black suits, staff in uniform, guests in civilian clothes, targets as VIPs.
+    /// Who wears which body (the 0.7.0 cast): players are Rook (man or woman by seat, team colour on
+    /// the jacket lining and armband), guards dress for the map's climate, bodyguards in dark suits,
+    /// staff as waiter, cook, maid or mechanic, guests in summer clothes or the base outfits, targets as
+    /// the tycoon or the magnate. The old MPFB bodies are no longer worn (Chr_Agent stays the clips' reference).
     /// Every choice is a pure function of networked data (role, seat, object id, map, spawn point),
     /// so every machine dresses an NPC the same way.
     /// </summary>
     public static class HumanCast
     {
-        public const string AGENT = "Chr_Agent", AGENT_F = "Chr_Agent_F", BODYGUARD = "Chr_Bodyguard", STAFF = "Chr_Staff";
-        public const string CIVILIAN_M = "Chr_Civilian_M", CIVILIAN_F = "Chr_Civilian_F", VIP = "Chr_VIP", ARMS = "Chr_Arms";
+        public const string AGENT = "Chr_Rook", AGENT_F = "Chr_Rook_F", BODYGUARD = "Chr_Bodyguard", STAFF = "Chr_Waiter";
+        public const string CIVILIAN_M = "Chr_Guest_M", CIVILIAN_F = "Chr_Guest_F", VIP = "Chr_VIP_M", VIP_F = "Chr_VIP_F", ARMS = "Chr_Arms";
+        private static readonly string[] STAFF_SET = { "Chr_Waiter", "Chr_Cook", "Chr_Maid", "Chr_Mechanic" };
+        private static readonly string[] GUESTS_M = { "Chr_Guest_M", "Chr_Base_Slim", "Chr_Base_Average", "Chr_Base_Heavy" };
+        private static readonly string[] GUESTS_F = { "Chr_Guest_F" };
 
         public static string ForAgent(int pSeat) => (pSeat & 1) == 0 ? AGENT : AGENT_F;
 
@@ -49,8 +54,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                     // Staff where the staff pass is needed, guests where the invitation is; a mix elsewhere.
                     SecurityZone.At(pSpawn, out AccessLevel lAccess);
                     uint lRoll = Hash(pId);
-                    if (lAccess == AccessLevel.Staff || (lAccess != AccessLevel.Guest && lRoll % 10 < 3)) return STAFF;
-                    return (lRoll / 10 & 1) == 0 ? CIVILIAN_M : CIVILIAN_F;
+                    if (lAccess == AccessLevel.Staff || (lAccess != AccessLevel.Guest && lRoll % 10 < 3)) return STAFF_SET[(lRoll / 10) % STAFF_SET.Length];
+                    string[] lSet = (lRoll / 10 & 1) == 0 ? GUESTS_M : GUESTS_F;
+                    return lSet[(lRoll / 20) % lSet.Length];
                 }
                 default: return Guard(BiomeOf(pMap));
             }
@@ -62,7 +68,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             if (pTarget == null) return VIP;
             if (!string.IsNullOrEmpty(pTarget.character)) return pTarget.character;
             string lName = " " + pTarget.displayName.ToLowerInvariant() + " ";
-            foreach (string lWord in FEMININE) if (lName.Contains(lWord)) return CIVILIAN_F;
+            foreach (string lWord in FEMININE) if (lName.Contains(lWord)) return VIP_F;
             return VIP;
         }
 

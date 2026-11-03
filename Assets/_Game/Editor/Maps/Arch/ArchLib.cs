@@ -97,18 +97,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     lMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
                     AssetDatabase.CreateAsset(lMaterial, lPath);
                 }
-                lMaterial.SetFloat("_Surface", 1f);
-                lMaterial.SetFloat("_Blend", 0f);
-                lMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                lMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                lMaterial.SetFloat("_ZWrite", 0f);
-                lMaterial.SetFloat("_Cull", 0f);
-                lMaterial.SetOverrideTag("RenderType", "Transparent");
-                lMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                lMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-                lMaterial.SetColor("_BaseColor", new Color(0.55f, 0.62f, 0.66f, 0.32f));
-                lMaterial.SetFloat("_Smoothness", 0.96f);
-                lMaterial.SetFloat("_Metallic", 0.1f);
+                // Clear glass with Fresnel reflections and a dim room behind empty shells (world track).
+                lMaterial = PbrLibrary.WindowGlass(lMaterial) ?? lMaterial;
                 EditorUtility.SetDirty(lMaterial);
                 return _mats["glass"] = new ArchMat("glass", lMaterial, 1f);
             }
@@ -116,6 +106,19 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         /// <summary>Collision without a renderer.</summary>
         public static readonly ArchMat Invisible = new ArchMat("collider", null, 1f);
+
+        /// <summary>A small street lantern standing on pBottom: base plate, four iron corner bars, a warm core, a stepped cap and a finial.</summary>
+        public static void LanternParts(List<(ArchMat, Vector3, Vector3)> pParts, Vector3 pBottom)
+        {
+            ArchMat lGlow = ArchLib.PlainMat("LanternGlow", new Color(1f, 0.72f, 0.4f), 0.6f, 0f, 1f, new Color(2.4f, 1.5f, 0.6f));
+            pParts.Add((ArchLib.Iron, pBottom + new Vector3(0, 0.02f, 0), new Vector3(0.2f, 0.04f, 0.2f)));
+            foreach (float x in new[] { -0.085f, 0.085f }) foreach (float z in new[] { -0.085f, 0.085f })
+                pParts.Add((ArchLib.Iron, pBottom + new Vector3(x, 0.17f, z), new Vector3(0.025f, 0.28f, 0.025f)));
+            pParts.Add((lGlow, pBottom + new Vector3(0, 0.17f, 0), new Vector3(0.12f, 0.24f, 0.12f)));
+            pParts.Add((ArchLib.Iron, pBottom + new Vector3(0, 0.33f, 0), new Vector3(0.24f, 0.04f, 0.24f)));
+            pParts.Add((ArchLib.Iron, pBottom + new Vector3(0, 0.38f, 0), new Vector3(0.15f, 0.06f, 0.15f)));
+            pParts.Add((ArchLib.Iron, pBottom + new Vector3(0, 0.44f, 0), new Vector3(0.05f, 0.08f, 0.05f)));
+        }
 
         public static ArchMat Iron => PlainMat("WroughtIron", new Color(0.07f, 0.07f, 0.075f), 0.35f, 0.85f);
         public static ArchMat Brass => PlainMat("Brass", new Color(0.75f, 0.58f, 0.3f), 0.7f, 1f);

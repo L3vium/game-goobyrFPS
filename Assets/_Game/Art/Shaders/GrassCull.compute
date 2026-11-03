@@ -1,0 +1,168 @@
+// Author : Baptiste Vu Liem
+// Grass placement for one camera (World/GrassField.cs). Stateless: every frame each visible 16 m chunk
+// is covered by a grid of ~0.35 m slots; a slot's hash decides its jitter, its rank and its looks, the
+// map baked by the builder (R density, G height, B dryness, A tall grass) decides whether it grows, the
+// terrain's heightmap gives its ground. Slots far from the camera thin out by rank (the lowest ranks
+// stay, widened so the meadow keeps its coverage) and shrink to nothing just before they go, so nothing
+// pops. Near slots become tufts of curved blades, far ones 4-blade cards. The wind (GoobyrWind.hlsl, now
+// and last frame, for the motion vectors) and the trampling are evaluated here once per tuft, not per
+// blade vertex. Output: two instance buffers and their indirect draw arguments (instance counts written
+// in place, clamped to the buffers' size).
+#pragma kernel Cull
+#pragma kernel Clamp
+
+#include "GoobyrWind.hlsl"
+
+struct GrassInstance
+{
+    float3 position;   // root on the ground (world)
+    uint shape;        // f16 yaw (radians) | f16 height (m)
+    uint size;         // f16 width scale | f16 blades kept (0..1, tufts thin out before they become cards)
+    uint tint;         // unorm8 dryness | variation | tall grass | flattened (trampled)
+    uint normal;       // f16 terrain normal x | f16 terrain normal z
+    uint wind;         // f16 push x | f16 push z: wind and trampling on the tip, this frame
+    uint windBefore;   // the same last frame (motion vectors)
+};
+
+RWStructuredBuffer<GrassInstance> _Near;
+RWStructuredBuffer<GrassInstance> _Far;
+// Two IndexedIndirect commands (5 uints each): near tufts, then far cards. Byte 4 and 24 are the counts.
+RWByteAddressBuffer _Args;
+StructuredBuffer<uint> _Chunks;            // visible chunks: x | z << 16
+
+Texture2D<float4> _GrassMap;
+Texture2D<float> _Heightmap;
+Texture2D<float4> _GrassTrample;
+SamplerState sampler_linear_clamp;
+float4 _GrassTrampleArea;  // x, z of the trample window's corner, 1 / its size, 1 when live
+
+float4 _TerrainOrigin;     // xyz world origin of the terrain, w = metres per heightmap unit
+float4 _TerrainSize;       // x size x, y size z, z heightmap resolution, w unused
+float4 _Grid;              // x chunk size (m), y slots per chunk side, z slot spacing (m), w density scale
+float4 _CameraPosition;    // xyz, w = farthest grass (m)
+float4 _Lod;               // x tufts -> cards distance, y thinning start (m), z thinning exponent, w fewest kept
+float4 _Style;             // x height (m), y height variation, z tall grass height (m), w wind scale
+float4 _FrustumPlanes[6];
+uint _Capacity;            // instances per buffer
+uint _CapacityFar;
+
+uint Pcg(uint v)
+{
+    uint state = v * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+float U01(uint h) { return (h & 0x00FFFFFFu) / 16777216.0; }
+
+float HeightAt(float2 uv)
+{
+    float lRes = _TerrainSize.z;
+    float2 lUv = uv * ((lRes - 1.0) / lRes) + 0.5 / lRes;
+    return _Heightmap.SampleLevel(sampler_linear_clamp, lUv, 0) * _TerrainOrigin.w + _TerrainOrigin.y;
+}
+
+uint Unorm8(float v) { return (uint)round(saturate(v) * 255.0); }
+
+[numthreads(8, 8, 1)]
+void Cull(uint3 id : SV_DispatchThreadID)
+{
+    uint lSlots = (uint)_Grid.y;
+    if (id.x >= lSlots || id.y >= lSlots) return;
+    uint lPacked = _Chunks[id.z];
+    uint2 lChunk = uint2(lPacked & 0xFFFFu, lPacked >> 16);
+    uint2 lCell = lChunk * lSlots + id.xy;
+
+    uint h0 = Pcg(lCell.x * 73856093u ^ Pcg(lCell.y * 19349663u + 1013904223u));
+    uint h1 = Pcg(h0);
+    uint h2 = Pcg(h1);
+    uint h3 = Pcg(h2);
+    float2 lJitter = float2(U01(h0), U01(h1));
+    float lRank = U01(h2);
+
+    float2 xz = _TerrainOrigin.xz + (float2(lCell) + 0.1 + 0.8 * lJitter) * _Grid.z;
+    float2 uv = (xz - _TerrainOrigin.xz) / _TerrainSize.xy;
+    if (any(uv <= 0.0) || any(uv >= 1.0)) return;
+
+    float4 lMap = _GrassMap.SampleLevel(sampler_linear_clamp, uv, 0);
+    float lDensity = saturate(lMap.r * _Grid.w);
+    if (lRank >= lDensity) return;
+
+    float3 lRoot = float3(xz.x, HeightAt(uv), xz.y);
+    float lDistance = distance(lRoot, _CameraPosition.xyz);
+    if (lDistance > _CameraPosition.w) return;
+
+    // Fewer, wider tufts with distance; the slot shrinks away as its rank reaches the cut.
+    float lKeep = clamp(pow(abs(_Lod.y / max(lDistance, _Lod.y)), _Lod.z), _Lod.w, 1.0);
+    float lCut = lKeep * lDensity;
+    if (lRank >= lCut) return;
+    float lFade = saturate((lCut - lRank) / max(0.12 * lCut, 0.004));
+    // The last metres before the farthest grass fade out too.
+    lFade *= saturate((_CameraPosition.w - lDistance) / 8.0);
+
+    float lVariation = U01(h3);
+    float lTall = lMap.a;
+    // Map height 0 is a mown lawn (15 %), 0.5 the style's height, 1 half again as tall.
+    float lHeight = _Style.x * (lMap.g < 0.5 ? lerp(0.15, 1.0, lMap.g * 2.0) : lerp(1.0, 1.45, lMap.g * 2.0 - 1.0)) * (1.0 + (lVariation - 0.5) * _Style.y);
+    lHeight = lerp(lHeight, _Style.z * (0.8 + 0.4 * lVariation), lTall);
+
+    // Frustum: a sphere round the tuft (generous, for the wind and the widened far cards).
+    float3 lCenter = lRoot + float3(0.0, lHeight * 0.5, 0.0);
+    float lRadius = lHeight * 0.7 + 0.45;
+    [unroll] for (int p = 0; p < 6; p++)
+        if (dot(_FrustumPlanes[p].xyz, lCenter) + _FrustumPlanes[p].w < -lRadius) return;
+
+    // Ground normal from the heightmap (central differences).
+    float lStep = 1.0 / (_TerrainSize.z - 1.0);
+    float hL = HeightAt(uv - float2(lStep, 0.0)), hR = HeightAt(uv + float2(lStep, 0.0));
+    float hD = HeightAt(uv - float2(0.0, lStep)), hU = HeightAt(uv + float2(0.0, lStep));
+    float3 lNormal = normalize(float3(hL - hR, 2.0 * lStep * _TerrainSize.x, hD - hU));
+
+    // The tip's push: the wind's field at the tuft (now and last frame), and what tramples it.
+    float2 lPush = GoobyrWindPush(lRoot.xz, _GoobyrWindTime.x) * _Style.w;
+    float2 lBefore = GoobyrWindPush(lRoot.xz, _GoobyrWindTime.y) * _Style.w;
+    float4 lTrample = 0.0;
+    float2 lTrampleUv = (lRoot.xz - _GrassTrampleArea.xy) * _GrassTrampleArea.z;
+    if (_GrassTrampleArea.w > 0.5 && all(lTrampleUv > 0.0) && all(lTrampleUv < 1.0))
+        lTrample = _GrassTrample.SampleLevel(sampler_linear_clamp, lTrampleUv, 0);
+    float lFlat = saturate(lTrample.z);
+    lPush = lPush * (1.0 - lFlat) + lTrample.xy * 1.6;
+    lBefore = lBefore * (1.0 - lFlat) + lTrample.xy * 1.6;
+
+    uint h4 = Pcg(h3);
+    float lYaw = U01(h4) * 6.2831853;
+    float lNear = _Lod.x + (U01(Pcg(h4)) - 0.5) * 6.0;
+    bool lIsNear = lDistance < lNear;
+    // Tufts drop blades on their way to the card distance (10 -> 4), the kept ones widen.
+    float lBlades = lIsNear ? lerp(1.0, 0.4, saturate((lDistance - 6.0) / max(lNear - 6.0, 1.0))) : 1.0;
+    float lWidth = min(rsqrt(lKeep), 3.0);
+
+    GrassInstance g;
+    g.position = lRoot;
+    g.shape = f32tof16(lYaw) | (f32tof16(lHeight * lFade) << 16);
+    g.size = f32tof16(lWidth) | (f32tof16(lBlades) << 16);
+    g.tint = Unorm8(lMap.b) | (Unorm8(lVariation) << 8) | (Unorm8(lTall) << 16) | (Unorm8(lFlat) << 24);
+    g.normal = f32tof16(lNormal.x) | (f32tof16(lNormal.z) << 16);
+    g.wind = f32tof16(lPush.x) | (f32tof16(lPush.y) << 16);
+    g.windBefore = f32tof16(lBefore.x) | (f32tof16(lBefore.y) << 16);
+
+    uint lIndex;
+    if (lIsNear)
+    {
+        _Args.InterlockedAdd(4, 1, lIndex);
+        if (lIndex < _Capacity) _Near[lIndex] = g;
+    }
+    else
+    {
+        _Args.InterlockedAdd(24, 1, lIndex);
+        if (lIndex < _CapacityFar) _Far[lIndex] = g;
+    }
+}
+
+// The counts can pass the buffers' size on a very dense view: draw only what was written.
+[numthreads(1, 1, 1)]
+void Clamp(uint3 id : SV_DispatchThreadID)
+{
+    _Args.Store(4, min(_Args.Load(4), _Capacity));
+    _Args.Store(24, min(_Args.Load(24), _CapacityFar));
+}

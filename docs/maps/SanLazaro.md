@@ -239,3 +239,36 @@ on the bell deck (priest), the chute into the casa (capataz).
 - **Reuse:** plaza = fiesta, chase, car extraction; cafetal = chute route, water-tower sniper duel;
   caves = route, disposal, waterfall extraction; reception = social approach, toast kill, priest's
   stair escape. **Extractions:** boat, plane, car, waterfall.
+
+
+## 9. Security: sentry guns, terminals, cameras, distractions (0.7.0)
+| Group | Guns (all face the doors, the stealth entries stay behind them) | Terminal (hidden) | Cable | Way to the terminal without passing a gun |
+|---|---|---|---|---|
+| **Vault** (-2) | floor gun by the east wall over the stair foot and the vault desk; ceiling gun in the SW corner | coal store desk (-1), 20 m away | up the vault's east wall, across the security room, along the cellar corridor ceiling, into the coal store | the **coal chute** (vent) from the north kitchen yard |
+| **Private wing** (F1) | study gun by the north wall facing the keycard door; suite gun in the NW corner facing the gallery door (balcony and study window behind them) | sewing room desk (F2 south), 30 m away | study ceiling, up through the archive, along the mirador base and the stair hall, through the steward's office, along the sewing room's south wall | the **padlocked sewing-room door** (Padlock) or the **F2 south balcony** |
+
+- **Accident opportunity (the terminal as a weapon).** Hack the sewing-room terminal and the study gun
+  turns on everyone but you. **Don Ramiro** spends 4 min at his study desk (Office): the gun covers
+  the desk, so he dies in a "malfunction" with nobody to blame. The coal-store terminal does the same to
+  **Teodoro Aranda** during his 5 min at the vault desk.
+- **Cameras (9):** main gate, service gate, north yard, vault corridor (from the security room),
+  the private wing's north gallery, plus the earlier set; blind spots: the coal store, the sewing
+  room's balcony side, the west ivy.
+- **Distractions:** PCs on every office desk (office, anteroom, study, steward, police, mill, radio),
+  fans in the kitchen, guard rooms and messes, hoses on the kitchen-yard, orchard and sacristy walls.
+
+## 10. Patrols, crowds, break spots, facades (0.7.0)
+- **Casa La Cumbre, a loop on every floor:** *Cellar* (-1: wine, cold and coal stores, the vault
+  corridor), *Portico* (0: a pair round the patio arcade), the first-floor gallery pair, *UpperGallery*
+  (2: past the sewing room's padlocked door, which it tries).
+- **Pueblo:** pairs round the plaza (kept 50 m from the river-dock start), along the market street and
+  on the river road between the plaza and the south lane; **cafetal:** a pair round the beneficio's
+  drying patio. The older kit patrols (the hacienda walls, the airstrip, the terraces) now do errands.
+- **Errands on street beats:** a chat at the first corner, a smoke or a call half-way, a look around
+  at every other corner; inside, each stop does its room's errand.
+- **Crowds:** two ways out per crowd (the fiesta on the plaza, the sponsor's tables, the pickers),
+  outdoors and on opposite sides, besides the map exits (dock, bus road, drive, south lane, ridge road,
+  airstrip). Break spots in the cantina, the casa's salons, dining room and kitchen, the church.
+- **Facades:** the casa and the church have dressed-stone quoins; pueblo houses chamfered corners,
+  a plinth with a coping, rising damp, streaks under the sills, fiesta bills, election posters and
+  notices on the street fronts.

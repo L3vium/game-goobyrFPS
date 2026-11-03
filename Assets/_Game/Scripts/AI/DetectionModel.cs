@@ -93,8 +93,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             return pEngagedFor >= pWindow ? Confrontation.Combat : Confrontation.Hold;
         }
 
-        /// <summary>Seconds a guard escorts a trespasser out of a restricted area before it fires.</summary>
-        public const float ESCORT_TIME = 4f;
+        /// <summary>
+        /// Seconds a guard warns a trespasser in a restricted area ("hey, you can't be here!") before it
+        /// fires: with the faster restricted gauge, the first shot comes 3-4 s after it first saw them.
+        /// Stepping back into a public place ends it.
+        /// </summary>
+        public const float ESCORT_TIME = 1.6f;
 
         /// <summary>Does an NPC notice a confrontation or a fight (close, roughly in front of it, nothing in between)?</summary>
         public static bool Witnesses(float pDistance, float pAngle, bool pLineOfSight) => pLineOfSight && pDistance <= WITNESS_RANGE && pAngle <= PERIPHERAL_ANGLE;
@@ -185,16 +189,16 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         /// <summary>
         /// How much a sighting counts given where the player stands and what they do: nothing in a
-        /// public place for someone behaving (no weapon raised, not running, not carrying the
-        /// proof), 0.55 in a restricted area, full when trespassing in a hostile one - or anywhere
-        /// for someone acting suspicious (a raised gun is noticed even on the plaza, at 0.6).
+        /// public place for someone behaving (no weapon out, not running, not carrying the proof),
+        /// 0.8 in a restricted area, full when trespassing in a hostile one - or anywhere for someone
+        /// acting suspicious (a gun out is noticed even on the plaza, at 0.6).
         /// </summary>
         public static float TierFactor(SecurityTier pTier, bool pSuspicious)
         {
             switch (pTier)
             {
                 case SecurityTier.Public: return pSuspicious ? 0.6f : 0f;
-                case SecurityTier.Restricted: return pSuspicious ? 1f : 0.55f;
+                case SecurityTier.Restricted: return pSuspicious ? 1f : 0.8f;
                 default: return 1f;
             }
         }

@@ -71,6 +71,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>Bottom of the opening (a boarded window, a hatch in a wall).</summary>
         public float sill;
         public string poi;
+        /// <summary>A painted sign board over this street door (the shop's name), or null.</summary>
+        public string sign;
     }
 
     public class ArchWindow
@@ -170,6 +172,22 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public ArchMat underbelly;
         /// <summary>Guest ceilings (plaster) when <see cref="ceiling"/> is timber.</summary>
         public ArchMat guestCeiling;
+        /// <summary>Dressed-stone quoins at the outer corners (alternating long and short blocks).</summary>
+        public bool quoins;
+        /// <summary>Weathering decals: rising damp at the foot of the walls, streaks under sills, cracks.</summary>
+        public bool weathered = true;
+        /// <summary>Street posters and notices pasted on the ground-floor facades (town houses).</summary>
+        public bool posters;
+        /// <summary>Most chimneys on one pitched roof (about one per 14 m of ridge); 0: none.</summary>
+        public int chimneys;
+        /// <summary>Moorish openings: horseshoe arches in an alfiz frame, mashrabiya lattice oriels instead of shutters and iron balconies.</summary>
+        public bool moorish;
+        /// <summary>Decoration only (no colliders): flower boxes and shallow Juliet balconies under the upper-floor windows.</summary>
+        public bool flowerBoxes;
+        /// <summary>Dormers per slope of a pitched roof (decoration, no colliders); 0: none.</summary>
+        public int dormers;
+        /// <summary>Shutter colours by wing: the building's length split evenly along x, one material each.</summary>
+        public ArchMat[] shutterWings;
     }
 
     /// <summary>A building to generate: footprint, floors, rooms, openings, stairs, roofs, vents, climbs.</summary>
@@ -181,6 +199,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public Vector2 size = new Vector2(10, 8);
         public float storey = 3.6f;
         public float slab = 0.3f;
+        /// <summary>Floors whose facades get no decorative additions (flower boxes, Juliet balconies): a secured floor keeps its design.</summary>
+        public readonly HashSet<int> plainFloors = new HashSet<int>();
         public ArchStyle style;
         public int zone;
         public readonly List<ArchRoom> rooms = new List<ArchRoom>();

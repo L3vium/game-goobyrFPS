@@ -84,6 +84,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             Animator lAnimator = lStudio._body.Animator;
             if (lAnimator != null) lAnimator.Update(0.5f);
             Transform lHead = lStudio._body.Head;
+            // Chin up for the photo: the idle's head hangs ~7 deg (the clip's own pose). The cast's head bone
+            // runs straight up the skull at rest (its local Y), so levelling that axis levels the face (this render only).
+            if (lHead != null) lHead.rotation = Quaternion.Slerp(Quaternion.identity, Quaternion.FromToRotation(lHead.up, Vector3.up), 0.9f) * lHead.rotation;
             Vector3 lFace = lHead != null ? lHead.position + Vector3.up * 0.04f : lStudio.transform.position + Vector3.up * 1.6f;
             Transform lSubject = lStudio._body.transform;
             Vector3 lFront = lSubject.forward * 2.6f + lSubject.right * -0.7f;

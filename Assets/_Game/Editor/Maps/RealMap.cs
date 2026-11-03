@@ -36,7 +36,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private readonly List<(Rect rect, Ground ground)> _pads = new List<(Rect, Ground)>();
         private readonly List<(Vector2 center, Vector2 size, float yaw, Ground ground)> _turnedPads = new List<(Vector2, Vector2, float, Ground)>();
         private readonly List<(Matrix4x4 toLocal, Rect rect)> _cellarHoles = new List<(Matrix4x4, Rect)>();
-        private readonly List<(Vector3 a, Vector3 b, float radius)> _caveHoles = new List<(Vector3, Vector3, float)>();
+        private readonly List<(Vector3 a, Vector3 b, float radius, float height)> _caveHoles = new List<(Vector3, Vector3, float, float)>();
         private bool[,] _built;
         private readonly List<ArchResult> _buildings = new List<ArchResult>();
         private const float MASK_CELL = 2f;
@@ -74,7 +74,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             ArchBuilder.MeshPrefix = K.Map.sceneName;
             // The sky material and the volume profile of the map come from the art pass.
             if (ArtBuilder.Sky(K.Map) == null) ArtBuilder.Build();
-            Shape = new LandShape(Relief);
+            Shape = new LandShape(EdgeRelief);
             Plan();
             K.LandLayers = Own(Untinted(Layers()));
             K.PlanStorey = 3.6f;
@@ -92,6 +92,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lOutside.transform.SetParent(K.Markers, false);
             lOutside.AddComponent<SecurityOutside>().Setup(OutsideTier);
             Dress();
+            DressTurretRooms();
             CrowdSpots();
             KeyLoops();
             Errands();
@@ -177,7 +178,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         /// <summary>A cut in the land along a cave tunnel's mouth (where its tube breaks the surface).</summary>
-        protected void CaveHole(Vector3 pA, Vector3 pB, float pRadius) => _caveHoles.Add((pA, pB, pRadius));
+        protected void CaveHole(Vector3 pA, Vector3 pB, float pRadius, float pHeight = 3.6f) => _caveHoles.Add((pA, pB, pRadius, pHeight));
 
         private bool HoleAt(float pX, float pZ)
         {
@@ -186,16 +187,18 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Vector3 l = lToLocal.MultiplyPoint3x4(new Vector3(pX, 0f, pZ));
                 if (lRect.Contains(new Vector2(l.x, l.z))) return true;
             }
-            foreach ((Vector3 a, Vector3 b, float lRadius) in _caveHoles)
+            foreach ((Vector3 a, Vector3 b, float lRadius, float lHeight) in _caveHoles)
             {
                 Vector2 a2 = new Vector2(a.x, a.z), b2 = new Vector2(b.x, b.z), p2 = new Vector2(pX, pZ);
                 Vector2 ab = b2 - a2;
-                float t = Mathf.Clamp01(Vector2.Dot(p2 - a2, ab) / Mathf.Max(0.001f, ab.sqrMagnitude));
+                float t = Vector2.Dot(p2 - a2, ab) / Mathf.Max(0.001f, ab.sqrMagnitude);
+                // Never in front of the mouth: the open ground there stays whole.
+                if (t < 0f || t > 1f) continue;
                 if (Vector2.Distance(p2, a2 + ab * t) > lRadius) continue;
                 float lFloor = Mathf.Lerp(a.y, b.y, t);
                 float lGround = K.GroundAt(pX, pZ);
                 // Only where the land lies inside the tube's height: the mouth, not the hill above it.
-                if (lGround > lFloor - 0.6f && lGround < lFloor + 3.6f) return true;
+                if (lGround > lFloor - 0.6f && lGround < lFloor + lHeight - 0.3f) return true;
             }
             return false;
         }
@@ -921,15 +924,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 // On a post when the entry is near the ground, else a bulb on a bracket against the wall.
                 float lGround = K.GroundAt(p.x, p.z), lPole = p.y - lGround;
                 if (lEntryRoot == null) lEntryRoot = K.Group("EntryLamps", K.Env);
-                if (lPole > 0.5f && lPole < 3.2f)
-                    A.BoxObject("EntryLampPost", new Vector3(p.x, lGround, p.z), 0f, lEntryRoot, 0, true,
-                        (ArchLib.Iron, new Vector3(0, lPole * 0.5f, 0), new Vector3(0.07f, lPole + 0.1f, 0.07f)),
-                        (ArchLib.Iron, new Vector3(0, lPole + 0.12f, 0), new Vector3(0.18f, 0.04f, 0.18f)),
-                        (ArchLib.LampGlow, new Vector3(0, lPole, 0), new Vector3(0.12f, 0.18f, 0.12f)));
-                else
-                    A.BoxObject("EntryLamp", p, 0f, lEntryRoot, 0, false,
-                        (ArchLib.Iron, new Vector3(0, 0.12f, 0), new Vector3(0.14f, 0.04f, 0.14f)),
-                        (ArchLib.LampGlow, new Vector3(0, 0, 0), new Vector3(0.1f, 0.16f, 0.1f)));
+                List<(ArchMat, Vector3, Vector3)> lParts = new List<(ArchMat, Vector3, Vector3)>();
+                bool lPost = lPole > 0.5f && lPole < 3.2f;
+                if (lPost)
+                {
+                    lParts.Add((ArchLib.Iron, new Vector3(0, 0.25f, 0), new Vector3(0.16f, 0.5f, 0.16f)));
+                    lParts.Add((ArchLib.Iron, new Vector3(0, lPole * 0.5f, 0), new Vector3(0.07f, lPole, 0.07f)));
+                }
+                ArchLib.LanternParts(lParts, new Vector3(0, lPost ? lPole : -0.2f, 0));
+                A.BoxObject(lPost ? "EntryLampPost" : "EntryLamp", lPost ? new Vector3(p.x, lGround, p.z) : p, 0f, lEntryRoot, 0, lPost, lParts.ToArray());
                 Light lLight = new GameObject("EntryLight").AddComponent<Light>();
                 lLight.transform.SetParent(K.Lights, false);
                 lLight.transform.position = p + Vector3.down * 0.2f;
@@ -1066,8 +1069,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lHolder.transform.position = lLamp;
                 lBulb.Flush(lHolder.transform, "Arch_CaveLantern");
             }
-            CaveHole(pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth * 0.6f);
-            CaveHole(pPath[pPath.Length - 1], pPath[Mathf.Max(0, pPath.Length - 2)], pWidth * 0.6f);
+            CaveHole(pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth * 0.48f, pHeight);
+            CaveHole(pPath[pPath.Length - 1], pPath[Mathf.Max(0, pPath.Length - 2)], pWidth * 0.48f, pHeight);
             Mouth(lRoot, pName + "_A", pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth, pHeight);
             Mouth(lRoot, pName + "_B", pPath[pPath.Length - 1], pPath[Mathf.Max(0, pPath.Length - 2)], pWidth, pHeight);
         }

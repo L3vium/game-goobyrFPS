@@ -54,6 +54,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         // ================================================================ land
 
+        protected override (bool north, bool east, bool south, bool west) RockEdges => (true, false, true, true);
+
         protected override float Relief(float x, float z)
         {
             // Base: the valley climbs north from the river town to the hacienda hill.

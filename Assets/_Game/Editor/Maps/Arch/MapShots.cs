@@ -16,6 +16,20 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>Renders the open scene from a point toward another into a PNG.</summary>
         public static string Shot(string pPath, Vector3 pFrom, Vector3 pTo, float pFov = 60f, int pWidth = 1600, int pHeight = 900, float pFar = 1500f)
         {
+            // Every framing is checked before it is saved; a failing one is re-rolled round its target, or dropped.
+            if (!Frames(pFrom, pTo, out string lWhy))
+            {
+                if (Reroll(pFrom, pTo, out Vector3 lNew))
+                {
+                    _rerolls.Append($"{Path.GetFileName(pPath)}: {lWhy}; re-rolled {pFrom:F1} -> {lNew:F1}\n");
+                    pFrom = lNew;
+                }
+                else
+                {
+                    _rerolls.Append($"{Path.GetFileName(pPath)}: {lWhy}; no valid framing, dropped\n");
+                    return pPath + " (dropped)";
+                }
+            }
             GameObject lObject = new GameObject("ShotCamera");
             Camera lCamera = lObject.AddComponent<Camera>();
             lObject.AddComponent<UniversalAdditionalCameraData>().renderPostProcessing = true;
@@ -46,6 +60,148 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         private static bool Clear(Vector3 p) => !Physics.CheckSphere(p, 0.35f, ~0, QueryTriggerInteraction.Ignore);
+
+        private static readonly System.Text.StringBuilder _rerolls = new System.Text.StringBuilder();
+
+        /// <summary>The framings re-rolled or dropped since the last call, one per line (and clears the log).</summary>
+        public static string Rerolls()
+        {
+            string s = _rerolls.ToString();
+            _rerolls.Clear();
+            return s;
+        }
+
+        /// <summary>True when a point is inside one of the map's buildings.</summary>
+        private static bool Indoors(Vector3 p)
+        {
+            foreach (Systems.BuildingVolume v in Object.FindObjectsByType<Systems.BuildingVolume>(FindObjectsSortMode.None)) if (v.Contains(p)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// The framing rules: the camera is not inside a collider (0.3 m sphere), and the centre ray meets
+        /// nothing closer than 3 m (2 m indoors), or than the subject itself when it is nearer.
+        /// </summary>
+        public static bool Frames(Vector3 pFrom, Vector3 pTo, out string pWhy)
+        {
+            if (Physics.CheckSphere(pFrom, 0.3f, ~0, QueryTriggerInteraction.Ignore)) { pWhy = "camera inside a collider"; return false; }
+            float lNeed = Mathf.Min(Indoors(pFrom) ? 2f : 3f, Vector3.Distance(pFrom, pTo) - 0.5f);
+            if (lNeed > 0f && Physics.Raycast(pFrom, (pTo - pFrom).normalized, out RaycastHit lHit, lNeed, ~0, QueryTriggerInteraction.Ignore))
+            {
+                pWhy = $"centre ray hits {lHit.collider.name} at {lHit.distance:F1} m";
+                return false;
+            }
+            pWhy = null;
+            return true;
+        }
+
+        /// <summary>A new camera point round the same target: turned 15-90 degrees either way, nearer or further, a little up or down.</summary>
+        private static bool Reroll(Vector3 pFrom, Vector3 pTo, out Vector3 pNew)
+        {
+            Vector3 v = pFrom - pTo;
+            float[] lScales = { 1f, 0.8f, 1.2f, 0.65f };
+            float[] lUps = { 0f, 0.4f, -0.3f };
+            for (int k = 0; k < 12; k++)
+            {
+                float lAngle = (k % 2 == 0 ? 1 : -1) * (k / 2 + 1) * 15f;
+                foreach (float lScale in lScales)
+                    foreach (float lUp in lUps)
+                    {
+                        Vector3 p = pTo + Quaternion.Euler(0, lAngle, 0) * v * lScale + Vector3.up * lUp;
+                        if (!Frames(p, pTo, out _)) continue;
+                        if (Physics.Linecast(p, pTo, out RaycastHit lHit, ~0, QueryTriggerInteraction.Ignore) && lHit.distance < Vector3.Distance(p, pTo) - 1.2f) continue;
+                        pNew = p;
+                        return true;
+                    }
+            }
+            pNew = pFrom;
+            return false;
+        }
+
+        /// <summary>How far the centre ray runs free from a camera toward a target (up to 40 m).</summary>
+        private static float Depth(Vector3 pFrom, Vector3 pTo) => Physics.Raycast(pFrom, (pTo - pFrom).normalized, out RaycastHit lHit, 40f, ~0, QueryTriggerInteraction.Ignore) ? lHit.distance : 40f;
+
+        /// <summary>
+        /// A room from a corner: each corner at eye height is tried, aiming across the room's middle at
+        /// the far corner; the corner that frames and sees furthest wins.
+        /// </summary>
+        private static string RoomShot(string pPath, Transform pZone, Vector3 pSize)
+        {
+            Vector3 c = pZone.position;
+            Vector3 lHalf = new Vector3(pSize.x * 0.5f - 0.55f, 0f, pSize.z * 0.5f - 0.55f);
+            Vector3 lBestFrom = Vector3.zero, lBestTo = Vector3.zero;
+            float lBest = -1f;
+            foreach (float sx in new[] { -1f, 1f })
+                foreach (float sz in new[] { -1f, 1f })
+                    foreach (float lUp in new[] { 1.75f, 1.5f })
+                    {
+                        Vector3 lFrom = c + pZone.rotation * new Vector3(sx * lHalf.x, lUp, sz * lHalf.z);
+                        Vector3 lTo = c + pZone.rotation * new Vector3(-sx * lHalf.x * 0.7f, 1.0f, -sz * lHalf.z * 0.7f);
+                        if (!Frames(lFrom, lTo, out _)) continue;
+                        float d = Depth(lFrom, lTo);
+                        if (d > lBest) { lBest = d; lBestFrom = lFrom; lBestTo = lTo; }
+                    }
+            if (lBest < 0f)
+            {
+                _rerolls.Append($"{Path.GetFileName(pPath)}: no corner frames the room, dropped\n");
+                return pPath + " (dropped)";
+            }
+            return Shot(pPath, lBestFrom, lBestTo, 74f);
+        }
+
+        /// <summary>True when the land at a point is painted mostly with a grass layer.</summary>
+        private static bool OnGrass(Vector3 p)
+        {
+            Terrain lLand = Terrain.activeTerrain;
+            if (lLand == null) return false;
+            TerrainData td = lLand.terrainData;
+            Vector3 l = p - lLand.transform.position;
+            int x = Mathf.Clamp(Mathf.RoundToInt(l.x / td.size.x * (td.alphamapWidth - 1)), 0, td.alphamapWidth - 1);
+            int z = Mathf.Clamp(Mathf.RoundToInt(l.z / td.size.z * (td.alphamapHeight - 1)), 0, td.alphamapHeight - 1);
+            float[,,] a = td.GetAlphamaps(x, z, 1, 1);
+            float lGrass = 0f;
+            for (int i = 0; i < td.terrainLayers.Length && i < a.GetLength(2); i++)
+            {
+                TerrainLayer lLayer = td.terrainLayers[i];
+                string lName = ((lLayer != null ? lLayer.name : "") + " " + (lLayer != null && lLayer.diffuseTexture != null ? lLayer.diffuseTexture.name : "")).ToLowerInvariant();
+                if (lName.Contains("grass") || lName.Contains("turf") || lName.Contains("meadow") || lName.Contains("lawn")) lGrass += a[0, 0, i];
+            }
+            return lGrass > 0.5f;
+        }
+
+        /// <summary>
+        /// A landmark framed from the ground: the first candidate point (x, z at eye height) with a clear
+        /// line to it; every candidate passed over is logged as a re-roll.
+        /// </summary>
+        public static string FrameFrom(string pPath, Vector3 pTarget, float pFov, params Vector2[] pCandidates)
+        {
+            Physics.SyncTransforms();
+            foreach (Vector2 c in pCandidates)
+            {
+                Vector3 lFrom = Eye(c.x, c.y, 1.7f);
+                bool lBlocked = Physics.Linecast(lFrom, pTarget, out RaycastHit lHit, ~0, QueryTriggerInteraction.Ignore) && lHit.distance < Vector3.Distance(lFrom, pTarget) - 4f;
+                if (lBlocked || !Frames(lFrom, pTarget, out _) || Indoors(lFrom))
+                {
+                    _rerolls.Append($"{Path.GetFileName(pPath)}: ({c.x:F0}, {c.y:F0}) {(lBlocked ? "blocked by " + lHit.collider.name : "no clear framing")}, next\n");
+                    continue;
+                }
+                return Shot(pPath, lFrom, pTarget, pFov);
+            }
+            _rerolls.Append($"{Path.GetFileName(pPath)}: no candidate sees the target, dropped\n");
+            return pPath + " (dropped)";
+        }
+
+        /// <summary>The San Lazaro mirador tower from the plaza or the hacienda grounds.</summary>
+        public static string MiradorShot(string pPath)
+        {
+            Vector3 lTop = new Vector3(121f, 69f, 124f);
+            foreach (UI.MapPoi lPoi in Object.FindObjectsByType<UI.MapPoi>(FindObjectsSortMode.None))
+                if (lPoi.Label == "Mirador") { lTop = lPoi.transform.position; break; }
+            Vector3 lTarget = lTop + Vector3.down * 7f;
+            return FrameFrom(pPath, lTarget, 38f,
+                new Vector2(110f, 52f), new Vector2(135f, 55f), new Vector2(150f, 62f), new Vector2(92f, 60f), new Vector2(70f, 72f),
+                new Vector2(165f, 95f), new Vector2(60f, 105f), new Vector2(-20f, -140f), new Vector2(-30f, -150f), new Vector2(-12f, -128f));
+        }
 
         /// <summary>The first viewpoint round a target (distance, height) with a clear line of sight to it.</summary>
         private static bool View(Vector3 pTarget, Vector3 pPreferred, float pDistance, float pUp, out Vector3 pFrom, bool pOutdoors = false)
@@ -149,13 +305,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     for (int k = 0; k < Mathf.Min(pRoomsPerFloor, lFloor.Value.Count); k++)
                     {
                         AI.SecurityZone z = lFloor.Value[k];
-                        Vector3 c = z.transform.position;
-                        Vector3 lHalf = new Vector3(z.Size.x * 0.5f - 0.6f, 0f, z.Size.z * 0.5f - 0.6f);
-                        Vector3 lFrom = c + z.transform.rotation * new Vector3(-lHalf.x, 1.75f, -lHalf.z);
-                        for (int tries = 0; tries < 4 && !Clear(lFrom); tries++) lFrom = c + z.transform.rotation * Quaternion.Euler(0, 90f * (tries + 1), 0) * new Vector3(-lHalf.x, 1.75f, -lHalf.z);
-                        Vector3 lTo = c + z.transform.rotation * new Vector3(lHalf.x * 0.4f, 1.0f, lHalf.z * 0.4f);
                         string lName = z.name.Replace("Zone_", "").Split('_')[0];
-                        lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_f{lFloor.Key}_{lName.ToLowerInvariant()}.png"), lFrom, lTo, 72f)).Append('\n');
+                        lLog.Append(RoomShot(Path.Combine(pDir, $"{pPrefix}_f{lFloor.Key}_{lName.ToLowerInvariant()}.png"), z.transform, z.Size)).Append('\n');
                     }
                 }
             }
@@ -339,37 +490,72 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 }
                 Time(1);
             }
-            // Street fronts: posters and weathering on the town houses, at eye level from across the street.
+            // Street fronts: posters, weathering and door dressing, at eye level down the street's axis.
             int n = 0;
             System.Collections.Generic.List<Vector3> lSeen = new System.Collections.Generic.List<Vector3>();
+            System.Collections.Generic.List<(Vector3 at, Vector3 outward)> lFronts = new System.Collections.Generic.List<(Vector3, Vector3)>();
             foreach (UnityEngine.Rendering.Universal.DecalProjector d in Object.FindObjectsByType<UnityEngine.Rendering.Universal.DecalProjector>(FindObjectsSortMode.None))
+                if (d.name.StartsWith("Decal_Poster")) lFronts.Add((d.transform.position, -d.transform.forward));
+            foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
+                if (t.name == "StreetProps")
+                    foreach (Transform p in t) lFronts.Add((p.position + Vector3.up * 1.6f, OpenSide(p.position + Vector3.up * 0.6f)));
+            foreach ((Vector3 p, Vector3 lOutward) in lFronts)
             {
-                if (n >= 3 || !d.name.StartsWith("Decal_Poster")) continue;
-                Vector3 p = d.transform.position;
+                if (n >= 3) break;
                 if (lSeen.Exists(o => Vector3.Distance(o, p) < 40f)) continue;
-                lSeen.Add(p);
-                Vector3 lOut = -d.transform.forward;
-                // From across the street, with a clear line to the poster (else the next poster).
-                if (!View(p, lOut + Vector3.Cross(Vector3.up, lOut) * 0.35f, 6.5f, 0f, out Vector3 lFrom, true)) continue;
-                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_street{n++}.png"), lFrom, p + Vector3.down * 0.5f, 62f)).Append('\n');
+                Vector3 lOut = lOutward;
+                lOut.y = 0f;
+                if (lOut.sqrMagnitude < 0.01f) continue;
+                lOut.Normalize();
+                Vector3 lAxis = Vector3.Cross(Vector3.up, lOut);
+                foreach (float lSign in new[] { 1f, -1f })
+                {
+                    Vector3 lFrom = p + lOut * 2.6f - lAxis * lSign * 9f;
+                    lFrom = Eye(lFrom.x, lFrom.z, 1.6f);
+                    Vector3 lTo = p + lOut * 1.0f + lAxis * lSign * 8f;
+                    lTo.y = lFrom.y + 0.4f;
+                    if (Indoors(lFrom) || !Frames(lFrom, lTo, out _)) continue;
+                    lSeen.Add(p);
+                    lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_street{n++}.png"), lFrom, lTo, 64f)).Append('\n');
+                    break;
+                }
             }
             // A dressed corner of the key building (quoins or a chamfer), from the ground.
             if (lKey != null)
             {
                 Vector3 lCorner = lKey.transform.position + lKey.transform.rotation * new Vector3(-lKey.Size.x * 0.5f, 0f, -lKey.Size.z * 0.5f);
-                Vector3 lOut = lKey.transform.rotation * new Vector3(-1f, 0f, -1f).normalized;
-                Vector3 lBase = MapShots.Eye(lCorner.x + lOut.x * 7f, lCorner.z + lOut.z * 7f, 1.6f);
-                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_corner.png"), lBase, new Vector3(lCorner.x, lBase.y + 2.5f, lCorner.z), 64f)).Append('\n');
+                // Down the street along the facade: from beyond the corner, the corner near in the frame.
+                Vector3 lAlong = lKey.transform.rotation * Vector3.right, lFront = lKey.transform.rotation * Vector3.back;
+                Vector3 lFrom = lCorner - lAlong * 9f + lFront * 3.2f;
+                lFrom = MapShots.Eye(lFrom.x, lFrom.z, 1.6f);
+                Vector3 lTo = lCorner + lAlong * 9f + lFront * 0.8f;
+                lTo.y = lFrom.y + 2.0f;
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_corner.png"), lFrom, lTo, 64f)).Append('\n');
             }
-            // Grass at eye level: toward the first tall grass field, from 9 m away.
+            // Grass at eye level: standing on painted grass, looking over a tall grass field with 15 m clear ahead.
+            bool lGrassShot = false;
+            int lTried = 0;
             foreach (Transform t in Object.FindObjectsByType<Transform>(FindObjectsSortMode.None))
             {
-                if (t.name != "TallGrass" || t.childCount == 0) continue;
-                Vector3 g = t.GetChild(0).position;
-                Vector3 lFrom = MapShots.Eye(g.x - 9f, g.z - 6f, 1.6f);
-                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_grass_eye.png"), lFrom, MapShots.Eye(g.x, g.z, 0.9f), 64f)).Append('\n');
-                break;
+                if (lGrassShot || t.name != "TallGrass") continue;
+                for (int i = 0; i < t.childCount && !lGrassShot && lTried < 400; i += Mathf.Max(1, t.childCount / 24))
+                {
+                    Vector3 g = t.GetChild(i).position;
+                    for (int k = 0; k < 8 && !lGrassShot; k++, lTried++)
+                    {
+                        Vector3 d = Quaternion.Euler(0, k * 45f, 0) * Vector3.forward;
+                        Vector3 lFrom = Eye(g.x - d.x * 9f, g.z - d.z * 9f, 1.6f), lTo = Eye(g.x, g.z, 0.9f);
+                        if (!OnGrass(lFrom) || !OnGrass(new Vector3(g.x, 0f, g.z)) || Indoors(lFrom)) continue;
+                        Vector3 lFlat = lTo - lFrom;
+                        lFlat.y = 0f;
+                        if (Physics.Raycast(lFrom, lFlat.normalized, 15f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                        if (!Frames(lFrom, lTo, out _)) continue;
+                        lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_grass_eye.png"), lFrom, lTo, 64f)).Append('\n');
+                        lGrassShot = true;
+                    }
+                }
             }
+            if (!lGrassShot) _rerolls.Append($"{pPrefix}_grass_eye.png: no grass point with 15 m clear, dropped\n");
             return lLog.ToString();
         }
 

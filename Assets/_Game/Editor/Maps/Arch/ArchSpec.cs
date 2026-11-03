@@ -182,6 +182,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public int chimneys;
         /// <summary>Moorish openings: horseshoe arches in an alfiz frame, mashrabiya lattice oriels instead of shutters and iron balconies.</summary>
         public bool moorish;
+        /// <summary>Decoration only (no colliders): flower boxes and shallow Juliet balconies under the upper-floor windows.</summary>
+        public bool flowerBoxes;
+        /// <summary>Dormers per slope of a pitched roof (decoration, no colliders); 0: none.</summary>
+        public int dormers;
+        /// <summary>Shutter colours by wing: the building's length split evenly along x, one material each.</summary>
+        public ArchMat[] shutterWings;
     }
 
     /// <summary>A building to generate: footprint, floors, rooms, openings, stairs, roofs, vents, climbs.</summary>
@@ -193,6 +199,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public Vector2 size = new Vector2(10, 8);
         public float storey = 3.6f;
         public float slab = 0.3f;
+        /// <summary>Floors whose facades get no decorative additions (flower boxes, Juliet balconies): a secured floor keeps its design.</summary>
+        public readonly HashSet<int> plainFloors = new HashSet<int>();
         public ArchStyle style;
         public int zone;
         public readonly List<ArchRoom> rooms = new List<ArchRoom>();

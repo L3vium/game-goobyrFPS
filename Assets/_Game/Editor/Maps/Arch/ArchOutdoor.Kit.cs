@@ -44,7 +44,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             ArchMat lDeck = ArchLib.Surface("wood_floor_deck", 2f), lSkirt = ArchLib.Tinted("velour_velvet", new Color(0.12f, 0.12f, 0.14f), "skirt", 1f);
             ArchMat lCloth = ArchLib.Tinted("velour_velvet", new Color(0.7f, 0.08f, 0.1f), "stage", 1.5f), lSteel = ArchLib.Surface("metal_plate", 1.5f);
-            ArchMat lCabinet = ArchLib.PlainMat("SpeakerCabinet", new Color(0.05f, 0.05f, 0.055f), 0.25f, 0f), lCone = ArchLib.PlainMat("SpeakerGrille", new Color(0.13f, 0.13f, 0.14f), 0.1f, 0.4f);
+            ArchMat lCabinet = ArchLib.Tinted("dark_wooden_planks", new Color(0.32f, 0.32f, 0.34f), "speaker", 2f), lCone = ArchLib.Tinted("metal_plate", new Color(0.3f, 0.3f, 0.32f), "grille", 4f);
+            ArchMat lWoofer = ArchLib.PlainMat("WooferCone", new Color(0.16f, 0.16f, 0.17f), 0.35f, 0f), lCorner = ArchLib.Galvanised;
             ArchMesh lMesh = new ArchMesh();
             Quaternion lRot = Quaternion.Euler(0, pYaw, 0);
             lMesh.Frame = Matrix4x4.TRS(pGround, lRot, Vector3.one);
@@ -74,8 +75,26 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Vector3 c = new Vector3(s * (W * 0.5f + 1.6f), 0, -D * 0.5f + 0.8f);
                 for (int k = 0; k < 2; k++) lMesh.Box(lCabinet, c + new Vector3(0, 0.4f + k * 0.8f, 0), new Vector3(1.2f, 0.78f, 0.9f));
                 for (int k = 0; k < 3; k++) lMesh.Box(lCabinet, c + new Vector3(0, 1.85f + k * 0.62f, 0), new Vector3(0.9f, 0.6f, 0.7f));
-                for (int k = 0; k < 2; k++) lMesh.Box(lCone, c + new Vector3(0, 0.4f + k * 0.8f, -0.46f), new Vector3(0.9f, 0.6f, 0.02f), false);
-                for (int k = 0; k < 3; k++) lMesh.Box(lCone, c + new Vector3(0, 1.85f + k * 0.62f, -0.36f), new Vector3(0.7f, 0.45f, 0.02f), false);
+                for (int k = 0; k < 2; k++)
+                {
+                    Vector3 f = c + new Vector3(0, 0.4f + k * 0.8f, -0.46f);
+                    lMesh.Box(lCone, f, new Vector3(1.0f, 0.66f, 0.02f), false);
+                    foreach (float x in new[] { -0.25f, 0.25f })
+                    {
+                        lMesh.Tube(lWoofer, f + new Vector3(x, 0, 0), f + new Vector3(x, 0, -0.04f), 0.21f, 16, false);
+                        lMesh.Tube(lCorner, f + new Vector3(x, 0, -0.04f), f + new Vector3(x, 0, -0.07f), 0.06f, 10, false);
+                    }
+                    foreach (float x in new[] { -0.6f, 0.6f }) foreach (float y in new[] { -0.39f, 0.39f })
+                        lMesh.Box(lCorner, c + new Vector3(x * 0.98f, 0.4f + k * 0.8f + y * 0.98f, -0.42f), new Vector3(0.08f, 0.08f, 0.08f), false);
+                }
+                for (int k = 0; k < 3; k++)
+                {
+                    Vector3 f = c + new Vector3(0, 1.85f + k * 0.62f, -0.36f);
+                    lMesh.Box(lCone, f + new Vector3(-0.18f, 0, 0), new Vector3(0.44f, 0.5f, 0.02f), false);
+                    lMesh.Tube(lWoofer, f + new Vector3(-0.18f, 0, 0), f + new Vector3(-0.18f, 0, -0.04f), 0.17f, 14, false);
+                    lMesh.Box(lCorner, f + new Vector3(0.2f, 0, -0.06f), new Vector3(0.3f, 0.2f, 0.12f), false);
+                    lMesh.Box(lWoofer, f + new Vector3(0.2f, 0, -0.125f), new Vector3(0.24f, 0.14f, 0.01f), false);
+                }
                 lMesh.Box(lCabinet, new Vector3(s * W * 0.25f, H + 0.18f, -D * 0.5f + 0.6f), new Vector3(0.7f, 0.36f, 0.5f), Quaternion.Euler(-25f, 0, 0));
             }
             // Par cans on the front truss, a microphone stand, the mixing desk out front.

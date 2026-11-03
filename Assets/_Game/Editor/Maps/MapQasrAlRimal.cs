@@ -50,6 +50,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return 1f - Mathf.SmoothStep(0f, 1f, d / pEdge);
         }
 
+        protected override (bool north, bool east, bool south, bool west) RockEdges => (true, true, false, false);
+
         protected override float Relief(float x, float z)
         {
             float h = TOWN_Y + LandShape.Fbm(x, z, 70f, 3, 4.2f) * 1.5f;

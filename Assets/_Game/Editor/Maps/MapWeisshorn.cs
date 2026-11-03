@@ -40,6 +40,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         [MenuItem("Goobyr/Build/Map Weisshorn")]
         public static void BuildMenu() => new MapWeisshorn().Build();
 
+        protected override (bool north, bool east, bool south, bool west) RockEdges => (true, true, false, true);
+
         protected override float Relief(float x, float z)
         {
             float h;

@@ -155,25 +155,61 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             int lRes = _landData.alphamapResolution, lLayers = _landData.alphamapLayers;
             float[,,] lAlpha = _landData.GetAlphamaps(0, 0, lRes, lRes);
-            float Weight(Ground[] pGrounds, float pX, float pZ)
+            // The turf weights, blurred over ~2.5 m: painted edges are hard, a meadow's edge is not.
+            int lRadius = Mathf.Max(1, Mathf.RoundToInt(2.5f / (_landSize / lRes)));
+            float[,] lTurf = SoftWeights(lAlpha, lRes, lLayers, _realTurf, lRadius), lDryTurf = SoftWeights(lAlpha, lRes, lLayers, _realDryTurf, lRadius);
+            float Weight(float[,] pWeights, float pX, float pZ)
             {
-                if (pGrounds == null) return 0f;
+                if (pWeights == null) return 0f;
                 int i = Mathf.Clamp(Mathf.FloorToInt((pX - _landOrigin.x) / _landSize * lRes), 0, lRes - 1);
                 int j = Mathf.Clamp(Mathf.FloorToInt((pZ - _landOrigin.z) / _landSize * lRes), 0, lRes - 1);
-                float w = 0f;
-                foreach (Ground g in pGrounds) if ((int)g < lLayers) w += lAlpha[j, i, (int)g];
-                return w;
+                return pWeights[j, i];
             }
             bool lLayered = _realTurf != null || _realDryTurf != null;
-            System.Func<float, float, float> lDensity = lLayered
-                ? (x, z) => _realDensity(x, z) * Mathf.Clamp01((Weight(_realTurf, x, z) + Weight(_realDryTurf, x, z)) * 1.5f)
-                : _realDensity;
+            // How far inside the meadow a point is (0 at its edge, 1 well inside), with a ragged noise so the
+            // edge wanders: the grass thins and shortens toward it, and the terrain's meadow tint follows.
+            System.Func<float, float, float> lInside = (x, z) => !lLayered ? 1f
+                : Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(((Weight(lTurf, x, z) + Weight(lDryTurf, x, z)) * 1.5f - 0.15f + 0.3f * LandShape.Fbm(x, z, 3.5f, 2, 17.3f)) / 0.85f));
+            System.Func<float, float, float> lDensity = (x, z) => _realDensity(x, z) * lInside(x, z);
+            System.Func<float, float, float> lHeight = (x, z) => Mathf.Clamp01((0.5f + 0.35f * LandShape.Fbm(x, z, 9f, 2, 31.7f)) * Mathf.Lerp(0.55f, 1f, lInside(x, z)));
             System.Func<float, float, float> lDry = _realDryness ?? (_realDryTurf == null ? null : (x, z) =>
             {
-                float g = Weight(_realTurf, x, z), d = Weight(_realDryTurf, x, z);
+                float g = Weight(lTurf, x, z), d = Weight(lDryTurf, x, z);
                 return Mathf.Clamp01(d / Mathf.Max(0.001f, g + d) * 0.75f + 0.25f * (0.5f + 0.5f * LandShape.Fbm(x, z, 24f, 2, 12.9f)));
             });
-            GrassBaker.Bake(Land, Map.sceneName, _realGrass, lDensity, null, lDry, _tallGrass.Count > 0 ? (System.Func<float, float, float>)TallGrassDensity : null);
+            GrassBaker.Bake(Land, Map.sceneName, _realGrass, lDensity, lHeight, lDry, _tallGrass.Count > 0 ? (System.Func<float, float, float>)TallGrassDensity : null);
+        }
+
+        /// <summary>The summed alphamap weight of some ground layers, box-blurred by a radius in texels (null without layers).</summary>
+        private static float[,] SoftWeights(float[,,] pAlpha, int pRes, int pLayers, Ground[] pGrounds, int pRadius)
+        {
+            if (pGrounds == null) return null;
+            float[,] a = new float[pRes, pRes], b = new float[pRes, pRes];
+            for (int j = 0; j < pRes; j++)
+                for (int i = 0; i < pRes; i++)
+                    foreach (Ground g in pGrounds) if ((int)g < pLayers) a[j, i] += pAlpha[j, i, (int)g];
+            float lNorm = 1f / (pRadius * 2 + 1);
+            for (int j = 0; j < pRes; j++)
+            {
+                float lSum = 0f;
+                for (int k = -pRadius; k <= pRadius; k++) lSum += a[j, Mathf.Clamp(k, 0, pRes - 1)];
+                for (int i = 0; i < pRes; i++)
+                {
+                    b[j, i] = lSum * lNorm;
+                    lSum += a[j, Mathf.Min(i + pRadius + 1, pRes - 1)] - a[j, Mathf.Max(i - pRadius, 0)];
+                }
+            }
+            for (int i = 0; i < pRes; i++)
+            {
+                float lSum = 0f;
+                for (int k = -pRadius; k <= pRadius; k++) lSum += b[Mathf.Clamp(k, 0, pRes - 1), i];
+                for (int j = 0; j < pRes; j++)
+                {
+                    a[j, i] = lSum * lNorm;
+                    lSum += b[Mathf.Min(j + pRadius + 1, pRes - 1), i] - b[Mathf.Max(j - pRadius, 0), i];
+                }
+            }
+            return a;
         }
 
         /// <summary>Cuts holes in the terrain where the function says so (cellars, cave mouths): applied by <see cref="Finish"/>.</summary>

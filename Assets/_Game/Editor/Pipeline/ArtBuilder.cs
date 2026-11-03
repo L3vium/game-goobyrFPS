@@ -69,6 +69,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Material lGlint = EditorAssets.Material(EditorAssets.ART_RESOURCES + "/M_SnowGlint.mat", Shader.Find("Goobyr/SnowGlint"));
             lGlint.shader = Shader.Find("Goobyr/SnowGlint");
             lGlint.enableInstancing = true;
+            // Sparse, bright stars at 1080p toward the sun: facets within ~13° of the mirror angle flash.
+            lGlint.SetFloat("_Size", 0.06f);
+            lGlint.SetFloat("_Sharpness", 200f);
+            lGlint.SetFloat("_Intensity", 60f);
+            lGlint.SetFloat("_FadeFar", 45f);
             EditorUtility.SetDirty(lGlint);
             return lGlint;
         }

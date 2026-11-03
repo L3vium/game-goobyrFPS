@@ -6,10 +6,10 @@ Shader "Goobyr/SnowGlint"
 {
     Properties
     {
-        _Size ("Size (m)", Float) = 0.03
-        _Sharpness ("Facet sharpness", Float) = 900
-        _Intensity ("Intensity", Float) = 14
-        _FadeFar ("Fade out distance (m)", Float) = 30
+        _Size ("Size (m)", Float) = 0.06
+        _Sharpness ("Facet sharpness", Float) = 200
+        _Intensity ("Intensity", Float) = 60
+        _FadeFar ("Fade out distance (m)", Float) = 45
         [HDR] _Tint ("Tint", Color) = (0.92, 0.96, 1, 1)
     }
     SubShader
@@ -27,6 +27,7 @@ Shader "Goobyr/SnowGlint"
             #pragma vertex Vert
             #pragma fragment Frag
             #pragma multi_compile_instancing
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
@@ -51,12 +52,13 @@ Shader "Goobyr/SnowGlint"
                 float lDistance = length(lToEye);
                 float3 lView = lToEye / max(lDistance, 1e-4);
 
-                Light lSun = GetMainLight();
+                // No sparkle in shade: the sun's shadow at the crystal (sampled per vertex, a quad is a point).
+                Light lSun = GetMainLight(TransformWorldToShadowCoord(lCenter));
                 float3 lHalf = normalize(lSun.direction + lView);
                 float lSpecular = pow(saturate(dot(lFacet, lHalf)), _Sharpness);
                 float lSunUp = saturate(lSun.direction.y * 4.0);
                 float lFade = saturate(lDistance - 0.8) * saturate((_FadeFar - lDistance) / (_FadeFar * 0.35));
-                half lGlint = lSpecular * lFade * lSunUp * _Intensity * dot(lSun.color, half3(0.3, 0.59, 0.11));
+                half lGlint = lSpecular * lFade * lSunUp * lSun.shadowAttenuation * _Intensity * dot(lSun.color, half3(0.3, 0.59, 0.11));
                 o.glint = lGlint;
 
                 // Camera-facing, a little bigger far away so a distant crystal stays about a pixel; dim ones collapse to nothing.

@@ -23,9 +23,9 @@ Rules I write for myself after a correction. Read at the start of every session.
 ## 2026-10-30 — ended prompts without building and pushing
 - **Every prompt ends with a player build, pushed, and merged to main.** No exceptions, even when
   a background agent still works, even for a small feature. Order: commit + push each change →
-  `Goobyr/Build/Player` → commit + push the build → `git checkout main && git merge --ff-only dev
-  && git push origin main && git checkout dev`. A turn that changed code and stops before this is
-  not finished.
+  `Goobyr/Build/Player` → commit + push the build → release main without checking it out (the
+  `commit-tree` procedure in CLAUDE.md). A turn that changed code and stops before this is not
+  finished.
 - **Background agents don't block the build.** Ask them to pause editor use, build from what is
   on disk, and say in the report which in-progress work the build does or does not contain.
 
@@ -67,7 +67,7 @@ Rules I write for myself after a correction. Read at the start of every session.
   nothing can overlap. Screenshot every changed screen.
 - **Generated only, realistic target.** No downloads or packs (user choice): textures, sounds,
   props and humans come from builders, Blender scripts and `generate_3d`.
-- **Unity MCP for this machine is 8084** (was 8082 until 2026-11-02; the user says when it moves), not registered as a Claude MCP server: drive it over HTTP.
+- **Unity MCP for this machine is 8080** (8082 until 2026-11-02, then 8084; the user says when it moves), not registered as a Claude MCP server: drive it over HTTP with `Tools/unity_mcp.py`.
 
 ## 2026-10-31 — Caster mode (tournament spectators)
 - **Spectating is a product, not a fallback.** A spectator must be able to join on purpose (even
@@ -79,8 +79,9 @@ Rules I write for myself after a correction. Read at the start of every session.
 
 ## 2026-11-01 — 0.5 judged ugly, buggy, dumb AI, bad LD; "not merged to main"
 - **main must look like its own branch.** A fast-forward merge leaves main and dev on the same
-  commit, so Fork draws one line and the user believes nothing was merged. Merge with
-  `git merge --no-ff dev -m "Release x.y.z"`; never `--ff-only`.
+  commit, so Fork draws one line and the user believes nothing was merged. Give main its own
+  merge commit (`git commit-tree "dev^{tree}" -p main -p dev`, see CLAUDE.md); never `--ff-only`,
+  and never check main out under the open editor (it reimports the whole project).
 - **Realistic means real PBR sources.** Stylized/low-poly is rejected. Art comes from Poly Haven
   (CC0 textures, models, HDRIs, via its API), MakeHuman/MPFB (CC0 humans) and CMU mocap,
   processed by scripts in `Tools/` and credited in `docs/Credits.md`. Still no store packs and no
@@ -91,3 +92,30 @@ Rules I write for myself after a correction. Read at the start of every session.
 - **Parkour probes must handle thin geometry.** Probe ledges at several depths past the face
   (walls and sills are 0.3 m), and grab ledges in the air.
 - **No isolated NPCs.** Every guard belongs to a bastion, a perimeter, a scene or a patrol.
+
+## 2026-11-03 — 0.6 judged "PS3", Hitman-like hero, enemies passive, hands and punch wrong
+- **Original characters only.** No bald man in a suit and red tie, nothing that reads as another
+  game's hero. The protagonist is our own design (Rook: copper quiff, bomber jacket, scarf).
+- **Direction: beautiful and a bit goofy, "TABS-flavoured" not TABS-literal.** The world is
+  realistic (PBR, real light, real grass); people are human-shaped and slightly stylized. The
+  goofiness comes from motion and reactions (wobble, faces, barks, silly ragdolls), never from
+  mascot bodies or low-poly shapes.
+- **Grass is geometry, not a texture.** GPU blades with wind and trampling wherever the ground is
+  soft, edges feathered, mown lawns in gardens. A flat green splat reads as PS3.
+- **One body contract.** Every eye, chest, head and capsule height comes from `Core/BodyMetrics`;
+  the camera, NPC senses, headshots and markers all read it. A hard-coded height is a bug.
+- **First-person grips are authored, not solved.** Poses are made in Blender around each weapon on
+  an arms rig with a weapon socket; IK and bone-measured grips drift and look wrong.
+- **Test the attack chain after any AI change.** A guard who sees an armed trespasser must shoot
+  within seconds; the AI scenario runner (`Goobyr/Test/AI Scenarios`) proves it. A passive enemy
+  is the worst AI bug, worse than a dumb one.
+- **Several agents, one editor.** Each agent sets `UNITY_MCP_AGENT`, holds the editor lock for
+  anything that changes the editor and checks it still holds it before each step; commits go
+  through `Tools/commit.py` (own paths only). Long MCP calls on Unity 6.6 lose their reply: write
+  results to a file and poll it.
+- **Unity 6.6:** `Object.GetInstanceID()` no longer compiles (use `GetHashCode()` or
+  `GetEntityId()`); renderer features can come back null after the upgrade (relink them); huge
+  or NaN bounds in procedural draws hang the editor (sanity-check every `worldBounds`).
+- **Judge the shots before the judge does.** Screenshot scripts check every framing (camera not in
+  a collider, nothing within 2-3 m of the centre ray) and re-roll; a judge round spent on shots
+  of walls is wasted. Also scan for null or default materials before each judge round.

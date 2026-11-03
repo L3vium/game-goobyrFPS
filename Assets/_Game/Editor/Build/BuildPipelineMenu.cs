@@ -194,7 +194,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 scenes = System.Array.ConvertAll(EditorBuildSettings.scenes, s => s.path),
                 locationPathName = OUTPUT,
                 target = BuildTarget.StandaloneWindows64,
-                options = BuildOptions.None
+                // The build ships through Git LFS on every release: LZ4HC roughly halves the data
+                // files (slower to build, as fast to load).
+                options = BuildOptions.CompressWithLz4HC
             };
             BuildReport lReport = BuildPipeline.BuildPlayer(lOptions);
             if (lReport.summary.result == BuildResult.Succeeded)

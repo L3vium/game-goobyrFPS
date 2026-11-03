@@ -223,6 +223,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             CourtRange("WaitingEast", new Vector2(28f, 70f), 2, 28f, 1, RoomType.Mess, SecurityTier.Restricted, AccessLevel.Guest);
             _keep = KeepSpec(KEEP);
             Lot(_keep, 2f, Ground.Cobble);
+            // Corner towers rising two floors above the keep's block, crenellated: the fortress silhouette.
+            Vector2[] lKeepCorners = { new Vector2(KEEP.x - 6.5f, KEEP.z - 6.5f), new Vector2(KEEP.x + 34f, KEEP.z - 6.5f), new Vector2(KEEP.x + 34f, KEEP.z + 34f), new Vector2(KEEP.x - 6.5f, KEEP.z + 34f) };
+            for (int i = 0; i < 4; i++)
+            {
+                ArchSpec t = new ArchSpec { name = "KeepTower" + i, origin = new Vector3(lKeepCorners[i].x, MESA_Y, lKeepCorners[i].y), size = new Vector2(6.5f, 6.5f), style = ArchStyles.Fortress(), zone = ZONE_CITADEL, shut = true };
+                for (int f = 0; f <= 5; f++) t.Room("TowerCore" + f, f, 0, 0, 6.5f, 6.5f, RoomType.Store, SecurityTier.Restricted).noFurniture = true;
+                ArchRoom lTop = t.Room("TowerTop", 6, 0, 0, 6.5f, 6.5f, RoomType.Terrace, SecurityTier.Restricted); lTop.open = true;
+                _bastionSpecs.Add(t);
+            }
             Vector2[] lCorners = { new Vector2(CITADEL.xMin, CITADEL.yMin), new Vector2(CITADEL.xMax, CITADEL.yMin), new Vector2(CITADEL.xMax, CITADEL.yMax), new Vector2(CITADEL.xMin, CITADEL.yMax) };
             for (int i = 0; i < 4; i++)
             {

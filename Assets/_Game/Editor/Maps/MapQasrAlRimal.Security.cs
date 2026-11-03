@@ -78,6 +78,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             A.Distraction("hose", Kp(34.02f, 0, 15f, 0f), b.Yaw(90f));
             A.Distraction("hose", _pressR.At(-0.02f, 0, 2.5f, 0f), _pressR.Yaw(-90f));
             A.Distraction("hose", _seraiR.At(-0.02f, 0, 3f, 0f), _seraiR.Yaw(-90f));
+            // A shortcut locked from outside: the guards' ladder, folded on the roof, drops to the third court.
+            A.DropLadder(Kp(-0.5f, 4, 27f, 1.2f), Kp(-0.5f, 0, 27f, 0f), b.root.rotation * Vector3.left, "Keep roof drop ladder");
         }
     }
 }

@@ -61,7 +61,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return h;
         }
 
-        protected override ArchMat CliffMaterial => ArchLib.Surface("rock_face", 8f);
+        private static ArchMat _alpine;
+        protected override ArchMat CliffMaterial => _alpine != null && _alpine.material != null ? _alpine : _alpine = new ArchMat("rock_alpine", PbrLibrary.Rock("rock_face", new Color(0.62f, 0.6f, 0.58f), new Color(0.5f, 0.47f, 0.45f), 0.6f, "alpine"), 6f);
+        protected override bool ScreeRocks => false;
+        protected override (float band, float ledges, bool columns, bool buttresses, bool snow) Strata => (4f, 0.4f, false, true, true);
+        protected override float BackdropHeight(float x, float z) => 110f + Mathf.Max(0f, LandShape.Fbm(x, z, 300f, 4, 8.3f)) * 260f + LandShape.Ridged(x, z, 140f, 4, 2.7f) * 120f;
+        protected override ArchMat BackdropLow => ArchLib.Tinted("rock_face", new Color(0.55f, 0.57f, 0.62f), "alpine_far", 60f);
+        protected override ArchMat BackdropHigh => ArchLib.Surface("snow_02", 50f);
+        protected override float BackdropSnowLine => 190f;
 
         protected override float Woods(float x, float z, float h)
         {
@@ -79,15 +86,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         protected override string TreeAt(float x, float z, float h, float pRoll, System.Random r, out float pScale)
         {
             pScale = 0.8f + (float)r.NextDouble() * 0.4f;
-            if (h > 85f) return pRoll < 0.6f ? (r.NextDouble() < 0.5 ? "Veg_Rock_A" : "Veg_Rock_C") : null;
+            if (h > 85f) return pRoll < 0.3f ? "Veg_SnowBush" : null;
             if (pRoll < 0.3f) return "Veg_Fir_Snowy_Large";
             if (pRoll < 0.55f) return "Veg_Fir_Snowy_Medium";
             if (pRoll < 0.7f) return "Veg_Fir_Medium";
             if (pRoll < 0.78f) return "Veg_Fir_Small";
             if (pRoll < 0.84f) return "Veg_Birch";
             if (pRoll < 0.93f) return "Veg_SnowBush";
-            pScale = 2f + (float)r.NextDouble() * 3f;
-            return r.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A";
+            return null;
         }
 
         protected override TerrainLayer[] Layers() => new[]
@@ -130,7 +136,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         protected override void Details()
         {
             // Real grass (alpine style) on the pastures the snow has left; the snow keeps its white.
-            K.RealGrass(World.GrassStyle.Alpine(), (x, z) => Built(x, z) || K.LandSlope(x, z) > 30f || K.GroundAt(x, z) < 0.05f ? 0f : 1f, new[] { Ground.DryGrass });
+            K.RealGrass(World.GrassStyle.Alpine(),
+                (x, z) => K.Covered(x, z) || OnStreet(x, z, 0.3f) >= 0 || K.LandSlope(x, z) > 30f || K.GroundAt(x, z) < 0.05f ? 0f : 1f,
+                new[] { Ground.DryGrass }, null, null,
+                (x, z) => Built(x, z) ? 0.15f : Mathf.Clamp01(0.5f + 0.3f * LandShape.Fbm(x, z, 9f, 2, 31.7f)));
             K.TallGrassDetail = null;
         }
 
@@ -179,6 +188,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Tunnels();
             Security();
             Snow();
+            Apron();
             Matches();
             Beats();
             Exits();

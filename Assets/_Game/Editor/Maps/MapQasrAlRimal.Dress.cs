@@ -29,7 +29,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             ArchOutdoor.Fountain(A, G(PLAZA, 0f), 2.2f);
             foreach (Vector2 p in new[] { new Vector2(8, -138), new Vector2(32, -138), new Vector2(8, -162), new Vector2(32, -162) })
             {
-                K.LandTree("Veg_DatePalm", p.x, p.y, 0.9f);
+                K.LandTree("Veg_DatePalm", p.x + (((int)p.y & 3) - 1.5f) * 1.1f, p.y + (((int)p.x & 3) - 1.5f) * 0.9f, 0.75f + (((int)(p.x + p.y)) & 3) * 0.08f);
                 A.Lamp(G(p + new Vector2(2, 0), 0f), 0f, new Color(1f, 0.78f, 0.5f), 14f, 2.2f);
             }
             // Covered souk streets: awnings overhead, stalls, the two arches framing the keep.
@@ -365,7 +365,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 A.Model("Prop_Crate_Wood", lDesk + new Vector3(1.6f, 0, 0.2f), 10f);
             }
             ArchOutdoor.Sign(A, G(lGateHall.x - 8.5f, lGateHall.z - 12.5f, 0f), 180f, "Petitions", true, new Color(0.15f, 0.35f, 0.3f));
-            for (int i = 0; i < 4; i++) { K.LandTree("Veg_DatePalm", -64f + i * 9f, 90f, 0.7f); K.LandTree("Veg_DatePalm", 24f + i * 9f, 90f, 0.7f); }
+            // (The court palms grow in clusters: Courts().)
             ArchOutdoor.Fountain(A, G(-3f, 76f, 0f), 2.4f);
             ArchOutdoor.GuardBooth(A, G(4.5f, 64.5f, 0f), 0f, false);
             for (int i = 0; i < 3; i++) A.Model("Furn_DiningTable", G(-30f + i * 6f, 70f + (i % 2) * 2f, 0f), 0f);

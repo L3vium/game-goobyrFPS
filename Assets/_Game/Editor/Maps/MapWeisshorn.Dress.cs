@@ -14,7 +14,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private void Deck(Rect pRect, float pY, bool pRailS, bool pRailE, bool pRailW)
         {
             ArchMesh lMesh = new ArchMesh();
-            ArchMat lDeck = ArchLib.Surface("wood_floor_deck", 2f), lPost = ArchLib.Surface("dark_wood", 1.5f);
+            ArchMat lDeck = ArchLib.Surface("wood_floor_deck", 2f), lPost = ArchLib.PlainMat("DarkSteel", new Color(0.16f, 0.17f, 0.18f), 0.45f, 0.85f);
             lMesh.BoxMinMax(lDeck, new Vector3(pRect.xMin, pY - 0.3f, pRect.yMin), new Vector3(pRect.xMax, pY, pRect.yMax));
             for (float x = pRect.xMin + 0.3f; x < pRect.xMax; x += 4f)
                 for (float z = pRect.yMin + 0.3f; z < pRect.yMax; z += 4f)

@@ -108,7 +108,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 floorDefault = ArchLib.Surface("large_floor_tiles_02", 2f),
                 lightColor = new Color(1f, 0.78f, 0.52f),
                 outerThickness = 0.55f,
-                windowSpacing = 4.2f
+                windowSpacing = 4.2f,
+                moorish = true,
+                shutters = false
             };
         }
 
@@ -116,7 +118,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public static ArchStyle Fortress()
         {
             ArchStyle s = Adobe(new Color(0.92f, 0.8f, 0.62f), "keep", false);
-            s.facade = ArchLib.Tinted("large_sandstone_blocks", new Color(1.45f, 1.15f, 0.82f), "fortress", 2.6f);
+            s.facade = ArchLib.Tinted("large_sandstone_blocks", new Color(1.1f, 0.95f, 0.8f), "fortress", 2.6f);
             s.cellarWall = s.facade;
             s.outerThickness = 0.8f;
             s.windowSpacing = 6f;

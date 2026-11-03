@@ -17,6 +17,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             _casa = CasaSpec(CASA, 0f);
             Lot(_casa, 2f, Ground.Cobble);
+            // The gravel drive from the frisk gate to the portico.
+            Road(4f, Ground.Asphalt, new Vector2(78f, 76f), new Vector2(94f, 85f), new Vector2(108f, 94f));
             _garage = Facing("Garage", new Vector2(140f, 124f), PAD_Y, 3, 12f, 11f, ArchStyles.Colonial(new Color(0.96f, 0.95f, 0.91f), "casa"), ZONE_HACIENDA);
             _garage.style.chimneys = 0;
             _garage.Room("GarageBay", 0, 0, 0, 12, 11, RoomType.Garage, SecurityTier.Restricted, AccessLevel.Staff);

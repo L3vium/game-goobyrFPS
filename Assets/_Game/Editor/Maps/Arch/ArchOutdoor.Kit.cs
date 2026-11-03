@@ -149,25 +149,22 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             ArchMesh lMesh = new ArchMesh();
             float y = pPost ? 1.7f : 0f;
             if (pPost) lMesh.Box(ArchLib.Iron, new Vector3(0, 0.85f, 0.03f), new Vector3(0.06f, 1.7f, 0.06f));
-            lMesh.Box(ArchLib.Tinted("painted_metal_shutter", lBack, "sign_" + ColorUtility.ToHtmlStringRGB(lBack), 1f), new Vector3(0, y, 0), new Vector3(0.95f, 0.34f, 0.03f), !pPost);
+            lMesh.Box(ArchLib.Tinted("painted_metal_shutter", lBack, "sign_" + ColorUtility.ToHtmlStringRGB(lBack), 1f), new Vector3(0, y, 0), new Vector3(1.22f, 0.32f, 0.03f), !pPost);
             lMesh.Flush(lRoot.transform, A.K.Map.sceneName + "_Sign_" + (_count++));
-            // White lettering on both faces.
-            foreach (float lFace in new[] { -1f, 1f })
+            // The painted face (both faces on a post), from the sign painter: readable, never mirrored.
+            Material lFace = ArchSigns.For(pText.ToUpperInvariant(), lBack, Color.white);
+            if (lFace == null) return;
+            foreach (float lSide in pPost ? new[] { -1f, 1f } : new[] { -1f })
             {
-                GameObject lText = new GameObject("Text");
-                lText.transform.SetParent(lRoot.transform, false);
-                lText.transform.localPosition = new Vector3(0, y, lFace * 0.02f);
-                lText.transform.localRotation = Quaternion.Euler(0, lFace < 0 ? 0f : 180f, 0);
-                TextMesh lLetters = lText.AddComponent<TextMesh>();
-                lLetters.text = pText.ToUpperInvariant();
-                lLetters.anchor = TextAnchor.MiddleCenter;
-                lLetters.alignment = TextAlignment.Center;
-                lLetters.characterSize = 0.04f;
-                lLetters.fontSize = 48;
-                lLetters.fontStyle = FontStyle.Bold;
-                lLetters.color = Color.white;
-                lText.transform.localScale = Vector3.one * Mathf.Min(1f, 12f / Mathf.Max(6, pText.Length));
-                if (!pPost) break;
+                GameObject lQuad = new GameObject("Face");
+                lQuad.transform.SetParent(lRoot.transform, false);
+                lQuad.transform.localPosition = new Vector3(0, y, lSide * 0.017f);
+                lQuad.transform.localRotation = Quaternion.Euler(0, lSide < 0 ? 0f : 180f, 0);
+                lQuad.transform.localScale = new Vector3(1.2f, 0.3f, 1f);
+                lQuad.AddComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
+                MeshRenderer lRenderer = lQuad.AddComponent<MeshRenderer>();
+                lRenderer.sharedMaterial = lFace;
+                lRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
         }
 

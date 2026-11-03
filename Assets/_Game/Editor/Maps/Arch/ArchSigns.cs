@@ -31,14 +31,18 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         };
 
         /// <summary>The lit material of a sign reading <paramref name="pText"/> (null when the font is missing).</summary>
-        public static Material For(string pText)
+        public static Material For(string pText) => For(pText, null, null);
+
+        /// <summary>A sign in given colours (a red "Staff only" plate, a green "Petitions" board).</summary>
+        public static Material For(string pText, Color? pBoard, Color? pInk)
         {
             if (string.IsNullOrEmpty(pText)) return null;
-            string lKey = Slug(pText);
+            string lKey = Slug(pText) + (pBoard.HasValue ? "_" + ColorUtility.ToHtmlStringRGB(pBoard.Value) : "");
             if (_materials.TryGetValue(lKey, out Material lCached) && lCached != null) return lCached;
             int lHash = 0;
             foreach (char ch in pText) lHash = lHash * 31 + ch;
             (Color lBoard, Color lInk) = PALETTE[(lHash & 0x7fffffff) % PALETTE.Length];
+            if (pBoard.HasValue) { lBoard = pBoard.Value; lInk = pInk ?? Color.white; }
             Texture2D lPainted = Paint(pText, lBoard, lInk, lHash);
             if (lPainted == null) return null;
             byte[] lBytes = lPainted.EncodeToPNG();

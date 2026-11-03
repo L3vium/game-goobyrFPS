@@ -17,7 +17,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// <see cref="Plan"/> (pads, roads, before the land exists) and <see cref="Dress"/> (buildings,
     /// props, NPCs, markers).
     /// </summary>
-    public abstract class RealMap : MapBuilderBase
+    public abstract partial class RealMap : MapBuilderBase
     {
         protected const float HALF = 250f, SIZE = 500f;
         protected virtual float MinY => -30f;
@@ -102,6 +102,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Details();
             Vegetate();
             CliffSkin();
+            CliffStrata();
+            Backdrop();
+            PairLoneGuards();
+            EntryLamps();
             Edges();
             K.CoverSpacing = 1.8f;
             K.DistanceCulling();
@@ -326,10 +330,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     if (lSlope > 38f)
                     {
                         // Scree slopes: boulders break up the rock faces.
-                        if (lSlope < 52f && lRandom.NextDouble() < 0.05) K.LandTree(lRandom.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A", px, pz, 1.5f + (float)lRandom.NextDouble() * 2f);
-                        // Cliff walls: big boulders half sunk into the face give a broken, layered silhouette
-                        // and hide the terrain texture stretched down the steep slope.
-                        else if (lSlope >= 52f && lRandom.NextDouble() < 0.2) CliffBoulder(CliffRock(lRandom), px, pz, 4f + (float)lRandom.NextDouble() * 6f, lRandom);
+                        if (ScreeRocks && lSlope < 52f && lRandom.NextDouble() < 0.05) K.LandTree(lRandom.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_A", px, pz, 1.5f + (float)lRandom.NextDouble() * 2f);
+                        // Cliff walls are dressed by CliffStrata (ledges, columns, talus) in the cliff rock.
                         continue;
                     }
                     float lWoods = Woods(px, pz, h);
@@ -771,6 +773,204 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         private Transform _cliffRocks;
+
+        /// <summary>The biome's rock models may lie on scree (the orange boulders don't belong on alpine slopes).</summary>
+        protected virtual bool ScreeRocks => true;
+        /// <summary>How the cliff walls are layered: strata spacing (m), ledge chance, basalt columns, buttresses, snow on the ledges.</summary>
+        protected virtual (float band, float ledges, bool columns, bool buttresses, bool snow) Strata => (3.5f, 0.35f, false, true, false);
+        /// <summary>The land beyond the map box (distant peaks, mesas, hills): height at a point, and the rock / high materials.</summary>
+        protected virtual float BackdropHeight(float pX, float pZ) => 40f + LandShape.Fbm(pX, pZ, 260f, 4, 4.2f) * 70f;
+        protected virtual ArchMat BackdropLow => ArchLib.Surface("rock_face", 40f);
+        protected virtual ArchMat BackdropHigh => ArchLib.Surface("rock_face", 40f);
+        protected virtual float BackdropSnowLine => 9999f;
+
+        /// <summary>
+        /// Layered rock on the cliff walls instead of boulder wallpaper: horizontal strata ledges snapped
+        /// to the biome's bands along the contour (snow on them where it snows), basalt column clusters or
+        /// buttresses against the face, and talus blocks at the foot. Render-only meshes in 64 m chunks.
+        /// </summary>
+        private void CliffStrata()
+        {
+            if (K.Land == null) return;
+            (float lBand, float lLedges, bool lColumns, bool lButtresses, bool lSnow) = Strata;
+            ArchMat lRock = CliffMaterial;
+            System.Random r = new System.Random(K.Map.sceneName.Length * 7919 + 13);
+            Transform lRoot = K.Group("CliffStrata", K.Env);
+            Vector3 lOrigin = K.Land.transform.position;
+            TerrainData lData = K.Land.terrainData;
+            Vector3 Out(float x, float z)
+            {
+                Vector3 n = lData.GetInterpolatedNormal((x - lOrigin.x) / lData.size.x, (z - lOrigin.z) / lData.size.z);
+                n.y = 0f;
+                return n.sqrMagnitude > 0.0001f ? n.normalized : Vector3.forward;
+            }
+            int lCount = 0;
+            const float CHUNK = 64f, STEP = 3f;
+            for (float cx = -HALF; cx < HALF; cx += CHUNK)
+                for (float cz = -HALF; cz < HALF; cz += CHUNK)
+                {
+                    ArchMesh lMesh = new ArchMesh();
+                    bool lAny = false;
+                    for (float x = cx; x < cx + CHUNK; x += STEP)
+                        for (float z = cz; z < cz + CHUNK; z += STEP)
+                        {
+                            float px = x + (float)r.NextDouble() * STEP, pz = z + (float)r.NextDouble() * STEP;
+                            if (Built(px, pz) || HoleAt(px, pz)) continue;
+                            float lSlope = K.LandSlope(px, pz), h = K.GroundAt(px, pz);
+                            if (h < WaterLevel + 0.3f) continue;
+                            Vector3 lOut = Out(px, pz), lAlong = Vector3.Cross(Vector3.up, lOut);
+                            if (lSlope >= 50f)
+                            {
+                                if (r.NextDouble() < lLedges)
+                                {
+                                    // A stratum: a slab along the contour at the nearest band line, jutting out of the face.
+                                    float y = Mathf.Round(h / lBand) * lBand;
+                                    if (Mathf.Abs(y - h) > lBand * 0.5f) y = h;
+                                    float lLength = 3.5f + (float)r.NextDouble() * 4f, lThick = 0.35f + (float)r.NextDouble() * 0.6f, lDepth = 1.1f + (float)r.NextDouble() * 1.1f;
+                                    Vector3 lAt = new Vector3(px, y, pz) + lOut * (lDepth * 0.25f);
+                                    Quaternion lTurn = Quaternion.LookRotation(lOut) * Quaternion.Euler(((float)r.NextDouble() - 0.5f) * 6f, 0f, ((float)r.NextDouble() - 0.5f) * 5f);
+                                    lMesh.Box(lRock, lAt, new Vector3(lLength, lThick, lDepth), lTurn, false);
+                                    if (lSnow) lMesh.Box(ArchLib.Snow, lAt + lTurn * new Vector3(0f, lThick * 0.5f + 0.06f, 0.05f), new Vector3(lLength * 0.92f, 0.12f, lDepth * 0.85f), lTurn, false);
+                                    lAny = true; lCount++;
+                                }
+                                if (lColumns && r.NextDouble() < 0.1)
+                                {
+                                    // Basalt organ pipes: a cluster of hexagonal columns standing against the face.
+                                    int n = 3 + r.Next(5);
+                                    for (int k = 0; k < n; k++)
+                                    {
+                                        float lRadius = 0.45f + (float)r.NextDouble() * 0.3f, lHeight = 5f + (float)r.NextDouble() * 8f;
+                                        Vector3 lBase = new Vector3(px, h - 1.5f, pz) + lAlong * ((k - n * 0.5f) * lRadius * 1.75f) + lOut * (0.3f + (float)r.NextDouble() * 0.4f);
+                                        lMesh.Cylinder(lRock, lBase, lRadius, lHeight, 6, false, true);
+                                    }
+                                    lAny = true; lCount++;
+                                }
+                                else if (lButtresses && r.NextDouble() < 0.06)
+                                {
+                                    // A buttress: a pillar of rock standing proud of the wall.
+                                    float lHeight = 5f + (float)r.NextDouble() * 7f, lWide = 1.4f + (float)r.NextDouble() * 1.4f;
+                                    lMesh.Box(lRock, new Vector3(px, h - 1f + lHeight * 0.5f, pz) + lOut * (lWide * 0.3f), new Vector3(lWide, lHeight, lWide * 0.8f), Quaternion.LookRotation(lOut) * Quaternion.Euler(0f, 0f, ((float)r.NextDouble() - 0.5f) * 8f), false);
+                                    lAny = true; lCount++;
+                                }
+                            }
+                            else if (lSlope > 26f && lSlope < 46f && r.NextDouble() < 0.18 && K.LandSlope(px - lOut.x * 5f, pz - lOut.z * 5f) >= 50f)
+                            {
+                                // Talus at the foot of the wall: fallen blocks, half buried.
+                                int n = 1 + r.Next(3);
+                                for (int k = 0; k < n; k++)
+                                {
+                                    float s = 0.4f + (float)r.NextDouble() * 1.1f;
+                                    float qx = px + ((float)r.NextDouble() - 0.5f) * 2.5f, qz = pz + ((float)r.NextDouble() - 0.5f) * 2.5f;
+                                    Quaternion lTurn = Quaternion.Euler((float)r.NextDouble() * 40f - 20f, (float)r.NextDouble() * 360f, (float)r.NextDouble() * 40f - 20f);
+                                    Vector3 lAt = new Vector3(qx, K.GroundAt(qx, qz) + s * 0.2f, qz);
+                                    lMesh.Box(lRock, lAt, new Vector3(s * 1.3f, s * 0.8f, s), lTurn, false);
+                                    if (lSnow) lMesh.Box(ArchLib.Snow, lAt + Vector3.up * (s * 0.42f), new Vector3(s * 1.1f, 0.1f, s * 0.8f), Quaternion.Euler(0f, lTurn.eulerAngles.y, 0f), false);
+                                }
+                                lAny = true; lCount++;
+                            }
+                        }
+                    if (lAny) lMesh.Flush(lRoot, K.Map.sceneName + "_Strata_" + (int)cx + "_" + (int)cz, 0, true);
+                }
+            Debug.Log($"[Build] {K.Map.sceneName}: {lCount} strata, columns, buttresses and talus");
+        }
+
+        /// <summary>
+        /// The land beyond the map box, so the edges read as country rather than walls: a ring of terrain
+        /// from just outside the box to 1.5 km (sunk under the map inside the box), shaped by the map's
+        /// <see cref="BackdropHeight"/>, rock below its snow (or high) line. No colliders.
+        /// </summary>
+        private void Backdrop()
+        {
+            Transform lRoot = K.Group("Backdrop", K.Env);
+            ArchMesh lMesh = new ArchMesh();
+            const int ANGLES = 120;
+            float[] lRadii = { 230f, 255f, 285f, 320f, 370f, 430f, 510f, 610f, 740f, 900f, 1100f, 1350f, 1600f };
+            Vector3 Point(int a, int i)
+            {
+                float lAngle = a * Mathf.PI * 2f / ANGLES, rr = lRadii[i];
+                float x = Mathf.Cos(lAngle) * rr, z = Mathf.Sin(lAngle) * rr;
+                float h = BackdropHeight(x, z) * Mathf.Clamp01((rr - 250f) / 160f) + MinY * (1f - Mathf.Clamp01((rr - 250f) / 160f));
+                if (Mathf.Abs(x) < HALF + 4f && Mathf.Abs(z) < HALF + 4f) h = Mathf.Min(h, MinY - 30f);
+                return new Vector3(x, h, z);
+            }
+            for (int a = 0; a < ANGLES; a++)
+                for (int i = 0; i < lRadii.Length - 1; i++)
+                {
+                    Vector3 p0 = Point(a, i), p1 = Point(a + 1, i), p2 = Point(a + 1, i + 1), p3 = Point(a, i + 1);
+                    float lMean = (p0.y + p1.y + p2.y + p3.y) * 0.25f;
+                    lMesh.Quad(lMean > BackdropSnowLine ? BackdropHigh : BackdropLow, p0, p3, p2, p1, false);
+                }
+            lMesh.Flush(lRoot, K.Map.sceneName + "_Backdrop", 0, true);
+        }
+
+        /// <summary>
+        /// Every stealth entry shows itself from its approach (C4): a caged bulb over each vent grille,
+        /// coal chute, hatch, well shaft, tunnel mouth and drop ladder on the pause map, lit at night.
+        /// </summary>
+        private void EntryLamps()
+        {
+            int n = 0;
+            Transform lEntryRoot = null;
+            foreach (MapPoi lPoi in Object.FindObjectsByType<MapPoi>(FindObjectsSortMode.None))
+            {
+                string lLabel = lPoi.Label ?? "";
+                bool lEntry = lPoi.Type == MapPoi.Kind.Vent || lPoi.Type == MapPoi.Kind.Underground || lPoi.Type == MapPoi.Kind.Shortcut
+                    || System.Text.RegularExpressions.Regex.IsMatch(lLabel, "chute|well|qanat|cave|crevasse|bay|boarded|hatch|ladder|duct|window", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (!lEntry || n >= 24) continue;
+                Vector3 p = lPoi.transform.position + Vector3.up * 1.9f;
+                // On a post when the entry is near the ground, else a bulb on a bracket against the wall.
+                float lGround = K.GroundAt(p.x, p.z), lPole = p.y - lGround;
+                if (lEntryRoot == null) lEntryRoot = K.Group("EntryLamps", K.Env);
+                if (lPole > 0.5f && lPole < 3.2f)
+                    A.BoxObject("EntryLampPost", new Vector3(p.x, lGround, p.z), 0f, lEntryRoot, 0, true,
+                        (ArchLib.Iron, new Vector3(0, lPole * 0.5f, 0), new Vector3(0.07f, lPole + 0.1f, 0.07f)),
+                        (ArchLib.Iron, new Vector3(0, lPole + 0.12f, 0), new Vector3(0.18f, 0.04f, 0.18f)),
+                        (ArchLib.LampGlow, new Vector3(0, lPole, 0), new Vector3(0.12f, 0.18f, 0.12f)));
+                else
+                    A.BoxObject("EntryLamp", p, 0f, lEntryRoot, 0, false,
+                        (ArchLib.Iron, new Vector3(0, 0.12f, 0), new Vector3(0.14f, 0.04f, 0.14f)),
+                        (ArchLib.LampGlow, new Vector3(0, 0, 0), new Vector3(0.1f, 0.16f, 0.1f)));
+                Light lLight = new GameObject("EntryLight").AddComponent<Light>();
+                lLight.transform.SetParent(K.Lights, false);
+                lLight.transform.position = p + Vector3.down * 0.2f;
+                lLight.type = LightType.Point;
+                lLight.range = 6f;
+                lLight.intensity = 1.4f;
+                lLight.color = new Color(1f, 0.78f, 0.5f);
+                lLight.shadows = LightShadows.None;
+                n++;
+            }
+            Debug.Log($"[Build] {K.Map.sceneName}: {n} entry lamps");
+        }
+
+        /// <summary>
+        /// A guard alone on a street or in a clearing gets a partner (C7): an armed post outdoors with no
+        /// other armed NPC within 8 m gets a second guard 1.6 m beside it, facing the same way.
+        /// </summary>
+        private void PairLoneGuards()
+        {
+            List<NpcSpawnPoint> lArmed = new List<NpcSpawnPoint>();
+            foreach (NpcSpawnPoint lSpawn in Object.FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
+                if (lSpawn.Role != NpcRole.Worker && lSpawn.Role != NpcRole.Target) lArmed.Add(lSpawn);
+            Systems.BuildingVolume[] lVolumes = Object.FindObjectsByType<Systems.BuildingVolume>(FindObjectsSortMode.None);
+            int lAdded = 0;
+            foreach (NpcSpawnPoint lGuard in lArmed.ToArray())
+            {
+                if (lGuard.Role != NpcRole.Guard) continue;
+                Vector3 p = lGuard.transform.position;
+                bool lInside = false;
+                foreach (Systems.BuildingVolume v in lVolumes) if (v.Contains(p + Vector3.up)) { lInside = true; break; }
+                if (lInside) continue;
+                bool lAlone = true;
+                foreach (NpcSpawnPoint o in lArmed) if (o != lGuard && Vector3.Distance(o.transform.position, p) < 8f) { lAlone = false; break; }
+                if (!lAlone) continue;
+                Vector3 lBeside = p + lGuard.transform.right * 1.6f;
+                NpcSpawnPoint lMate = A.Npc(NpcRole.Guard, new Vector3(lBeside.x, K.GroundAt(lBeside.x, lBeside.z) + 0.05f, lBeside.z), lGuard.transform.eulerAngles.y - 20f, lGuard.Zone, Data.ItemKind.Pistol);
+                lArmed.Add(lMate);
+                lAdded++;
+            }
+            if (lAdded > 0) Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} lone guards paired");
+        }
 
         private void Edges()
         {

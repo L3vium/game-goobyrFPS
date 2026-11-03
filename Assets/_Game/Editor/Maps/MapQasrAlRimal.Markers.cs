@@ -160,7 +160,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Gun(_pressR.InRoom("PressLoft", 0.5f, 0.5f, 0.1f)); Gun(_kasbahR.InRoom("KasbahUpper", 0.5f, 0.5f, 0.1f)); Gun(_baseR.At(2f, 0, 5f, 0.1f));
             Gun(_bunkerR.InRoom("BunkerHall", 0.2f, 0.5f, 0.1f)); Gun(_bunkerR.InRoom("BunkerCellar", 0.5f, 0.5f, 0.1f)); Gun(_bunkerR.InRoom("BunkerBunks", 0.5f, 0.5f, 0.1f));
             Gun(G(122f, 104f, 0.2f)); Gun(G(170f, 110f, 0.1f));
-            foreach (ArchResult b in _bastions) { Gun(b.Center("BastionGuard", 0.1f)); Gun(b.Center("BastionTop", 0.1f)); }
+            foreach (ArchResult b in _bastions) { if (!b.spec.name.StartsWith("Bastion")) continue; Gun(b.Center("BastionGuard", 0.1f)); Gun(b.Center("BastionTop", 0.1f)); }
             Gun(Kp(28f, -1, 28f, 0.1f)); Gun(Kp(30f, -1, 31f, 0.1f)); Gun(Kp(30f, 0, 20f, 0.1f)); Gun(Kp(5f, 2, 26f, 0.1f));
             Gun(Kp(28f, 2, 30f, 0.1f)); Gun(Kp(5f, 3, 5f, 0.1f)); Gun(Kp(17f, 2, 5f, 0.1f)); Gun(G(-50f, 128f, 0.1f));
             K.Weapon(ItemKind.Sniper, new Vector3(NEEDLE.x + 1f, 60.25f, NEEDLE.y + 1f));

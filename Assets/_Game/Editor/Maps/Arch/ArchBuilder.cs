@@ -500,6 +500,58 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (lKind == WallKind.Facade && st.quoins && s.floor >= 0) Quoins(c, s, n, lSide, y0, H);
         }
 
+        /// <summary>
+        /// A Moorish opening: the rectangular hole closed at the top into a horseshoe arch (masonry fills in
+        /// the upper corners), an alfiz frame round it, a stone sill, and on upper floors every other window
+        /// a mashrabiya oriel - a wooden lattice box standing out of the wall - instead of shutters.
+        /// </summary>
+        private static void MoorishWindow(Ctx c, Seg s, float n, ArchWindow w, float sa, float y0, float s0, float s1, float b, float t, float pBottom, float lT)
+        {
+            ArchStyle st = c.spec.style;
+            if (w.kind == WindowKind.Open || w.kind == WindowKind.Glazed || w.kind == WindowKind.French || w.kind == WindowKind.Boarded) c.result.keepClear.Add((s.floor, ClearRect(s, n, s0, s1, lT, 0.6f), false));
+            float lHalf = (s1 - s0) * 0.5f, lArch = Mathf.Min(lHalf * 1.1f, 0.75f), lSpring = t - lArch;
+            ArchMat lWall = st.facade;
+            const int BANDS = 7;
+            for (int k = 0; k < BANDS; k++)
+            {
+                float y = lSpring + lArch * k / BANDS, y1 = lSpring + lArch * (k + 1) / BANDS, lMid = (y + y1) * 0.5f;
+                float u = Mathf.Clamp01((lMid - lSpring) / lArch);
+                // A horseshoe: the arch a little wider than the jambs just above the springing, then closing.
+                float lOpen = lHalf * Mathf.Sqrt(Mathf.Max(0f, 1f - u * u)) * (u < 0.35f ? 1.08f : 1f);
+                float lFill = Mathf.Clamp(lHalf - lOpen, 0f, lHalf);
+                if (lFill > 0.01f)
+                {
+                    SegBox(c, s, n, s0, s0 + lFill, y, y1, -lT, 0f, lWall, false);
+                    SegBox(c, s, n, s1 - lFill, s1, y, y1, -lT, 0f, lWall, false);
+                }
+                SegBox(c, s, n, s0 + lFill - 0.06f, s0 + lFill, y, y1, -0.01f, 0.03f, st.trim, false);
+                SegBox(c, s, n, s1 - lFill, s1 - lFill + 0.06f, y, y1, -0.01f, 0.03f, st.trim, false);
+            }
+            // The alfiz: a rectangular frame enclosing the arch.
+            SegBox(c, s, n, s0 - 0.2f, s0 - 0.12f, lSpring - 0.1f, t + 0.2f, -0.01f, 0.04f, st.trim, false);
+            SegBox(c, s, n, s1 + 0.12f, s1 + 0.2f, lSpring - 0.1f, t + 0.2f, -0.01f, 0.04f, st.trim, false);
+            SegBox(c, s, n, s0 - 0.2f, s1 + 0.2f, t + 0.12f, t + 0.2f, -0.01f, 0.04f, st.trim, false);
+            if (pBottom > 0.05f) SegBox(c, s, n, s0 - 0.1f, s1 + 0.1f, b - 0.07f, b, -lT - 0.02f, 0.1f, st.trim);
+            bool lOriel = s.floor >= 1 && pBottom > 0.05f && ((int)(sa * 3.1f) + s.floor) % 2 == 0 && w.kind != WindowKind.Slit;
+            if (!lOriel) return;
+            ArchMat lWood = st.shutter ?? st.door ?? st.trim;
+            float o0 = s0 - 0.12f, o1 = s1 + 0.12f, ob = b - 0.25f, ot = lSpring + 0.1f, D = 0.42f;
+            // Base corbel, roof cap, corner posts.
+            SegBox(c, s, n, o0 - 0.05f, o1 + 0.05f, ob - 0.12f, ob, 0f, D + 0.04f, lWood);
+            SegBox(c, s, n, o0 - 0.08f, o1 + 0.08f, ot, ot + 0.1f, 0f, D + 0.08f, lWood, false);
+            foreach (float e in new[] { o0, o1 - 0.06f }) SegBox(c, s, n, e, e + 0.06f, ob, ot, D - 0.06f, D, lWood, false);
+            // The lattice: thin turned bars both ways on the front and the two cheeks.
+            for (float x = o0 + 0.14f; x < o1 - 0.08f; x += 0.14f) SegBox(c, s, n, x, x + 0.025f, ob, ot, D - 0.04f, D - 0.015f, lWood, false);
+            for (float y = ob + 0.14f; y < ot - 0.05f; y += 0.14f)
+            {
+                SegBox(c, s, n, o0, o1, y, y + 0.025f, D - 0.04f, D - 0.015f, lWood, false);
+                SegBox(c, s, n, o0, o0 + 0.025f, y, y + 0.025f, 0f, D, lWood, false);
+                SegBox(c, s, n, o1 - 0.025f, o1, y, y + 0.025f, 0f, D, lWood, false);
+            }
+            // A solid panel low down (the seat inside), so the oriel can be leaned on from the room.
+            SegBox(c, s, n, o0, o1, ob, ob + 0.5f, D - 0.05f, D - 0.03f, lWood, true);
+        }
+
         /// <summary>A plinth course with a weathered cap: the base, then a thin projecting coping on top.</summary>
         private static void PlinthRun(Ctx c, Seg s, float n, float s0, float s1, float yb, float yt, ArchMat pMat)
         {
@@ -616,6 +668,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 SegBox(c, s, n, s0, s1, b + (t - b) * 0.62f, b + (t - b) * 0.62f + 0.05f, fd0 + 0.01f, fd1 - 0.01f, lFrame, false);
             }
             if (lGlass) SegBox(c, s, n, s0 + 0.05f, s1 - 0.05f, b + 0.03f, t - 0.05f, -lT * 0.55f - 0.012f, -lT * 0.55f + 0.012f, ArchLib.Glass, true);
+            if (st.moorish) { MoorishWindow(c, s, n, w, sa, y0, s0, s1, b, t, lBottom, lT); return; }
             // A deep stone sill (a hangable ledge) and the surround; rain streaks under every other one.
             if (lBottom > 0.05f)
             {
@@ -1351,6 +1404,23 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 SegBox(c, s, n, k, k + 0.25f, y - 0.55f, y - 0.22f, 0f, d * 0.45f, st.trim);
                 SegBox(c, s, n, k, k + 0.25f, y - 0.8f, y - 0.55f, 0f, d * 0.2f, st.trim);
+            }
+            if (st.moorish)
+            {
+                ArchMat lWood = st.shutter ?? st.door ?? st.trim;
+                SegBox(c, s, n, s0, s1, y + 2.3f, y + 2.42f, -0.05f, d + 0.1f, lWood);
+                foreach (float e in new[] { s0, s1 - 0.08f }) SegBox(c, s, n, e, e + 0.08f, y + 0.04f, y + 2.3f, d - 0.08f, d, lWood);
+                for (float k = s0 + 0.14f; k < s1 - 0.1f; k += 0.14f) SegBox(c, s, n, k, k + 0.025f, y + 0.6f, y + 2.3f, d - 0.05f, d - 0.025f, lWood, false);
+                for (float yy = y + 0.74f; yy < y + 2.28f; yy += 0.14f) SegBox(c, s, n, s0, s1, yy, yy + 0.025f, d - 0.05f, d - 0.025f, lWood, false);
+                SegBox(c, s, n, s0, s1, y + 0.04f, y + 0.6f, d - 0.06f, d - 0.02f, lWood);
+                for (float k = 0.14f; k < d - 0.06f; k += 0.14f)
+                {
+                    SegBox(c, s, n, s0, s0 + 0.025f, y + 0.6f, y + 2.3f, k, k + 0.025f, lWood, false);
+                    SegBox(c, s, n, s1 - 0.025f, s1, y + 0.6f, y + 2.3f, k, k + 0.025f, lWood, false);
+                }
+                SegBox(c, s, n, s0, s0 + 0.04f, y + 0.04f, y + 0.6f, 0f, d, lWood);
+                SegBox(c, s, n, s1 - 0.04f, s1, y + 0.04f, y + 0.6f, 0f, d, lWood);
+                return;
             }
             // Wrought-iron railing: top rail, bottom rail, bars, posts; collision by invisible panels.
             SegBox(c, s, n, s0, s1, y + 0.98f, y + 1.05f, d - 0.07f, d, ArchLib.Iron, false);

@@ -97,18 +97,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     lMaterial = new Material(Shader.Find("Universal Render Pipeline/Lit"));
                     AssetDatabase.CreateAsset(lMaterial, lPath);
                 }
-                lMaterial.SetFloat("_Surface", 1f);
-                lMaterial.SetFloat("_Blend", 0f);
-                lMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                lMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                lMaterial.SetFloat("_ZWrite", 0f);
-                lMaterial.SetFloat("_Cull", 0f);
-                lMaterial.SetOverrideTag("RenderType", "Transparent");
-                lMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                lMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-                lMaterial.SetColor("_BaseColor", new Color(0.55f, 0.62f, 0.66f, 0.32f));
-                lMaterial.SetFloat("_Smoothness", 0.96f);
-                lMaterial.SetFloat("_Metallic", 0.1f);
+                // Clear glass with Fresnel reflections and a dim room behind empty shells (world track).
+                lMaterial = PbrLibrary.WindowGlass(lMaterial) ?? lMaterial;
                 EditorUtility.SetDirty(lMaterial);
                 return _mats["glass"] = new ArchMat("glass", lMaterial, 1f);
             }

@@ -180,6 +180,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public bool posters;
         /// <summary>Most chimneys on one pitched roof (about one per 14 m of ridge); 0: none.</summary>
         public int chimneys;
+        /// <summary>Moorish openings: horseshoe arches in an alfiz frame, mashrabiya lattice oriels instead of shutters and iron balconies.</summary>
+        public bool moorish;
     }
 
     /// <summary>A building to generate: footprint, floors, rooms, openings, stairs, roofs, vents, climbs.</summary>

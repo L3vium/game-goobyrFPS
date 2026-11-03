@@ -48,8 +48,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private static bool Clear(Vector3 p) => !Physics.CheckSphere(p, 0.35f, ~0, QueryTriggerInteraction.Ignore);
 
         /// <summary>The first viewpoint round a target (distance, height) with a clear line of sight to it.</summary>
-        private static bool View(Vector3 pTarget, Vector3 pPreferred, float pDistance, float pUp, out Vector3 pFrom)
+        private static bool View(Vector3 pTarget, Vector3 pPreferred, float pDistance, float pUp, out Vector3 pFrom, bool pOutdoors = false)
         {
+            Systems.BuildingVolume[] lVolumes = pOutdoors ? Object.FindObjectsByType<Systems.BuildingVolume>(FindObjectsSortMode.None) : new Systems.BuildingVolume[0];
             Vector3 lFlat = pPreferred;
             lFlat.y = 0f;
             if (lFlat.sqrMagnitude < 0.01f) lFlat = Vector3.back;
@@ -61,6 +62,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 {
                     Vector3 p = pTarget + Quaternion.Euler(0, lAngle, 0) * lFlat * pDistance * lScale + Vector3.up * pUp;
                     if (!Clear(p)) continue;
+                    bool lIndoors = false;
+                    foreach (Systems.BuildingVolume v in lVolumes) if (v.Contains(p)) { lIndoors = true; break; }
+                    if (lIndoors) continue;
                     if (Physics.Linecast(p, pTarget, out RaycastHit lHit, ~0, QueryTriggerInteraction.Ignore) && lHit.distance < Vector3.Distance(p, pTarget) - 1.2f) continue;
                     pFrom = p;
                     return true;
@@ -211,6 +215,36 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private static Vector3 _panic;
 
+        /// <summary>The stealth entries (vents, chutes, wells, tunnel mouths, drop ladders) from their approach, at eye height.</summary>
+        public static string EntryShots(string pDir, string pPrefix, int pMax = 10)
+        {
+            Physics.SyncTransforms();
+            System.Text.StringBuilder lLog = new System.Text.StringBuilder();
+            Systems.BuildingVolume[] lVolumes = Object.FindObjectsByType<Systems.BuildingVolume>(FindObjectsSortMode.None);
+            int n = 0;
+            foreach (UI.MapPoi lPoi in Object.FindObjectsByType<UI.MapPoi>(FindObjectsSortMode.None))
+            {
+                string lLabel = lPoi.Label ?? "";
+                bool lEntry = lPoi.Type == UI.MapPoi.Kind.Vent || lPoi.Type == UI.MapPoi.Kind.Underground || lPoi.Type == UI.MapPoi.Kind.Shortcut
+                    || System.Text.RegularExpressions.Regex.IsMatch(lLabel, "chute|well|qanat|cave|crevasse|bay|boarded|hatch|ladder|duct", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (!lEntry || n >= pMax) continue;
+                Vector3 p = lPoi.transform.position;
+                // Approach from outside: away from the nearest building's middle.
+                Vector3 lAway = Vector3.back;
+                float lBest = float.MaxValue;
+                foreach (Systems.BuildingVolume v in lVolumes)
+                {
+                    float d = Vector3.Distance(v.transform.position, p);
+                    if (d < lBest) { lBest = d; lAway = p - v.transform.position; }
+                }
+                lAway.y = 0f;
+                if (!View(p + Vector3.up * 0.6f, lAway, 6f, 1.0f, out Vector3 lFrom, true)) View(p + Vector3.up * 0.6f, lAway, 4f, 1.0f, out lFrom);
+                string lName = System.Text.RegularExpressions.Regex.Replace(lLabel.ToLowerInvariant(), "[^a-z0-9]+", "_").Trim('_');
+                lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_entry{n++}_{lName}.png"), lFrom, p + Vector3.up * 0.6f, 64f)).Append('\n');
+            }
+            return lLog.ToString();
+        }
+
         /// <summary>Play mode: patrols caught walking (moving ones, 25 m apart), each from ahead and to one side.</summary>
         public static string PatrolShots(string pDir, string pPrefix, int pCount)
         {
@@ -296,7 +330,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 // Four times of day on the key building, from a clear point on its approach.
                 // A clear view of the building from its front, a little above the ground.
                 Vector3 lTo = c + Vector3.up * 2f;
-                View(lTo, -lKey.transform.forward + lKey.transform.right * 0.6f, r * 0.9f, 6f, out Vector3 lFrom);
+                View(lTo, -lKey.transform.forward + lKey.transform.right * 0.6f, r * 0.9f, 6f, out Vector3 lFrom, true);
                 string[] lNames = { "dawn", "noon", "dusk", "night" };
                 for (int t = 0; t < 4; t++)
                 {
@@ -316,7 +350,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lSeen.Add(p);
                 Vector3 lOut = -d.transform.forward;
                 // From across the street, with a clear line to the poster (else the next poster).
-                if (!View(p, lOut + Vector3.Cross(Vector3.up, lOut) * 0.35f, 6.5f, 0f, out Vector3 lFrom)) continue;
+                if (!View(p, lOut + Vector3.Cross(Vector3.up, lOut) * 0.35f, 6.5f, 0f, out Vector3 lFrom, true)) continue;
                 lLog.Append(Shot(Path.Combine(pDir, $"{pPrefix}_street{n++}.png"), lFrom, p + Vector3.down * 0.5f, 62f)).Append('\n');
             }
             // A dressed corner of the key building (quoins or a chamfer), from the ground.

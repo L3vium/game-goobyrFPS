@@ -102,6 +102,20 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return r.NextDouble() < 0.5 ? "Veg_Rock_B" : "Veg_Rock_C";
         }
 
+        private static ArchMat _sandstone;
+        protected override ArchMat CliffMaterial => _sandstone != null && _sandstone.material != null ? _sandstone : _sandstone = new ArchMat("rock_desert", PbrLibrary.Rock("cliff_side", new Color(0.95f, 0.82f, 0.66f), new Color(0.78f, 0.62f, 0.48f), 0f, "desert", 7f, 2.5f), 7f);
+        protected override (float band, float ledges, bool columns, bool buttresses, bool snow) Strata => (2.2f, 0.5f, false, true, false);
+        protected override float BackdropHeight(float x, float z)
+        {
+            // Flat-topped mesas standing out of dunes.
+            float n = LandShape.Fbm(x, z, 260f, 3, 6.6f);
+            float lMesa = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((n - 0.12f) * 9f));
+            return Mathf.Lerp(8f + LandShape.Fbm(x, z, 90f, 2, 1.3f) * 10f, 85f + LandShape.Fbm(x, z, 400f, 2, 2.2f) * 30f, lMesa);
+        }
+        protected override ArchMat BackdropLow => ArchLib.Tinted("coast_sand_01", new Color(1f, 0.85f, 0.65f), "dune_far", 50f);
+        protected override ArchMat BackdropHigh => ArchLib.Tinted("cliff_side", new Color(1f, 0.82f, 0.62f), "mesa_far", 50f);
+        protected override float BackdropSnowLine => 40f;
+
         protected override TerrainLayer[] Layers() => new[]
         {
             PbrLibrary.Layer("dry_ground_01", 5f), PbrLibrary.Layer("gravelly_sand", 5f), PbrLibrary.Layer("cracked_red_ground", 5f),
@@ -125,11 +139,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // Real grass: lush under the palms of the grove, straw tufts in the desert (no layer tinted:
             // the oasis ground is the desert's).
             K.RealGrass(World.GrassStyle.Oasis(), (x, z) =>
-            {
-                bool lGrove = z > -100f && z < -24f && x > -160f && x < 150f;
-                if (Built(x, z) || K.LandSlope(x, z) > 30f) return 0f;
-                return lGrove ? Mathf.Clamp01(0.6f + LandShape.Fbm(x, z, 15f, 2, 3f)) : Mathf.Clamp01(LandShape.Fbm(x, z, 18f, 2, 7f) - 0.15f) * 0.6f;
-            }, null, null, (x, z) => z > -100f && z < -24f && x > -160f && x < 150f ? 0.25f : 0.85f);
+                {
+                    if (K.Covered(x, z) || OnStreet(x, z, 0.3f) >= 0 || K.LandSlope(x, z) > 30f) return 0f;
+                    bool lGrove = z > -100f && z < -24f && x > -160f && x < 150f;
+                    return lGrove ? Mathf.Clamp01(0.6f + LandShape.Fbm(x, z, 15f, 2, 3f)) : Mathf.Clamp01(LandShape.Fbm(x, z, 7f, 2, 7f) * 1.6f - 0.35f) * 0.55f;
+                },
+                new[] { Ground.Grass, Ground.DryGrass, Ground.Dirt, Ground.Sand }, null,
+                (x, z) => z > -100f && z < -24f && x > -160f && x < 150f ? 0.25f : 0.9f,
+                (x, z) => Mathf.Clamp01(0.35f + 0.45f * LandShape.Fbm(x, z, 5f, 2, 4.4f)));
             K.TallGrassDetail = null;
         }
 
@@ -183,6 +200,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             DressCitadel();
             Tunnels();
             Security();
+            Courts();
             Matches();
             Beats();
             Exits();

@@ -44,9 +44,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Cowering where it stands; safe at its exit (on the phone).</summary>
         private bool _cowering, _safe;
 
-        /// <summary>The pose of a fleeing civilian standing still: frozen staring during the startle, on the phone once out, cowering otherwise.</summary>
+        /// <summary>
+        /// The pose of a fleeing civilian standing still: cowering when it decided to, on the phone once out,
+        /// otherwise none (frozen in the startle, or a beat while its way out is worked out).
+        /// </summary>
         private Com.IsartDigital.GoobyrFPS.FX.BodyPose CrowdFleePose() => Time.time < _startledUntil ? Com.IsartDigital.GoobyrFPS.FX.BodyPose.None
-            : _safe && !_cowering ? Com.IsartDigital.GoobyrFPS.FX.BodyPose.Phone : Com.IsartDigital.GoobyrFPS.FX.BodyPose.Cower;
+            : _cowering ? Com.IsartDigital.GoobyrFPS.FX.BodyPose.Cower : _safe ? Com.IsartDigital.GoobyrFPS.FX.BodyPose.Phone : Com.IsartDigital.GoobyrFPS.FX.BodyPose.None;
 
         /// <summary>Host: a new match (statics outlive a match on the host).</summary>
         private static void ResetCrowd() => _incidents.Clear();

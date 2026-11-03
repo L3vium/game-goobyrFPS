@@ -32,6 +32,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private PlayerAvatar _player;
         private readonly StringBuilder _log = new StringBuilder();
+        private readonly List<Renderer> _hiddenArms = new List<Renderer>();
         private const string GAME_ROOT = "Assets/_Game/Prefabs/Net/P_GameRoot.prefab";
 
         public IEnumerator Run()
@@ -91,17 +92,23 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private IEnumerator GuardEngages()
         {
-            Npc lGuard = null;
-            Vector3 lStand = Vector3.zero;
+            // The guard nearest the crowd: the town is open ground (the jungle posts hide everyone in leaves).
+            Vector3 lTown = CrowdCentre(out _);
+            List<Npc> lGuards = new List<Npc>();
             foreach (Npc lNpc in Npc.All)
+                if (lNpc != null && lNpc.Health.IsAlive && lNpc.Role == NpcRole.Guard && lNpc.State.Value == NpcState.Idle) lGuards.Add(lNpc);
+            lGuards.Sort((a, b) => (a.transform.position - lTown).sqrMagnitude.CompareTo((b.transform.position - lTown).sqrMagnitude));
+            Npc lGuard = null;
+            Vector3 lStand = Vector3.zero, lCamera = Vector3.zero;
+            foreach (Npc lNpc in lGuards)
             {
-                if (lNpc == null || !lNpc.Health.IsAlive || lNpc.Role != NpcRole.Guard || lNpc.State.Value != NpcState.Idle) continue;
-                if (SecurityZone.At(lNpc.transform.position) == SecurityTier.Public) continue;
                 Vector3 lWish = lNpc.transform.position + lNpc.transform.forward * 9f;
                 if (!NavMesh.SamplePosition(lWish, out NavMeshHit lHit, 1.5f, NavMesh.AllAreas)) continue;
-                if (SecurityZone.At(lHit.position) == SecurityTier.Public || Mathf.Abs(lHit.position.y - lNpc.transform.position.y) > 1.5f) continue;
-                if (!Senses.Clear(lNpc.Eye, lHit.position + Vector3.up * 1.15f)) continue;
-                if (!OpenAround(lHit.position)) continue;
+                if (Mathf.Abs(lHit.position.y - lNpc.transform.position.y) > 1.5f) continue;
+                if (!Senses.Clear(lNpc.Eye, lHit.position + Vector3.up * 1.15f) || !OpenAround(lHit.position)) continue;
+                // Outdoors only (a dark interior renders black): nothing overhead of the guard or the player.
+                if (!Outdoors(lNpc.transform.position) || !Outdoors(lHit.position)) continue;
+                if (!ClearView(lNpc, lHit.position, out lCamera)) continue;
                 lGuard = lNpc;
                 lStand = lHit.position;
                 break;
@@ -116,12 +123,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             _player.Weapons.Selected.Value = 0;
             float lStart = Time.time, lCombatAt = -1f;
             int lFrame = 0;
-            while (Time.time - lStart < 9f && (lCombatAt < 0f || Time.time - lCombatAt < 1.6f))
+            while (Time.time - lStart < 12f && (lCombatAt < 0f || Time.time - lCombatAt < 1.6f))
             {
                 if (lCombatAt < 0f && lGuard.State.Value == NpcState.Combat) lCombatAt = Time.time;
                 Log($"  t={Time.time - lStart:0.0}s guard {lGuard.State.Value} gauge {lGuard.Gauge:0.00}");
-                Vector3 lBack = _player.transform.position - _player.transform.forward * 3.4f + _player.transform.right * 1.5f + Vector3.up * 2.3f;
-                yield return Frame("guard", lFrame++, lBack, lGuard.Eye);
+                yield return Frame("guard", lFrame++, lCamera, Vector3.Lerp(_player.Eye, lGuard.Eye, 0.6f));
                 yield return new WaitForSeconds(0.35f);
             }
             Log(lCombatAt > 0f ? $"guard in combat after {lCombatAt - lStart:0.0} s" : "guard never fought");
@@ -132,18 +138,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private IEnumerator CrowdFlees()
         {
-            // The densest crowd.
-            Vector3 lCentre = Vector3.zero;
-            int lBest = 0;
-            foreach (Npc lNpc in Npc.All)
-            {
-                if (lNpc == null || !lNpc.IsCrowd || !lNpc.Health.IsAlive) continue;
-                int lNear = 0;
-                Vector3 lSum = Vector3.zero;
-                foreach (Npc lOther in Npc.All)
-                    if (lOther != null && lOther.IsCrowd && (lOther.transform.position - lNpc.transform.position).sqrMagnitude < 100f) { lNear++; lSum += lOther.transform.position; }
-                if (lNear > lBest) { lBest = lNear; lCentre = lSum / lNear; }
-            }
+            Vector3 lCentre = CrowdCentre(out int lBest);
             if (lBest < 3) { Log("no crowd"); yield break; }
             Vector3 lStand = Vector3.zero;
             bool lFound = false;
@@ -164,8 +159,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             float lYaw = Quaternion.LookRotation(new Vector3(lTo.x, 0f, lTo.z)).eulerAngles.y;
             _player.Motor.Teleport(lStand + Vector3.up * 0.1f, lYaw);
             _player.SetLook(lYaw, -2f);
-            _player.Weapons.Selected.Value = 0;
-            yield return new WaitForSeconds(0.6f);
+            // A loud gun for the shot (the starting one is silenced: an 8 m noise).
+            _player.Weapons.GiveServer(GameDatabase.Find(ItemKind.Pistol), -1, -1);
+            yield return null;
+            for (int i = 0; i < WeaponHolder.WEAPON_SLOTS; i++)
+                if (_player.Weapons.ItemIn(i) != null && _player.Weapons.ItemIn(i).kind == ItemKind.Pistol) _player.Weapons.Selected.Value = i;
+            yield return new WaitForSeconds(0.4f);
             Vector3 lHigh = lStand - lTo.normalized * 5f + Vector3.up * 7f;
             yield return Frame("crowd", 0, lHigh, lCentre);
             _player.SetLook(lYaw, -35f);
@@ -192,6 +191,48 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             else NoiseSystem.Emit(_player.Eye, 40f, NoiseKind.Alarming, _player.OwnerClientId);
         }
 
+        /// <summary>The middle of the densest crowd (and how many stand within 10 m of its densest member).</summary>
+        private static Vector3 CrowdCentre(out int pCount)
+        {
+            Vector3 lCentre = Vector3.zero;
+            pCount = 0;
+            foreach (Npc lNpc in Npc.All)
+            {
+                if (lNpc == null || !lNpc.IsCrowd || !lNpc.Health.IsAlive) continue;
+                int lNear = 0;
+                Vector3 lSum = Vector3.zero;
+                foreach (Npc lOther in Npc.All)
+                    if (lOther != null && lOther.IsCrowd && (lOther.transform.position - lNpc.transform.position).sqrMagnitude < 100f) { lNear++; lSum += lOther.transform.position; }
+                if (lNear > pCount) { pCount = lNear; lCentre = lSum / lNear; }
+            }
+            return lCentre;
+        }
+
+        /// <summary>A camera spot that sees both the guard and the player (over a shoulder, or from the side).</summary>
+        private static bool ClearView(Npc pGuard, Vector3 pStand, out Vector3 pCamera)
+        {
+            Vector3 lAcross = pGuard.transform.position - pStand;
+            lAcross.y = 0f;
+            lAcross.Normalize();
+            Vector3 lSide = Vector3.Cross(Vector3.up, lAcross);
+            Vector3[] lTries = { -lAcross * 3.4f + lSide * 1.6f, -lAcross * 3.4f - lSide * 1.6f, lSide * 6f - lAcross * 1f, -lSide * 6f - lAcross * 1f };
+            // Scenery only: the people's own colliders are what the camera looks at.
+            int lMask = ~((1 << Core.GameLayers.NPC) | (1 << Core.GameLayers.PLAYER) | (1 << Core.GameLayers.RAGDOLL) | (1 << Core.GameLayers.LOCAL_VIEW));
+            foreach (Vector3 lOffset in lTries)
+            {
+                pCamera = pStand + lOffset + Vector3.up * 2.4f;
+                if (Physics.Linecast(pCamera, pGuard.Eye, lMask, QueryTriggerInteraction.Ignore)) continue;
+                if (Physics.Linecast(pCamera, pStand + Vector3.up * 1.2f, lMask, QueryTriggerInteraction.Ignore)) continue;
+                if (Physics.CheckSphere(pCamera, 0.5f, lMask, QueryTriggerInteraction.Ignore) || !Outdoors(pCamera)) continue;
+                return true;
+            }
+            pCamera = Vector3.zero;
+            return false;
+        }
+
+        /// <summary>Open sky above (no roof, no floor of a storey above within 12 m).</summary>
+        private static bool Outdoors(Vector3 pAt) => !Physics.Raycast(pAt + Vector3.up * 0.5f, Vector3.up, 12f, Core.GameLayers.WorldMask, QueryTriggerInteraction.Ignore);
+
         private static bool OpenAround(Vector3 pAt) => !Physics.CheckCapsule(pAt + Vector3.up * 0.5f, pAt + Vector3.up * 1.7f, 0.35f, Core.GameLayers.WorldMask, QueryTriggerInteraction.Ignore);
 
         /// <summary>One frame: what the player sees (game view, HUD) and a third-person render.</summary>
@@ -204,7 +245,13 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 File.WriteAllBytes(Path.Combine(OutputFolder, $"{pName}_view_{pIndex:00}.png"), lView.EncodeToPNG());
                 Object.Destroy(lView);
             }
+            // The third-person render must not draw the player's first-person arms (they float in mid-air).
+            int lLocal = 1 << Core.GameLayers.LOCAL_VIEW;
+            bool lHidden = false;
+            foreach (Renderer lRenderer in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+                if ((lLocal & (1 << lRenderer.gameObject.layer)) != 0 && lRenderer.enabled) { lRenderer.enabled = false; _hiddenArms.Add(lRenderer); lHidden = true; }
             MapShots.Shot(Path.Combine(OutputFolder, $"{pName}_tp_{pIndex:00}.png"), pFrom, pTo, 58f, 1280, 720);
+            if (lHidden) { foreach (Renderer lRenderer in _hiddenArms) if (lRenderer != null) lRenderer.enabled = true; _hiddenArms.Clear(); }
         }
     }
 }

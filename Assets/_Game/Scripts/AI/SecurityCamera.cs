@@ -41,7 +41,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void Update()
         {
             if (Off) return;
-            transform.localRotation = _rest * Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.35f + GetInstanceID()) * _sweep, 0f);
+            transform.localRotation = _rest * Quaternion.Euler(0f, Mathf.Sin(Time.time * 0.35f + GetHashCode()) * _sweep, 0f);
             if (Unity.Netcode.NetworkManager.Singleton == null || !Unity.Netcode.NetworkManager.Singleton.IsServer) return;
             _cooldown -= Time.deltaTime;
 

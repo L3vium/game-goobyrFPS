@@ -24,7 +24,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Window glass: seen through.</summary>
         public static bool SeeThrough(Collider pCollider)
         {
-            int lId = pCollider.GetInstanceID();
+            int lId = pCollider.GetHashCode();
             if (_seeThrough.TryGetValue(lId, out bool lGlass)) return lGlass;
             Renderer lRenderer = pCollider.GetComponent<Renderer>();
             string lMaterial = lRenderer != null && lRenderer.sharedMaterial != null ? lRenderer.sharedMaterial.name : null;
@@ -34,7 +34,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Does this collider muffle a sound (a wall, a floor, the ground)?</summary>
         public static bool Structural(Collider pCollider)
         {
-            int lId = pCollider.GetInstanceID();
+            int lId = pCollider.GetHashCode();
             if (_structural.TryGetValue(lId, out bool lWall)) return lWall;
             return _structural[lId] = NpcRules.IsStructural(pCollider is TerrainCollider, pCollider.bounds.size, SeeThrough(pCollider));
         }

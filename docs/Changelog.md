@@ -74,6 +74,106 @@ World
 - Truer colour textures: ground, bark, walls and props are crisper (no blocky smears in subtle
   greens and browns); the armchairs and the metal props no longer look washed out.
 
+Characters
+- A new original cast is designed: the hero **Rook** (copper
+  quiff, amber shades pushed up, olive bomber with an orange lining in your team colour, mustard
+  scarf, cargo trousers, boots, leather gloves; male and female), three body bases and every outfit
+  (jungle / desert / snow guards, bodyguard, waiter, cook, maid, mechanic, two guests, two targets).
+- Faces come alive: people blink, frown when they aim at you, look scared when they flee or cower,
+  wince when hit, and show X eyes when they die.
+- Bodies wobble: heads and chests lag a little behind every hit, landing and sudden stop.
+- Goofier ragdolls: big heads, looser joints, deaths that spin rather than fly, and still at rest within seconds.
+- Hands no longer sink into bellies and hips: they slide around the body (head and torso kept clear).
+- Sprinting characters may scurry with quick little steps (pace up to 2.5).
+- Everyone wears the new cast: you play Rook (man or woman by seat) with your team's colour on the
+  jacket lining, facings and armband; guards dress for the map, staff are waiters, cooks, maids and
+  mechanics, guests wear summer clothes, and the targets are the tycoon and the magnate.
+- Guards and civilians look surprised the moment they spot you.
+- Feet slide less: walk, run and crouch speeds re-measured on the new bodies; arms swing clear of bellies.
+- Third-person guns sit in the new gloved hands (grips measured on Rook's hand).
+- Guards on a search open closets, dumpsters and crates near where they lost you and pull out whoever hides inside.
+
+Maps
+- Sentry guns guard each map's restricted cores (San Lázaro: the vault and the Don's private wing;
+  Qasr al-Rimal: the keep's vault and armoury, the war room and the governor's study; Weisshorn: the
+  VIP floor and the observatory bunker). Each group answers to a control PC hidden 15-40 m away; a
+  thick yellow cable runs from the guns along walls and ceilings, through rooms, to it. Hack the PC and
+  the guns turn on everyone but you — a target at his desk in front of a gun dies in an "accident".
+- Every map has at least 8 security cameras over its gates, the corridors into restricted floors and
+  the approaches to the guns, with blind spots to learn.
+- New distractions everywhere: office PCs on desks, pedestal fans in kitchens and guard rooms, garden
+  hoses on yard and garden walls. Each pulls the nearest guard off his post.
+- More throwables (150+ per map), dropped beside guard posts and patrol stops.
+- Guards walk: every floor of each key building has a patrol loop (the casa's cellar ring, portico and
+  galleries; the keep's cellar, ground floor, light-well galleries and roof; every floor of the Grand
+  Hotel, its roof walk and delivery yard), patrol pairs walk the plazas, market streets, souk, courts,
+  chalet street and lake shore, and well over a third of the armed staff is on the move.
+- Fleeing civilians have somewhere to run: each map marks its exits (docks, stations, roads, trails).
+- The editor no longer crashes while building Weisshorn (cliff boulders are scene objects now), and
+  steep cliffs carry a rock skin whose texture no longer streaks down the walls.
+- Patrols do errands: pairs stop to chat, one has a smoke or takes a call, every other corner is a
+  look around; inside, each stop fits its room (a smoke in the guard room, a watch at the vault, a lean
+  on the terrace) and a patrol passing a locked door tries it. Every guarded building has someone
+  walking its rooms.
+- Crowds know where to run: every group of guests or staff has two ways out on opposite sides, 25-55 m
+  away on open ground, besides the map's own exits (docks, stations, roads, trails).
+- Staff and guests drift between break spots in every social room (the bar, the buffet, the lounge, the
+  kitchen, the terrace) instead of standing on their marks all match.
+- Patrol stops no longer drop to the floor below when they fall on a stair well or inside furniture.
+- Buildings lose the boxy look: dressed-stone quoins on the corners of the grand houses (the hotel, the
+  casa, the keep, the churches), chamfered corners on plain walls, moulded cornices and stepped string
+  courses, a plinth with a projecting coping, drip moulds over the windows and stone surrounds round
+  the street doors.
+- Weathering: rising damp along the foot of the walls, rain streaks under window sills, hairline
+  cracks, and posters and notices pasted on the town houses' street fronts.
+- Shop signs you can read over the doors of the open shops and bars: a bakery, an ironmonger's, a
+  billiard hall in San Lázaro (and a faded "SE ARRIENDA" on some shut houses), an épicerie, a
+  pharmacie and a salon de thé in the souk, a Bäckerei, a Metzgerei, a Käserei and a Stübli on the
+  chalet street.
+- Roofs: ridge tiles along every pitched roof (snowed over in Weisshorn) and chimney stacks on the
+  houses, chalets and the Grand Hotel.
+- Real grass on the maps (the world track's GPU grass): San Lázaro's pastures and terraces, the
+  Qasr oasis grove (straw tufts out in the desert), and Weisshorn's new snow-free meadows on the valley
+  floor and the sunny lower slopes (the pistes, the lake shore and everything high stay white). The
+  hiding fields of tall grass grow tall blades, and in Weisshorn they stand in the meadows.
+- Weisshorn's ice rink has two gates: the skaters can run when trouble starts.
+- Lived-in interiors: no enterable room is an empty shell (8+ pieces in any room over 12 m2), framed
+  paintings and brass sconces on the walls, curtains at the guest-room windows, a row of chandeliers
+  in the big halls, lobbies, salons, dining rooms and stair halls; luggage at the Grand Hotel's desk.
+- Stealth entries show from their approach: a caged lamp on a post or a bracket over every vent, chute,
+  well, hatch, tunnel mouth and drop ladder. Qasr gets a drop ladder from the keep roof to the third
+  court (a shortcut locked from outside, like the mirador's and the spa garden's).
+- Cliffs are layered rock instead of boulder wallpaper: strata ledges along the contour, basalt
+  organ-pipe columns in San Lázaro, sandstone buttresses in Qasr, grey alpine rock with snow on every
+  ledge in Weisshorn, talus at the foot; hills, mesas and snow peaks beyond the map box.
+- Lone guards on streets and in clearings stand in pairs.
+- San Lázaro: a hedged gravel drive from the frisk gate, a fountain, beds, benches and garden cover on
+  the casa lawns; stalls, benches, trees in planters and a bandstand on the plaza.
+- Qasr al-Rimal: Moorish openings (horseshoe arches in an alfiz, mashrabiya oriels and lattice
+  balconies instead of shutters and iron railings) on the keep and the town; four crenellated corner
+  towers rising above the keep; tents, shades, stalls and palms in planters in the courts; palms in
+  clusters; scrub on the desert; the date press lit and signed, with sacks and a brazier; the
+  STAFF ONLY plates read the right way round.
+- Weisshorn: snowbanks, sledges, ski racks, a snowcat and woodsheds round the hotel; dark steel stilts
+  under the terrace deck instead of red timber.
+- Round 4 (judge fixes): the San Lázaro stage's PA stacks are painted plywood cabinets with steel
+  corners, woofers and horns (no more black boxes); entry lamps are iron lanterns with a stepped cap
+  and a warm core; the coal hatch has a stone curb and rusted iron lids; the tunnel mouths no longer
+  open a hole in the ground in front of them.
+- Qasr interiors: zellige in the keep's halls and salons, plank floors in the barracks and guard rooms,
+  terracotta on the terraces, plaster tiles in kitchens and baths, stone flags in the stores and
+  cellars (cobbles stay in the courts). Big sitting rooms get a rug, a brass low table, cushions and
+  hanging lanterns; stores and cellars crates, cellar walls plank shelving with jars and sacks under an
+  iron lantern; garages and workshops a workbench; guard rooms a table and chairs.
+- The rooms the sentry guns guard have a workbench, military crates and a cable tray under the ceiling.
+- Qasr streets: doors with a second step, a striped awning or a tiled hood, an iron lantern on a
+  bracket and potted plants; iron grilles on the ground-floor windows, the odd mashrabiya oriel at
+  street level, heavier stains along the foot of the walls.
+- The rock walls closing each map vary in height along their length, dip in saddles where the hills
+  and peaks beyond show through, and climb in two or three benches over a talus apron.
+- Weisshorn's Grand Hotel: flower boxes and shallow Juliet rails under the guest-floor windows (not
+  on the VIP floor, nothing to climb), dormers on the attic roof, red, green or blue shutters by wing.
+
 ## 0.6.0 — realistic preview
 - Everyone is the same size: your eyes are at the height of everyone else's (the crowd no longer
   looks like children, the bodyguards no longer tower over you), and headshots follow the head.

@@ -206,7 +206,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 SerializedObject lRendererData = new SerializedObject(pRenderer);
                 SerializedProperty lMap = lRendererData.FindProperty("m_RendererFeatureMap");
                 lMap.arraySize++;
-                lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = lFeature.GetInstanceID();
+                lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = AssetDatabase.TryGetGUIDAndLocalFileIdentifier(lFeature, out string _, out long lFileId) ? lFileId : 0;
                 lRendererData.ApplyModifiedPropertiesWithoutUndo();
             }
             SerializedObject lSerialized = new SerializedObject(lFeature);
@@ -226,7 +226,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             SerializedObject lRendererData = new SerializedObject(pRenderer);
             SerializedProperty lMap = lRendererData.FindProperty("m_RendererFeatureMap");
             lMap.arraySize++;
-            lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = lFeature.GetInstanceID();
+            lMap.GetArrayElementAtIndex(lMap.arraySize - 1).longValue = AssetDatabase.TryGetGUIDAndLocalFileIdentifier(lFeature, out string _, out long lFileId) ? lFileId : 0;
             lRendererData.ApplyModifiedPropertiesWithoutUndo();
             lFeature.Create();
             EditorUtility.SetDirty(pRenderer);

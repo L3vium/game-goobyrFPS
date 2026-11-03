@@ -5,7 +5,7 @@
     python Tools/unity_mcp.py <tool> '<json args>'
     python Tools/unity_mcp.py <tool> @args.json
 
-The editor's MCP port is read from UNITY_MCP_PORT (default 8084).
+The editor's MCP port is read from UNITY_MCP_PORT (default 8080).
 
 Several agents share one editor. Each one sets UNITY_MCP_AGENT=<name> (its own MCP session, so
 replies never cross) and holds the editor lock for anything that changes the editor's state:
@@ -24,7 +24,7 @@ import sys
 import time
 import urllib.request
 
-PORT = int(os.environ.get("UNITY_MCP_PORT", "8084"))
+PORT = int(os.environ.get("UNITY_MCP_PORT", "8080"))
 URL = f"http://localhost:{PORT}/mcp"
 AGENT = os.environ.get("UNITY_MCP_AGENT", "main")
 HERE = os.path.dirname(os.path.abspath(__file__))

@@ -21,7 +21,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public static void Flash(GameObject pRoot, Color pColor, float pDuration = 0.1f)
         {
             if (pRoot == null) return;
-            if (!_flash.TryGetValue(pRoot.GetInstanceID(), out MMF_Player lPlayer) || lPlayer == null)
+            if (!_flash.TryGetValue(pRoot.GetHashCode(), out MMF_Player lPlayer) || lPlayer == null)
             {
                 List<Renderer> lRenderers = new List<Renderer>();
                 foreach (Renderer lRenderer in pRoot.GetComponentsInChildren<Renderer>())
@@ -40,7 +40,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 };
                 lPlayer.AddFeedback(lFlicker);
                 lPlayer.Initialization();
-                _flash[pRoot.GetInstanceID()] = lPlayer;
+                _flash[pRoot.GetHashCode()] = lPlayer;
             }
             MMF_Flicker lFeedback = lPlayer.GetFeedbackOfType<MMF_Flicker>();
             if (lFeedback != null)
@@ -55,12 +55,12 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public static void Squash(Transform pTarget, float pAmount = 0.08f, float pDuration = 0.22f)
         {
             if (pTarget == null) return;
-            if (!_squash.TryGetValue(pTarget.GetInstanceID(), out MMF_Player lPlayer) || lPlayer == null)
+            if (!_squash.TryGetValue(pTarget.GetHashCode(), out MMF_Player lPlayer) || lPlayer == null)
             {
                 lPlayer = NewPlayer(pTarget.gameObject, "FeelSquash");
                 lPlayer.AddFeedback(new MMF_SquashAndStretch { SquashAndStretchTarget = pTarget, Label = "Squash" });
                 lPlayer.Initialization();
-                _squash[pTarget.GetInstanceID()] = lPlayer;
+                _squash[pTarget.GetHashCode()] = lPlayer;
             }
             MMF_SquashAndStretch lFeedback = lPlayer.GetFeedbackOfType<MMF_SquashAndStretch>();
             if (lFeedback != null)

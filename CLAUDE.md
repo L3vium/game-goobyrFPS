@@ -13,7 +13,8 @@ validate through Unity MCP, `tasks/lessons.md` after every correction).
 - **End of every prompt:** player build (`Goobyr/Build/Player`, output `Builds/Windows/GoobyrFPS.exe`,
   versioned through LFS), commit + push it, then release main **without checking it out** (a
   checkout would reimport the whole project under the open editor):
-  `git merge-base --is-ancestor main dev` (must succeed), then
+  `git merge-base --is-ancestor main^2 dev` (main's last release parent is in dev; main itself never
+  is, it holds its own merge commits), then
   `git update-ref refs/heads/main $(git commit-tree "dev^{tree}" -p main -p dev -m "Release x.y.z")`
   and `git push origin main`. Same result as `merge --no-ff`: main gets its own merge commits and
   stays a distinct line in Fork.

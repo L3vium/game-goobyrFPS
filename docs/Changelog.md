@@ -1,6 +1,80 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 — Unreleased
+
+Guards and civilians
+- Guards attack again. A guard who is searching (after a shot, a lost confrontation, a radio call)
+  and glimpses you comes straight at you, weapon up; he no longer calms down into a casual look.
+- Guards remember. Shoot, kill, punch or take someone down in front of a guard, flee a
+  confrontation, or get into a fight, and that zone knows you for two minutes: seen means shot,
+  wherever you stand. Everyone else still gets the benefit of the doubt in public places.
+- A gun in your hand is noticed. On the plaza a guard walks up and tells you to put it away
+  (holster it and he lets you go); anywhere else a drawn gun is a crime and guards open fire.
+  Cameras see it too.
+- Restricted areas: a guard warns you, then shoots, about 3-4 seconds after he first sees you.
+  Hostile areas: guards shoot on sight after a short reaction. A calm, unarmed player in a public
+  place is never shot.
+- Gunfire carries. Guards' shots are heard like yours and every armed guard in earshot comes
+  running; real walls (not crates or fences) muffle sound, and guards see through windows.
+- Smarter firefights: guards' first shots are wild and they need a moment to track you again after
+  losing you; they duck behind low cover and pop up to shoot; one pushes to where you were last
+  seen; searches fan out in widening circles, each guard looking around at every spot; at night they
+  carry torches. The last guard standing keeps shooting instead of phoning for help, radio calls are
+  spaced out, guards aim properly while they move, and lookouts on towers see the ground below.
+- Civilians panic like people: a scream and a frozen stare, then a stampede for the exits, away
+  from the danger and never past it, and they cower when cornered. Panic spreads through a crowd.
+- Witnesses talk. A guest who sees a crime, a body or a gun runs to the nearest guard (a pulsing
+  amber "!" over their head and a WITNESS warning): stop them before they get there, or the guard
+  comes to look and knows who you are.
+- Guests and staff mingle: they wander to the bar, the buffet or the garden and step out for a smoke
+  or a call. Patrols have errands: they stop to look around, try locked doors, smoke, take a call or
+  stand watch, and pairs walk side by side and chat.
+- Everyone talks gibberish ("huh?", "hey!", "over there!", screams, "help!", "clear", radio chatter
+  and small talk) in four goofy voices.
+- Fixes: patrols stay and look around where they went to check something; crowds run away from the
+  trouble (not from the middle of the map); the target has its 120 HP.
+
+First person
+- The hands are authored around every weapon: both hands wrap the real grips (the support hand round
+  the firing hand on pistols, on the fore-end, pump or vertical grip on long guns), the trigger
+  finger rests on the trigger when you aim and along the frame otherwise. This replaces the
+  0.6.0 hands.
+- Aiming puts the sights exactly on the centre of the screen, for every gun, and recoil kicks about
+  the sights instead of swinging the gun off line.
+- Your own arms are dark leather gloves under an olive bomber sleeve with a rib cuff, the same as
+  the third-person Rook: the black suit sleeves and white shirt cuffs of 0.6.0 are gone.
+- Fists up in a guard by the chin. Left click alternates a jab and a cross that pull back and drive
+  to the middle of the screen; the hit lands on contact with a freeze of the arms, a jolt of the view
+  and a squash of whoever you hit. Holding something, you throw a quick left jab; takedowns grab
+  and twist.
+- Throws are overhand and the item leaves the hand at the release.
+
+World
+- Colour grade redone in HDR: calmer, cleaner contrast and a look per biome that holds at every
+  hour (warm and humid jungle, golden desert, cool and crisp snow). Dawn and dusk are warm and bright
+  enough to play, nights are moonlit and readable instead of black, and dawn and dusk under trees
+  are no longer black against the low sun. Qasr al-Rimal's desert grade is calmer.
+- Trees, palms, bushes and ferns sway in one shared wind whose gusts roll across the land; leaves
+  glow when the sun is behind them, detail levels cross-fade instead of popping, and bushes, rocks
+  and boulders cast shadows.
+- Real grass: blades, not a texture. Dense curved tufts sway in the shared wind (gusts roll over a
+  meadow as waves of light), glow when the sun is behind them, part where someone walks and stand
+  back up, and stay pressed round dropped items so they can be found. Seen from low down they no
+  longer turn black at the roots. The ground keeps the meadow's colour where the blades end.
+- Ground without repeating tiles: grass, earth, sand and rock no longer repeat as a visible grid
+  across fields and slopes, and broad patches vary their colour a little, like real land. Slopes
+  and banks keep their shape at a distance.
+- Local reflections: every building floor and the streets round the buildings reflect their
+  surroundings (glossy floors, glass, metal and water), not just the sky.
+- Window glass is clear and a little dark so lit interiors read through it, and shows a dim room
+  where there is nothing behind it. Cliffs are layered rock with strata and snow on every ledge.
+- A softer sky: rounder, billowing clouds with lit tops, soft grey bellies and bright edges round
+  the sun; sky and cloud gradients no longer band.
+- Fresh snow sparkles more: about 265 sparse stars toward the sun instead of a handful.
+- Truer colour textures: ground, bark, walls and props are crisper (no blocky smears in subtle
+  greens and browns); the armchairs and the metal props no longer look washed out.
+
+## 0.6.0 — realistic preview
 - Everyone is the same size: your eyes are at the height of everyone else's (the crowd no longer
   looks like children, the bodyguards no longer tower over you), and headshots follow the head.
 - The HUD tells you when you are TRESPASSING or in a HOSTILE AREA. Sentry guns only fire on

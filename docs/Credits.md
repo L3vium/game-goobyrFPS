@@ -199,3 +199,16 @@ Built by `Tools/Blender/characters/*.py` (original project scripts). Sources and
   143_23, 143_39, 143_40.
 - Hand-keyed clips (aim, fire, reload, hang/shimmy/climb-up, mantle, slide, swim idle, takedown pair, hit reacts, lean,
   crouch idle, look-around layer), procedural camouflage, the earpiece mesh and all recolours are original project work.
+
+## Unity Technologies (Unity Companion License)
+- `Goobyr/TerrainLit`, `Hidden/Goobyr/TerrainLit (Add Pass)`, `Hidden/Goobyr/TerrainLit (Basemap Gen)` and
+  `GoobyrTerrainPasses.hlsl` (`Assets/_Game/Art/Shaders/Terrain`) are derived from the Universal Render
+  Pipeline 17.6 terrain shaders (`TerrainLit.shader`, `TerrainLitAdd.shader`, `TerrainLitBasemapGen.shader`,
+  `TerrainLitPasses.hlsl`), (c) Unity Technologies, used under the Unity Companion License for Unity-dependent
+  projects. Changed: the anti-tiling splat mix, the meadow colour where real grass grows, and a broad
+  brightness and hue variation. https://unity.com/legal/licenses/unity-companion-license
+- The other custom shaders (`Goobyr/Foliage`, `Goobyr/Grass`, `Goobyr/Rock`, `Goobyr/WindowGlass`,
+  `Goobyr/SnowGlint`, the sky and the grass compute shaders) are original project work; they call URP's
+  shader library (lighting, shadows, Forward+) and are not copies of it.
+- The NPC barks (`bark_<voice>_<kind>`) are synthesised at build time by `SfxBuilder` (formant synthesis);
+  no recorded speech is used.

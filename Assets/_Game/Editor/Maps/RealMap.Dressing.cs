@@ -137,6 +137,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             ArchMat lLeather = ArchLib.PlainMat("Leather", new Color(0.35f, 0.2f, 0.12f), 0.35f, 0f), lCase = ArchLib.PlainMat("CaseBlue", new Color(0.15f, 0.2f, 0.32f), 0.4f, 0.1f);
             A.BoxObject("LuggageCart", g, pYaw, K.Props, 0, true,
                 (ArchLib.Brass, new Vector3(0, 0.25f, 0), new Vector3(1.2f, 0.05f, 0.6f)),
+                (ArchLib.Iron, new Vector3(0, 0.1f, 0), new Vector3(1.1f, 0.2f, 0.5f)),
                 (ArchLib.Brass, new Vector3(-0.58f, 0.9f, 0), new Vector3(0.04f, 1.3f, 0.04f)),
                 (ArchLib.Brass, new Vector3(0.58f, 0.9f, 0), new Vector3(0.04f, 1.3f, 0.04f)),
                 (ArchLib.Brass, new Vector3(0, 1.55f, 0), new Vector3(1.2f, 0.05f, 0.05f)),

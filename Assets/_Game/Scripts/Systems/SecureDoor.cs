@@ -29,12 +29,12 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
             _prompt = pLock switch { Lock.Crowbar => "PRY OPEN", Lock.Keycard => "SWIPE KEYCARD", Lock.Keypad => "ENTER CODE", _ => "UNLOCK" };
         }
 
-        private ItemKind Needed => _lock switch { Lock.Crowbar => ItemKind.Crowbar, Lock.Keycard => ItemKind.Keycard, Lock.Keypad => ItemKind.CodeNote, _ => ItemKind.StaffPass };
+        private ItemKind Needed => _lock switch { Lock.Crowbar => ItemKind.Crowbar, Lock.Keycard => ItemKind.Keycard, Lock.Keypad => ItemKind.CodeNote, _ => ItemKind.Crowbar };
 
         public override string Prompt(PlayerAvatar pWho, ItemDefinition pHeld)
         {
             if (State != 0) return "";
-            return Has(pWho) ? _prompt : _lock switch { Lock.Crowbar => "NEEDS A CROWBAR", Lock.Keycard => "NEEDS A KEYCARD", Lock.Keypad => "NEEDS THE CODE", _ => "NEEDS A STAFF KEY" };
+            return Has(pWho) ? _prompt : _lock switch { Lock.Crowbar => "NEEDS A CROWBAR", Lock.Keycard => "NEEDS A KEYCARD", Lock.Keypad => "NEEDS THE CODE", _ => "NEEDS A CROWBAR" };
         }
 
         public override bool CanInteract(PlayerAvatar pWho, ItemDefinition pHeld) => State == 0 && Has(pWho);

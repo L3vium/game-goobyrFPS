@@ -155,10 +155,16 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             }
 
             // NPCs from the map's spawn points.
+            int lConverted = 0;
             foreach (NpcSpawnPoint lSpawn in FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
             {
-                Npc lSpawned = SpawnNpc(lSpawn.transform.position, lSpawn.transform.rotation, lSpawn.Role, lSpawn.Zone, GameDatabase.Find(lSpawn.Weapon), lSpawn.Route, null, -1, null);
-                if (lSpawn.Carries != ItemKind.Fists) lSpawned.SetCarried(GameDatabase.Find(lSpawn.Carries));
+                // Only enemies: a civilian's post in the map is one more armed guard's.
+                bool lCivilian = lSpawn.Role == NpcRole.Worker;
+                NpcRole lRole = lCivilian ? NpcRole.Guard : lSpawn.Role;
+                ItemKind lGun = lCivilian ? (lConverted++ % 3 == 2 ? ItemKind.Smg : ItemKind.Pistol) : lSpawn.Weapon;
+                Npc lSpawned = SpawnNpc(lSpawn.transform.position, lSpawn.transform.rotation, lRole, lSpawn.Zone, GameDatabase.Find(lGun), lSpawn.Route, null, -1, null);
+                ItemKind lCarries = lSpawn.Carries == ItemKind.StaffPass ? ItemKind.Crowbar : lSpawn.Carries == ItemKind.Invitation ? ItemKind.Fists : lSpawn.Carries;
+                if (lCarries != ItemKind.Fists) lSpawned.SetCarried(GameDatabase.Find(lCarries));
                 lSpawned.SetEnforcer(lSpawn.Enforcer);
             }
 
@@ -200,7 +206,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             AnnounceRpc("NEW CONTRACT", Target != null ? Target.displayName.ToUpperInvariant() : "");
         }
 
-        private static bool IsKit(ItemKind pKind) => pKind is ItemKind.Invitation or ItemKind.StaffPass or ItemKind.Keycard;
+        private static bool IsKit(ItemKind pKind) => pKind == ItemKind.Keycard;
 
         /// <summary>The pass of an inside start, once the starting loadout is in (next frame).</summary>
         private System.Collections.IEnumerator GiveKit(Weapons.WeaponHolder pHolder, ItemDefinition pKit)
@@ -209,12 +215,22 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             if (pHolder != null && pHolder.IsSpawned) pHolder.GiveServer(pKit, -1, -1);
         }
 
+        private static readonly ItemKind[] MELEE_KINDS = { ItemKind.Knife, ItemKind.Machete, ItemKind.Bat };
+
         private void SpawnItems(System.Random pRandom)
         {
             foreach (MatchPoint lPoint in MatchPoint.OfKind(MatchPoint.Kind.WeaponSpawn))
                 ItemPickup.SpawnServer(GameDatabase.Find(lPoint.Item), lPoint.transform.position + Vector3.up * 0.1f, -1, -1, Vector3.zero);
+            int lGadgets = 0;
             foreach (MatchPoint lPoint in MatchPoint.OfKind(MatchPoint.Kind.GadgetSpawn))
-                ItemPickup.SpawnServer(GameDatabase.Find(lPoint.Item), lPoint.transform.position + Vector3.up * 0.1f, -1, -1, Vector3.zero);
+            {
+                if (lPoint.Item is ItemKind.Invitation or ItemKind.EmeticPoison) continue;
+                ItemKind lKind = lPoint.Item == ItemKind.StaffPass ? ItemKind.Crowbar : lPoint.Item;
+                // One throwable spot in three holds a blade or a club instead: something to fight with is never far.
+                if (lKind is ItemKind.Coin or ItemKind.Rock or ItemKind.Brick or ItemKind.Bottle or ItemKind.Wrench && lGadgets++ % 3 == 0)
+                    lKind = MELEE_KINDS[pRandom.Next(MELEE_KINDS.Length)];
+                ItemPickup.SpawnServer(GameDatabase.Find(lKind), lPoint.transform.position + Vector3.up * 0.1f, -1, -1, Vector3.zero);
+            }
 
             // Unique weapons: several hidden candidate spots each, only one is used.
             foreach (ItemKind lKind in new[] { ItemKind.RocketLauncher, ItemKind.Flamethrower })

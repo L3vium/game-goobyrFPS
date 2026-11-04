@@ -11,8 +11,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
     public static class GameInput
     {
         private static InputActionMap _map;
-        private static InputAction _move, _look, _fire, _aim, _reload, _interact, _crouch, _jump, _sprint, _melee, _throw, _scroll, _map_, _ptt, _pause, _detonate, _score, _nextSpectate, _instinct, _wheel;
-        private static readonly InputAction[] _slots = new InputAction[6];
+        private static InputAction _move, _look, _fire, _aim, _reload, _interact, _crouch, _jump, _sprint, _melee, _throw, _scroll, _map_, _ptt, _pause, _detonate, _score, _nextSpectate, _instinct, _leanLeft, _leanRight, _block, _zoom;
+        private static readonly InputAction[] _slots = new InputAction[Weapons.WeaponHolder.SLOT_COUNT];
 
         /// <summary>Menus (pause, map screen, chat) switch gameplay input off.</summary>
         public static bool GameplayEnabled { get; set; } = true;
@@ -33,24 +33,25 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             _throw = _map.FindAction("Throw"); _scroll = _map.FindAction("Scroll"); _map_ = _map.FindAction("Map"); _ptt = _map.FindAction("PushToTalk");
             _pause = _map.FindAction("Pause"); _detonate = _map.FindAction("Detonate"); _score = _map.FindAction("Scoreboard"); _nextSpectate = _map.FindAction("NextSpectate");
             _instinct = _map.FindAction("Instinct");
-            _wheel = _map.FindAction("Wheel");
-            for (int i = 0; i < 6; i++) _slots[i] = _map.FindAction("Slot" + (i + 1));
+            _leanLeft = _map.FindAction("LeanLeft"); _leanRight = _map.FindAction("LeanRight");
+            _block = _map.FindAction("Block"); _zoom = _map.FindAction("Zoom");
+            for (int i = 0; i < _slots.Length; i++) _slots[i] = _map.FindAction("Slot" + (i + 1));
             _map.Enable();
         }
 
         private static bool On => GameplayEnabled;
 
         public static Vector2 Move { get { Ensure(); return On ? Vector2.ClampMagnitude(_move.ReadValue<Vector2>(), 1f) : Vector2.zero; } }
-        /// <summary>The camera's look input (zero while the weapon wheel takes the look to pick).</summary>
-        public static Vector2 Look { get { Ensure(); return On && !WheelOpen ? _look.ReadValue<Vector2>() * MouseSensitivity : Vector2.zero; } }
-        /// <summary>The look input whatever the wheel (the wheel reads it to pick a slot).</summary>
-        public static Vector2 RawLook { get { Ensure(); return On ? _look.ReadValue<Vector2>() : Vector2.zero; } }
-        public static bool WheelHeld { get { Ensure(); return On && _wheel.IsPressed(); } }
-        /// <summary>Set by the HUD while the weapon wheel is shown.</summary>
-        public static bool WheelOpen { get; set; }
+        public static Vector2 Look { get { Ensure(); return On ? _look.ReadValue<Vector2>() * MouseSensitivity : Vector2.zero; } }
         public static bool Fire { get { Ensure(); return On && _fire.IsPressed(); } }
         public static bool FirePressed { get { Ensure(); return On && _fire.WasPressedThisFrame(); } }
         public static bool Aim { get { Ensure(); return On && _aim.IsPressed(); } }
+        /// <summary>The right button let go: a gadget held with its arc showing is thrown.</summary>
+        public static bool AimReleased { get { Ensure(); return On && _aim.WasReleasedThisFrame(); } }
+        /// <summary>Lean: -1 left (Q, A on AZERTY), +1 right (E), 0 both or neither.</summary>
+        public static float Lean { get { Ensure(); return !On ? 0f : (_leanRight.IsPressed() ? 1f : 0f) - (_leanLeft.IsPressed() ? 1f : 0f); } }
+        public static bool BlockHeld { get { Ensure(); return On && _block.IsPressed(); } }
+        public static bool ZoomHeld { get { Ensure(); return On && _zoom.IsPressed(); } }
         public static bool Reload { get { Ensure(); return On && _reload.WasPressedThisFrame(); } }
         public static bool Interact { get { Ensure(); return On && _interact.WasPressedThisFrame(); } }
         public static bool InteractHeld { get { Ensure(); return On && _interact.IsPressed(); } }
@@ -59,6 +60,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public static bool JumpPressed { get { Ensure(); return On && _jump.WasPressedThisFrame(); } }
         public static bool JumpHeld { get { Ensure(); return On && _jump.IsPressed(); } }
         public static bool Sprint { get { Ensure(); return On && _sprint.IsPressed(); } }
+        public static bool SprintPressed { get { Ensure(); return On && _sprint.WasPressedThisFrame(); } }
         public static bool Melee { get { Ensure(); return On && _melee.WasPressedThisFrame(); } }
         public static bool Throw { get { Ensure(); return On && _throw.WasPressedThisFrame(); } }
         public static float Scroll { get { Ensure(); return On ? _scroll.ReadValue<Vector2>().y : 0f; } }
@@ -78,7 +80,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             {
                 Ensure();
                 if (!On) return -1;
-                for (int i = 0; i < 6; i++) if (_slots[i].WasPressedThisFrame()) return i;
+                for (int i = 0; i < _slots.Length; i++) if (_slots[i].WasPressedThisFrame()) return i;
                 return -1;
             }
         }

@@ -63,7 +63,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 ItemKind.Sniper => "Sniper",
                 ItemKind.RocketLauncher => "Launcher",
                 ItemKind.Flamethrower => "Flamer",
-                ItemKind.Wrench or ItemKind.Crowbar or ItemKind.Bottle => "Handle",
+                ItemKind.Wrench or ItemKind.Crowbar or ItemKind.Bottle or ItemKind.Knife or ItemKind.Machete or ItemKind.Bat => "Handle",
                 ItemKind.Rock or ItemKind.Brick or ItemKind.C4 or ItemKind.SmokeGrenade => "Palm",
                 _ => "Pinch"
             };

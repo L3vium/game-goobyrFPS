@@ -32,7 +32,11 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         /// <summary>Pries open boarded and rusted doors (loudly).</summary>
         Crowbar,
         /// <summary>A note with a keypad code (vault, server room).</summary>
-        CodeNote
+        CodeNote,
+        /// <summary>Blades and clubs: held in a weapon slot, left click swings for the item's damage.</summary>
+        Knife,
+        Machete,
+        Bat
     }
 
     public enum ItemSlot
@@ -98,6 +102,8 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         public bool IsKey => kind is ItemKind.Invitation or ItemKind.StaffPass or ItemKind.Keycard or ItemKind.Crowbar or ItemKind.CodeNote;
         /// <summary>A heavy throwable: knocks out the NPC it hits.</summary>
         public bool KnocksOut => kind is ItemKind.Brick or ItemKind.Rock or ItemKind.Bottle or ItemKind.Wrench;
+        /// <summary>Held like a weapon, swung instead of fired.</summary>
+        public bool IsMelee => kind is ItemKind.Knife or ItemKind.Machete or ItemKind.Bat;
         public bool IsPoison => kind is ItemKind.Poison or ItemKind.EmeticPoison;
         public bool UsesAmmo => IsGun || kind is ItemKind.RocketLauncher or ItemKind.Flamethrower;
     }

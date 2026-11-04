@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.8.0 — Rules and controls
+
+Only enemies
+- No more civilians and no more trespassing: every person on a map is an armed enemy, the whole map
+  is hostile, and the target fights instead of running. Nobody panics, cowers or ducks any more.
+- Guards really look: they see up to 30 m and notice faster. A guard checking out a sound or a body
+  who sees you has seen you, full stop. Civilian posts are armed guards now, so maps hold about
+  twice as many enemies.
+
+Controls, modelled on Dishonored
+- Left click attacks with whatever you hold (guns fire from the hip), right click aims or throws.
+  Crouch toggles on C, lean on Q/E (A/E on AZERTY), block on left Ctrl, zoom on left Alt.
+- The selection wheel is gone: the inventory is a horizontal bar of four slots at the bottom of the
+  screen. Keys and tools no longer take a slot.
+
+Feel
+- The hands no longer drag behind the camera, and bare hands stay hidden except during a punch or
+  a block. Punches are 2.5 times faster.
+- A jump or a climb no longer breaks your run. Ladders: getting over the top works, an overhang no
+  longer jams you, and you can't re-grab one by accident.
+- Takedowns from behind are instant: the body drops on the spot.
+
+Items
+- New blades and clubs: knife, machete, bat, lying around the maps. You start with a lightly loaded
+  pistol. Pickups rest on the ground with no aura or spin, and swell a little when you look at them.
+
 ## 0.7.0 — Unreleased
 
 Guards and civilians

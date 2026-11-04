@@ -13,8 +13,7 @@ MonoBehaviour:
   m_Name: GameRules
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Data.GameRules
   startingLoadout:
-  - {fileID: 11400000, guid: c153c4d88632d434b8e19dcbb9c23a4b, type: 2}
-  - {fileID: 11400000, guid: b45ff664f1f229045b79b77f17d1f45e, type: 2}
+  - {fileID: 11400000, guid: 1d941f151a3473048808769df1b0233d, type: 2}
   playerHealth: 100
   playerDamageMultiplier: 1
   maxPlayers: 8
@@ -26,9 +25,9 @@ MonoBehaviour:
   activeExtractions: 2
   npcHealth: 100
   npcDamageMultiplier: 0.7
-  npcVisionRange: 20
+  npcVisionRange: 30
   npcVisionAngle: 90
-  npcDetectTime: 2.2
+  npcDetectTime: 1.3
   npcReactionTime: 0.7
   callDuration: 3
   reinforcementsPerCall: 4

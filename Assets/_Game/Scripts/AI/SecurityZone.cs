@@ -62,16 +62,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>The tier at a point and the access that legitimises it there.</summary>
         public static SecurityTier At(Vector3 pPoint, out AccessLevel pAccess)
         {
-            bool lInside = false;
-            SecurityTier lTier = SecurityTier.Public;
+            // There is no social ladder any more: everyone on a map is an enemy, everywhere is hostile.
             pAccess = AccessLevel.None;
-            foreach (SecurityZone lZone in _all)
-            {
-                if (!lZone.Contains(pPoint)) continue;
-                if (!lInside || lZone._tier > lTier || (lZone._tier == lTier && lZone._access > pAccess)) { lTier = lZone._tier; pAccess = lZone._access; }
-                lInside = true;
-            }
-            return lInside ? lTier : Outside;
+            return SecurityTier.Hostile;
         }
 
         /// <summary>

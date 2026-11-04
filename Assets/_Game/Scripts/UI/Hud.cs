@@ -31,20 +31,15 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private TextMeshProUGUI _zone;
         private Image _healthFill, _flash, _extractFill, _scope;
         private RectTransform _extractBar, _scoreboardPanel, _markers;
-        private readonly TextMeshProUGUI[] _slots = new TextMeshProUGUI[WeaponHolder.SLOT_COUNT];
-        private readonly Image[] _slotBacks = new Image[WeaponHolder.SLOT_COUNT];
-        private CanvasGroup _healthGroup, _ammoGroup, _wheelGroup, _stripGroup;
+        private CanvasGroup _healthGroup, _ammoGroup, _stripGroup;
         private readonly TextMeshProUGUI[] _stripNames = new TextMeshProUGUI[WeaponHolder.SLOT_COUNT];
         private readonly TextMeshProUGUI[] _stripCounts = new TextMeshProUGUI[WeaponHolder.SLOT_COUNT];
         private readonly Image[] _stripBars = new Image[WeaponHolder.SLOT_COUNT];
         private readonly Image[] _stripBacks = new Image[WeaponHolder.SLOT_COUNT];
-        private float _stripShowUntil;
         private Image _bannerRule;
-        private float _healthShowUntil, _ammoShowUntil, _wheelShowUntil, _lastHp = -1f;
+        private float _healthShowUntil, _ammoShowUntil, _lastHp = -1f;
         private string _lastAmmo = "";
-        private int _lastSelected = -1, _wheelPick = -1;
-        private Vector2 _wheelAim;
-        private readonly List<(TextMeshProUGUI text, float until)> _toasts = new List<(TextMeshProUGUI, float)>();
+                private readonly List<(TextMeshProUGUI text, float until)> _toasts = new List<(TextMeshProUGUI, float)>();
         private readonly List<(TextMeshProUGUI text, float until)> _feed = new List<(TextMeshProUGUI, float)>();
         private readonly List<(Image arc, Vector3 from, float until)> _damageArcs = new List<(Image, Vector3, float)>();
         private readonly Dictionary<string, TextMeshProUGUI> _worldMarkers = new Dictionary<string, TextMeshProUGUI>();
@@ -162,34 +157,24 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _ammo = UIFactory.Text(lAmmoPanel.transform, "Ammo", "", 30, UIFactory.Paper, TextAlignmentOptions.BottomRight, new Vector2(1, 0), new Vector2(-160, 18), new Vector2(320, 40));
             _weaponName = UIFactory.Text(lAmmoPanel.transform, "Weapon", "", 15, new Color(1, 1, 1, 0.7f), TextAlignmentOptions.BottomRight, new Vector2(1, 0), new Vector2(-160, 54), new Vector2(320, 22));
 
-            // The inventory, bottom right above the ammo: the six slots as a list, shown on a switch (wheel, keys).
-            RectTransform lStrip = UIFactory.Rect(_root, "Inventory", new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 120), new Vector2(260, WeaponHolder.SLOT_COUNT * 36f));
+            // The inventory: a horizontal bar, bottom centre, always there.
+            const float SLOT_W = 158f, SLOT_GAP = 6f;
+            float lBarWidth = WeaponHolder.SLOT_COUNT * SLOT_W + (WeaponHolder.SLOT_COUNT - 1) * SLOT_GAP;
+            RectTransform lStrip = UIFactory.Rect(_root, "Inventory", new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 26), new Vector2(lBarWidth, 44));
             _stripGroup = lStrip.gameObject.AddComponent<CanvasGroup>();
-            _stripGroup.alpha = 0f;
             for (int i = 0; i < WeaponHolder.SLOT_COUNT; i++)
             {
-                RectTransform lRow = UIFactory.Rect(lStrip, "Slot" + i, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(0, -i * 36f), new Vector2(260, 32));
-                _stripBacks[i] = lRow.gameObject.AddComponent<Image>();
+                RectTransform lCell = UIFactory.Rect(lStrip, "Slot" + i, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(i * (SLOT_W + SLOT_GAP), 0), new Vector2(SLOT_W, 44));
+                _stripBacks[i] = lCell.gameObject.AddComponent<Image>();
                 _stripBacks[i].raycastTarget = false;
-                _stripBars[i] = UIFactory.Panel(lRow, "Bar", ThreatMarkers.Amber, new Vector2(1, 0.5f), new Vector2(-1.5f, 0), new Vector2(3, 32));
-                TextMeshProUGUI lKey = UIFactory.Text(lRow, "Key", (i + 1).ToString(), 14, UIFactory.Muted, TextAlignmentOptions.Center, new Vector2(0, 0.5f), new Vector2(10, 0), new Vector2(24, 30));
+                _stripBars[i] = UIFactory.Panel(lCell, "Bar", UIFactory.Accent, new Vector2(0.5f, 0), new Vector2(0, 1.5f), new Vector2(SLOT_W, 3));
+                TextMeshProUGUI lKey = UIFactory.Text(lCell, "Key", (i + 1).ToString(), 13, UIFactory.Muted, TextAlignmentOptions.Center, new Vector2(0, 0.5f), new Vector2(11, 0), new Vector2(18, 40));
                 lKey.font = UIFactory.Heading;
-                _stripNames[i] = UIFactory.Text(lRow, "Name", "", 16, UIFactory.Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(40, 0), new Vector2(135, 30));
+                _stripNames[i] = UIFactory.Text(lCell, "Name", "", 15, UIFactory.Paper, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(82, 7), new Vector2(120, 22));
                 _stripNames[i].overflowMode = TextOverflowModes.Ellipsis;
                 _stripNames[i].font = UIFactory.Heading;
-                _stripCounts[i] = UIFactory.Text(lRow, "Count", "", 15, UIFactory.Muted, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-14, 0), new Vector2(70, 30));
+                _stripCounts[i] = UIFactory.Text(lCell, "Count", "", 13, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 0.5f), new Vector2(82, -10), new Vector2(120, 18));
                 _stripCounts[i].font = UIFactory.Heading;
-            }
-
-            // The weapon wheel: the slots in a ring around the crosshair, only while Q / LB is held.
-            RectTransform lWheel = UIFactory.Rect(_root, "Wheel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(10, 10));
-            _wheelGroup = lWheel.gameObject.AddComponent<CanvasGroup>();
-            _wheelGroup.alpha = 0f;
-            for (int i = 0; i < WeaponHolder.SLOT_COUNT; i++)
-            {
-                float a = (90f - i * 60f) * Mathf.Deg2Rad;
-                _slotBacks[i] = UIFactory.Panel(lWheel, "Slot" + i, new Color(0.05f, 0.05f, 0.07f, 0.72f), new Vector2(0.5f, 0.5f), new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * 190f, new Vector2(150, 64));
-                _slots[i] = UIFactory.Text(_slotBacks[i].transform, "Label", "", 16, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(144, 60));
             }
 
             // No contract panel: the contract is on the map screen. Only the proof, once in play, gets a quiet line.
@@ -226,7 +211,6 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _bannerTitle.characterSpacing = 14f;
             _bannerTitle.color = UIFactory.Paper;
             _health.font = _ammo.font = _clock.font = UIFactory.HeadingBold;
-            foreach (TextMeshProUGUI lSlot in _slots) { lSlot.font = UIFactory.Heading; lSlot.characterSpacing = 3f; }
             _bannerRule = UIFactory.Rule(_root, new Vector2(0.5f, 0.72f), new Vector2(0, -36), 160, false, UIFactory.Accent, 3f);
             _bannerRule.name = "BannerRule";
             _crosshair.fontSize = 26;
@@ -305,10 +289,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 bool lConcealed = lMe.Hidden.Value || (lMe.Crouched.Value && lMe.InGrass.Value);
                 _stealth.text = "";
 
-                // Trespass status, as guards, cameras and sentry guns judge it (a valid pass makes it public).
-                SecurityTier lTier = lAlive ? SecurityZone.ForPlayer(SecurityZone.At(lMe.transform.position, out AccessLevel lNeed), lNeed, lWeapons != null ? lWeapons.Access : AccessLevel.None, false) : SecurityTier.Public;
-                _zone.text = lTier == SecurityTier.Hostile ? "HOSTILE AREA" : lTier == SecurityTier.Restricted ? "TRESPASSING" : "";
-                _zone.color = lTier == SecurityTier.Hostile ? UIFactory.Danger : UIFactory.Accent;
+                _zone.text = "";
             }
 
             // Ammo and slots.
@@ -323,44 +304,17 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 _lastAmmo = lAmmoKey;
                 _ammoGroup.alpha = Mathf.MoveTowards(_ammoGroup.alpha, Time.time < _ammoShowUntil ? 1f : 0f, dt * (Time.time < _ammoShowUntil ? 6f : 1.2f));
 
-                // The wheel: held, the look picks a slot and releasing selects it. A switch shows the inventory list instead.
-                if (lWeapons.Selected.Value != _lastSelected) { if (_lastSelected >= 0) _stripShowUntil = Time.time + 2.5f; _lastSelected = lWeapons.Selected.Value; }
-                bool lWheel = GameInput.WheelHeld;
-                if (lWheel)
-                {
-                    if (!GameInput.WheelOpen) { _wheelAim = Vector2.zero; _wheelPick = -1; }
-                    _wheelAim = Vector2.ClampMagnitude(_wheelAim + GameInput.RawLook * 0.02f, 1f);
-                    if (_wheelAim.magnitude > 0.45f)
-                    {
-                        float lAngle = Mathf.Atan2(_wheelAim.y, _wheelAim.x) * Mathf.Rad2Deg;
-                        _wheelPick = Mathf.RoundToInt(Mathf.Repeat(90f - lAngle, 360f) / 60f) % WeaponHolder.SLOT_COUNT;
-                    }
-                    _wheelShowUntil = Time.time + 0.3f;
-                }
-                else if (GameInput.WheelOpen && _wheelPick >= 0) lWeapons.Select(_wheelPick);
-                GameInput.WheelOpen = lWheel;
-                bool lShowWheel = Time.time < _wheelShowUntil;
-                _wheelGroup.alpha = Mathf.MoveTowards(_wheelGroup.alpha, lShowWheel ? 1f : 0f, dt * (lShowWheel ? 10f : 3f));
                 for (int i = 0; i < WeaponHolder.SLOT_COUNT; i++)
                 {
                     InventorySlot s = lWeapons.SlotAt(i);
                     ItemDefinition lItem = GameDatabase.Item(s.item);
-                    string lName = lItem != null ? lItem.displayName.ToUpperInvariant() : (i < WeaponHolder.WEAPON_SLOTS ? "FISTS" : "-");
-                    if (lItem != null && lItem.slot == ItemSlot.Gadget) lName += " x" + s.reserve;
-                    _slots[i].text = "<size=70%>" + (i + 1) + "</size>\n" + lName;
-                    bool lSelected = GameInput.WheelOpen && _wheelPick >= 0 ? _wheelPick == i : lWeapons.Selected.Value == i;
-                    _slotBacks[i].color = lSelected ? new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, 0.85f) : new Color(0.05f, 0.05f, 0.07f, 0.72f);
-                    _slots[i].color = lSelected ? UIFactory.Paper : UIFactory.Muted;
-
                     bool lCurrent = lWeapons.Selected.Value == i;
-                    _stripNames[i].text = lItem != null ? lItem.displayName.ToUpperInvariant() : (i < WeaponHolder.WEAPON_SLOTS ? "FISTS" : "EMPTY");
+                    _stripNames[i].text = lItem != null ? lItem.displayName.ToUpperInvariant() : (i < WeaponHolder.WEAPON_SLOTS ? "FISTS" : "");
                     _stripNames[i].color = lCurrent ? UIFactory.Paper : lItem != null ? new Color(0.85f, 0.85f, 0.85f) : new Color(1, 1, 1, 0.3f);
-                    _stripCounts[i].text = lItem == null ? "" : lItem.UsesAmmo ? s.magazine + "/" + s.reserve : lItem.slot == ItemSlot.Gadget ? "x" + s.reserve : "";
-                    _stripBacks[i].color = lCurrent ? new Color(0.03f, 0.03f, 0.04f, 0.82f) : new Color(0.03f, 0.03f, 0.04f, 0.5f);
+                    _stripCounts[i].text = lItem == null ? "" : lItem.UsesAmmo ? s.magazine + " / " + s.reserve : lItem.slot == ItemSlot.Gadget ? "x" + s.reserve : "";
+                    _stripBacks[i].color = lCurrent ? new Color(0.03f, 0.03f, 0.04f, 0.78f) : new Color(0.03f, 0.03f, 0.04f, 0.42f);
                     _stripBars[i].enabled = lCurrent;
                 }
-                bool lShowStrip = Time.time < _stripShowUntil && !lShowWheel;
-                _stripGroup.alpha = Mathf.MoveTowards(_stripGroup.alpha, lShowStrip ? 1f : 0f, dt * (lShowStrip ? 8f : 2f));
             }
 
             // Contract.

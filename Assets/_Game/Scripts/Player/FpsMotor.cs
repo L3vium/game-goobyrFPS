@@ -306,12 +306,14 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 _airStartY = Mathf.Max(_airStartY, transform.position.y);
             }
 
-            // Crouch and sprint are held. Crouching while moving slides; from a sprint, further.
-            bool lHeld = GameInput.CrouchHeld;
+            // Crouch toggles, sprint is held and stands up. Crouching while moving slides; from a sprint, further.
+            if (GameInput.CrouchPressed) _crouchToggled = !_crouchToggled;
+            else if (GameInput.SprintPressed) _crouchToggled = false;
+            bool lHeld = _crouchToggled;
             bool lCrouchStarted = lHeld && !_wantCrouch;
             _wantCrouch = lHeld;
-            // Coyote time, not the raw grounded flag: going down stairs never flickers the sprint.
-            Sprinting = GameInput.Sprint && pInput.y > 0.3f && !Aiming && !_wantCrouch && _coyote > 0f && !Crawling;
+            // A sprint starts on the ground and carries through the air: a jump never breaks the run.
+            Sprinting = GameInput.Sprint && pInput.y > 0.3f && !Aiming && !_wantCrouch && (_coyote > 0f || Sprinting) && !Crawling;
 
             _slideCooldownTimer -= dt;
             if (lCrouchStarted && Grounded && PlanarSpeed > _crouchSpeed + 0.6f && _slideCooldownTimer <= 0f)
@@ -386,7 +388,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             if (lWasGrounded && lRise > 0.04f && lRise < 0.6f) _stepOffset = Mathf.Max(-0.6f, _stepOffset - lRise);
 
             // Climbable surface ahead and pushing forward: grab it.
-            if (pInput.y > 0.5f && TryGrabClimbable()) SetMode(MotorMode.Climb);
+            if (pInput.y > 0.5f && _regrabLock <= 0f && TryGrabClimbable()) SetMode(MotorMode.Climb);
 
             // Deep enough water: swim.
             if (Systems.WaterVolume.At(transform.position + Vector3.up * 0.1f, out float lSurface) != null && lSurface - transform.position.y > SWIM_DEPTH)
@@ -652,6 +654,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             _moveTime = Mathf.Max(0.05f, pTime);
             _vaulting = pVault;
             _afterMove = pAfter;
+            // The run goes on after a mantle or a vault, along where the body was heading.
+            _moveCarry = pAfter == MotorMode.Walk ? new Vector3(pTo.x - _moveFrom.x, 0f, pTo.z - _moveFrom.z).normalized * PlanarSpeed : Vector3.zero;
             _velocity = Vector3.zero;
             Mode = MotorMode.Mantle;
             if (pAfter != MotorMode.LedgeHang)
@@ -681,6 +685,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             if (_afterMove == MotorMode.Walk)
             {
                 Grounded = true;
+                _velocity = _moveCarry;
                 _coyote = 0.12f;
                 OnLanded?.Invoke(2f);
             }
@@ -766,12 +771,18 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         // ---------------------------------------------------------------- climbables
 
+        private bool _crouchToggled;
+        private float _climbStuck;
+        private Vector3 _moveCarry;
+
         private bool TryGrabClimbable()
         {
             Vector3 lOrigin = transform.position + Vector3.up * 1f;
             if (!Physics.Raycast(lOrigin, transform.forward, out RaycastHit lHit, 0.75f, 1 << GameLayers.CLIMBABLE, QueryTriggerInteraction.Ignore)) return false;
             _climbNormal = lHit.normal;
             _velocity = Vector3.zero;
+            _climbStuck = 0f;
+            Sprinting = false;
             return true;
         }
 
@@ -811,8 +822,22 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
             Vector3 lRight = Vector3.Cross(Vector3.up, _climbNormal).normalized;
             Vector3 lMove = Vector3.up * pInput.y * _climbSpeed - lRight * pInput.x * _climbSpeed * 0.7f - _climbNormal * 0.5f;
+            float lClimbFrom = transform.position.y;
             _controller.Move(lMove * dt);
-            if (pInput.y < -0.5f && _controller.isGrounded) SetMode(MotorMode.Walk);
+            if (pInput.y < -0.5f && _controller.isGrounded) { SetMode(MotorMode.Walk); _regrabLock = 0.5f; return; }
+
+            // Pushing up and not rising (an eave, a floor overhead): over the edge if there is one, else let go.
+            bool lRising = transform.position.y - lClimbFrom > _climbSpeed * pInput.y * dt * 0.3f;
+            _climbStuck = pInput.y > 0.5f && !lRising ? _climbStuck + dt : 0f;
+            if (_climbStuck > 0.2f)
+            {
+                _climbStuck = 0f;
+                if (TryTraverse(-_climbNormal, false) || TryAirGrab(-_climbNormal)) return;
+                SetMode(MotorMode.Walk);
+                _velocity = _climbNormal * 2.5f;
+                _regrabLock = 0.8f;
+                return;
+            }
             _airStartY = transform.position.y;
         }
 

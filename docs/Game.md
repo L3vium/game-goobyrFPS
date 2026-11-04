@@ -11,17 +11,18 @@ is lethal both ways. **Sight has absolute priority:** a guard who came to check 
 sees a player has seen them, and fights at once. Nobody flees or cowers, the target included.
 
 ## Modes
-- **Free-for-all** — everyone for themselves.
-- **Teams** — 2 to 4 teams of any size (host picks the count, players pick their team or shuffle);
-  whoever extracts makes their team win. Teammates cannot hurt each other.
-- **Co-op** — one team against the AI; lost if everyone is eliminated.
+There is no mode to choose: **the team boxes in the room are the mode** (`LobbyState.ResolveTeams`,
+`MatchRulesLogic.ModeFromBoxes`). Everyone in one box is co-op against the map, nobody sharing a box is
+free-for-all, anything else is teams. Whoever extracts makes their team win; teammates cannot hurt
+each other.
 
-Every player starts together at one of the map's start points (drawn per match among those with no
-NPC post or patrol point within 50 m) with the starting
-loadout (GD Tool; hush pistol + coins by default). Death = eliminated: a 1.2 s look at your body,
-then the caster view restricted to whom you may watch (teammates in Teams, anyone in FFA and co-op;
-no free camera or map in Teams). The match ends on an extraction, when every player is eliminated, or at the
-time limit (draw); the end screen's buttons go back to the lobby (host) or leave the room at once. The proof carrier is revealed to everyone every 10 s.
+**Protect the target:** any box can be set to protect the target (`LobbyState.DefenderMask`). Its
+agents start beside the target; guards, cameras, vehicles and sentry guns ignore them and neither
+side can hurt the other (`PlayerAvatar.IsProtector`, `Damageable.DamageScale`). They hear what the
+guards see on a talkie-walkie (`UI/RadioFeed`: contact, body found, call for backup, a line on the
+right and 30 s on the map). There is no proof in this mode: the attackers win when the target dies
+(`MatchOutcome.TargetKilled`), the protectors when every attacker is down or the clock runs out
+(`AttackersDown`, `TimeUp`, `MatchRulesLogic.EvaluateProtect`).
 
 ## Maps (three zones each, each with its own reinforcements)
 Designed in `docs/maps/*.md` (zones, social tiers, rooms, entries, NPC tables, targets, starts),
@@ -441,9 +442,15 @@ hold to show the arc and release to throw · **block LCtrl** (a raised guard lea
 **zoom LAlt** · wheel or 1-4 change item (no selection wheel) · reload R · detonate T · quick punch V ·
 map M · instinct Tab (hold) · scoreboard ` (key left of 1, ² on AZERTY) · push-to-talk B · pause Esc.
 
-Caster view: agents 1-8 · next agent arrows / LB RB · feed Tab / D-pad left right · layouts F1-F4 /
-D-pad up · focus F (Shift+F: with the main feed) / D-pad down · to main Enter / A · eyes-chase V / X ·
-free camera C / Y · tactical map T / B · auto-director P / R3 · hide overlays H · reset camera R.
+Caster view, three modes: **Switch F1** (one screen: agents 1-8, arrows, eyes-chase V, right drag orbits),
+**Multi F2** (everybody's eyes at once, double click one to go to it), **Fly F3** (WASD/ZQSD, Space up,
+Ctrl down, Shift fast, wheel speed, the mouse looks). Hide overlays H. Anyone eliminated becomes a caster
+(in teams they see the adversaries too), and a caster alone can start a match to fly around.
+
+Front end (`UI/MenuUI`): the title is PLAY, options and quit; PLAY opens a room at once, on Steam when
+it runs. The room is the one screen: map picture and plan, agents in team boxes (+ adds one, agents are
+dragged between them), icon (`UIIcons.Agent`) and role on your own line, invite and shuffle under the
+agents, proximity chat as the only global option. Each map has one mood (`MapDefinition.timeOfDay`).
 
 ## Interface
 Restrained and typographic (Barlow), dark panels, thin rules, one accent: signal amber (red only for

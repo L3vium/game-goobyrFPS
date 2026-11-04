@@ -42,6 +42,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         private static bool On => GameplayEnabled;
 
         public static Vector2 Move { get { Ensure(); return On ? Vector2.ClampMagnitude(_move.ReadValue<Vector2>(), 1f) : Vector2.zero; } }
+        /// <summary>The move keys whatever the gameplay lock (the caster's flight).</summary>
+        public static Vector2 MoveAlways { get { Ensure(); return Vector2.ClampMagnitude(_move.ReadValue<Vector2>(), 1f); } }
         public static Vector2 Look { get { Ensure(); return On ? _look.ReadValue<Vector2>() * MouseSensitivity : Vector2.zero; } }
         public static bool Fire { get { Ensure(); return On && _fire.IsPressed(); } }
         public static bool FirePressed { get { Ensure(); return On && _fire.WasPressedThisFrame(); } }

@@ -201,6 +201,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             Health.Team = Damageable.NPC_TEAM;
             Health.HeadCentre = () => _body != null && _body.Head != null && _body.Model.gameObject.activeInHierarchy ? _body.HeadCentre : transform.position + Vector3.up * BodyMetrics.HEAD_CENTRE;
             Health.InitHealth(NpcRules.MaxHealth(Role, GameDatabase.Rules.npcHealth));
+            // The ones protecting the target can't hurt its men.
+            Health.DamageScale = pInfo => { PlayerAvatar lBy = pInfo.attacker != DamageInfo.NO_PLAYER ? PlayerAvatar.ForClient(pInfo.attacker) : null; return lBy != null && lBy.IsProtector ? 0f : 1f; };
             Health.OnDeathClient += HandleDeathClient;
             Health.OnHitClient += HandleHitClient;
             gameObject.AddComponent<Audio.Footsteps>().Init(() => !Health.IsAlive ? 0f : State.Value == NpcState.Combat || State.Value == NpcState.Flee || State.Value == NpcState.Search || State.Value == NpcState.Report ? 0.9f : 0.45f);
@@ -406,7 +408,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
             foreach (PlayerAvatar lPlayer in PlayerAvatar.All)
             {
-                if (lPlayer == null || !lPlayer.IsSpawned || !lPlayer.Health.IsAlive) continue;
+                if (lPlayer == null || !lPlayer.IsSpawned || !lPlayer.Health.IsAlive || lPlayer.IsProtector) continue;
                 float lExposure = Exposure(lPlayer, lRules, lCombat || OnEdge);
                 if (lExposure > lBestExposure) { lBestExposure = lExposure; lBest = lPlayer; }
                 if (lPlayer == _combatTarget && lExposure > 0f) _combatTargetExposed = true;
@@ -616,6 +618,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 return;
             }
             SpottedRpc();
+            Match.MatchDirector.Instance?.RadioServer("CONTACT", "A GUARD HAS EYES ON AN AGENT", transform.position);
             bool lCrime = CommitsCrime(pPlayer);
             if (lCrime) Zone?.MarkHostile(pPlayer, HostileAct.DrawnGun);
             switch (NpcRules.OnSpotted(Flees, OnEdge, IsHostile(pPlayer), TierFor(pPlayer), lCrime))
@@ -719,6 +722,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 // First to find it: runs over and radios it in.
                 Investigate(lOther.transform.position, true);
                 RadioBodyIn(lOther.NetworkObjectId, lOther.transform.position);
+                Match.MatchDirector.Instance?.RadioServer("BODY", "A BODY WAS FOUND", lOther.transform.position);
                 return;
             }
         }
@@ -756,6 +760,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// </summary>
         private static void HearAll(NoiseEvent pNoise)
         {
+            // The ones protecting the target make all the noise they want.
+            if (pNoise.fromPlayer)
+            {
+                PlayerAvatar lMaker = PlayerAvatar.ForClient(pNoise.source);
+                if (lMaker != null && lMaker.IsProtector) return;
+            }
             // Gunfire and explosions: whoever sees the player who made them knows who did it.
             if (pNoise.fromPlayer && pNoise.kind == NoiseKind.Alarming) ReportHostileAct(PlayerAvatar.ForClient(pNoise.source), HostileAct.Shot, null);
             // Hearing a sound can make someone scream (another sound, heard right away): every nested call
@@ -1556,6 +1566,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         public void StartCall()
         {
+            Match.MatchDirector.Instance?.RadioServer("CALL", "A GUARD IS CALLING FOR BACKUP", transform.position);
             if (!Health.IsAlive) { Zone?.CallFinished(this, false); return; }
             _callTimer = GameDatabase.Rules.callDuration;
             SetState(NpcState.Calling);

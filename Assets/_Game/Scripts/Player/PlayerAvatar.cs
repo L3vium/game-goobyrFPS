@@ -85,7 +85,12 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             All.Add(this);
             Health.HeadCentre = () => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? BodyMetrics.CROUCH_HEAD_CENTRE : BodyMetrics.HEAD_CENTRE);
             Health.InitHealth(GameDatabase.Rules.playerHealth);
-            Health.DamageScale = pInfo => Blocking.Value && pInfo.type == DamageType.Melee ? BLOCK_FACTOR : 1f;
+            Health.DamageScale = pInfo =>
+            {
+                // Guards and sentry guns never hurt the ones protecting the target.
+                if (pInfo.attacker == DamageInfo.NO_PLAYER && pInfo.type == DamageType.Bullet && IsProtector) return 0f;
+                return Blocking.Value && pInfo.type == DamageType.Melee ? BLOCK_FACTOR : 1f;
+            };
             Health.OnHitClient += HandleHit;
             gameObject.AddComponent<Audio.Footsteps>().Init(
                 () => !Health.IsAlive || Hidden.Value ? 0f : Crouched.Value ? 0.1f : Sprinting.Value ? 1f : 0.55f,
@@ -288,6 +293,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         public float LookYaw => _yaw;
         public float LookPitch => _pitch;
+
+        /// <summary>On a team protecting the target: the map's enemies are its friends.</summary>
+        public bool IsProtector => LobbyState.Instance != null && LobbyState.Instance.IsProtector(Team.Value);
 
         /// <summary>How far the eye slides on a lean, its roll, and the zoom key's narrowing.</summary>
         public const float LEAN_DISTANCE = 0.5f, LEAN_ROLL = 9f, ZOOM_FACTOR = 0.55f;

@@ -34,6 +34,9 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         public readonly NetworkVariable<bool> Caster = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> TalkingNow = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
+        /// <summary>The icon the player chose for their agent.</summary>
+        public readonly NetworkVariable<int> Icon = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
         public string Name => DisplayName.Value.ToString();
         public bool IsAgent => !Caster.Value;
 
@@ -62,6 +65,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
                 DisplayName.Value = PlayerIdentity.LocalName;
                 SteamId.Value = PlayerIdentity.LocalSteamId;
                 Caster.Value = PlayerIdentity.JoinAsCaster;
+                Icon.Value = PlayerIdentity.LocalIcon;
             }
 
             DisplayName.OnValueChanged += Changed;

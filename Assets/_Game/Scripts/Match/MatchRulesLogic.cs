@@ -29,7 +29,11 @@ namespace Com.IsartDigital.GoobyrFPS.Match
         /// <summary>Every player is eliminated.</summary>
         AllEliminated,
         /// <summary>Time ran out.</summary>
-        TimeUp
+        TimeUp,
+        /// <summary>A team protects the target: it died, the attackers win.</summary>
+        TargetKilled,
+        /// <summary>A team protects the target: every attacker is down, the protectors win.</summary>
+        AttackersDown
     }
 
     /// <summary>A player as the rules see it: no Unity, so the rules are unit-tested.</summary>
@@ -47,7 +51,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
     public static class MatchRulesLogic
     {
         public const int NO_TEAM = -1;
-        public const int MAX_TEAMS = 4;
+        public const int MAX_TEAMS = 8;
 
         /// <summary>
         /// The team a player actually plays on. FFA gives everyone their own team (their seat),
@@ -101,6 +105,39 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             if (pPlayers.Count > 0 && !AnyAlive(pPlayers)) return MatchOutcome.AllEliminated;
             if (pTimeLeft <= 0f) return MatchOutcome.TimeUp;
             return MatchOutcome.None;
+        }
+
+        /// <summary>
+        /// The outcome when a team protects the target: no proof to carry. The attackers win the moment
+        /// it dies; the protectors when every attacker is down, or when the clock runs out.
+        /// </summary>
+        public static MatchOutcome EvaluateProtect(IReadOnlyList<RulesPlayer> pPlayers, int pProtectorMask, bool pTargetDead, float pTimeLeft)
+        {
+            if (pTargetDead) return MatchOutcome.TargetKilled;
+            bool lAttackerAlive = false;
+            foreach (RulesPlayer lPlayer in pPlayers)
+                if (lPlayer.alive && !IsProtector(pProtectorMask, lPlayer.team)) lAttackerAlive = true;
+            if (!lAttackerAlive) return MatchOutcome.AttackersDown;
+            return pTimeLeft <= 0f ? MatchOutcome.TimeUp : MatchOutcome.None;
+        }
+
+        public static bool IsProtector(int pMask, int pTeam) => pTeam >= 0 && pTeam < 31 && (pMask & (1 << pTeam)) != 0;
+
+        /// <summary>
+        /// The mode is what the team boxes say: everyone in one box is co-op, nobody sharing a box
+        /// is free-for-all, anything else is teams.
+        /// </summary>
+        public static MatchMode ModeFromBoxes(IReadOnlyList<int> pAgentsPerBox)
+        {
+            int lUsed = 0;
+            bool lShared = false;
+            foreach (int lCount in pAgentsPerBox)
+            {
+                if (lCount > 0) lUsed++;
+                if (lCount > 1) lShared = true;
+            }
+            if (lUsed <= 1) return MatchMode.Coop;
+            return lShared ? MatchMode.Teams : MatchMode.FreeForAll;
         }
 
         /// <summary>Draws the target index among the enabled ones, with the host's seed.</summary>

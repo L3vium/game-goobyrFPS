@@ -100,6 +100,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Atmosphere(lMaps[1], new Color(0.2f, 0.45f, 0.86f), new Color(0.96f, 0.88f, 0.74f), new Color(1f, 0.82f, 0.55f), new Color(1f, 0.93f, 0.8f), 2.8f, new Vector3(62f, -20f, 0), 0.12f, 0.003f, 0f, 40f, new Color(0.4f, 0.36f, 0.3f), 0.7f, 10f, 12f);
             Atmosphere(lMaps[2], new Color(0.3f, 0.46f, 0.76f), new Color(0.86f, 0.9f, 0.95f), new Color(1f, 0.92f, 0.85f), new Color(1f, 0.97f, 0.94f), 2.0f, new Vector3(32f, 40f, 0), 0.45f, 0.006f, 0f, 24f, new Color(0.38f, 0.42f, 0.5f), 0.8f, -6f, 12f);
 
+            // Each map has one mood: there is no time-of-day option.
+            lMaps[0].timeOfDay = 1;
+            lMaps[1].timeOfDay = 2;
+            lMaps[2].timeOfDay = 3;
+            foreach (MapDefinition lMap in lMaps) EditorUtility.SetDirty(lMap);
+
             GameDatabase lDatabase = EditorAssets.LoadOrCreate<GameDatabase>(EditorAssets.RESOURCES + "/GameDatabase.asset");
             lDatabase.rules = lRules;
             lDatabase.items = lItems;

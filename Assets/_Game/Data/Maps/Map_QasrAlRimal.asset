@@ -47,6 +47,8 @@ MonoBehaviour:
   - {fileID: 2800000, guid: d8ddc3746e5f448458c45a94d1115852, type: 3}
   - {fileID: 2800000, guid: 7336ef9cf2c96a4459b5e7468adf6fce, type: 3}
   - {fileID: 2800000, guid: 7878e514a9ca2a04491cfff02e13b70f, type: 3}
+  preview: {fileID: 0}
+  timeOfDay: 2
   planOrigin: {x: -250, y: -250}
   planSize: 500
   planStorey: 3.6

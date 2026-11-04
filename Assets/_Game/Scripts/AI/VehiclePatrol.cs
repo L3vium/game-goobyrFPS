@@ -108,6 +108,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private bool WorthAStop(PlayerAvatar pPlayer)
         {
+            if (pPlayer.IsProtector) return false;
             LevelZone lZone = LevelZone.At(_body.position) ?? LevelZone.Get(0);
             if (lZone != null && lZone.IsHostile(pPlayer)) return true;
             SecurityTier lTier = SecurityZone.ForPlayer(SecurityZone.At(pPlayer.transform.position, out AccessLevel lNeed), lNeed, pPlayer.Weapons != null ? pPlayer.Weapons.Access : AccessLevel.None, false);

@@ -43,7 +43,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             PrefabUtility.InstantiatePrefab(PrefabBuilder.GameRoot);
             new GameObject("MenuUI").AddComponent<MenuUI>();
-            new GameObject("TitleDiorama").AddComponent<TitleDiorama>();
             MapDefinition lMap = GameDatabase.Instance.maps[0];
             RenderSettings.skybox = ArtBuilder.Sky(lMap);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;

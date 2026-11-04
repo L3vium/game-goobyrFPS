@@ -9,22 +9,22 @@ using UnityEngine.UI;
 namespace Com.IsartDigital.GoobyrFPS.UI
 {
     /// <summary>
-    /// Builds the game's UI in code, in one restrained look: flat near-black panels, white
-    /// typography in Barlow (condensed caps for headings, letter-spaced), thin rules, a single red
+    /// Builds the game's UI in code, in one restrained look: flat night-blue panels, white
+    /// typography in Barlow (condensed caps for headings, letter-spaced), thin rules, a single coral
     /// accent. Motion is quiet - fades, short slides, an accent bar on the hovered item - never
     /// squash and stretch (that belongs to the game world, not the menus).
     /// </summary>
     public static class UIFactory
     {
-        public static readonly Color Ink = new Color(0.04f, 0.04f, 0.05f);
+        public static readonly Color Ink = new Color(0.07f, 0.08f, 0.13f);
         public static readonly Color Paper = new Color(0.95f, 0.95f, 0.94f);
         public static readonly Color Muted = new Color(0.62f, 0.63f, 0.65f);
-        /// <summary>Signal amber: the one accent of the interface (red is kept for the target and danger).</summary>
-        public static readonly Color Accent = new Color(0.96f, 0.63f, 0.17f);
+        /// <summary>Coral: the one accent of the interface (pure red is kept for the target and danger).</summary>
+        public static readonly Color Accent = new Color(0.95f, 0.46f, 0.38f);
         public static readonly Color Danger = new Color(0.9f, 0.2f, 0.18f);
         public static readonly Color Accent2 = new Color(0.95f, 0.95f, 0.94f);
         public static readonly Color Good = new Color(0.45f, 0.82f, 0.55f);
-        public static readonly Color PanelColor = new Color(0.03f, 0.03f, 0.04f, 0.78f);
+        public static readonly Color PanelColor = new Color(0.1f, 0.11f, 0.17f, 0.86f);
         public static readonly Color Line = new Color(1f, 1f, 1f, 0.14f);
 
         private static TMP_FontAsset _body, _bodyBold, _heading, _headingBold;

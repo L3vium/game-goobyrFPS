@@ -36,6 +36,18 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             }
         }
 
+        /// <summary>The agent's chosen icon (see <see cref="UI.UIIcons.Agent"/>), remembered between sessions.</summary>
+        public static int LocalIcon
+        {
+            get => PlayerPrefs.GetInt("goobyr.icon", 0);
+            set
+            {
+                PlayerPrefs.SetInt("goobyr.icon", value);
+                PlayerPrefs.Save();
+                if (LobbyPlayer.Local != null && LobbyPlayer.Local.IsSpawned) LobbyPlayer.Local.Icon.Value = value;
+            }
+        }
+
         /// <summary>
         /// Join (or stay in) rooms as a caster: watch every agent from the multi-feed view, never play.
         /// Sent with the connection request, so a caster may also join a match already running.

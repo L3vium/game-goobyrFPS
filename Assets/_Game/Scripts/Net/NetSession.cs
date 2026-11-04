@@ -158,7 +158,26 @@ namespace Com.IsartDigital.GoobyrFPS.Net
 
         private void JoinSteamOwner(ulong pOwner)
         {
-            if (_networkManager.IsListening) return;
+            if (pOwner == PlayerIdentity.LocalSteamId) return;
+            if (_networkManager.IsListening)
+            {
+                // PLAY opens a room at once: an invite accepted while alone in it closes it first.
+                if (!_networkManager.IsHost || _networkManager.ConnectedClientsIds.Count > 1) return;
+                _networkManager.Shutdown();
+                StartCoroutine(JoinOwnerAfterShutdown(pOwner));
+                return;
+            }
+            DialSteamOwner(pOwner);
+        }
+
+        private System.Collections.IEnumerator JoinOwnerAfterShutdown(ulong pOwner)
+        {
+            while (_networkManager.ShutdownInProgress || _networkManager.IsListening) yield return null;
+            DialSteamOwner(pOwner);
+        }
+
+        private void DialSteamOwner(ulong pOwner)
+        {
             UseSteamTransport();
             _steamTransport.targetSteamId = pOwner;
             Kind = SessionKind.Steam;

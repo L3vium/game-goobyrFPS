@@ -15,10 +15,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     /// A page of the in-match menu (<see cref="PauseMenu"/>):
     /// <list type="bullet">
     /// <item><b>Map</b>: the whole stylized plan of the level, floor by floor (it opens on yours),
-    /// zoom with the wheel or the triggers, pan by dragging or with the stick; the zones' names, the
-    /// target in red (always), you, your teammates, the proof and the revealed extractions.</item>
-    /// <item><b>Contract</b>: the target's portrait rendered when the page opens, its name, one line
-    /// of dossier, the proof wanted and where the contract stands - nothing more.</item>
+    /// zoom on the cursor with the wheel or the triggers, pan with any mouse button or the stick; a
+    /// legend whose every line switches its marks on and off.</item>
+    /// <item><b>Contract</b>: the target's portrait rendered when the page opens, its name, its file
+    /// (who, habits, where, protection), the orders and where the contract stands.</item>
     /// </list>
     /// </summary>
     public class MapScreen : MonoBehaviour
@@ -40,6 +40,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private int _used;
         private Vector2 _lastMouse;
         private bool _dragging;
+        private readonly HashSet<Legend_> _off = new HashSet<Legend_>();
+        private readonly HashSet<string> _labelled = new HashSet<string>();
+
+        private enum Legend_ { Target, You, Teammate, Proof, Extraction, Radio, Zones, Landmark, Entrance, Vent, Climb, Underground, Overlook, Shortcut }
 
         private RawImage _portrait;
         private RenderTexture _portraitTexture;
@@ -75,23 +79,60 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 Button lButton = UIFactory.Button(lSide, lNames[f], new Vector2(0, 1), new Vector2(0, -50 - f * 52), new Vector2(320, 48), UIFactory.Accent2, () => _floor = lFloor, 22);
                 _floorButtons.Add(lButton);
             }
-            UIFactory.Title(lSide, "LegendTitle", "LEGEND", 15, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(0, -290), new Vector2(320, 22), true, 5f);
-            Legend(lSide, 0, UIIcons.Chevron, ThreatMarkers.Red, "TARGET");
-            Legend(lSide, 1, UIIcons.Arrow, UIFactory.Paper, "YOU");
-            Legend(lSide, 2, UIIcons.Dot, ThreatMarkers.Blue, "TEAMMATE");
-            Legend(lSide, 3, UIIcons.Diamond, ThreatMarkers.Amber, "PROOF");
-            Legend(lSide, 4, UIIcons.Ring, UIFactory.Good, "EXTRACTION");
+            UIFactory.Title(lSide, "LegendTitle", "LEGEND", 15, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(0, -280), new Vector2(320, 22), true, 5f);
+            int lRow = 0;
+            AddLegend(lSide, lRow++, Legend_.Target, UIIcons.Chevron, ThreatMarkers.Red, "TARGET");
+            AddLegend(lSide, lRow++, Legend_.You, UIIcons.Arrow, UIFactory.Accent, "YOU");
+            AddLegend(lSide, lRow++, Legend_.Teammate, UIIcons.Dot, ThreatMarkers.Blue, "TEAMMATES");
+            AddLegend(lSide, lRow++, Legend_.Proof, UIIcons.Diamond, ThreatMarkers.Amber, "PROOF");
+            AddLegend(lSide, lRow++, Legend_.Extraction, UIIcons.Ring, UIFactory.Good, "EXTRACTIONS");
+            AddLegend(lSide, lRow++, Legend_.Radio, UIIcons.Phone, UIFactory.Accent, "RADIO ALERTS");
+            AddLegend(lSide, lRow++, Legend_.Zones, UIIcons.Dot, Color.white, "ZONE NAMES");
+            AddLegend(lSide, lRow++, Legend_.Landmark, UIIcons.DiamondOutline, MapPoi.ColorOf(MapPoi.Kind.Landmark), "LANDMARKS");
+            AddLegend(lSide, lRow++, Legend_.Entrance, UIIcons.Ring, MapPoi.ColorOf(MapPoi.Kind.Entrance), "ENTRANCES");
+            AddLegend(lSide, lRow++, Legend_.Vent, UIIcons.Dot, MapPoi.ColorOf(MapPoi.Kind.Vent), "VENTS");
+            AddLegend(lSide, lRow++, Legend_.Climb, UIIcons.Dot, MapPoi.ColorOf(MapPoi.Kind.Climb), "CLIMBS");
+            AddLegend(lSide, lRow++, Legend_.Underground, UIIcons.Dot, MapPoi.ColorOf(MapPoi.Kind.Underground), "TUNNELS");
+            AddLegend(lSide, lRow++, Legend_.Overlook, UIIcons.Chevron, MapPoi.ColorOf(MapPoi.Kind.Overlook), "OVERLOOKS");
+            AddLegend(lSide, lRow, Legend_.Shortcut, UIIcons.DiamondOutline, MapPoi.ColorOf(MapPoi.Kind.Shortcut), "SHORTCUTS");
         }
 
         private const int MapPlanBakerFloors = 4;
 
-        private static void Legend(RectTransform pSide, int pIndex, Sprite pSprite, Color pColor, string pLabel)
+        /// <summary>A legend line: its icon and name; a click switches those marks off and on.</summary>
+        private void AddLegend(RectTransform pSide, int pIndex, Legend_ pKind, Sprite pSprite, Color pColor, string pLabel)
         {
-            float y = -330 - pIndex * 38;
-            Image lIcon = UIFactory.Panel(pSide, "Icon", pColor, new Vector2(0, 1), new Vector2(14, y), new Vector2(18, 18));
+            float y = -316 - pIndex * 38;
+            Button lRow = UIFactory.Button(pSide, "", new Vector2(0, 1), new Vector2(0, y), new Vector2(320, 36), UIFactory.Accent2, null, 18);
+            ((RectTransform)lRow.transform).pivot = new Vector2(0, 0.5f);
+            ((RectTransform)lRow.transform).anchoredPosition = new Vector2(0, y);
+            TextMeshProUGUI lText = lRow.GetComponentInChildren<TextMeshProUGUI>();
+            lText.text = pLabel;
+            lText.fontSize = 18;
+            lText.margin = new Vector4(34, 0, 0, 0);
+            Image lIcon = UIFactory.Panel(lRow.transform, "Icon", pColor, new Vector2(0, 0.5f), new Vector2(22, 0), new Vector2(18, 18));
             lIcon.sprite = pSprite;
-            UIFactory.Title(pSide, "Label", pLabel, 18, UIFactory.Paper, TextAlignmentOptions.Left, new Vector2(0, 1), new Vector2(44, y + 4), new Vector2(276, 26), false, 3f);
+            lRow.onClick.AddListener(() =>
+            {
+                bool lNowOff = _off.Add(pKind);
+                if (!lNowOff) _off.Remove(pKind);
+                lText.text = lNowOff ? "<s>" + pLabel + "</s>" : pLabel;
+                lIcon.color = new Color(pColor.r, pColor.g, pColor.b, lNowOff ? 0.2f : pColor.a);
+            });
         }
+
+        private bool Shown(Legend_ pKind) => !_off.Contains(pKind);
+
+        private static Legend_ LegendOf(MapPoi.Kind pKind) => pKind switch
+        {
+            MapPoi.Kind.Landmark => Legend_.Landmark,
+            MapPoi.Kind.Entrance => Legend_.Entrance,
+            MapPoi.Kind.Vent => Legend_.Vent,
+            MapPoi.Kind.Climb => Legend_.Climb,
+            MapPoi.Kind.Underground => Legend_.Underground,
+            MapPoi.Kind.Overlook => Legend_.Overlook,
+            _ => Legend_.Shortcut
+        };
 
         private void OnEnable()
         {
@@ -122,34 +163,50 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
 
             _used = 0;
-            foreach (LevelZone lZone in LevelZone.All) Pin(lZone.transform.position, null, Color.white, 0f, lZone.ZoneName.ToUpperInvariant());
-            // Landmarks and the ways in: entrances, vents, climbs, cave mouths, overlooks.
+            _labelled.Clear();
+            if (Shown(Legend_.Zones))
+                foreach (LevelZone lZone in LevelZone.All) Pin(lZone.transform.position, null, Color.white, 0f, lZone.ZoneName.ToUpperInvariant());
+            // Landmarks and the ways in, on the floor shown: entrances, vents, climbs, cave mouths, overlooks.
             foreach (MapPoi lPoi in MapPoi.All)
             {
+                if (!Shown(LegendOf(lPoi.Type)) || MapPlan.FloorAt(lPoi.transform.position) != _floor) continue;
                 bool lLandmark = lPoi.Type == MapPoi.Kind.Landmark;
-                Pin(lPoi.transform.position, lLandmark ? UIIcons.DiamondOutline : PoiIcon(lPoi.Type), MapPoi.ColorOf(lPoi.Type), 0f, _zoom > 1.6f || lLandmark ? lPoi.Label.ToUpperInvariant() : null, lLandmark ? 20f : 14f, false);
+                // One name per thing at a glance; zoomed in, every one of them.
+                string lLabel = _zoom > 1.6f || lLandmark ? lPoi.Label.ToUpperInvariant() : null;
+                if (lLabel != null && _zoom < 2.5f && !_labelled.Add(lLabel)) lLabel = null;
+                Pin(lPoi.transform.position, lLandmark ? UIIcons.DiamondOutline : PoiIcon(lPoi.Type), MapPoi.ColorOf(lPoi.Type), 0f, lLabel, lLandmark ? 20f : 14f, false);
             }
             MatchDirector lDirector = MatchDirector.Instance;
             if (lDirector != null && lDirector.Proof.Value != ProofState.TargetAlive)
             {
                 List<MatchPoint> lExtractions = MatchPoint.OfKind(MatchPoint.Kind.Extraction);
-                for (int i = 0; i < lExtractions.Count; i++)
-                    if ((lDirector.ActiveExtractions.Value & (1 << i)) != 0) Pin(lExtractions[i].transform.position, UIIcons.Ring, UIFactory.Good, 0f, lExtractions[i].Label.ToUpperInvariant(), 26f, true);
-                if (lDirector.Proof.Value == ProofState.Dropped) Pin(lDirector.ProofPosition.Value, UIIcons.Diamond, ThreatMarkers.Amber, 0f, "PROOF", 24f, true);
+                if (Shown(Legend_.Extraction))
+                    for (int i = 0; i < lExtractions.Count; i++)
+                        if ((lDirector.ActiveExtractions.Value & (1 << i)) != 0) Pin(lExtractions[i].transform.position, UIIcons.Ring, UIFactory.Good, 0f, lExtractions[i].Label.ToUpperInvariant(), 26f, true);
+                if (lDirector.Proof.Value == ProofState.Dropped && Shown(Legend_.Proof)) Pin(lDirector.ProofPosition.Value, UIIcons.Diamond, ThreatMarkers.Amber, 0f, "PROOF", 24f, true);
             }
-            foreach (Npc lNpc in Npc.All)
-                if (lNpc != null && lNpc.IsTarget && lNpc.Health.IsAlive) Pin(lNpc.transform.position, UIIcons.Chevron, ThreatMarkers.Red, 180f, "TARGET", 30f, true);
+            if (Shown(Legend_.Radio))
+                foreach (RadioFeed.Alert lAlert in RadioFeed.Recent)
+                    if (Time.time - lAlert.at < RadioFeed.MAP_TIME) Pin(lAlert.where, UIIcons.Phone, UIFactory.Accent, 0f, null, 22f, true);
+            if (Shown(Legend_.Target))
+                foreach (Npc lNpc in Npc.All)
+                    if (lNpc != null && lNpc.IsTarget && lNpc.Health.IsAlive) Pin(lNpc.transform.position, UIIcons.Chevron, ThreatMarkers.Red, 180f, "TARGET", 30f, true);
             PlayerAvatar lMe = PlayerAvatar.Local;
             foreach (PlayerAvatar lAvatar in PlayerAvatar.All)
             {
                 if (lAvatar == null || !lAvatar.Health.IsAlive || lAvatar == lMe) continue;
-                if (lAvatar.CarriesProof.Value) Pin(lAvatar.transform.position, UIIcons.Diamond, ThreatMarkers.Amber, 0f, "PROOF CARRIER", 22f, true);
-                else if (lMe != null && lAvatar.Team.Value == lMe.Team.Value && LobbyState.Instance != null && LobbyState.Instance.Mode.Value != MatchMode.FreeForAll)
+                if (lAvatar.CarriesProof.Value) { if (Shown(Legend_.Proof)) Pin(lAvatar.transform.position, UIIcons.Diamond, ThreatMarkers.Amber, 0f, "PROOF CARRIER", 22f, true); }
+                else if (Shown(Legend_.Teammate) && lMe != null && lAvatar.Team.Value == lMe.Team.Value && LobbyState.Instance != null && LobbyState.Instance.Mode.Value != MatchMode.FreeForAll)
                     Pin(lAvatar.transform.position, UIIcons.Dot, ThreatMarkers.Blue, 0f, lAvatar.DisplayName.ToUpperInvariant(), 20f, true);
             }
             // You, last so it draws on top: a big amber arrow on a dark halo, kept on the edge when out of view.
-            if (lMe != null && lMe.Health.IsAlive) Pin(lMe.transform.position, UIIcons.Arrow, UIFactory.Accent, -lMe.LookYaw, "YOU", 40f, true);
-            for (int i = _used; i < _pool.Count; i++) _pool[i].rect.gameObject.SetActive(false);
+            if (lMe != null && lMe.Health.IsAlive && Shown(Legend_.You)) Pin(lMe.transform.position, UIIcons.Arrow, UIFactory.Accent, -lMe.LookYaw, "YOU", 40f, true);
+            // A pin and its label are siblings: both go, or the name stays behind where it last was.
+            for (int i = _used; i < _pool.Count; i++)
+            {
+                _pool[i].rect.gameObject.SetActive(false);
+                _pool[i].label.gameObject.SetActive(false);
+            }
         }
 
         /// <summary>Wheel / triggers zoom, drag / left stick pan.</summary>
@@ -162,9 +219,14 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             {
                 Vector2 lPosition = lMouse.position.ReadValue();
                 bool lOver = RectTransformUtility.RectangleContainsScreenPoint(_frame, lPosition, null);
-                if (lOver) lZoomInput += Mathf.Sign(lMouse.scroll.ReadValue().y) * (Mathf.Abs(lMouse.scroll.ReadValue().y) > 0.01f ? 0.25f : 0f);
-                if (lMouse.leftButton.wasPressedThisFrame && lOver) _dragging = true;
-                if (!lMouse.leftButton.isPressed) _dragging = false;
+                if (lOver)
+                {
+                    float lScroll = lMouse.scroll.ReadValue().y;
+                    if (Mathf.Abs(lScroll) > 0.01f) ZoomAt(lPosition, 1f + Mathf.Sign(lScroll) * 0.25f);
+                }
+                bool lPressed = lMouse.leftButton.wasPressedThisFrame || lMouse.rightButton.wasPressedThisFrame || lMouse.middleButton.wasPressedThisFrame;
+                if (lPressed && lOver) _dragging = true;
+                if (!lMouse.leftButton.isPressed && !lMouse.rightButton.isPressed && !lMouse.middleButton.isPressed) _dragging = false;
                 if (_dragging)
                 {
                     Vector2 lDelta = lPosition - _lastMouse;
@@ -181,6 +243,18 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
             if (Mathf.Abs(lZoomInput) > 0f) _zoom = Mathf.Clamp(_zoom * (1f + lZoomInput), 1f, 5f);
             _center += lPan;
+        }
+
+        /// <summary>Zooms keeping what is under the cursor under the cursor.</summary>
+        private void ZoomAt(Vector2 pScreen, float pFactor)
+        {
+            float lBefore = _zoom;
+            _zoom = Mathf.Clamp(_zoom * pFactor, 1f, 6f);
+            if (Mathf.Approximately(lBefore, _zoom)) return;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(_frame, pScreen, null, out Vector2 lLocal)) return;
+            // From the frame's middle, as a share of its width (the frame's pivot sits on its left edge).
+            Vector2 lOffset = new Vector2(lLocal.x - _frame.rect.center.x, lLocal.y - _frame.rect.center.y) / _frame.rect.width;
+            _center += lOffset * (1f / lBefore - 1f / _zoom);
         }
 
         private static Sprite PoiIcon(MapPoi.Kind pKind) => pKind switch
@@ -248,10 +322,33 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _portrait.raycastTarget = false;
             UIFactory.Title(pPage, "Kicker", "TARGET", 16, ThreatMarkers.Red, TextAlignmentOptions.Left, L, new Vector2(520, -10), new Vector2(600, 24), true, 5f);
             _targetName = UIFactory.Title(pPage, "Name", "", 56, UIFactory.Paper, TextAlignmentOptions.Left, L, new Vector2(520, -60), new Vector2(600, 70), true, 1f);
-            _targetLine = UIFactory.Text(pPage, "Line", "", 22, UIFactory.Muted, TextAlignmentOptions.TopLeft, L, new Vector2(520, -150), new Vector2(600, 90));
-            UIFactory.Rule(pPage, L, new Vector2(520, -240), 600, false, new Color(1, 1, 1, 0.12f), 1f);
-            _targetProof = UIFactory.Title(pPage, "Proof", "", 20, UIFactory.Paper, TextAlignmentOptions.Left, L, new Vector2(520, -270), new Vector2(600, 28), false, 3f);
-            _targetState = UIFactory.Title(pPage, "State", "", 20, UIFactory.Accent, TextAlignmentOptions.Left, L, new Vector2(520, -306), new Vector2(600, 28), true, 3f);
+            _targetLine = UIFactory.Text(pPage, "File", "", 22, UIFactory.Paper, TextAlignmentOptions.TopLeft, L, Vector2.zero, new Vector2(760, 420));
+            _targetLine.rectTransform.pivot = L;
+            _targetLine.rectTransform.anchoredPosition = new Vector2(520, -130);
+            UIFactory.Rule(pPage, L, new Vector2(520, -570), 760, false, new Color(1, 1, 1, 0.12f), 1f);
+            _targetProof = UIFactory.Title(pPage, "Proof", "", 20, UIFactory.Paper, TextAlignmentOptions.Left, L, new Vector2(520, -600), new Vector2(760, 28), false, 3f);
+            _targetState = UIFactory.Title(pPage, "State", "", 20, UIFactory.Accent, TextAlignmentOptions.Left, L, new Vector2(520, -636), new Vector2(760, 28), true, 3f);
+        }
+
+        /// <summary>Everything worth knowing on the target: who it is, where it spends its day, who is with it, and what to do.</summary>
+        private static string ContractFile(Data.TargetProfile pTarget, bool pProtect, bool pGuarding)
+        {
+            const string HEAD = "<font=\"BarlowCondensed-Bold SDF\"><color=#9EA0A6>";
+            const string TAIL = "</color></font>\n";
+            Data.MapDefinition lMap = LobbyState.Instance != null ? LobbyState.Instance.Map : null;
+            string lFile = pTarget.dossier + "\n\n";
+            if (lMap != null && pTarget.zone >= 0 && pTarget.zone < lMap.zoneNames.Length) lFile += HEAD + "WHERE" + TAIL + lMap.zoneNames[pTarget.zone] + "\n\n";
+            if (pTarget.routine != null && pTarget.routine.Count > 0)
+            {
+                List<string> lHabits = new List<string>();
+                foreach (Data.ActivityType lActivity in pTarget.routine) lHabits.Add(lActivity.ToString().ToLowerInvariant());
+                lFile += HEAD + "HABITS" + TAIL + string.Join(", ", lHabits) + "\n\n";
+            }
+            lFile += HEAD + "PROTECTION" + TAIL + (pTarget.bodyguards > 0 ? pTarget.bodyguards + " bodyguards never far, and every guard on the map." : "Every guard on the map.") + "\n\n";
+            string lOrders = pGuarding ? "Keep the target alive. Hunt down every agent who comes for it; the guards are on your side and your radio tells you what they see."
+                : pProtect ? "Kill the target: that is all it takes. Another team of agents is guarding it and hears everything the guards see."
+                : "Kill the target, take the proof from its body and carry it to an extraction point. Anyone can take it from you.";
+            return lFile + HEAD + "ORDERS" + TAIL + lOrders;
         }
 
         /// <summary>The contract: a portrait of the target rendered now, and its file.</summary>
@@ -260,8 +357,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             MatchDirector lDirector = MatchDirector.Instance;
             Data.TargetProfile lTarget = lDirector != null ? lDirector.Target : null;
             _targetName.text = lTarget != null ? lTarget.displayName.ToUpperInvariant() : "";
-            _targetLine.text = lTarget != null ? lTarget.dossier : "";
-            _targetProof.text = lTarget != null ? "PROOF   <color=#FFFFFF>" + lTarget.proof.ToString().ToUpperInvariant() + "</color>" : "";
+            bool lProtect = lDirector != null && lDirector.Protect;
+            bool lGuarding = lProtect && PlayerAvatar.Local != null && PlayerAvatar.Local.IsProtector;
+            _targetLine.text = lTarget != null ? ContractFile(lTarget, lProtect, lGuarding) : "";
+            _targetProof.text = lTarget != null && !lProtect ? "PROOF   <color=#FFFFFF>" + lTarget.proof.ToString().ToUpperInvariant() + "</color>" : "";
             _targetState.text = lDirector == null ? "" : lDirector.Proof.Value switch
             {
                 ProofState.TargetAlive => "STATUS   ALIVE",

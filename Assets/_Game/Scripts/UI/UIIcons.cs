@@ -84,6 +84,75 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             return Mathf.Min(lFrame, Mathf.Min(lShaft, lHead));
         });
 
+        // ---------------------------------------------------------------- agents' icons
+
+        public const int AGENT_COUNT = 16;
+        /// <summary>The shield: an agent's icon, and the mark of a team protecting the target.</summary>
+        public const int SHIELD = 8;
+
+        /// <summary>The icon an agent chose for themselves.</summary>
+        public static Sprite Agent(int pIndex)
+        {
+            int lIndex = Mathf.Abs(pIndex) % AGENT_COUNT;
+            return Get("agent" + lIndex, (x, y) => AgentShape(lIndex, x, y));
+        }
+
+        private static float C(float pX, float pY, float pCx, float pCy, float pR) => Mathf.Sqrt((pX - pCx) * (pX - pCx) + (pY - pCy) * (pY - pCy)) - pR;
+
+        /// <summary>Signed distance to a polygon given as x, y pairs.</summary>
+        private static float Poly(float pX, float pY, params float[] pPoints)
+        {
+            int lCount = pPoints.Length / 2;
+            float lDistance = float.MaxValue;
+            bool lInside = false;
+            for (int i = 0, j = lCount - 1; i < lCount; j = i++)
+            {
+                float lAx = pPoints[j * 2], lAy = pPoints[j * 2 + 1], lBx = pPoints[i * 2], lBy = pPoints[i * 2 + 1];
+                float lEx = lBx - lAx, lEy = lBy - lAy, lWx = pX - lAx, lWy = pY - lAy;
+                float t = Mathf.Clamp01((lWx * lEx + lWy * lEy) / (lEx * lEx + lEy * lEy));
+                float lDx = lWx - lEx * t, lDy = lWy - lEy * t;
+                lDistance = Mathf.Min(lDistance, lDx * lDx + lDy * lDy);
+                if ((lAy > pY) != (lBy > pY) && pX < lAx + (pY - lAy) / (lBy - lAy) * (lBx - lAx)) lInside = !lInside;
+            }
+            return (lInside ? -1f : 1f) * Mathf.Sqrt(lDistance);
+        }
+
+        private static float StarShape(float pX, float pY)
+        {
+            float[] lPoints = new float[20];
+            for (int i = 0; i < 10; i++)
+            {
+                float lAngle = Mathf.PI * 0.5f + i * Mathf.PI / 5f, lRadius = i % 2 == 0 ? 0.92f : 0.38f;
+                lPoints[i * 2] = Mathf.Cos(lAngle) * lRadius;
+                lPoints[i * 2 + 1] = Mathf.Sin(lAngle) * lRadius;
+            }
+            return Poly(pX, pY, lPoints);
+        }
+
+        private static float AgentShape(int pIndex, float x, float y)
+        {
+            float r = Mathf.Sqrt(x * x + y * y);
+            switch (pIndex)
+            {
+                case 0: return StarShape(x, y);
+                case 1: return Mathf.Min(Mathf.Min(C(x, y, -0.36f, 0.3f, 0.42f), C(x, y, 0.36f, 0.3f, 0.42f)), Poly(x, y, -0.74f, 0.12f, 0.74f, 0.12f, 0f, -0.86f));
+                case 2: return Poly(x, y, 0.15f, 0.92f, -0.55f, -0.05f, -0.05f, -0.05f, -0.2f, -0.92f, 0.55f, 0.15f, 0.05f, 0.15f);
+                case 3: return Mathf.Max(C(x, y, 0f, 0f, 0.82f), -C(x, y, 0.36f, 0.16f, 0.64f));
+                case 4: return Mathf.Min(r - 0.42f, Mathf.Max(Mathf.Abs(r - 0.74f) - 0.16f, (0.5f - Mathf.Cos(Mathf.Atan2(y, x) * 8f)) * 0.3f));
+                case 5: return Mathf.Min(C(x, y, 0f, -0.24f, 0.6f), Poly(x, y, -0.52f, 0.06f, 0.52f, 0.06f, 0f, 0.94f));
+                case 6: return Poly(x, y, -0.8f, -0.62f, 0.8f, -0.62f, 0.92f, 0.5f, 0.42f, 0f, 0f, 0.72f, -0.42f, 0f, -0.92f, 0.5f);
+                case 7: return Mathf.Abs(x) + Mathf.Abs(y) * 0.8f - 0.84f;
+                case SHIELD: return Poly(x, y, -0.72f, 0.78f, 0.72f, 0.78f, 0.72f, 0f, 0f, -0.92f, -0.72f, 0f);
+                case 9: return Mathf.Min(Mathf.Max(Mathf.Max(C(x, y, 0f, 0.62f, 1.08f), C(x, y, 0f, -0.62f, 1.08f)), 0.42f - r), r - 0.24f);
+                case 10: return Mathf.Min(Mathf.Min(Mathf.Abs(r - 0.76f) - 0.11f, Mathf.Abs(r - 0.42f) - 0.09f), r - 0.13f);
+                case 11: return Mathf.Min(RoundBox(x, y, 0.24f, 0.82f, 0.04f), RoundBox(x, y, 0.82f, 0.24f, 0.04f));
+                case 12: return Mathf.Max(Mathf.Max(Mathf.Min(C(x, y, 0f, 0.16f, 0.74f), RoundBox(x, y + 0.62f, 0.38f, 0.3f, 0.06f)), -C(x, y, -0.28f, 0.14f, 0.19f)), -C(x, y, 0.28f, 0.14f, 0.19f));
+                case 13: return Mathf.Min(C(x, y, -0.1f, -0.2f, 0.66f), Poly(x, y, 0.22f, 0.3f, 0.42f, 0.5f, 0.78f, 0.84f, 0.66f, 0.94f, 0.3f, 0.6f, 0.1f, 0.42f));
+                case 14: return Mathf.Min(Mathf.Min(Mathf.Min(C(x, y, -0.36f, -0.2f, 0.4f), C(x, y, 0.36f, -0.2f, 0.4f)), Poly(x, y, -0.74f, -0.02f, 0.74f, -0.02f, 0f, 0.92f)), Poly(x, y, -0.1f, -0.3f, 0.1f, -0.3f, 0.26f, -0.88f, -0.26f, -0.88f));
+                default: return Mathf.Min(Mathf.Min(Mathf.Min(C(x, y, 0f, 0.42f, 0.38f), C(x, y, -0.4f, -0.08f, 0.38f)), C(x, y, 0.4f, -0.08f, 0.38f)), Poly(x, y, -0.08f, 0f, 0.08f, 0f, 0.22f, -0.9f, -0.22f, -0.9f));
+            }
+        }
+
         private static float RoundBox(float pX, float pY, float pHalfW, float pHalfH, float pRadius)
         {
             float lDx = Mathf.Abs(pX) - pHalfW + pRadius, lDy = Mathf.Abs(pY) - pHalfH + pRadius;

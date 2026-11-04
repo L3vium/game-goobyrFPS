@@ -58,6 +58,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private readonly Frame[] _frames = new Frame[CasterLayoutLogic.MAX_FEEDS];
         private readonly List<Card> _cards = new List<Card>();
         private TextMeshProUGUI _kicker, _info, _auto, _help;
+        private readonly Button[] _modes = new Button[3];
 
         // ---------------------------------------------------------------- build
 
@@ -80,6 +81,16 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _info = UIFactory.Title(lTop, "Info", "", 18, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), new Vector2(0, 0), new Vector2(620, 26), true, 2f);
             _info.overflowMode = TextOverflowModes.Ellipsis;
             _auto = UIFactory.Title(lTop, "Auto", "", 14, UIFactory.Good, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-18, 0), new Vector2(170, 20), true, 3f);
+
+            // The three modes, under the bar.
+            string[] lModes = { "SWITCH", "MULTI", "FLY" };
+            for (int i = 0; i < lModes.Length; i++)
+            {
+                CasterView.CasterMode lMode = (CasterView.CasterMode)i;
+                Button lButton = UIFactory.Button(_overlay, "F" + (i + 1) + "  " + lModes[i], new Vector2(0.5f, 1f), new Vector2((i - 1) * 176f, -82f), new Vector2(168, 40), UIFactory.Accent2, () => _view.SetMode(lMode), 18);
+                lButton.GetComponent<Image>().color = Back;
+                _modes[i] = lButton;
+            }
 
             _cardsRow = UIFactory.Rect(_overlay, "Cards", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), Vector2.zero, new Vector2(8 * (CARD_W + CARD_GAP), CARD_H));
             for (int i = 0; i < 8; i++) _cards.Add(BuildCard(i));
@@ -196,7 +207,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             CasterLayout lShown = _view.ShownLayout;
             _bandTop.enabled = lShown == CasterLayout.Duo;
             _bandBottom.enabled = lShown == CasterLayout.Duo || lShown == CasterLayout.MainPlus3;
-            bool lShow = !_view.Clean && !EndScreen.IsShown;
+            bool lShow = !_view.Clean && !EndScreen.IsBlocking;
             _group.alpha = lShow ? 1f : 0f;
             _group.blocksRaycasts = lShow;
             if (!lShow) return;
@@ -219,6 +230,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             RefreshTop();
             RefreshCards();
             _help.text = Help();
+            _cardsRow.gameObject.SetActive(_view.Mode != CasterView.CasterMode.Fly);
+            for (int i = 0; i < _modes.Length; i++)
+                _modes[i].GetComponentInChildren<TextMeshProUGUI>().fontStyle = (int)_view.Mode == i ? FontStyles.Underline : FontStyles.Normal;
         }
 
         private void RefreshFrame(Frame pFrame, int pPosition, CasterLayout pLayout, float pCovered)
@@ -429,8 +443,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _info.text = lMap + DOT + lMode + DOT + lClock + DOT + lContract;
             _kicker.text = _view.Restricted ? "ELIMINATED" : "CASTER";
             _kicker.color = _view.Restricted ? UIFactory.Danger : UIFactory.Accent;
-            _auto.text = _view.AutoDirector ? "AUTO DIRECTOR" : "MANUAL";
-            _auto.color = _view.AutoDirector ? UIFactory.Good : UIFactory.Muted;
+            _auto.text = "";
         }
 
         private void RefreshCards()
@@ -495,15 +508,15 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             string W(string pKey, string pWhat) => "<color=#F2F2F0>" + pKey + "</color> " + pWhat + GAP;
 
             if (lPad)
-                return W("LB RB", "AGENT") + W("D-PAD LEFT RIGHT", "FEED") + W("D-PAD UP", "LAYOUT") + W("D-PAD DOWN", "FOCUS") + W("A", "TO MAIN") + W("X", "EYES / CHASE")
-                    + (_view.CanFly ? W("Y", "FREE CAMERA") + W("B", "MAP") : "") + W("R3", "AUTO DIRECTOR") + W("R STICK", lFeed.kind == FeedKind.Free ? "LOOK" : "ORBIT")
+                return W("D-PAD UP", "MODE") + W("LB RB", "AGENT") + W("X", "EYES / CHASE") + W("R STICK", lFeed.kind == FeedKind.Free ? "LOOK" : "ORBIT")
                     + (lFeed.kind == FeedKind.Free ? W("L STICK  LT RT", "FLY") : "");
 
-            string lHelp = W("1-" + Mathf.Clamp(_view.Agents.Count, 1, 8), "AGENT") + W("ARROWS", "NEXT AGENT") + W("TAB", "FEED") + W(K(Key.Enter), "TO MAIN")
-                + W(K(Key.F), "FOCUS") + W("SHIFT+" + K(Key.F), "FOCUS 2") + W("F1-F4", "LAYOUT") + W(K(Key.V), "EYES / CHASE");
-            if (_view.CanFly) lHelp += W(K(Key.C), "FREE CAMERA") + W(K(Key.T), "MAP");
-            lHelp += W(K(Key.P), "AUTO") + W(K(Key.H), "HIDE") + W("RIGHT CLICK", lFeed.kind == FeedKind.Free ? "LOOK" : "ORBIT") + W("WHEEL", lFeed.kind == FeedKind.Free ? "SPEED" : "ZOOM");
-            if (lFeed.kind == FeedKind.Free) lHelp += W(K(Key.W) + K(Key.A) + K(Key.S) + K(Key.D) + "  " + K(Key.E) + K(Key.Q), "FLY");
+            string lHelp = W("F1 F2 F3", "MODE");
+            if (_view.Mode == CasterView.CasterMode.Fly)
+                lHelp += W(K(Key.W) + K(Key.A) + K(Key.S) + K(Key.D), "FLY") + W("SPACE  CTRL", "UP DOWN") + W("SHIFT", "FAST") + W("WHEEL", "SPEED");
+            else
+                lHelp += W("1-" + Mathf.Clamp(_view.Agents.Count, 1, 8), "AGENT") + W("ARROWS", "NEXT AGENT") + W(K(Key.V), "EYES / CHASE") + W("RIGHT CLICK", "ORBIT") + W("WHEEL", "ZOOM");
+            lHelp += W(K(Key.H), "HIDE");
             return lHelp;
         }
     }

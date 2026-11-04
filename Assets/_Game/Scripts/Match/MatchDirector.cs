@@ -61,7 +61,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
         private ProofPickup _proof;
         private float _revealTimer;
         /// <summary>The end screen waits for the host's button, back to the lobby after this at the latest.</summary>
-        public const float END_SCREEN_FALLBACK = 45f;
+        public const float END_SCREEN_FALLBACK = 180f;
         private float _endTimer;
         private readonly List<ExtractionPoint> _extractions = new List<ExtractionPoint>();
         private static HumanRagdoll _targetRagdoll;
@@ -184,6 +184,17 @@ namespace Com.IsartDigital.GoobyrFPS.Match
                 TargetNpc.Value = lTargetNpc.NetworkObject;
                 for (int i = 0; i < lChosen.bodyguards; i++)
                     SpawnNpc(lAt + new Vector3(i % 2 == 0 ? 1.5f : -1.5f, 0, -1.5f - i * 0.5f), Quaternion.identity, NpcRole.Bodyguard, lChosen.zone, GameDatabase.Find(i % 2 == 0 ? ItemKind.Smg : ItemKind.Shotgun), null, lTargetNpc, -1, null);
+
+                // The team protecting it starts at its side, the others where they are.
+                int lGuard = 0;
+                foreach (PlayerAvatar lAvatar in PlayerAvatar.All)
+                {
+                    if (lAvatar == null || !lAvatar.IsProtector) continue;
+                    float lRing = lGuard++ * 1.1f;
+                    Vector3 lBeside = lAt + new Vector3(Mathf.Cos(lRing), 0f, Mathf.Sin(lRing)) * 3f + Vector3.up * 0.2f;
+                    if (UnityEngine.AI.NavMesh.SamplePosition(lBeside, out UnityEngine.AI.NavMeshHit lGround, 6f, UnityEngine.AI.NavMesh.AllAreas)) lBeside = lGround.position + Vector3.up * 0.2f;
+                    lAvatar.TeleportOwnerRpc(lBeside, 0f);
+                }
             }
 
             SpawnItems(lRandom);
@@ -203,7 +214,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             StartTime.Value = NetworkManager.ServerTime.TimeAsFloat;
             Phase.Value = MatchPhase.Playing;
             if (LobbyState.Instance != null) LobbyState.Instance.Phase.Value = MatchPhase.Playing;
-            AnnounceRpc("NEW CONTRACT", Target != null ? Target.displayName.ToUpperInvariant() : "");
+            ContractStartRpc(Target != null ? Target.displayName.ToUpperInvariant() : "");
         }
 
         private static bool IsKit(ItemKind pKind) => pKind == ItemKind.Keycard;
@@ -283,6 +294,12 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             if (!pNpc.IsTarget) return;
 
             _killMethod = MethodName(pInfo);
+            // A team protects it: the attackers only had to kill it, there is no proof to carry.
+            if (Protect)
+            {
+                _targetDead = true;
+                return;
+            }
             NetworkObject lProof = Instantiate(NetPrefabs.Instance.proof, pNpc.transform.position + Vector3.up * 0.6f, Quaternion.identity);
             lProof.Spawn(true);
             _proof = lProof.GetComponent<ProofPickup>();
@@ -405,8 +422,42 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
             List<RulesPlayer> lPlayers = new List<RulesPlayer>();
             foreach (LobbyPlayer lPlayer in LobbyPlayer.Agents()) lPlayers.Add(new RulesPlayer { clientId = lPlayer.OwnerClientId, team = lPlayer.Team.Value, alive = lPlayer.Alive.Value });
-            MatchOutcome lOutcome = MatchRulesLogic.Evaluate(lPlayers, WinnerTeam.Value, TimeLeft.Value);
+            MatchOutcome lOutcome = Protect
+                ? MatchRulesLogic.EvaluateProtect(lPlayers, LobbyState.Instance.DefenderMask.Value, _targetDead, TimeLeft.Value)
+                : MatchRulesLogic.Evaluate(lPlayers, WinnerTeam.Value, TimeLeft.Value);
             if (lOutcome != MatchOutcome.None) EndMatchServer(lOutcome);
+        }
+
+        /// <summary>A team protects the target this match.</summary>
+        public bool Protect => LobbyState.Instance != null && LobbyState.Instance.DefenderMask.Value != 0;
+        private bool _targetDead;
+        private readonly Dictionary<string, float> _radioAt = new Dictionary<string, float>();
+        /// <summary>The same kind of alert goes out at most this often.</summary>
+        private const float RADIO_GAP = 4f;
+
+        /// <summary>Host: what the guards see goes out on the radio of the team protecting the target.</summary>
+        public void RadioServer(string pKind, string pLine, Vector3 pWhere)
+        {
+            if (!Protect || !Playing) return;
+            if (_radioAt.TryGetValue(pKind, out float lAt) && Time.time - lAt < RADIO_GAP) return;
+            _radioAt[pKind] = Time.time;
+            RadioRpc(pLine, pWhere);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        private void RadioRpc(string pLine, Vector3 pWhere)
+        {
+            bool lCaster = LobbyPlayer.Local != null && LobbyPlayer.Local.Caster.Value;
+            if (!lCaster && (PlayerAvatar.Local == null || !PlayerAvatar.Local.IsProtector)) return;
+            UI.RadioFeed.Push(pLine, pWhere);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        private void ContractStartRpc(string pTarget)
+        {
+            bool lProtector = PlayerAvatar.Local != null && PlayerAvatar.Local.IsProtector;
+            if (lProtector) UI.Hud.Announce("PROTECT THE TARGET", "KEEP " + pTarget + " ALIVE: HUNT THE AGENTS COMING FOR THEM");
+            else UI.Hud.Announce("NEW CONTRACT", pTarget);
         }
 
         private void UpdateExtraction(PlayerAvatar pCarrier)
@@ -464,7 +515,16 @@ namespace Com.IsartDigital.GoobyrFPS.Match
         [Rpc(SendTo.Everyone)]
         private void EndRpc(MatchOutcome pOutcome, int pWinnerTeam, string pWinners, string pMethod)
         {
-            bool lWon = pOutcome == MatchOutcome.Extracted && LobbyPlayer.Local != null && LobbyPlayer.Local.Team.Value == pWinnerTeam;
+            LobbyPlayer lMe = LobbyPlayer.Local;
+            bool lProtector = lMe != null && LobbyState.Instance != null && LobbyState.Instance.IsProtector(lMe.Team.Value);
+            bool lWon = lMe != null && !lMe.Caster.Value && pOutcome switch
+            {
+                MatchOutcome.Extracted => lMe.Team.Value == pWinnerTeam,
+                MatchOutcome.TargetKilled => !lProtector,
+                MatchOutcome.AttackersDown => lProtector,
+                MatchOutcome.TimeUp => lProtector,
+                _ => false
+            };
             UI.EndScreen.Show(pOutcome, lWon, pWinners, pMethod);
             if (lWon && CameraRig.Instance != null) Effects.Confetti(CameraRig.Instance.WorldCamera.transform.position + CameraRig.Instance.WorldCamera.transform.forward * 3f);
             GameInput.GameplayEnabled = false;

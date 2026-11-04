@@ -13,38 +13,60 @@ using UnityEngine.UI;
 namespace Com.IsartDigital.GoobyrFPS.UI
 {
     /// <summary>
-    /// The title scene's screens, over the key art (<see cref="TitleDiorama"/>). The game is played
-    /// between friends: one creates a room and shares its code, the others join with it.
-    /// <list type="bullet">
-    /// <item><b>Main</b>: a vertical list - create a room, join a room, solo, options, quit - each
-    /// with its icon and one line saying what it does; the agent's name bottom right.</item>
-    /// <item><b>Join</b>: the room code, big; the direct IP (LAN) folded under it.</item>
-    /// <item><b>Briefing</b>: the map card (its plan as the picture), the mode as three explicit cards,
-    /// teams and options as rows, the agents in aligned columns, the room code with a copy button,
-    /// READY or START.</item>
-    /// </list>
+    /// The whole front of the game in two screens. <b>Title</b>: PLAY, and small icons for the options
+    /// and quit. <b>The room</b>: PLAY opens it at once, and everything happens there - the map on the
+    /// left, the agents on the right in team boxes (a + adds a box, agents are dragged between them,
+    /// a box can protect the target), a role and an icon on each agent's own line, invites under the
+    /// agents. There is no mode to choose: the boxes are the mode (see <see cref="LobbyState.ResolveTeams"/>).
     /// </summary>
     public class MenuUI : MonoBehaviour
     {
-        private enum Screen { Main, Join, Lobby, Settings }
+        private enum Screen { Main, Lobby, Settings }
 
-        private const string VERSION = "0.7.0";
+        private const string VERSION = "0.8.1";
         private static readonly Vector2 TL = new Vector2(0, 1);
+        private static readonly Color Navy = new Color(0.1f, 0.11f, 0.17f, 1f);
+        private static readonly Color Slate = new Color(1f, 1f, 1f, 0.05f);
+
+        private const float BOX_W = 362f, BOX_GAP = 16f, BOX_TOP = 112f, BOX_BOTTOM = 820f, HEADER_H = 40f, ROW_H = 42f, DROP_H = 44f;
+        private const int MAX_ROWS = 12;
+
+        private class TeamBox
+        {
+            public RectTransform rect;
+            public Image bar, drop;
+            public TextMeshProUGUI title;
+            public Button protect, remove;
+            public Image protectIcon;
+            public TextMeshProUGUI protectLabel;
+        }
+
+        private class AgentRow
+        {
+            public RectTransform rect;
+            public Image back, icon;
+            public Button iconButton, role;
+            public TextMeshProUGUI name, state, roleLabel;
+            public LobbyPlayer player;
+            public AgentRowDrag drag;
+        }
 
         private RectTransform _root;
-        private GameObject _main, _join, _lobby, _settings;
-        private TextMeshProUGUI _status, _menuHint, _code, _mapName, _mapDescription, _playerCount, _startHint;
-        private TMP_InputField _joinCode, _joinIp, _name;
-        private Button _startButton, _readyButton, _copyButton, _firstMain, _shuffle, _invite;
-        private Toggle _casterSwitch;
-        private RawImage _mapPicture;
-        private GameObject _mapArrows, _teamsRow, _teamPicker;
-        private System.Action<string> _setTeamCount;
-        private System.Action<string> _setTime;
-        private GameObject _timeRow;
-        private readonly List<(Button button, Image back, Image bar, MatchMode mode)> _modeCards = new List<(Button, Image, Image, MatchMode)>();
-        private readonly List<(RectTransform row, Image bar, TextMeshProUGUI name, TextMeshProUGUI team, TextMeshProUGUI state)> _agents = new List<(RectTransform, Image, TextMeshProUGUI, TextMeshProUGUI, TextMeshProUGUI)>();
+        private GameObject _main, _lobby, _settings, _iconPicker;
+        private TextMeshProUGUI _status, _mapName, _mapDescription, _playerCount, _startHint, _code, _viewLabel;
+        private TMP_InputField _name, _joinField;
+        private Button _startButton, _readyButton, _copyButton, _invite, _shuffle, _addBox, _left, _right, _viewSwap;
+        private Toggle _proximity;
+        private RawImage _mapPicture, _mapInset;
+        private GameObject _insetFrame;
+        private bool _planBig;
         private Screen _current;
+        private RectTransform _casterBox;
+        private readonly List<TeamBox> _boxes = new List<TeamBox>();
+        private readonly List<AgentRow> _rows = new List<AgentRow>();
+        private RectTransform _ghost;
+        private TextMeshProUGUI _ghostName;
+        private float _joiningUntil;
 
         private void Start()
         {
@@ -55,22 +77,29 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             Spectator.Stop();
             HumanRagdoll.ClearAll();
 
+            // A camera only so the screen has a known clear colour: the backdrop is a still image.
+            Camera lCamera = new GameObject("MenuCamera").AddComponent<Camera>();
+            lCamera.transform.SetParent(transform, false);
+            lCamera.clearFlags = CameraClearFlags.SolidColor;
+            lCamera.backgroundColor = Navy;
+            lCamera.cullingMask = 0;
+
             Canvas lCanvas = UIFactory.Canvas("MenuCanvas", 20);
             lCanvas.transform.SetParent(transform, false);
             _root = (RectTransform)lCanvas.transform;
 
-            // Cinematic framing: dark gradient on the left where the text sits.
-            Image lShade = UIFactory.Stretch(_root, "Shade").gameObject.AddComponent<Image>();
-            lShade.sprite = GradientSprite();
-            lShade.color = new Color(0, 0, 0, 0.88f);
-            lShade.raycastTarget = false;
+            RawImage lBackdrop = UIFactory.Stretch(_root, "Backdrop").gameObject.AddComponent<RawImage>();
+            Texture2D lArt = Resources.Load<Texture2D>("Title/TitleArt");
+            lBackdrop.texture = lArt;
+            lBackdrop.color = lArt != null ? Color.white : Navy;
+            lBackdrop.raycastTarget = false;
 
             BuildMain();
-            BuildJoin();
             BuildLobby();
             BuildSettings();
-            _status = UIFactory.Title(_root, "Status", "", 18, UIFactory.Muted, TextAlignmentOptions.Right, new Vector2(1, 1), new Vector2(-110, -40), new Vector2(1000, 30), false, 3f);
-            UIFactory.Title(_root, "Version", "v" + VERSION, 13, new Color(1, 1, 1, 0.3f), TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(110, 8), new Vector2(200, 20), false, 3f);
+            BuildIconPicker();
+            _status = UIFactory.Title(_root, "Status", "", 16, UIFactory.Muted, TextAlignmentOptions.Right, new Vector2(1, 0), new Vector2(-70, 14), new Vector2(900, 24), false, 3f);
+            UIFactory.Title(_root, "Version", "v" + VERSION, 13, new Color(1, 1, 1, 0.3f), TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(70, 8), new Vector2(200, 20), false, 3f);
 
             Show(NetworkManagerListening() ? Screen.Lobby : Screen.Main);
             NetSession.OnStatus += HandleStatus;
@@ -91,28 +120,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             _current = pScreen;
             _main.SetActive(pScreen == Screen.Main);
-            _join.SetActive(pScreen == Screen.Join);
             _lobby.SetActive(pScreen == Screen.Lobby);
             _settings.SetActive(pScreen == Screen.Settings);
-            GameObject lShown = pScreen switch { Screen.Main => _main, Screen.Join => _join, Screen.Lobby => _lobby, _ => _settings };
-            UIFactory.FadeIn(lShown, 0.3f, new Vector2(-24, 0));
-            GameObject lFirst = pScreen == Screen.Main && _firstMain != null ? _firstMain.gameObject : lShown.GetComponentInChildren<Selectable>()?.gameObject;
-            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(lFirst);
+            GameObject lShown = pScreen switch { Screen.Main => _main, Screen.Lobby => _lobby, _ => _settings };
+            UIFactory.FadeIn(lShown, 0.25f, Vector2.zero);
+            if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
         }
 
-        private static Sprite GradientSprite()
-        {
-            Texture2D lTexture = new Texture2D(256, 1, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
-            for (int x = 0; x < 256; x++)
-            {
-                float t = x / 255f;
-                lTexture.SetPixel(x, 0, new Color(1, 1, 1, Mathf.Clamp01(1.05f - t * 1.5f)));
-            }
-            lTexture.Apply();
-            return Sprite.Create(lTexture, new Rect(0, 0, 256, 1), new Vector2(0.5f, 0.5f));
-        }
-
-        /// <summary>A rect anchored and pivoted on the top-left corner of its parent (screen layout in plain coordinates).</summary>
         private static RectTransform Box(Transform pParent, string pName, float pX, float pY, float pWidth, float pHeight) =>
             UIFactory.Rect(pParent, pName, TL, TL, TL, new Vector2(pX, -pY), new Vector2(pWidth, pHeight));
 
@@ -124,108 +138,45 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             return lText;
         }
 
-        /// <summary>A section header: small caps label over a short amber rule.</summary>
-        private static void Header(Transform pParent, string pText, float pX, float pY)
+        private static Button SmallButton(Transform pParent, string pLabel, float pX, float pY, float pWidth, float pHeight, System.Action pAction, float pFont = 18f, bool pPrimary = false)
         {
-            Label(pParent, pText, 15, UIFactory.Muted, pX, pY, 500, 22, true, 5f);
-            UIFactory.Rule(pParent, TL, new Vector2(pX, -pY - 28), 28, false, UIFactory.Accent, 2f);
+            Button lButton = UIFactory.Button(pParent, pLabel, TL, new Vector2(pX, -pY), new Vector2(pWidth, pHeight), pPrimary ? UIFactory.Accent : UIFactory.Accent2, pAction, pFont);
+            ((RectTransform)lButton.transform).pivot = TL;
+            ((RectTransform)lButton.transform).anchoredPosition = new Vector2(pX, -pY);
+            lButton.GetComponent<Image>().color = pPrimary ? UIFactory.Accent : Slate;
+            TextMeshProUGUI lText = lButton.GetComponentInChildren<TextMeshProUGUI>();
+            lText.alignment = TextAlignmentOptions.Center;
+            lText.rectTransform.anchoredPosition = Vector2.zero;
+            lText.rectTransform.sizeDelta = new Vector2(pWidth, pHeight);
+            return lButton;
         }
 
-        // ---------------------------------------------------------------- main
+        private static Button IconButton(Transform pParent, Sprite pIcon, float pX, float pY, float pSize, System.Action pAction)
+        {
+            Button lButton = SmallButton(pParent, "", pX, pY, pSize, pSize, pAction);
+            Image lIcon = UIFactory.Panel(lButton.transform, "Icon", UIFactory.Paper, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(pSize * 0.55f, pSize * 0.55f));
+            lIcon.sprite = pIcon;
+            return lButton;
+        }
+
+        // ---------------------------------------------------------------- title
 
         private void BuildMain()
         {
             _main = UIFactory.Stretch(_root, "Main").gameObject;
             Transform p = _main.transform;
-
-            Label(p, "STEALTH CONTRACTS  ·  2 TO 8 FRIENDS", 16, UIFactory.Accent, 110, 120, 900, 24, true, 6f);
-            Label(p, "GOOBYR FPS", 104, UIFactory.Paper, 104, 148, 1100, 120, true, 4f);
-
-            // The menu: one entry per thing to do, each saying what it does.
-            (string label, string hint, Sprite icon, System.Action action)[] lEntries =
-            {
-                ("CREATE A ROOM", "Open a room and give its code to your friends.", UIIcons.Create, CreateRoom),
-                ("JOIN A ROOM", "Type the code a friend gives you.", UIIcons.Code, () => Show(Screen.Join)),
-                ("SOLO", "Play a contract alone against the AI.", UIIcons.Person, () => { NetSession.Instance.HostLocal(); Show(Screen.Lobby); }),
-                ("OPTIONS", "Controls, video, audio and voice chat.", UIIcons.Options, () => Show(Screen.Settings)),
-                ("QUIT", "Back to the desktop.", UIIcons.Exit, Application.Quit)
-            };
-            for (int i = 0; i < lEntries.Length; i++)
-            {
-                (string lLabel, string lHint, Sprite lIcon, System.Action lAction) = lEntries[i];
-                Button lButton = MenuEntry(p, lLabel, lIcon, 110, 360 + i * 76, i == 0, lAction);
-                lButton.gameObject.AddComponent<HoverHint>().Init(lHint, pText => _menuHint.text = pText);
-                if (i == 0) _firstMain = lButton;
-            }
-            _menuHint = Label(p, "", 20, UIFactory.Muted, 110, 360 + lEntries.Length * 76 + 20, 640, 30, false, 2f);
-
-            // Footer: the controls on the left, the agent's name on the right.
-            UIFactory.Rule(p, new Vector2(0.5f, 0), new Vector2(0, 74), 1700, false, new Color(1, 1, 1, 0.12f), 1f);
-            UIFactory.Title(p, "Hints", "ENTER / A  SELECT      ESC / B  BACK", 16, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(110, 32), new Vector2(700, 24), false, 3f);
-            UIFactory.Title(p, "AgentLabel", "AGENT NAME", 14, UIFactory.Accent, TextAlignmentOptions.Right, new Vector2(1, 0), new Vector2(-110, 84), new Vector2(360, 22), true, 4f);
-            _name = UIFactory.Input(p, "YOUR NAME", new Vector2(1, 0), new Vector2(-110, 24), new Vector2(360, 52));
-            _name.characterLimit = 24;
-            _name.text = PlayerIdentity.LocalName;
-            _name.onEndEdit.AddListener(v => PlayerIdentity.LocalName = v);
+            Label(p, "GOOBYR", 170, UIFactory.Paper, 104, 250, 1100, 190, true, 3f);
+            Button lPlay = SmallButton(p, "PLAY", 110, 470, 440, 104, Play, 54, true);
+            lPlay.GetComponentInChildren<TextMeshProUGUI>().characterSpacing = 3f;
+            IconButton(p, UIIcons.Options, 110, 960, 60, () => Show(Screen.Settings));
+            IconButton(p, UIIcons.Exit, 182, 960, 60, Application.Quit);
         }
 
-        /// <summary>A main menu entry: icon, label; the first one is filled amber.</summary>
-        private static Button MenuEntry(Transform pParent, string pLabel, Sprite pIcon, float pX, float pY, bool pPrimary, System.Action pAction)
-        {
-            Button lButton = UIFactory.Button(pParent, pLabel, TL, new Vector2(pX, -pY), new Vector2(460, 64), pPrimary ? UIFactory.Accent : UIFactory.Accent2, pAction, 30);
-            TextMeshProUGUI lText = lButton.GetComponentInChildren<TextMeshProUGUI>();
-            // Room for the icon (a margin: the hover slide moves the label's position, not its margin).
-            lText.alignment = TextAlignmentOptions.Left;
-            lText.margin = new Vector4(pPrimary ? 56 : 46, 0, 0, 0);
-            Image lIcon = UIFactory.Panel(lButton.transform, "Icon", pPrimary ? UIFactory.Ink : UIFactory.Paper, new Vector2(0, 0.5f), new Vector2(22, 0), new Vector2(30, 30));
-            lIcon.sprite = pIcon;
-            lIcon.raycastTarget = false;
-            return lButton;
-        }
-
-        /// <summary>A room on Steam (public but found only by its code); LAN when Steam is not running.</summary>
-        private void CreateRoom()
+        /// <summary>PLAY: a room right away, on Steam when it runs (invites work at once), else on the local network.</summary>
+        private void Play()
         {
             if (SteamReady) NetSession.Instance.HostSteam(false);
             else NetSession.Instance.HostLocal();
-            Show(Screen.Lobby);
-        }
-
-        // ---------------------------------------------------------------- join
-
-        private void BuildJoin()
-        {
-            _join = UIFactory.Stretch(_root, "Join").gameObject;
-            Transform p = _join.transform;
-            Label(p, "JOIN A ROOM", 88, UIFactory.Paper, 104, 150, 1100, 110, true, 4f);
-            Label(p, "Ask the friend who created the room for its six-letter code.", 22, UIFactory.Muted, 110, 270, 900, 30, false, 1f);
-
-            Header(p, "ROOM CODE", 110, 340);
-            _joinCode = UIFactory.Input(p, "ABC-DEF", TL, new Vector2(110, -390), new Vector2(420, 72));
-            _joinCode.characterLimit = 7;
-            _joinCode.onValidateInput = (pText, pIndex, pChar) => char.IsLetter(pChar) || pChar == '-' ? char.ToUpperInvariant(pChar) : '\0';
-            _joinCode.textComponent.fontSize = 40;
-            _joinCode.textComponent.characterSpacing = 18f;
-            _joinCode.onSubmit.AddListener(_ => JoinByCode());
-            UIFactory.Button(p, "JOIN", TL, new Vector2(110 + 420 + 20, -390), new Vector2(220, 72), UIFactory.Accent, JoinByCode, 30);
-            Label(p, "A STEAM INVITE (SHIFT + TAB) JOINS DIRECTLY.", 16, UIFactory.Muted, 110, 490, 900, 24, false, 3f);
-
-            // Casters watch every agent at once (tournament view) and may join a contract already running.
-            RectTransform lCaster = UIWidgets.List(p, "Caster", TL, new Vector2(110 + 330, -540), 660f);
-            UIWidgets.Switch(lCaster, "Join as a caster  ·  watch, don't play", PlayerIdentity.JoinAsCaster, v => PlayerIdentity.JoinAsCaster = v);
-            Label(p, "UP TO FOUR LIVE FEEDS, FREE CAMERA AND TACTICAL MAP. WORKS DURING A CONTRACT TOO.", 14, UIFactory.Muted, 110, 606, 900, 22, false, 3f);
-
-            Header(p, "DIRECT IP  ·  SAME NETWORK", 110, 670);
-            _joinIp = UIFactory.Input(p, "192.168.1.20", TL, new Vector2(110, -720), new Vector2(420, 52));
-            UIFactory.Button(p, "CONNECT", TL, new Vector2(110 + 420 + 20, -720), new Vector2(220, 52), UIFactory.Accent2, () => { NetSession.Instance.JoinLocal(_joinIp.text); Show(Screen.Lobby); }, 24);
-
-            UIFactory.Button(p, "BACK", TL, new Vector2(110, -860), new Vector2(300, 56), UIFactory.Accent2, () => Show(Screen.Main), 26);
-        }
-
-        private void JoinByCode()
-        {
-            if (string.IsNullOrWhiteSpace(_joinCode.text)) return;
-            NetSession.Instance.JoinSteamCode(_joinCode.text);
             Show(Screen.Lobby);
         }
 
@@ -233,260 +184,442 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             _settings = UIFactory.Stretch(_root, "Settings").gameObject;
             Transform p = _settings.transform;
-            Label(p, "OPTIONS", 88, UIFactory.Paper, 104, 150, 1100, 110, true, 4f);
-            SettingsPanel.Build(p, TL, new Vector2(110 + 450, -300), 900f);
-            UIFactory.Button(p, "BACK", TL, new Vector2(110, -940), new Vector2(300, 56), UIFactory.Accent2, () => Show(Screen.Main), 26);
+            _settings.AddComponent<Image>().color = new Color(Navy.r, Navy.g, Navy.b, 0.96f);
+            Label(p, "OPTIONS", 72, UIFactory.Paper, 104, 90, 1100, 90, true, 8f);
+            SettingsPanel.Build(p, TL, new Vector2(110 + 450, -230), 900f);
+            SmallButton(p, "BACK", 110, 960, 240, 56, () => Show(Screen.Main), 24);
         }
 
-        // ---------------------------------------------------------------- briefing
+        // ---------------------------------------------------------------- the room
 
         private void BuildLobby()
         {
             _lobby = UIFactory.Stretch(_root, "Lobby").gameObject;
             Transform p = _lobby.transform;
-            Image lBack = UIFactory.Stretch(p, "Back").gameObject.AddComponent<Image>();
-            lBack.color = new Color(0.03f, 0.035f, 0.04f, 0.72f);
-            lBack.raycastTarget = false;
+            _lobby.AddComponent<Image>().color = new Color(Navy.r, Navy.g, Navy.b, 0.97f);
 
-            Label(p, "BRIEFING", 64, UIFactory.Paper, 106, 60, 600, 80, true, 4f);
+            // Left: the map, as a picture with its plan beside it (a click swaps the two).
+            RectTransform lFrame = Box(p, "MapFrame", 70, 60, 1000, 563);
+            lFrame.gameObject.AddComponent<Image>().color = new Color(0.05f, 0.055f, 0.09f, 1f);
+            _mapPicture = UIFactory.Stretch(lFrame, "Picture").gameObject.AddComponent<RawImage>();
+            _mapPicture.raycastTarget = false;
+            _insetFrame = Box(lFrame, "Inset", 1000 - 266, 563 - 266, 256, 256).gameObject;
+            _insetFrame.AddComponent<Image>().color = new Color(0.05f, 0.055f, 0.09f, 0.92f);
+            _mapInset = Box(_insetFrame.transform, "Plan", 4, 4, 248, 248).gameObject.AddComponent<RawImage>();
+            _mapInset.raycastTarget = false;
+            _viewSwap = _insetFrame.AddComponent<Button>();
+            _viewSwap.transition = Selectable.Transition.None;
+            _viewSwap.onClick.AddListener(() => _planBig = !_planBig);
+            _viewLabel = Label(lFrame, "", 13, UIFactory.Muted, 14, 563 - 26, 400, 20, true, 3f);
+            _left = SmallButton(lFrame, "‹", 0, 563 / 2 - 60, 56, 120, () => ChangeMap(-1), 48);
+            _right = SmallButton(lFrame, "›", 1000 - 56, 563 / 2 - 60, 56, 120, () => ChangeMap(1), 48);
 
-            // Room code, top right, with a copy button.
-            _code = Label(p, "", 22, UIFactory.Paper, 1690 - 600, 88, 600, 32, true, 6f, TextAlignmentOptions.TopRight);
-            _copyButton = UIFactory.Button(p, "COPY", TL, new Vector2(1700, -80), new Vector2(110, 44), UIFactory.Accent2, () =>
+            _mapName = Label(p, "", 44, UIFactory.Paper, 70, 640, 1000, 54, true, 5f);
+            _mapDescription = UIFactory.Text(p, "Description", "", 21, UIFactory.Muted, TextAlignmentOptions.TopLeft, TL, Vector2.zero, new Vector2(1000, 84));
+            _mapDescription.rectTransform.pivot = TL;
+            _mapDescription.rectTransform.anchoredPosition = new Vector2(70, -696);
+
+            // Left, under the map: who you are, joining someone else's room, the one global option.
+            Label(p, "AGENT NAME", 14, UIFactory.Muted, 70, 800, 360, 20, true, 4f);
+            _name = UIFactory.Input(p, "YOUR NAME", TL, Vector2.zero, new Vector2(340, 52));
+            ((RectTransform)_name.transform).pivot = TL;
+            ((RectTransform)_name.transform).anchoredPosition = new Vector2(70, -826);
+            _name.characterLimit = 24;
+            _name.text = PlayerIdentity.LocalName;
+            _name.onEndEdit.AddListener(v => PlayerIdentity.LocalName = v);
+
+            Label(p, "JOIN A ROOM  ·  CODE OR IP", 14, UIFactory.Muted, 440, 800, 460, 20, true, 4f);
+            _joinField = UIFactory.Input(p, "ABC-DEF", TL, Vector2.zero, new Vector2(320, 52));
+            ((RectTransform)_joinField.transform).pivot = TL;
+            ((RectTransform)_joinField.transform).anchoredPosition = new Vector2(440, -826);
+            _joinField.characterLimit = 40;
+            _joinField.onValidateInput = (pText, pIndex, pChar) => char.IsLetterOrDigit(pChar) || pChar == '-' || pChar == '.' ? char.ToUpperInvariant(pChar) : '\0';
+            _joinField.onSubmit.AddListener(_ => JoinOther());
+            SmallButton(p, "JOIN", 770, 826, 120, 52, JoinOther, 22);
+
+            RectTransform lOptions = UIWidgets.List(p, "Options", TL, new Vector2(70 + 300, -890), 600f);
+            _proximity = UIWidgets.Switch(lOptions, "Proximity voice chat", true, v =>
+            {
+                LobbyState lState = LobbyState.Instance;
+                if (lState != null && lState.IsServer) lState.ProximityChat.Value = v;
+            });
+
+            SmallButton(p, "LEAVE", 70, 980, 200, 56, () => { NetSession.Instance.Leave(); Show(Screen.Main); }, 22);
+            IconButton(p, UIIcons.Options, 282, 980, 56, () => Show(Screen.Settings));
+
+            // Right: the agents, in their boxes.
+            Label(p, "AGENTS", 30, UIFactory.Paper, 1110, 60, 400, 38, true, 6f);
+            _playerCount = Label(p, "", 16, UIFactory.Muted, 1110, 70, 740, 24, true, 4f, TextAlignmentOptions.TopRight);
+            for (int i = 0; i < MatchRulesLogic.MAX_TEAMS; i++) _boxes.Add(BuildBox(p, i));
+            _casterBox = Box(p, "Casters", 1110, BOX_TOP, BOX_W, HEADER_H);
+            _casterBox.gameObject.AddComponent<Image>().color = Slate;
+            Label(_casterBox, "CASTERS", 18, UIFactory.Muted, 14, 10, 300, 24, true, 4f);
+            _addBox = SmallButton(p, "+  NEW TEAM", 1110, BOX_TOP, BOX_W, HEADER_H, () => LobbyState.Instance?.AddBoxRpc(), 20);
+            for (int i = 0; i < MAX_ROWS; i++) _rows.Add(BuildRow(p));
+
+            // Under the agents: inviting and shuffling belong with them.
+            _invite = SmallButton(p, "INVITE FRIENDS", 1110, 836, 200, 48, () => SteamLobby.Instance?.Invite(), 18);
+            _shuffle = SmallButton(p, "SHUFFLE", 1320, 836, 130, 48, () => LobbyState.Instance?.ShuffleRpc(), 18);
+            _code = Label(p, "", 18, UIFactory.Paper, 1460, 850, 300, 26, true, 4f, TextAlignmentOptions.TopRight);
+            _copyButton = SmallButton(p, "COPY", 1770, 836, 80, 48, () =>
             {
                 if (SteamLobby.Instance != null) GUIUtility.systemCopyBuffer = SteamLobby.Instance.Code;
                 HandleStatus("CODE COPIED");
-            }, 20);
+            }, 16);
 
-            // Column 1: the map.
-            Header(p, "MAP", 110, 180);
-            RectTransform lCard = Box(p, "MapCard", 110, 230, 620, 640);
-            lCard.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.5f);
-            _mapPicture = Box(lCard, "Picture", 0, 0, 620, 470).gameObject.AddComponent<RawImage>();
-            _mapPicture.raycastTarget = false;
-            _mapName = Label(lCard, "", 40, UIFactory.Paper, 24, 490, 580, 50, true, 3f);
-            _mapDescription = Label(lCard, "", 19, UIFactory.Muted, 24, 546, 572, 84, false, 0.5f);
-            _mapDescription.textWrappingMode = TextWrappingModes.Normal;
-            _mapArrows = Box(lCard, "Arrows", 0, 0, 620, 470).gameObject;
-            ArrowButton(_mapArrows.transform, "‹", 0, () => ChangeMap(-1));
-            ArrowButton(_mapArrows.transform, "›", 620 - 64, () => ChangeMap(1));
+            _startHint = Label(p, "", 16, UIFactory.Muted, 1110, 900, 740, 24, false, 2f, TextAlignmentOptions.TopRight);
+            _startButton = SmallButton(p, "START CONTRACT", 1110, 930, 740, 106, () => LobbyState.Instance?.StartMatch(), 40, true);
+            _readyButton = SmallButton(p, "READY", 1110, 930, 740, 106, () => { if (LobbyPlayer.Local != null) LobbyPlayer.Local.Ready.Value = !LobbyPlayer.Local.Ready.Value; }, 40, true);
 
-            // Column 2: mode, teams, options.
-            Header(p, "MODE", 790, 180);
-            (MatchMode mode, string title, string line)[] lModes =
-            {
-                (MatchMode.FreeForAll, "FREE-FOR-ALL", "Every agent for themselves  ·  1v1v1v1"),
-                (MatchMode.Teams, "TEAMS", "2 to 4 teams  ·  the first team to extract wins"),
-                (MatchMode.Coop, "CO-OP", "All agents together against the AI")
-            };
-            for (int i = 0; i < lModes.Length; i++) ModeCard(p, lModes[i].mode, lModes[i].title, lModes[i].line, 790, 230 + i * 104);
-
-            RectTransform lOptions = UIWidgets.List(p, "Options", TL, new Vector2(790 + 290, -560), 580f);
-            _teamsRow = UIWidgets.Row(lOptions, "Teams").gameObject;
-            _setTeamCount = StepperInRow((RectTransform)_teamsRow.transform, "Number of teams", d => ChangeTeams(d));
-            RectTransform lTimeRow = UIWidgets.Row(lOptions, "Time of day");
-            _timeRow = lTimeRow.gameObject;
-            _setTime = StepperInRow(lTimeRow, "Time of day", d => ChangeTime(d));
-            RectTransform lPicker = UIWidgets.Row(lOptions, "Your team");
-            _teamPicker = lPicker.gameObject;
-            for (int i = 0; i < MatchRulesLogic.MAX_TEAMS; i++)
-            {
-                int lTeam = i;
-                Button lTeamButton = UIFactory.Button(lPicker, (i + 1).ToString(), new Vector2(1, 0.5f), new Vector2(-22 - (MatchRulesLogic.MAX_TEAMS - 1 - i) * 58, 0), new Vector2(50, 40), UIFactory.Accent2, () => LobbyPlayer.Local?.ChooseTeamRpc(lTeam), 22);
-                ((RectTransform)lTeamButton.transform).pivot = new Vector2(1, 0.5f);
-                UIFactory.Rule(lTeamButton.transform, new Vector2(0.5f, 0), new Vector2(0, 2), 50, false, LobbyPlayer.TeamColor(i), 4f);
-            }
-            UIWidgets.Switch(lOptions, "Proximity voice chat", true, v => { if (LobbyState.Instance != null) LobbyState.Instance.ProximityChat.Value = v; });
-            _casterSwitch = UIWidgets.Switch(lOptions, "Watch as a caster", PlayerIdentity.JoinAsCaster, v => PlayerIdentity.JoinAsCaster = v);
-            RectTransform lShuffleRow = UIWidgets.Row(lOptions, "Shuffle the teams");
-            _shuffle = UIFactory.Button(lShuffleRow, "SHUFFLE", new Vector2(1, 0.5f), new Vector2(-22, 0), new Vector2(160, 40), UIFactory.Accent2, ShuffleTeams, 20);
-            RectTransform lInviteRow = UIWidgets.Row(lOptions, "Invite Steam friends");
-            _invite = UIFactory.Button(lInviteRow, "INVITE", new Vector2(1, 0.5f), new Vector2(-22, 0), new Vector2(160, 40), UIFactory.Accent2, () => SteamLobby.Instance?.Invite(), 20);
-
-            // Column 3: the agents and the start.
-            Header(p, "AGENTS", 1430, 180);
-            _playerCount = Label(p, "", 15, UIFactory.Muted, 1430, 180, 380, 22, true, 4f, TextAlignmentOptions.TopRight);
-            for (int i = 0; i < 12; i++)
-            {
-                RectTransform lRow = Box(p, "Agent" + i, 1430, 230 + i * 50, 380, 44);
-                lRow.gameObject.AddComponent<Image>().color = new Color(1, 1, 1, 0.04f);
-                Image lBar = UIFactory.Panel(lRow, "Team", Color.white, new Vector2(0, 0.5f), new Vector2(2, 0), new Vector2(4, 44));
-                TextMeshProUGUI lName = Label(lRow, "", 20, UIFactory.Paper, 18, 10, 200, 26, true, 1f);
-                lName.overflowMode = TextOverflowModes.Ellipsis;
-                TextMeshProUGUI lTeam = Label(lRow, "", 15, UIFactory.Muted, 220, 13, 70, 22, true, 2f);
-                TextMeshProUGUI lState = Label(lRow, "", 15, UIFactory.Muted, 290, 13, 76, 22, true, 2f, TextAlignmentOptions.TopRight);
-                _agents.Add((lRow, lBar, lName, lTeam, lState));
-            }
-            _startHint = Label(p, "", 16, UIFactory.Muted, 1430, 890, 380, 24, false, 2f);
-            _startButton = UIFactory.Button(p, "START CONTRACT", TL, new Vector2(1430, -930), new Vector2(380, 72), UIFactory.Accent, () => LobbyState.Instance?.StartMatch(), 30);
-            _readyButton = UIFactory.Button(p, "READY", TL, new Vector2(1430, -930), new Vector2(380, 72), UIFactory.Accent, () => { if (LobbyPlayer.Local != null) LobbyPlayer.Local.Ready.Value = !LobbyPlayer.Local.Ready.Value; }, 30);
-            UIFactory.Button(p, "LEAVE THE ROOM", TL, new Vector2(110, -938), new Vector2(300, 56), UIFactory.Accent2, () => { NetSession.Instance.Leave(); Show(Screen.Main); }, 24);
+            // What follows the pointer while an agent is dragged.
+            _ghost = UIFactory.Panel(p, "Ghost", new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, 0.9f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(BOX_W, ROW_H)).rectTransform;
+            _ghostName = UIFactory.Title(_ghost, "Name", "", 20, UIFactory.Ink, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(BOX_W, ROW_H), true, 2f);
+            _ghost.gameObject.SetActive(false);
         }
 
-        private static void ArrowButton(Transform pParent, string pGlyph, float pX, System.Action pAction)
+        private TeamBox BuildBox(Transform pParent, int pIndex)
         {
-            Button lButton = UIFactory.Button(pParent, pGlyph, TL, new Vector2(pX, -175), new Vector2(64, 120), UIFactory.Accent2, pAction, 54);
-            Image lBack = lButton.GetComponent<Image>();
-            lBack.color = new Color(0, 0, 0, 0.35f);
-            TextMeshProUGUI lText = lButton.GetComponentInChildren<TextMeshProUGUI>();
-            lText.alignment = TextAlignmentOptions.Center;
-            lText.rectTransform.anchoredPosition = Vector2.zero;
-            lText.rectTransform.sizeDelta = new Vector2(64, 120);
+            TeamBox lBox = new TeamBox();
+            lBox.rect = Box(pParent, "Team" + pIndex, 1110, BOX_TOP, BOX_W, HEADER_H);
+            lBox.rect.gameObject.AddComponent<Image>().color = Slate;
+            lBox.bar = UIFactory.Panel(lBox.rect, "Bar", LobbyPlayer.TeamColor(pIndex), new Vector2(0.5f, 1f), new Vector2(0, -2), new Vector2(BOX_W, 4));
+            lBox.title = Label(lBox.rect, "TEAM " + (pIndex + 1), 18, UIFactory.Paper, 14, 12, 90, 24, true, 3f);
+
+            int lIndex = pIndex;
+            lBox.protect = SmallButton(lBox.rect, "", 100, 6, 198, 30, () => LobbyState.Instance?.ToggleProtectRpc(lIndex), 14);
+            lBox.protectIcon = UIFactory.Panel(lBox.protect.transform, "Icon", UIFactory.Muted, new Vector2(0, 0.5f), new Vector2(14, 0), new Vector2(16, 16));
+            lBox.protectIcon.sprite = UIIcons.Agent(UIIcons.SHIELD);
+            lBox.protectLabel = Label(lBox.protect.transform, "PROTECT THE TARGET", 13, UIFactory.Muted, 30, 8, 170, 18, true, 1.5f);
+            lBox.remove = SmallButton(lBox.rect, "×", BOX_W - 38, 6, 30, 30, () => LobbyState.Instance?.RemoveBoxRpc(lIndex), 22);
+            lBox.drop = Box(lBox.rect, "Drop", 8, HEADER_H, BOX_W - 16, DROP_H - 8).gameObject.AddComponent<Image>();
+            lBox.drop.color = new Color(1, 1, 1, 0.025f);
+            lBox.drop.raycastTarget = false;
+            Label(lBox.drop.transform, "DROP AN AGENT HERE", 13, new Color(1, 1, 1, 0.3f), 0, 10, BOX_W - 16, 20, false, 3f, TextAlignmentOptions.Top);
+            return lBox;
         }
 
-        /// <summary>A stepper (‹ value ›) on the right of an existing row.</summary>
-        private static System.Action<string> StepperInRow(RectTransform pRow, string pLabel, System.Action<int> pOnStep)
+        private AgentRow BuildRow(Transform pParent)
         {
-            TextMeshProUGUI lLabel = pRow.GetComponentInChildren<TextMeshProUGUI>();
-            if (lLabel != null) lLabel.text = pLabel.ToUpperInvariant();
-            TextMeshProUGUI lValue = UIFactory.Title(pRow, "Value", "", 20, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(1, 0.5f), new Vector2(-70, 0), new Vector2(60, 30), true, 1f);
-            Button lMinus = UIFactory.Button(pRow, "−", new Vector2(1, 0.5f), new Vector2(-138, 0), new Vector2(40, 40), UIFactory.Accent2, () => pOnStep(-1), 28);
-            Button lPlus = UIFactory.Button(pRow, "+", new Vector2(1, 0.5f), new Vector2(-22, 0), new Vector2(40, 40), UIFactory.Accent2, () => pOnStep(1), 28);
-            foreach (Button lButton in new[] { lMinus, lPlus })
+            AgentRow lRow = new AgentRow();
+            lRow.rect = Box(pParent, "Agent", 0, 0, BOX_W - 8, ROW_H - 4);
+            lRow.back = lRow.rect.gameObject.AddComponent<Image>();
+            lRow.back.color = new Color(1, 1, 1, 0.045f);
+            lRow.drag = lRow.rect.gameObject.AddComponent<AgentRowDrag>();
+            lRow.drag.Init(this, lRow.rect);
+
+            lRow.iconButton = SmallButton(lRow.rect, "", 3, 3, 32, 32, () => OpenIconPicker(lRow), 10);
+            lRow.icon = UIFactory.Panel(lRow.iconButton.transform, "Icon", UIFactory.Paper, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24, 24));
+
+            lRow.name = Label(lRow.rect, "", 19, UIFactory.Paper, 44, 8, 150, 24, true, 1f);
+            lRow.name.overflowMode = TextOverflowModes.Ellipsis;
+            lRow.state = Label(lRow.rect, "", 13, UIFactory.Muted, 190, 11, 76, 20, true, 1.5f, TextAlignmentOptions.TopRight);
+            lRow.role = SmallButton(lRow.rect, "", BOX_W - 8 - 80, 4, 76, 30, ToggleCaster, 13);
+            lRow.roleLabel = lRow.role.GetComponentInChildren<TextMeshProUGUI>();
+            lRow.rect.gameObject.SetActive(false);
+            return lRow;
+        }
+
+        private static void ToggleCaster()
+        {
+            if (LobbyPlayer.Local == null) return;
+            PlayerIdentity.JoinAsCaster = !LobbyPlayer.Local.Caster.Value;
+        }
+
+        // ---------------------------------------------------------------- icons
+
+        private void BuildIconPicker()
+        {
+            _iconPicker = UIFactory.Stretch(_root, "IconPicker").gameObject;
+            Image lDim = _iconPicker.AddComponent<Image>();
+            lDim.color = new Color(0, 0, 0, 0.45f);
+            Button lClose = _iconPicker.AddComponent<Button>();
+            lClose.transition = Selectable.Transition.None;
+            lClose.onClick.AddListener(() => _iconPicker.SetActive(false));
+            RectTransform lPanel = UIFactory.Panel(_iconPicker.transform, "Panel", Navy, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(372, 420)).rectTransform;
+            lPanel.GetComponent<Image>().raycastTarget = true;
+            Label(lPanel, "YOUR ICON", 20, UIFactory.Paper, 24, 18, 300, 26, true, 5f);
+            for (int i = 0; i < UIIcons.AGENT_COUNT; i++)
             {
-                TextMeshProUGUI lText = lButton.GetComponentInChildren<TextMeshProUGUI>();
-                lText.alignment = TextAlignmentOptions.Center;
-                lText.rectTransform.anchoredPosition = Vector2.zero;
-                lText.rectTransform.sizeDelta = new Vector2(40, 40);
+                int lIcon = i;
+                IconButton(lPanel, UIIcons.Agent(i), 24 + i % 4 * 82, 60 + i / 4 * 86, 78, () =>
+                {
+                    PlayerIdentity.LocalIcon = lIcon;
+                    _iconPicker.SetActive(false);
+                });
             }
-            return pText => lValue.text = pText;
+            _iconPicker.SetActive(false);
         }
 
-        /// <summary>A mode card: the name, one line on how it plays; amber edge on the chosen one.</summary>
-        private void ModeCard(Transform pParent, MatchMode pMode, string pTitle, string pLine, float pX, float pY)
+        private void OpenIconPicker(AgentRow pRow)
         {
-            Button lButton = UIFactory.Button(pParent, "", TL, new Vector2(pX, -pY), new Vector2(580, 92), UIFactory.Accent2, () => SetMode(pMode), 1);
-            // The button's own background is the hover wash; the chosen state has a layer of its own.
-            Image lBack = UIFactory.Stretch(lButton.transform, "ChosenBack").gameObject.AddComponent<Image>();
-            lBack.raycastTarget = false;
-            lBack.transform.SetAsFirstSibling();
-            Image lBar = UIFactory.Panel(lButton.transform, "Chosen", UIFactory.Accent, new Vector2(0, 0.5f), new Vector2(0, 0), new Vector2(6, 92));
-            Label(lButton.transform, pTitle, 28, UIFactory.Paper, 28, 14, 520, 34, true, 3f);
-            Label(lButton.transform, pLine, 18, UIFactory.Muted, 28, 52, 540, 26, false, 1f);
-            _modeCards.Add((lButton, lBack, lBar, pMode));
+            if (pRow.player == LobbyPlayer.Local) _iconPicker.SetActive(true);
         }
+
+        // ---------------------------------------------------------------- drag and drop
+
+        /// <summary>A row may be dragged by its own player, or by the host.</summary>
+        public bool CanDrag(RectTransform pRow)
+        {
+            AgentRow lRow = _rows.Find(r => r.rect == pRow);
+            if (lRow == null || lRow.player == null || lRow.player.Caster.Value) return false;
+            return lRow.player == LobbyPlayer.Local || (LobbyState.Instance != null && LobbyState.Instance.IsServer);
+        }
+
+        public void DragStart(RectTransform pRow)
+        {
+            AgentRow lRow = _rows.Find(r => r.rect == pRow);
+            _ghostName.text = lRow != null && lRow.player != null ? lRow.player.Name.ToUpperInvariant() : "";
+            _ghost.gameObject.SetActive(true);
+            _ghost.SetAsLastSibling();
+        }
+
+        public void DragMove(Vector2 pScreen)
+        {
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(_root, pScreen, null, out Vector2 lLocal)) _ghost.anchoredPosition = lLocal;
+        }
+
+        public void DragEnd(RectTransform pRow, Vector2 pScreen)
+        {
+            _ghost.gameObject.SetActive(false);
+            AgentRow lRow = _rows.Find(r => r.rect == pRow);
+            LobbyState lState = LobbyState.Instance;
+            if (lRow == null || lRow.player == null || lState == null) return;
+            for (int i = 0; i < lState.BoxCount.Value; i++)
+                if (RectTransformUtility.RectangleContainsScreenPoint(_boxes[i].rect, pScreen, null))
+                {
+                    lState.MovePlayerRpc(lRow.player.OwnerClientId, i);
+                    return;
+                }
+        }
+
+        // ---------------------------------------------------------------- actions
 
         private void ChangeMap(int pDelta)
         {
             LobbyState lState = LobbyState.Instance;
             if (lState == null || !lState.IsServer) return;
-            int lCount = Mathf.Max(1, GameDatabase.Maps.Count);
-            lState.MapIndex.Value = ((lState.MapIndex.Value + pDelta) % lCount + lCount) % lCount;
+            lState.MapIndex.Value = Mathf.Clamp(lState.MapIndex.Value + pDelta, 0, Mathf.Max(0, GameDatabase.Maps.Count - 1));
+            _planBig = false;
         }
 
-        private void SetMode(MatchMode pMode)
+        /// <summary>Someone else's room: this one closes first, then we dial theirs (a code on Steam, an IP on the network).</summary>
+        private void JoinOther()
         {
-            LobbyState lState = LobbyState.Instance;
-            if (lState == null || !lState.IsServer) return;
-            lState.Mode.Value = pMode;
-            lState.ResolveTeams();
+            string lWhere = _joinField.text.Trim();
+            if (lWhere.Length == 0) return;
+            _joiningUntil = Time.unscaledTime + 12f;
+            NetSession.Instance.Leave();
+            StartCoroutine(JoinAfterLeaving(lWhere));
         }
 
-        private void ChangeTime(int pDelta)
+        private System.Collections.IEnumerator JoinAfterLeaving(string pWhere)
         {
-            LobbyState lState = LobbyState.Instance;
-            if (lState == null || !lState.IsServer) return;
-            int lCount = FX.TimeOfDay.Names.Length;
-            lState.TimeOfDay.Value = ((lState.TimeOfDay.Value + pDelta) % lCount + lCount) % lCount;
+            while (NetSession.Instance.Network.ShutdownInProgress || NetSession.Instance.Network.IsListening) yield return null;
+            if (pWhere.Contains(".")) NetSession.Instance.JoinLocal(pWhere);
+            else NetSession.Instance.JoinSteamCode(pWhere);
         }
 
-        private void ChangeTeams(int pDelta)
-        {
-            LobbyState lState = LobbyState.Instance;
-            if (lState == null || !lState.IsServer) return;
-            lState.TeamCount.Value = Mathf.Clamp(lState.TeamCount.Value + pDelta, 2, MatchRulesLogic.MAX_TEAMS);
-            lState.ResolveTeams();
-        }
-
-        private void ShuffleTeams()
-        {
-            LobbyState lState = LobbyState.Instance;
-            if (lState == null || !lState.IsServer) return;
-            List<LobbyPlayer> lShuffled = LobbyPlayer.Agents();
-            List<int> lTeams = MatchRulesLogic.AutoBalance(lShuffled.Count, lState.TeamCount.Value);
-            for (int i = 0; i < lShuffled.Count; i++) { int j = Random.Range(i, lShuffled.Count); (lShuffled[i], lShuffled[j]) = (lShuffled[j], lShuffled[i]); }
-            for (int i = 0; i < lShuffled.Count; i++) lShuffled[i].ChooseTeamRpc(lTeams[i]);
-            lState.Invoke(nameof(LobbyState.ResolveTeams), 0.3f);
-        }
+        // ---------------------------------------------------------------- refresh
 
         private void Update()
         {
-            // Steam comes up after the menu: show its persona until the player types a nickname.
             if (_name != null && !_name.isFocused && !PlayerIdentity.HasCustomName && _name.text != PlayerIdentity.LocalName) _name.SetTextWithoutNotify(PlayerIdentity.LocalName);
-            if (_current == Screen.Lobby && !NetworkManagerListening() && Time.timeSinceLevelLoad > 1f && (NetSession.Instance == null || NetSession.Instance.Kind == SessionKind.None)) Show(Screen.Main);
+            bool lGone = !NetworkManagerListening() && Time.timeSinceLevelLoad > 1f && (NetSession.Instance == null || NetSession.Instance.Kind == SessionKind.None);
+            if (_current == Screen.Lobby && lGone && Time.unscaledTime > _joiningUntil) Show(Screen.Main);
             if (_current != Screen.Lobby) return;
 
             LobbyState lState = LobbyState.Instance;
             bool lHost = lState != null && lState.IsServer;
             _startButton.gameObject.SetActive(lHost);
             _readyButton.gameObject.SetActive(!lHost && (LobbyPlayer.Local == null || !LobbyPlayer.Local.Caster.Value));
-            _mapArrows.SetActive(lHost);
             if (lState == null)
             {
                 _startHint.text = "CONNECTING TO THE ROOM...";
+                foreach (TeamBox lBox in _boxes) lBox.rect.gameObject.SetActive(false);
+                foreach (AgentRow lRow in _rows) lRow.rect.gameObject.SetActive(false);
+                _casterBox.gameObject.SetActive(false);
+                _addBox.gameObject.SetActive(false);
                 return;
             }
 
             if (lHost) lState.ResolveTeams();
-            MapDefinition lMap = lState.Map;
-            _mapName.text = lMap != null ? lMap.displayName.ToUpperInvariant() : "-";
-            _mapDescription.text = lMap != null ? lMap.description : "";
-            _mapPicture.texture = lMap != null && lMap.planFloors != null && lMap.planFloors.Length > 0 ? lMap.planFloors[0] : null;
-            _mapPicture.uvRect = new Rect(0.05f, 0.12f, 0.9f, 0.9f * 470f / 620f);
-            _mapPicture.color = _mapPicture.texture != null ? Color.white : new Color(0.1f, 0.1f, 0.12f);
+            RefreshMap(lState, lHost);
+            int lAgents = RefreshAgents(lState, lHost, out int lWaiting, out bool lAttackers);
 
-            bool lTeams = lState.Mode.Value == MatchMode.Teams;
-            foreach ((Button lButton, Image lBack, Image lBar, MatchMode lMode) in _modeCards)
-            {
-                bool lChosen = lState.Mode.Value == lMode;
-                lBar.enabled = lChosen;
-                lBack.color = lChosen ? new Color(1, 1, 1, 0.1f) : new Color(1, 1, 1, 0.025f);
-                lButton.interactable = lHost;
-            }
-            _teamsRow.SetActive(lTeams && lHost);
-            _setTeamCount(lState.TeamCount.Value.ToString());
-            _setTime(FX.TimeOfDay.Names[Mathf.Clamp(lState.TimeOfDay.Value, 0, FX.TimeOfDay.Names.Length - 1)]);
-            foreach (Button lButton in _timeRow.GetComponentsInChildren<Button>()) lButton.interactable = lHost;
-            _teamPicker.SetActive(lTeams);
-            for (int i = 0; i < MatchRulesLogic.MAX_TEAMS; i++) _teamPicker.transform.GetChild(_teamPicker.transform.childCount - MatchRulesLogic.MAX_TEAMS + i).gameObject.SetActive(i < lState.TeamCount.Value);
-            _shuffle.transform.parent.gameObject.SetActive(lTeams && lHost);
-            _invite.transform.parent.gameObject.SetActive(lHost && SteamReady);
-
+            _proximity.SetIsOnWithoutNotify(lState.ProximityChat.Value);
+            _proximity.interactable = lHost;
+            _invite.gameObject.SetActive(lHost && SteamReady);
+            _shuffle.gameObject.SetActive(lHost && lState.BoxCount.Value > 1);
             bool lSteamRoom = SteamLobby.Instance != null && !string.IsNullOrEmpty(SteamLobby.Instance.Code);
-            _code.text = lSteamRoom ? "ROOM CODE   <color=#F5A12B>" + SteamLobby.Instance.Code + "</color>" : NetSession.Instance != null && NetSession.Instance.Kind == SessionKind.Local ? (LobbyPlayer.All.Count <= 1 ? "SOLO" : "LOCAL NETWORK") : "";
+            _code.text = lSteamRoom ? "ROOM <color=#" + ColorUtility.ToHtmlStringRGB(UIFactory.Accent) + ">" + SteamLobby.Instance.Code + "</color>" : "";
             _copyButton.gameObject.SetActive(lSteamRoom);
 
-            if (LobbyPlayer.Local != null && _casterSwitch.isOn != LobbyPlayer.Local.Caster.Value) _casterSwitch.isOn = LobbyPlayer.Local.Caster.Value;
+            int lCasters = LobbyPlayer.CasterCount();
+            _playerCount.text = lAgents + " / " + GameDatabase.Rules.maxPlayers + (lCasters > 0 ? "  ·  " + lCasters + " CASTER" + (lCasters > 1 ? "S" : "") : "");
+            bool lNeedAttackers = lState.DefenderMask.Value != 0 && !lAttackers;
+            _startButton.interactable = lWaiting == 0 && !lNeedAttackers && (lAgents > 0 || lCasters > 0);
+            _startHint.text = !lHost ? "THE HOST STARTS THE CONTRACT"
+                : lNeedAttackers ? "SOMEONE HAS TO COME FOR THE TARGET"
+                : lWaiting > 0 ? "WAITING FOR " + lWaiting + " AGENT" + (lWaiting > 1 ? "S" : "") + " TO BE READY" : "";
+            if (LobbyPlayer.Local != null) _readyButton.GetComponentInChildren<TextMeshProUGUI>().text = LobbyPlayer.Local.Ready.Value ? "NOT READY" : "READY";
+        }
 
-            // Agents first, then the casters (they watch: no team, no ready check).
-            List<LobbyPlayer> lRoster = LobbyPlayer.Agents();
-            int lAgentCount = lRoster.Count;
-            foreach (LobbyPlayer lPlayer in LobbyPlayer.All) if (lPlayer.Caster.Value) lRoster.Add(lPlayer);
-            int lWaiting = 0;
-            for (int i = 0; i < _agents.Count; i++)
+        private void RefreshMap(LobbyState pState, bool pHost)
+        {
+            MapDefinition lMap = pState.Map;
+            _mapName.text = lMap != null ? lMap.displayName.ToUpperInvariant() : "-";
+            _mapDescription.text = lMap != null ? lMap.description : "";
+            int lLast = Mathf.Max(0, GameDatabase.Maps.Count - 1);
+            _left.gameObject.SetActive(pHost && pState.MapIndex.Value > 0);
+            _right.gameObject.SetActive(pHost && pState.MapIndex.Value < lLast);
+
+            Texture lPlan = lMap != null && lMap.planFloors != null && lMap.planFloors.Length > 0 ? lMap.planFloors[0] : null;
+            Texture lShot = lMap != null ? lMap.preview : null;
+            bool lPlanBig = lShot == null || _planBig;
+            _insetFrame.SetActive(lShot != null && lPlan != null);
+            _mapInset.texture = _planBig ? lShot : lPlan;
+            _mapInset.uvRect = new Rect(0, 0, 1, 1);
+            // The plan is square: it fits the frame's height, whole; the screenshot fills the frame.
+            RectTransform lPicture = _mapPicture.rectTransform;
+            _mapPicture.texture = lPlanBig ? lPlan : lShot;
+            _mapPicture.color = _mapPicture.texture != null ? Color.white : new Color(0, 0, 0, 0);
+            lPicture.anchorMin = lPlanBig ? new Vector2(0.5f, 0.5f) : Vector2.zero;
+            lPicture.anchorMax = lPlanBig ? new Vector2(0.5f, 0.5f) : Vector2.one;
+            lPicture.sizeDelta = lPlanBig ? new Vector2(563, 563) : Vector2.zero;
+            lPicture.anchoredPosition = Vector2.zero;
+            _viewLabel.text = lShot != null ? (_planBig ? "CLICK THE PICTURE: VIEW" : "CLICK THE PLAN: FULL MAP") : "";
+        }
+
+        /// <summary>Lays out the boxes and fills them: two columns, each box as tall as its agents, the next box in the shorter column.</summary>
+        private int RefreshAgents(LobbyState pState, bool pHost, out int pWaiting, out bool pAttackers)
+        {
+            pWaiting = 0;
+            pAttackers = false;
+            int lBoxes = pState.BoxCount.Value;
+            List<LobbyPlayer> lAgents = LobbyPlayer.Agents();
+            float[] lColumn = { BOX_TOP, BOX_TOP };
+            int lRowIndex = 0;
+
+            for (int i = 0; i < _boxes.Count; i++)
             {
-                (RectTransform lRow, Image lBar, TextMeshProUGUI lName, TextMeshProUGUI lTeam, TextMeshProUGUI lStateText) = _agents[i];
-                LobbyPlayer lPlayer = i < lRoster.Count ? lRoster[i] : null;
-                lRow.gameObject.SetActive(lPlayer != null);
-                if (lPlayer == null) continue;
-                bool lIsHost = lPlayer.OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId;
-                bool lCaster = lPlayer.Caster.Value;
-                if (!lIsHost && !lCaster && !lPlayer.Ready.Value) lWaiting++;
-                lBar.color = lCaster ? new Color(1, 1, 1, 0.25f) : LobbyPlayer.TeamColor(lPlayer.Team.Value);
-                lName.text = lPlayer.Name.ToUpperInvariant() + (lPlayer == LobbyPlayer.Local ? "  <color=#9EA0A6><size=70%>YOU</size></color>" : "");
-                lTeam.text = lTeams && !lCaster ? "TEAM " + (lPlayer.Team.Value + 1) : "";
-                lStateText.text = lCaster ? (lIsHost ? "HOST · CASTER" : "CASTER") : lIsHost ? "HOST" : lPlayer.Ready.Value ? "READY" : "WAITING";
-                lStateText.color = lCaster ? ThreatMarkers.Blue : lIsHost ? UIFactory.Accent : lPlayer.Ready.Value ? UIFactory.Good : UIFactory.Muted;
+                TeamBox lBox = _boxes[i];
+                bool lOn = i < lBoxes;
+                lBox.rect.gameObject.SetActive(lOn);
+                if (!lOn) continue;
+
+                int lCount = 0;
+                foreach (LobbyPlayer lAgent in lAgents) if (lAgent.Team.Value == i) lCount++;
+                float lHeight = HEADER_H + (lCount > 0 ? lCount * ROW_H + 4f : DROP_H);
+                int lCol = lColumn[1] < lColumn[0] ? 1 : 0;
+                float lX = 1110 + lCol * (BOX_W + BOX_GAP), lY = lColumn[lCol];
+                lBox.rect.anchoredPosition = new Vector2(lX, -lY);
+                lBox.rect.sizeDelta = new Vector2(BOX_W, lHeight);
+                lColumn[lCol] += lHeight + 12f;
+                lBox.drop.gameObject.SetActive(lCount == 0);
+                lBox.remove.gameObject.SetActive(pHost && lCount == 0 && lBoxes > 1);
+
+                bool lProtects = pState.IsProtector(i);
+                if (!lProtects && lCount > 0) pAttackers = true;
+                lBox.protect.gameObject.SetActive(pHost || lProtects);
+                lBox.protect.interactable = pHost;
+                lBox.protectIcon.color = lProtects ? UIFactory.Accent : UIFactory.Muted;
+                lBox.protectLabel.color = lProtects ? UIFactory.Accent : UIFactory.Muted;
+
+                float lRowY = HEADER_H;
+                foreach (LobbyPlayer lAgent in lAgents)
+                {
+                    if (lAgent.Team.Value != i || lRowIndex >= _rows.Count) continue;
+                    if (FillRow(_rows[lRowIndex++], lAgent, lX + 4, lY + lRowY, pHost)) pWaiting++;
+                    lRowY += ROW_H;
+                }
             }
-            int lCasters = lRoster.Count - lAgentCount;
-            _playerCount.text = lAgentCount + " / " + GameDatabase.Rules.maxPlayers + (lCasters > 0 ? "  ·  " + lCasters + " CASTER" + (lCasters > 1 ? "S" : "") : "");
-            _startButton.interactable = lWaiting == 0 && lAgentCount > 0;
-            _startHint.text = lHost
-                ? lAgentCount == 0 ? "AT LEAST ONE AGENT MUST PLAY"
-                : lWaiting > 0 ? "WAITING FOR " + lWaiting + " AGENT" + (lWaiting > 1 ? "S" : "") + " TO BE READY" : "EVERYONE IS READY"
-                : "THE HOST STARTS THE CONTRACT";
-            TextMeshProUGUI lReadyLabel = _readyButton.GetComponentInChildren<TextMeshProUGUI>();
-            if (LobbyPlayer.Local != null) lReadyLabel.text = LobbyPlayer.Local.Ready.Value ? "NOT READY" : "READY";
+
+            // The + comes after the last box, in the shorter column.
+            bool lCanAdd = pHost && lBoxes < MatchRulesLogic.MAX_TEAMS;
+            _addBox.gameObject.SetActive(lCanAdd);
+            if (lCanAdd)
+            {
+                int lCol = lColumn[1] < lColumn[0] ? 1 : 0;
+                ((RectTransform)_addBox.transform).anchoredPosition = new Vector2(1110 + lCol * (BOX_W + BOX_GAP), -lColumn[lCol]);
+                lColumn[lCol] += HEADER_H + 12f;
+            }
+
+            // Casters watch: no team, a box of their own in the shorter column.
+            int lCasters = LobbyPlayer.CasterCount();
+            _casterBox.gameObject.SetActive(lCasters > 0);
+            if (lCasters > 0)
+            {
+                int lCol = lColumn[1] < lColumn[0] ? 1 : 0;
+                float lX = 1110 + lCol * (BOX_W + BOX_GAP), lY = lColumn[lCol];
+                _casterBox.anchoredPosition = new Vector2(lX, -lY);
+                _casterBox.sizeDelta = new Vector2(BOX_W, HEADER_H + lCasters * ROW_H + 4f);
+                float lRowY = HEADER_H;
+                foreach (LobbyPlayer lPlayer in LobbyPlayer.All)
+                {
+                    if (!lPlayer.Caster.Value || lRowIndex >= _rows.Count) continue;
+                    FillRow(_rows[lRowIndex++], lPlayer, lX + 4, lY + lRowY, pHost);
+                    lRowY += ROW_H;
+                }
+            }
+
+            for (int i = lRowIndex; i < _rows.Count; i++) { _rows[i].player = null; _rows[i].rect.gameObject.SetActive(false); }
+            return lAgents.Count;
+        }
+
+        /// <summary>One agent's line. True when the host is still waiting for this agent to be ready.</summary>
+        private static bool FillRow(AgentRow pRow, LobbyPlayer pPlayer, float pX, float pY, bool pHost)
+        {
+            pRow.player = pPlayer;
+            pRow.rect.gameObject.SetActive(true);
+            pRow.rect.anchoredPosition = new Vector2(pX, -pY);
+            bool lMe = pPlayer == LobbyPlayer.Local;
+            bool lIsHost = pPlayer.OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId;
+            bool lCaster = pPlayer.Caster.Value;
+            pRow.icon.sprite = UIIcons.Agent(pPlayer.Icon.Value);
+            pRow.iconButton.interactable = lMe;
+            pRow.name.text = pPlayer.Name.ToUpperInvariant();
+            pRow.back.color = lMe ? new Color(1, 1, 1, 0.09f) : new Color(1, 1, 1, 0.045f);
+            bool lWaiting = !lIsHost && !lCaster && !pPlayer.Ready.Value;
+            pRow.state.text = lIsHost ? "HOST" : lCaster ? "" : pPlayer.Ready.Value ? "READY" : "WAITING";
+            pRow.state.color = lIsHost ? UIFactory.Accent : pPlayer.Ready.Value ? UIFactory.Good : UIFactory.Muted;
+            // Your role is on your own line; others' lines only say what they are when they cast.
+            pRow.role.gameObject.SetActive(lMe || lCaster);
+            pRow.role.interactable = lMe;
+            pRow.roleLabel.text = lCaster ? "CASTER" : "AGENT";
+            return lWaiting;
+        }
+    }
+
+    /// <summary>Drags an agent's line to another team box (<see cref="MenuUI.CanDrag"/> says who may).</summary>
+    public class AgentRowDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    {
+        private MenuUI _menu;
+        private RectTransform _row;
+        private bool _dragging;
+
+        public void Init(MenuUI pMenu, RectTransform pRow)
+        {
+            _menu = pMenu;
+            _row = pRow;
+        }
+
+        public void OnBeginDrag(PointerEventData pData)
+        {
+            _dragging = _menu.CanDrag(_row);
+            if (!_dragging) return;
+            _menu.DragStart(_row);
+            _menu.DragMove(pData.position);
+        }
+
+        public void OnDrag(PointerEventData pData)
+        {
+            if (_dragging) _menu.DragMove(pData.position);
+        }
+
+        public void OnEndDrag(PointerEventData pData)
+        {
+            if (_dragging) _menu.DragEnd(_row, pData.position);
+            _dragging = false;
         }
     }
 }

@@ -48,7 +48,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             PlayerAvatar lCaught = null;
             foreach (PlayerAvatar lPlayer in PlayerAvatar.All)
             {
-                if (lPlayer == null || !lPlayer.IsSpawned || !lPlayer.Health.IsAlive || lPlayer.Hidden.Value) continue;
+                if (lPlayer == null || !lPlayer.IsSpawned || !lPlayer.Health.IsAlive || lPlayer.Hidden.Value || lPlayer.IsProtector) continue;
                 Vector3 lTo = lPlayer.Chest - transform.position;
                 if (lTo.magnitude > _range || Vector3.Angle(transform.forward, lTo) > _halfAngle) continue;
                 SecurityTier lTier = SecurityZone.ForPlayer(SecurityZone.At(lPlayer.transform.position, out AccessLevel lNeed), lNeed, lPlayer.Weapons != null ? lPlayer.Weapons.Access : AccessLevel.None, false);

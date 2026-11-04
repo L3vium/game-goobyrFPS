@@ -5,9 +5,8 @@ using UnityEngine;
 namespace Com.IsartDigital.GoobyrFPS.Player
 {
     /// <summary>
-    /// The camera of an eliminated player: a short death cam over the body, then the
-    /// <see cref="CasterView"/> restricted to the agents they may watch (teammates only in Teams,
-    /// anyone in free-for-all and co-op).
+    /// The camera of an eliminated player: a short death cam over the body, then they are a caster
+    /// like any other (<see cref="CasterView"/>).
     /// </summary>
     public class Spectator : MonoBehaviour
     {
@@ -45,7 +44,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             _deathTimer -= Time.deltaTime;
             if (_deathTimer <= 0f)
             {
-                CasterView.Begin(true);
+                CasterView.Begin(false);
                 Stop();
                 return;
             }

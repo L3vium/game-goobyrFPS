@@ -36,7 +36,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
         private void Awake()
         {
-            Canvas lCanvas = UIFactory.Canvas("PauseCanvas", 30);
+            Canvas lCanvas = UIFactory.Canvas("PauseCanvas", 50);
             lCanvas.transform.SetParent(transform, false);
             _panel = UIFactory.Stretch(lCanvas.transform, "Panel").gameObject;
             _panel.AddComponent<Image>().color = new Color(0.05f, 0.055f, 0.065f, 0.96f);
@@ -57,7 +57,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 Toggle(false);
                 NetSession.Instance?.Leave();
             }, 26);
-            UIFactory.Title(p, "Hints", "ESC  RESUME      M  MAP      WHEEL / TRIGGERS  ZOOM      DRAG / STICK  PAN", 15, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(480, 30), new Vector2(1200, 24), false, 3f);
+            UIFactory.Title(p, "Hints", "ESC  RESUME      M  MAP      WHEEL  ZOOM      ANY MOUSE BUTTON  PAN", 15, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(480, 30), new Vector2(1200, 24), false, 3f);
 
             // The pages, right of the column.
             RectTransform lContent = UIFactory.Rect(p, "Content", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
@@ -121,9 +121,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             if (pOpen == _open) return;
             _open = pOpen;
             _panel.SetActive(pOpen);
-            GameInput.GameplayEnabled = !pOpen;
-            // The caster view keeps the cursor free (it clicks feeds and cards).
-            GameInput.LockCursor(!pOpen && !CasterView.Active);
+            GameInput.GameplayEnabled = !pOpen && !EndScreen.IsShown;
+            // The caster view looks after the cursor itself (free to click feeds, locked to fly).
+            GameInput.LockCursor(!pOpen && !CasterView.Active && !EndScreen.IsShown);
             Audio.Sfx.Play2D("map", 0.5f);
             if (pOpen)
             {

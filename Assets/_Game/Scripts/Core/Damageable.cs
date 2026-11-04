@@ -100,6 +100,7 @@ namespace Com.IsartDigital.GoobyrFPS.Core
                 && !MatchRulesLogic.CanDamage(pInfo.attackerTeam, Team)) return false;
 
             if (DamageScale != null) pInfo.amount *= DamageScale(pInfo);
+            if (pInfo.amount <= 0f) return false;
             Health.Value = Mathf.Max(0f, Health.Value - pInfo.amount);
             OnDamagedServer?.Invoke(pInfo);
             HitClientRpc(pInfo.amount, pInfo.point, pInfo.direction, pInfo.headshot);

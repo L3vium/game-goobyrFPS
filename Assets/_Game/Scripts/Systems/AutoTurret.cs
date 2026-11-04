@@ -157,7 +157,7 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
             {
                 foreach (PlayerAvatar lPlayer in PlayerAvatar.All)
                 {
-                    if (lPlayer == null || !lPlayer.IsSpawned || lPlayer.Health == null || !lPlayer.Health.IsAlive || lPlayer.Hidden.Value) continue;
+                    if (lPlayer == null || !lPlayer.IsSpawned || lPlayer.Health == null || !lPlayer.Health.IsAlive || lPlayer.Hidden.Value || lPlayer.IsProtector) continue;
                     SecurityTier lTier = SecurityZone.ForPlayer(SecurityZone.At(lPlayer.transform.position, out AccessLevel lNeed), lNeed, lPlayer.Weapons != null ? lPlayer.Weapons.Access : AccessLevel.None, false);
                     if (lTier == SecurityTier.Public) continue;
                     Consider(lPlayer.Health, lPlayer.Chest, ref lBest, ref lBestDistance, ref pAim);

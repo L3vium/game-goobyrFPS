@@ -48,6 +48,10 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         [Header("Plan (baked by the map build)")]
         [Tooltip("The stylized plan per floor: ground first, then a storey up each.")]
         public Texture2D[] planFloors;
+        /// <summary>The room's picture of the map: a shot of it with an agent in front (null: the plan is shown instead).</summary>
+        public Texture2D preview;
+        /// <summary>The map's one mood (<see cref="FX.TimeOfDay"/>): 0 dawn, 1 noon, 2 dusk, 3 night.</summary>
+        public int timeOfDay = 1;
         /// <summary>World XZ of the plan's bottom-left corner, and its side in metres.</summary>
         public Vector2 planOrigin;
         public float planSize = 500f;

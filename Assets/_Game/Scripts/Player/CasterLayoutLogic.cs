@@ -14,7 +14,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         /// <summary>Four feeds, 2 x 2.</summary>
         Quad,
         /// <summary>A big main feed and three small ones on the right, the agent cards below.</summary>
-        MainPlus3
+        MainPlus3,
+        /// <summary>As many equal feeds as <see cref="CasterLayoutLogic.GridCells"/> says: everybody's screen at once.</summary>
+        Grid
     }
 
     /// <summary>What a feed shows.</summary>
@@ -48,7 +50,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
     /// </summary>
     public static class CasterLayoutLogic
     {
-        public const int MAX_FEEDS = 4;
+        public const int MAX_FEEDS = 9;
+        /// <summary>How many feeds the grid layout shows.</summary>
+        public static int GridCells = 4;
         /// <summary>The auto-director keeps a pick at least this long.</summary>
         public const float MIN_HOLD = 5f;
         /// <summary>...and changes only for an agent this much more interesting.</summary>
@@ -58,7 +62,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             CasterLayout.Single => 1,
             CasterLayout.Duo => 2,
-            _ => MAX_FEEDS
+            CasterLayout.Grid => Mathf.Clamp(GridCells, 1, MAX_FEEDS),
+            _ => 4
         };
 
         /// <summary>The feed's camera viewport, normalised with the origin bottom-left (<see cref="Camera.rect"/>).</summary>
@@ -69,6 +74,11 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 case CasterLayout.Single: return new Rect(0f, 0f, 1f, 1f);
                 case CasterLayout.Duo: return new Rect(pFeed * 0.5f, 0.25f, 0.5f, 0.5f);
                 case CasterLayout.Quad: return new Rect(pFeed % 2 * 0.5f, pFeed < 2 ? 0.5f : 0f, 0.5f, 0.5f);
+                case CasterLayout.Grid:
+                    int lCells = Mathf.Clamp(GridCells, 1, MAX_FEEDS);
+                    int lColumns = Mathf.CeilToInt(Mathf.Sqrt(lCells));
+                    int lRows = Mathf.CeilToInt(lCells / (float)lColumns);
+                    return new Rect(pFeed % lColumns / (float)lColumns, 1f - (pFeed / lColumns + 1) / (float)lRows, 1f / lColumns, 1f / lRows);
                 default: return pFeed == 0 ? new Rect(0f, 0.25f, 0.75f, 0.75f) : new Rect(0.75f, 1f - pFeed * 0.25f, 0.25f, 0.25f);
             }
         }

@@ -15,20 +15,23 @@ using UnityEngine.Rendering.Universal;
 namespace Com.IsartDigital.GoobyrFPS.Player
 {
     /// <summary>
-    /// The tournament view: up to four live feeds on screen at once, each its own camera.
+    /// The view of whoever watches, in three modes:
     /// <list type="bullet">
-    /// <item>a feed follows an agent (behind the shoulder, or through their eyes), flies freely, or shows the tactical map;</item>
-    /// <item>layouts: one feed, two side by side, four in a grid, or a main feed with three small ones;</item>
-    /// <item>focus brings the selected feed (or it and the main one) full screen and back;</item>
-    /// <item>the auto-director keeps the agent worth watching (proof, fights, close to the target) on the main feed.</item>
+    /// <item><b>Switch</b>: one screen, moving from agent to agent;</item>
+    /// <item><b>Multi</b>: everybody's screen at once;</item>
+    /// <item><b>Fly</b>: flying freely over the map, the only mode when nobody is left to watch.</item>
     /// </list>
-    /// Casters (who joined to watch) get it all; an eliminated agent gets it restricted to whom they
-    /// may watch (<see cref="MatchRulesLogic.CanSpectate"/>), without the free camera and map in Teams.
-    /// The overlays are drawn by <see cref="CasterHud"/>.
+    /// Anyone gets it all: a caster, and an agent the moment they are eliminated (so in teams a dead
+    /// player sees the adversaries too). The overlays are drawn by <see cref="CasterHud"/>.
     /// </summary>
     public class CasterView : MonoBehaviour
     {
         public const ulong NOBODY = ulong.MaxValue;
+
+        public enum CasterMode : byte { Switch, Multi, Fly }
+
+        /// <summary>The mode on screen (<see cref="SetMode"/>).</summary>
+        public CasterMode Mode { get; private set; }
 
         /// <summary>One feed: what it shows and its camera.</summary>
         public class Feed
@@ -66,7 +69,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public int ShownFeed(int pPosition) => _focus.Count > 0 ? _focus[pPosition] : pPosition;
 
         /// <summary>The free camera and the map would let an eliminated agent scout for their team.</summary>
-        public bool CanFly => !Restricted || LobbyState.Instance == null || LobbyState.Instance.Mode.Value != MatchMode.Teams;
+        public bool CanFly => true;
 
         private const float DEFAULT_DISTANCE = 3.6f, FREE_SPEED = 9f, DEAD_HOLD = 3f, DOUBLE_CLICK = 0.3f, HURT_MEMORY = 4f, AUTO_PAUSE = 15f;
 
@@ -149,8 +152,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 if (i < lAlive.Count) _feeds[i].agent = lAlive[i].OwnerClientId;
                 else if (CanFly) _feeds[i].kind = i == _feeds.Length - 1 ? FeedKind.Tactical : FeedKind.Free;
             }
-            Layout = Restricted || lAlive.Count < 2 ? CasterLayout.Single : CasterLayout.MainPlus3;
-            AutoDirector = !Restricted;
+            AutoDirector = false;
             Selected = 0;
             // Free cameras start high over the agents, each from another side.
             Vector3 lCentre = Vector3.zero;
@@ -168,6 +170,44 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             RenderPipelineManager.endCameraRendering += AfterFeed;
             _hud = gameObject.AddComponent<CasterHud>();
             _hud.Build(this);
+            SetMode(lAlive.Count > 0 ? CasterMode.Switch : CasterMode.Fly);
+        }
+
+        /// <summary>Switch: one agent's screen. Multi: all of them, through their eyes. Fly: a free camera; the mouse looks, no button held.</summary>
+        public void SetMode(CasterMode pMode)
+        {
+            List<LobbyPlayer> lAlive = Agents.FindAll(pAgent => IsAlive(pAgent.OwnerClientId));
+            if (pMode != CasterMode.Fly && lAlive.Count == 0) pMode = CasterMode.Fly;
+            Mode = pMode;
+            _focus.Clear();
+            Selected = 0;
+            switch (pMode)
+            {
+                case CasterMode.Multi:
+                    CasterLayoutLogic.GridCells = Mathf.Min(lAlive.Count, CasterLayoutLogic.MAX_FEEDS);
+                    Layout = CasterLayout.Grid;
+                    for (int i = 0; i < CasterLayoutLogic.GridCells; i++)
+                    {
+                        _feeds[i].kind = FeedKind.Eyes;
+                        _feeds[i].agent = lAlive[i].OwnerClientId;
+                        _feeds[i].hasPose = false;
+                    }
+                    break;
+                case CasterMode.Fly:
+                    Layout = CasterLayout.Single;
+                    if (_feeds[0].kind != FeedKind.Free) StartFree(_feeds[0]);
+                    break;
+                default:
+                    Layout = CasterLayout.Single;
+                    if (_feeds[0].kind == FeedKind.Free || _feeds[0].kind == FeedKind.Tactical || !IsAlive(_feeds[0].agent))
+                    {
+                        _feeds[0].agent = lAlive[0].OwnerClientId;
+                        _feeds[0].kind = FeedKind.Chase;
+                        _feeds[0].hasPose = false;
+                    }
+                    break;
+            }
+            Audio.Sfx.Play2D("click", 0.35f);
         }
 
         private void OnDestroy()
@@ -362,8 +402,11 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             RefreshAgents();
             ReadThreats();
-            if (!PauseMenu.IsOpen && !EndScreen.IsShown) ReadInput();
+            bool lFree = !PauseMenu.IsOpen && !EndScreen.IsBlocking;
+            if (lFree) ReadInput();
             else if (_dragging) EndDrag();
+            // Flying, the mouse looks: the cursor stays locked until a menu needs it.
+            if (Mode == CasterMode.Fly || !_dragging) GameInput.LockCursor(Mode == CasterMode.Fly && lFree);
             UpdateAutoDirector();
         }
 
@@ -414,11 +457,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
             if (lKeys != null)
             {
-                if (lKeys.f1Key.wasPressedThisFrame) SetLayout(CasterLayout.Single);
-                if (lKeys.f2Key.wasPressedThisFrame) SetLayout(CasterLayout.Duo);
-                if (lKeys.f3Key.wasPressedThisFrame) SetLayout(CasterLayout.Quad);
-                if (lKeys.f4Key.wasPressedThisFrame) SetLayout(CasterLayout.MainPlus3);
-                if (lKeys.fKey.wasPressedThisFrame) ToggleFocus(lShift);
+                if (lKeys.f1Key.wasPressedThisFrame) SetMode(CasterMode.Switch);
+                if (lKeys.f2Key.wasPressedThisFrame) SetMode(CasterMode.Multi);
+                if (lKeys.f3Key.wasPressedThisFrame) SetMode(CasterMode.Fly);
                 if (lKeys.tabKey.wasPressedThisFrame) StepSelection(lShift ? -1 : 1);
                 for (int i = 0; i < 8; i++)
                     if (lKeys[Key.Digit1 + i].wasPressedThisFrame || lKeys[Key.Numpad1 + i].wasPressedThisFrame) AssignIndex(i);
@@ -427,27 +468,18 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 if (lKeys.upArrowKey.wasPressedThisFrame) StepSelection(-1);
                 if (lKeys.downArrowKey.wasPressedThisFrame) StepSelection(1);
                 if (lKeys.vKey.wasPressedThisFrame) ToggleEyes();
-                if (lKeys.cKey.wasPressedThisFrame) ToggleFree();
-                if (lKeys.tKey.wasPressedThisFrame) ToggleTactical();
-                if (lKeys.enterKey.wasPressedThisFrame || lKeys.numpadEnterKey.wasPressedThisFrame) Promote();
-                if (lKeys.pKey.wasPressedThisFrame) ToggleAutoDirector();
                 if (lKeys.hKey.wasPressedThisFrame) Clean = !Clean;
                 if (lKeys.rKey.wasPressedThisFrame) ResetCamera(_feeds[Selected]);
             }
 
             if (lPad != null)
             {
-                if (lPad.dpad.up.wasPressedThisFrame) SetLayout((CasterLayout)(((int)Layout + 1) % 4));
-                if (lPad.dpad.down.wasPressedThisFrame) ToggleFocus(false);
+                if (lPad.dpad.up.wasPressedThisFrame) SetMode((CasterMode)(((int)Mode + 1) % 3));
                 if (lPad.dpad.left.wasPressedThisFrame) StepSelection(-1);
                 if (lPad.dpad.right.wasPressedThisFrame) StepSelection(1);
                 if (lPad.leftShoulder.wasPressedThisFrame) Cycle(-1);
                 if (lPad.rightShoulder.wasPressedThisFrame) Cycle(1);
-                if (lPad.buttonSouth.wasPressedThisFrame) Promote();
                 if (lPad.buttonWest.wasPressedThisFrame) ToggleEyes();
-                if (lPad.buttonNorth.wasPressedThisFrame) ToggleFree();
-                if (lPad.buttonEast.wasPressedThisFrame) ToggleTactical();
-                if (lPad.rightStickButton.wasPressedThisFrame) ToggleAutoDirector();
             }
 
             if (lMouse == null) return;
@@ -461,7 +493,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             {
                 bool lDouble = lFeedUnder == _lastClickFeed && Time.unscaledTime - _lastClick < DOUBLE_CLICK;
                 SelectFeed(lFeedUnder);
-                if (lDouble) ToggleFocus(false);
+                // A double click on one of everybody's screens: that agent, full screen.
+                if (lDouble && Mode == CasterMode.Multi) { ulong lAgent = _feeds[lFeedUnder].agent; SetMode(CasterMode.Switch); _feeds[0].agent = lAgent; _feeds[0].kind = FeedKind.Eyes; _feeds[0].hasPose = false; }
                 _lastClick = lDouble ? -1f : Time.unscaledTime;
                 _lastClickFeed = lFeedUnder;
             }
@@ -500,7 +533,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         private Vector2 LookInput()
         {
             Vector2 lLook = Vector2.zero;
-            if (_dragging && Mouse.current != null) lLook += Mouse.current.delta.ReadValue() * 0.12f * GameInput.MouseSensitivity;
+            if ((_dragging || Mode == CasterMode.Fly) && Mouse.current != null) lLook += Mouse.current.delta.ReadValue() * 0.12f * GameInput.MouseSensitivity;
             if (Gamepad.current != null) lLook += Gamepad.current.rightStick.ReadValue() * 140f * Time.unscaledDeltaTime;
             return lLook;
         }
@@ -660,11 +693,13 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
                 Keyboard lKeys = Keyboard.current;
                 Gamepad lPad = Gamepad.current;
-                Vector2 lMove = GameInput.Move;
+                // Read past the gameplay lock: the end of a match stops the avatars, not the flight.
+                bool lCanMove = !PauseMenu.IsOpen && !EndScreen.IsBlocking;
+                Vector2 lMove = lCanMove ? GameInput.MoveAlways : Vector2.zero;
                 float lRise = 0f;
-                if (lKeys != null) lRise += (lKeys.spaceKey.isPressed || lKeys.eKey.isPressed ? 1f : 0f) - (lKeys.leftCtrlKey.isPressed || lKeys.qKey.isPressed ? 1f : 0f);
+                if (lKeys != null && lCanMove) lRise += (lKeys.spaceKey.isPressed || lKeys.eKey.isPressed ? 1f : 0f) - (lKeys.leftCtrlKey.isPressed || lKeys.qKey.isPressed ? 1f : 0f);
                 if (lPad != null) lRise += lPad.rightTrigger.ReadValue() - lPad.leftTrigger.ReadValue();
-                float lSpeed = pFeed.freeSpeed * (GameInput.Sprint ? 3f : 1f);
+                float lSpeed = pFeed.freeSpeed * (lKeys != null && lKeys.leftShiftKey.isPressed ? 3f : 1f);
                 Quaternion lYaw = Quaternion.Euler(0f, pFeed.freeYaw, 0f);
                 Quaternion lView = Quaternion.Euler(pFeed.freePitch, pFeed.freeYaw, 0f);
                 Vector3 lVelocity = (lView * Vector3.forward * lMove.y + lYaw * Vector3.right * lMove.x + Vector3.up * Mathf.Clamp(lRise, -1f, 1f)) * lSpeed;

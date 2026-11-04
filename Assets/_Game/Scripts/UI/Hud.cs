@@ -349,7 +349,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
 
             // The caster view (casters, and agents once eliminated) draws its own read-out.
-            _spectating.text = EndScreen.IsShown || CasterView.Active ? "" : Spectator.Active ? "ELIMINATED   <size=70%>[ESC] LEAVE</size>" : "";
+            _spectating.text = EndScreen.IsShown || CasterView.Active ? "" : Spectator.Active ? "ELIMINATED" : "";
 
             // Voice.
             string lTalking = "";

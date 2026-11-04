@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.8.1 — One screen
+
+The front end
+- The title is PLAY, a gear and an exit icon. The backdrop is a still colour for now (no more
+  flickering); the real picture comes with the maps' rebuild.
+- PLAY opens your room at once, and everything happens there: the map on the left, the agents on the
+  right, joining someone else by code or IP. Playing solo is just starting without inviting anyone.
+- No more mode, team count, time-of-day, caster or shuffle options. The team boxes are the mode: a +
+  adds a box, agents are dragged between boxes. Invite and shuffle sit under the agents. Your icon (16 to
+  choose from) and your Agent/Caster role are on your own line. Proximity chat is the only option left.
+- Map arrows stop at the first and last map, and the plan shows the whole map.
+- Each map has its own mood: San Lázaro by day, Qasr at dusk, Weisshorn at night.
+
+Protect the target
+- Any team can be set to protect the target: it starts at its side, the guards are its friends, and it
+  gets their alerts on a talkie-walkie. The attackers win by killing the target, with no proof to carry;
+  the protectors by killing every attacker or holding out until the end of the clock.
+
+Map and contract
+- Fixed the map's names staying behind when zooming: labels now go with their marks.
+- Zoom follows the cursor, any mouse button pans, marks are filtered by floor and each legend line
+  switches its marks on and off. Repeated names show once until you zoom in.
+- The contract tells more: who, where, habits, protection and orders.
+
+End of match and caster
+- The end screen sits over the match, the pause menu goes above it, and SPECTATE lets you watch on.
+- The caster view has three modes: Switch, Multi (everybody's screen) and Fly. Dying makes you a
+  caster, and a caster alone can start a match just to fly around the map.
+
 ## 0.8.0 — Rules and controls
 
 Only enemies

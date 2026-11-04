@@ -320,6 +320,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         /// <summary>The same test the host makes: an NPC that hasn't noticed us, seen from behind, in reach.</summary>
         private bool PredictTakedown()
         {
+            if (Avatar.IsProtector) return false;
             if (!Physics.SphereCast(Avatar.AimOrigin, MELEE_RADIUS, Avatar.AimDirection, out RaycastHit lHit, MELEE_RANGE, GameLayers.CharacterMask, QueryTriggerInteraction.Ignore)) return false;
             Npc lNpc = lHit.collider.GetComponentInParent<Npc>();
             if (lNpc == null || !lNpc.Health.IsAlive) return false;
@@ -483,7 +484,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             Npc lNpc = lTarget.GetComponent<Npc>();
             Vector3 lFlat = Vector3.ProjectOnPlane(pDirection, Vector3.up);
             float lFromBack = Vector3.Angle(lTarget.transform.forward, lFlat);
-            bool lTakedown = lNpc != null && DetectionModel.CanTakedown(lFromBack, lNpc.Gauge, lNpc.IsAlerted);
+            bool lTakedown = lNpc != null && !Avatar.IsProtector && DetectionModel.CanTakedown(lFromBack, lNpc.Gauge, lNpc.IsAlerted);
             if (lTakedown)
             {
                 lNpc.Takedown(pDirection, OwnerClientId, Avatar.Team.Value);

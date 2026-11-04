@@ -89,6 +89,9 @@ namespace Com.IsartDigital.GoobyrFPS.Core
             return lOffset.y > -lRadius && lOffset.x * lOffset.x + lOffset.z * lOffset.z < lRadius * lRadius * 2.5f;
         }
 
+        /// <summary>Host only: what the victim's stance makes of a hit (a raised guard against a punch).</summary>
+        public System.Func<DamageInfo, float> DamageScale;
+
         /// <summary>Host only. Returns true if the hit killed.</summary>
         public bool ApplyDamage(DamageInfo pInfo)
         {
@@ -96,6 +99,7 @@ namespace Com.IsartDigital.GoobyrFPS.Core
             if (pInfo.attackerTeam != MatchRulesLogic.NO_TEAM && Team != NPC_TEAM && pInfo.attacker != DamageInfo.NO_PLAYER
                 && !MatchRulesLogic.CanDamage(pInfo.attackerTeam, Team)) return false;
 
+            if (DamageScale != null) pInfo.amount *= DamageScale(pInfo);
             Health.Value = Mathf.Max(0f, Health.Value - pInfo.amount);
             OnDamagedServer?.Invoke(pInfo);
             HitClientRpc(pInfo.amount, pInfo.point, pInfo.direction, pInfo.headshot);

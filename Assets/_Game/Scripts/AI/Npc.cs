@@ -87,8 +87,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private bool OnDuty => State.Value == NpcState.Idle || State.Value == NpcState.Patrol || State.Value == NpcState.Routine || State.Value == NpcState.Escort;
         public bool IsTarget => Role == NpcRole.Target;
         /// <summary>Unarmed crowd members (guests, staff, spectators): they run away instead of fighting.</summary>
-        public bool IsCrowd => Role == NpcRole.Worker;
-        private bool Flees => IsTarget || IsCrowd;
+        public bool IsCrowd => false;
+        /// <summary>Nobody runs: there are only enemies on a map, the target included.</summary>
+        private bool Flees => false;
         public LevelZone Zone { get; private set; }
         public ItemDefinition Weapon => GameDatabase.Item(WeaponItem.Value);
         public Vector3 Eye => transform.position + Vector3.up * BodyMetrics.EYE * transform.localScale.y;
@@ -293,7 +294,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _animator.AimPitch = AimPitch.Value;
             _animator.Held = lArmed ? WeaponModels.HeldOf(Weapon) : HeldKind.None;
             _animator.Aiming = lArmed && (lState == NpcState.Engaged || lState == NpcState.Combat);
-            _animator.Crouched = Ducked.Value && lState == NpcState.Combat;
+            _animator.Crouched = false;
             _animator.Panic = (lState == NpcState.Flee || lState == NpcState.Report) && IsCrowd;
             _animator.Calling = lState == NpcState.Calling;
             _animator.Pose = Pose.Value;
@@ -426,7 +427,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                     _lastSawTarget = Time.time;
                 }
                 else if (_awareness >= 1f) Spot(lBest);
-                else if (OnEdge) HuntToward(lBest.transform.position);
+                // Sight has absolute priority: whoever came to check something out and sees a player has seen them.
+                else if (State.Value == NpcState.Investigate || State.Value == NpcState.Search) { _awareness = 1f; Spot(lBest); }
                 else if (CanBecomeSuspicious)
                 {
                     if (_awareness > DetectionModel.INVESTIGATE && State.Value != NpcState.Investigate) Investigate(lBest.transform.position, false);
@@ -941,7 +943,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 if (Time.time < _nextBreakAt) return false;
                 // Staff and guests mingle more than guards leave their posts.
-                _nextBreakAt = Time.time + NpcRules.BreakInterval(IsCrowd, IsCrowd && Solo, Random.value);
+                _nextBreakAt = Time.time + NpcRules.BreakInterval(true, false, Random.value);
                 _break = ActivityNode.Near(ZoneIndex.Value, _home, lReach, IsCrowd ? (System.Predicate<ActivityType>)CrowdActivity : BreakActivity);
                 _breakUntil = 0f;
                 if (_break == null) return false;
@@ -1290,7 +1292,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             // Behind low cover: ducked a moment, up for a burst, down again.
             if (!lAtCover) _atCoverSince = -1f;
             else if (_atCoverSince < 0f) _atCoverSince = Time.time;
-            bool lDucked = lAtCover && _cover.Low && !NpcRules.Peeking(Time.time - _atCoverSince);
+            bool lDucked = false;
             if (Ducked.Value != lDucked) Ducked.Value = lDucked;
 
             Vector3 lAimPoint = _targetVisible ? _combatTarget.Chest : lKnown + Vector3.up * 1.1f;
@@ -1670,12 +1672,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _visuals?.HideAll();
             foreach (Collider lCollider in GetComponentsInChildren<Collider>()) lCollider.enabled = false;
             Audio.Sfx.Play(pType == DamageType.Melee ? "thud" : "death", transform.position, 0.9f, 25f);
-            if (_takedownVictim && pType == DamageType.Melee && _animator != null)
-            {
-                _animator.Takedown(true);
-                StartCoroutine(GoLimp(1.5f, pImpulse * 0.2f, pPoint));
-                return;
-            }
+            // A takedown is instant: the body just drops where it stood.
+            if (_takedownVictim && pType == DamageType.Melee) { GoLimpNow(pImpulse * 0.25f, pPoint); return; }
             if (pType == DamageType.Bullet || pType == DamageType.Explosion) Effects.Fluff(pPoint, pImpulse.normalized, Effects.Blood, true);
             GoLimpNow(pImpulse, pPoint);
         }

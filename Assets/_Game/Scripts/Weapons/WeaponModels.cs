@@ -160,6 +160,18 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                     GameArt.Part(t, "Bar", lCyl, new Vector3(0, 0, 0.18f), new Vector3(0.022f, 0.3f, 0.022f), new Color(0.55f, 0.12f, 0.1f)).transform.localRotation = Quaternion.Euler(90, 0, 0);
                     GameArt.Part(t, "Claw", lBox, new Vector3(0, 0.03f, 0.48f), new Vector3(0.02f, 0.07f, 0.03f), new Color(0.3f, 0.3f, 0.32f));
                     break;
+                case ItemKind.Knife:
+                    GameArt.Part(t, "Grip", lBox, new Vector3(0, 0, 0.02f), new Vector3(0.028f, 0.03f, 0.11f), new Color(0.16f, 0.14f, 0.13f));
+                    GameArt.Part(t, "Blade", lBox, new Vector3(0, 0.004f, 0.17f), new Vector3(0.008f, 0.032f, 0.2f), new Color(0.78f, 0.8f, 0.82f));
+                    break;
+                case ItemKind.Machete:
+                    GameArt.Part(t, "Grip", lBox, new Vector3(0, 0, 0.03f), new Vector3(0.03f, 0.035f, 0.13f), new Color(0.32f, 0.2f, 0.12f));
+                    GameArt.Part(t, "Blade", lBox, new Vector3(0, 0.012f, 0.32f), new Vector3(0.008f, 0.07f, 0.45f), new Color(0.68f, 0.7f, 0.72f));
+                    break;
+                case ItemKind.Bat:
+                    GameArt.Part(t, "Handle", lCyl, new Vector3(0, 0, 0.12f), new Vector3(0.03f, 0.15f, 0.03f), new Color(0.62f, 0.42f, 0.24f)).transform.localRotation = Quaternion.Euler(90, 0, 0);
+                    GameArt.Part(t, "Barrel", lCyl, new Vector3(0, 0, 0.5f), new Vector3(0.06f, 0.26f, 0.06f), new Color(0.72f, 0.5f, 0.3f)).transform.localRotation = Quaternion.Euler(90, 0, 0);
+                    break;
                 case ItemKind.Poison:
                 case ItemKind.EmeticPoison:
                     GameArt.Part(t, "Vial", lCyl, Vector3.zero, new Vector3(0.04f, 0.1f, 0.04f), lAccent, GameArt.Glow);

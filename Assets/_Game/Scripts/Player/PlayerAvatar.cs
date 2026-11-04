@@ -35,6 +35,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         /// <summary>Eyes under water: out of sight beyond arm's length.</summary>
         public readonly NetworkVariable<bool> Submerged = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> Aiming = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        /// <summary>Guard up (left Ctrl): a punch or a blade does less (see <see cref="Damageable.DamageScale"/>).</summary>
+        public readonly NetworkVariable<bool> Blocking = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<float> Pitch = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         /// <summary>What the body is doing (climbing, hanging, vaulting...), for the third-person animation.</summary>
         public readonly NetworkVariable<MotionState> Motion = new NetworkVariable<MotionState>(MotionState.Ground, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -83,6 +85,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             All.Add(this);
             Health.HeadCentre = () => transform.position + Vector3.up * (Crouched.Value || Hidden.Value ? BodyMetrics.CROUCH_HEAD_CENTRE : BodyMetrics.HEAD_CENTRE);
             Health.InitHealth(GameDatabase.Rules.playerHealth);
+            Health.DamageScale = pInfo => Blocking.Value && pInfo.type == DamageType.Melee ? BLOCK_FACTOR : 1f;
             Health.OnHitClient += HandleHit;
             gameObject.AddComponent<Audio.Footsteps>().Init(
                 () => !Health.IsAlive || Hidden.Value ? 0f : Crouched.Value ? 0.1f : Sprinting.Value ? 1f : 0.55f,
@@ -220,12 +223,23 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             else
             {
                 lEye = transform.position + Vector3.up * (Motor.EyeHeight + _landDip + Motor.StepSmoothing) + transform.rotation * lBob;
-                lRotation = Quaternion.Euler(_pitch, _yaw, _tilt + _slideTilt);
+                // Lean: the eye slides sideways and rolls, stopped by a wall before it goes through.
+                bool lCanLean = Motor.Mode == MotorMode.Walk && Motor.Grounded && !Motor.Sprinting;
+                _lean = Mathf.MoveTowards(_lean, lCanLean ? GameInput.Lean : 0f, dt * 5f);
+                float lLeanReach = LEAN_DISTANCE * Mathf.Abs(_lean);
+                if (lLeanReach > 0.01f)
+                {
+                    Vector3 lSide = Quaternion.Euler(0f, _yaw, 0f) * Vector3.right * Mathf.Sign(_lean);
+                    if (Physics.SphereCast(lEye, 0.12f, lSide, out RaycastHit lLeanHit, lLeanReach, GameLayers.WorldMask, QueryTriggerInteraction.Ignore)) lLeanReach = Mathf.Max(0f, lLeanHit.distance - 0.02f);
+                    lEye += lSide * lLeanReach;
+                }
+                lRotation = Quaternion.Euler(_pitch, _yaw, _tilt + _slideTilt - _lean * LEAN_ROLL);
             }
             CameraRig.Instance.SetPose(lEye, lRotation);
 
             float lFov = CameraRig.Instance.BaseFov + (Motor.Sprinting ? 7f : 0f) + (Motor.Sliding ? 10f : 0f);
             if (Weapons != null && Weapons.AdsFov > 0f) lFov = Weapons.AdsFov;
+            else if (GameInput.ZoomHeld) lFov *= ZOOM_FACTOR;
             CameraRig.Instance.SetTargetFov(lFov);
 
             // Concealment reads on the HUD status, never as a screen vignette.
@@ -274,6 +288,12 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         public float LookYaw => _yaw;
         public float LookPitch => _pitch;
+
+        /// <summary>How far the eye slides on a lean, its roll, and the zoom key's narrowing.</summary>
+        public const float LEAN_DISTANCE = 0.5f, LEAN_ROLL = 9f, ZOOM_FACTOR = 0.55f;
+        /// <summary>What a raised guard leaves of a melee hit.</summary>
+        public const float BLOCK_FACTOR = 0.3f;
+        private float _lean;
 
         public Vector3 AimOrigin => CameraRig.Instance != null && IsOwner ? CameraRig.Instance.WorldCamera.transform.position : Eye;
         public Vector3 AimDirection => IsOwner && CameraRig.Instance != null ? CameraRig.Instance.WorldCamera.transform.forward : Quaternion.Euler(Pitch.Value, transform.eulerAngles.y, 0) * Vector3.forward;

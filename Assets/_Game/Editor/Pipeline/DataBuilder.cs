@@ -55,7 +55,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Item("StaffPass", "Staff Pass", ItemKind.StaffPass, ItemSlot.Gadget, new Color(0.5f, 0.75f, 0.95f), pResetTuning, i => { i.stack = 1; }),
                 Item("Keycard", "Keycard", ItemKind.Keycard, ItemSlot.Gadget, new Color(0.9f, 0.3f, 0.3f), pResetTuning, i => { i.stack = 1; }),
                 Item("Crowbar", "Crowbar", ItemKind.Crowbar, ItemSlot.Gadget, new Color(0.7f, 0.2f, 0.15f), pResetTuning, i => { i.stack = 1; }),
-                Item("CodeNote", "Code Note", ItemKind.CodeNote, ItemSlot.Gadget, new Color(0.95f, 0.95f, 0.85f), pResetTuning, i => { i.stack = 1; })
+                Item("CodeNote", "Code Note", ItemKind.CodeNote, ItemSlot.Gadget, new Color(0.95f, 0.95f, 0.85f), pResetTuning, i => { i.stack = 1; }),
+                Item("Knife", "Knife", ItemKind.Knife, ItemSlot.Weapon, new Color(0.78f, 0.8f, 0.82f), pResetTuning, i => { i.damage = 70; i.magazine = 0; i.reserveAmmo = 0; i.noiseRadius = 4; }),
+                Item("Machete", "Machete", ItemKind.Machete, ItemSlot.Weapon, new Color(0.68f, 0.7f, 0.72f), pResetTuning, i => { i.damage = 90; i.magazine = 0; i.reserveAmmo = 0; i.noiseRadius = 6; }),
+                Item("Bat", "Bat", ItemKind.Bat, ItemSlot.Weapon, new Color(0.72f, 0.5f, 0.3f), pResetTuning, i => { i.damage = 55; i.magazine = 0; i.reserveAmmo = 0; i.noiseRadius = 8; })
             };
 
             // How far each item is heard in the open (walls muffle it, DetectionModel.Loudness): kept in
@@ -70,10 +73,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (lNoise.TryGetValue(lItem.kind, out float lRadius)) { lItem.noiseRadius = lRadius; EditorUtility.SetDirty(lItem); }
 
             GameRules lRules = EditorAssets.LoadOrCreate<GameRules>(EditorAssets.DATA + "/GameRules.asset");
-            if (lRules.startingLoadout.Count == 0 || pResetTuning)
-            {
-                lRules.startingLoadout = new List<ItemDefinition> { lItems[0], lItems[7] };
-            }
+            // A pistol to start with (see WeaponHolder: lightly loaded), and guards who really look.
+            lRules.startingLoadout = new List<ItemDefinition> { lItems[1] };
+            lRules.npcVisionRange = 30f;
+            lRules.npcDetectTime = 1.3f;
             EditorUtility.SetDirty(lRules);
 
             List<MapDefinition> lMaps = new List<MapDefinition>

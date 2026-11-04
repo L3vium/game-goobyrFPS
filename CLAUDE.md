@@ -13,15 +13,18 @@ validate through Unity MCP, `tasks/lessons.md` after every correction).
 - **End of every prompt:** player build (`Goobyr/Build/Player`, output `Builds/Windows/GoobyrFPS.exe`,
   versioned through LFS), commit + push it, then release main **without checking it out** (a
   checkout would reimport the whole project under the open editor):
-  `git merge-base --is-ancestor main dev` (must succeed), then
+  `git merge-base --is-ancestor main^2 dev` (main's last release parent is in dev; main itself never
+  is, it holds its own merge commits), then
   `git update-ref refs/heads/main $(git commit-tree "dev^{tree}" -p main -p dev -m "Release x.y.z")`
   and `git push origin main`. Same result as `merge --no-ff`: main gets its own merge commits and
   stays a distinct line in Fork.
 
 ## Unity access
 
-The editor stays open with MCP for Unity on `http://localhost:8080/mcp`, driven over HTTP with
+The editor stays open with MCP for Unity, driven over HTTP with
 `python Tools/unity_mcp.py <tool> '<json>'`; batchmode is not available (the project is locked).
+Other Unity projects run MCP servers on neighbouring ports: this one is on **8083** today, so set
+`UNITY_MCP_PORT=8083` and confirm with `mcpforunity://project/info` that it answers `Hitman`.
 Compile, console, tests, builders and the player build all go through MCP (`refresh_unity`,
 `read_console`, `run_tests`, `execute_menu_item`). Never launch, close or restart the editor.
 

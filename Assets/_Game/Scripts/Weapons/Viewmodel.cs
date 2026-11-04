@@ -40,6 +40,11 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private float _magOutAt = -1f, _magGrabAt = -1f, _magInAt = -1f;
         private bool _magDropped;
         private Renderer[] _armRenderers = new Renderer[0];
+        private bool _handsShown = true;
+        /// <summary>How much faster than authored the punches play, and the takedown.</summary>
+        public const float MELEE_SPEED = 2.5f, TAKEDOWN_SPEED = 1.7f;
+        /// <summary>How far under its authored pose a held item sits when not aiming: it stays out of the way.</summary>
+        private static readonly Vector3 LOWERED = new Vector3(0.012f, -0.04f, -0.015f);
 
         private int _builtItem = -2;
         private ItemDefinition _item;
@@ -288,13 +293,17 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (pMove == MeleeMove.Takedown)
             {
                 // Both hands grab: the held item is put away for the takedown and raised again after.
-                float lLength = _set != null ? _set.Length(ViewmodelArms.S_TAKEDOWN, 1.1f) : 1.1f;
-                if (_model != null) _hiddenUntil = Time.time + lLength - 0.15f;
-                PlayAction(ViewmodelArms.S_TAKEDOWN, ViewmodelArms.LAYER_ACTION, 1f, lLength);
+                float lLength = (_set != null ? _set.Length(ViewmodelArms.S_TAKEDOWN, 1.1f) : 1.1f) / TAKEDOWN_SPEED;
+                if (_model != null) _hiddenUntil = Time.time + lLength - 0.1f;
+                PlayAction(ViewmodelArms.S_TAKEDOWN, ViewmodelArms.LAYER_ACTION, TAKEDOWN_SPEED, lLength);
+                return lStrike / TAKEDOWN_SPEED;
             }
-            else if (_item != null) PlayAction(ViewmodelArms.S_JAB, ViewmodelArms.LAYER_LEFT, 1f, _set != null ? _set.Length(ViewmodelArms.S_JAB, 0.5f) : 0.5f);
-            else PlayAction(lClip, ViewmodelArms.LAYER_ACTION, 1f, _set != null ? _set.Length(lClip, 0.5f) : 0.5f);
-            return lStrike;
+            // A blade or a club: the right hand's cross carries it. Another held item: a quick left jab.
+            if (_item != null && _item.IsMelee) lClip = ViewmodelArms.S_CROSS;
+            bool lLeft = _item != null && !_item.IsMelee;
+            float lClipLength = (_set != null ? _set.Length(lLeft ? ViewmodelArms.S_JAB : lClip, 0.5f) : 0.5f) / MELEE_SPEED;
+            PlayAction(lLeft ? ViewmodelArms.S_JAB : lClip, lLeft ? ViewmodelArms.LAYER_LEFT : ViewmodelArms.LAYER_ACTION, MELEE_SPEED, lClipLength);
+            return lStrike / MELEE_SPEED;
         }
 
         public static float DefaultStrike(MeleeMove pMove) => pMove == MeleeMove.Takedown ? 0.3f : pMove == MeleeMove.Cross ? 0.18f : 0.16f;
@@ -364,9 +373,17 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (lIndex != _builtItem) { Rebuild(lItem); _switchT = 0f; }
 
             bool lAlive = lAvatar.Health.IsAlive && lAvatar.Motor.Mode != MotorMode.Hidden;
-            bool lShown = lAlive && (!_holder.Scoped || ShowScoped) && lAvatar.Motor.Mode != MotorMode.Climb && lAvatar.Motor.Mode != MotorMode.LedgeHang;
+            bool lShown = lAlive && (!_holder.Scoped || ShowScoped) && lAvatar.Motor.Mode != MotorMode.Climb && lAvatar.Motor.Mode != MotorMode.LedgeHang && lAvatar.Motor.Mode != MotorMode.Mantle;
             _rig.gameObject.SetActive(lShown);
             if (!lShown || _animator == null) return;
+
+            // Bare hands stay out of sight: only a swing or a raised guard brings them up.
+            bool lHands = _item != null || _action != "" || lAvatar.Blocking.Value;
+            if (lHands != _handsShown)
+            {
+                _handsShown = lHands;
+                foreach (Renderer lRenderer in _armRenderers) if (lRenderer != null) lRenderer.enabled = lHands;
+            }
 
             float dt = Time.deltaTime;
             bool lAiming = _holder.IsAiming;
@@ -399,14 +416,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             PlayerAvatar lAvatar = _holder.Avatar;
             float dt = Time.deltaTime;
 
-            // Sway: the arms lag the look and the movement a little (much less when aiming).
-            Vector2 lLook = GameInput.Look;
-            Vector3 lTargetSway = new Vector3(-lLook.x * 0.0007f, -lLook.y * 0.0007f, 0f);
-            Vector3 lLocalVel = lAvatar.transform.InverseTransformDirection(lAvatar.Motor.Velocity);
-            lTargetSway += new Vector3(-lLocalVel.x * 0.003f, -lLocalVel.y * 0.002f, -lLocalVel.z * 0.0012f);
-            _swayVel += ((lTargetSway - _sway) * 160f - _swayVel * 16f) * dt;
-            _sway += _swayVel * dt;
-            _sway = Vector3.ClampMagnitude(_sway, 0.045f);
+            // No sway: the arms are locked to the camera, they never drag behind a turn.
+            _sway = Vector3.zero;
             _kickPos = Vector3.Lerp(_kickPos, Vector3.zero, 1f - Mathf.Exp(-14f * dt));
             _kickRot = Vector3.Lerp(_kickRot, Vector3.zero, 1f - Mathf.Exp(-12f * dt));
 
@@ -417,7 +428,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             Vector3 lBob = new Vector3(Mathf.Cos(_bob) * 0.009f, Mathf.Abs(Mathf.Sin(_bob)) * 0.011f, 0f) * lBobScale;
             float lFree = 1f - lAds * 0.8f;
 
-            Vector3 lPos = _sway * lFree + lBob;
+            Vector3 lPos = lBob + LOWERED * (1f - lAds);
             Quaternion lRot = Quaternion.Euler(new Vector3(-_sway.y * 180f, _sway.x * 180f, _sway.x * 220f) * lFree);
 
             // Switch: the new item comes up from below; a procedural reload dips and rolls it.

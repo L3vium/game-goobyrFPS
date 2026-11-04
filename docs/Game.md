@@ -4,15 +4,11 @@ Multiplayer (1-8) stealth-assassination FPS with realistic PBR art and realistic
 (MakeHuman bodies, CMU mocap). **Every NPC is hostile to every player.** A target is drawn from the
 map's pool of 15; kill it, take the proof from its body (its dossier or the item it carries),
 carry it to one of the active extraction points. PvP is on: killing the carrier drops the proof.
-There are no disguises — it is stealth (sight, sound, cover, grass, smoke, darkness), and when
-it goes loud, everyone is lethal both ways. Maps follow Hitman's **social ladder** instead
-(`AI/SecurityZone`, `DetectionModel.TierFactor`): in **public** places (streets, plazas, the
-market, the gala floor) a player who behaves - no gun raised, not sprinting, not climbing walls,
-not carrying the proof, no weapon in hand - is just another passer-by; in **restricted** areas
-(staff corridors, yards) guards notice at 80 % speed, warn you, then shoot (about 3-4 s after first
-sight); **hostile** areas (compounds, VIP floors, bunkers) are trespassing with full detection and
-fire on sight after a short reaction. Whoever has done something visible - shot, killed, punched,
-fled a confrontation - is a known hostile in that zone for two minutes, whatever the tier.
+There are no disguises and **no civilians: everyone on a map is an enemy, and the whole map is
+hostile** (`SecurityZone.At` always answers Hostile; civilian posts in a map become armed guards at
+spawn). It is stealth (sight, sound, cover, grass, smoke, darkness), and when it goes loud, everyone
+is lethal both ways. **Sight has absolute priority:** a guard who came to check a sound or a body and
+sees a player has seen them, and fights at once. Nobody flees or cowers, the target included.
 
 ## Modes
 - **Free-for-all** — everyone for themselves.
@@ -218,17 +214,15 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   25 m in white, and within 70 m the security: cameras, sentry guns and their cables in amber (blue
   once a gun is turned), so a cable can be followed through walls to its control PC. Purely local and visual. Hidden parts are a solid silhouette, visible parts a rim
   of light; a stencil bit gives each pixel to the first colour drawn, so red wins.
-- **HUD** (`UI/Hud`, `UI/Minimap`, `UI/Compass`): minimal, nothing by default. A status line above
-  the health shows TRESPASSING (amber) or HOSTILE AREA (red) wherever guards, cameras and sentry
-  guns would treat you as an intruder (a valid pass clears it).
+- **HUD** (`UI/Hud`, `UI/Minimap`, `UI/Compass`): minimal.
   - A heading strip across the top (cardinal letters, ticks, heading) with the target's marker and
     distance always on it, plus extractions, teammates and the dropped proof.
   - A round minimap bottom left: the map's baked stylized plan of the floor you stand on, north up
     and still, your arrow turning; the target in red (pinned to the rim when far), teammates, NPCs
     noticing or hunting you, revealed extractions; its rim takes the threat colour.
   - Weapon and ammo fade in on a change or while aiming; health only when it changes or runs low.
-  - The inventory is a list bottom right, shown on a switch (wheel, 1-6); the weapon wheel around
-    the crosshair only while Q / LB is held (the look picks, release selects).
+  - The inventory is a horizontal bar bottom centre, always shown: four slots (two weapons, two
+    gadgets). Keys and tools sit in three hidden slots: they open things and are never held.
   - No objective panel: the contract is in the in-match menu.
 - **Map plans** (`Editor/Maps/MapPlanBaker`, read by `UI/MapPlan`): every map build bakes one flat
   plan per floor (ground and three storeys) from the scene - ground dark, tree crowns darker,
@@ -438,13 +432,14 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
 - Gameplay code lives in Assembly-CSharp (no asmdefs, as in Hangtime) so editor tools and tests
   in `Assets/_Game/Editor` see it.
 
-## Controls (physical keys, AZERTY-safe)
-Move WASD/ZQSD · look mouse · **LMB punches** (from behind an NPC that hasn't noticed you: a silent
-takedown, dead at once) · **RMB raises the weapon** and LMB then fires · with a throwable, RMB shows the
-arc and LMB throws · wheel cycles what you carry (fists included, empty slots skipped) · reload R ·
-interact / pick up F · crouch Ctrl/C · jump Space · sprint Shift (hold) · crouch-slide Ctrl/C while
-moving · punch also V/MMB · throw G · detonate T · slots 1-6 · map M ·
-instinct Tab (hold) · scoreboard ` (key left of 1, ² on AZERTY) · push-to-talk B · pause Esc.
+## Controls (physical keys, AZERTY-safe; modelled on Dishonored)
+Move WASD/ZQSD · look mouse · jump and contextual climb Space · sprint Shift (hold; a jump keeps the
+run) · **crouch C (toggle)**, C during a sprint slides · **lean Q/E (A/E on AZERTY)** · interact / pick
+up F · **LMB attacks**: punch, blade or club swing, gun fired from the hip; on the back of an NPC that
+hasn't noticed you, whatever you hold, an instant takedown · **RMB aims a gun**; with a gadget in hand,
+hold to show the arc and release to throw · **block LCtrl** (a raised guard leaves 30 % of a melee hit) ·
+**zoom LAlt** · wheel or 1-4 change item (no selection wheel) · reload R · detonate T · quick punch V ·
+map M · instinct Tab (hold) · scoreboard ` (key left of 1, ² on AZERTY) · push-to-talk B · pause Esc.
 
 Caster view: agents 1-8 · next agent arrows / LB RB · feed Tab / D-pad left right · layouts F1-F4 /
 D-pad up · focus F (Shift+F: with the main feed) / D-pad down · to main Enter / A · eyes-chase V / X ·

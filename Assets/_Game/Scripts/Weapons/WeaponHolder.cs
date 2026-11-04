@@ -16,7 +16,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
     /// A player's inventory and everything they do with it: shoot, reload, punch, throw, plant
     /// and blow C4, burn with the flamethrower, pick up and drop.
     /// <para>
-    /// Six slots: two weapons (1-2) and four gadgets (3-6); an empty weapon slot is the fists.
+    /// Four slots: two weapons (1-2) and two gadgets (3-4); an empty weapon slot is the fists. Keys and
+    /// tools sit in hidden slots after them: they open things, they are never held.
     /// The host owns the slot list and the ammo; the owner predicts the shot locally (muzzle,
     /// tracer, recoil, sound) and sends origin + direction + spread seed, the host re-traces the
     /// same pellets, deals the damage and replays the shot on the other machines.
@@ -26,7 +27,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
     [RequireComponent(typeof(PlayerAvatar))]
     public class WeaponHolder : NetworkBehaviour
     {
-        public const int SLOT_COUNT = 6;
+        public const int SLOT_COUNT = 4;
+        public const int KEY_SLOTS = 3;
         public const int WEAPON_SLOTS = 2;
 
         public readonly NetworkList<InventorySlot> Slots = new NetworkList<InventorySlot>();
@@ -62,7 +64,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         /// <summary>Melee reach: a sphere this wide swept this far from the eye (owner prediction and host).</summary>
         public const float MELEE_RADIUS = 0.35f, MELEE_RANGE = 1.7f;
         /// <summary>Owner cooldown between swings; the host refuses swings closer than its own minimum.</summary>
-        public const float MELEE_COOLDOWN = 0.42f, TAKEDOWN_COOLDOWN = 1.1f, MELEE_MIN_INTERVAL = 0.3f;
+        public const float MELEE_COOLDOWN = 0.18f, TAKEDOWN_COOLDOWN = 0.6f, MELEE_MIN_INTERVAL = 0.12f;
+        /// <summary>A bare punch's damage; a blade or a club deals its item's.</summary>
+        public const float FIST_DAMAGE = 34f;
         /// <summary>Predicted contact: how long the arms freeze, and the camera's jolt.</summary>
         public const float HIT_STOP = 0.07f;
         /// <summary>Tools only (first-person shots): aim as if the button were held.</summary>
@@ -88,8 +92,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         {
             if (IsServer)
             {
-                for (int i = 0; i < SLOT_COUNT; i++) Slots.Add(InventorySlot.Empty);
-                foreach (ItemDefinition lItem in GameDatabase.Rules.startingLoadout) if (lItem != null) GiveServer(lItem, -1, -1);
+                for (int i = 0; i < SLOT_COUNT + KEY_SLOTS; i++) Slots.Add(InventorySlot.Empty);
+                // The starting gun is lightly loaded: one magazine in it, one spare.
+                foreach (ItemDefinition lItem in GameDatabase.Rules.startingLoadout) if (lItem != null) GiveServer(lItem, -1, lItem.UsesAmmo ? lItem.magazine : -1);
             }
             if (IsOwner)
             {
@@ -155,8 +160,12 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
 
             // Right click raises the weapon (aims); only then does left click fire. Lowered, left click punches.
             ItemDefinition lHeld = HeldItem;
-            _aiming = (GameInput.Aim || ForceAim) && lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher || lHeld.kind == ItemKind.Flamethrower);
-            Avatar.Motor.Aiming = _aiming;
+            bool lShooter = lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher || lHeld.kind == ItemKind.Flamethrower);
+            _aiming = (GameInput.Aim || ForceAim) && lShooter;
+            // Firing from the hip breaks a sprint just like aiming does.
+            Avatar.Motor.Aiming = _aiming || (lShooter && GameInput.Fire);
+            bool lBlocking = GameInput.BlockHeld && !_aiming;
+            if (Avatar.Blocking.Value != lBlocking) Avatar.Blocking.Value = lBlocking;
             if (Avatar.Aiming.Value != _aiming) Avatar.Aiming.Value = _aiming;
 
             if (GameInput.Reload && lHeld != null && lHeld.UsesAmmo) ReloadRpc(Selected.Value);
@@ -174,12 +183,15 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             }
             else if (_arc != null) _arc.Hide();
 
-            if (lHeld != null && lHeld.slot == ItemSlot.Gadget)
+            // Left click attacks, whatever is held; an unaware NPC's back in reach is always the takedown.
+            if (GameInput.FirePressed && PredictTakedown()) TryMelee();
+            else if (lHeld != null && lHeld.slot == ItemSlot.Gadget)
             {
-                // Throwables: right click shows the arc, left click throws.
-                if (GameInput.FirePressed) ThrowGadget(Selected.Value);
+                // Gadgets: the right button shows the arc, letting it go throws; left click still punches.
+                if (GameInput.AimReleased) ThrowGadget(Selected.Value);
+                if (GameInput.FirePressed) TryMelee();
             }
-            else if (lHeld == null || !_aiming)
+            else if (lHeld == null || lHeld.IsMelee)
             {
                 if (GameInput.FirePressed) TryMelee();
             }
@@ -480,7 +492,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             }
             lTarget.ApplyDamage(new DamageInfo
             {
-                amount = 34f, type = DamageType.Melee, point = lHit.point, direction = pDirection,
+                amount = HeldItem != null && HeldItem.IsMelee ? HeldItem.damage : FIST_DAMAGE, type = DamageType.Melee, point = lHit.point, direction = pDirection,
                 attacker = OwnerClientId, attackerTeam = Avatar.Team.Value
             });
             NoiseSystem.Emit(lHit.point, 6f, NoiseKind.Suspicious, OwnerClientId);
@@ -573,6 +585,15 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (pItem == null) return false;
             int lMag = pMagazine < 0 ? pItem.magazine : pMagazine;
             int lReserve = pReserve < 0 ? (pItem.slot == ItemSlot.Gadget ? pItem.stack : pItem.reserveAmmo) : pReserve;
+
+            if (pItem.IsKey)
+            {
+                for (int i = SLOT_COUNT; i < Slots.Count; i++)
+                    if (Slots[i].item == pItem.Index) return true;
+                for (int i = SLOT_COUNT; i < Slots.Count; i++)
+                    if (Slots[i].IsEmpty) { Slots[i] = new InventorySlot { item = pItem.Index, magazine = 0, reserve = 1 }; return true; }
+                return false;
+            }
 
             if (pItem.slot == ItemSlot.Gadget)
             {

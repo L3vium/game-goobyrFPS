@@ -10,8 +10,9 @@ using UnityEngine;
 namespace Com.IsartDigital.GoobyrFPS.Weapons
 {
     /// <summary>
-    /// An item lying on the map: a weapon, ammo or a gadget, bobbing and glowing a little so it
-    /// reads from afar. Spawned by the host from the map's item spawn points and from the dead.
+    /// An item lying on the map: a weapon, ammo or a gadget, at rest on the ground with no aura; it
+    /// only swells a little while the player looks at it in reach. Spawned by the host from the
+    /// map's item spawn points and from the dead.
     /// </summary>
     public class ItemPickup : NetworkBehaviour
     {
@@ -26,7 +27,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public static readonly List<ItemPickup> All = new List<ItemPickup>();
 
         private Transform _visual;
-        private float _phase;
+        /// <summary>The pickup the local player looks at, in reach.</summary>
+        public static ItemPickup Focused;
         private Rigidbody _body;
 
         public static ItemPickup SpawnServer(ItemDefinition pItem, Vector3 pPosition, int pMagazine, int pReserve, Vector3 pVelocity)
@@ -57,7 +59,6 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (!IsServer && _body != null) _body.isKinematic = true;
             ItemIndex.OnValueChanged += (_, __) => BuildVisual();
             BuildVisual();
-            _phase = Random.value * 6f;
         }
 
         private void BuildVisual()
@@ -68,19 +69,17 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             _visual = new GameObject("Visual").transform;
             _visual.SetParent(transform, false);
             GameObject lModel = WeaponModels.Build(lItem, _visual, GameLayers.PICKUP);
-            lModel.transform.localScale = Vector3.one * (lItem.slot == ItemSlot.Gadget ? 2.2f : 1.5f);
-            // A glow ring under it: rarity colour (gold for the unique ones).
-            GameObject lRing = GameArt.Part(_visual, "Ring", LowPolyMesh.Cached("fx.ring", () => LowPolyMesh.Cylinder(24)), new Vector3(0, -0.28f, 0), new Vector3(0.8f, 0.01f, 0.8f), lItem.unique ? new Color(2f, 1.4f, 0.2f) : lItem.color * 1.2f, GameArt.Glow);
-            lRing.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lModel.transform.localScale = Vector3.one * (lItem.slot == ItemSlot.Gadget ? 1.5f : 1.2f);
         }
 
         private void Update()
         {
             if (_visual == null) return;
-            _phase += Time.deltaTime;
             bool lResting = _body == null || _body.isKinematic || _body.IsSleeping();
-            _visual.localPosition = lResting ? new Vector3(0, 0.35f + Mathf.Sin(_phase * 2f) * 0.06f, 0) : Vector3.zero;
-            _visual.localRotation = lResting ? Quaternion.Euler(0, _phase * 50f, 0) : Quaternion.identity;
+            _visual.localPosition = lResting ? new Vector3(0, 0.08f, 0) : Vector3.zero;
+            // A weapon lies on its side; small things sit as they are.
+            _visual.localRotation = lResting && Item != null && Item.slot == ItemSlot.Weapon ? Quaternion.Euler(0f, 0f, 90f) : Quaternion.identity;
+            _visual.localScale = Vector3.one * Mathf.MoveTowards(_visual.localScale.x, Focused == this ? 1.2f : 1f, Time.deltaTime * 3f);
             if (IsServer && _body != null && !_body.isKinematic && _body.IsSleeping())
             {
                 _body.isKinematic = true;

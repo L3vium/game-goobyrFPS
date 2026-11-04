@@ -141,24 +141,6 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Slot5",
-                    "type": "Button",
-                    "id": "2a2efa93-1cf1-411e-9e1d-e244cc36318e",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "Slot6",
-                    "type": "Button",
-                    "id": "cc7bc3ec-2c39-4d28-96b1-2102647bd0d1",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
                     "name": "Scroll",
                     "type": "Value",
                     "id": "3b7df91c-cba3-4e5b-82f6-05fc0e0e9d5d",
@@ -166,15 +148,6 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
-                },
-                {
-                    "name": "Wheel",
-                    "type": "Button",
-                    "id": "8ee52fab-b450-4b02-a1e9-0fbb0ad83c84",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
                 },
                 {
                     "name": "Instinct",
@@ -235,6 +208,42 @@
                     "type": "Button",
                     "id": "aad7132c-1907-4125-a3db-287122595e3e",
                     "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "LeanLeft",
+                    "type": "Button",
+                    "id": "2826d893-8f37-4fcb-846c-42cc845448c8",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "LeanRight",
+                    "type": "Button",
+                    "id": "953a922a-3257-4584-9d02-aee4da24ba01",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Block",
+                    "type": "Button",
+                    "id": "336a3c04-8bf0-451c-8835-7553cbc0d11b",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Zoom",
+                    "type": "Button",
+                    "id": "730773a5-d8e7-435d-85d4-1802b9c834d7",
+                    "expectedControlType": "Button",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -419,17 +428,6 @@
                 },
                 {
                     "name": "",
-                    "id": "6449db64-8524-4526-be66-c1e8dccadd1b",
-                    "path": "<Keyboard>/leftCtrl",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Keyboard&Mouse",
-                    "action": "Crouch",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "6d71792c-3a38-4c8f-ac43-0cbecbc2da4f",
                     "path": "<Keyboard>/c",
                     "interactions": "",
@@ -507,34 +505,12 @@
                 },
                 {
                     "name": "",
-                    "id": "a04d252f-7f81-431f-8036-6eb931e26c29",
-                    "path": "<Mouse>/middleButton",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Keyboard&Mouse",
-                    "action": "Melee",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "99e66af8-d5e5-44c0-8887-c973d8ec8fcc",
                     "path": "<Gamepad>/rightStickPress",
                     "interactions": "",
                     "processors": "",
                     "groups": "Gamepad",
                     "action": "Melee",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "eaa8e603-b7e4-408a-b69d-b56a48f8c319",
-                    "path": "<Keyboard>/g",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Keyboard&Mouse",
-                    "action": "Throw",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -590,28 +566,6 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "Slot4",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "da3eb2bb-275b-471e-8e2e-53a8f359b717",
-                    "path": "<Keyboard>/5",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Keyboard&Mouse",
-                    "action": "Slot5",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "4038a327-ef44-4520-9a87-e0fb908a31ea",
-                    "path": "<Keyboard>/6",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "Keyboard&Mouse",
-                    "action": "Slot6",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -771,23 +725,56 @@
                 },
                 {
                     "name": "",
-                    "id": "2ef3542e-78bf-4efd-aa19-e9f4f6a89e94",
+                    "id": "dbd971ae-a175-4e3f-9fae-c476b99b8c80",
                     "path": "<Keyboard>/q",
                     "interactions": "",
                     "processors": "",
                     "groups": "Keyboard&Mouse",
-                    "action": "Wheel",
+                    "action": "LeanLeft",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
                 {
                     "name": "",
-                    "id": "e4f028f8-6cf4-414d-a77d-384a4ab716c8",
+                    "id": "ae9b3f14-262f-4450-a99e-89f24681cbb4",
+                    "path": "<Keyboard>/e",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "LeanRight",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "aab5e184-c226-4e39-aa05-91e1ffbd24fa",
+                    "path": "<Keyboard>/leftCtrl",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Block",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "c24303e0-b8d3-4d9a-9408-593d2931e665",
                     "path": "<Gamepad>/leftShoulder",
                     "interactions": "",
                     "processors": "",
                     "groups": "Gamepad",
-                    "action": "Wheel",
+                    "action": "Block",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "359323d3-ddc0-4a7d-9d2f-a8b9fc590091",
+                    "path": "<Keyboard>/leftAlt",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Zoom",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

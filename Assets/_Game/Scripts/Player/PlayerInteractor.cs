@@ -73,6 +73,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 }
             }
 
+            ItemPickup.Focused = lPickup;
             if (lPickup != null && lPickup.Item != null)
             {
                 CurrentPrompt = "[F] TAKE " + lPickup.Item.displayName.ToUpperInvariant();

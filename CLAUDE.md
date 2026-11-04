@@ -21,8 +21,10 @@ validate through Unity MCP, `tasks/lessons.md` after every correction).
 
 ## Unity access
 
-The editor stays open with MCP for Unity on `http://localhost:8080/mcp`, driven over HTTP with
+The editor stays open with MCP for Unity, driven over HTTP with
 `python Tools/unity_mcp.py <tool> '<json>'`; batchmode is not available (the project is locked).
+Other Unity projects run MCP servers on neighbouring ports: this one is on **8083** today, so set
+`UNITY_MCP_PORT=8083` and confirm with `mcpforunity://project/info` that it answers `Hitman`.
 Compile, console, tests, builders and the player build all go through MCP (`refresh_unity`,
 `read_console`, `run_tests`, `execute_menu_item`). Never launch, close or restart the editor.
 

@@ -19,13 +19,19 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         [Tooltip("Multiplies the damage players deal.")]
         public float playerDamageMultiplier = 1f;
         public int maxPlayers = 8;
+        [Tooltip("F1 to F10 cheats on a living agent, listed bottom right. Always on in the Hitmen Dev build.")]
+        public bool cheatsEnabled;
 
         [Header("Match")]
         public float timeLimitMinutes = 20f;
         public bool proximityChatByDefault = true;
         public float proximityChatRange = 30f;
-        [Tooltip("Seconds between two reveals of the proof carrier to everyone.")]
-        public float proofRevealInterval = 10f;
+        [Tooltip("Seconds between two reveals of the proof carrier to everyone, when they have just taken it.")]
+        public float proofRevealInterval = 15f;
+        [Tooltip("The same, once they have held it for the whole ramp.")]
+        public float proofRevealFastest = 3f;
+        [Tooltip("Seconds of carrying over which the reveals go from the slowest to the fastest.")]
+        public float proofRevealRamp = 150f;
         [Tooltip("Seconds a carrier stays inside an extraction point to win.")]
         public float extractionTime = 3f;
         public int activeExtractions = 2;
@@ -34,10 +40,10 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         public float npcHealth = 100f;
         [Tooltip("Multiplies the damage NPCs deal.")]
         public float npcDamageMultiplier = 0.7f;
-        public float npcVisionRange = 20f;
+        public float npcVisionRange = 14f;
         public float npcVisionAngle = 90f;
         [Tooltip("Seconds of full exposure before an NPC is sure it saw a player.")]
-        public float npcDetectTime = 2.2f;
+        public float npcDetectTime = 2f;
         public float npcReactionTime = 0.7f;
         [Tooltip("Seconds of radio an NPC needs to call reinforcements. Kill it before.")]
         public float callDuration = 3f;

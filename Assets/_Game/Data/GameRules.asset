@@ -17,17 +17,20 @@ MonoBehaviour:
   playerHealth: 100
   playerDamageMultiplier: 1
   maxPlayers: 8
+  cheatsEnabled: 0
   timeLimitMinutes: 20
   proximityChatByDefault: 1
   proximityChatRange: 30
-  proofRevealInterval: 10
+  proofRevealInterval: 15
+  proofRevealFastest: 3
+  proofRevealRamp: 150
   extractionTime: 3
   activeExtractions: 2
   npcHealth: 100
   npcDamageMultiplier: 0.7
-  npcVisionRange: 30
+  npcVisionRange: 14
   npcVisionAngle: 90
-  npcDetectTime: 1.3
+  npcDetectTime: 2
   npcReactionTime: 0.7
   callDuration: 3
   reinforcementsPerCall: 4

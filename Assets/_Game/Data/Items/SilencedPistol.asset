@@ -22,7 +22,7 @@ MonoBehaviour:
   fireRate: 3.2
   automatic: 0
   pellets: 1
-  spread: 1.2
+  spread: 0.7
   adsSpreadFactor: 0.3
   range: 90
   magazine: 10
@@ -31,7 +31,7 @@ MonoBehaviour:
   recoil: 1.4
   adsFov: 62
   shake: 0.08
-  noiseRadius: 8
+  noiseRadius: 5
   projectileSpeed: 0
   explosionRadius: 0
   throwForce: 18

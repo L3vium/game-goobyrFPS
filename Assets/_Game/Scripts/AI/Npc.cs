@@ -408,7 +408,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
             foreach (PlayerAvatar lPlayer in PlayerAvatar.All)
             {
-                if (lPlayer == null || !lPlayer.IsSpawned || !lPlayer.Health.IsAlive || lPlayer.IsProtector) continue;
+                if (lPlayer == null || !lPlayer.IsSpawned || !lPlayer.Health.IsAlive || lPlayer.IsProtector || lPlayer.DevGhost) continue;
                 float lExposure = Exposure(lPlayer, lRules, lCombat || OnEdge);
                 if (lExposure > lBestExposure) { lBestExposure = lExposure; lBest = lPlayer; }
                 if (lPlayer == _combatTarget && lExposure > 0f) _combatTargetExposed = true;
@@ -555,9 +555,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 inGrass = pPlayer.InGrass.Value,
                 sprinting = pPlayer.Sprinting.Value
             };
-            // Cheap rejections before the line casts. Under water, only at arm's length.
+            // Cheap rejections before the line casts.
             if (lSight.distance > lSight.range) return 0f;
-            if (pPlayer.Submerged.Value && lSight.distance > 3f) return 0f;
             if (lSight.angle > Mathf.Max(lSight.halfCone, DetectionModel.PERIPHERAL_ANGLE) && lSight.distance >= DetectionModel.CLOSE_RANGE) return 0f;
             if (SmokeVolume.Blocks(lEye, lTarget)) return 0f;
             // The social ladder: a behaving player on the plaza is just another passer-by - even to a
@@ -702,7 +701,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 if (lOther == this || lOther.Health.IsAlive || _seenBodies.Contains(lOther.NetworkObjectId)) continue;
                 Vector3 lBody = lOther.transform.position + Vector3.up * 0.3f;
                 float lDistance = Vector3.Distance(Eye, lBody);
-                if (lDistance > 16f * BuildingVolume.LightFactor(lBody)) continue;
+                if (lDistance > BODY_SIGHT * BuildingVolume.LightFactor(lBody)) continue;
                 if (NpcRules.ConeAngle(transform.forward, lBody - Eye, Role == NpcRole.Lookout) > GameDatabase.Rules.npcVisionAngle * 0.5f) continue;
                 if (!Senses.Clear(Eye, lBody)) continue;
                 _seenBodies.Add(lOther.NetworkObjectId);
@@ -734,7 +733,6 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void RadioBodyIn(ulong pBody, Vector3 pWhere)
         {
             if (!_reportedBodies.Add(pBody)) return;
-            BodyFoundRpc();
             Bark(Barks.Radio);
             if (Zone == null) return;
             Zone.RaiseAlertness(90f);
@@ -764,7 +762,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (pNoise.fromPlayer)
             {
                 PlayerAvatar lMaker = PlayerAvatar.ForClient(pNoise.source);
-                if (lMaker != null && lMaker.IsProtector) return;
+                if (lMaker != null && (lMaker.IsProtector || lMaker.DevGhost)) return;
             }
             // Gunfire and explosions: whoever sees the player who made them knows who did it.
             if (pNoise.fromPlayer && pNoise.kind == NoiseKind.Alarming) ReportHostileAct(PlayerAvatar.ForClient(pNoise.source), HostileAct.Shot, null);
@@ -799,7 +797,8 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             foreach ((Npc lNpc, float lLoudness, float lDistance) in _hearers)
             {
                 bool lResponder;
-                if (NpcRules.AlwaysResponds(pNoise.kind, lNpc.IsArmedGuard, pNoise.capped)) lResponder = lNpc.CanRespond;
+                // Gunfire outranks whatever a guard was checking: it drops the coin and goes.
+                if (NpcRules.AlwaysResponds(pNoise.kind, lNpc.IsArmedGuard, pNoise.capped)) lResponder = lNpc.CanRespond || lNpc.State.Value == NpcState.Investigate;
                 else
                 {
                     lResponder = lGiven < lResponders && lNpc.CanRespond;
@@ -841,6 +840,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         /// <summary>Free to go and check a sound: not fighting, fleeing, sick or already on its way to one.</summary>
         private bool CanRespond => !InCombat && State.Value != NpcState.Engaged && State.Value != NpcState.Flee && State.Value != NpcState.Sick && State.Value != NpcState.Investigate && State.Value != NpcState.Report;
+
+        /// <summary>How far a body on the ground is noticed in full light.</summary>
+        private const float BODY_SIGHT = 10f;
 
         private void Hear(NoiseEvent pNoise, DetectionModel.Heard pHeard, float pDistance)
         {
@@ -1617,7 +1619,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
         private void HandleDeathServer(DamageInfo pInfo)
         {
-            if (State.Value == NpcState.Calling) { Zone?.CallFinished(this, false); CallCutRpc(); }
+            if (State.Value == NpcState.Calling) Zone?.CallFinished(this, false);
             State.Value = pInfo.knockout ? NpcState.KnockedOut : NpcState.Dead;
             if (_cover != null && _cover.Occupant == this) _cover.Occupant = null;
             _agent.enabled = false;
@@ -1732,14 +1734,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         private void CallDoneRpc()
         {
             Audio.Sfx.Play("radio", transform.position, 1f, 25f);
-            UI.Hud.Notify("REINFORCEMENTS CALLED", Zone != null ? Zone.ZoneName : "", UI.ThreatMarkers.Red);
         }
-
-        [Rpc(SendTo.Everyone)]
-        private void CallCutRpc() => UI.Hud.Notify("CALL INTERRUPTED", Zone != null ? Zone.ZoneName : "", UI.ThreatMarkers.White);
-
-        [Rpc(SendTo.Everyone)]
-        private void BodyFoundRpc() => UI.Hud.Notify("BODY FOUND", Zone != null ? Zone.ZoneName : "", UI.ThreatMarkers.Amber);
 
         [Rpc(SendTo.Everyone)]
         private void PukeRpc()

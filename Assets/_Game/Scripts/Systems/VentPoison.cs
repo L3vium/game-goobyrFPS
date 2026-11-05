@@ -44,7 +44,6 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
             _team = pWho.Team.Value;
             _timer = GameDatabase.Rules.ventGasDelay;
             SetStateServer(1);
-            if (MapEffects.Instance != null) MapEffects.Instance.ToastRpc("SOMETHING IS WRONG WITH THE AIR IN " + _building.BuildingName.ToUpperInvariant());
         }
 
         protected override void OnStateChanged(int pOld, int pNew)

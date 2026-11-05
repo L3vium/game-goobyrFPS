@@ -40,9 +40,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         /// <summary>Gauge floor while fighting (a lost player is not forgotten).</summary>
         public const float COMBAT_FLOOR = 0.6f;
         /// <summary>An NPC that sees a confrontation or a fight this close joins it.</summary>
-        public const float WITNESS_RANGE = 18f;
+        public const float WITNESS_RANGE = 12f;
         /// <summary>A completed phone call alerts the caller's zone mates this close to it.</summary>
-        public const float CALL_RADIUS = 60f;
+        public const float CALL_RADIUS = 30f;
 
         /// <summary>What an NPC's eye gets of a player this perception tick.</summary>
         public struct Sight
@@ -167,7 +167,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         public static float GuessError(float pDistance) => Mathf.Clamp(pDistance * 0.25f, 1.5f, 10f);
 
         /// <summary>Reach of a player's footsteps in the open (metres).</summary>
-        public const float STEP_CROUCH = 1.5f, STEP_WALK = 5f, STEP_SPRINT = 14f, STEP_SLIDE = 8f;
+        public const float STEP_CROUCH = 1f, STEP_WALK = 3f, STEP_SPRINT = 8f, STEP_SLIDE = 5f;
 
         /// <summary>Footsteps: silent standing still, a whisper crouched, a few metres walking, far sprinting or sliding.</summary>
         public static float FootstepRadius(float pSpeed, bool pCrouched, bool pSprinting)
@@ -175,14 +175,14 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             if (pSpeed < 0.6f) return 0f;
             if (pCrouched) return pSpeed > 4f ? STEP_SLIDE : Mathf.Lerp(0.5f, STEP_CROUCH, Mathf.InverseLerp(0.6f, 2.5f, pSpeed));
             if (pSprinting) return STEP_SPRINT;
-            return Mathf.Lerp(2f, STEP_WALK, Mathf.InverseLerp(0.6f, 4.4f, pSpeed));
+            return Mathf.Lerp(1f, STEP_WALK, Mathf.InverseLerp(0.6f, 4.4f, pSpeed));
         }
 
-        /// <summary>A landing: a hop is free, a real drop is heard about 3 m per metre fallen (half crouched).</summary>
+        /// <summary>A landing: a hop is free, a real drop is heard about 2 m per metre fallen (half crouched).</summary>
         public static float LandingRadius(float pFall, bool pCrouched)
         {
             if (pFall < 1.2f) return 0f;
-            return Mathf.Min(20f, (pFall - 0.6f) * 3f) * (pCrouched ? 0.5f : 1f);
+            return Mathf.Min(12f, (pFall - 0.6f) * 2f) * (pCrouched ? 0.5f : 1f);
         }
 
         // ---------------------------------------------------------------- trespassing

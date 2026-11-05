@@ -60,9 +60,10 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
         private ProofPickup _proof;
         private float _revealTimer;
-        /// <summary>The end screen waits for the host's button, back to the lobby after this at the latest.</summary>
-        public const float END_SCREEN_FALLBACK = 180f;
-        private float _endTimer;
+        /// <summary>Seconds the current carrier has held the proof: the reveals come faster and faster.</summary>
+        private float _carriedFor;
+        /// <summary>Dev cheat: the contract's clock stands still.</summary>
+        public static bool DevClockFrozen { get; set; }
         private readonly List<ExtractionPoint> _extractions = new List<ExtractionPoint>();
         private static HumanRagdoll _targetRagdoll;
         private string _killMethod = "";
@@ -218,7 +219,6 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             StartTime.Value = NetworkManager.ServerTime.TimeAsFloat;
             Phase.Value = MatchPhase.Playing;
             if (LobbyState.Instance != null) LobbyState.Instance.Phase.Value = MatchPhase.Playing;
-            ContractStartRpc(Target != null ? Target.displayName.ToUpperInvariant() : "");
         }
 
         private static bool IsKit(ItemKind pKind) => pKind == ItemKind.Keycard;
@@ -311,8 +311,6 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             _proof.Profile.Value = TargetProfileIndex.Value;
             Proof.Value = ProofState.Dropped;
             ProofPosition.Value = lProof.transform.position;
-            string lBy = lKiller != null ? lKiller.Name : "THE WORLD";
-            AnnounceRpc("TARGET ELIMINATED", (Target != null ? Target.displayName : "Target").ToUpperInvariant() + " - " + _killMethod + " - BY " + lBy.ToUpperInvariant());
             TargetDownRpc();
         }
 
@@ -367,7 +365,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             _proof.Carrier.Value = lSender;
             lAvatar.CarriesProof.Value = true;
             _revealTimer = 0f;
-            AnnounceRpc("PROOF TAKEN", ((lAvatar.Player != null ? lAvatar.Player.Name : "?") + " HAS IT - REACH AN EXTRACTION").ToUpperInvariant());
+            _carriedFor = 0f;
         }
 
         private void DropProofServer(Vector3 pAt)
@@ -381,7 +379,6 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             _proof.transform.position = pAt;
             ProofPosition.Value = pAt;
             Proof.Value = ProofState.Dropped;
-            AnnounceRpc("PROOF DROPPED", "GRAB IT!");
         }
 
         // ---------------------------------------------------------------- loop
@@ -392,19 +389,10 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             if (IsSpawned && Phase.Value != MatchPhase.Loading && !CasterView.Active && LobbyPlayer.Local != null && LobbyPlayer.Local.Caster.Value) CasterView.Begin(false);
             if (!IsServer || !IsSpawned) return;
 
-            if (Phase.Value == MatchPhase.Ended)
-            {
-                _endTimer -= Time.deltaTime;
-                if (_endTimer <= 0f && LobbyState.Instance != null)
-                {
-                    _endTimer = 999f;
-                    LobbyState.Instance.ReturnToLobby();
-                }
-                return;
-            }
+            // The end screen waits for the host's button, as long as it takes: nobody is ever thrown out.
             if (Phase.Value != MatchPhase.Playing) return;
 
-            TimeLeft.Value = Mathf.Max(0f, TimeLeft.Value - Time.deltaTime);
+            if (!DevClockFrozen) TimeLeft.Value = Mathf.Max(0f, TimeLeft.Value - Time.deltaTime);
 
             if (Proof.Value == ProofState.Carried && _proof != null)
             {
@@ -413,10 +401,11 @@ namespace Com.IsartDigital.GoobyrFPS.Match
                 else
                 {
                     ProofPosition.Value = lCarrier.transform.position;
+                    _carriedFor += Time.deltaTime;
                     _revealTimer -= Time.deltaTime;
                     if (_revealTimer <= 0f)
                     {
-                        _revealTimer = GameDatabase.Rules.proofRevealInterval;
+                        _revealTimer = MatchRulesLogic.RevealInterval(GameDatabase.Rules.proofRevealInterval, GameDatabase.Rules.proofRevealFastest, GameDatabase.Rules.proofRevealRamp, _carriedFor);
                         RevealCarrierRpc(lCarrier.transform.position);
                     }
                     UpdateExtraction(lCarrier);
@@ -456,14 +445,6 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             UI.RadioFeed.Push(pLine, pWhere);
         }
 
-        [Rpc(SendTo.Everyone)]
-        private void ContractStartRpc(string pTarget)
-        {
-            bool lProtector = PlayerAvatar.Local != null && PlayerAvatar.Local.IsProtector;
-            if (lProtector) UI.Hud.Announce("PROTECT THE TARGET", "KEEP " + pTarget + " ALIVE: HUNT THE AGENTS COMING FOR THEM");
-            else UI.Hud.Announce("NEW CONTRACT", pTarget);
-        }
-
         private void UpdateExtraction(PlayerAvatar pCarrier)
         {
             bool lInside = false;
@@ -483,7 +464,6 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             Outcome.Value = pOutcome;
             Phase.Value = MatchPhase.Ended;
             if (LobbyState.Instance != null) LobbyState.Instance.Phase.Value = MatchPhase.Ended;
-            _endTimer = END_SCREEN_FALLBACK;
             string lWinner = "";
             if (pOutcome == MatchOutcome.Extracted)
             {
@@ -495,9 +475,6 @@ namespace Com.IsartDigital.GoobyrFPS.Match
         }
 
         // ---------------------------------------------------------------- client feedback
-
-        [Rpc(SendTo.Everyone)]
-        private void AnnounceRpc(string pTitle, string pSubtitle) => UI.Hud.Announce(pTitle, pSubtitle);
 
         [Rpc(SendTo.Everyone)]
         private void KillFeedRpc(string pKiller, string pVictim, string pMethod) => UI.Hud.KillFeed(pKiller + "  >  " + pVictim + "  (" + pMethod + ")");

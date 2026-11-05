@@ -26,7 +26,6 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             Recent.RemoveAll(pAlert => Time.time - pAlert.at > MAP_TIME);
             Recent.Add(new Alert { line = pLine, where = pWhere, at = Time.time });
-            Hud.Notify("RADIO", pLine, UIFactory.Accent);
             Audio.Sfx.Play2D("radio", 0.6f);
         }
     }

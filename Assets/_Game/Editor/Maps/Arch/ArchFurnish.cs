@@ -427,10 +427,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // Line the walls: the room's pieces, again and again until the perimeter is dressed.
             Item[] lItems = WallItems(pRoom.type);
             int lWanted = Mathf.Clamp(Mathf.RoundToInt((W + D) * 2f / 2.2f), W * D >= 12f ? 8 : 4, 18), lMisses = 0, lPlaced = 0;
+            Dictionary<string, int> lPerModel = new Dictionary<string, int>();
             for (int k = 0; lItems.Length > 0 && lPlaced < lWanted && lMisses < lItems.Length + 2; k++)
             {
                 Item lItem = lItems[k % lItems.Length];
-                if (AgainstWall(pKit, b, pRoom, lItem.model, lItem.tall, r) != null) { lPlaced++; lMisses = 0; }
+                // A room has one bath, one stove, one fridge; nothing lines a whole wall on its own.
+                bool lFixture = lItem.model.Contains("Sink") || lItem.model.Contains("Bath") || lItem.model.Contains("Toilet") || lItem.model.Contains("Stove") || lItem.model.Contains("Fridge") || lItem.model.Contains("Wash") || lItem.model.Contains("Oven");
+                lPerModel.TryGetValue(lItem.model, out int lSoFar);
+                if (lSoFar >= (lFixture ? 1 : 3)) { lMisses++; continue; }
+                if (AgainstWall(pKit, b, pRoom, lItem.model, lItem.tall, r) != null) { lPlaced++; lMisses = 0; lPerModel[lItem.model] = lSoFar + 1; }
                 else lMisses++;
             }
             CentreGroup(pKit, b, pRoom, pZone, r);
@@ -439,8 +444,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (pRoom.type != RoomType.Stair && pRoom.type != RoomType.Corridor)
             {
                 Vector2 p = new Vector2(Mathf.Lerp(pRoom.rect.xMin + 0.9f, pRoom.rect.xMax - 0.9f, (float)r.NextDouble()), Mathf.Lerp(pRoom.rect.yMin + 0.9f, pRoom.rect.yMax - 0.9f, (float)r.NextDouble()));
-                if (Free(b, pRoom, new Rect(p.x - 0.2f, p.y - 0.2f, 0.4f, 0.4f), false)) pKit.Throwable(b.At(p.x, pRoom.floor, p.y, 0.05f));
-                else pKit.Throwable(b.At(c.x, pRoom.floor, c.y, 0.05f));
+                if (Free(b, pRoom, new Rect(p.x - 0.2f, p.y - 0.2f, 0.4f, 0.4f), false)) pKit.ThrowableIndoors(b.At(p.x, pRoom.floor, p.y, 0.05f));
+                else pKit.ThrowableIndoors(b.At(c.x, pRoom.floor, c.y, 0.05f));
             }
         }
 

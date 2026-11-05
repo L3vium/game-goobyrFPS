@@ -142,8 +142,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lBurner.shadows = LightShadows.None;
             ArchOutdoor.Sign(A, _roaster + new Vector3(-2.6f, 0f, -2.4f), 180f, "Gas - Peligro", true, new Color(0.85f, 0.6f, 0.05f));
             for (int i = 0; i < 3; i++) A.Sacks(_roaster + new Vector3(3.2f, 0f, -1.5f + i * 1.6f), 90f + i * 20f);
-            A.Explosive(_roaster + new Vector3(-2.6f, 0, -1.4f), 0f, true);
-            A.Explosive(_roaster + new Vector3(-2.6f, 0, -0.8f), 0f, true);
             K.Activity(ActivityType.Drink, _roaster + new Vector3(0, 0.05f, 3.8f), 180f, ZONE_CAFETAL, 20f);
             A.Drinks(_beneficioR.At(18f, 0, 3.5f, 0.8f), _beneficio.yaw, ZONE_CAFETAL, 3, false);
             A.Model("Furn_DiningTable", _beneficioR.At(18f, 0, 3.5f, 0f), _beneficio.yaw);

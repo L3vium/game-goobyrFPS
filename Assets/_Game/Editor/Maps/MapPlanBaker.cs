@@ -20,18 +20,18 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// </summary>
     public static class MapPlanBaker
     {
-        public const int RES = 1024, FLOORS = 4;
+        public const int RES = 2048, FLOORS = 4;
         private const float CUT = 1.3f;
 
-        private static readonly Color32 VOID = new Color32(16, 18, 21, 255);
-        private static readonly Color32 GROUND = new Color32(38, 42, 46, 255);
-        private static readonly Color32 TREE = new Color32(28, 32, 35, 255);
-        private static readonly Color32 WATER = new Color32(34, 58, 84, 255);
-        private static readonly Color32 PATH = new Color32(78, 82, 86, 255);
-        private static readonly Color32 ROAD = new Color32(112, 116, 121, 255);
-        private static readonly Color32 FLOOR = new Color32(150, 155, 162, 255);
-        private static readonly Color32 WALL = new Color32(232, 234, 238, 255);
-        private static readonly Color32 EDGE = new Color32(200, 204, 210, 255);
+        private static readonly Color32 VOID = new Color32(24, 26, 36, 255);
+        private static readonly Color32 GROUND = new Color32(194, 199, 203, 255);
+        private static readonly Color32 TREE = new Color32(172, 179, 183, 255);
+        private static readonly Color32 WATER = new Color32(92, 112, 132, 255);
+        private static readonly Color32 PATH = new Color32(210, 213, 216, 255);
+        private static readonly Color32 ROAD = new Color32(226, 228, 230, 255);
+        private static readonly Color32 FLOOR = new Color32(142, 149, 158, 255);
+        private static readonly Color32 WALL = new Color32(60, 66, 76, 255);
+        private static readonly Color32 EDGE = new Color32(92, 98, 108, 255);
 
         public static void Bake(MapDefinition pMap, Terrain pLand, float pStorey)
         {
@@ -112,6 +112,24 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // A soft dark edge around walkable built floors, so rooms read as shapes.
             for (int f = 0; f < FLOORS; f++) Outline(lFloors[f]);
 
+            // Beyond the outline there is nothing to read: the map's shape stands out against the void.
+            if (pMap.boundary != null && pMap.boundary.Length > 0)
+            {
+                int lN = pMap.boundary.Length;
+                float[] lReach = new float[lN];
+                for (int k = 0; k < lN; k++) lReach[k] = pMap.boundary[k].magnitude;
+                for (int z = 0; z < RES; z++)
+                    for (int x = 0; x < RES; x++)
+                    {
+                        float lX = lOrigin.x + (x + 0.5f) * lCell, lZ = lOrigin.z + (z + 0.5f) * lCell;
+                        float t = Mathf.Repeat(Mathf.Atan2(lZ, lX), Mathf.PI * 2f) / (Mathf.PI * 2f) * lN;
+                        int k = Mathf.FloorToInt(t) % lN;
+                        float lMax = Mathf.Lerp(lReach[k], lReach[(k + 1) % lN], t - Mathf.Floor(t));
+                        if (lX * lX + lZ * lZ <= lMax * lMax) continue;
+                        for (int f = 0; f < FLOORS; f++) lFloors[f][z * RES + x] = VOID;
+                    }
+            }
+
             string lFolder = EditorAssets.ROOT + "/Art/Generated/Plans";
             EditorAssets.EnsureFolder(lFolder);
             pMap.planFloors = new Texture2D[FLOORS];
@@ -131,6 +149,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lImporter.wrapMode = TextureWrapMode.Clamp;
                 lImporter.filterMode = FilterMode.Bilinear;
                 lImporter.textureCompression = TextureImporterCompression.CompressedHQ;
+                lImporter.maxTextureSize = RES;
                 lImporter.SaveAndReimport();
                 pMap.planFloors[f] = AssetDatabase.LoadAssetAtPath<Texture2D>(lPath);
             }

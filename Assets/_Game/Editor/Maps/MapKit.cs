@@ -1305,7 +1305,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             NavMeshSurface lSurface = Root.gameObject.AddComponent<NavMeshSurface>();
             lSurface.collectObjects = CollectObjects.All;
             lSurface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
-            lSurface.layerMask = (1 << GameLayers.DEFAULT) | (1 << GameLayers.INTERACTABLE) | (1 << GameLayers.CLIMBABLE);
+            lSurface.layerMask = (1 << GameLayers.DEFAULT) | (1 << GameLayers.INTERACTABLE);
             ConfigureAgent();
             lSurface.agentTypeID = NavMesh.GetSettingsByIndex(0).agentTypeID;
             // Two voxels per agent radius, so the 0.35 m radius is not rounded up to 0.5 m.
@@ -1315,6 +1315,31 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             string lPath = EditorAssets.SCENES + "/" + Map.sceneName + "_NavMesh.asset";
             AssetDatabase.DeleteAsset(lPath);
             AssetDatabase.CreateAsset(lSurface.navMeshData, lPath);
+            LadderLinks();
+        }
+
+        /// <summary>Guards use the ladders and pipes too: each climb with walkable ground at both ends gets a navigation link.</summary>
+        private void LadderLinks()
+        {
+            Physics.SyncTransforms();
+            int lLinks = 0;
+            foreach (BoxCollider lBox in Root.GetComponentsInChildren<BoxCollider>())
+            {
+                if (lBox.gameObject.layer != GameLayers.CLIMBABLE) continue;
+                Bounds b = lBox.bounds;
+                if (b.size.y < 1.5f) continue;
+                Vector3 lLow = new Vector3(b.center.x, b.min.y + 0.1f, b.center.z), lHigh = new Vector3(b.center.x, b.max.y - 0.2f, b.center.z);
+                if (!NavMesh.SamplePosition(lLow, out NavMeshHit lBottom, 2.2f, NavMesh.AllAreas) || !NavMesh.SamplePosition(lHigh, out NavMeshHit lTop, 2.2f, NavMesh.AllAreas)) continue;
+                if (lTop.position.y - lBottom.position.y < 1.2f) continue;
+                NavMeshLink lLink = lBox.gameObject.AddComponent<NavMeshLink>();
+                lLink.startPoint = lBox.transform.InverseTransformPoint(lBottom.position);
+                lLink.endPoint = lBox.transform.InverseTransformPoint(lTop.position);
+                lLink.width = 0.6f;
+                lLink.bidirectional = true;
+                lLink.agentTypeID = NavMesh.GetSettingsByIndex(0).agentTypeID;
+                lLinks++;
+            }
+            Debug.Log($"[Build] {Map.sceneName}: {lLinks} ladder links");
         }
 
         /// <summary>
@@ -1425,6 +1450,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (Land != null) MapPlanBaker.Bake(Map, Land, PlanStorey);
             Scene lScene = SceneManager.GetActiveScene();
             EditorSceneManager.SaveScene(lScene, _scenePath);
+            FlatArt.Build();
             AssetDatabase.SaveAssets();
             Debug.Log($"[Build] map {Map.displayName} saved to {_scenePath}");
         }

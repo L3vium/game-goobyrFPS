@@ -267,6 +267,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             Vector2 lInput = GameInput.Move;
             _regrabLock -= dt;
+            SafetyNet(dt);
             switch (Mode)
             {
                 case MotorMode.Walk: UpdateWalk(dt, lInput); break;
@@ -542,7 +543,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                     lAbove.y = pFeet.y + pMaxRise + 0.3f;
                     float lReach = pMaxRise + 0.3f - pMinRise + 0.1f;
                     if (!Physics.SphereCast(lAbove, 0.05f, Vector3.down, out RaycastHit lTop, lReach, LedgeMask, QueryTriggerInteraction.Ignore)) continue;
-                    if (lTop.normal.y < 0.7f) continue;
+                    if (lTop.normal.y < 0.55f) continue;
                     float lRise = lTop.point.y - pFeet.y;
                     if (lRise < pMinRise || lRise > pMaxRise) continue;
                     // Nothing as high a bit further in: a thin top.
@@ -770,6 +771,31 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         }
 
         // ---------------------------------------------------------------- climbables
+
+        // A last resort: a body with nothing under it at all is back where it last stood.
+        private Vector3 _lastSafe;
+        private bool _hasSafe;
+        private float _safeTimer, _voidTime;
+
+        private void SafetyNet(float dt)
+        {
+            _safeTimer -= dt;
+            if (Mode == MotorMode.Walk && Grounded && _safeTimer <= 0f)
+            {
+                _safeTimer = 0.5f;
+                _lastSafe = transform.position + Vector3.up * 0.1f;
+                _hasSafe = true;
+            }
+            if (Grounded || Mode != MotorMode.Walk || !_hasSafe) { _voidTime = 0f; return; }
+            if (Physics.Raycast(transform.position + Vector3.up, Vector3.down, 120f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore)) { _voidTime = 0f; return; }
+            _voidTime += dt;
+            if (_voidTime < 0.6f) return;
+            _voidTime = 0f;
+            _controller.enabled = false;
+            transform.position = _lastSafe;
+            _controller.enabled = true;
+            _velocity = Vector3.zero;
+        }
 
         private bool _crouchToggled;
         private float _climbStuck;

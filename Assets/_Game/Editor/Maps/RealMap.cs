@@ -98,6 +98,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Errands();
             K.AfterNavMesh = CrowdExits;
             TopUpThrowables(160);
+            TopUpWeapons(120);
             K.LandHoles(HoleAt);
             PlantTallGrass();
             Details();
@@ -289,22 +290,30 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     Vector2 p = new Vector2(x + (float)lRandom.NextDouble() * 5f, z + (float)lRandom.NextDouble() * 5f);
                     if (Built(p.x, p.y) || K.GroundAt(p.x, p.y) < WaterLevel + 0.8f || K.LandSlope(p.x, p.y) > 20f || !TallGrassAllowed(p.x, p.y)) continue;
                     float lToBuilt = DistanceToBuilt(p, 40f);
-                    if (lToBuilt < 5f || lToBuilt > 28f) continue;
-                    lCandidates.Add((p, 1f - Mathf.Abs(lToBuilt - 12f) / 20f + (float)lRandom.NextDouble() * 0.35f));
+                    if (lToBuilt < 3f) continue;
+                    lCandidates.Add((p, 1f - Mathf.Abs(lToBuilt - 10f) / 30f + (float)lRandom.NextDouble() * 0.5f));
                 }
             lCandidates.Sort((a, b) => b.score.CompareTo(a.score));
             List<Vector2> lPicked = new List<Vector2>();
             foreach ((Vector2 lPoint, float _) in lCandidates)
             {
-                if (lPicked.Count >= 12) break;
+                if (lPicked.Count >= 46) break;
                 bool lFar = true;
-                foreach (Vector2 lOther in lPicked) if ((lOther - lPoint).sqrMagnitude < 50f * 50f) { lFar = false; break; }
+                foreach (Vector2 lOther in lPicked) if ((lOther - lPoint).sqrMagnitude < 26f * 26f) { lFar = false; break; }
                 if (!lFar) continue;
-                float lRadius = Mathf.Min(8f + (float)lRandom.NextDouble() * 5f, DistanceToBuilt(lPoint, 20f) - 2f);
-                if (lRadius < 5.5f) continue;
+                float lRadius = Mathf.Min(8f + (float)lRandom.NextDouble() * 7f, DistanceToBuilt(lPoint, 20f) - 1f);
+                if (lRadius < 4f) continue;
                 lPicked.Add(lPoint);
                 K.TallGrassField(lPoint, lRadius);
             }
+        }
+
+        /// <summary>Nothing grows in front of or over a tunnel's ends.</summary>
+        private bool NearCaveMouth(float pX, float pZ)
+        {
+            foreach ((Vector3 a, Vector3 b, float _, float _) in _caveHoles)
+                if (new Vector2(pX - a.x, pZ - a.z).sqrMagnitude < 64f || new Vector2(pX - b.x, pZ - b.z).sqrMagnitude < 64f) return true;
+            return false;
         }
 
         private float DistanceToBuilt(Vector2 pPoint, float pMax)
@@ -326,7 +335,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (float z = -HALF + 2f; z < HALF - 2f; z += 3.2f)
                 {
                     float px = x + (float)lRandom.NextDouble() * 2.8f, pz = z + (float)lRandom.NextDouble() * 2.8f;
-                    if (Built(px, pz) || K.InTallGrass(px, pz, 1.5f)) continue;
+                    if (Built(px, pz) || K.InTallGrass(px, pz, 1.5f) || NearCaveMouth(px, pz)) continue;
                     float h = K.GroundAt(px, pz);
                     if (h < WaterLevel + 0.5f) continue;
                     float lSlope = K.LandSlope(px, pz);
@@ -706,11 +715,45 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 if (!Physics.Raycast(p, Vector3.down, out RaycastHit lHit, 3f, ~0, QueryTriggerInteraction.Ignore) || lHit.normal.y < 0.85f) continue;
                 Vector3 lSpot = lHit.point + Vector3.up * 0.05f;
                 if (Physics.CheckSphere(lSpot + Vector3.up * 0.4f, 0.3f, ~0, QueryTriggerInteraction.Ignore)) continue;
-                A.Throwable(lSpot);
+                // Under a roof, nothing that belongs outdoors.
+                if (Physics.Raycast(lSpot + Vector3.up * 0.2f, Vector3.up, 12f, ~0, QueryTriggerInteraction.Ignore)) A.ThrowableIndoors(lSpot);
+                else A.Throwable(lSpot);
                 lCount++;
                 lAdded++;
             }
             Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} throwables added beside posts ({lCount} in all)");
+        }
+
+        /// <summary>
+        /// Plenty to fight with: guns beside the posts and the patrol stops until the map holds
+        /// <paramref name="pTarget"/>, a good share of them outdoors in plain sight.
+        /// </summary>
+        private void TopUpWeapons(int pTarget)
+        {
+            Physics.SyncTransforms();
+            int lCount = 0;
+            foreach (MatchPoint p in K.Markers.GetComponentsInChildren<MatchPoint>()) if (p.PointKind == MatchPoint.Kind.WeaponSpawn) lCount++;
+            List<Vector3> lPosts = new List<Vector3>();
+            foreach (NpcSpawnPoint s in K.Markers.GetComponentsInChildren<NpcSpawnPoint>()) lPosts.Add(s.transform.position);
+            foreach (PatrolRoute r in K.Markers.GetComponentsInChildren<PatrolRoute>()) foreach (Transform t in r.transform) lPosts.Add(t.position);
+            if (lPosts.Count == 0) return;
+            Data.ItemKind[] lGuns = { Data.ItemKind.Pistol, Data.ItemKind.Smg, Data.ItemKind.Pistol, Data.ItemKind.Shotgun, Data.ItemKind.SilencedPistol, Data.ItemKind.Smg, Data.ItemKind.Sniper };
+            System.Random lRandom = new System.Random(K.Map.sceneName.GetHashCode() ^ 0x51a);
+            int lAdded = 0;
+            for (int k = 0; k < lPosts.Count * 8 && lCount < pTarget; k++)
+            {
+                Vector3 lPost = lPosts[lRandom.Next(lPosts.Count)];
+                float a = (float)lRandom.NextDouble() * Mathf.PI * 2f, d = 3f + (float)lRandom.NextDouble() * 5f;
+                Vector3 p = lPost + new Vector3(Mathf.Cos(a) * d, 1.2f, Mathf.Sin(a) * d);
+                if (Physics.Linecast(lPost + Vector3.up * 1.2f, p, ~0, QueryTriggerInteraction.Ignore)) continue;
+                if (!Physics.Raycast(p, Vector3.down, out RaycastHit lHit, 3f, ~0, QueryTriggerInteraction.Ignore) || lHit.normal.y < 0.85f) continue;
+                Vector3 lSpot = lHit.point + Vector3.up * 0.05f;
+                if (Physics.CheckSphere(lSpot + Vector3.up * 0.4f, 0.3f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                K.Weapon(lGuns[lCount % lGuns.Length], lSpot);
+                lCount++;
+                lAdded++;
+            }
+            Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} guns added beside posts ({lCount} in all)");
         }
 
         /// <summary>The rock texture of the cliff skin (box-projected, so it never stretches down a wall).</summary>
@@ -975,16 +1018,51 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (lAdded > 0) Debug.Log($"[Build] {K.Map.sceneName}: {lAdded} lone guards paired");
         }
 
+        /// <summary>
+        /// The edge of the map: a rounded, uneven outline, wide enough to hold every marker, walled by
+        /// invisible boxes along it and kept on the map definition for the plan and the room's picture.
+        /// The land's relief carries on beyond it.
+        /// </summary>
         private void Edges()
         {
-            for (int s = 0; s < 4; s++)
+            const int N = 128;
+            float[] lRadius = new float[N];
+            float lSeed = K.Map.sceneName.GetHashCode() % 1000 * 0.1f;
+            for (int i = 0; i < N; i++)
             {
-                Vector3 lPos = s switch { 0 => new Vector3(0, 40, -HALF + 1f), 1 => new Vector3(HALF - 1f, 40, 0), 2 => new Vector3(0, 40, HALF - 1f), _ => new Vector3(-HALF + 1f, 40, 0) };
-                Vector3 lSize = s % 2 == 0 ? new Vector3(SIZE, 200, 2) : new Vector3(2, 200, SIZE);
+                float a = i * Mathf.PI * 2f / N, c = Mathf.Abs(Mathf.Cos(a)), s = Mathf.Abs(Mathf.Sin(a));
+                float lRound = Mathf.Pow(Mathf.Pow(c, 3.4f) + Mathf.Pow(s, 3.4f), -1f / 3.4f);
+                float lNoise = Mathf.PerlinNoise(Mathf.Cos(a) * 1.7f + lSeed, Mathf.Sin(a) * 1.7f + lSeed);
+                lRadius[i] = (HALF - 6f) * lRound * Mathf.Lerp(0.8f, 1f, lNoise);
+            }
+            // Everything placed stays inside.
+            foreach (Transform t in K.Markers.GetComponentsInChildren<Transform>())
+            {
+                Vector2 p = new Vector2(t.position.x, t.position.z);
+                int i = Mathf.RoundToInt(Mathf.Repeat(Mathf.Atan2(p.y, p.x), Mathf.PI * 2f) / (Mathf.PI * 2f) * N) % N;
+                lRadius[i] = Mathf.Max(lRadius[i], p.magnitude + 8f);
+            }
+            for (int pass = 0; pass < 2; pass++)
+                for (int i = 0; i < N; i++) lRadius[i] = Mathf.Max(lRadius[i], (lRadius[(i + 1) % N] + lRadius[(i + N - 1) % N]) * 0.5f - 2f);
+
+            Vector2[] lOutline = new Vector2[N];
+            for (int i = 0; i < N; i++)
+            {
+                float a = i * Mathf.PI * 2f / N;
+                Vector2 p = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * lRadius[i];
+                lOutline[i] = new Vector2(Mathf.Clamp(p.x, -HALF + 1f, HALF - 1f), Mathf.Clamp(p.y, -HALF + 1f, HALF - 1f));
+            }
+            K.Map.boundary = lOutline;
+            UnityEditor.EditorUtility.SetDirty(K.Map);
+            for (int i = 0; i < N; i++)
+            {
+                Vector2 a = lOutline[i], b = lOutline[(i + 1) % N];
+                Vector2 lMid = (a + b) * 0.5f, lDir = b - a;
                 GameObject lEdge = new GameObject("MapEdge");
                 lEdge.transform.SetParent(K.Markers, false);
-                lEdge.transform.position = lPos;
-                lEdge.AddComponent<BoxCollider>().size = lSize;
+                lEdge.transform.position = new Vector3(lMid.x, 40f, lMid.y);
+                lEdge.transform.rotation = Quaternion.LookRotation(new Vector3(lDir.x, 0f, lDir.y));
+                lEdge.AddComponent<BoxCollider>().size = new Vector3(2f, 400f, lDir.magnitude + 1f);
             }
         }
 
@@ -1025,7 +1103,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 for (int k = 0; k < N; k++)
                 {
                     float a = k * Mathf.PI * 2f / N;
-                    float n = 1f + (Mathf.PerlinNoise(i * 0.31f + k * 0.17f, k * 0.53f) - 0.5f) * 0.45f * lNoise;
+                    float n = 1f + (Mathf.PerlinNoise(i * 0.31f + k * 0.17f, k * 0.53f) - 0.5f) * 0.18f * lNoise;
                     Vector3 lOffset = lRight * Mathf.Cos(a) * pWidth * 0.5f * n * lWiden + Vector3.up * (Mathf.Sin(a) * pHeight * 0.5f * n + pHeight * 0.5f);
                     Vector3 p = lPoints[i] + lOffset;
                     if (p.y < lPoints[i].y) p.y = lPoints[i].y;
@@ -1069,6 +1147,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lHolder.transform.position = lLamp;
                 lBulb.Flush(lHolder.transform, "Arch_CaveLantern");
             }
+            // Wherever the tube runs too close under the surface, the land opens for it: no terrain in the way.
+            for (int i = 1; i < lPoints.Count - 1; i++)
+            {
+                if (K.GroundAt(lPoints[i].x, lPoints[i].z) < lPoints[i].y + pHeight + 0.6f)
+                    CaveHole(lPoints[i], lPoints[i + 1], pWidth * 0.55f, pHeight);
+            }
             CaveHole(pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth * 0.48f, pHeight);
             CaveHole(pPath[pPath.Length - 1], pPath[Mathf.Max(0, pPath.Length - 2)], pWidth * 0.48f, pHeight);
             Mouth(lRoot, pName + "_A", pPath[0], pPath[Mathf.Min(1, pPath.Length - 1)], pWidth, pHeight);
@@ -1111,8 +1195,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (float s in new[] { -1f, 1f })
                 for (int k = 0; k < 2; k++)
                 {
-                    Vector3 p = pEnd + lSide * s * (pWidth * 0.5f + 1.6f + k * 1.8f) + lIn * (0.5f + k * 1.2f);
-                    K.LandTree(CliffRock(r), p.x, p.z, 2.2f + (float)r.NextDouble() * 1.6f);
+                    // Far enough out that even the biggest one leaves the way clear.
+                    Vector3 p = pEnd + lSide * s * (pWidth * 0.5f + 3.2f + k * 2.2f) + lIn * (0.5f + k * 1.2f);
+                    K.LandTree(CliffRock(r), p.x, p.z, 1.8f + (float)r.NextDouble() * 1.0f);
                 }
         }
 

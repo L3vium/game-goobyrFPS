@@ -85,7 +85,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             // brighter tints keep their hue and are scaled down.
             float lMax = Mathf.Max(pTint.r, Mathf.Max(pTint.g, pTint.b));
             if (lMax > 1.15f) pTint = new Color(pTint.r * 1.15f / lMax, pTint.g * 1.15f / lMax, pTint.b * 1.15f / lMax, pTint.a);
-            lMaterial.SetColor("_BaseColor", pTint);
+            // The base is a flat colour: the tint multiplies it.
+            lMaterial.SetColor("_BaseColor", lBase.GetColor("_BaseColor") * pTint);
             EditorUtility.SetDirty(lMaterial);
             return lMaterial;
         }
@@ -102,17 +103,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lLayer = new TerrainLayer();
                 AssetDatabase.CreateAsset(lLayer, lPath);
             }
-            lLayer.diffuseTexture = lSurface.GetTexture("_BaseMap") as Texture2D;
-            lLayer.normalMapTexture = lSurface.GetTexture("_BumpMap") as Texture2D;
-            lLayer.maskMapTexture = lSurface.GetTexture("_MetallicGlossMap") as Texture2D;
+            // The surface's material is a flat colour by now: its photograph gives the layer its own.
+            string lDiff = Find($"{ROOT}/Textures/{pId}", pId, "diff");
+            lLayer.diffuseTexture = lDiff != null ? AssetDatabase.LoadAssetAtPath<Texture2D>(lDiff) : null;
             lLayer.normalScale = 1f;
             lLayer.tileSize = new Vector2(pTile, pTile);
-            lLayer.smoothness = 1f;
-            lLayer.metallic = 0f;
-            // Mask map packs metal, occlusion and smoothness; no height (B = 0).
             lLayer.maskMapRemapMin = Vector4.zero;
             lLayer.maskMapRemapMax = Vector4.one;
             EditorUtility.SetDirty(lLayer);
+            FlatArt.Apply(lLayer);
             return lLayer;
         }
 
@@ -307,7 +306,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         public static void Foliage(Material pMaterial, float pBend)
         {
             Shader lFoliage = Shader.Find("Goobyr/Foliage");
-            if (pMaterial == null || lFoliage == null) return;
+            if (pMaterial == null || lFoliage == null || pMaterial.shader.name == FlatArt.SHADER) return;
             // Cutout (leaves, fronds, cards) or solid (bark, stems), whatever shader it had before.
             bool lLeaf = pMaterial.shader == lFoliage ? pMaterial.IsKeywordEnabled("_ALPHATEST_ON") : pMaterial.HasProperty("_AlphaClip") && pMaterial.GetFloat("_AlphaClip") > 0.5f;
             bool lCard = pMaterial.name.ToLowerInvariant().EndsWith("_card");
@@ -443,6 +442,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             ApplyKind(lMaterial, pKind);
             lMaterial.enableInstancing = true;
             EditorUtility.SetDirty(lMaterial);
+            FlatArt.Apply(lMaterial);
             return lMaterial;
         }
 
@@ -490,6 +490,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             string lFbx = $"{Unix(pDir)}/{lAsset}.fbx";
             if (!File.Exists(lFbx)) lFbx = Directory.GetFiles(pDir, "*.fbx").Select(Unix).FirstOrDefault();
             if (lFbx == null) return false;
+            if (FlatArt.RemapFlat(lFbx)) return true;
             ModelImporter lImporter = AssetImporter.GetAtPath(lFbx) as ModelImporter;
             if (lImporter == null) return false;
 

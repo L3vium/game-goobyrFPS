@@ -23,10 +23,10 @@ namespace Com.IsartDigital.GoobyrFPS.Core
         public const int TRIGGER = 17;
 
         /// <summary>What a bullet stops on: world, characters, props you can hit.</summary>
-        public static readonly int ShotMask = (1 << DEFAULT) | (1 << PLAYER) | (1 << NPC) | (1 << INTERACTABLE) | (1 << CLIMBABLE) | (1 << RAGDOLL);
+        public static readonly int ShotMask = (1 << DEFAULT) | (1 << PLAYER) | (1 << NPC) | (1 << INTERACTABLE) | (1 << RAGDOLL);
 
         /// <summary>What blocks a line of sight (smoke and grass are handled by the perception, not by raycasts).</summary>
-        public static readonly int SightBlockMask = (1 << DEFAULT) | (1 << INTERACTABLE) | (1 << CLIMBABLE);
+        public static readonly int SightBlockMask = (1 << DEFAULT) | (1 << INTERACTABLE);
 
         /// <summary>What the character controller walks on and bumps into.</summary>
         public static readonly int WorldMask = (1 << DEFAULT) | (1 << INTERACTABLE) | (1 << CLIMBABLE);

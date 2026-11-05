@@ -64,13 +64,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Gateway(G(x, -105.5f, 0f), 0f, 5.6f, 6.4f, null);
             }
             // Tea house: the storyteller's brazier (rigged canister), drinks, the back room wardrobe.
-            A.Explosive(_teaR.InRoom("TeaRoom", 0.5f, 0.5f, 0f), 0f, true);
             A.Model("Furn_DiningTable", _teaR.InRoom("TeaRoom", 0.3f, 0.6f, 0f), _teaHouse.yaw, _teaR.interior);
             A.Drinks(_teaR.InRoom("TeaRoom", 0.3f, 0.6f, 0.77f), _teaHouse.yaw, ZONE_TOWN, 3, true, 1.2f);
             A.Distraction("radio", _teaR.InRoom("TeaKitchen", 0.5f, 0.9f, 0f), _teaHouse.yaw);
             A.Wardrobe(_teaR.InRoom("TeaBackRoom", 0.9f, 0.8f, 0f), _teaHouse.yaw + 180f, _teaR.interior);
             // Caravanserai: fuel drums, crates, the stable, a phone.
-            for (int i = 0; i < 4; i++) A.Explosive(_seraiR.At(9f + i * 0.7f, 0, 22f, 0f), i * 30f);
             A.CrateStack(_seraiR.At(20f, 0, 9f, 0f), 0f, 4);
             A.BigCrate(_seraiR.At(15f, 0, 27.6f, 0f), 180f);
             A.Distraction("phone", _seraiR.At(27.5f, 0, 15f, 0.8f), -90f);
@@ -132,7 +130,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lPressObject.transform.SetParent(A.Systems, false);
             lPressObject.transform.position = _screwPress;
             foreach (GameObject lPart in lPress.Flush(lPressObject.transform, "Qasr_ScrewPress", Core.GameLayers.INTERACTABLE)) { lPart.isStatic = false; lPart.transform.position -= _screwPress; }
-            A.Explosive(_screwPress + new Vector3(2.4f, 0, -1.6f), 0f, true);
             K.Activity(ActivityType.Inspect, _screwPress + new Vector3(0, 0.05f, -2f), 0f, ZONE_GROVE, 30f);
             A.Model("Furn_Desk", _pressR.InRoom("PressOffice", 0.5f, 0.5f, 0f), _press.yaw, _pressR.interior);
             A.Gadget(ItemKind.CodeNote, _pressR.InRoom("PressOffice", 0.5f, 0.5f, 0.82f), "Tithe ledger (vault code)");

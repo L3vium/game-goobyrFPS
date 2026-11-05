@@ -7,14 +7,14 @@ TerrainLayer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Map_SanLazaro_Turf_DryGrass
-  m_DiffuseTexture: {fileID: 2800000, guid: 7af845812e0dc274a881c2ae036c78d5, type: 3}
-  m_NormalMapTexture: {fileID: 2800000, guid: 5ef782d7e8c9cfe40b15cffe7a1cb1ca, type: 3}
-  m_MaskMapTexture: {fileID: 2800000, guid: b11bea53721d4dd468862d0416a55337, type: 3}
+  m_DiffuseTexture: {fileID: 2800000, guid: 89f1bce378f637441933b9508321a2f7, type: 3}
+  m_NormalMapTexture: {fileID: 0}
+  m_MaskMapTexture: {fileID: 0}
   m_TileSize: {x: 5, y: 5}
   m_TileOffset: {x: 0, y: 0}
   m_Specular: {r: 0, g: 0, b: 0, a: 0}
   m_Metallic: 0
-  m_Smoothness: 1
+  m_Smoothness: 0
   m_NormalScale: 1
   m_DiffuseRemapMin: {x: 0, y: 0, z: 0, w: 0}
   m_DiffuseRemapMax: {x: 1, y: 1, z: 1, w: 1}

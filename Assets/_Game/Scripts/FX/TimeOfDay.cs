@@ -66,6 +66,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public static TimeOfDay Instance { get; private set; }
         public int Current { get; private set; } = -1;
         public Biome MapBiome => _biome;
+        /// <summary>The camera has a roof over it and walls around it.</summary>
+        public bool Indoors { get; private set; }
 
         private Material _skyInstance;
         private Volume _volume;
@@ -212,7 +214,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             if (lRoof)
                 foreach (Vector3 d in new[] { Vector3.forward, Vector3.back, Vector3.left, Vector3.right })
                     if (Physics.Raycast(p, d, 18f, Core.GameLayers.WorldMask, QueryTriggerInteraction.Ignore)) lWalls++;
-            _indoor = Mathf.MoveTowards(_indoor, lRoof && lWalls >= 3 ? 0.3f : 1f, Time.deltaTime * 1.5f);
+            Indoors = lRoof && lWalls >= 3;
+            // Barely less than outdoors: walking into a building is never walking into the dark.
+            _indoor = Mathf.MoveTowards(_indoor, lRoof && lWalls >= 3 ? 0.9f : 1f, Time.deltaTime * 1.5f);
             if (Mathf.Abs(_indoor - _appliedIndoor) < 0.05f && !(_indoor == 1f && _appliedIndoor != 1f)) return;
             _appliedIndoor = _indoor;
             RenderSettings.ambientIntensity = _ambient * _indoor;
@@ -309,7 +313,53 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                     break;
             }
             Grade(pBiome, lPresets);
+            Stylise(pBiome, lPresets);
             return lPresets;
+        }
+
+        /// <summary>The flat look's skies and grade: pastel, airy, soft contrast; the sun's strength no longer sets the exposure.</summary>
+        private static void Stylise(Biome pBiome, TimePreset[] pPresets)
+        {
+            for (int i = 0; i < pPresets.Length; i++)
+            {
+                TimePreset p = pPresets[i];
+                p.saturation = i == 3 ? 6f : 8f;
+                p.contrast = -4f;
+                p.temperature *= 0.4f;
+                p.tint = 0f;
+                p.shadows = Color.white;
+                p.highlights = Color.white;
+                p.exposure = i == 3 ? 0.35f : 0f;
+                // Barely any haze, and a sun that lights the terrain and the grass as gently as the flat shader.
+                p.fogDensity *= 0.1f;
+                p.fogAmbient = Color.Lerp(p.fogAmbient, Color.white, 0.5f);
+                p.sunIntensity = i == 3 ? 0.65f : 1.1f;
+                p.cloudCoverage = Mathf.Min(p.cloudCoverage, 0.38f);
+                p.ambient = i == 3 ? 1.5f : 1.15f;
+                if (i == 1)
+                {
+                    p.zenith = pBiome == Biome.Desert ? new Color(0.44f, 0.72f, 0.86f) : pBiome == Biome.Jungle ? new Color(0.4f, 0.76f, 0.8f) : new Color(0.5f, 0.76f, 0.88f);
+                    p.horizon = pBiome == Biome.Desert ? new Color(0.95f, 0.9f, 0.76f) : new Color(0.86f, 0.95f, 0.93f);
+                    p.haze = Color.Lerp(p.horizon, Color.white, 0.4f);
+                }
+                else if (i == 2)
+                {
+                    p.zenith = new Color(0.56f, 0.56f, 0.72f);
+                    p.horizon = new Color(1f, 0.78f, 0.56f);
+                    p.haze = new Color(1f, 0.82f, 0.6f);
+                    p.sunColor = new Color(1f, 0.74f, 0.5f);
+                }
+                else if (i == 3)
+                {
+                    p.zenith = new Color(0.08f, 0.13f, 0.3f);
+                    p.horizon = new Color(0.2f, 0.3f, 0.5f);
+                    p.haze = new Color(0.3f, 0.4f, 0.62f);
+                    p.sunColor = new Color(0.7f, 0.8f, 1f);
+                }
+                p.cloudLit = Color.Lerp(Color.white, p.sunColor, 0.3f);
+                p.cloudShade = Color.Lerp(p.zenith, p.horizon, 0.6f);
+                pPresets[i] = p;
+            }
         }
 
         /// <summary>The colour grade and the wind of each preset: the biome's identity, nudged per hour.</summary>

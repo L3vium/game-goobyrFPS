@@ -23,7 +23,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     {
         private enum Screen { Main, Lobby, Settings }
 
-        private const string VERSION = "0.8.1";
+        private const string VERSION = "0.9.0";
         private static readonly Vector2 TL = new Vector2(0, 1);
         private static readonly Color Navy = new Color(0.1f, 0.11f, 0.17f, 1f);
         private static readonly Color Slate = new Color(1f, 1f, 1f, 0.05f);

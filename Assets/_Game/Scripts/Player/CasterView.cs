@@ -457,19 +457,19 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
             if (lKeys != null)
             {
-                if (lKeys.f1Key.wasPressedThisFrame) SetMode(CasterMode.Switch);
-                if (lKeys.f2Key.wasPressedThisFrame) SetMode(CasterMode.Multi);
-                if (lKeys.f3Key.wasPressedThisFrame) SetMode(CasterMode.Fly);
-                if (lKeys.tabKey.wasPressedThisFrame) StepSelection(lShift ? -1 : 1);
+                if (GameInput.CasterModeSwitch) SetMode(CasterMode.Switch);
+                if (GameInput.CasterModeMulti) SetMode(CasterMode.Multi);
+                if (GameInput.CasterModeFly) SetMode(CasterMode.Fly);
+                if (GameInput.CasterNext) StepSelection(lShift ? -1 : 1);
                 for (int i = 0; i < 8; i++)
                     if (lKeys[Key.Digit1 + i].wasPressedThisFrame || lKeys[Key.Numpad1 + i].wasPressedThisFrame) AssignIndex(i);
                 if (lKeys.leftArrowKey.wasPressedThisFrame) Cycle(-1);
                 if (lKeys.rightArrowKey.wasPressedThisFrame) Cycle(1);
                 if (lKeys.upArrowKey.wasPressedThisFrame) StepSelection(-1);
                 if (lKeys.downArrowKey.wasPressedThisFrame) StepSelection(1);
-                if (lKeys.vKey.wasPressedThisFrame) ToggleEyes();
-                if (lKeys.hKey.wasPressedThisFrame) Clean = !Clean;
-                if (lKeys.rKey.wasPressedThisFrame) ResetCamera(_feeds[Selected]);
+                if (GameInput.CasterEyes) ToggleEyes();
+                if (GameInput.CasterClean) Clean = !Clean;
+                if (GameInput.CasterReset) ResetCamera(_feeds[Selected]);
             }
 
             if (lPad != null)
@@ -533,6 +533,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         private Vector2 LookInput()
         {
             Vector2 lLook = Vector2.zero;
+            // A menu or the end screen over the view: the mouse belongs to them, the camera stays still.
+            if (PauseMenu.IsOpen || EndScreen.IsShown) return Vector2.zero;
             if ((_dragging || Mode == CasterMode.Fly) && Mouse.current != null) lLook += Mouse.current.delta.ReadValue() * 0.12f * GameInput.MouseSensitivity;
             if (Gamepad.current != null) lLook += Gamepad.current.rightStick.ReadValue() * 140f * Time.unscaledDeltaTime;
             return lLook;
@@ -697,15 +699,31 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 bool lCanMove = !PauseMenu.IsOpen && !EndScreen.IsBlocking;
                 Vector2 lMove = lCanMove ? GameInput.MoveAlways : Vector2.zero;
                 float lRise = 0f;
-                if (lKeys != null && lCanMove) lRise += (lKeys.spaceKey.isPressed || lKeys.eKey.isPressed ? 1f : 0f) - (lKeys.leftCtrlKey.isPressed || lKeys.qKey.isPressed ? 1f : 0f);
+                if (lCanMove) lRise += GameInput.CasterRise;
                 if (lPad != null) lRise += lPad.rightTrigger.ReadValue() - lPad.leftTrigger.ReadValue();
-                float lSpeed = pFeed.freeSpeed * (lKeys != null && lKeys.leftShiftKey.isPressed ? 3f : 1f);
+                float lSpeed = pFeed.freeSpeed * (GameInput.CasterFast ? 3f : 1f);
                 Quaternion lYaw = Quaternion.Euler(0f, pFeed.freeYaw, 0f);
                 Quaternion lView = Quaternion.Euler(pFeed.freePitch, pFeed.freeYaw, 0f);
                 Vector3 lVelocity = (lView * Vector3.forward * lMove.y + lYaw * Vector3.right * lMove.x + Vector3.up * Mathf.Clamp(lRise, -1f, 1f)) * lSpeed;
-                lCamera.position += lVelocity * dt;
+                lCamera.position = FlyStep(lCamera.position, lVelocity * dt);
             }
             lCamera.rotation = Quaternion.Slerp(lCamera.rotation, Quaternion.Euler(pFeed.freePitch, pFeed.freeYaw, 0f), 1f - Mathf.Exp(-20f * dt));
+        }
+
+        /// <summary>The free camera stops on the world and slides along it: never through the ground, never under the map.</summary>
+        private static Vector3 FlyStep(Vector3 pFrom, Vector3 pStep)
+        {
+            const float RADIUS = 0.35f;
+            for (int i = 0; i < 3 && pStep.sqrMagnitude > 0.000001f; i++)
+            {
+                float lLength = pStep.magnitude;
+                Vector3 lDir = pStep / lLength;
+                if (!Physics.SphereCast(pFrom, RADIUS, lDir, out RaycastHit lHit, lLength + 0.02f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore)) return pFrom + pStep;
+                float lGo = Mathf.Max(0f, lHit.distance - 0.02f);
+                pFrom += lDir * lGo;
+                pStep = Vector3.ProjectOnPlane(lDir * (lLength - lGo), lHit.normal);
+            }
+            return pFrom;
         }
 
         // ---------------------------------------------------------------- through the eyes

@@ -22,6 +22,8 @@ namespace Com.IsartDigital.GoobyrFPS.World
 
         public static RoomProbes Instance { get; private set; }
         public int Count => _probes.Count;
+        /// <summary>The first capture of the whole map is over (the loading screen waits for it).</summary>
+        public bool Captured { get; private set; }
 
         private readonly List<ReflectionProbe> _probes = new List<ReflectionProbe>();
         private Coroutine _rendering;
@@ -58,6 +60,7 @@ namespace Com.IsartDigital.GoobyrFPS.World
                 if (i % 2 == 1) yield return null;
             }
             _rendering = null;
+            Captured = true;
         }
 
         /// <summary>Creates the probes (once per map; again only if called again).</summary>

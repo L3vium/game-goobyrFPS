@@ -1,4 +1,5 @@
 using Com.IsartDigital.GoobyrFPS.FX;
+using Com.IsartDigital.GoobyrFPS.Core;
 using UnityEngine;
 
 // Author : Baptiste Vu Liem
@@ -50,6 +51,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             }
             _orbit += Time.deltaTime * 20f;
             Vector3 lFrom = _deathPoint + Quaternion.Euler(0, _orbit, 0) * new Vector3(0, 2.5f, -4.5f) + Vector3.up * (DEATH_CAM - _deathTimer) * 1.6f;
+            // The orbit stays on this side of walls and above the ground.
+            Vector3 lBack = lFrom - _deathPoint;
+            if (Physics.SphereCast(_deathPoint, 0.25f, lBack.normalized, out RaycastHit lHit, lBack.magnitude, GameLayers.WorldMask, QueryTriggerInteraction.Ignore))
+                lFrom = _deathPoint + lBack.normalized * Mathf.Max(0.3f, lHit.distance - 0.05f);
             lRig.SetPose(lFrom, Quaternion.LookRotation(_deathPoint - lFrom));
         }
     }

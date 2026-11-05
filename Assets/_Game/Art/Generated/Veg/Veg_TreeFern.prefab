@@ -102,6 +102,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7568134203411435257}
   - component: {fileID: 8947445909270108475}
+  - component: {fileID: 3082833144399319540}
   m_Layer: 0
   m_Name: Veg_TreeFern
   m_TagString: Untagged
@@ -148,3 +149,23 @@ CapsuleCollider:
   m_Height: 4.0029745
   m_Direction: 1
   m_Center: {x: 0, y: 2.0014873, z: 0}
+--- !u!205 &3082833144399319540
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7518849140416115571}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: 0, y: 1.5366247, z: -0.00000023841858}
+  m_Size: 4.2
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.004
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 8336455168719971754}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0

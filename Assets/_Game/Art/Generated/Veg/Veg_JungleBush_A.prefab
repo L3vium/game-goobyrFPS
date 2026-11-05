@@ -100,6 +100,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1362999708974527279}
+  - component: {fileID: 5324553737548235618}
   m_Layer: 0
   m_Name: Veg_JungleBush_A
   m_TagString: Untagged
@@ -123,3 +124,23 @@ Transform:
   - {fileID: 1378414803844382710}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!205 &5324553737548235618
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3789706564174680314}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: 0.13364935, y: 0.6684732, z: -0.107055664}
+  m_Size: 2.9215412
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.012
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 4399989335147760036}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0

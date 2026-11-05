@@ -101,6 +101,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6556351625928791331}
   - component: {fileID: 8786318686948866990}
+  - component: {fileID: 1826954750610832799}
   m_Layer: 0
   m_Name: Veg_Ceiba
   m_TagString: Untagged
@@ -147,3 +148,23 @@ CapsuleCollider:
   m_Height: 8
   m_Direction: 1
   m_Center: {x: 0, y: 4, z: 0}
+--- !u!205 &1826954750610832799
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8634257222292547696}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: 0.084300995, y: 9.604583, z: 0.07485962}
+  m_Size: 20.368929
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.004
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 5233212965417937171}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0

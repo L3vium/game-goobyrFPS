@@ -102,6 +102,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5110671772351884972}
   - component: {fileID: 3959818966382626701}
+  - component: {fileID: 5148646354866795377}
   m_Layer: 0
   m_Name: Veg_Fir_Snowy_Large
   m_TagString: Untagged
@@ -148,3 +149,23 @@ CapsuleCollider:
   m_Height: 6.629509
   m_Direction: 1
   m_Center: {x: 0, y: 3.3147545, z: 0}
+--- !u!205 &5148646354866795377
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6734353122350769313}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: 0.16835308, y: 6.8499985, z: -0.0000009536743}
+  m_Size: 14.299997
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.004
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 2139742250940512948}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0

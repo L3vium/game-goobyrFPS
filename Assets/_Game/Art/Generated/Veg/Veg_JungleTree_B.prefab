@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7029636815403664313}
   - component: {fileID: 8255017716903125662}
+  - component: {fileID: 8865066123704114900}
   m_Layer: 0
   m_Name: Veg_JungleTree_B
   m_TagString: Untagged
@@ -56,6 +57,26 @@ CapsuleCollider:
   m_Height: 8
   m_Direction: 1
   m_Center: {x: 0, y: 4, z: 0}
+--- !u!205 &8865066123704114900
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6767144835763370031}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: -0.035943985, y: 7.95193, z: -0.7324171}
+  m_Size: 16.503862
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.004
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 3331659340808741390}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0
 --- !u!1 &8486790461447081727
 GameObject:
   m_ObjectHideFlags: 0

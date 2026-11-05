@@ -100,6 +100,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3235926346607088972}
   - component: {fileID: 1104651266602899272}
+  - component: {fileID: 2863768567551242688}
   m_Layer: 0
   m_Name: Veg_Rock_B
   m_TagString: Untagged
@@ -144,3 +145,23 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2.091487, y: 1.9317387, z: 1.459963}
   m_Center: {x: -0.15144932, y: -0.038411736, z: 0.523228}
+--- !u!205 &2863768567551242688
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 744141703173878003}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: -0.15144932, y: 0.523228, z: 0.038411617}
+  m_Size: 2.4605727
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.012
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 7651505542379235014}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0

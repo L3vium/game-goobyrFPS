@@ -46,7 +46,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lCamera.clearFlags = CameraClearFlags.Skybox;
             lCamera.GetUniversalAdditionalCameraData().renderPostProcessing = true;
             lRig.transform.position = lFrom;
-            lRig.transform.rotation = Quaternion.LookRotation(lLook - lFrom);
+            // Nearly level, tipped up just enough: the agent stays in frame, the sky fills the top.
+            Vector3 lAim = Vector3.ProjectOnPlane(lLook - lFrom, Vector3.up).normalized;
+            lRig.transform.rotation = Quaternion.LookRotation(lAim + Vector3.up * 0.1f);
 
             GameObject lAgent = Agent(lRig.transform, pLand);
             RenderTexture lTarget = new RenderTexture(WIDTH, HEIGHT, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
@@ -93,18 +95,23 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             {
                 if (lPoi.Type != MapPoi.Kind.Landmark) continue;
                 Vector3 lAt = lPoi.transform.position + Vector3.up * 4f;
-                for (int d = 0; d < 12; d++)
-                {
-                    float a = d * Mathf.PI / 6f;
-                    Vector3 lSpot = lAt + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * 34f;
-                    lSpot.y = pLand.SampleHeight(lSpot) + pLand.transform.position.y + 2.4f;
-                    if (Physics.Linecast(lSpot, lAt, ~0, QueryTriggerInteraction.Ignore)) continue;
-                    if (Physics.CheckSphere(lSpot, 1.5f, ~0, QueryTriggerInteraction.Ignore)) continue;
-                    // The more of a building fills the frame around the landmark, the better the picture.
-                    int lScore = 0;
-                    foreach (MapPoi lOther in lPois) if (Vector3.Distance(lOther.transform.position, lAt) < 26f) lScore++;
-                    if (lScore > lBestScore) { lBestScore = lScore; lBest = lAt; lBestFrom = lSpot; }
-                }
+                // From afar first: the whole building and some sky, an open patch of level ground to stand on.
+                foreach (float lDistance in new[] { 75f, 55f, 38f })
+                    for (int d = 0; d < 12; d++)
+                    {
+                        float a = d * Mathf.PI / 6f;
+                        Vector3 lGround = lAt + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * lDistance;
+                        lGround.y = pLand.SampleHeight(lGround) + pLand.transform.position.y;
+                        Vector3 lSpot = lGround + Vector3.up * 1.55f;
+                        if (Physics.Linecast(lSpot, lAt, ~0, QueryTriggerInteraction.Ignore)) continue;
+                        if (Physics.CheckSphere(lSpot + Vector3.up, 2.5f, ~0, QueryTriggerInteraction.Ignore)) continue;
+                        Vector3 lFlat = Vector3.ProjectOnPlane(lAt - lSpot, Vector3.up).normalized;
+                        float lAhead = pLand.SampleHeight(lSpot + lFlat * 3f) + pLand.transform.position.y;
+                        if (Mathf.Abs(lAhead - lGround.y) > 0.5f) continue;
+                        int lScore = Mathf.RoundToInt(lDistance);
+                        foreach (MapPoi lOther in lPois) if (Vector3.Distance(lOther.transform.position, lAt) < 26f) lScore += 2;
+                        if (lScore > lBestScore) { lBestScore = lScore; lBest = lAt; lBestFrom = lSpot; }
+                    }
             }
             pFrom = lBestFrom;
             return lBest;
@@ -117,7 +124,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (lModel == null) return null;
             GameObject lAgent = Object.Instantiate(lModel);
             Vector3 lFlat = Vector3.ProjectOnPlane(pCamera.forward, Vector3.up).normalized;
-            Vector3 lAt = pCamera.position + lFlat * 3.1f + pCamera.right * 1.25f;
+            Vector3 lAt = pCamera.position + lFlat * 3.4f + pCamera.right * 1.35f;
             lAt.y = pLand.SampleHeight(lAt) + pLand.transform.position.y;
             lAgent.transform.SetPositionAndRotation(lAt, Quaternion.LookRotation(lFlat));
             string lClipPath = CharacterBuilder.ANIM_DIR;

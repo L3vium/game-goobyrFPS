@@ -89,7 +89,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _root = (RectTransform)lCanvas.transform;
 
             RawImage lBackdrop = UIFactory.Stretch(_root, "Backdrop").gameObject.AddComponent<RawImage>();
-            Texture2D lArt = Resources.Load<Texture2D>("Title/TitleArt");
+            Texture2D lArt = Resources.Load<Texture2D>("Art/Title/TitleArt");
             lBackdrop.texture = lArt;
             lBackdrop.color = lArt != null ? Color.white : Navy;
             lBackdrop.raycastTarget = false;

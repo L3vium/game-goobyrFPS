@@ -23,7 +23,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     {
         private enum Screen { Main, Lobby, Settings }
 
-        private const string VERSION = "0.9.0";
+        private const string VERSION = "0.9.1";
         private static readonly Vector2 TL = new Vector2(0, 1);
         private static readonly Color Navy = new Color(0.1f, 0.11f, 0.17f, 1f);
         private static readonly Color Slate = new Color(1f, 1f, 1f, 0.05f);
@@ -165,7 +165,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             _main = UIFactory.Stretch(_root, "Main").gameObject;
             Transform p = _main.transform;
-            Label(p, "GOOBYR", 170, UIFactory.Paper, 104, 250, 1100, 190, true, 3f);
+            Label(p, "HITMEN", 170, UIFactory.Paper, 104, 250, 1100, 190, true, 3f);
             Button lPlay = SmallButton(p, "PLAY", 110, 470, 440, 104, Play, 54, true);
             lPlay.GetComponentInChildren<TextMeshProUGUI>().characterSpacing = 3f;
             IconButton(p, UIIcons.Options, 110, 960, 60, () => Show(Screen.Settings));

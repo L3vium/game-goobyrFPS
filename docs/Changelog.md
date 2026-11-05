@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.9.1 — Controls, shooting and the missing trees
+
+The game is called Hitmen now. Two players ship: `Hitmen.exe`, and `Hitmen Dev.exe` with cheats.
+
+Fixed
+- The trees, bushes and rocks were all invisible since 0.9.0 while their collisions stayed: that is why
+  the maps looked empty and why you got stuck on nothing. They are drawn again. The jungle is very dense
+  for now; groves replace it with the map's rebuild.
+- Nobody is sent back to the room on a timer any more: the end screen waits for the host.
+- The mouse no longer moves the camera behind the pause menu or the end screen.
+- The caster's camera stops on the world and no longer goes under the map.
+- The eyes no longer dip on slopes and jumps, and a crouch no longer sticks after a climb.
+- The ground no longer flickers: its facets come from a fixed grid instead of following the terrain's level
+  of detail. The fountain's water no longer fights with its stone.
+- A guard checking a noise now answers a gunshot next to it, and low walls no longer muffle shots.
+- A loading screen hides the hitches of starting a contract.
+
+Controls
+- Ctrl crouches and slides (from a run, further), Shift runs, a little slower than before. Run, slide and
+  keep holding Shift: you get up and run on. Jump gets you out of a crouch or a slide.
+- E is the takedown, behind an enemy who hasn't seen you. Left click no longer does it.
+- Lean has no key by default. As a caster, A rises and E descends.
+- Every key can be set in the options, the caster's too.
+- No more swimming: water only comes up to your shins, for now over an invisible floor.
+
+Shooting
+- Left click fires, right click aims, and the gun stays low while aiming so you can see.
+- One crosshair for everything (the sniper's scope excepted). White marks on a hit, red marks and a skull on
+  a headshot, a longer skull on a kill confirmed by the host.
+- Much larger headshots (from the shoulders up), fatter bullets against people, tighter spreads.
+
+Enemies and the contract
+- Guards see 14 m instead of 30 m and take 2 s to be sure instead of 1.3 s. Shots and steps carry about half
+  as far, and they notice bodies and calls less far away.
+- All the notifications and banners are gone, "reinforcements called" included.
+- Whoever carries the proof is no longer followed live: a yellow mark stays where they were last seen and
+  moves at each reveal, from every 15 s down to every 3 s.
+
+Hitmen Dev
+- F1 to F10 on a living agent, listed bottom right: invincible, fly, super speed, any weapon (a list),
+  infinite ammo, invisible to the AI, see enemies, kill enemies nearby, go to the target, freeze the clock.
+  Any build gets them with `cheatsEnabled` in the Game Rules.
+
 ## 0.9.0 — The new look, the new sound, fuller maps
 
 The look

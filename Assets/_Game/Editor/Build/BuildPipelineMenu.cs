@@ -18,7 +18,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
     /// </summary>
     public static class BuildPipelineMenu
     {
-        public const string OUTPUT = "Builds/Windows/GoobyrFPS.exe";
+        public const string PRODUCT = "Hitmen", OUTPUT = "Builds/Windows/Hitmen.exe", OUTPUT_DEV = "Builds/Windows Dev/Hitmen Dev.exe";
+        /// <summary>Compiled into the Dev player: its cheats are on whatever the rules say (UI/DevCheats).</summary>
+        public const string DEV_DEFINE = "HITMEN_DEV";
 
         [MenuItem("Goobyr/Build/All (data, art, prefabs, sounds, maps, title)")]
         public static void All()
@@ -179,30 +181,47 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lLight.intensity = pIntensity;
         }
 
+        /// <summary>Both players: the game and the same game with its cheats.</summary>
         [MenuItem("Goobyr/Build/Player (Windows)")]
         public static void Player()
+        {
+            if (BuildVariant(OUTPUT, PRODUCT, null)) BuildVariant(OUTPUT_DEV, PRODUCT + " Dev", new[] { DEV_DEFINE });
+        }
+
+        /// <summary>Only the game (a build of half the time, when the cheats aren't needed).</summary>
+        [MenuItem("Goobyr/Build/Player (Windows, no Dev)")]
+        public static void PlayerRelease() => BuildVariant(OUTPUT, PRODUCT, null);
+
+        private static bool BuildVariant(string pOutput, string pProduct, string[] pDefines)
         {
             Scenes();
             PlayerSettings.SplashScreen.show = false;
             // Static batching would copy every kit mesh into combined meshes (1.5 GB per map):
             // the SRP batcher and the distance culling handle the draw calls instead.
             PlayerSettings.SetStaticBatchingForPlatform(BuildTarget.StandaloneWindows64, false);
+            string lProduct = PlayerSettings.productName;
+            PlayerSettings.productName = pProduct;
             BuildPlayerOptions lOptions = new BuildPlayerOptions
             {
                 scenes = System.Array.ConvertAll(EditorBuildSettings.scenes, s => s.path),
-                locationPathName = OUTPUT,
+                locationPathName = pOutput,
                 target = BuildTarget.StandaloneWindows64,
+                extraScriptingDefines = pDefines,
                 // The build ships through Git LFS on every release: LZ4HC roughly halves the data
                 // files (slower to build, as fast to load).
                 options = BuildOptions.CompressWithLz4HC
             };
-            BuildReport lReport = BuildPipeline.BuildPlayer(lOptions);
-            if (lReport.summary.result == BuildResult.Succeeded)
+            BuildReport lReport;
+            try { lReport = BuildPipeline.BuildPlayer(lOptions); }
+            finally { PlayerSettings.productName = lProduct; }
+            if (lReport.summary.result != BuildResult.Succeeded)
             {
-                File.Copy("steam_appid.txt", Path.Combine(Path.GetDirectoryName(OUTPUT), "steam_appid.txt"), true);
-                Debug.Log($"[Build] player OK: {OUTPUT} ({lReport.summary.totalSize / (1024 * 1024)} MB, {lReport.summary.totalTime.TotalSeconds:0}s)");
+                Debug.LogError($"[Build] {pProduct} FAILED: {lReport.summary.result}, {lReport.summary.totalErrors} errors");
+                return false;
             }
-            else Debug.LogError($"[Build] player FAILED: {lReport.summary.result}, {lReport.summary.totalErrors} errors");
+            File.Copy("steam_appid.txt", Path.Combine(Path.GetDirectoryName(pOutput), "steam_appid.txt"), true);
+            Debug.Log($"[Build] {pProduct} OK: {pOutput} ({lReport.summary.totalSize / (1024 * 1024)} MB, {lReport.summary.totalTime.TotalSeconds:0}s)");
+            return true;
         }
     }
 }

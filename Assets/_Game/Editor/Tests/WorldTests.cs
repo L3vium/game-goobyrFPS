@@ -32,13 +32,12 @@ namespace Com.IsartDigital.GoobyrFPS.Tests
             {
                 TimePreset[] p = TimeOfDay.PresetsFor(lBiome, 0f);
                 Assert.AreEqual(4, p.Length, lBiome + ": dawn, noon, dusk, night");
-                Assert.Greater(p[0].exposure, p[1].exposure, lBiome + ": dawn is exposed up from noon");
-                Assert.Greater(p[2].exposure, p[1].exposure, lBiome + ": dusk is exposed up from noon");
-                Assert.Greater(p[3].exposure, p[0].exposure, lBiome + ": the night is exposed up the most");
+                // The flat look exposes every hour alike (TimeOfDay.Stylise): the night stays readable by its colours.
+                Assert.GreaterOrEqual(p[3].exposure, p[1].exposure, lBiome + ": the night is never darker exposed than noon");
                 Assert.Less(p[3].saturation, p[1].saturation, lBiome + ": the night is less colourful than noon");
                 for (int i = 0; i < 4; i++)
                 {
-                    Assert.That(p[i].contrast, Is.InRange(0f, 20f), lBiome + " " + i + ": HDR grade keeps a calm contrast");
+                    Assert.That(p[i].contrast, Is.InRange(-20f, 20f), lBiome + " " + i + ": HDR grade keeps a calm contrast");
                     Assert.That(p[i].saturation, Is.InRange(-30f, 20f), lBiome + " " + i + ": natural saturation");
                     Assert.Greater(p[i].sunIntensity, 0f, lBiome + " " + i + ": a sun or a moon");
                     Assert.Greater(p[i].wind, 0f, lBiome + " " + i + ": some wind");

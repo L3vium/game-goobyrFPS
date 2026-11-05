@@ -71,7 +71,7 @@ namespace Com.IsartDigital.GoobyrFPS.Audio
             _next = (_next + 1) % POOL;
             lSource.transform.position = pPosition;
             lSource.clip = lClip;
-            lSource.volume = pVolume * Volume;
+            lSource.volume = pVolume * Volume * (pName.StartsWith("bark_") ? 0.8f : 1f);
             lSource.maxDistance = pRange;
             lSource.minDistance = Mathf.Clamp(pRange / 14f, 0.8f, 8f);
             lSource.spatialBlend = 1f;

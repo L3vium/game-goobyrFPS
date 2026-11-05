@@ -75,7 +75,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _pages[Tab.Contract] = lContractPage;
 
             GameObject lOptions = UIFactory.Stretch(lContent, "OptionsPage").gameObject;
-            SettingsPanel.Build(lOptions.transform, new Vector2(0.5f, 1f), new Vector2(0, 0), 900f);
+            SettingsPanel.Build(lOptions.transform, new Vector2(0.5f, 1f), new Vector2(0, 0), 900f, 900f);
             _pages[Tab.Options] = lOptions;
 
             _panel.SetActive(false);
@@ -142,9 +142,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     /// <summary>The options list, shared by the title and pause screens: rows, label left, control right.</summary>
     public static class SettingsPanel
     {
-        public static RectTransform Build(Transform pParent, Vector2 pAnchor, Vector2 pPosition, float pWidth)
+        public static RectTransform Build(Transform pParent, Vector2 pAnchor, Vector2 pPosition, float pWidth, float pHeight = 640f)
         {
-            RectTransform lList = UIWidgets.List(pParent, "Settings", pAnchor, pPosition, pWidth);
+            RectTransform lList = UIWidgets.ScrollList(pParent, "Settings", pAnchor, pPosition, pWidth, pHeight);
             UIWidgets.Section(lList, "CONTROLS");
             UIWidgets.Slider(lList, "Mouse sensitivity", 0.2f, 3f, GameInput.MouseSensitivity, v => v.ToString("0.00"), v => GameInput.MouseSensitivity = v);
             UIWidgets.Section(lList, "VIDEO");
@@ -157,6 +157,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             UIWidgets.Slider(lList, "Master volume", 0f, 1f, Audio.Sfx.Volume, v => Mathf.RoundToInt(v * 100f) + "%", v => { Audio.Sfx.Volume = v; AudioListener.volume = v; });
             UIWidgets.Section(lList, "VOICE CHAT");
             UIWidgets.Switch(lList, "Push to talk", Audio.VoiceChat.PushToTalk, v => Audio.VoiceChat.PushToTalk = v, "B");
+            KeyBindings.Build(lList);
             return lList;
         }
     }

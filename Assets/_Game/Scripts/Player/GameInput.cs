@@ -11,7 +11,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
     public static class GameInput
     {
         private static InputActionMap _map;
-        private static InputAction _move, _look, _fire, _aim, _reload, _interact, _crouch, _jump, _sprint, _melee, _throw, _scroll, _map_, _ptt, _pause, _detonate, _score, _nextSpectate, _instinct, _leanLeft, _leanRight, _block, _zoom;
+        private static InputAction _move, _look, _fire, _aim, _reload, _interact, _crouch, _jump, _sprint, _melee, _throw, _scroll, _map_, _ptt, _pause, _detonate, _score, _nextSpectate, _instinct, _leanLeft, _leanRight, _block, _zoom, _takedown;
+        private static InputActionMap _caster;
+        private static InputAction _casterRise, _casterDescend, _casterFast, _casterSwitch, _casterMulti, _casterFly, _casterNext, _casterEyes, _casterClean, _casterReset;
         private static readonly InputAction[] _slots = new InputAction[Weapons.WeaponHolder.SLOT_COUNT];
 
         /// <summary>Menus (pause, map screen, chat) switch gameplay input off.</summary>
@@ -26,6 +28,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         private static void Ensure()
         {
             if (_map != null) return;
+            LoadBindings();
             _map = InputSystem.actions.FindActionMap("Player", true);
             _move = _map.FindAction("Move"); _look = _map.FindAction("Look"); _fire = _map.FindAction("Fire"); _aim = _map.FindAction("Aim");
             _reload = _map.FindAction("Reload"); _interact = _map.FindAction("Interact"); _crouch = _map.FindAction("Crouch"); _jump = _map.FindAction("Jump");
@@ -34,9 +37,55 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             _pause = _map.FindAction("Pause"); _detonate = _map.FindAction("Detonate"); _score = _map.FindAction("Scoreboard"); _nextSpectate = _map.FindAction("NextSpectate");
             _instinct = _map.FindAction("Instinct");
             _leanLeft = _map.FindAction("LeanLeft"); _leanRight = _map.FindAction("LeanRight");
-            _block = _map.FindAction("Block"); _zoom = _map.FindAction("Zoom");
+            _block = _map.FindAction("Block"); _zoom = _map.FindAction("Zoom"); _takedown = _map.FindAction("Takedown");
             for (int i = 0; i < _slots.Length; i++) _slots[i] = _map.FindAction("Slot" + (i + 1));
             _map.Enable();
+            _caster = InputSystem.actions.FindActionMap("Caster", true);
+            _casterRise = _caster.FindAction("Rise"); _casterDescend = _caster.FindAction("Descend"); _casterFast = _caster.FindAction("Fast");
+            _casterSwitch = _caster.FindAction("ModeSwitch"); _casterMulti = _caster.FindAction("ModeMulti"); _casterFly = _caster.FindAction("ModeFly");
+            _casterNext = _caster.FindAction("NextFeed"); _casterEyes = _caster.FindAction("Eyes"); _casterClean = _caster.FindAction("Clean"); _casterReset = _caster.FindAction("ResetCamera");
+            _caster.Enable();
+        }
+
+        // ---------------------------------------------------------------- key bindings
+
+        private const string BINDINGS_KEY = "hitmen.bindings";
+
+        private static void LoadBindings()
+        {
+            string lJson = PlayerPrefs.GetString(BINDINGS_KEY, "");
+            if (!string.IsNullOrEmpty(lJson)) InputSystem.actions.LoadBindingOverridesFromJson(lJson);
+        }
+
+        /// <summary>Keeps the player's keys for the next run.</summary>
+        public static void SaveBindings()
+        {
+            PlayerPrefs.SetString(BINDINGS_KEY, InputSystem.actions.SaveBindingOverridesAsJson());
+            PlayerPrefs.Save();
+        }
+
+        public static void ResetBindings()
+        {
+            InputSystem.actions.RemoveAllBindingOverrides();
+            PlayerPrefs.DeleteKey(BINDINGS_KEY);
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>What to press for an action of the Player map, as a prompt shows it: "E", "F"...</summary>
+        public static string KeyName(string pAction)
+        {
+            Ensure();
+            InputAction lAction = _map.FindAction(pAction);
+            if (lAction == null) return "?";
+            for (int i = 0; i < lAction.bindings.Count; i++)
+            {
+                InputBinding lBinding = lAction.bindings[i];
+                if (lBinding.isComposite || lBinding.isPartOfComposite) continue;
+                string lPath = lBinding.effectivePath ?? "";
+                if (!lPath.StartsWith("<Keyboard>") && !lPath.StartsWith("<Mouse>")) continue;
+                return lAction.GetBindingDisplayString(i).ToUpperInvariant();
+            }
+            return "?";
         }
 
         private static bool On => GameplayEnabled;
@@ -68,13 +117,40 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public static float Scroll { get { Ensure(); return On ? _scroll.ReadValue<Vector2>().y : 0f; } }
         public static bool Detonate { get { Ensure(); return On && _detonate.WasPressedThisFrame(); } }
         public static bool InstinctHeld { get { Ensure(); return On && _instinct.IsPressed(); } }
+        /// <summary>The silent kill, from behind an NPC that has not seen you.</summary>
+        public static bool TakedownPressed { get { Ensure(); return On && _takedown.WasPressedThisFrame(); } }
         public static bool NextSpectate { get { Ensure(); return On && _nextSpectate.WasPressedThisFrame(); } }
 
         // Menu keys work whatever the gameplay lock.
         public static bool MapPressed { get { Ensure(); return _map_.WasPressedThisFrame(); } }
-        public static bool PausePressed { get { Ensure(); return _pause.WasPressedThisFrame(); } }
+        public static bool PausePressed { get { Ensure(); return !Rebinding && Time.frameCount > _rebindEnded + 1 && _pause.WasPressedThisFrame(); } }
+
+        private static bool _rebinding;
+        private static int _rebindEnded = -10;
+
+        /// <summary>A key is being set in the options: Esc cancels that, it does not close the menu.</summary>
+        public static bool Rebinding
+        {
+            get => _rebinding;
+            set
+            {
+                if (_rebinding && !value) _rebindEnded = Time.frameCount;
+                _rebinding = value;
+            }
+        }
         public static bool ScoreboardHeld { get { Ensure(); return _score.IsPressed(); } }
         public static bool PushToTalk { get { Ensure(); return _ptt.IsPressed(); } }
+
+        // The caster's keys: past the gameplay lock (the end of a match stops the avatars, not the flight).
+        public static float CasterRise { get { Ensure(); return (_casterRise.IsPressed() ? 1f : 0f) - (_casterDescend.IsPressed() ? 1f : 0f); } }
+        public static bool CasterFast { get { Ensure(); return _casterFast.IsPressed(); } }
+        public static bool CasterModeSwitch { get { Ensure(); return _casterSwitch.WasPressedThisFrame(); } }
+        public static bool CasterModeMulti { get { Ensure(); return _casterMulti.WasPressedThisFrame(); } }
+        public static bool CasterModeFly { get { Ensure(); return _casterFly.WasPressedThisFrame(); } }
+        public static bool CasterNext { get { Ensure(); return _casterNext.WasPressedThisFrame(); } }
+        public static bool CasterEyes { get { Ensure(); return _casterEyes.WasPressedThisFrame(); } }
+        public static bool CasterClean { get { Ensure(); return _casterClean.WasPressedThisFrame(); } }
+        public static bool CasterReset { get { Ensure(); return _casterReset.WasPressedThisFrame(); } }
 
         public static int SlotPressed
         {

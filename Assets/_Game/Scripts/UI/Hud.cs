@@ -14,9 +14,9 @@ using UnityEngine.UI;
 namespace Com.IsartDigital.GoobyrFPS.UI
 {
     /// <summary>
-    /// The in-match HUD: crosshair and hitmarkers, health, ammo, the six inventory slots, the
-    /// target dossier and contract status, the clock, prompts, banners, toasts, kill feed, damage
-    /// direction arcs, world markers (proof, carrier pings, extractions, teammates), the stealth
+    /// The in-match HUD: crosshair and hit marks, health, ammo, the inventory slots, the contract
+    /// status, the clock, prompts, kill feed, damage direction arcs, world markers (proof, carrier
+    /// pings, extractions, teammates), the stealth
     /// eye, the extraction bar, the sniper scope, spectating and voice indicators, the scoreboard.
     /// Static entry points let gameplay code report events without holding a reference.
     /// </summary>
@@ -24,9 +24,15 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     {
         private static Hud _instance;
 
+        /// <summary>The mark of the proof's carrier, on every map and compass.</summary>
+        public static readonly Color CARRIER_YELLOW = new Color(1f, 0.85f, 0.23f);
+
         private Canvas _canvas;
         private RectTransform _root;
-        private TextMeshProUGUI _crosshair, _hitmarker, _health, _ammo, _weaponName, _prompt, _clock, _dossier, _status, _bannerTitle, _bannerSub, _stealth, _spectating, _voice, _scoreboard;
+        private TextMeshProUGUI _health, _ammo, _weaponName, _prompt, _clock, _dossier, _status, _stealth, _spectating, _voice, _scoreboard;
+        private readonly Image[] _crossTicks = new Image[4];
+        private readonly Image[] _hitBars = new Image[4];
+        private Image _crossDot, _skull;
         /// <summary>Where you stand socially: nothing in public, TRESPASSING (amber), HOSTILE AREA (red).</summary>
         private TextMeshProUGUI _zone;
         private Image _healthFill, _flash, _extractFill, _scope;
@@ -36,18 +42,17 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private readonly TextMeshProUGUI[] _stripCounts = new TextMeshProUGUI[WeaponHolder.SLOT_COUNT];
         private readonly Image[] _stripBars = new Image[WeaponHolder.SLOT_COUNT];
         private readonly Image[] _stripBacks = new Image[WeaponHolder.SLOT_COUNT];
-        private Image _bannerRule;
         private float _healthShowUntil, _ammoShowUntil, _lastHp = -1f;
         private string _lastAmmo = "";
-                private readonly List<(TextMeshProUGUI text, float until)> _toasts = new List<(TextMeshProUGUI, float)>();
         private readonly List<(TextMeshProUGUI text, float until)> _feed = new List<(TextMeshProUGUI, float)>();
         private readonly List<(Image arc, Vector3 from, float until)> _damageArcs = new List<(Image, Vector3, float)>();
         private readonly Dictionary<string, TextMeshProUGUI> _worldMarkers = new Dictionary<string, TextMeshProUGUI>();
-        private float _hitmarkerTime, _bannerTime, _flashAlpha;
+        private float _hitTime, _hitLength = 0.2f, _skullTime, _flashAlpha;
+        private bool _hitHead;
+        /// <summary>How long the skull of a headshot, and of a kill, stays over the crosshair.</summary>
+        private const float SKULL_HEAD = 0.45f, SKULL_KILL = 0.8f;
         private Color _flashColor;
-        private Vector3 _carrierPing;
-        private float _carrierPingTime = -99f;
-        private float _spreadKick;
+        private Vector3? _carrierPing;
 
         public static void Ensure()
         {
@@ -63,37 +68,28 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
         // ---------------------------------------------------------------- static API
 
+        /// <summary>A hit: white marks around the crosshair; on the head they are red, with the skull.</summary>
         public static void Hitmarker(bool pHead)
         {
             if (_instance == null) return;
-            _instance._hitmarkerTime = 0.25f;
-            _instance._hitmarker.color = pHead ? new Color(1f, 0.3f, 0.3f) : Color.white;
-            _instance._hitmarker.fontSize = pHead ? 70 : 52;
+            _instance._hitTime = _instance._hitLength = pHead ? 0.3f : 0.2f;
+            _instance._hitHead = pHead;
+            if (pHead) _instance._skullTime = Mathf.Max(_instance._skullTime, SKULL_HEAD);
             Audio.Sfx.Play2D(pHead ? "hit_head" : "hit", 0.5f);
         }
 
-        public static void Toast(string pMessage)
+        /// <summary>The host's word: a hit it alone could see, or a kill (the marks go red, the skull stays longer).</summary>
+        private void HandleConfirmed(bool pHead, bool pKill)
         {
-            if (_instance == null) return;
-            TextMeshProUGUI lText = UIFactory.Text(_instance._root, "Toast", pMessage, 28, UIFactory.Paper, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-30, 0), new Vector2(760, 40));
-            _instance._toasts.Insert(0, (lText, Time.time + 4f));
-        }
-
-        /// <summary>A notification on the right: what happened in its category colour, where in grey.</summary>
-        public static void Notify(string pWhat, string pWhere, Color pColor)
-        {
-            string lLine = "<font=\"BarlowCondensed-Bold SDF\"><color=#" + ColorUtility.ToHtmlStringRGB(pColor) + ">" + pWhat + "</color></font>";
-            if (!string.IsNullOrEmpty(pWhere)) lLine += "   <size=80%><color=#9EA0A6>" + pWhere.ToUpperInvariant() + "</color></size>";
-            Toast(lLine);
-        }
-
-        public static void Announce(string pTitle, string pSubtitle)
-        {
-            if (_instance == null) return;
-            _instance._bannerTitle.text = pTitle;
-            _instance._bannerSub.text = pSubtitle;
-            _instance._bannerTime = 4.5f;
-            Audio.Sfx.Play2D("announce", 0.7f);
+            if (pKill)
+            {
+                _hitTime = _hitLength = 0.4f;
+                _hitHead = true;
+                _skullTime = SKULL_KILL;
+                Juice.Kill(pHead);
+                Audio.Sfx.Play2D("hit_head", 0.7f);
+            }
+            else Hitmarker(pHead);
         }
 
         public static void KillFeed(string pLine)
@@ -112,10 +108,11 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
         public static void PingCarrier(Vector3 pPosition)
         {
-            if (_instance == null) return;
-            _instance._carrierPing = pPosition;
-            _instance._carrierPingTime = Time.time;
+            if (_instance != null) _instance._carrierPing = pPosition;
         }
+
+        /// <summary>Where the proof's carrier was last revealed, if anywhere yet.</summary>
+        public static Vector3? CarrierPing => _instance != null ? _instance._carrierPing : null;
 
         // ---------------------------------------------------------------- build
 
@@ -135,8 +132,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _scope.preserveAspect = false;
             _scope.raycastTarget = false;
 
-            _crosshair = UIFactory.Text(_root, "Crosshair", "+", 44, Color.white, TextAlignmentOptions.Center, C, Vector2.zero, new Vector2(120, 120));
-            _hitmarker = UIFactory.Text(_root, "Hitmarker", "x", 52, Color.white, TextAlignmentOptions.Center, C, new Vector2(0, 2), new Vector2(120, 120));
+            BuildCrosshair(C);
             _prompt = UIFactory.Text(_root, "Prompt", "", 30, UIFactory.Paper, TextAlignmentOptions.Center, C, new Vector2(0, -90), new Vector2(900, 50));
 
             // Health, bottom left.
@@ -184,8 +180,6 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _clock = UIFactory.Text(_root, "Clock", "", 26, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 1), new Vector2(0, -30), new Vector2(240, 40));
             gameObject.AddComponent<Minimap>().Build(_root);
             gameObject.AddComponent<Compass>().Build(_root);
-            _bannerTitle = UIFactory.Text(_root, "BannerTitle", "", 72, UIFactory.Accent, TextAlignmentOptions.Center, new Vector2(0.5f, 0.72f), Vector2.zero, new Vector2(1600, 90));
-            _bannerSub = UIFactory.Text(_root, "BannerSub", "", 32, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.72f), new Vector2(0, -70), new Vector2(1600, 50));
 
             _extractBar = UIFactory.Panel(_root, "ExtractBar", UIFactory.PanelColor, new Vector2(0.5f, 0.5f), new Vector2(0, -150), new Vector2(420, 26)).rectTransform;
             _extractFill = UIFactory.Panel(_extractBar, "Fill", UIFactory.Good, new Vector2(0, 0.5f), Vector2.zero, new Vector2(420, 26));
@@ -202,26 +196,73 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _flash.color = new Color(1, 1, 1, 0);
 
             // Typography: condensed capitals for numbers and titles, the accent as a thin rule.
-            foreach (TextMeshProUGUI lText in new[] { _health, _ammo, _clock, _bannerTitle, _bannerSub, _weaponName, _status, _stealth, _zone, _spectating, _prompt })
+            foreach (TextMeshProUGUI lText in new[] { _health, _ammo, _clock, _weaponName, _status, _stealth, _zone, _spectating, _prompt })
             {
                 lText.font = UIFactory.Heading;
                 lText.characterSpacing = 4f;
             }
-            _bannerTitle.font = UIFactory.HeadingBold;
-            _bannerTitle.characterSpacing = 14f;
-            _bannerTitle.color = UIFactory.Paper;
             _health.font = _ammo.font = _clock.font = UIFactory.HeadingBold;
-            _bannerRule = UIFactory.Rule(_root, new Vector2(0.5f, 0.72f), new Vector2(0, -36), 160, false, UIFactory.Accent, 3f);
-            _bannerRule.name = "BannerRule";
-            _crosshair.fontSize = 26;
             _health.font = _ammo.font = UIFactory.Heading;
 
+            if (DevCheats.Allowed) gameObject.AddComponent<DevCheats>().Build(_root);
+
             Juice.OnScreenFlash += HandleFlash;
+            Core.Damageable.OnConfirmed += HandleConfirmed;
+        }
+
+        /// <summary>One crosshair whatever is held: a dot and four ticks, the hit marks on its diagonals, the skull over it.</summary>
+        private void BuildCrosshair(Vector2 pCentre)
+        {
+            RectTransform lCross = UIFactory.Rect(_root, "Crosshair", pCentre, pCentre, pCentre, Vector2.zero, Vector2.zero);
+            _crossDot = UIFactory.Panel(lCross, "Dot", Color.white, pCentre, Vector2.zero, new Vector2(3, 3));
+            for (int i = 0; i < 4; i++)
+                _crossTicks[i] = UIFactory.Panel(lCross, "Tick" + i, Color.white, pCentre, Vector2.zero, i % 2 == 0 ? new Vector2(2, 8) : new Vector2(8, 2));
+            foreach (Image lPart in lCross.GetComponentsInChildren<Image>()) Outlined(lPart);
+            for (int i = 0; i < 4; i++)
+            {
+                _hitBars[i] = UIFactory.Panel(lCross, "Hit" + i, Color.white, pCentre, Vector2.zero, new Vector2(16, 3));
+                _hitBars[i].rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f + 90f * i);
+                Outlined(_hitBars[i]);
+            }
+            _skull = UIFactory.Panel(lCross, "Skull", new Color(1f, 0.16f, 0.14f), pCentre, new Vector2(0, 58), new Vector2(46, 46));
+            _skull.sprite = SkullSprite();
+            _skull.preserveAspect = true;
+        }
+
+        private static void Outlined(Image pImage)
+        {
+            pImage.raycastTarget = false;
+            Shadow lShadow = pImage.gameObject.AddComponent<Shadow>();
+            lShadow.effectColor = new Color(0f, 0f, 0f, 0.55f);
+            lShadow.effectDistance = new Vector2(1f, -1f);
+        }
+
+        /// <summary>The kill mark, drawn here: a round skull, its jaw and teeth, two eyes and a nose cut out.</summary>
+        private static Sprite SkullSprite()
+        {
+            const int SIZE = 96;
+            Texture2D lTexture = new Texture2D(SIZE, SIZE, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            float Disc(Vector2 pPoint, Vector2 pCentre, float pRadius) => Mathf.Clamp01(pRadius - Vector2.Distance(pPoint, pCentre) + 0.5f);
+            for (int y = 0; y < SIZE; y++)
+                for (int x = 0; x < SIZE; x++)
+                {
+                    Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                    float lBody = Disc(p, new Vector2(48, 56), 36f);
+                    bool lJaw = p.x > 28f && p.x < 68f && p.y > 12f && p.y < 40f;
+                    if (lJaw) lBody = 1f;
+                    // Teeth: gaps in the lower jaw.
+                    if (p.y < 24f && p.x > 28f && p.x < 68f && Mathf.Repeat(p.x - 28f, 10f) < 2.5f) lBody = 0f;
+                    float lHoles = Mathf.Max(Disc(p, new Vector2(34, 54), 10f), Disc(p, new Vector2(62, 54), 10f), Disc(p, new Vector2(48, 36), 4f));
+                    lTexture.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(lBody - lHoles)));
+                }
+            lTexture.Apply();
+            return Sprite.Create(lTexture, new Rect(0, 0, SIZE, SIZE), new Vector2(0.5f, 0.5f));
         }
 
         private void OnDestroy()
         {
             Juice.OnScreenFlash -= HandleFlash;
+            Core.Damageable.OnConfirmed -= HandleConfirmed;
             if (_instance == this) _instance = null;
         }
 
@@ -257,20 +298,15 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             MatchDirector lDirector = MatchDirector.Instance;
             bool lAlive = lMe != null && lMe.Health.IsAlive;
 
-            // Crosshair: spreads with movement and shots, a dot when aiming.
+            // The crosshair: always the same, it only opens a little with speed.
             WeaponHolder lWeapons = lAlive ? lMe.Weapons : null;
             ItemDefinition lHeld = lWeapons != null ? lWeapons.HeldItem : null;
             bool lScoped = lWeapons != null && lWeapons.Scoped;
             _scope.enabled = lScoped;
-            _crosshair.enabled = lAlive && !lScoped;
             float lSpread = lMe != null ? Mathf.Clamp01(lMe.Motor.PlanarSpeed / 7f) : 0f;
-            _crosshair.text = lWeapons != null && lWeapons.AdsFov > 0f ? "·" : lHeld != null && lHeld.kind == ItemKind.Shotgun ? "( + )" : "+";
-            _crosshair.rectTransform.localScale = Vector3.one * (1f + lSpread * 0.6f);
-            _hitmarkerTime -= dt;
-            _hitmarker.enabled = _hitmarkerTime > 0f;
-            _hitmarker.rectTransform.localScale = Vector3.one * (1f + Mathf.Max(0f, _hitmarkerTime) * 2f);
+            UpdateCrosshair(dt, lAlive && !lScoped, lSpread);
 
-            _prompt.text = lAlive ? PlayerInteractor.CurrentPrompt : "";
+            _prompt.text = !lAlive ? "" : lWeapons != null && lWeapons.TakedownReady ? "[" + GameInput.KeyName("Takedown") + "] TAKEDOWN" : PlayerInteractor.CurrentPrompt;
 
             // Health.
             if (lMe != null)
@@ -356,23 +392,50 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             foreach (LobbyPlayer lPlayer in LobbyPlayer.All) if (lPlayer.TalkingNow.Value) lTalking += "<sprite=0> " + lPlayer.Name + "\n";
             _voice.text = lTalking.Replace("<sprite=0>", ")))");
 
-            // Banner, flash.
-            _bannerTime -= dt;
-            float lBanner = Mathf.Clamp01(_bannerTime);
-            _bannerTitle.alpha = _bannerSub.alpha = lBanner;
-            _bannerRule.color = new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, lBanner);
-            _bannerTitle.characterSpacing = 14f + Mathf.Max(0f, _bannerTime - 3.8f) * 40f;
+            // Flash.
             _flashAlpha = Mathf.MoveTowards(_flashAlpha, 0f, dt * 2.5f);
             _flash.color = new Color(_flashColor.r, _flashColor.g, _flashColor.b, _flashAlpha);
 
             // Stacks.
-            Restack(_toasts, -60f, 44f, new Vector2(1, 0.5f));
             Restack(_feed, -40f, 36f, new Vector2(1, 1));
             UpdateDamageArcs(lMe);
 
             bool lBoard = GameInput.ScoreboardHeld || (lDirector != null && lDirector.Phase.Value == MatchPhase.Ended);
             _scoreboardPanel.gameObject.SetActive(GameInput.ScoreboardHeld && !CasterView.Active);
             if (lBoard) _scoreboard.text = Scoreboard();
+        }
+
+        private void UpdateCrosshair(float dt, bool pShown, float pSpread)
+        {
+            float lGap = 7f + pSpread * 5f;
+            _crossDot.enabled = pShown;
+            for (int i = 0; i < 4; i++)
+            {
+                float lAngle = i * Mathf.PI * 0.5f;
+                _crossTicks[i].enabled = pShown;
+                _crossTicks[i].rectTransform.anchoredPosition = new Vector2(Mathf.Sin(lAngle), Mathf.Cos(lAngle)) * (lGap + 4f);
+            }
+
+            // The marks burst out and fade; the skull pops, then fades.
+            _hitTime = Mathf.Max(0f, _hitTime - dt);
+            float lHit = _hitTime / Mathf.Max(0.01f, _hitLength);
+            Color lColor = _hitHead ? new Color(1f, 0.16f, 0.14f) : Color.white;
+            lColor.a = lHit;
+            for (int i = 0; i < 4; i++)
+            {
+                float lAngle = (45f + 90f * i) * Mathf.Deg2Rad;
+                _hitBars[i].enabled = _hitTime > 0f;
+                _hitBars[i].color = lColor;
+                _hitBars[i].rectTransform.anchoredPosition = new Vector2(Mathf.Cos(lAngle), Mathf.Sin(lAngle)) * (18f + (1f - lHit) * 12f);
+                _hitBars[i].rectTransform.sizeDelta = new Vector2(_hitHead ? 20f : 14f, _hitHead ? 4f : 3f);
+            }
+            _skullTime = Mathf.Max(0f, _skullTime - dt);
+            _skull.enabled = _skullTime > 0f;
+            if (_skullTime > 0f)
+            {
+                _skull.color = new Color(1f, 0.16f, 0.14f, Mathf.Clamp01(_skullTime * 4f));
+                _skull.rectTransform.localScale = Vector3.one * (1f + Mathf.Clamp01(_skullTime - SKULL_HEAD + 0.15f) * 2.5f);
+            }
         }
 
         private void Restack(List<(TextMeshProUGUI text, float until)> pList, float pStart, float pStep, Vector2 pAnchor)
@@ -413,8 +476,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             if (lCamera == null) return;
 
             if (pDirector.Proof.Value == ProofState.Dropped) Marker(lUsed, lCamera, "proof", pDirector.ProofPosition.Value + Vector3.up, "<color=#FFE066>PROOF</color>");
-            if (pDirector.Proof.Value == ProofState.Carried && (pMe == null || !pMe.CarriesProof.Value) && Time.time - _carrierPingTime < 4f)
-                Marker(lUsed, lCamera, "carrier", _carrierPing + Vector3.up * 2.2f, "<color=#FFB13B>CARRIER</color>");
+            // The carrier is never tracked live: a yellow mark stays where they were last seen, until the next reveal.
+            if (pDirector.Proof.Value == ProofState.Carried && (pMe == null || !pMe.CarriesProof.Value) && CarrierPing.HasValue)
+                Marker(lUsed, lCamera, "carrier", CarrierPing.Value + Vector3.up * 2.2f, "<color=#FFD83B>PROOF</color>");
             if (pDirector.Proof.Value != ProofState.TargetAlive)
             {
                 List<AI.MatchPoint> lExtractions = AI.MatchPoint.OfKind(AI.MatchPoint.Kind.Extraction);

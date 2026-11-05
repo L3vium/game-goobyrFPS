@@ -36,39 +36,69 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             return lResult;
         }
 
+        /// <summary>A bullet is this much fatter against people than against the world: aiming stays forgiving.</summary>
+        public const float ASSIST_RADIUS = 0.16f;
+
+        /// <summary>
+        /// What a shot hits, the same on the owner's prediction and on the host: the first solid thing
+        /// on the line (the dead don't stop it), or a living body within <see cref="ASSIST_RADIUS"/>
+        /// of the line before that.
+        /// </summary>
+        public static bool Trace(Vector3 pOrigin, Vector3 pDirection, float pRange, Transform pIgnore, out RaycastHit pHit)
+        {
+            pHit = default;
+            bool lFound = false;
+            float lReach = pRange;
+            RaycastHit[] lLine = Physics.RaycastAll(pOrigin, pDirection, pRange, GameLayers.ShotMask, QueryTriggerInteraction.Ignore);
+            System.Array.Sort(lLine, (a, b) => a.distance.CompareTo(b.distance));
+            foreach (RaycastHit lHit in lLine)
+            {
+                if (pIgnore != null && lHit.collider.transform.IsChildOf(pIgnore)) continue;
+                Damageable lBody = lHit.collider.GetComponentInParent<Damageable>();
+                if (lBody != null && !lBody.IsAlive) continue;
+                pHit = lHit;
+                if (lBody != null) return true;
+                lFound = true;
+                lReach = lHit.distance;
+                break;
+            }
+
+            float lNearest = float.MaxValue;
+            foreach (RaycastHit lHit in Physics.SphereCastAll(pOrigin, ASSIST_RADIUS, pDirection, lReach, GameLayers.CharacterMask, QueryTriggerInteraction.Ignore))
+            {
+                if (lHit.distance <= 0f || lHit.distance >= lNearest) continue;
+                if (pIgnore != null && lHit.collider.transform.IsChildOf(pIgnore)) continue;
+                Damageable lBody = lHit.collider.GetComponentInParent<Damageable>();
+                if (lBody == null || !lBody.IsAlive) continue;
+                lNearest = lHit.distance;
+                pHit = lHit;
+                lFound = true;
+            }
+            return lFound;
+        }
+
         /// <summary>
         /// Host: traces one pellet, damages what it hits, returns the end point. Ignores the
         /// shooter's own colliders (<paramref name="pIgnore"/>).
         /// </summary>
         public static Vector3 TraceServer(Vector3 pOrigin, Vector3 pDirection, ItemDefinition pItem, float pDamage, ulong pAttacker, int pTeam, Transform pIgnore)
         {
-            RaycastHit[] lHits = Physics.RaycastAll(pOrigin, pDirection, pItem.range, GameLayers.ShotMask, QueryTriggerInteraction.Ignore);
-            System.Array.Sort(lHits, (a, b) => a.distance.CompareTo(b.distance));
-            foreach (RaycastHit lHit in lHits)
+            if (!Trace(pOrigin, pDirection, pItem.range, pIgnore, out RaycastHit lHit)) return pOrigin + pDirection * pItem.range;
+            DamageInfo lInfo = new DamageInfo
             {
-                if (pIgnore != null && lHit.collider.transform.IsChildOf(pIgnore)) continue;
-
-                DamageInfo lInfo = new DamageInfo
-                {
-                    amount = pDamage, type = DamageType.Bullet, point = lHit.point, direction = pDirection,
-                    attacker = pAttacker, attackerTeam = pTeam
-                };
-
-                IShootable lShootable = lHit.collider.GetComponentInParent<IShootable>();
-                lShootable?.OnShotServer(lInfo);
-
-                Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
-                if (lTarget != null)
-                {
-                    if (!lTarget.IsAlive) continue;
-                    lInfo.headshot = lTarget.IsHeadshot(lHit.point);
-                    if (lInfo.headshot) lInfo.amount *= pItem.headMultiplier;
-                    lTarget.ApplyDamage(lInfo);
-                }
-                else NoiseSystem.Emit(lHit.point, 7f, NoiseKind.Suspicious, pAttacker);
-                return lHit.point;
+                amount = pDamage, type = DamageType.Bullet, point = lHit.point, direction = pDirection,
+                attacker = pAttacker, attackerTeam = pTeam
+            };
+            lHit.collider.GetComponentInParent<IShootable>()?.OnShotServer(lInfo);
+            Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
+            if (lTarget != null)
+            {
+                lInfo.headshot = lTarget.IsHeadshot(lHit.point);
+                if (lInfo.headshot) lInfo.amount *= pItem.headMultiplier;
+                lTarget.ApplyDamage(lInfo);
             }
-            return pOrigin + pDirection * pItem.range;
+            else NoiseSystem.Emit(lHit.point, 5f, NoiseKind.Suspicious, pAttacker);
+            return lHit.point;
         }
 
         /// <summary>
@@ -106,7 +136,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 Flammable lFlammable = lCollider.GetComponentInParent<Flammable>();
                 if (lFlammable != null && lFalloff > 0.2f) lFlammable.IgniteServer();
             }
-            NoiseSystem.Emit(pPosition, Mathf.Max(80f, pRadius * 12f), NoiseKind.Alarming, pAttacker);
+            NoiseSystem.Emit(pPosition, Mathf.Max(50f, pRadius * 7f), NoiseKind.Alarming, pAttacker);
             if (MapEffects.Instance != null) MapEffects.Instance.ExplosionRpc(pPosition, pRadius);
         }
     }

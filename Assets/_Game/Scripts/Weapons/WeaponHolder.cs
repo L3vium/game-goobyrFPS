@@ -158,7 +158,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 Cycle(lScroll < 0 ? 1 : -1);
             }
 
-            // Right click raises the weapon (aims); only then does left click fire. Lowered, left click punches.
+            // Left click fires, from the hip or (right click held) aimed.
             ItemDefinition lHeld = HeldItem;
             bool lShooter = lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher || lHeld.kind == ItemKind.Flamethrower);
             _aiming = (GameInput.Aim || ForceAim) && lShooter;
@@ -168,6 +168,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (Avatar.Blocking.Value != lBlocking) Avatar.Blocking.Value = lBlocking;
             if (Avatar.Aiming.Value != _aiming) Avatar.Aiming.Value = _aiming;
 
+            TakedownReady = PredictTakedown();
+            if (GameInput.TakedownPressed && TakedownReady) TryMelee(true);
             if (GameInput.Reload && lHeld != null && lHeld.UsesAmmo) ReloadRpc(Selected.Value);
             if (GameInput.Melee) TryMelee();
             if (GameInput.Throw) ThrowGadget(_lastGadget);
@@ -183,9 +185,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             }
             else if (_arc != null) _arc.Hide();
 
-            // Left click attacks, whatever is held; an unaware NPC's back in reach is always the takedown.
-            if (GameInput.FirePressed && PredictTakedown()) TryMelee();
-            else if (lHeld != null && lHeld.slot == ItemSlot.Gadget)
+            // Left click attacks, whatever is held.
+            if (lHeld != null && lHeld.slot == ItemSlot.Gadget)
             {
                 // Gadgets: the right button shows the arc, letting it go throws; left click still punches.
                 if (GameInput.AimReleased) ThrowGadget(Selected.Value);
@@ -259,7 +260,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 foreach (Vector3 lDir in lPellets)
                 {
                     Vector3 lEnd = lOrigin + lDir * pItem.range;
-                    if (Physics.Raycast(lOrigin, lDir, out RaycastHit lHit, pItem.range, GameLayers.ShotMask, QueryTriggerInteraction.Ignore) && !lHit.collider.transform.IsChildOf(transform))
+                    if (Ballistics.Trace(lOrigin, lDir, pItem.range, transform, out RaycastHit lHit))
                     {
                         lEnd = lHit.point;
                         Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
@@ -267,7 +268,6 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                         {
                             bool lHead = lTarget.IsHeadshot(lHit.point);
                             UI.Hud.Hitmarker(lHead);
-                            if (lHead) Juice.Kill(true);
                             Effects.Fluff(lHit.point, -lDir, Effects.Blood, lHead);
                         }
                         else Effects.Impact(lHit.point, lHit.normal, new Color(0.75f, 0.7f, 0.6f));
@@ -298,14 +298,14 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
 
         /// <summary>
         /// Left click with nothing raised (or the melee key): the punch plays at once - jab and cross
-        /// alternating bare-handed, a left jab holding something, the takedown on an unaware NPC from
-        /// behind - and the hit is resolved at the clip's contact time (<see cref="Strike"/>).
+        /// alternating bare-handed, a left jab holding something - or the takedown key behind an unaware
+        /// NPC; the hit is resolved at the clip's contact time (<see cref="Strike"/>).
         /// </summary>
-        private void TryMelee()
+        private void TryMelee(bool pTakedown = false)
         {
             if (Time.time < _nextMelee || _strikePending || _throwSlot >= 0) return;
             Viewmodel.MeleeMove lMove;
-            if (PredictTakedown()) lMove = Viewmodel.MeleeMove.Takedown;
+            if (pTakedown) lMove = Viewmodel.MeleeMove.Takedown;
             else if (HeldItem == null) { lMove = _nextCross ? Viewmodel.MeleeMove.Cross : Viewmodel.MeleeMove.Jab; _nextCross = !_nextCross; }
             else lMove = Viewmodel.MeleeMove.Jab;
             float lStrike = View != null ? View.PlayMelee(lMove) : Viewmodel.DefaultStrike(lMove);
@@ -316,6 +316,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             Sfx.Play("swing", transform.position, 0.6f);
             SwingRpc();
         }
+
+        /// <summary>Owner: an NPC's unaware back is in reach, the takedown key would kill it.</summary>
+        public bool TakedownReady { get; private set; }
 
         /// <summary>The same test the host makes: an NPC that hasn't noticed us, seen from behind, in reach.</summary>
         private bool PredictTakedown()
@@ -356,7 +359,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                     }
                 }
             }
-            MeleeRpc(lOrigin, lDirection);
+            MeleeRpc(lOrigin, lDirection, _strikeMove == Viewmodel.MeleeMove.Takedown);
         }
 
         private void ThrowGadget(int pSlot)
@@ -395,7 +398,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (lItem == null || lSlot.magazine <= 0 || Reloading.Value) return;
             if (Vector3.Distance(pOrigin, transform.position) > 4f) pOrigin = Avatar.Eye;
 
-            lSlot.magazine--;
+            if (!Avatar.DevInfiniteAmmo) lSlot.magazine--;
             Slots[pSlot] = lSlot;
 
             NoiseSystem.Emit(pOrigin, lItem.noiseRadius, lItem.kind == ItemKind.SilencedPistol ? NoiseKind.Suspicious : NoiseKind.Alarming, OwnerClientId);
@@ -468,7 +471,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         /// eye more than 4 m from the body is replaced by the real eye); reach is the host's own.
         /// </summary>
         [Rpc(SendTo.Server)]
-        private void MeleeRpc(Vector3 pOrigin, Vector3 pDirection)
+        private void MeleeRpc(Vector3 pOrigin, Vector3 pDirection, bool pTakedown)
         {
             if (!Avatar.Health.IsAlive || Time.time < _nextMeleeServer) return;
             _nextMeleeServer = Time.time + MELEE_MIN_INTERVAL;
@@ -479,12 +482,12 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             Damageable lTarget = lHit.collider.GetComponentInParent<Damageable>();
             if (lTarget == null || lTarget == Avatar.Health) return;
 
-            // From behind, on an NPC that hasn't noticed you: a silent takedown, dead at once.
+            // The takedown key, from behind, on an NPC that hasn't noticed you: dead at once and silent.
             // Otherwise a solid punch (and a scuffle the guards close by hear).
             Npc lNpc = lTarget.GetComponent<Npc>();
             Vector3 lFlat = Vector3.ProjectOnPlane(pDirection, Vector3.up);
             float lFromBack = Vector3.Angle(lTarget.transform.forward, lFlat);
-            bool lTakedown = lNpc != null && !Avatar.IsProtector && DetectionModel.CanTakedown(lFromBack, lNpc.Gauge, lNpc.IsAlerted);
+            bool lTakedown = pTakedown && lNpc != null && !Avatar.IsProtector && DetectionModel.CanTakedown(lFromBack, lNpc.Gauge, lNpc.IsAlerted);
             if (lTakedown)
             {
                 lNpc.Takedown(pDirection, OwnerClientId, Avatar.Team.Value);
@@ -522,7 +525,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private void TakedownFeedbackRpc(Vector3 pPoint, Vector3 pDirection)
         {
             Sfx.Play("takedown", pPoint, 0.8f, 8f);
-            if (IsOwner) { Juice.Takedown(); UI.Hud.Hitmarker(true); }
+            if (IsOwner) Juice.Takedown();
         }
 
         /// <summary>
@@ -564,6 +567,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         /// <summary>Host: one use of the item in a slot (throwables, poison).</summary>
         public void ConsumeServer(int pSlot)
         {
+            if (Avatar.DevInfiniteAmmo) return;
             InventorySlot lSlot = SlotAt(pSlot);
             lSlot.reserve--;
             Slots[pSlot] = lSlot.reserve <= 0 ? InventorySlot.Empty : lSlot;
@@ -642,7 +646,6 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         {
             Sfx.Play2D("pickup", 0.8f);
             ItemDefinition lItem = GameDatabase.Item(pItem);
-            if (lItem != null) UI.Hud.Toast("+ " + lItem.displayName.ToUpperInvariant());
             for (int i = 0; i < SLOT_COUNT; i++)
                 if (SlotAt(i).item == pItem && lItem != null && lItem.slot == ItemSlot.Weapon) { Select(i); break; }
         }
@@ -683,7 +686,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             InventorySlot lSlot = SlotAt(Selected.Value);
             ItemDefinition lItem = GameDatabase.Item(lSlot.item);
             if (lItem == null || lItem.kind != ItemKind.Flamethrower || lSlot.magazine <= 0) return;
-            lSlot.magazine--;
+            if (!Avatar.DevInfiniteAmmo) lSlot.magazine--;
             Slots[Selected.Value] = lSlot;
             Flamethrower.TickServer(Avatar.Eye, Avatar.AimDirection, lItem, OwnerClientId, Avatar.Team.Value, Avatar.Health);
         }

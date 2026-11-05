@@ -80,14 +80,17 @@ namespace Com.IsartDigital.GoobyrFPS.Core
             }
         }
 
-        /// <summary>A hit on the head: within the head's width and no lower than the chin (a hat or hair counts).</summary>
+        /// <summary>A hit on the head: from the shoulders up, forgiving on purpose (a hat or hair counts).</summary>
         public bool IsHeadshot(Vector3 pPoint)
         {
             Vector3 lHead = HeadCentre != null ? HeadCentre() : transform.position + Vector3.up * BodyMetrics.HEAD_CENTRE * transform.lossyScale.y;
-            float lRadius = BodyMetrics.HEAD_RADIUS * transform.lossyScale.y;
+            float lRadius = BodyMetrics.HEAD_HIT_RADIUS * transform.lossyScale.y;
             Vector3 lOffset = pPoint - lHead;
             return lOffset.y > -lRadius && lOffset.x * lOffset.x + lOffset.z * lOffset.z < lRadius * lRadius * 2.5f;
         }
+
+        /// <summary>Host only (dev cheat): nothing hurts.</summary>
+        public bool Invincible { get; set; }
 
         /// <summary>Host only: what the victim's stance makes of a hit (a raised guard against a punch).</summary>
         public System.Func<DamageInfo, float> DamageScale;
@@ -95,7 +98,7 @@ namespace Com.IsartDigital.GoobyrFPS.Core
         /// <summary>Host only. Returns true if the hit killed.</summary>
         public bool ApplyDamage(DamageInfo pInfo)
         {
-            if (!IsServer || Dead.Value) return false;
+            if (!IsServer || Dead.Value || Invincible) return false;
             if (pInfo.attackerTeam != MatchRulesLogic.NO_TEAM && Team != NPC_TEAM && pInfo.attacker != DamageInfo.NO_PLAYER
                 && !MatchRulesLogic.CanDamage(pInfo.attackerTeam, Team)) return false;
 
@@ -104,9 +107,16 @@ namespace Com.IsartDigital.GoobyrFPS.Core
             Health.Value = Mathf.Max(0f, Health.Value - pInfo.amount);
             OnDamagedServer?.Invoke(pInfo);
             HitClientRpc(pInfo.amount, pInfo.point, pInfo.direction, pInfo.headshot);
+            bool lByPlayer = pInfo.attacker != DamageInfo.NO_PLAYER;
 
-            if (Health.Value > 0f) return false;
+            if (Health.Value > 0f)
+            {
+                // Bullets and punches are already felt on the shooter's machine; blasts and flames are not.
+                if (lByPlayer && pInfo.type != DamageType.Bullet && pInfo.type != DamageType.Melee) ConfirmRpc(false, false, RpcTarget.Single(pInfo.attacker, RpcTargetUse.Temp));
+                return false;
+            }
 
+            if (lByPlayer) ConfirmRpc(pInfo.headshot, true, RpcTarget.Single(pInfo.attacker, RpcTargetUse.Temp));
             Dead.Value = true;
             OnDeathServer?.Invoke(pInfo);
             float lForce = pInfo.type == DamageType.Explosion ? 30f : pInfo.type == DamageType.Bullet ? 9f : pInfo.type == DamageType.Melee ? 6f : 3f;
@@ -125,6 +135,13 @@ namespace Com.IsartDigital.GoobyrFPS.Core
         {
             if (IsServer && !Dead.Value) Health.Value = Mathf.Min(MaxHealth, Health.Value + pAmount);
         }
+
+        /// <summary>To the shooter only: the host's word on a hit it could not predict, and on every kill.</summary>
+        [Rpc(SendTo.SpecifiedInParams)]
+        private void ConfirmRpc(bool pHead, bool pKill, RpcParams pParams = default) => OnConfirmed?.Invoke(pHead, pKill);
+
+        /// <summary>The shooter's machine: head, kill.</summary>
+        public static event Action<bool, bool> OnConfirmed;
 
         [Rpc(SendTo.Everyone)]
         private void HitClientRpc(float pAmount, Vector3 pPoint, Vector3 pDirection, bool pHeadshot) => OnHitClient?.Invoke(pAmount, pPoint, pDirection, pHeadshot);

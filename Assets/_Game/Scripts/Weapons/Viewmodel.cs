@@ -45,6 +45,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public const float MELEE_SPEED = 2.5f, TAKEDOWN_SPEED = 1.7f;
         /// <summary>How far under its authored pose a held item sits when not aiming: it stays out of the way.</summary>
         private static readonly Vector3 LOWERED = new Vector3(0.012f, -0.04f, -0.015f);
+        /// <summary>Where the sight line sits under the view when aiming (the crosshair stays clear above it).</summary>
+        private static readonly Vector3 ADS_HOLD = new Vector3(0.05f, -0.075f, 0.01f);
 
         private int _builtItem = -2;
         private ItemDefinition _item;
@@ -456,6 +458,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 _rig.localPosition = lSight + lSquare * (_rig.localPosition - lSight);
                 lSight = transform.InverseTransformPoint(_sight.position);
                 _rig.localPosition -= new Vector3(lSight.x, lSight.y, 0f) * lAds;
+                // ... then the gun drops below the crosshair: aiming clears the view, it never fills it.
+                _rig.localPosition += ADS_HOLD * lAds;
             }
 
             // Recoil turns the rig about the sight (or the hand): the muzzle flips, the sight stays put.

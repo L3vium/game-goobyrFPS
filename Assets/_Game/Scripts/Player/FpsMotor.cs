@@ -14,7 +14,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         Zipline,
         Hidden,
         Locked,
-        Swim,
         /// <summary>Hanging from a ledge by the hands: shimmy, climb up, drop, leap to the next ledge.</summary>
         LedgeHang
     }
@@ -49,8 +48,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
     /// sideways, climb up, drop, or leap to the next ledge with jump and a direction.</item>
     /// <item><b>Climb</b> drainpipes, ladders and ivy (<c>Climbable</c>), topping out onto the roof.</item>
     /// </list>
-    /// plus ziplines, jump pads, hiding spots, swimming and diving
-    /// (<see cref="Systems.WaterVolume"/>). Only enabled on the owning machine; the result reaches
+    /// plus ziplines, jump pads and hiding spots. Water is never deeper than the knees: nobody swims.
+    /// Only enabled on the owning machine; the result reaches
     /// everyone through the NetworkTransform and <see cref="State"/>.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
@@ -58,7 +57,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
     {
         [Header("Speeds")]
         [SerializeField] private float _walkSpeed = 4.4f;
-        [SerializeField] private float _sprintSpeed = 7.2f;
+        [SerializeField] private float _sprintSpeed = 6.2f;
         [SerializeField] private float _crouchSpeed = 2.3f;
         [SerializeField] private float _crawlSpeed = 1.6f;
         [SerializeField] private float _acceleration = 55f;
@@ -76,18 +75,11 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         [Header("Slides")]
         [SerializeField] private float _slideCooldown = 0.55f;
         /// <summary>Slide speed out of a sprint, and out of a walk.</summary>
-        [SerializeField] private float _crouchSlideBoost = 12f;
-        [SerializeField] private float _walkSlideBoost = 7f;
+        [SerializeField] private float _crouchSlideBoost = 10f;
+        [SerializeField] private float _walkSlideBoost = 6.5f;
         /// <summary>How fast a slide bleeds speed out of a sprint, and out of a walk (m/s²).</summary>
-        [SerializeField] private float _sprintSlideFriction = 2.8f;
-        [SerializeField] private float _walkSlideFriction = 6f;
-
-        [Header("Water")]
-        [SerializeField] private float _swimSpeed = 3f;
-        [SerializeField] private float _swimSprintSpeed = 4.5f;
-        [SerializeField] private float _diveSpeed = 2.4f;
-        /// <summary>Seconds of breath under water before drowning starts.</summary>
-        [SerializeField] private float _breathTime = 20f;
+        [SerializeField] private float _sprintSlideFriction = 3.6f;
+        [SerializeField] private float _walkSlideFriction = 7f;
 
         [Header("Traversal")]
         [SerializeField] private float _climbSpeed = 3.2f;
@@ -112,14 +104,13 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         /// <summary>Camera offset that eases step-ups (stairs, kerbs) instead of popping the view.</summary>
         public float StepSmoothing => _stepOffset;
         public bool InGrass => _grassCount > 0;
-        public bool Swimming => Mode == MotorMode.Swim;
-        /// <summary>The eyes are below the water surface (hidden from sight, muffled, breath running out).</summary>
-        public bool Underwater { get; private set; }
-        /// <summary>Breath left, 1 = full.</summary>
-        public float Breath { get; private set; } = 1f;
         public bool Aiming { get; set; }
         /// <summary>Multiplies the speed (carrying a heavy weapon, being sick).</summary>
         public float SpeedMultiplier { get; set; } = 1f;
+        /// <summary>Dev cheats: through everything, up and down with the jump and crouch keys.</summary>
+        public bool DevFly { get; set; }
+        /// <summary>Dev cheats: multiplies every speed.</summary>
+        public float DevSpeed { get; set; } = 1f;
 
         /// <summary>What the body is doing, for the third-person animation.</summary>
         public MotionState State => Mode switch
@@ -128,7 +119,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             MotorMode.Mantle => _vaulting ? MotionState.Vault : MotionState.Mantle,
             MotorMode.Zipline => MotionState.Zipline,
             MotorMode.Hidden => MotionState.Hidden,
-            MotorMode.Swim => MotionState.Swim,
             MotorMode.LedgeHang => MotionState.Hang,
             _ => !Grounded ? MotionState.Air : _crouchSliding ? MotionState.Slide : Crawling ? MotionState.Crawl : MotionState.Ground
         };
@@ -141,10 +131,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public event Action<float> OnSlide;
         /// <summary>A mantle, vault or ledge grab started (for the sound and the view).</summary>
         public event Action<MotionState> OnTraversal;
-        /// <summary>Raised on landing with the fall damage to apply (0 = none), and each second of drowning.</summary>
+        /// <summary>Raised on landing with the fall damage to apply (0 = none).</summary>
         public event Action<float> OnFallDamage;
-        /// <summary>Raised when hitting the water, with the entry speed.</summary>
-        public event Action<float> OnSplash;
 
         private CharacterController _controller;
         private Vector3 _velocity;
@@ -159,7 +147,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         private float _ziplineT;
         private Systems.HidingSpot _hidingSpot;
         private Vector3 _climbNormal;
-        private float _drownTimer;
         private float _stepOffset;
         private float _regrabLock;
 
@@ -182,8 +169,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         {
             _velocity = Vector3.zero;
             Mode = MotorMode.Walk;
-            Underwater = false;
-            Breath = 1f;
         }
 
         public void Teleport(Vector3 pPosition, float pYaw)
@@ -267,6 +252,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             Vector2 lInput = GameInput.Move;
             _regrabLock -= dt;
+            if (DevFly) { UpdateDevFly(dt, lInput); return; }
             SafetyNet(dt);
             switch (Mode)
             {
@@ -275,13 +261,27 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 case MotorMode.Mantle: UpdateMove(dt); break;
                 case MotorMode.LedgeHang: UpdateHang(dt, lInput); break;
                 case MotorMode.Zipline: UpdateZipline(dt); break;
-                case MotorMode.Swim: UpdateSwim(dt, lInput); break;
                 case MotorMode.Hidden:
                     if (GameInput.Interact || GameInput.JumpPressed) ExitHidingSpot();
                     break;
             }
             UpdateHeight(dt);
             _stepOffset = Mathf.Lerp(_stepOffset, 0f, 1f - Mathf.Exp(-14f * dt));
+        }
+
+        private void UpdateDevFly(float dt, Vector2 pInput)
+        {
+            float lRise = (GameInput.JumpHeld ? 1f : 0f) - (GameInput.CrouchHeld ? 1f : 0f);
+            float lSpeed = (GameInput.Sprint ? 30f : 12f) * DevSpeed;
+            Quaternion lView = Camera.main != null ? Camera.main.transform.rotation : transform.rotation;
+            Vector3 lMove = (lView * Vector3.forward * pInput.y + transform.right * pInput.x + Vector3.up * lRise) * lSpeed;
+            _controller.enabled = false;
+            transform.position += lMove * dt;
+            _controller.enabled = true;
+            _velocity = Vector3.zero;
+            Grounded = true;
+            Crouched = Crawling = Sprinting = false;
+            _airStartY = transform.position.y;
         }
 
         private void UpdateWalk(float dt, Vector2 pInput)
@@ -333,7 +333,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             // A crouch that doesn't fit ahead (a vent, a crawlspace) goes down on all fours; it stays so until a crouch fits again.
             Crawling = Crouched && !_crouchSliding && ((pInput.y > 0.2f && LowCeilingAhead()) || (Crawling && !CanFit(CROUCH_HEIGHT)));
 
-            float lSpeed = (Crawling ? _crawlSpeed : Crouched ? _crouchSpeed : Sprinting ? _sprintSpeed : _walkSpeed) * SpeedMultiplier;
+            float lSpeed = (Crawling ? _crawlSpeed : Crouched ? _crouchSpeed : Sprinting ? _sprintSpeed : _walkSpeed) * SpeedMultiplier * DevSpeed;
             if (Aiming) lSpeed *= 0.65f;
             Vector3 lWish = (transform.forward * pInput.y + transform.right * pInput.x) * lSpeed;
             Vector3 lPlanar = new Vector3(_velocity.x, 0, _velocity.z);
@@ -344,7 +344,12 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 float lSlope = Grounded && Physics.Raycast(transform.position + Vector3.up * 0.3f, Vector3.down, out RaycastHit lGround, 0.8f, GameLayers.WorldMask, QueryTriggerInteraction.Ignore)
                     ? Vector3.Dot(new Vector3(lGround.normal.x, 0f, lGround.normal.z), lPlanar.normalized) : 0f;
                 lPlanar = Vector3.MoveTowards(lPlanar, Vector3.zero, Mathf.Max(0.5f, _slideFriction - lSlope * 14f) * dt);
-                if (lPlanar.magnitude < _crouchSpeed + 0.3f || !Grounded || !_wantCrouch) _crouchSliding = false;
+                if (lPlanar.magnitude < _crouchSpeed + 0.3f || !Grounded || !_wantCrouch)
+                {
+                    _crouchSliding = false;
+                    // Run, slide, run: still holding the run key, the body gets up and goes on.
+                    if (GameInput.Sprint && CanFit(STAND_HEIGHT)) _crouchToggled = false;
+                }
             }
             else
             {
@@ -360,8 +365,12 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             if (_jumpBuffer > 0f && !Crawling)
             {
                 if (TryTraverse(MoveDirection(pInput), true)) { _jumpBuffer = 0f; return; }
-                if (_coyote > 0f && !Crouched)
+                if (_coyote > 0f && (!Crouched || CanFit(STAND_HEIGHT)))
                 {
+                    // A jump gets up from a crouch and out of a slide, with its speed.
+                    _crouchToggled = false;
+                    _wantCrouch = false;
+                    _crouchSliding = false;
                     _velocity.y = Mathf.Sqrt(-2f * _gravity * _jumpHeight);
                     _coyote = 0f;
                     _jumpBuffer = 0f;
@@ -380,25 +389,20 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             _velocity.x = lPlanar.x;
             _velocity.z = lPlanar.z;
             float lBeforeY = transform.position.y;
-            _controller.Move(_velocity * dt);
+            _controller.Move((_velocity + _steepPush) * dt);
+            _steepPush = Vector3.zero;
 
             // Down stairs and slopes: stay glued to the ground instead of hopping off every step.
             if (lWasGrounded && !lJumped && !_controller.isGrounded && _velocity.y <= 0f && !_crouchSliding) SnapToGround();
             // Up a step: the body pops up, the eyes follow smoothly.
             float lRise = transform.position.y - lBeforeY;
-            if (lWasGrounded && lRise > 0.04f && lRise < 0.6f) _stepOffset = Mathf.Max(-0.6f, _stepOffset - lRise);
+            // Only a real step: what a 50 degree slope gives at this speed is walking, and the eyes stay on the body.
+            float lSlopeRise = PlanarSpeed * dt * 1.2f;
+            if (lWasGrounded && !lJumped && lRise > 0.06f + lSlopeRise && lRise < 0.6f) _stepOffset = Mathf.Max(-0.35f, _stepOffset - lRise);
 
             // Climbable surface ahead and pushing forward: grab it.
             if (pInput.y > 0.5f && _regrabLock <= 0f && TryGrabClimbable()) SetMode(MotorMode.Climb);
 
-            // Deep enough water: swim.
-            if (Systems.WaterVolume.At(transform.position + Vector3.up * 0.1f, out float lSurface) != null && lSurface - transform.position.y > SWIM_DEPTH)
-            {
-                OnSplash?.Invoke(Mathf.Abs(_velocity.y) + PlanarSpeed * 0.3f);
-                _crouchSliding = false;
-                Crawling = false;
-                SetMode(MotorMode.Swim);
-            }
         }
 
         /// <summary>The flat direction the player pushes toward (their facing when only pressing forward or nothing).</summary>
@@ -409,6 +413,15 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             return lDir.sqrMagnitude > 0.01f ? lDir.normalized : transform.forward;
         }
 
+        /// <summary>A head against a ceiling stops rising; a face too steep to stand on slides the body off it.</summary>
+        private void OnControllerColliderHit(ControllerColliderHit pHit)
+        {
+            if (Mode != MotorMode.Walk) return;
+            if (pHit.normal.y < -0.3f && _velocity.y > 0f) { _velocity.y = 0f; return; }
+            if (pHit.normal.y > 0.05f && pHit.normal.y < 0.64f && !Grounded && _velocity.y <= 0f)
+                _steepPush = Vector3.ProjectOnPlane(Vector3.down, pHit.normal).normalized * 3f;
+        }
+
         private void SnapToGround()
         {
             float lRadius = _controller.radius * 0.9f;
@@ -417,56 +430,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             if (lHit.normal.y < 0.6f) return;
             _controller.Move(Vector3.down * (lHit.distance + 0.02f));
             Grounded = _controller.isGrounded;
-        }
-
-        /// <summary>Water deeper than this at the feet makes the player swim.</summary>
-        private const float SWIM_DEPTH = 1.25f;
-
-        private void UpdateSwim(float dt, Vector2 pInput)
-        {
-            Systems.WaterVolume lWater = Systems.WaterVolume.At(transform.position + Vector3.up * 0.5f, out float lSurface);
-            Grounded = false;
-            Crouched = false;
-            Crawling = false;
-            Sprinting = false;
-            _crouchSliding = false;
-            if (lWater == null || (lSurface - transform.position.y < SWIM_DEPTH - 0.2f && _controller.isGrounded))
-            {
-                SetMode(MotorMode.Walk);
-                Underwater = false;
-                _airStartY = transform.position.y;
-                return;
-            }
-
-            Underwater = transform.position.y + EyeHeight < lSurface - 0.05f;
-            // Floating keeps the eyes just above the surface; crouch dives, jump rises.
-            float lFloat = lSurface - EyeHeight + 0.15f;
-            float lTargetY = GameInput.CrouchHeld ? -_diveSpeed
-                : GameInput.JumpHeld && Underwater ? _diveSpeed * 1.1f
-                : Mathf.Clamp((lFloat - transform.position.y) * 2.5f, -1.5f, 2.2f);
-            _velocity.y = Mathf.MoveTowards(_velocity.y, lTargetY, 8f * dt);
-
-            float lSpeed = (GameInput.Sprint ? _swimSprintSpeed : _swimSpeed) * (Underwater ? 0.85f : 1f) * SpeedMultiplier;
-            Vector3 lWish = (transform.forward * pInput.y + transform.right * pInput.x) * lSpeed;
-            Vector3 lPlanar = Vector3.MoveTowards(new Vector3(_velocity.x, 0, _velocity.z), lWish, 8f * dt);
-            _velocity.x = lPlanar.x;
-            _velocity.z = lPlanar.z;
-
-            // At the surface, jump climbs out onto a ledge.
-            if (GameInput.JumpPressed && !Underwater && TryTraverse(transform.forward, false)) { Underwater = false; return; }
-
-            if (Underwater)
-            {
-                Breath = Mathf.Max(0f, Breath - dt / _breathTime);
-                if (Breath <= 0f && (_drownTimer -= dt) <= 0f) { _drownTimer = 1f; OnFallDamage?.Invoke(12f); }
-            }
-            else
-            {
-                Breath = Mathf.Min(1f, Breath + dt / 3f);
-                _drownTimer = 0f;
-            }
-            _controller.Move((_velocity + lWater.Current) * dt);
-            _airStartY = transform.position.y;
         }
 
         // ---------------------------------------------------------------- heights
@@ -490,6 +453,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             return !Physics.CapsuleCast(lFeet, transform.position + Vector3.up * (CRAWL_HEIGHT - lRadius), lRadius, transform.forward, 0.6f, LedgeMask, QueryTriggerInteraction.Ignore);
         }
 
+        private const float STEP_OFFSET = 0.45f;
+
         private void UpdateHeight(float dt)
         {
             float lTarget = Mode == MotorMode.Hidden ? CROUCH_HEIGHT
@@ -499,6 +464,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             float lHeight = Mathf.MoveTowards(_controller.height, lTarget, dt * 6f);
             _controller.height = lHeight;
             _controller.center = new Vector3(0, lHeight * 0.5f, 0);
+            // A low body steps over less: a step higher than its knees would wedge it under the ledge.
+            _controller.stepOffset = Mathf.Min(STEP_OFFSET, lHeight * 0.3f);
         }
 
         // ---------------------------------------------------------------- ledges
@@ -658,6 +625,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             // The run goes on after a mantle or a vault, along where the body was heading.
             _moveCarry = pAfter == MotorMode.Walk ? new Vector3(pTo.x - _moveFrom.x, 0f, pTo.z - _moveFrom.z).normalized * PlanarSpeed : Vector3.zero;
             _velocity = Vector3.zero;
+            _crouchToggled = false;
+            _crouchSliding = false;
             Mode = MotorMode.Mantle;
             if (pAfter != MotorMode.LedgeHang)
             {
@@ -798,6 +767,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         }
 
         private bool _crouchToggled;
+        private Vector3 _steepPush;
         private float _climbStuck;
         private Vector3 _moveCarry;
 

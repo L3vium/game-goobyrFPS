@@ -47,13 +47,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private float _vignetteBase = 0.2f;
         private Color _vignetteColor = Color.black;
         private float _desaturate;
-        private bool _underwater;
-        private float _underwaterBlend;
-        private AudioLowPassFilter _lowPass;
         private AudioReverbFilter _reverb;
-        private Color _fogColor;
-        private float _fogDensity;
-        private bool _fogSaved;
         private float _exposurePulse;
         private float _seed;
 
@@ -77,13 +71,11 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             lWorld.transform.SetParent(transform, false);
             lWorld.tag = "MainCamera";
             WorldCamera = lWorld.AddComponent<Camera>();
-            WorldCamera.nearClipPlane = 0.05f;
+            WorldCamera.nearClipPlane = 0.1f;
             WorldCamera.farClipPlane = 900f;
             WorldCamera.fieldOfView = BaseFov;
             WorldCamera.cullingMask = ~(1 << GameLayers.LOCAL_VIEW);
             lWorld.AddComponent<AudioListener>();
-            _lowPass = lWorld.AddComponent<AudioLowPassFilter>();
-            _lowPass.cutoffFrequency = 22000f;
             _reverb = lWorld.AddComponent<AudioReverbFilter>();
             _reverb.reverbPreset = AudioReverbPreset.Room;
             _reverb.enabled = false;
@@ -167,19 +159,6 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
         public void SetDesaturate(float pAmount) => _desaturate = pAmount;
 
-        /// <summary>Eyes under water: blue-green murk, close fog, muffled sound (local only).</summary>
-        public void SetUnderwater(bool pUnder)
-        {
-            if (pUnder == _underwater) return;
-            _underwater = pUnder;
-            if (pUnder && !_fogSaved)
-            {
-                _fogColor = RenderSettings.fogColor;
-                _fogDensity = RenderSettings.fogDensity;
-                _fogSaved = true;
-            }
-        }
-
         private void LateUpdate()
         {
             float dt = Time.unscaledDeltaTime;
@@ -203,19 +182,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _color.postExposure.overrideState = _exposurePulse > 0.01f;
             _color.postExposure.value = _exposurePulse;
 
-            _underwaterBlend = Mathf.MoveTowards(_underwaterBlend, _underwater ? 1f : 0f, dt * 6f);
-            _color.colorFilter.overrideState = _underwaterBlend > 0.01f;
-            _color.colorFilter.value = Color.Lerp(Color.white, new Color(0.45f, 0.78f, 0.86f), _underwaterBlend);
-            if (_underwaterBlend > 0.01f) _color.saturation.overrideState = true;
-            if (_underwaterBlend > 0.01f) _color.saturation.value = Mathf.Min(_color.saturation.value, -25f * _underwaterBlend);
-            _lowPass.cutoffFrequency = Mathf.Lerp(22000f, 700f, _underwaterBlend);
             _reverb.enabled = TimeOfDay.Instance != null && TimeOfDay.Instance.Indoors;
-            if (_fogSaved)
-            {
-                RenderSettings.fogColor = Color.Lerp(_fogColor, new Color(0.08f, 0.22f, 0.26f), _underwaterBlend);
-                RenderSettings.fogDensity = Mathf.Lerp(_fogDensity, 0.12f, _underwaterBlend);
-                if (_underwaterBlend <= 0f) _fogSaved = false;
-            }
         }
 
         // ---------------------------------------------------------------- juice entry points

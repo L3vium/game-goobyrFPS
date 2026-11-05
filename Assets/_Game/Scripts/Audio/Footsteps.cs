@@ -19,13 +19,11 @@ namespace Com.IsartDigital.GoobyrFPS.Audio
         private Vector3 _last;
         private float _distance;
         private System.Func<float> _loudness;
-        private System.Func<bool> _swimming;
 
-        /// <summary><paramref name="pLoudness"/>: 0 (silent) .. 1 (running); <paramref name="pSwimming"/>: in deep water.</summary>
-        public void Init(System.Func<float> pLoudness, System.Func<bool> pSwimming = null)
+        /// <summary><paramref name="pLoudness"/>: 0 (silent) .. 1 (running).</summary>
+        public void Init(System.Func<float> pLoudness)
         {
             _loudness = pLoudness;
-            _swimming = pSwimming;
             _last = transform.position;
         }
 
@@ -39,15 +37,14 @@ namespace Com.IsartDigital.GoobyrFPS.Audio
             float lLoud = _loudness != null ? _loudness() : 0.5f;
             if (lLoud <= 0f) { _distance = 0f; return; }
 
-            bool lSwim = _swimming != null && _swimming();
             lStep.y = 0f;
             float lMoved = lStep.magnitude;
             if (lMoved > 1.5f) return; // a teleport
             _distance += lMoved;
-            float lStride = lSwim ? 1.6f : Mathf.Lerp(0.65f, 1.05f, lLoud);
+            float lStride = Mathf.Lerp(0.65f, 1.05f, lLoud);
             if (_distance < lStride) return;
             _distance = 0f;
-            string lSound = lSwim ? "swim" : "step_" + SurfaceAt(lPosition);
+            string lSound = "step_" + SurfaceAt(lPosition);
             Sfx.Play(lSound, lPosition + Vector3.up * 0.05f, Mathf.Lerp(0.25f, 0.9f, lLoud), Mathf.Lerp(10f, 30f, lLoud), 0.1f);
         }
 

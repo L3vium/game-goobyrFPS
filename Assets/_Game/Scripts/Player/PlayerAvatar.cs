@@ -22,6 +22,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
     /// owner into network variables; health, team and the proof stay with the host.
     /// </para>
     /// </summary>
+    /// <summary>What a dev cheat changes on the host.</summary>
+    [System.Flags]
+    public enum DevFlag { None = 0, Invincible = 1, Ghost = 2, InfiniteAmmo = 4 }
+
     [RequireComponent(typeof(CharacterController), typeof(Damageable), typeof(FpsMotor))]
     public class PlayerAvatar : NetworkBehaviour
     {
@@ -32,8 +36,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public readonly NetworkVariable<bool> Sprinting = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> InGrass = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> Hidden = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-        /// <summary>Eyes under water: out of sight beyond arm's length.</summary>
-        public readonly NetworkVariable<bool> Submerged = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> Aiming = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         /// <summary>Guard up (left Ctrl): a punch or a blade does less (see <see cref="Damageable.DamageScale"/>).</summary>
         public readonly NetworkVariable<bool> Blocking = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -42,6 +44,12 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public readonly NetworkVariable<MotionState> Motion = new NetworkVariable<MotionState>(MotionState.Ground, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<int> Team = new NetworkVariable<int>(0);
         public readonly NetworkVariable<bool> CarriesProof = new NetworkVariable<bool>(false);
+        private DevFlag _devFlags;
+
+        /// <summary>Host (dev cheat): no NPC, camera or turret notices this player.</summary>
+        public bool DevGhost => (_devFlags & DevFlag.Ghost) != 0;
+        /// <summary>Host (dev cheat): magazines and throwables never run out.</summary>
+        public bool DevInfiniteAmmo => (_devFlags & DevFlag.InfiniteAmmo) != 0;
 
         public FpsMotor Motor { get; private set; }
         public CharacterController Controller { get; private set; }
@@ -93,8 +101,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             };
             Health.OnHitClient += HandleHit;
             gameObject.AddComponent<Audio.Footsteps>().Init(
-                () => !Health.IsAlive || Hidden.Value ? 0f : Crouched.Value ? 0.1f : Sprinting.Value ? 1f : 0.55f,
-                () => IsOwner ? Motor.Swimming : Submerged.Value);
+                () => !Health.IsAlive || Hidden.Value ? 0f : Crouched.Value ? 0.1f : Sprinting.Value ? 1f : 0.55f);
             Health.OnDeathClient += HandleDeath;
             Team.OnValueChanged += (_, pNew) => ApplyTeam(pNew);
 
@@ -122,7 +129,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 Motor.OnDrop += HandleDrop;
                 Motor.OnTraversal += HandleTraversal;
                 Motor.OnFallDamage += pDamage => FallDamageRpc(pDamage);
-                Motor.OnSplash += pSpeed => SplashRpc(transform.position + Vector3.up * 0.9f, Mathf.Clamp01(pSpeed / 8f) + 0.5f);
             }
             else Controller.enabled = true;
         }
@@ -176,9 +182,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 Sprinting.Value = Motor.Sprinting;
                 InGrass.Value = Motor.InGrass;
                 Hidden.Value = Motor.Mode == MotorMode.Hidden;
-                Submerged.Value = Motor.Underwater;
                 if (Motion.Value != Motor.State) Motion.Value = Motor.State;
-                CameraRig.Instance?.SetUnderwater(Motor.Underwater);
                 if (Mathf.Abs(Pitch.Value - _pitch) > 1f) Pitch.Value = _pitch;
                 Motor.SpeedMultiplier = CarriesProof.Value ? 0.92f : 1f;
             }
@@ -342,17 +346,6 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             }
         }
 
-        [Rpc(SendTo.Everyone)]
-        private void SplashRpc(Vector3 pPoint, float pSize)
-        {
-            Effects.Splash(pPoint, pSize);
-            if (IsServer) AI.NoiseSystem.Emit(pPoint, 8f * pSize, AI.NoiseKind.Suspicious, OwnerClientId);
-        }
-
-        /// <summary>Host: a notification for this player only (caught on camera...).</summary>
-        [Rpc(SendTo.Owner)]
-        public void NotifyRpc(string pWhat, string pWhere) => UI.Hud.Notify(pWhat, pWhere, UI.ThreatMarkers.Amber);
-
         /// <summary>Host → owner: a searcher opened the hiding spot this player is in; out they come.</summary>
         [Rpc(SendTo.Owner)]
         public void PullOutOfHidingRpc()
@@ -373,6 +366,49 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public void InteractRpc(int pInteractableId, int pHeldItem)
         {
             if (MapSession.Instance != null) MapSession.Instance.HandleInteract(this, pInteractableId, pHeldItem);
+        }
+
+        // ---------------------------------------------------------------- dev cheats (the host checks they are on)
+
+        [Rpc(SendTo.Server)]
+        public void DevSetFlagRpc(int pFlag, bool pOn)
+        {
+            if (!UI.DevCheats.Allowed) return;
+            _devFlags = pOn ? _devFlags | (DevFlag)pFlag : _devFlags & ~(DevFlag)pFlag;
+            Health.Invincible = (_devFlags & DevFlag.Invincible) != 0;
+        }
+
+        [Rpc(SendTo.Server)]
+        public void DevGiveRpc(int pItem)
+        {
+            if (UI.DevCheats.Allowed && Weapons != null) Weapons.GiveServer(GameDatabase.Item(pItem), -1, -1);
+        }
+
+        [Rpc(SendTo.Server)]
+        public void DevKillNearRpc(float pRadius)
+        {
+            if (!UI.DevCheats.Allowed) return;
+            foreach (AI.Npc lNpc in new List<AI.Npc>(AI.Npc.All))
+                if (lNpc != null && lNpc.Health.IsAlive && !lNpc.IsTarget && Vector3.Distance(lNpc.transform.position, transform.position) <= pRadius)
+                    lNpc.Health.Kill(DamageInfo.World(0f, DamageType.Bullet, lNpc.transform.position + Vector3.up, Vector3.down));
+        }
+
+        [Rpc(SendTo.Server)]
+        public void DevToTargetRpc()
+        {
+            if (!UI.DevCheats.Allowed) return;
+            foreach (AI.Npc lNpc in AI.Npc.All)
+                if (lNpc != null && lNpc.IsTarget && lNpc.Health.IsAlive)
+                {
+                    TeleportOwnerRpc(lNpc.transform.position - lNpc.transform.forward * 2.5f + Vector3.up * 0.2f, lNpc.transform.eulerAngles.y);
+                    return;
+                }
+        }
+
+        [Rpc(SendTo.Server)]
+        public void DevFreezeClockRpc(bool pOn)
+        {
+            if (UI.DevCheats.Allowed) Match.MatchDirector.DevClockFrozen = pOn;
         }
 
         /// <summary>Host: pushes the owner (explosions).</summary>

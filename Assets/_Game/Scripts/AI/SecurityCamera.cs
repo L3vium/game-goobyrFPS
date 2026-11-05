@@ -48,6 +48,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             PlayerAvatar lCaught = null;
             foreach (PlayerAvatar lPlayer in PlayerAvatar.All)
             {
+                if (lPlayer != null && lPlayer.DevGhost) continue;
                 if (lPlayer == null || !lPlayer.IsSpawned || !lPlayer.Health.IsAlive || lPlayer.Hidden.Value || lPlayer.IsProtector) continue;
                 Vector3 lTo = lPlayer.Chest - transform.position;
                 if (lTo.magnitude > _range || Vector3.Angle(transform.forward, lTo) > _halfAngle) continue;
@@ -64,7 +65,6 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             _seen = 0f;
             LevelZone lZone = LevelZone.Get(_zone);
             if (lZone != null) lZone.ReportThreatPoint(lCaught.transform.position, 2, 70f);
-            lCaught.NotifyRpc("SPOTTED ON CAMERA", lZone != null ? lZone.ZoneName : "");
         }
 
         private void OnDrawGizmosSelected()

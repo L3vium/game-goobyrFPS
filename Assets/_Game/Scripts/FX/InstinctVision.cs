@@ -24,6 +24,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
     {
         public enum Slot { Target, Ally, Alert, Npc, Use }
 
+        /// <summary>Dev cheat: always on, and every NPC of the map in it.</summary>
+        public static bool RevealAll { get; set; }
+
         public struct Draw
         {
             public Renderer renderer;
@@ -76,7 +79,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private void Update()
         {
             PlayerAvatar lLocal = PlayerAvatar.Local;
-            bool lWant = GameInput.InstinctHeld && lLocal != null && lLocal.Health != null && lLocal.Health.IsAlive;
+            bool lWant = (GameInput.InstinctHeld || RevealAll) && lLocal != null && lLocal.Health != null && lLocal.Health.IsAlive;
             if (lWant && !_on)
             {
                 Wave = 0f;
@@ -128,13 +131,13 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             foreach (Npc lNpc in Npc.All)
             {
                 if (lNpc == null || lNpc.IsTarget || !lNpc.Health.IsAlive) continue;
-                if ((lNpc.transform.position - lEye).sqrMagnitude > lNpcRange) continue;
+                if (!RevealAll && (lNpc.transform.position - lEye).sqrMagnitude > lNpcRange) continue;
                 if (lNpc.IsAlerted || lNpc.Awareness.Value >= 10) AddTree(lNpc.transform, Slot.Alert);
             }
             foreach (Npc lNpc in Npc.All)
             {
                 if (lNpc == null || lNpc.IsTarget || !lNpc.Health.IsAlive || lNpc.IsAlerted || lNpc.Awareness.Value >= 10) continue;
-                if ((lNpc.transform.position - lEye).sqrMagnitude > lNpcRange) continue;
+                if (!RevealAll && (lNpc.transform.position - lEye).sqrMagnitude > lNpcRange) continue;
                 AddTree(lNpc.transform, Slot.Npc);
             }
 

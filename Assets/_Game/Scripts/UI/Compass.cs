@@ -84,6 +84,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             if (lDirector != null)
             {
                 if (lDirector.Proof.Value == ProofState.Dropped) Pin(lYaw, lFrom, lDirector.ProofPosition.Value, ThreatMarkers.Amber, true);
+                if (lDirector.Proof.Value == ProofState.Carried && !lMe.CarriesProof.Value && Hud.CarrierPing.HasValue) Pin(lYaw, lFrom, Hud.CarrierPing.Value, Hud.CARRIER_YELLOW, true);
                 if (lDirector.Proof.Value != ProofState.TargetAlive)
                 {
                     List<MatchPoint> lExtractions = MatchPoint.OfKind(MatchPoint.Kind.Extraction);

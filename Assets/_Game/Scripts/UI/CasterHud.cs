@@ -184,7 +184,6 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             if (pAvatar.CarriesProof.Value) return ("PROOF", UIFactory.Good);
             if (pView.InCombat(lId)) return ("COMBAT", ThreatMarkers.Red);
             if (pView.IsEngaged(lId)) return ("SPOTTED", ThreatMarkers.Amber);
-            if (pAvatar.Submerged.Value) return ("UNDERWATER", ThreatMarkers.Blue);
             if (pAvatar.Hidden.Value) return ("HIDDEN", ThreatMarkers.Blue);
             if (pAvatar.InGrass.Value && pAvatar.Crouched.Value) return ("IN THE GRASS", ThreatMarkers.Blue);
             if (pView.HurtRecently(lId)) return ("HIT", UIFactory.Danger);

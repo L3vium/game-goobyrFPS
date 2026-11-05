@@ -659,10 +659,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         }
 
         /// <summary>
-        /// A flat water surface you can swim in (returned so a builder can tilt it into a cascade).
-        /// <paramref name="pCurrent"/> pushes swimmers (rivers). The bed deeper than waist height is
-        /// cut out of the NavMesh: NPCs keep to the banks and the shallows.
+        /// A flat water surface (returned so a builder can tilt it into a cascade). Nobody swims: an
+        /// invisible floor just under it keeps feet in the water, whatever the bed below. The water
+        /// is cut out of the NavMesh: NPCs keep to the banks.
         /// </summary>
+        public const float WADING_DEPTH = 0.35f;
+
         public GameObject Water(Vector3 pCenter, Vector2 pSize, Vector3 pCurrent = default)
         {
             GameObject lWater = new GameObject("Water") { layer = GameLayers.WATER };
@@ -678,6 +680,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lModifier.center = new Vector3(0f, -20.9f, 0f);
             lModifier.size = new Vector3(1f, 40f, 1f);
             lModifier.area = NavMesh.GetAreaFromName("Not Walkable");
+            GameObject lFloor = new GameObject("WadingFloor") { layer = GameLayers.DEFAULT };
+            lFloor.transform.SetParent(lWater.transform, false);
+            BoxCollider lWade = lFloor.AddComponent<BoxCollider>();
+            lWade.center = new Vector3(0f, -WADING_DEPTH - 0.5f, 0f);
+            lWade.size = new Vector3(1f, 1f, 1f);
             return lWater;
         }
 

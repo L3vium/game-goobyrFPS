@@ -61,6 +61,45 @@ struct Varyings
     UNITY_VERTEX_OUTPUT_STEREO
 };
 
+#ifdef UNITY_INSTANCING_ENABLED
+// The flat look without the shimmer: the terrain's own triangles change as its level of detail follows
+// the camera, and their facets with them. These facets come from a fixed grid over the heightmap, so
+// they stay put when the player moves.
+#define FACET_TEXELS 6.0
+float3 TerrainFacetPoint(int2 pTexel)
+{
+    float2 lLast = 1.0 / _TerrainHeightmapRecipSize.zw;
+    pTexel = min(pTexel, int2(lLast));
+    float lHeight = UnpackHeightmap(_TerrainHeightmapTexture.Load(int3(pTexel, 0)));
+    return float3(pTexel.x * _TerrainHeightmapScale.x, lHeight * _TerrainHeightmapScale.y, pTexel.y * _TerrainHeightmapScale.z);
+}
+
+float3 TerrainFacetNormal(float2 pUv)
+{
+    float2 lCell = pUv / _TerrainHeightmapRecipSize.zw / FACET_TEXELS;
+    float2 lOrigin = floor(lCell);
+    float2 f = lCell - lOrigin;
+    int2 a = int2(lOrigin * FACET_TEXELS);
+    int lStep = (int)FACET_TEXELS;
+    // Diagonals alternate cell by cell, so the facets don't line up into a pattern.
+    bool lFlip = fmod(lOrigin.x + lOrigin.y, 2.0) > 0.5;
+    int2 p0, p1, p2;
+    if (lFlip)
+    {
+        if (f.x + f.y < 1.0) { p0 = a; p1 = a + int2(lStep, 0); p2 = a + int2(0, lStep); }
+        else { p0 = a + int2(lStep, lStep); p1 = a + int2(0, lStep); p2 = a + int2(lStep, 0); }
+    }
+    else
+    {
+        if (f.x > f.y) { p0 = a; p1 = a + int2(lStep, lStep); p2 = a + int2(lStep, 0); }
+        else { p0 = a; p1 = a + int2(0, lStep); p2 = a + int2(lStep, lStep); }
+    }
+    float3 q0 = TerrainFacetPoint(p0);
+    float3 lNormal = normalize(cross(TerrainFacetPoint(p1) - q0, TerrainFacetPoint(p2) - q0));
+    return lNormal.y < 0.0 ? -lNormal : lNormal;
+}
+#endif
+
 void InitializeInputData(Varyings IN, half3 normalTS, out InputData inputData)
 {
     inputData = (InputData)0;
@@ -87,8 +126,12 @@ void InitializeInputData(Varyings IN, half3 normalTS, out InputData inputData)
     #endif
 
     // The flat look: the terrain's facets, whatever its normal map says.
-    inputData.normalWS = normalize(cross(ddy(IN.positionWS), ddx(IN.positionWS)));
-    if (inputData.normalWS.y < 0) inputData.normalWS = -inputData.normalWS;
+    #ifdef UNITY_INSTANCING_ENABLED
+        inputData.normalWS = TerrainFacetNormal(IN.uvMainAndLM.xy);
+    #else
+        inputData.normalWS = normalize(cross(ddy(IN.positionWS), ddx(IN.positionWS)));
+        if (inputData.normalWS.y < 0) inputData.normalWS = -inputData.normalWS;
+    #endif
     inputData.viewDirectionWS = viewDirWS;
 
     #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)

@@ -126,10 +126,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lBloom.intensity.Override(0.8f);
             lBloom.scatter.Override(0.72f);
             UnityEngine.Rendering.Universal.Vignette lVignette = Add<UnityEngine.Rendering.Universal.Vignette>(lProfile);
-            lVignette.intensity.Override(0.22f);
+            lVignette.intensity.Override(0.1f);
             lVignette.smoothness.Override(0.5f);
             UnityEngine.Rendering.Universal.Tonemapping lTone = Add<UnityEngine.Rendering.Universal.Tonemapping>(lProfile);
-            lTone.mode.Override(UnityEngine.Rendering.Universal.TonemappingMode.ACES);
+            lTone.mode.Override(UnityEngine.Rendering.Universal.TonemappingMode.Neutral);
             EditorUtility.SetDirty(lProfile);
             return lProfile;
         }
@@ -167,7 +167,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 SerializedProperty lSettings = lSo.FindProperty("m_Settings");
                 if (lSettings != null)
                 {
-                    lSettings.FindPropertyRelative("Intensity").floatValue = 0.9f;
+                    lSettings.FindPropertyRelative("Intensity").floatValue = 0.55f;
                     lSettings.FindPropertyRelative("Radius").floatValue = 0.45f;
                     SerializedProperty lDirect = lSettings.FindPropertyRelative("DirectLightingStrength");
                     if (lDirect != null) lDirect.floatValue = 0.3f;

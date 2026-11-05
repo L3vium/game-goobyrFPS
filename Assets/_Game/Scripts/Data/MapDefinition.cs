@@ -50,6 +50,8 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         public Texture2D[] planFloors;
         /// <summary>The room's picture of the map: a shot of it with an agent in front (null: the plan is shown instead).</summary>
         public Texture2D preview;
+        /// <summary>The outline of the playable ground, by equal angles around the map's centre (x, z).</summary>
+        public Vector2[] boundary;
         /// <summary>The map's one mood (<see cref="FX.TimeOfDay"/>): 0 dawn, 1 noon, 2 dusk, 3 night.</summary>
         public int timeOfDay = 1;
         /// <summary>World XZ of the plan's bottom-left corner, and its side in metres.</summary>

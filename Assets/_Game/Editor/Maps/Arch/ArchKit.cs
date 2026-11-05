@@ -828,6 +828,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         /// <summary>A gadget spawn (a pass, a key, a tool, a poison) with a label for the designers.</summary>
         public void Gadget(ItemKind pKind, Vector3 pPosition, string pLabel) => K.Point(MatchPoint.Kind.GadgetSpawn, pPosition, 0f, pLabel, pKind);
 
+        /// <summary>A throwable that belongs inside a building: no rocks in a living room.</summary>
+        public void ThrowableIndoors(Vector3 pPosition) => K.Gadget(Pick(ItemKind.Bottle, ItemKind.Wrench, ItemKind.Bottle, ItemKind.Coin, ItemKind.Brick), pPosition);
+
         /// <summary>A throwable lying on a surface (rock, bottle, wrench, brick, coin).</summary>
         public void Throwable(Vector3 pPosition, ItemKind pKind = ItemKind.Fists)
         {

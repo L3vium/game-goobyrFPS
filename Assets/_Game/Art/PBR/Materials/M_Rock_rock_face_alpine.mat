@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: M_Rock_rock_face_alpine
-  m_Shader: {fileID: 4800000, guid: 64b5e937af27f14429e8c629d9cc575a, type: 3}
+  m_Shader: {fileID: 4800000, guid: 0258ef1ce3f8ef940a6c6a24aeb59fb1, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -24,24 +24,27 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: b39bd9c02c69a3d4cbcc35264eccf5b7, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
-        m_Texture: {fileID: 2800000, guid: 1f4c1bce2e64f5d4e9cbcc5c93c7fd71, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MaskMap:
-        m_Texture: {fileID: 2800000, guid: 29e950796cdf7e84792d4bae736c4fbe, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SnowMap:
-        m_Texture: {fileID: 2800000, guid: 108204ab5140e114fb07aca693768522, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _Cull: 2
     - _Cutoff: 0.5
+    - _HitFlash: 0
+    - _Smooth: 0
     - _Smoothness: 0.6
     - _SnowAmount: 0.6
     - _SnowTile: 4
@@ -49,7 +52,9 @@ Material:
     - _StrataStrength: 0.6
     - _Tile: 6
     m_Colors:
-    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BaseColor: {r: 0.2515508, g: 0.09406995, b: 0.01764049, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _ShadowTint: {r: 0.58, g: 0.6, b: 0.86, a: 1}
     - _SnowColor: {r: 1, g: 1, b: 1, a: 1}
     - _StrataA: {r: 0.62, g: 0.6, b: 0.58, a: 1}
     - _StrataB: {r: 0.5, g: 0.47, b: 0.45, a: 1}

@@ -11,8 +11,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
     /// head, upper and lower arms and legs, capsules and boxes sized from the bones, realistic mass
     /// split (75 kg), character joints whose hinge limits start from the current bend so elbows and
     /// knees only fold the right way. It keeps the speed it had and takes the blow at the hit point.
-    /// Local to each machine (the impulse comes through the death RPC), capped so long matches keep
-    /// their frame rate.
+    /// For a moment its muscles still hold the pose it died in, then they let go: the body staggers and
+    /// folds instead of dropping like a sack. The ears flop on their own little joints. Local to each
+    /// machine (the impulse comes through the death RPC), capped so long matches keep their frame rate.
     /// </summary>
     public class HumanRagdoll : MonoBehaviour
     {
@@ -24,6 +25,10 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         public Rigidbody Pelvis { get; private set; }
 
         private readonly List<Rigidbody> _bodies = new List<Rigidbody>();
+        private readonly List<(Rigidbody body, Rigidbody parent, Quaternion rest)> _muscles = new List<(Rigidbody, Rigidbody, Quaternion)>();
+        /// <summary>How long the muscles hold on after death, how hard and how damped (angular acceleration).</summary>
+        private const float MUSCLE_TIME = 1.1f, MUSCLE_STRENGTH = 150f, MUSCLE_DAMPING = 14f;
+        private float _bornAt;
         private float _settleCheck;
         private float _startY;
 
@@ -47,9 +52,16 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             HumanRagdoll lRagdoll = lModel.gameObject.AddComponent<HumanRagdoll>();
             _alive.Enqueue(lRagdoll);
             GameLayers.SetRecursive(lModel.gameObject, GameLayers.RAGDOLL);
-            foreach (SkinnedMeshRenderer lSkin in lModel.GetComponentsInChildren<SkinnedMeshRenderer>()) lSkin.updateWhenOffscreen = true;
+            foreach (SkinnedMeshRenderer lSkin in lModel.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                lSkin.updateWhenOffscreen = true;
+                // A player's own body was drawn as a shadow only: their corpse is there for all to see, themselves included.
+                lSkin.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                lSkin.forceRenderingOff = false;
+            }
             lRagdoll.Build(lAnimator, lCharacter.right, lCharacter.forward);
             lRagdoll._startY = lModel.position.y;
+            lRagdoll._bornAt = Time.time;
 
             foreach (Rigidbody lRigidbody in lRagdoll._bodies) lRigidbody.linearVelocity = pVelocity;
             if (pImpulse.sqrMagnitude > 0.0001f)
@@ -137,10 +149,55 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             Limb(lThighR, lCalfR, Pelvis, 0.1f, R(lThighR, lCalfR, 0.20f, 0.065f, 0.11f), pRight, 45f, 85f, 50f, out Rigidbody lLegR);
             Hinge(lCalfR, lToesR != null ? lToesR : lFootR, lLegR, lThighR, 0.06f, R(lCalfR, lFootR, 0.14f, 0.045f, 0.075f), pRight, 145f);
 
+            // The ears flop.
+            foreach (string lEarName in new[] { "ear_l", "ear_r" })
+            {
+                Transform lEar = FindDeep(lHead, lEarName);
+                if (lEar == null) continue;
+                Rigidbody lEarBody = Body(lEar, 0.006f);
+                lEar.gameObject.AddComponent<SphereCollider>().radius = 0.04f / Mathf.Max(0.01f, lEar.lossyScale.x);
+                Ball(lEarBody, lHeadBody, lEar, pRight, pForward, 25f, 40f, 40f);
+            }
+
+            // The muscles: every joint remembers the pose it died in.
+            foreach (Rigidbody lBody in _bodies)
+            {
+                CharacterJoint lJoint = lBody.GetComponent<CharacterJoint>();
+                if (lJoint != null && lJoint.connectedBody != null) _muscles.Add((lBody, lJoint.connectedBody, Quaternion.Inverse(lJoint.connectedBody.rotation) * lBody.rotation));
+            }
+
             // No self-collision: the parts start overlapping at the joints and would push each other apart.
             Collider[] lColliders = GetComponentsInChildren<Collider>();
             for (int i = 0; i < lColliders.Length; i++)
                 for (int j = i + 1; j < lColliders.Length; j++) Physics.IgnoreCollision(lColliders[i], lColliders[j]);
+        }
+
+        private static Transform FindDeep(Transform pRoot, string pName)
+        {
+            if (pRoot.name == pName) return pRoot;
+            foreach (Transform lChild in pRoot)
+            {
+                Transform lFound = FindDeep(lChild, pName);
+                if (lFound != null) return lFound;
+            }
+            return null;
+        }
+
+        private void FixedUpdate()
+        {
+            float lAge = Time.time - _bornAt;
+            if (lAge >= MUSCLE_TIME) return;
+            float lStrength = MUSCLE_STRENGTH * (1f - lAge / MUSCLE_TIME) * (1f - lAge / MUSCLE_TIME);
+            foreach ((Rigidbody lBody, Rigidbody lParent, Quaternion lRest) in _muscles)
+            {
+                if (lBody == null || lParent == null || lBody.isKinematic) continue;
+                Quaternion lDelta = lParent.rotation * lRest * Quaternion.Inverse(lBody.rotation);
+                lDelta.ToAngleAxis(out float lAngle, out Vector3 lAxis);
+                if (lAngle > 180f) lAngle -= 360f;
+                if (float.IsInfinity(lAxis.x) || Mathf.Abs(lAngle) < 0.2f) continue;
+                Vector3 lRelative = lBody.angularVelocity - lParent.angularVelocity;
+                lBody.AddTorque(lAxis * (lAngle * Mathf.Deg2Rad * lStrength) - lRelative * MUSCLE_DAMPING * (lStrength / MUSCLE_STRENGTH), ForceMode.Acceleration);
+            }
         }
 
         private Rigidbody Body(Transform pBone, float pShare)

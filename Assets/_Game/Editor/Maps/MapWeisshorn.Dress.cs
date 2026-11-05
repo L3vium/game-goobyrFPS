@@ -142,7 +142,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             A.Distraction("generator", _garageR.At(1.5f, 0, 10.5f, 0f), _garage.yaw);
             A.Distraction("radio", _garageR.At(14.5f, 0, 2f, 0f), _garage.yaw);
             A.Dumpster(_garageR.At(-3f, 0, 4f, 0f), _garage.yaw + 90f);
-            A.Explosive(_garageR.InRoom("GarageMine", 0.2f, 0.8f, 0f), 0f);
             A.CrateStack(_mineHutR.At(4.5f, 0, -2f, 0f), 0f, 3);
             // Ski-jump tower with its inrun, the lookout on top.
             Vector3 lJump = G(SKIJUMP, 0f);
@@ -307,8 +306,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             A.Model("Furn_BarCounter", Hp(68.6f, 2, 6f, 0f), -90f, _hotelR.interior);
             // Spa: pool, sauna stove (explosive), hot tub heater, ipecac at the doctor's.
             K.Water(Hp(7f, 2, 21f, -0.3f), new Vector2(8f, 5f));
-            A.Explosive(Hp(1.2f, 2, 29f, 0f), 0f, true);
-            A.Explosive(Hp(12f, 2, 17f, 0f), 0f, true);
             A.Distraction("radio", Hp(12f, 2, 29f, 0f), 180f);
             A.Gadget(ItemKind.EmeticPoison, Hp(33f, 3, 4f, 0.8f), "Ipecac (doctor's bag)");
             A.Gadget(ItemKind.CodeNote, Hp(3f, 1, 26f, 0.9f), "Butler's code card");
@@ -316,11 +313,9 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             A.Distraction("phone", Hp(28f, 4, 4f, 0.8f), 0f);
             A.Distraction("tv", Hp(36f, 4, 6f, 0f), 180f);
             A.Distraction("phone", Hp(32f, 2, 4f, 0.8f), 0f);
-            A.Explosive(Hp(20f, 2, 1f, 0f), 0f, true);
             A.LaundryCart(Hp(3f, 1, 28f, 0f), 180f);
             A.LaundryCart(Hp(5f, 0, 3f, 0f), 0f);
             A.Model("Prop_Helicopter", Hp(58f, 4, 14f, 0f), 30f);
-            A.Explosive(Hp(-2f, 2, 6f, 0f), 0f, true);
         }
 
         private void Tunnels()
@@ -329,7 +324,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Vector3 lMine = _garageR.At(-0.6f, -1, 6f, 0f);
             Vector3 lCold = Hp(35f, 0, 30.6f, 0f);
             Cave("MineGallery", 3.6f, 3.0f, lMine, lMine + new Vector3(-8f, 0, 4f), new Vector3(60f, 18f, 40f), new Vector3(30f, 32f, 90f), new Vector3(20f, 40f, 125f), new Vector3(lCold.x, lCold.y, lCold.z + 6f), lCold);
-            A.Explosive(new Vector3(60f, 18f, 40f) + new Vector3(1.5f, 0f, 0f), 0f);
             Poi(new Vector3(60f, 19f, 40f), "Mine gallery", MapPoi.Kind.Underground);
             // Bunker escape tunnel: command level -> under the ski-jump.
             Vector3 lBunker = _observatoryR.At(-0.6f, -2, 11f, 0f);

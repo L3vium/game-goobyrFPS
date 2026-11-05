@@ -73,7 +73,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         };
 
         /// <summary>The 0.7.0 cast (Tools/Blender/characters/cast): a separate head mesh with expression blend shapes.</summary>
-        public static bool IsNewCast(GameObject pModel) => pModel != null && FindDeep(pModel.transform, pModel.name + "_Head_LOD0") != null;
+        public static bool IsNewCast(GameObject pModel) => pModel != null && (FindDeep(pModel.transform, pModel.name + "_Head_LOD0") != null || FindDeep(pModel.transform, pModel.name + "_LOD0") != null);
 
         [MenuItem("Goobyr/Build/Characters")]
         public static void Build()
@@ -107,6 +107,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             foreach (string lFolder in CharacterFolders())
             {
                 string lName = Path.GetFileName(lFolder);
+                if (FlatArt.RemapFlat(Fbx(lFolder))) continue;
                 bool lNew = IsNewCast(AssetDatabase.LoadAssetAtPath<GameObject>(Fbx(lFolder)));
                 PbrLibrary.PrepareFolder(lFolder);
                 // Hair, brows and lashes carry their coverage in the PNG's alpha.

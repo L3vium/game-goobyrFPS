@@ -255,15 +255,17 @@ namespace Com.IsartDigital.GoobyrFPS.World
             foreach (Material m in new[] { _nearMaterial, _farMaterial })
             {
                 if (m == null) continue;
-                m.SetColor("_RootColor", _style.root);
-                m.SetColor("_TipColor", _style.tip);
-                m.SetColor("_DryColor", _style.dry);
+                // The flat look: fat leaves in clean colours, roots barely darker, no shine.
+                Color lTip = Color.Lerp(_style.tip, Color.white, 0.22f);
+                m.SetColor("_RootColor", Color.Lerp(lTip, Color.black, 0.28f));
+                m.SetColor("_TipColor", lTip);
+                m.SetColor("_DryColor", Color.Lerp(_style.dry, Color.white, 0.2f));
                 m.SetColor("_TranslucencyColor", _style.translucency);
-                m.SetFloat("_BladeWidth", _style.bladeWidth);
-                m.SetFloat("_TuftRadius", _style.tuftRadius);
+                m.SetFloat("_BladeWidth", _style.bladeWidth * 3.4f);
+                m.SetFloat("_TuftRadius", _style.tuftRadius * 1.5f);
                 m.SetFloat("_WindScale", _style.wind);
-                m.SetFloat("_Translucency", _style.translucencyAmount);
-                m.SetFloat("_Gloss", _style.gloss);
+                m.SetFloat("_Translucency", 0.15f);
+                m.SetFloat("_Gloss", 0f);
             }
         }
 

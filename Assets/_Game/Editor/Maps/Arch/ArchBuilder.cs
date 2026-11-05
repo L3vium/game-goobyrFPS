@@ -159,6 +159,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (pSpec.stringCourses)
                 for (int f = 1; f <= c.maxF; f++) if (!pSpec.cornices.Contains(f)) StringCourse(c, f);
             foreach (ArchBalcony b in pSpec.balconies) Balcony(c, b);
+            AddClimbs(pSpec);
             foreach (ArchDrain d in pSpec.drains) Drain(c, d);
             foreach (ArchHatch h in pSpec.hatches) Hatch(c, h);
             c.mesh.Flush(r.shell, MeshPrefix + "_" + pSpec.name);
@@ -1591,6 +1592,30 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 _ivy = lLeaf != null ? new ArchMat("IvyLeaf", lLeaf, 0.9f) : ArchLib.PlainMat("Ivy", new Color(0.15f, 0.3f, 0.1f), 0.2f, 0f);
                 return _ivy;
             }
+        }
+
+        /// <summary>
+        /// Every building with an upstairs or a roof worth reaching gets two ways up at least: pipes and
+        /// ivy on the middle of its sides, where the spec has none.
+        /// </summary>
+        private static void AddClimbs(ArchSpec pSpec)
+        {
+            Rect lBounds = default;
+            bool lAny = false;
+            foreach (ArchRoom lRoom in pSpec.rooms)
+            {
+                if (lRoom.floor != 0) continue;
+                lBounds = lAny ? Rect.MinMaxRect(Mathf.Min(lBounds.xMin, lRoom.rect.xMin), Mathf.Min(lBounds.yMin, lRoom.rect.yMin), Mathf.Max(lBounds.xMax, lRoom.rect.xMax), Mathf.Max(lBounds.yMax, lRoom.rect.yMax)) : lRoom.rect;
+                lAny = true;
+            }
+            if (!lAny || lBounds.width < 3f || lBounds.height < 3f) return;
+            Vector2[] lSpots =
+            {
+                new Vector2(lBounds.xMin, lBounds.center.y + 0.25f), new Vector2(lBounds.xMax, lBounds.center.y - 0.25f),
+                new Vector2(lBounds.center.x + 0.25f, lBounds.yMax), new Vector2(lBounds.center.x - 0.25f, lBounds.yMin)
+            };
+            for (int i = 0; i < lSpots.Length && pSpec.drains.Count < 2; i++)
+                pSpec.Climb(lSpots[i].x, lSpots[i].y, i % 2 == 0 ? ClimbKind.Drainpipe : ClimbKind.Ivy);
         }
 
         private static void Drain(Ctx c, ArchDrain d)

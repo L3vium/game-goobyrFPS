@@ -86,7 +86,9 @@ void InitializeInputData(Varyings IN, half3 normalTS, out InputData inputData)
         half3 SH = IN.vertexSH;
     #endif
 
-    inputData.normalWS = NormalizeNormalPerPixel(inputData.normalWS);
+    // The flat look: the terrain's facets, whatever its normal map says.
+    inputData.normalWS = normalize(cross(ddy(IN.positionWS), ddx(IN.positionWS)));
+    if (inputData.normalWS.y < 0) inputData.normalWS = -inputData.normalWS;
     inputData.viewDirectionWS = viewDirWS;
 
     #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)

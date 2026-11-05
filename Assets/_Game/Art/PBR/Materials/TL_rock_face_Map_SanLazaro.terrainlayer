@@ -7,14 +7,14 @@ TerrainLayer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: TL_rock_face_Map_SanLazaro
-  m_DiffuseTexture: {fileID: 2800000, guid: b39bd9c02c69a3d4cbcc35264eccf5b7, type: 3}
-  m_NormalMapTexture: {fileID: 2800000, guid: 1f4c1bce2e64f5d4e9cbcc5c93c7fd71, type: 3}
-  m_MaskMapTexture: {fileID: 2800000, guid: 29e950796cdf7e84792d4bae736c4fbe, type: 3}
+  m_DiffuseTexture: {fileID: 2800000, guid: d690fabb734edd94483a8f74ebf51461, type: 3}
+  m_NormalMapTexture: {fileID: 0}
+  m_MaskMapTexture: {fileID: 0}
   m_TileSize: {x: 8, y: 8}
   m_TileOffset: {x: 0, y: 0}
   m_Specular: {r: 0, g: 0, b: 0, a: 0}
   m_Metallic: 0
-  m_Smoothness: 1
+  m_Smoothness: 0
   m_NormalScale: 1
   m_DiffuseRemapMin: {x: 0, y: 0, z: 0, w: 0}
   m_DiffuseRemapMax: {x: 1, y: 1, z: 1, w: 1}

@@ -333,7 +333,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
 
             if (Crouched)
             {
-                SetGait(pLocal, pSpeed, 1, CROUCH, CROUCH, 0f, dt, out pPace, 3.3f);
+                SetGait(pLocal, pSpeed, 1, CROUCH, CROUCH, 0f, dt, out pPace, 1.7f);
                 return S_CROUCH;
             }
             if (Panic && pSpeed > 1f)
@@ -355,9 +355,8 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 }
             }
             int lTier = Sprinting && pLocal.z > 0.5f * pSpeed ? 3 : pSpeed > RUN_FROM ? 2 : 1;
-            // The pace may reach 3: quick little steps when the motor outruns the clip (TABS-ish scurry); the
-            // player's 4.4 m/s strafe needs ~2.8 on the side-run clips.
-            SetGait(pLocal, pSpeed, lTier, WALK, RUN, SPRINT, dt, out pPace, 3f);
+            // Never a scurry: past this pace the feet slide a little rather than the legs going goofy.
+            SetGait(pLocal, pSpeed, lTier, WALK, RUN, SPRINT, dt, out pPace, 1.8f);
             return S_LOCOMOTION;
         }
 
@@ -559,7 +558,6 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             float lGround = lHit.point.y - transform.position.y;
             if (lGround < -0.5f || lGround > 0.5f) { _animator.SetIKPositionWeight(pGoal, 0f); _animator.SetIKRotationWeight(pGoal, 0f); return 0f; }
             Vector3 lTarget = new Vector3(lFoot.x, lHit.point.y + Mathf.Max(lLift, 0.06f), lFoot.z);
-            lTarget = LockFoot(pGoal == AvatarIKGoal.LeftFoot ? 0 : 1, lTarget, lLift);
             Quaternion lSlope = Quaternion.FromToRotation(Vector3.up, Vector3.Slerp(Vector3.up, lHit.normal, 0.8f));
             _animator.SetIKPositionWeight(pGoal, _footWeight);
             _animator.SetIKRotationWeight(pGoal, _footWeight * Mathf.Clamp01(1f - lLift * 6f));

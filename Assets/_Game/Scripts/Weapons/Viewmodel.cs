@@ -148,7 +148,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         private readonly System.Collections.Generic.List<(Material material, Color color)> _shadedModel = new System.Collections.Generic.List<(Material, Color)>();
         private float _shade = 1f, _appliedShade = -1f;
         /// <summary>How dark the arms and the held item get when the sun is blocked at the eye.</summary>
-        public const float SHADE = 0.42f;
+        public const float SHADE = 0.8f;
 
         /// <summary>The arms take no world shadow: they dim themselves when the sun is hidden from the eye.</summary>
         private void UpdateShade(float pDt)

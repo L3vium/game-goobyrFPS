@@ -161,13 +161,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lCandle.AddComponent<Flammable>().Setup(20f, 3f, false, 1.4f);
             }
             A.Model("Prop_Jerrycan", C(8.6f, 0, 22.9f, 0f), 0f);
-            A.Explosive(C(14f, 0, 1.2f, 0f), 0f);
-            A.Explosive(C(14.7f, 0, 1.2f, 0f), 0f);
             A.Distraction("radio", C(12.8f, 0, 9f, 0f), 90f);
             A.Distraction("phone", C(24.5f, 1, 27.6f, 0.8f), 0f);
             A.Distraction("phone", C(35f, 0, 7f, 0.8f), 0f);
             A.Distraction("radio", C(4f, -1, 30.6f, 0f), 180f);
-            A.Explosive(C(38.6f, -1, 30.6f, 0f), 0f, true);
             A.LaundryCart(C(33f, -1, 30.5f, 0f), 180f);
             A.LaundryCart(C(2f, 1, 30.5f, 0f), 180f);
             A.Gadget(ItemKind.EmeticPoison, C(36f, 0, 30.6f, 0.95f), "Emetic (kitchen)");

@@ -41,8 +41,8 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     _ => null
                 };
                 h.Door(0, pWidth * 0.3f, lSplit);
-                h.Door(0, pWidth * 0.75f, pDepth, DoorKind.Door, 1.1f);
-                h.Stair(0, 0.9f, pDepth - 1.5f, pWidth - 1.1f, pDepth - 0.45f, 3, false);
+                h.Door(0, pWidth - 0.85f, pDepth, DoorKind.Door, 1.1f);
+                h.Stair(0, 0.85f, pDepth - 1.5f, pWidth - 1.75f, pDepth - 0.45f, 3, false);
                 h.Room("Bedroom", 1, 0, 0, pWidth, lSplit, RoomType.Bedroom, SecurityTier.Restricted);
                 h.Room("Landing", 1, 0, lSplit, pWidth, pDepth, RoomType.Corridor, SecurityTier.Restricted);
                 h.Door(1, pWidth * 0.75f, lSplit);

@@ -156,6 +156,7 @@ namespace Com.IsartDigital.GoobyrFPS.Match
 
             // NPCs from the map's spawn points.
             int lConverted = 0;
+            HashSet<PatrolRoute> lReinforced = new HashSet<PatrolRoute>();
             foreach (NpcSpawnPoint lSpawn in FindObjectsByType<NpcSpawnPoint>(FindObjectsSortMode.None))
             {
                 // Only enemies: a civilian's post in the map is one more armed guard's.
@@ -166,6 +167,9 @@ namespace Com.IsartDigital.GoobyrFPS.Match
                 ItemKind lCarries = lSpawn.Carries == ItemKind.StaffPass ? ItemKind.Crowbar : lSpawn.Carries == ItemKind.Invitation ? ItemKind.Fists : lSpawn.Carries;
                 if (lCarries != ItemKind.Fists) lSpawned.SetCarried(GameDatabase.Find(lCarries));
                 lSpawned.SetEnforcer(lSpawn.Enforcer);
+                // One more man on every patrol: the map is alive wherever you look.
+                if (lSpawn.Route != null && lReinforced.Add(lSpawn.Route))
+                    SpawnNpc(lSpawn.transform.position + lSpawn.transform.right * 1.2f, lSpawn.transform.rotation, NpcRole.Patrol, lSpawn.Zone, GameDatabase.Find(ItemKind.Smg), lSpawn.Route, null, -1, null);
             }
 
             // The target and its bodyguards.

@@ -78,10 +78,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private static float TrunkRadius(string pName)
         {
-            if (pName.Contains("Ceiba")) return 1.4f;
-            if (pName.Contains("JungleTree")) return 0.55f;
+            // The low-poly trunks' real radii: you walk around what you see.
+            if (pName.Contains("Ceiba")) return 1.1f;
+            if (pName.Contains("JungleTree")) return 0.5f;
             if (pName.Contains("Palm") || pName.Contains("Fern")) return 0.25f;
-            if (pName.Contains("Fir_Large") || pName.Contains("Snowy_Large")) return 0.45f;
+            if (pName.Contains("Fir_Large") || pName.Contains("Snowy_Large")) return 0.5f;
             if (pName.Contains("Acacia") || pName.Contains("Dead") || pName.Contains("Birch")) return 0.3f;
             return 0.35f;
         }

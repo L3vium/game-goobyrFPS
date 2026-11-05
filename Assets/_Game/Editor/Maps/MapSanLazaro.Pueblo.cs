@@ -53,10 +53,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     _ => null
                 };
                 h.Door(0, pWidth * 0.3f, lSplit);
-                h.Door(0, pWidth * 0.75f, pDepth, DoorKind.Door, 1.1f);
+                h.Door(0, pWidth - 0.85f, pDepth, DoorKind.Door, 1.1f);
                 if (pFloors > 1)
                 {
-                    h.Stair(0, 0.9f, pDepth - 1.5f, pWidth - 1.1f, pDepth - 0.45f, 3, false);
+                    h.Stair(0, 0.85f, pDepth - 1.5f, pWidth - 1.75f, pDepth - 0.45f, 3, false);
                     h.Room("Bedroom", 1, 0, 0, pWidth, lSplit, RoomType.Bedroom, SecurityTier.Restricted);
                     h.Room("Landing", 1, 0, lSplit, pWidth, pDepth, RoomType.Corridor, SecurityTier.Restricted);
                     h.Door(1, pWidth * 0.75f, lSplit);
@@ -253,9 +253,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lBuntingRoot.transform.SetParent(K.Env, false);
             lBunting.Flush(lBuntingRoot.transform, "SanLazaro_Bunting");
             // Fireworks mortars under the stage (explosive), the empanada cart's gas tank on the cantina terrace.
-            A.Explosive(lStage + new Vector3(0.5f, 0f, 1.5f), 0f, true);
-            A.Explosive(lStage + new Vector3(-0.8f, 0f, -1.2f), 0f, true);
-            A.Explosive(G(-52.5f, -140f, 0f), 0f, true);
             ArchOutdoor.Stall(A, G(-53.5f, -137f, 0f), 90f, new Color(0.9f, 0.75f, 0.2f));
             // Cantina terrace tables with drinks (the sponsor's glass).
             for (int i = 0; i < 3; i++)

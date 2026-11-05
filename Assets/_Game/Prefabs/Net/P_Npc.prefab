@@ -60,7 +60,7 @@ MonoBehaviour:
   SynchronizeTransform: 1
   m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
+  SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
@@ -240,7 +240,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 413b19bb3af41b448b581aa124d35e53, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.HumanBody
-  _character: Chr_Agent
+  _character: Chr_Rook
   _buildOnAwake: 1
   _culling: 1
 --- !u!114 &7946411692822265206

@@ -50,6 +50,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
         private bool _underwater;
         private float _underwaterBlend;
         private AudioLowPassFilter _lowPass;
+        private AudioReverbFilter _reverb;
         private Color _fogColor;
         private float _fogDensity;
         private bool _fogSaved;
@@ -83,6 +84,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             lWorld.AddComponent<AudioListener>();
             _lowPass = lWorld.AddComponent<AudioLowPassFilter>();
             _lowPass.cutoffFrequency = 22000f;
+            _reverb = lWorld.AddComponent<AudioReverbFilter>();
+            _reverb.reverbPreset = AudioReverbPreset.Room;
+            _reverb.enabled = false;
             UniversalAdditionalCameraData lWorldData = WorldCamera.GetUniversalAdditionalCameraData();
             lWorldData.renderPostProcessing = true;
             lWorldData.antialiasing = AntialiasingMode.TemporalAntiAliasing;
@@ -205,6 +209,7 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             if (_underwaterBlend > 0.01f) _color.saturation.overrideState = true;
             if (_underwaterBlend > 0.01f) _color.saturation.value = Mathf.Min(_color.saturation.value, -25f * _underwaterBlend);
             _lowPass.cutoffFrequency = Mathf.Lerp(22000f, 700f, _underwaterBlend);
+            _reverb.enabled = TimeOfDay.Instance != null && TimeOfDay.Instance.Indoors;
             if (_fogSaved)
             {
                 RenderSettings.fogColor = Color.Lerp(_fogColor, new Color(0.08f, 0.22f, 0.26f), _underwaterBlend);

@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 413b19bb3af41b448b581aa124d35e53, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.HumanBody
-  _character: Chr_Agent
+  _character: Chr_Rook
   _buildOnAwake: 1
   _culling: 0
 --- !u!114 &7252460285987459555
@@ -121,7 +121,7 @@ MonoBehaviour:
   SynchronizeTransform: 1
   m_InScenePlaced: 0
   ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
+  SceneMigrationSynchronization: 0
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
@@ -231,10 +231,6 @@ MonoBehaviour:
   _airAcceleration: 14
   _jumpHeight: 1.15
   _gravity: -24
-  _standHeight: 1.86
-  _crouchHeight: 1.1
-  _crawlHeight: 0.74
-  _eyeOffset: 0.12
   _slideCooldown: 0.55
   _crouchSlideBoost: 12
   _walkSlideBoost: 7

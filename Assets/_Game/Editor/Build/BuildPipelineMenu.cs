@@ -25,7 +25,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             DataBuilder.Build(false);
             ArtBuilder.Build();
-            SfxBuilder.Build();
             CharacterBuilder.Build();
             PrefabBuilder.Build();
             PbrLibrary.Build();

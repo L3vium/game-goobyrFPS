@@ -7,14 +7,14 @@ TerrainLayer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Map_Weisshorn_Turf_DryGrass
-  m_DiffuseTexture: {fileID: 2800000, guid: cd690c7819d33e045a53731c58429f58, type: 3}
-  m_NormalMapTexture: {fileID: 2800000, guid: 7448581ce72bbda4cbefcdf464838cb1, type: 3}
-  m_MaskMapTexture: {fileID: 2800000, guid: 9a0818c7510499545befd540b07b0cfc, type: 3}
+  m_DiffuseTexture: {fileID: 2800000, guid: fb8d7482e3df93145816356ad14f8e5a, type: 3}
+  m_NormalMapTexture: {fileID: 0}
+  m_MaskMapTexture: {fileID: 0}
   m_TileSize: {x: 4, y: 4}
   m_TileOffset: {x: 0, y: 0}
   m_Specular: {r: 0, g: 0, b: 0, a: 0}
   m_Metallic: 0
-  m_Smoothness: 1
+  m_Smoothness: 0
   m_NormalScale: 1
   m_DiffuseRemapMin: {x: 0, y: 0, z: 0, w: 0}
   m_DiffuseRemapMax: {x: 0.78, y: 0.9, z: 0.68, w: 1}

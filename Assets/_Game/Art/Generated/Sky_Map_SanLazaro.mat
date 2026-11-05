@@ -32,6 +32,7 @@ Material:
     - _CloudSpeed: 0.25
     - _CloudTop: 1.6
     - _Exponent: 0.9
+    - _SilverLining: 1.2
     - _SunHalo: 1.2
     - _SunSize: 0.006
     m_Colors:

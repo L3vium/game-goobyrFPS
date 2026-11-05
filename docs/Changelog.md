@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.0 — The new look, the new sound, fuller maps
+
+The look
+- The whole game is flat-coloured and faceted now: pastel skies, clean colours, soft shadows, barely
+  any haze, and buildings as bright inside as out. Each map keeps one mood.
+- A new cast with big floppy ears: agents in dark suits with a tie in their team's colour, guards
+  dressed for the climate, targets who stand out. Ears, arms and heads swing as they move.
+- Deaths are physical: the body staggers and folds as its muscles let go. Your own body falls too.
+- New trees, palms, firs, bushes and rocks, and fat clumps of grass. Walking and crouching no longer
+  scurry, and the flickering leg should be gone.
+
+The sound
+- Every sound was thrown away and generated again: guns with a real room tail, a set of footsteps per
+  surface, punchy hits, wordless gibberish for the guards, a radio for the talkie-walkie, and one
+  ambience per map. Rooms ring when you are indoors.
+
+The maps
+- More to do: more than twice the tall grass around the enemies, about 120 guns, a second man on every
+  patrol, two ways up every building, and guards who use the ladders.
+- Fixed: rows of the same sink, rocks indoors, explosive barrels in villages (they stay in military
+  places), house stairs with no way out at the top, tunnels blocked by the ground or by boulders, trees
+  floating over slopes, and falling under the map (you are put back where you last stood).
+- The map's edge is an organic outline instead of a square, and the plan is sharper, pale on dark.
+- The room shows a picture of each map with an agent in front, and the title uses the first one.
+
 ## 0.8.1 — One screen
 
 The front end

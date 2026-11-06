@@ -38,7 +38,6 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
             PlayEffectServer(0);
             NoiseSystem.Emit(transform.position, 3f, NoiseKind.Suspicious, lBy);
             foreach (AutoTurret lTurret in _turrets) if (lTurret != null) lTurret.TurnServer(lBy);
-            if (pWho != null) pWho.NotifyRpc("TURRETS HACKED", "They now fire on the guards");
         }
 
         private void OnEnable() => Tint();

@@ -50,6 +50,13 @@ namespace Com.IsartDigital.GoobyrFPS.Match
     /// </summary>
     public static class MatchRulesLogic
     {
+        /// <summary>Seconds until the next reveal of whoever carries the proof: from the slowest to the fastest over the ramp.</summary>
+        public static float RevealInterval(float pSlowest, float pFastest, float pRamp, float pCarriedFor)
+        {
+            float t = System.Math.Min(1f, System.Math.Max(0f, pCarriedFor / System.Math.Max(1f, pRamp)));
+            return pSlowest + (pFastest - pSlowest) * t;
+        }
+
         public const int NO_TEAM = -1;
         public const int MAX_TEAMS = 8;
 

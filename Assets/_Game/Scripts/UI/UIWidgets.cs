@@ -31,6 +31,23 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             return lList;
         }
 
+        /// <summary>A list that scrolls with the wheel when it outgrows <paramref name="pHeight"/>.</summary>
+        public static RectTransform ScrollList(Transform pParent, string pName, Vector2 pAnchor, Vector2 pPosition, float pWidth, float pHeight, float pSpacing = 6f)
+        {
+            RectTransform lView = UIFactory.Rect(pParent, pName + "View", pAnchor, pAnchor, new Vector2(0.5f, 1f), pPosition, new Vector2(pWidth, pHeight));
+            lView.gameObject.AddComponent<RectMask2D>();
+            Image lCatcher = lView.gameObject.AddComponent<Image>();
+            lCatcher.color = new Color(0f, 0f, 0f, 0f);
+            RectTransform lList = List(lView, pName, new Vector2(0.5f, 1f), Vector2.zero, pWidth, pSpacing);
+            ScrollRect lScroll = lView.gameObject.AddComponent<ScrollRect>();
+            lScroll.viewport = lView;
+            lScroll.content = lList;
+            lScroll.horizontal = false;
+            lScroll.movementType = ScrollRect.MovementType.Clamped;
+            lScroll.scrollSensitivity = 40f;
+            return lList;
+        }
+
         /// <summary>A small-caps section title with a short accent rule, inside a list.</summary>
         public static void Section(RectTransform pList, string pTitle)
         {

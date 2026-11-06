@@ -380,7 +380,6 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         {
             PlayerAvatar lMe = PlayerAvatar.Local;
             if (lMe == null || (lMe.transform.position - transform.position).sqrMagnitude > 60f * 60f) return;
-            UI.Hud.Notify("WITNESS", "RUNNING TO A GUARD", UI.ThreatMarkers.Amber);
         }
     }
 }

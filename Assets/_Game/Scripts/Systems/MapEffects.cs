@@ -47,11 +47,5 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
         {
             if (pTarget.TryGet(out NetworkObject lObject)) BurnVisuals.Apply(lObject, pOn);
         }
-
-        [Rpc(SendTo.Everyone)]
-        public void ToastRpc(string pMessage)
-        {
-            UI.Hud.Toast(pMessage);
-        }
     }
 }

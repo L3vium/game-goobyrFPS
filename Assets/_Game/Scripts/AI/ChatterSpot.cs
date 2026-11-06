@@ -37,7 +37,6 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             foreach (Npc lNpc in Npc.All)
                 if (lNpc != null && lNpc.Health.IsAlive && !lNpc.IsAlerted && (lNpc.transform.position - transform.position).sqrMagnitude < 25f) { lSpeaker = true; break; }
             if (!lSpeaker) return;
-            UI.Hud.Notify("OVERHEARD · " + _speaker.ToUpperInvariant(), _lines[_next], UI.ThreatMarkers.White);
             _next = (_next + 1) % _lines.Length;
             _cooldown = _next == 0 ? 90f : 7f;
         }

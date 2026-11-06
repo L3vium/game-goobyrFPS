@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2501977273634554315}
   - component: {fileID: 1614940885142890601}
+  - component: {fileID: 7113683883928296036}
   m_Layer: 0
   m_Name: Veg_DeadTree
   m_TagString: Untagged
@@ -56,6 +57,26 @@ CapsuleCollider:
   m_Height: 0.95552135
   m_Direction: 1
   m_Center: {x: 0, y: 0.47776067, z: 0}
+--- !u!205 &7113683883928296036
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2321107562869656466}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: 0.10259342, y: 2.603482, z: 0.14690828}
+  m_Size: 5.8069644
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.004
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 9196550164549156831}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0
 --- !u!1 &2636548804131500715
 GameObject:
   m_ObjectHideFlags: 0

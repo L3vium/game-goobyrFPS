@@ -19,6 +19,8 @@ namespace Com.IsartDigital.GoobyrFPS.Core
         public const float HEAD_CENTRE = 1.64f;
         public const float CROUCH_HEAD_CENTRE = 0.94f;
         public const float HEAD_RADIUS = 0.16f;
+        /// <summary>The head as bullets see it, much larger than the skull: from the shoulders up is a headshot.</summary>
+        public const float HEAD_HIT_RADIUS = 0.24f;
 
         /// <summary>Player capsule heights; the camera sits <see cref="CAPSULE"/> - <see cref="EYE"/> under the top.</summary>
         public const float CAPSULE = 1.80f;

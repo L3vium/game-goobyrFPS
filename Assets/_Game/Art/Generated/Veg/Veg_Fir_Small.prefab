@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2123418865688037338}
   - component: {fileID: 1415123240180536133}
+  - component: {fileID: 4901658331819241394}
   m_Layer: 0
   m_Name: Veg_Fir_Small
   m_TagString: Untagged
@@ -56,6 +57,26 @@ CapsuleCollider:
   m_Height: 3.1197689
   m_Direction: 1
   m_Center: {x: 0, y: 1.5598844, z: 0}
+--- !u!205 &4901658331819241394
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3612999475255246417}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: 0.079224944, y: 2.3499994, z: -0.00000023841858}
+  m_Size: 5.299999
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.004
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 8212329537292961309}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0
 --- !u!1 &9131119394227541167
 GameObject:
   m_ObjectHideFlags: 0

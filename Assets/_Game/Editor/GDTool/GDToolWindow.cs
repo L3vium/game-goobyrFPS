@@ -77,7 +77,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Players & match", EditorStyles.boldLabel);
-            Fields(lRules, "playerHealth", "playerDamageMultiplier", "maxPlayers", "timeLimitMinutes", "proximityChatByDefault", "proximityChatRange", "proofRevealInterval", "extractionTime", "activeExtractions");
+            Fields(lRules, "cheatsEnabled", "playerHealth", "playerDamageMultiplier", "maxPlayers", "timeLimitMinutes", "proximityChatByDefault", "proximityChatRange", "proofRevealInterval", "extractionTime", "activeExtractions");
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Systems", EditorStyles.boldLabel);
             Fields(lRules, "ventGasDelay", "ventGasDuration", "fireSpreadInterval");

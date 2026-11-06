@@ -31,7 +31,7 @@ MonoBehaviour:
   recoil: 8
   adsFov: 60
   shake: 0.6
-  noiseRadius: 70
+  noiseRadius: 45
   projectileSpeed: 42
   explosionRadius: 7.5
   throwForce: 18

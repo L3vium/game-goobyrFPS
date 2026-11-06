@@ -39,7 +39,6 @@ namespace Com.IsartDigital.GoobyrFPS.Systems
             FlareVisual.Launch(transform.position + Vector3.up);
             Audio.Sfx.Play("siren", transform.position, 1f, 400f, 0f);
             Juice.Flash(new Color(1f, 0.3f, 0.2f), 0.15f);
-            UI.Hud.Toast("ALARM! THE WHOLE AREA IS ON ALERT");
         }
     }
 }

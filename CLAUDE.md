@@ -1,4 +1,4 @@
-# Goobyr FPS — working agreements
+# Hitmen — working agreements
 
 See also `D:\_Project\AGENTS.md` (Unity-first, new Input System only, no hand-written `.meta`,
 validate through Unity MCP, `tasks/lessons.md` after every correction).
@@ -10,8 +10,8 @@ validate through Unity MCP, `tasks/lessons.md` after every correction).
   this checkout: commit with `python Tools/commit.py "Subject" [-m "body"] <paths…>` (stages and
   commits only those paths, with their `.meta`, under a mutex, then pushes). Never `git add -A`,
   `commit -a`, stash, reset, checkout or pull in the shared checkout.
-- **End of every prompt:** player build (`Goobyr/Build/Player`, output `Builds/Windows/GoobyrFPS.exe`,
-  versioned through LFS), commit + push it, then release main **without checking it out** (a
+- **End of every prompt:** player builds (`Goobyr/Build/Player (Windows)`, outputs `Builds/Windows/Hitmen.exe`
+  and `Builds/Windows Dev/Hitmen Dev.exe` with its cheats, versioned through LFS), commit + push it, then release main **without checking it out** (a
   checkout would reimport the whole project under the open editor):
   `git merge-base --is-ancestor main^2 dev` (main's last release parent is in dev; main itself never
   is, it holds its own merge commits), then
@@ -24,7 +24,7 @@ validate through Unity MCP, `tasks/lessons.md` after every correction).
 The editor stays open with MCP for Unity, driven over HTTP with
 `python Tools/unity_mcp.py <tool> '<json>'`; batchmode is not available (the project is locked).
 Other Unity projects run MCP servers on neighbouring ports and this one's changes when the editor
-restarts (8083, then 8084): set `UNITY_MCP_PORT` and confirm with `mcpforunity://project/info` that it
+restarts (8080 to 8084, last seen on 8082): set `UNITY_MCP_PORT` and confirm with `mcpforunity://project/info` that it
 answers `Hitman` before driving an editor.
 Compile, console, tests, builders and the player build all go through MCP (`refresh_unity`,
 `read_console`, `run_tests`, `execute_menu_item`). Never launch, close or restart the editor.

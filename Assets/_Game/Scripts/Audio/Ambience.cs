@@ -55,10 +55,9 @@ namespace Com.IsartDigital.GoobyrFPS.Audio
 
         private void Update()
         {
-            bool lUnder = PlayerAvatar.Local != null && PlayerAvatar.Local.Motor != null && PlayerAvatar.Local.Motor.Underwater;
             float dt = Time.unscaledDeltaTime;
-            if (_bed != null) _bed.volume = Mathf.MoveTowards(_bed.volume, (lUnder ? 0.05f : _level) * Sfx.Volume, dt * 0.6f);
-            if (_under != null) _under.volume = Mathf.MoveTowards(_under.volume, (lUnder ? 0.6f : 0f) * Sfx.Volume, dt * 2f);
+            if (_bed != null) _bed.volume = Mathf.MoveTowards(_bed.volume, _level * Sfx.Volume, dt * 0.6f);
+            if (_under != null) _under.volume = Mathf.MoveTowards(_under.volume, 0f, dt * 2f);
         }
     }
 }

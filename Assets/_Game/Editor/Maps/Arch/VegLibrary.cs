@@ -34,6 +34,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 lCount++;
             }
             AssetDatabase.SaveAssets();
+            // The maps' terrains read their trees' LODs from the prefabs when told to.
+            foreach (string lGuid in AssetDatabase.FindAssets("t:TerrainData"))
+            {
+                TerrainData lData = AssetDatabase.LoadAssetAtPath<TerrainData>(AssetDatabase.GUIDToAssetPath(lGuid));
+                lData.RefreshPrototypes();
+                EditorUtility.SetDirty(lData);
+            }
+            AssetDatabase.SaveAssets();
             Debug.Log($"[Build] vegetation: {lCount} prefabs tuned");
         }
 
@@ -56,6 +64,14 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         private static void Configure(GameObject pRoot, string pName)
         {
             LODGroup lGroup = pRoot.GetComponent<LODGroup>();
+            // A terrain tree needs a renderer or an LOD group on the prefab's root, or it is never drawn
+            // (its collider stays): a one-level model gets a group of one.
+            if (lGroup == null)
+            {
+                lGroup = pRoot.AddComponent<LODGroup>();
+                lGroup.SetLODs(new[] { new LOD(IsTree(pName) ? 0.004f : 0.012f, pRoot.GetComponentsInChildren<Renderer>()) });
+                lGroup.RecalculateBounds();
+            }
             Renderer[] lLast = null;
             if (lGroup != null)
             {

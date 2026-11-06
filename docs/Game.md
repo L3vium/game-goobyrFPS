@@ -1,4 +1,4 @@
-# Goobyr FPS — design
+# Hitmen — design
 
 Multiplayer (1-8) stealth-assassination FPS in a flat, faceted, pastel look with physical,
 floppy-eared characters (see **The look**). **Every NPC is hostile to every player.** A target is drawn from the
@@ -110,7 +110,7 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
 
 ## Systems
 - **AI** (`AI/Npc`; the decisions are pure functions in `AI/NpcRules` and the senses' numbers in
-  `AI/DetectionModel`, both covered by EditMode tests): sight is a 90° cone out to 20 m (lookouts
+  `AI/DetectionModel`, both covered by EditMode tests): sight is a 90° cone out to 14 m (lookouts
   30 m, with a flat cone of 40° up to 75° down, so they see the ground below their tower) with an
   edge-of-vision band out to 75° that fills three times slower, weighed by distance, light (power
   cut), stance, grass, smoke and walls; guards see through window glass (bullets still stop on
@@ -140,8 +140,8 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
     their heads. Guards' own gunfire is an alarming noise too (once per 1.5 s per shooter) and every
     armed guard that hears gunfire responds (`NpcRules.AlwaysResponds`); the far siren stays capped
     for everyone. A sound never gives a position: they head for a guess a few metres off. Footsteps
-    follow the player's real speed and stance (silent standing still, 1.5 m crouched, 5 m walking,
-    14 m sprinting, 8 m sliding). Hearing is re-entrant (a scream during a shot has its own hearer
+    follow the player's real speed and stance (silent standing still, 1 m crouched, 3 m walking,
+    8 m sprinting, 5 m sliding). Hearing is re-entrant (a scream during a shot has its own hearer
     list).
   - **Combat.** `NpcRules.HitChance` (range, stance, blind fire, a 4 s warm-up and a 1.5 s tracking
     ramp after losing you: wild first shots); low cover cycles 1.4 s ducked and 2.2 s up (shots
@@ -172,7 +172,7 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
     nearest free armed guard within 45 m, tells it face to face (1.6 s), and the guard searches the
     spot weapon up, radios bodies in and marks the culprit hostile; with no guard near it flees.
     `UI/ThreatMarkers` shows a pulsing amber "!" over the witness (pinned to the screen edge within
-    60 m) and a WITNESS toast.
+    30 m).
   - **Exits, errands and patrols.** Map builders place `ExitPoint`s round every crowd and public
     area (`AiPlacement.Exit`: two or more on opposite sides, 20-60 m out). Guests and staff
     wander (the bar, the buffet, the garden, a smoke, a call); guards and staff take breaks at
@@ -205,20 +205,17 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   where only the cable leads; hacking it turns the laser green and the guns on guards and targets
   (staff and guests are spared), the kills credited to the hacker. Every machine aims the guns
   with the same rules; only the host fires.
-- **Player** (eyes at 1.60 m, 0.90 m crouched, `Core/BodyMetrics`): walk, sprint (held), crouch (held; crouching while moving slides,
-  much further out of a sprint and faster downhill), crawl (crouched where a crouch doesn't fit:
-  vents, crawlspaces), jump, zipline, hide, swim, and **parkour** (`FpsMotor`): jump in front of
+- **Player** (eyes at 1.60 m, 0.90 m crouched, `Core/BodyMetrics`): walk, sprint (held), crouch (toggled; crouching while moving slides,
+  further out of a sprint and faster downhill; still holding sprint at its end gets up and runs on), crawl (crouched where a crouch doesn't fit:
+  vents, crawlspaces), jump (also out of a crouch or a slide), zipline, hide, and **parkour** (`FpsMotor`): jump in front of
   anything 0.45-2.4 m high to mantle onto it - the ledge is probed at six heights and four depths past
   the face, so 30 cm walls and window sills count; thin obstacles with floor beyond (fences, garden
   walls, open windows) are vaulted over or through; in the air, the hands grab any ledge they reach
   and hang: shimmy with A/D, climb up with W or jump, drop with crouch or S, leap to the next ledge
   with jump + A/D, kick off with jump + S. Drainpipes, ladders and ivy are climbed and topped out
   onto the roof. Stairs keep you glued to the steps and step-ups ease the view; landings from a real
-  drop are heard (3 m per metre fallen, half crouched); remote players get the motion state
-  (`PlayerAvatar.Motion`) for their animation. Swimming:
-  (`Systems/WaterVolume`: crouch dives, jump rises or climbs out at the surface, rivers carry you,
-  20 s of breath under water; under water nobody sees you beyond arm's length, the view turns
-  blue-green and the sound muffles; splashes are heard; deep water is cut out of the NavMesh); head bob, sway, tilt, landing dip, FOV kicks; 6-slot inventory;
+  drop are heard (2 m per metre fallen, half crouched); remote players get the motion state
+  (`PlayerAvatar.Motion`) for their animation. Nobody swims: an invisible floor (`MapKit.Water`, 0.35 m under the surface) keeps feet in the water, and water is cut out of the NavMesh; head bob, sway, tilt, landing dip, FOV kicks; 6-slot inventory;
   guns, rocket launcher, flamethrower, coin / brick / smoke / C4 + remote (T), poisons, punches and
   silent takedowns from behind (`DetectionModel.CanTakedown`: within 70° of its back, the NPC not
   alerted, its gauge under half - a 2.5 m sound instead of a fall). Rocks, bottles, bricks and
@@ -262,7 +259,7 @@ climb, vent, tunnel and overlook. `SecurityOutside` sets the tier of the ground 
   MMF_Player built at runtime): the white hit flash on people and props (MMF_Flicker) and a
   subtle squash and stretch (MMF_SquashAndStretch) on hits, pickups, throws, jump pads and
   devices switched on; blood and dust puffs, explosions with fireball, shockwave, debris and
-  light flash, smoke clouds, hitmarkers, damage arcs, kill feed, banners.
+  light flash, smoke clouds, hit marks and the kill skull on the crosshair (the host confirms kills, `Damageable.OnConfirmed`), damage arcs, kill feed. There are no notifications and no banners.
 - **Online**: played between friends. *Create a room* opens a Steam room (found only by its
   six-letter code; LAN when Steam is not running), *Join a room* takes the code (or a direct IP), and
   Steam invites work too (Facepunch transport, App ID 480 for now); LAN/IP and solo through Unity Transport. The agent name is the typed nickname, else the
@@ -439,7 +436,7 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
   position) and routed through `MapSession`; only dynamic things are NetworkObjects.
 - Patrol cars move as a function of the match clock, so they need no transform sync.
 - One body size for everything (`Core/BodyMetrics`): eyes at 1.60 m (0.90 crouched), chest 1.15,
-  a 0.16 m head sphere at 1.64 (0.94 crouched), a 1.80 m capsule (1.10 crouched, 0.74 crawling). The player's camera, `Npc.Eye`, headshots (the
+  a 0.16 m head at 1.64 (0.94 crouched, bullets see 0.24 m: from the shoulders up, `HEAD_HIT_RADIUS`), a 1.80 m capsule (1.10 crouched, 0.74 crawling). The player's camera, `Npc.Eye`, headshots (the
   head bone when the body has one), cover peeks and markers read it, and every character model is
   scaled on its rest pose so its eyes sit at 1.60 m - you look people in the eye.
 - One MonoBehaviour per file named after it (scene/prefab serialization).
@@ -451,10 +448,10 @@ The caster view (`Player/CasterView`, overlays in `UI/CasterHud`, pure rules in
 
 ## Controls (physical keys, AZERTY-safe; modelled on Dishonored)
 Move WASD/ZQSD · look mouse · jump and contextual climb Space · sprint Shift (hold; a jump keeps the
-run) · **crouch C (toggle)**, C during a sprint slides · **lean Q/E (A/E on AZERTY)** · interact / pick
+run) · **crouch LCtrl (toggle)**, LCtrl while moving slides, further from a sprint · **takedown E** · lean unbound by default · every key can be set in the options (`UI/KeyBindings`) · interact / pick
 up F · **LMB attacks**: punch, blade or club swing, gun fired from the hip; on the back of an NPC that
 hasn't noticed you, whatever you hold, an instant takedown · **RMB aims a gun**; with a gadget in hand,
-hold to show the arc and release to throw · **block LCtrl** (a raised guard leaves 30 % of a melee hit) ·
+hold to show the arc and release to throw · block unbound (a raised guard leaves 30 % of a melee hit) ·
 **zoom LAlt** · wheel or 1-4 change item (no selection wheel) · reload R · detonate T · quick punch V ·
 map M · instinct Tab (hold) · scoreboard ` (key left of 1, ² on AZERTY) · push-to-talk B · pause Esc.
 

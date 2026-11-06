@@ -159,9 +159,14 @@ namespace Com.IsartDigital.GoobyrFPS.Net
 
             ResolveTeams();
             TimeOfDay.Value = lMap.timeOfDay;
+            ShowCurtainRpc(lMap.displayName);
             Phase.Value = MatchPhase.Loading;
             NetworkManager.SceneManager.LoadScene(lMap.sceneName, UnityEngine.SceneManagement.LoadSceneMode.Single);
         }
+
+        /// <summary>Everyone: the loading screen, up before the heavy work starts.</summary>
+        [Rpc(SendTo.Everyone)]
+        private void ShowCurtainRpc(string pMap) => UI.LoadingCurtain.Show(pMap);
 
         /// <summary>Host side: back to the lobby (title scene) after the end screen.</summary>
         public void ReturnToLobby()

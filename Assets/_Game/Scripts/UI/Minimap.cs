@@ -81,7 +81,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             {
                 ThreatStatus.Combat => ThreatMarkers.Red,
                 ThreatStatus.Spotted or ThreatStatus.Searching or ThreatStatus.Suspicious => ThreatMarkers.Amber,
-                ThreatStatus.Hidden or ThreatStatus.Concealed or ThreatStatus.Underwater => ThreatMarkers.Blue,
+                ThreatStatus.Hidden or ThreatStatus.Concealed => ThreatMarkers.Blue,
                 _ => new Color(1f, 1f, 1f, 0.18f)
             };
             if (lStatus == ThreatStatus.Combat || lStatus == ThreatStatus.Spotted) lRing.a = 0.7f + Mathf.Sin(Time.time * 8f) * 0.3f;
@@ -107,6 +107,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                     if ((lDirector.ActiveExtractions.Value & (1 << i)) != 0) Dot(lFrom, lExtractions[i].transform.position, UIFactory.Good, 11f, true);
             }
             if (lTarget != null) Dot(lFrom, lTarget.transform.position, ThreatMarkers.Red, 12f, true);
+            if (lDirector != null && lDirector.Proof.Value == ProofState.Carried && (PlayerAvatar.Local == null || !PlayerAvatar.Local.CarriesProof.Value) && Hud.CarrierPing.HasValue)
+                Dot(lFrom, Hud.CarrierPing.Value, Hud.CARRIER_YELLOW, 12f, true);
             for (int i = _used; i < _dots.Count; i++) _dots[i].enabled = false;
         }
 

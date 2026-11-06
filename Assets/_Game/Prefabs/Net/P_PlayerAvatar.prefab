@@ -224,7 +224,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.Player.FpsMotor
   _walkSpeed: 4.4
-  _sprintSpeed: 7.2
+  _sprintSpeed: 6.2
   _crouchSpeed: 2.3
   _crawlSpeed: 1.6
   _acceleration: 55
@@ -232,14 +232,10 @@ MonoBehaviour:
   _jumpHeight: 1.15
   _gravity: -24
   _slideCooldown: 0.55
-  _crouchSlideBoost: 12
-  _walkSlideBoost: 7
-  _sprintSlideFriction: 2.8
-  _walkSlideFriction: 6
-  _swimSpeed: 3
-  _swimSprintSpeed: 4.5
-  _diveSpeed: 2.4
-  _breathTime: 20
+  _crouchSlideBoost: 10
+  _walkSlideBoost: 6.5
+  _sprintSlideFriction: 3.6
+  _walkSlideFriction: 7
   _climbSpeed: 3.2
   _mantleMinHeight: 0.45
   _mantleMaxHeight: 2.4

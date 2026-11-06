@@ -141,7 +141,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             Vector2 lCenter = Center(pSpec);
             Vector2 lSize = pSpec.size + Vector2.one * pMargin * 2f;
-            Shape.Flat(lCenter, lSize, pSpec.yaw, pSpec.origin.y - 0.02f, pFeather);
+            Shape.Flat(lCenter, lSize, pSpec.yaw, pSpec.origin.y - 0.07f, pFeather);
             _turnedPads.Add((lCenter, lSize, pSpec.yaw, pGround));
             float lReach = lSize.magnitude * 0.5f;
             Clear.Add(new Rect(lCenter.x - lReach * 0.8f, lCenter.y - lReach * 0.8f, lReach * 1.6f, lReach * 1.6f));

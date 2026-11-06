@@ -58,6 +58,19 @@ namespace Com.IsartDigital.GoobyrFPS.AI
         }
 
         /// <summary>
+        /// Is this hit a wall, floor or ceiling and not a low wall or a balustrade? One generated building
+        /// is one collider per material, whose bounds say nothing: the surface itself is probed a metre
+        /// above and below the hit.
+        /// </summary>
+        private static bool TallHere(in RaycastHit pHit, Vector3 pDir)
+        {
+            if (pHit.collider is TerrainCollider || Mathf.Abs(pHit.normal.y) > 0.5f) return true;
+            Vector3 lBack = pHit.point - pDir * 0.3f;
+            return Physics.Raycast(lBack + Vector3.up, pDir, 0.8f, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore)
+                   && Physics.Raycast(lBack + Vector3.down * 0.5f, pDir, 0.8f, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore);
+        }
+
+        /// <summary>
         /// Walls and floors between two points (each one muffles a sound), up to
         /// <see cref="DetectionModel.MAX_WALLS"/>. Steps through every surface the ray enters, so two
         /// walls of the same building count twice; the leaves of one partition count once.
@@ -74,7 +87,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             {
                 if (!Physics.Raycast(pFrom + lDir * lTravelled, lDir, out RaycastHit lHit, lLength - lTravelled, GameLayers.SightBlockMask, QueryTriggerInteraction.Ignore)) break;
                 float lAt = lTravelled + lHit.distance;
-                if (Structural(lHit.collider))
+                if (Structural(lHit.collider) && TallHere(lHit, lDir))
                 {
                     if (lAt - lLastWall > NpcRules.WALL_MERGE) lWalls++;
                     lLastWall = lAt;

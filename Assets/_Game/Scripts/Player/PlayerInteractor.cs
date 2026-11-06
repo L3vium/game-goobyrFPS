@@ -19,6 +19,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
         public static string CurrentPrompt { get; private set; } = "";
 
+        /// <summary>The interact key as the player set it, ready to open a prompt.</summary>
+        private static string Key => "[" + GameInput.KeyName("Interact") + "] ";
+
         private void Awake() => _avatar = GetComponent<PlayerAvatar>();
 
         private void Update()
@@ -30,7 +33,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             // Inside a hiding spot: the only thing to do is to get out.
             if (_avatar.Motor.Mode == MotorMode.Hidden)
             {
-                CurrentPrompt = "[F] LEAVE";
+                CurrentPrompt = Key + "LEAVE";
                 return;
             }
 
@@ -43,7 +46,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             ProofPickup lProof = lDirector != null && lDirector.Proof.Value == ProofState.Dropped ? FindFirstObjectByType<ProofPickup>() : null;
             if (lProof != null && Vector3.Distance(lProof.transform.position, transform.position + Vector3.up) < 2.6f)
             {
-                CurrentPrompt = "[F] TAKE THE PROOF";
+                CurrentPrompt = Key + "TAKE THE PROOF";
                 if (GameInput.Interact) lDirector.TakeProofRpc();
                 return;
             }
@@ -76,7 +79,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             ItemPickup.Focused = lPickup;
             if (lPickup != null && lPickup.Item != null)
             {
-                CurrentPrompt = "[F] TAKE " + lPickup.Item.displayName.ToUpperInvariant();
+                CurrentPrompt = Key + "TAKE " + lPickup.Item.displayName.ToUpperInvariant();
                 if (GameInput.Interact) _avatar.Weapons.PickupRpc(lPickup.NetworkObject);
                 return;
             }
@@ -85,7 +88,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             {
                 string lPrompt = lInteractable.Prompt(_avatar, lHeld);
                 if (string.IsNullOrEmpty(lPrompt)) return;
-                CurrentPrompt = "[F] " + lPrompt;
+                CurrentPrompt = Key + lPrompt;
                 if (!GameInput.Interact) return;
                 if (lInteractable.InteractLocal(_avatar)) return;
                 _avatar.InteractRpc(lInteractable.Id, lHeld != null ? lHeld.Index : -1);

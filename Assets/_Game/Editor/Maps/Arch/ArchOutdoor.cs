@@ -355,7 +355,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lMesh.Cylinder(lStone, pGround - Vector3.up * 0.3f, pRadius, 0.9f, 20);
             lMesh.Cylinder(lStone, pGround, 0.35f, 1.8f, 12);
             lMesh.Cylinder(lStone, pGround + Vector3.up * 1.8f, 0.9f, 0.18f, 14);
-            lMesh.Cylinder(ArchLib.PlainMat("FountainWater", new Color(0.25f, 0.4f, 0.42f), 0.95f, 0f), pGround + Vector3.up * 0.58f, pRadius - 0.25f, 0.02f, 20, false);
+            lMesh.Cylinder(ArchLib.PlainMat("FountainWater", new Color(0.25f, 0.4f, 0.42f), 0.95f, 0f), pGround + Vector3.up * 0.63f, pRadius - 0.25f, 0.02f, 20, false);
             Flush(A, lMesh, "Fountain", A.Props);
         }
 

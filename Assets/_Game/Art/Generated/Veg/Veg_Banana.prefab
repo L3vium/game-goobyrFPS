@@ -101,6 +101,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 690108992557908403}
+  - component: {fileID: 1353440991963853014}
   m_Layer: 0
   m_Name: Veg_Banana
   m_TagString: Untagged
@@ -124,3 +125,23 @@ Transform:
   - {fileID: 238876201819249507}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!205 &1353440991963853014
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8884408536157990548}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: -0.10403037, y: 1.2819997, z: 0}
+  m_Size: 4.2997417
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.012
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 7361066312091413867}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0

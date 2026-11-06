@@ -29,15 +29,15 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             List<ItemDefinition> lItems = new List<ItemDefinition>
             {
                 Item("SilencedPistol", "Silenced Pistol", ItemKind.SilencedPistol, ItemSlot.Weapon, new Color(0.35f, 0.75f, 0.95f), pResetTuning, i =>
-                { i.damage = 55; i.headMultiplier = 3; i.fireRate = 3.2f; i.magazine = 10; i.reserveAmmo = 30; i.spread = 1.2f; i.adsFov = 62; i.recoil = 1.4f; i.shake = 0.08f; i.noiseRadius = 9; i.range = 90; i.reloadTime = 1.3f; }),
+                { i.damage = 55; i.headMultiplier = 3; i.fireRate = 3.2f; i.magazine = 10; i.reserveAmmo = 30; i.spread = 0.7f; i.adsFov = 62; i.recoil = 1.4f; i.shake = 0.08f; i.noiseRadius = 9; i.range = 90; i.reloadTime = 1.3f; }),
                 Item("Pistol", "Pistol", ItemKind.Pistol, ItemSlot.Weapon, new Color(0.9f, 0.6f, 0.3f), pResetTuning, i =>
-                { i.damage = 62; i.headMultiplier = 3; i.fireRate = 4f; i.magazine = 12; i.reserveAmmo = 36; i.spread = 1.4f; i.adsFov = 62; i.recoil = 1.8f; i.shake = 0.12f; i.noiseRadius = 45; i.range = 100; i.reloadTime = 1.2f; }),
+                { i.damage = 62; i.headMultiplier = 3; i.fireRate = 4f; i.magazine = 12; i.reserveAmmo = 36; i.spread = 0.8f; i.adsFov = 62; i.recoil = 1.8f; i.shake = 0.12f; i.noiseRadius = 45; i.range = 100; i.reloadTime = 1.2f; }),
                 Item("Smg", "SMG", ItemKind.Smg, ItemSlot.Weapon, new Color(0.95f, 0.85f, 0.3f), pResetTuning, i =>
-                { i.damage = 27; i.headMultiplier = 2.2f; i.fireRate = 11; i.automatic = true; i.magazine = 30; i.reserveAmmo = 90; i.spread = 2.6f; i.adsSpreadFactor = 0.45f; i.adsFov = 64; i.recoil = 0.9f; i.shake = 0.1f; i.noiseRadius = 55; i.range = 80; i.reloadTime = 1.8f; }),
+                { i.damage = 27; i.headMultiplier = 2.2f; i.fireRate = 11; i.automatic = true; i.magazine = 30; i.reserveAmmo = 90; i.spread = 1.4f; i.adsSpreadFactor = 0.45f; i.adsFov = 64; i.recoil = 0.9f; i.shake = 0.1f; i.noiseRadius = 55; i.range = 80; i.reloadTime = 1.8f; }),
                 Item("Shotgun", "Shotgun", ItemKind.Shotgun, ItemSlot.Weapon, new Color(0.85f, 0.35f, 0.3f), pResetTuning, i =>
-                { i.damage = 150; i.headMultiplier = 1.5f; i.pellets = 8; i.fireRate = 1.2f; i.magazine = 6; i.reserveAmmo = 18; i.spread = 6.5f; i.adsSpreadFactor = 0.7f; i.adsFov = 68; i.recoil = 4.5f; i.shake = 0.45f; i.noiseRadius = 60; i.range = 32; i.reloadTime = 2.4f; }),
+                { i.damage = 150; i.headMultiplier = 1.5f; i.pellets = 8; i.fireRate = 1.2f; i.magazine = 6; i.reserveAmmo = 18; i.spread = 5f; i.adsSpreadFactor = 0.7f; i.adsFov = 68; i.recoil = 4.5f; i.shake = 0.45f; i.noiseRadius = 60; i.range = 32; i.reloadTime = 2.4f; }),
                 Item("Sniper", "Sniper Rifle", ItemKind.Sniper, ItemSlot.Weapon, new Color(0.45f, 0.8f, 0.45f), pResetTuning, i =>
-                { i.damage = 150; i.headMultiplier = 3; i.fireRate = 0.8f; i.magazine = 5; i.reserveAmmo = 15; i.spread = 4f; i.adsSpreadFactor = 0.02f; i.adsFov = 18; i.recoil = 6f; i.shake = 0.35f; i.noiseRadius = 90; i.range = 450; i.reloadTime = 2.6f; }),
+                { i.damage = 150; i.headMultiplier = 3; i.fireRate = 0.8f; i.magazine = 5; i.reserveAmmo = 15; i.spread = 2.5f; i.adsSpreadFactor = 0.02f; i.adsFov = 18; i.recoil = 6f; i.shake = 0.35f; i.noiseRadius = 90; i.range = 450; i.reloadTime = 2.6f; }),
                 Item("RocketLauncher", "Rocket Launcher", ItemKind.RocketLauncher, ItemSlot.Weapon, new Color(1f, 0.75f, 0.2f), pResetTuning, i =>
                 { i.unique = true; i.damage = 260; i.explosionRadius = 7.5f; i.projectileSpeed = 42; i.fireRate = 0.7f; i.magazine = 1; i.reserveAmmo = 4; i.spread = 0.5f; i.adsFov = 60; i.recoil = 8f; i.shake = 0.6f; i.noiseRadius = 80; i.range = 200; i.reloadTime = 2.8f; }),
                 Item("Flamethrower", "Flamethrower", ItemKind.Flamethrower, ItemSlot.Weapon, new Color(1f, 0.45f, 0.15f), pResetTuning, i =>
@@ -62,12 +62,12 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             };
 
             // How far each item is heard in the open (walls muffle it, DetectionModel.Loudness): kept in
-            // step with the 20 m sight range so a shot pulls the guards of one area, never the map.
+            // step with the 14 m sight range so a shot pulls the guards of one area, never the map.
             Dictionary<ItemKind, float> lNoise = new Dictionary<ItemKind, float>
             {
-                { ItemKind.SilencedPistol, 8f }, { ItemKind.Pistol, 40f }, { ItemKind.Smg, 45f }, { ItemKind.Shotgun, 50f },
-                { ItemKind.Sniper, 70f }, { ItemKind.RocketLauncher, 70f }, { ItemKind.Flamethrower, 20f },
-                { ItemKind.Coin, 12f }, { ItemKind.Brick, 11f }, { ItemKind.Rock, 10f }, { ItemKind.Bottle, 15f }, { ItemKind.Wrench, 12f }
+                { ItemKind.SilencedPistol, 5f }, { ItemKind.Pistol, 24f }, { ItemKind.Smg, 28f }, { ItemKind.Shotgun, 30f },
+                { ItemKind.Sniper, 40f }, { ItemKind.RocketLauncher, 45f }, { ItemKind.Flamethrower, 12f },
+                { ItemKind.Coin, 10f }, { ItemKind.Brick, 9f }, { ItemKind.Rock, 8f }, { ItemKind.Bottle, 12f }, { ItemKind.Wrench, 10f }
             };
             foreach (ItemDefinition lItem in lItems)
                 if (lNoise.TryGetValue(lItem.kind, out float lRadius)) { lItem.noiseRadius = lRadius; EditorUtility.SetDirty(lItem); }
@@ -75,8 +75,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             GameRules lRules = EditorAssets.LoadOrCreate<GameRules>(EditorAssets.DATA + "/GameRules.asset");
             // A pistol to start with (see WeaponHolder: lightly loaded), and guards who really look.
             lRules.startingLoadout = new List<ItemDefinition> { lItems[1] };
-            lRules.npcVisionRange = 30f;
-            lRules.npcDetectTime = 1.3f;
+            lRules.npcVisionRange = 14f;
+            lRules.npcDetectTime = 2f;
+            lRules.proofRevealInterval = 15f;
+            lRules.proofRevealFastest = 3f;
+            lRules.proofRevealRamp = 150f;
             EditorUtility.SetDirty(lRules);
 
             List<MapDefinition> lMaps = new List<MapDefinition>

@@ -12,7 +12,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     /// The end of a match, over the match still running behind it: who won, how the target died, the
     /// scores, and what next - the host takes the room back to the lobby, anyone can leave, or spectate
     /// (the panel steps aside for the caster view, a button brings it back). The pause menu stays on top.
-    /// Without a click the host's machine goes back to the lobby after <see cref="MatchDirector.END_SCREEN_FALLBACK"/>.
+    /// It stays until the host clicks: nobody is sent back to the room on a timer.
     /// </summary>
     public class EndScreen : MonoBehaviour
     {
@@ -109,9 +109,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             _time += Time.unscaledDeltaTime;
             _group.alpha = Mathf.Clamp01(_time * 2.5f);
-            float lLeft = Mathf.Max(0f, MatchDirector.END_SCREEN_FALLBACK - _time);
             bool lHost = LobbyState.Instance != null && LobbyState.Instance.IsServer;
-            _footer.text = lHost ? $"THE ROOM GOES BACK TO THE LOBBY IN {lLeft:0} S" : $"WAITING FOR THE HOST  -  LOBBY IN {lLeft:0} S AT THE LATEST";
+            _footer.text = lHost ? "" : "WAITING FOR THE HOST";
         }
 
         private void OnDestroy()

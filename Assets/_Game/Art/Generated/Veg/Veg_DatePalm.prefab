@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3356257593854678382}
   - component: {fileID: 3985081060483191268}
+  - component: {fileID: 7743558900322145165}
   m_Layer: 0
   m_Name: Veg_DatePalm
   m_TagString: Untagged
@@ -56,6 +57,26 @@ CapsuleCollider:
   m_Height: 6.342289
   m_Direction: 1
   m_Center: {x: 0, y: 3.1711445, z: 0}
+--- !u!205 &7743558900322145165
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 102954572713115801}
+  serializedVersion: 3
+  m_LocalReferencePoint: {x: -0.4392104, y: 3.9617505, z: -0.00034618378}
+  m_Size: 8.52962
+  m_FadeMode: 1
+  m_AnimateCrossFading: 1
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.004
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 9073469293768448698}
+  m_Enabled: 1
+  m_GlobalIlluminationLOD: 0
 --- !u!1 &7137345414814439932
 GameObject:
   m_ObjectHideFlags: 0

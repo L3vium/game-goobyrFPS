@@ -183,6 +183,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 if (Shown(Legend_.Extraction))
                     for (int i = 0; i < lExtractions.Count; i++)
                         if ((lDirector.ActiveExtractions.Value & (1 << i)) != 0) Pin(lExtractions[i].transform.position, UIIcons.Ring, UIFactory.Good, 0f, lExtractions[i].Label.ToUpperInvariant(), 26f, true);
+                if (lDirector.Proof.Value == ProofState.Carried && (PlayerAvatar.Local == null || !PlayerAvatar.Local.CarriesProof.Value) && Hud.CarrierPing.HasValue)
+                    Pin(Hud.CarrierPing.Value, UIIcons.Diamond, Hud.CARRIER_YELLOW, 0f, "PROOF");
                 if (lDirector.Proof.Value == ProofState.Dropped && Shown(Legend_.Proof)) Pin(lDirector.ProofPosition.Value, UIIcons.Diamond, ThreatMarkers.Amber, 0f, "PROOF", 24f, true);
             }
             if (Shown(Legend_.Radio))

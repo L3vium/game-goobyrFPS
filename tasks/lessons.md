@@ -119,3 +119,11 @@ Rules I write for myself after a correction. Read at the start of every session.
 - **Judge the shots before the judge does.** Screenshot scripts check every framing (camera not in
   a collider, nothing within 2-3 m of the centre ray) and re-roll; a judge round spent on shots
   of walls is wasted. Also scan for null or default materials before each judge round.
+
+## 2026-11-05 — the look of 0.9.0: empty maps, stuck on nothing
+- **Hitmen, goofy on purpose.** The game is called Hitmen, and its look is the flat goofy one: this replaces
+  "Goobyr FPS" and "realistic proportioned humans" above.
+- **Read the console after a map build.** Every terrain tree printed "couldn't be instanced" for a whole
+  release: a prefab without an LOD group or renderer on its root draws nothing and keeps its collider. A
+  build log with thousands of trees proves nothing about what is on screen: look at a screenshot from the air.
+- **Find the MCP port by asking each server** (`mcpforunity://project/info`, 8080 to 8084): it moves.

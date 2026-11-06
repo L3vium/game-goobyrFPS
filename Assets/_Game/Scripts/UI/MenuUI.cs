@@ -22,7 +22,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
     /// </summary>
     public class MenuUI : MonoBehaviour
     {
-        private enum Screen { Main, Join, Lobby, Settings }
+        private enum Screen { Main, Join, Lobby, Settings, Agent }
+
+        private delegate TResult Func<in T, out TResult>(T pValue);
 
         private static readonly Vector2 TL = new Vector2(0, 1);
         private static readonly Color Navy = new Color(0.1f, 0.11f, 0.17f, 1f);
@@ -63,7 +65,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         }
 
         private RectTransform _root;
-        private GameObject _main, _join, _lobby, _settings, _iconPicker;
+        private GameObject _main, _join, _lobby, _settings, _agent, _iconPicker;
         private TextMeshProUGUI _status, _mapName, _mapDescription, _playerCount, _startHint, _code, _joinStatus, _noFriends, _voidHint;
         private TMP_InputField _titleName, _name, _joinField;
         private Button _startButton, _readyButton, _copyButton, _invite, _shuffle, _addBox, _left, _right, _roleAgent, _roleCaster;
@@ -106,6 +108,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             BuildJoin();
             BuildLobby();
             BuildSettings();
+            BuildAgent();
             BuildIconPicker();
             _status = UIFactory.Title(_root, "Status", "", 16, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(1, 1), new Vector2(-500, -150), new Vector2(620, 24), false, 3f);
 
@@ -136,7 +139,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _join.SetActive(pScreen == Screen.Join);
             _lobby.SetActive(pScreen == Screen.Lobby || (pScreen == Screen.Settings && _beforeSettings == Screen.Lobby));
             _settings.SetActive(pScreen == Screen.Settings);
-            GameObject lShown = pScreen switch { Screen.Main => _main, Screen.Join => _join, Screen.Lobby => _lobby, _ => _settings };
+            _agent.SetActive(pScreen == Screen.Agent);
+            GameObject lShown = pScreen switch { Screen.Main => _main, Screen.Join => _join, Screen.Lobby => _lobby, Screen.Agent => _agent, _ => _settings };
             UIFactory.FadeIn(lShown, 0.25f, Vector2.zero);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
             if (pScreen == Screen.Join) { _friendsAt = 0f; _joinStatus.text = ""; }
@@ -323,6 +327,118 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
         private void CloseSettings() => Show(_beforeSettings);
 
+        // ---------------------------------------------------------------- the agent
+
+        /// <summary>
+        /// Each player's own screen, reached from the room: the name, what the agent wears, what it starts
+        /// with. The agent of the scene behind wears the choices as they are made.
+        /// </summary>
+        private void BuildAgent()
+        {
+            _agent = UIFactory.Stretch(_root, "Agent").gameObject;
+            Transform p = _agent.transform;
+            Image lBack = Box(p, "Back", 0, 0, 1280, 1080).gameObject.AddComponent<Image>();
+            lBack.color = Dim;
+            lBack.raycastTarget = false;
+            Label(p, "MY AGENT", 72, UIFactory.Paper, 106, 56, 800, 90, true, 5f);
+
+            Header(p, "AGENT NAME", 110, 166);
+            TMP_InputField lName = NameField(p, TL, Vector2.zero, new Vector2(1060, 56));
+            ((RectTransform)lName.transform).pivot = TL;
+            ((RectTransform)lName.transform).anchoredPosition = new Vector2(110, -206);
+            _agentName = lName;
+
+            Header(p, "LOOK", 110, 286);
+            RectTransform lLook = UIWidgets.List(p, "Look", TL, new Vector2(110 + 255, -326), 510f);
+            Func<int, string> lHat = i => FX.AgentHats.NAMES[i];
+            LookRow(lLook, "Head", FX.AgentHats.COUNT, l => l.hat, (l, v) => l.value.hat = (byte)v, lHat);
+            LookRow(lLook, "Skin", AgentLook.SKINS.Length, l => l.skin, (l, v) => l.value.skin = (byte)v, i => AgentLook.SKINS[i].name);
+            LookRow(lLook, "Body", AgentLook.CLOTHES.Length, l => l.top, (l, v) => l.value.top = (byte)v, i => AgentLook.CLOTHES[i].name);
+            LookRow(lLook, "Trousers", AgentLook.CLOTHES.Length, l => l.bottom, (l, v) => l.value.bottom = (byte)v, i => AgentLook.CLOTHES[i].name);
+            LookRow(lLook, "Shoes", AgentLook.SHOES.Length, l => l.shoes, (l, v) => l.value.shoes = (byte)v, i => AgentLook.SHOES[i].name);
+            MenuButton(p, "NEXT OUTFIT", 110, 690, 250, 64, NextSuit, 24);
+            MenuButton(p, "RANDOMIZE", 370, 690, 250, 64, RandomLook, 24);
+
+            Header(p, "LOADOUT", 660, 286);
+            RectTransform lKit = UIWidgets.List(p, "Loadout", TL, new Vector2(660 + 255, -326), 510f);
+            LoadoutRow(lKit, "Movement", Data.ItemSlot.Movement, l => l.movement, (l, v) => l.value.movement = v);
+            LoadoutRow(lKit, "Weapon", Data.ItemSlot.Weapon, l => l.weapon, (l, v) => l.value.weapon = v);
+            LoadoutRow(lKit, "Distraction", Data.ItemSlot.Gadget, l => l.distraction, (l, v) => l.value.distraction = v);
+            Label(p, "STRONGER WEAPONS ARE HIDDEN ON THE MAP, IN CRATES AND ROOMS.", 15, UIFactory.Muted, 660, 526, 520, 24, false, 2f);
+
+            MenuButton(p, "BACK", 110, 960, 300, 60, () => Show(Screen.Lobby), 26);
+        }
+
+        private TMP_InputField _agentName;
+        private readonly List<System.Action> _lookRefresh = new List<System.Action>();
+
+        private void LookRow(RectTransform pList, string pLabel, int pCount, Func<AgentLook, int> pGet, System.Action<Holder<AgentLook>, int> pSet, Func<int, string> pName)
+        {
+            System.Action<string> lShow = null;
+            lShow = UIWidgets.Stepper(pList, pLabel, "", pStep =>
+            {
+                Holder<AgentLook> lLook = new Holder<AgentLook>(PlayerIdentity.LocalLook);
+                pSet(lLook, (pGet(lLook.value) + pStep + pCount) % pCount);
+                SaveLook(lLook.value);
+            });
+            void Refresh() => lShow(pName(Mathf.Clamp(pGet(PlayerIdentity.LocalLook), 0, pCount - 1)));
+            _lookRefresh.Add(Refresh);
+            Refresh();
+        }
+
+        private void LoadoutRow(RectTransform pList, string pLabel, Data.ItemSlot pSlot, Func<AgentLook, short> pGet, System.Action<Holder<AgentLook>, short> pSet)
+        {
+            List<int> lChoices = new List<int> { -1 };
+            foreach (Data.ItemDefinition lItem in GameDatabase.Instance.items)
+                if (lItem != null && lItem.inLoadout && lItem.slot == pSlot) lChoices.Add(lItem.Index);
+            System.Action<string> lShow = null;
+            lShow = UIWidgets.Stepper(pList, pLabel, "", pStep =>
+            {
+                Holder<AgentLook> lLook = new Holder<AgentLook>(PlayerIdentity.LocalLook);
+                int lAt = Mathf.Max(0, lChoices.IndexOf(pGet(lLook.value)));
+                pSet(lLook, (short)lChoices[(lAt + pStep + lChoices.Count) % lChoices.Count]);
+                SaveLook(lLook.value);
+            });
+            void Refresh()
+            {
+                Data.ItemDefinition lItem = GameDatabase.Item(pGet(PlayerIdentity.LocalLook));
+                lShow(lItem != null ? lItem.displayName : "Nothing");
+            }
+            _lookRefresh.Add(Refresh);
+            Refresh();
+        }
+
+        /// <summary>A value a lambda can change.</summary>
+        private class Holder<T>
+        {
+            public T value;
+            public Holder(T pValue) => value = pValue;
+        }
+
+        private void SaveLook(AgentLook pLook)
+        {
+            PlayerIdentity.LocalLook = pLook;
+            if (TitleDiorama.Instance != null) TitleDiorama.Instance.Dress(pLook);
+            foreach (System.Action lRefresh in _lookRefresh) lRefresh();
+        }
+
+        private int _suit;
+
+        private void NextSuit()
+        {
+            AgentLook lLook = PlayerIdentity.LocalLook;
+            _suit = (_suit + 1) % AgentLook.SUITS.Length;
+            lLook.ApplySuit(_suit);
+            SaveLook(lLook);
+        }
+
+        private void RandomLook()
+        {
+            AgentLook lLook = PlayerIdentity.LocalLook;
+            lLook.Randomize();
+            SaveLook(lLook);
+        }
+
         // ---------------------------------------------------------------- the briefing
 
         private void BuildLobby()
@@ -374,14 +490,15 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _playerCount = Label(p, "", 16, UIFactory.Muted, AGENT_X, 166, AGENT_W, 24, true, 4f, TextAlignmentOptions.TopRight);
             _roleAgent = MenuButton(p, "AGENT", AGENT_X, TOP, AGENT_W / 2 - 3, 50, () => SetCaster(false), 22);
             _roleCaster = MenuButton(p, "CASTER", AGENT_X + AGENT_W / 2 + 3, TOP, AGENT_W / 2 - 3, 50, () => SetCaster(true), 22);
-            _voidArea = Box(p, "NoTeam", AGENT_X, TOP + 60, AGENT_W, 390);
+            _voidArea = Box(p, "NoTeam", AGENT_X, TOP + 60, AGENT_W, 330);
             Image lVoid = _voidArea.gameObject.AddComponent<Image>();
             lVoid.color = new Color(1, 1, 1, 0.025f);
             lVoid.raycastTarget = false;
-            _voidHint = Label(_voidArea, "EVERY AGENT FOR THEMSELVES", 14, new Color(1, 1, 1, 0.35f), 0, 362, AGENT_W, 20, false, 3f, TextAlignmentOptions.Top);
+            _voidHint = Label(_voidArea, "EVERY AGENT FOR THEMSELVES", 14, new Color(1, 1, 1, 0.35f), 0, 304, AGENT_W, 20, false, 3f, TextAlignmentOptions.Top);
             for (int i = 0; i < MAX_ROWS; i++) _rows.Add(BuildRow(p));
 
-            _invite = MenuButton(p, "INVITE FRIENDS", AGENT_X, 670, AGENT_W, 50, () => SteamLobby.Instance?.Invite(), 22);
+            _invite = MenuButton(p, "INVITE FRIENDS", AGENT_X, 610, AGENT_W, 46, () => SteamLobby.Instance?.Invite(), 20);
+            MenuButton(p, "MY AGENT  ·  LOOK AND LOADOUT", AGENT_X, 664, AGENT_W, 58, () => Show(Screen.Agent), 22);
             Label(p, "AGENT NAME", 15, UIFactory.Paper, AGENT_X, 738, AGENT_W, 22, true, 4f);
             _name = NameField(p, TL, Vector2.zero, new Vector2(AGENT_W, 56));
             ((RectTransform)_name.transform).pivot = TL;
@@ -525,12 +642,14 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             KeepName(_titleName);
             KeepName(_name);
+            KeepName(_agentName);
 
             if (GameInput.PausePressed)
             {
                 if (_current == Screen.Settings) CloseSettings();
                 else if (_current == Screen.Join) Show(Screen.Main);
                 else if (_current == Screen.Lobby) OpenSettings();
+                else if (_current == Screen.Agent) Show(Screen.Lobby);
             }
 
             if (_joining)

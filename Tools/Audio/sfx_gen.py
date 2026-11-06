@@ -340,6 +340,15 @@ def splash_small(r):
     return mix(bp(noise(r, 0.25), 500, 4000) * decay(0.25, 14, 0.005), *[at(modal(r, [r.uniform(700, 1800)], [70], seconds=0.06) * 0.2, r.uniform(0, 0.15)) for _ in range(4)])
 
 
+def duck(r):
+    """A rubber duck squeezed: a nasal rising squeak, then its sigh."""
+    def squeak(seconds, f0, f1):
+        phase = 2 * np.pi * np.cumsum(np.linspace(f0, f1, int(SR * seconds))) / SR
+        tone = np.sin(phase) + 0.5 * np.sin(2 * phase) + 0.3 * np.sin(3 * phase)
+        return bp(tone, 500, 5000) * np.sin(np.pi * np.linspace(0, 1, len(phase))) ** 0.5
+    return seq((0.0, squeak(0.11, 1200, 1950)), (0.12, squeak(0.16, 1700, 1050) * 0.8))
+
+
 def swim(r):
     return bp(noise(r, 0.5), 300, 1800) * np.sin(np.pi * np.linspace(0, 1, int(0.5 * SR))) ** 1.5 * 0.7
 
@@ -630,7 +639,7 @@ def amb_night(r):
 GROUPS = {
     -2.0: {"shot_pistol": shot_pistol, "shot_smg": shot_smg, "shot_shotgun": shot_shotgun, "shot_sniper": shot_sniper, "explosion": explosion, "rocket_launch": rocket_launch, "crash": crash, "siren": siren},
     -5.0: {"shot_silenced": shot_silenced, "punch": punch, "hit": hit, "hit_head": hit_head, "combat_hit": combat_hit, "thud": thud, "death": death, "takedown": takedown, "glass": glass, "metal_clang": metal_clang, "crowbar": crowbar, "chain_snap": chain_snap, "splash": splash, "caralarm": caralarm, "gas_alarm": gas_alarm, "phone": phone, "truck": truck, "brakes": brakes, "power_on": power_on, "power_off": power_off, "jumppad": jumppad, "smoke_pop": smoke_pop, "flame_start": flame_start, "fire_start": fire_start},
-    -8.0: {"swing": swing, "throw": throw, "brick": brick, "coin": coin, "dryfire": dryfire, "reload": reload_, "whizz": whizz, "rocket_fly": rocket_fly, "land": land, "jump": jump, "mantle": mantle, "vault": vault, "slide": slide, "ladder_drop": ladder_drop, "splash_small": splash_small, "swim": swim, "door_unlock": door_unlock, "switch": switch, "c4_stick": c4_stick, "vent_hiss": vent_hiss, "vent_open": vent_open, "generator": generator, "fan": fan, "computer": computer, "keyboard": keyboard, "tv": tv, "hose": hose, "pour": pour, "puke": puke, "sprinkler": sprinkler, "turret_warn": turret_warn, "radio": radio, "spotted": spotted, "target_down": target_down, "win": win, "lose": lose, "announce": announce},
+    -8.0: {"duck": duck, "swing": swing, "throw": throw, "brick": brick, "coin": coin, "dryfire": dryfire, "reload": reload_, "whizz": whizz, "rocket_fly": rocket_fly, "land": land, "jump": jump, "mantle": mantle, "vault": vault, "slide": slide, "ladder_drop": ladder_drop, "splash_small": splash_small, "swim": swim, "door_unlock": door_unlock, "switch": switch, "c4_stick": c4_stick, "vent_hiss": vent_hiss, "vent_open": vent_open, "generator": generator, "fan": fan, "computer": computer, "keyboard": keyboard, "tv": tv, "hose": hose, "pour": pour, "puke": puke, "sprinkler": sprinkler, "turret_warn": turret_warn, "radio": radio, "spotted": spotted, "target_down": target_down, "win": win, "lose": lose, "announce": announce},
     -11.0: {"step_grass": step_grass, "step_dirt": step_dirt, "step_sand": step_sand, "step_stone": step_stone, "step_wood": step_wood, "step_metal": step_metal, "step_water": step_water, "footstep": footstep, "click": click, "hover": hover, "map": map_, "pickup": pickup, "ping": ping},
     -14.0: {"amb_forest": amb_forest, "amb_desert": amb_desert, "amb_night": amb_night, "underwater": underwater, "tension_loop": tension_loop},
 }

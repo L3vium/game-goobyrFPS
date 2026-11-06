@@ -21,9 +21,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             return pItem.kind switch
             {
                 ItemKind.Fists => HeldKind.None,
-                ItemKind.Pistol or ItemKind.SilencedPistol => HeldKind.Pistol,
-                ItemKind.Smg or ItemKind.Shotgun or ItemKind.Sniper or ItemKind.RocketLauncher or ItemKind.Flamethrower => HeldKind.Rifle,
-                ItemKind.Crowbar or ItemKind.Wrench => HeldKind.Tool,
+                ItemKind.Pistol or ItemKind.SilencedPistol or ItemKind.Revolver => HeldKind.Pistol,
+                ItemKind.Smg or ItemKind.Shotgun or ItemKind.Sniper or ItemKind.RocketLauncher or ItemKind.Flamethrower or ItemKind.AssaultRifle or ItemKind.SawedOff or ItemKind.Crossbow or ItemKind.GrenadeLauncher => HeldKind.Rifle,
+                ItemKind.Crowbar or ItemKind.Wrench or ItemKind.Katana or ItemKind.FryingPan => HeldKind.Tool,
                 _ => HeldKind.Throwable
             };
         }
@@ -129,6 +129,66 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                     GameArt.Part(t, "Nozzle", lCyl, new Vector3(0, 0.04f, 0.28f), new Vector3(0.05f, 0.32f, 0.05f), lMetal).transform.localRotation = Quaternion.Euler(90, 0, 0);
                     GameArt.Part(t, "Pilot", lSphere, new Vector3(0, 0.02f, 0.45f), Vector3.one * 0.03f, new Color(0.3f, 0.6f, 1f), GameArt.Glow);
                     lMuzzleZ = 0.48f;
+                    break;
+                case ItemKind.Revolver:
+                    GameArt.Part(t, "Frame", lBox, new Vector3(0, 0.05f, 0.03f), new Vector3(0.05f, 0.075f, 0.14f), new Color(0.72f, 0.72f, 0.74f));
+                    GameArt.Part(t, "Drum", lCyl, new Vector3(0, 0.05f, 0.05f), new Vector3(0.075f, 0.075f, 0.075f), new Color(0.5f, 0.5f, 0.54f)).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    GameArt.Part(t, "Barrel", lCyl, new Vector3(0, 0.065f, 0.17f), new Vector3(0.032f, 0.14f, 0.032f), new Color(0.72f, 0.72f, 0.74f)).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    GameArt.Part(t, "Grip", lBox, new Vector3(0, -0.03f, -0.035f), new Vector3(0.05f, 0.12f, 0.06f), lWood).transform.localRotation = Quaternion.Euler(-16f, 0f, 0f);
+                    lMuzzleZ = 0.25f;
+                    break;
+                case ItemKind.AssaultRifle:
+                    GameArt.Part(t, "Stock", lBox, new Vector3(0, 0.01f, -0.17f), new Vector3(0.055f, 0.1f, 0.22f), lAccent);
+                    GameArt.Part(t, "Body", lBox, new Vector3(0, 0.04f, 0.08f), new Vector3(0.07f, 0.1f, 0.34f), lMetal);
+                    GameArt.Part(t, "Guard", lBox, new Vector3(0, 0.035f, 0.31f), new Vector3(0.062f, 0.075f, 0.18f), lAccent);
+                    GameArt.Part(t, "Barrel", lCyl, new Vector3(0, 0.05f, 0.47f), new Vector3(0.025f, 0.2f, 0.025f), lMetal * 0.6f).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    GameArt.Part(t, "Mag", lBox, new Vector3(0, -0.075f, 0.12f), new Vector3(0.045f, 0.16f, 0.07f), lMetal * 0.7f).transform.localRotation = Quaternion.Euler(14f, 0f, 0f);
+                    GameArt.Part(t, "Grip", lBox, new Vector3(0, -0.05f, -0.03f), new Vector3(0.045f, 0.11f, 0.055f), lMetal * 0.7f).transform.localRotation = Quaternion.Euler(-14f, 0f, 0f);
+                    GameArt.Part(t, "Sight", lBox, new Vector3(0, 0.105f, 0.12f), new Vector3(0.03f, 0.03f, 0.07f), lMetal * 0.5f);
+                    lMuzzleZ = 0.58f;
+                    break;
+                case ItemKind.SawedOff:
+                    GameArt.Part(t, "Stock", lBox, new Vector3(0, -0.02f, -0.06f), new Vector3(0.06f, 0.12f, 0.14f), lWood).transform.localRotation = Quaternion.Euler(-20f, 0f, 0f);
+                    GameArt.Part(t, "Body", lBox, new Vector3(0, 0.03f, 0.06f), new Vector3(0.08f, 0.07f, 0.14f), lMetal);
+                    GameArt.Part(t, "BarrelL", lCyl, new Vector3(-0.022f, 0.045f, 0.2f), new Vector3(0.04f, 0.2f, 0.04f), lMetal * 0.7f).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    GameArt.Part(t, "BarrelR", lCyl, new Vector3(0.022f, 0.045f, 0.2f), new Vector3(0.04f, 0.2f, 0.04f), lMetal * 0.7f).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    lMuzzleZ = 0.31f;
+                    break;
+                case ItemKind.Crossbow:
+                    GameArt.Part(t, "Tiller", lBox, new Vector3(0, 0.02f, 0.08f), new Vector3(0.05f, 0.05f, 0.46f), lWood);
+                    GameArt.Part(t, "ArmL", lBox, new Vector3(-0.15f, 0.025f, 0.28f), new Vector3(0.3f, 0.025f, 0.035f), lMetal).transform.localRotation = Quaternion.Euler(0f, 18f, 0f);
+                    GameArt.Part(t, "ArmR", lBox, new Vector3(0.15f, 0.025f, 0.28f), new Vector3(0.3f, 0.025f, 0.035f), lMetal).transform.localRotation = Quaternion.Euler(0f, -18f, 0f);
+                    GameArt.Part(t, "Bolt", lCyl, new Vector3(0, 0.055f, 0.2f), new Vector3(0.012f, 0.34f, 0.012f), new Color(0.85f, 0.25f, 0.2f)).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    lMuzzleZ = 0.38f;
+                    break;
+                case ItemKind.GrenadeLauncher:
+                    GameArt.Part(t, "Stock", lBox, new Vector3(0, 0.0f, -0.14f), new Vector3(0.06f, 0.1f, 0.2f), lMetal * 0.7f);
+                    GameArt.Part(t, "Drum", lCyl, new Vector3(0, 0.05f, 0.08f), new Vector3(0.17f, 0.15f, 0.17f), lAccent).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    GameArt.Part(t, "Barrel", lCyl, new Vector3(0, 0.06f, 0.27f), new Vector3(0.09f, 0.28f, 0.09f), lMetal).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    GameArt.Part(t, "Grip", lBox, new Vector3(0, -0.06f, -0.02f), new Vector3(0.05f, 0.12f, 0.06f), lMetal * 0.7f);
+                    lMuzzleZ = 0.42f;
+                    break;
+                case ItemKind.Katana:
+                    GameArt.Part(t, "Handle", lBox, new Vector3(0, 0.08f, 0), new Vector3(0.03f, 0.2f, 0.035f), new Color(0.15f, 0.15f, 0.2f));
+                    GameArt.Part(t, "Guard", lCyl, new Vector3(0, 0.19f, 0), new Vector3(0.08f, 0.012f, 0.08f), new Color(0.8f, 0.68f, 0.3f));
+                    GameArt.Part(t, "Blade", lBox, new Vector3(0, 0.56f, 0), new Vector3(0.012f, 0.72f, 0.04f), new Color(0.88f, 0.9f, 0.94f));
+                    break;
+                case ItemKind.FryingPan:
+                    GameArt.Part(t, "Handle", lBox, new Vector3(0, 0.1f, 0), new Vector3(0.03f, 0.28f, 0.02f), new Color(0.2f, 0.17f, 0.15f));
+                    GameArt.Part(t, "Pan", lCyl, new Vector3(0, 0.36f, 0), new Vector3(0.28f, 0.04f, 0.28f), new Color(0.22f, 0.22f, 0.25f)).transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    GameArt.Part(t, "Egg", lSphere, new Vector3(0, 0.36f, 0.025f), new Vector3(0.12f, 0.1f, 0.02f), new Color(0.98f, 0.96f, 0.9f));
+                    break;
+                case ItemKind.RadioDecoy:
+                    GameArt.Part(t, "Box", lBox, Vector3.zero, new Vector3(0.12f, 0.1f, 0.06f), lAccent);
+                    GameArt.Part(t, "Aerial", lCyl, new Vector3(0.045f, 0.12f, 0), new Vector3(0.008f, 0.16f, 0.008f), lMetal);
+                    break;
+                case ItemKind.Firecrackers:
+                    for (int i = 0; i < 4; i++) GameArt.Part(t, "Banger", lCyl, new Vector3(-0.04f + i * 0.027f, 0, 0), new Vector3(0.024f, 0.11f, 0.024f), lAccent);
+                    break;
+                case ItemKind.RubberDuck:
+                    GameArt.Part(t, "Body", lSphere, Vector3.zero, new Vector3(0.1f, 0.08f, 0.13f), lAccent);
+                    GameArt.Part(t, "Head", lSphere, new Vector3(0, 0.065f, 0.04f), Vector3.one * 0.07f, lAccent);
+                    GameArt.Part(t, "Beak", lBox, new Vector3(0, 0.06f, 0.085f), new Vector3(0.04f, 0.015f, 0.03f), new Color(0.95f, 0.5f, 0.15f));
                     break;
                 case ItemKind.Coin:
                     GameArt.Part(t, "Coin", lCyl, Vector3.zero, new Vector3(0.06f, 0.01f, 0.06f), new Color(1f, 0.8f, 0.25f)).transform.localRotation = Quaternion.Euler(90, 0, 0);

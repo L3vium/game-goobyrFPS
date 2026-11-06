@@ -133,7 +133,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         public static Action<string> Stepper(RectTransform pList, string pLabel, string pValue, Action<int> pOnStep)
         {
             RectTransform lRow = Row(pList, pLabel);
-            TextMeshProUGUI lValue = UIFactory.Title(lRow, "Value", pValue, 20, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(1, 0.5f), new Vector2(-142, 0), new Vector2(220, 30), true, 2f);
+            TextMeshProUGUI lValue = UIFactory.Title(lRow, "Value", pValue, 20, UIFactory.Paper, TextAlignmentOptions.Center, new Vector2(1, 0.5f), new Vector2(-52, 0), new Vector2(220, 30), true, 2f);
             Arrow(lRow, "‹", new Vector2(-272, 0), () => pOnStep(-1));
             Arrow(lRow, "›", new Vector2(-12, 0), () => pOnStep(1));
             return pText => lValue.text = pText;

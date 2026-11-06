@@ -183,7 +183,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             Mode = MotorMode.Walk;
         }
 
-        /// <summary>Jump pads, explosions.</summary>
+        /// <summary>Jump pads, spring boots, explosions: the landing that follows never hurts.</summary>
         public void Launch(Vector3 pVelocity, bool pReplace = true)
         {
             if (Mode == MotorMode.Hidden || Mode == MotorMode.Locked) return;
@@ -191,7 +191,48 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             _velocity = pReplace ? pVelocity : _velocity + pVelocity;
             Grounded = false;
             _coyote = 0f;
-            _airStartY = transform.position.y + 50f;
+            _softLanding = true;
+        }
+
+        /// <summary>The jetpack: lift this frame, and a landing that never hurts.</summary>
+        public void Thrust(float dt)
+        {
+            if (Mode != MotorMode.Walk) return;
+            _velocity.y = Mathf.Min(_velocity.y + (JET_ACCELERATION - _gravity) * dt, JET_CLIMB);
+            Grounded = false;
+            _coyote = 0f;
+            _softLanding = true;
+        }
+
+        /// <summary>The grappling hook: pulled towards a point until there, or until a jump lets go.</summary>
+        public void StartGrapple(Vector3 pPoint)
+        {
+            if (Mode != MotorMode.Walk) return;
+            GrapplePoint = pPoint;
+            Grappling = true;
+            _grappleTime = GRAPPLE_MAX_TIME;
+            _softLanding = true;
+            Grounded = false;
+        }
+
+        public bool Grappling { get; private set; }
+        public Vector3 GrapplePoint { get; private set; }
+        private const float JET_ACCELERATION = 26f, JET_CLIMB = 6f;
+        private const float GRAPPLE_SPEED = 17f, GRAPPLE_STEER = 60f, GRAPPLE_MAX_TIME = 2.2f, GRAPPLE_ARRIVE = 2.2f;
+        private float _grappleTime;
+        private bool _softLanding;
+
+        private void UpdateGrapple(float dt)
+        {
+            Vector3 lTo = GrapplePoint - (transform.position + Vector3.up * 1f);
+            _grappleTime -= dt;
+            if (lTo.magnitude < GRAPPLE_ARRIVE || _grappleTime <= 0f || GameInput.JumpPressed || Mode != MotorMode.Walk)
+            {
+                Grappling = false;
+                _velocity = Vector3.ClampMagnitude(_velocity, 9f);
+                return;
+            }
+            _velocity = Vector3.MoveTowards(_velocity, lTo.normalized * GRAPPLE_SPEED, GRAPPLE_STEER * dt);
         }
 
         public void EnterGrass() => _grassCount++;
@@ -297,7 +338,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                     float lDrop = _airStartY - transform.position.y;
                     OnLanded?.Invoke(lFall);
                     OnDrop?.Invoke(lDrop);
-                    if (lDrop > 7f) OnFallDamage?.Invoke((lDrop - 7f) * 14f);
+                    if (lDrop > 7f && !_softLanding) OnFallDamage?.Invoke((lDrop - 7f) * 14f);
+                    _softLanding = false;
                 }
                 _airStartY = transform.position.y;
             }
@@ -388,6 +430,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
 
             _velocity.x = lPlanar.x;
             _velocity.z = lPlanar.z;
+            if (Grappling) UpdateGrapple(dt);
             float lBeforeY = transform.position.y;
             _controller.Move((_velocity + _steepPush) * dt);
             _steepPush = Vector3.zero;

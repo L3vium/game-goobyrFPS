@@ -494,3 +494,13 @@ plants to. Teams: `LobbyPlayer.ChosenTeam` is a room team (`LobbyState.BoxCount`
 `NO_TEAM`; `LobbyState.ResolveTeams` gives each agent on their own a team id above the boxes, and an agent alone
 counts as a team of one for `ModeFromBoxes`. `DefenderMask` holds each room team's game mode. The pause map
 shows only the target, you, teammates, the active extractions and the proof.
+
+## Agent, loadout, first person (0.9.3)
+
+`Net/AgentLook` (hat, skin, top, bottom, shoes, three item indices) is written by its owner on `LobbyPlayer.Look` and
+kept by `PlayerIdentity.LocalLook`; `FX/AgentHats` tints the body's slots and builds the hat from primitives. The host
+gives the loadout in `WeaponHolder.GiveLoadoutServer`, only items with `ItemDefinition.inLoadout`. Slots: 0-2 weapons,
+`MOVE_SLOT`, `DISTRACTION_SLOT`, then the hidden keys; `Selected` is `FISTS` (-1) with nothing in hand.
+`Player/MovementGear` runs the movement items on the owner's machine. `Weapons/Viewmodel` is entirely code: poses in camera
+space, curves for actions, springs for recoil. The rigged first-person arms and `Tools/Blender/fp` are gone.
+Items appended to the database keep the earlier indices stable.

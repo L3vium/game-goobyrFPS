@@ -17,6 +17,7 @@ MonoBehaviour:
   slot: 0
   color: {r: 0.78, g: 0.8, b: 0.82, a: 1}
   unique: 0
+  inLoadout: 1
   damage: 70
   headMultiplier: 3
   fireRate: 3

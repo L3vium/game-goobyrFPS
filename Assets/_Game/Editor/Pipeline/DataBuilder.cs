@@ -58,7 +58,25 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                 Item("CodeNote", "Code Note", ItemKind.CodeNote, ItemSlot.Gadget, new Color(0.95f, 0.95f, 0.85f), pResetTuning, i => { i.stack = 1; }),
                 Item("Knife", "Knife", ItemKind.Knife, ItemSlot.Weapon, new Color(0.78f, 0.8f, 0.82f), pResetTuning, i => { i.damage = 70; i.magazine = 0; i.reserveAmmo = 0; i.noiseRadius = 4; }),
                 Item("Machete", "Machete", ItemKind.Machete, ItemSlot.Weapon, new Color(0.68f, 0.7f, 0.72f), pResetTuning, i => { i.damage = 90; i.magazine = 0; i.reserveAmmo = 0; i.noiseRadius = 6; }),
-                Item("Bat", "Bat", ItemKind.Bat, ItemSlot.Weapon, new Color(0.72f, 0.5f, 0.3f), pResetTuning, i => { i.damage = 55; i.magazine = 0; i.reserveAmmo = 0; i.noiseRadius = 8; })
+                Item("Bat", "Bat", ItemKind.Bat, ItemSlot.Weapon, new Color(0.72f, 0.5f, 0.3f), pResetTuning, i => { i.damage = 55; i.magazine = 0; i.reserveAmmo = 0; i.noiseRadius = 8; }),
+                Item("Revolver", "Revolver", ItemKind.Revolver, ItemSlot.Weapon, new Color(0.75f, 0.72f, 0.65f), pResetTuning, i =>
+                { i.damage = 85; i.headMultiplier = 3; i.fireRate = 2.2f; i.magazine = 6; i.reserveAmmo = 24; i.spread = 0.9f; i.adsFov = 60; i.recoil = 3.2f; i.shake = 0.2f; i.noiseRadius = 26; i.range = 110; i.reloadTime = 1.9f; }),
+                Item("AssaultRifle", "Assault Rifle", ItemKind.AssaultRifle, ItemSlot.Weapon, new Color(0.45f, 0.5f, 0.35f), pResetTuning, i =>
+                { i.damage = 34; i.headMultiplier = 2.4f; i.fireRate = 9; i.automatic = true; i.magazine = 28; i.reserveAmmo = 84; i.spread = 1.3f; i.adsSpreadFactor = 0.35f; i.adsFov = 58; i.recoil = 1.2f; i.shake = 0.12f; i.noiseRadius = 34; i.range = 160; i.reloadTime = 2f; }),
+                Item("SawedOff", "Sawed-Off", ItemKind.SawedOff, ItemSlot.Weapon, new Color(0.6f, 0.38f, 0.22f), pResetTuning, i =>
+                { i.damage = 190; i.headMultiplier = 1.4f; i.pellets = 10; i.fireRate = 2f; i.magazine = 2; i.reserveAmmo = 12; i.spread = 8f; i.adsSpreadFactor = 0.8f; i.adsFov = 70; i.recoil = 6f; i.shake = 0.5f; i.noiseRadius = 32; i.range = 18; i.reloadTime = 1.6f; }),
+                Item("Crossbow", "Crossbow", ItemKind.Crossbow, ItemSlot.Weapon, new Color(0.5f, 0.35f, 0.2f), pResetTuning, i =>
+                { i.damage = 120; i.headMultiplier = 3; i.fireRate = 0.9f; i.magazine = 1; i.reserveAmmo = 10; i.spread = 0.4f; i.adsFov = 50; i.recoil = 2f; i.shake = 0.1f; i.noiseRadius = 3; i.range = 90; i.reloadTime = 1.5f; }),
+                Item("GrenadeLauncher", "Grenade Launcher", ItemKind.GrenadeLauncher, ItemSlot.Weapon, new Color(0.35f, 0.42f, 0.3f), pResetTuning, i =>
+                { i.damage = 170; i.explosionRadius = 5.5f; i.projectileSpeed = 30; i.fireRate = 1f; i.magazine = 4; i.reserveAmmo = 8; i.spread = 0.5f; i.adsFov = 62; i.recoil = 5f; i.shake = 0.4f; i.noiseRadius = 36; i.range = 120; i.reloadTime = 2.6f; }),
+                Item("Katana", "Katana", ItemKind.Katana, ItemSlot.Weapon, new Color(0.85f, 0.88f, 0.92f), pResetTuning, i => { i.damage = 110; i.magazine = 0; i.reserveAmmo = 0; i.noiseRadius = 5; }),
+                Item("FryingPan", "Frying Pan", ItemKind.FryingPan, ItemSlot.Weapon, new Color(0.25f, 0.25f, 0.28f), pResetTuning, i => { i.damage = 60; i.magazine = 0; i.reserveAmmo = 0; i.noiseRadius = 12; }),
+                Item("RadioDecoy", "Radio Decoy", ItemKind.RadioDecoy, ItemSlot.Gadget, new Color(0.3f, 0.5f, 0.75f), pResetTuning, i => { i.stack = 2; i.throwForce = 14; i.noiseRadius = 12; }),
+                Item("Firecrackers", "Firecrackers", ItemKind.Firecrackers, ItemSlot.Gadget, new Color(0.9f, 0.25f, 0.2f), pResetTuning, i => { i.stack = 2; i.throwForce = 15; i.noiseRadius = 20; }),
+                Item("RubberDuck", "Rubber Duck", ItemKind.RubberDuck, ItemSlot.Gadget, new Color(0.98f, 0.85f, 0.25f), pResetTuning, i => { i.stack = 3; i.throwForce = 16; i.noiseRadius = 11; }),
+                Item("Grapple", "Grappling Hook", ItemKind.Grapple, ItemSlot.Movement, new Color(0.6f, 0.62f, 0.66f), pResetTuning, i => { i.magazine = 0; i.reserveAmmo = 0; i.stack = 1; }),
+                Item("JetPack", "Mini Jetpack", ItemKind.JetPack, ItemSlot.Movement, new Color(0.85f, 0.45f, 0.2f), pResetTuning, i => { i.magazine = 0; i.reserveAmmo = 0; i.stack = 1; }),
+                Item("SpringBoots", "Spring Boots", ItemKind.SpringBoots, ItemSlot.Movement, new Color(0.4f, 0.75f, 0.45f), pResetTuning, i => { i.magazine = 0; i.reserveAmmo = 0; i.stack = 1; })
             };
 
             // How far each item is heard in the open (walls muffle it, DetectionModel.Loudness): kept in
@@ -71,6 +89,19 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             };
             foreach (ItemDefinition lItem in lItems)
                 if (lNoise.TryGetValue(lItem.kind, out float lRadius)) { lItem.noiseRadius = lRadius; EditorUtility.SetDirty(lItem); }
+
+            // What an agent can start with; the rest is found on the map.
+            HashSet<ItemKind> lLoadout = new HashSet<ItemKind>
+            {
+                ItemKind.Pistol, ItemKind.SilencedPistol, ItemKind.Revolver, ItemKind.Knife, ItemKind.Bat, ItemKind.FryingPan,
+                ItemKind.Coin, ItemKind.Brick, ItemKind.SmokeGrenade, ItemKind.RadioDecoy, ItemKind.Firecrackers, ItemKind.RubberDuck,
+                ItemKind.Grapple, ItemKind.JetPack, ItemKind.SpringBoots
+            };
+            foreach (ItemDefinition lItem in lItems)
+            {
+                lItem.inLoadout = lLoadout.Contains(lItem.kind);
+                EditorUtility.SetDirty(lItem);
+            }
 
             GameRules lRules = EditorAssets.LoadOrCreate<GameRules>(EditorAssets.DATA + "/GameRules.asset");
             // A pistol to start with (see WeaponHolder: lightly loaded), and guards who really look.

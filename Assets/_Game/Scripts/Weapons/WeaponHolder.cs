@@ -16,8 +16,8 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
     /// A player's inventory and everything they do with it: shoot, reload, punch, throw, plant
     /// and blow C4, burn with the flamethrower, pick up and drop.
     /// <para>
-    /// Four slots: two weapons (1-2) and two gadgets (3-4); an empty weapon slot is the fists. Keys and
-    /// tools sit in hidden slots after them: they open things, they are never held.
+    /// Bare hands (key 1, always there), three weapon slots (keys 2-4), a movement item and a distraction,
+    /// each on its own key. Keys and tools sit in hidden slots after them: they open things, they are never held.
     /// The host owns the slot list and the ammo; the owner predicts the shot locally (muzzle,
     /// tracer, recoil, sound) and sends origin + direction + spread seed, the host re-traces the
     /// same pellets, deals the damage and replays the shot on the other machines.
@@ -27,12 +27,15 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
     [RequireComponent(typeof(PlayerAvatar))]
     public class WeaponHolder : NetworkBehaviour
     {
-        public const int SLOT_COUNT = 4;
+        public const int SLOT_COUNT = 5;
         public const int KEY_SLOTS = 3;
-        public const int WEAPON_SLOTS = 2;
+        public const int WEAPON_SLOTS = 3;
+        public const int MOVE_SLOT = 3, DISTRACTION_SLOT = 4;
+        /// <summary>The value of <see cref="Selected"/> with nothing in hand.</summary>
+        public const int FISTS = -1;
 
         public readonly NetworkList<InventorySlot> Slots = new NetworkList<InventorySlot>();
-        public readonly NetworkVariable<int> Selected = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        public readonly NetworkVariable<int> Selected = new NetworkVariable<int>(FISTS, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> Flaming = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> Reloading = new NetworkVariable<bool>(false);
 
@@ -73,9 +76,6 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public static bool ForceAim;
         private ThrowArc _arc;
         private bool _aiming;
-        private int _lastGadget = 2;
-        /// <summary>Owner: still to put the gun away once the starting loadout has arrived (a drawn gun is suspicious).</summary>
-        private bool _holsterOnSpawn;
         private GameObject _thirdPersonModel;
         private int _thirdPersonItem = -2;
         private GameObject _flameFx;
@@ -93,17 +93,28 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (IsServer)
             {
                 for (int i = 0; i < SLOT_COUNT + KEY_SLOTS; i++) Slots.Add(InventorySlot.Empty);
-                // The starting gun is lightly loaded: one magazine in it, one spare.
-                foreach (ItemDefinition lItem in GameDatabase.Rules.startingLoadout) if (lItem != null) GiveServer(lItem, -1, lItem.UsesAmmo ? lItem.magazine : -1);
+                GiveLoadoutServer();
             }
             if (IsOwner)
             {
                 View = Viewmodel.Create(this);
-                Selected.Value = 0;
-                _holsterOnSpawn = true;
+                Selected.Value = FISTS;
             }
             Avatar.Health.OnDeathServer += HandleDeathServer;
             Selected.OnValueChanged += (_, __) => RefreshThirdPerson();
+        }
+
+        /// <summary>Host: what the agent chose in its loadout (a starting gun is lightly loaded: one magazine in it, one spare).</summary>
+        private void GiveLoadoutServer()
+        {
+            Net.LobbyPlayer lPlayer = Avatar.Player;
+            if (lPlayer == null) return;
+            Net.AgentLook lLook = lPlayer.Look.Value;
+            foreach (short lIndex in new[] { lLook.weapon, lLook.movement, lLook.distraction })
+            {
+                ItemDefinition lItem = GameDatabase.Item(lIndex);
+                if (lItem != null && lItem.inLoadout) GiveServer(lItem, -1, lItem.UsesAmmo ? lItem.magazine : -1);
+            }
         }
 
         public override void OnNetworkDespawn()
@@ -140,17 +151,13 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (!IsOwner || !Avatar.Health.IsAlive) { if (_arc != null) _arc.Hide(); return; }
             if (Avatar.Motor.Mode == MotorMode.Hidden || Avatar.Motor.Mode == MotorMode.Zipline) { _aiming = false; if (_arc != null) _arc.Hide(); return; }
 
-            if (_holsterOnSpawn && Slots.Count >= SLOT_COUNT)
-            {
-                // Spawn with bare fists: the first empty weapon slot (the loadout stays one wheel turn away).
-                _holsterOnSpawn = false;
-                for (int i = 0; i < WEAPON_SLOTS; i++) if (SlotAt(i).IsEmpty) { Select(i); break; }
-            }
             if (_strikePending && Time.time >= _strikeAt) Strike();
             if (_throwSlot >= 0 && Time.time >= _throwAt) Release();
 
+            // Key 1 is bare hands, keys 2 to 4 the weapons.
             int lSlot = GameInput.SlotPressed;
-            if (lSlot >= 0) Select(lSlot);
+            if (lSlot == 0) Select(FISTS);
+            else if (lSlot > 0) Select(lSlot - 1);
             float lScroll = GameInput.Scroll;
             if (Mathf.Abs(lScroll) > 0.1f && Time.time >= _nextScroll)
             {
@@ -160,7 +167,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
 
             // Left click fires, from the hip or (right click held) aimed.
             ItemDefinition lHeld = HeldItem;
-            bool lShooter = lHeld != null && (lHeld.IsGun || lHeld.kind == ItemKind.RocketLauncher || lHeld.kind == ItemKind.Flamethrower);
+            bool lShooter = lHeld != null && (lHeld.IsGun || lHeld.IsLauncher || lHeld.kind == ItemKind.Flamethrower);
             _aiming = (GameInput.Aim || ForceAim) && lShooter;
             // Firing from the hip breaks a sprint just like aiming does.
             Avatar.Motor.Aiming = _aiming || (lShooter && GameInput.Fire);
@@ -172,7 +179,13 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (GameInput.TakedownPressed && TakedownReady) TryMelee(true);
             if (GameInput.Reload && lHeld != null && lHeld.UsesAmmo) ReloadRpc(Selected.Value);
             if (GameInput.Melee) TryMelee();
-            if (GameInput.Throw) ThrowGadget(_lastGadget);
+            if (GameInput.Throw)
+            {
+                // The distraction's key: thrown at once; what can't be thrown (a poison) comes to hand.
+                ItemDefinition lDistraction = ItemIn(DISTRACTION_SLOT);
+                if (lDistraction != null && lDistraction.IsThrowable) ThrowGadget(DISTRACTION_SLOT);
+                else if (lDistraction != null) Select(DISTRACTION_SLOT);
+            }
             if (GameInput.Detonate) DetonateRpc();
 
             bool lFlaming = false;
@@ -206,26 +219,24 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         }
 
         /// <summary>
-        /// The mouse wheel: next / previous slot that holds something, plus the fists (an empty
-        /// weapon slot). Empty gadget slots are skipped, and it wraps round.
+        /// The mouse wheel: bare hands, then the weapons, wrapping round.
         /// </summary>
         private void Cycle(int pStep)
         {
-            int lFists = -1;
-            for (int i = 0; i < WEAPON_SLOTS; i++) if (SlotAt(i).IsEmpty) { lFists = i; break; }
-            for (int n = 1; n <= SLOT_COUNT; n++)
+            const int STOPS = WEAPON_SLOTS + 1;
+            int lFrom = Selected.Value >= WEAPON_SLOTS ? 0 : Selected.Value + 1;
+            for (int n = 1; n <= STOPS; n++)
             {
-                int lSlot = ((Selected.Value + pStep * n) % SLOT_COUNT + SLOT_COUNT) % SLOT_COUNT;
-                if (!SlotAt(lSlot).IsEmpty || lSlot == lFists) { Select(lSlot); return; }
+                int lStop = ((lFrom + pStep * n) % STOPS + STOPS) % STOPS;
+                if (lStop == 0 || !SlotAt(lStop - 1).IsEmpty) { Select(lStop - 1); return; }
             }
         }
 
         public void Select(int pSlot)
         {
-            if (pSlot < 0 || pSlot >= SLOT_COUNT || pSlot == Selected.Value) return;
-            if (pSlot >= WEAPON_SLOTS && SlotAt(pSlot).IsEmpty) return;
+            if (pSlot < FISTS || pSlot >= SLOT_COUNT || pSlot == Selected.Value) return;
+            if (pSlot != FISTS && SlotAt(pSlot).IsEmpty) return;
             Selected.Value = pSlot;
-            if (pSlot >= WEAPON_SLOTS) _lastGadget = pSlot;
             View?.PlaySwitch();
             Sfx.Play2D("switch", 0.5f);
         }
@@ -248,7 +259,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             int lSeed = _spreadRandom.Next();
             Vector3 lMuzzle = View != null ? View.MuzzlePosition : lOrigin;
 
-            if (pItem.kind == ItemKind.RocketLauncher)
+            if (pItem.IsLauncher)
             {
                 Effects.Muzzle(lMuzzle, lDirection, 2f);
                 Juice.Shake(0.4f);
@@ -274,7 +285,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                     }
                     Effects.Tracer(lMuzzle, lEnd, new Color(1f, 0.85f, 0.5f, 0.9f));
                 }
-                Effects.Muzzle(lMuzzle, lDirection, pItem.kind == ItemKind.Shotgun ? 1.6f : pItem.kind == ItemKind.SilencedPistol ? 0.5f : 1f);
+                Effects.Muzzle(lMuzzle, lDirection, pItem.kind is ItemKind.Shotgun or ItemKind.SawedOff ? 1.6f : pItem.kind is ItemKind.SilencedPistol or ItemKind.Crossbow ? 0.5f : 1f);
                 Juice.Shake(pItem.shake);
             }
 
@@ -288,11 +299,12 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         public static string SoundFor(ItemDefinition pItem) => pItem.kind switch
         {
             ItemKind.SilencedPistol => "shot_silenced",
-            ItemKind.Pistol => "shot_pistol",
-            ItemKind.Smg => "shot_smg",
-            ItemKind.Shotgun => "shot_shotgun",
+            ItemKind.Pistol or ItemKind.Revolver => "shot_pistol",
+            ItemKind.Smg or ItemKind.AssaultRifle => "shot_smg",
+            ItemKind.Shotgun or ItemKind.SawedOff => "shot_shotgun",
             ItemKind.Sniper => "shot_sniper",
-            ItemKind.RocketLauncher => "rocket_launch",
+            ItemKind.Crossbow => "shot_silenced",
+            ItemKind.RocketLauncher or ItemKind.GrenadeLauncher => "rocket_launch",
             _ => "shot_pistol"
         };
 
@@ -371,6 +383,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (pSlot != Selected.Value)
             {
                 // Quick throw of a gadget not in hand (throw key): it goes at once.
+                View?.PlayThrow();
                 ThrowRpc(pSlot, Avatar.AimOrigin + Avatar.AimDirection * 0.5f, Avatar.AimDirection);
                 return;
             }
@@ -401,9 +414,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             if (!Avatar.DevInfiniteAmmo) lSlot.magazine--;
             Slots[pSlot] = lSlot;
 
-            NoiseSystem.Emit(pOrigin, lItem.noiseRadius, lItem.kind == ItemKind.SilencedPistol ? NoiseKind.Suspicious : NoiseKind.Alarming, OwnerClientId);
+            NoiseSystem.Emit(pOrigin, lItem.noiseRadius, lItem.kind is ItemKind.SilencedPistol or ItemKind.Crossbow ? NoiseKind.Suspicious : NoiseKind.Alarming, OwnerClientId);
 
-            if (lItem.kind == ItemKind.RocketLauncher)
+            if (lItem.IsLauncher)
             {
                 Projectile.SpawnRocket(pOrigin + pDirection.normalized * 1.2f, pDirection, lItem, OwnerClientId, Avatar.Team.Value);
                 RemoteShotRpc(lSlot.item, pOrigin, new Vector3[0]);
@@ -600,13 +613,20 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 return false;
             }
 
+            if (pItem.slot == ItemSlot.Movement)
+            {
+                if (Slots[MOVE_SLOT].item == pItem.Index) return false;
+                DropSlotServer(MOVE_SLOT);
+                Slots[MOVE_SLOT] = new InventorySlot { item = pItem.Index, magazine = 0, reserve = 1 };
+                return true;
+            }
+
             if (pItem.slot == ItemSlot.Gadget)
             {
-                for (int i = WEAPON_SLOTS; i < SLOT_COUNT; i++)
-                    if (Slots[i].item == pItem.Index) { InventorySlot s = Slots[i]; s.reserve += lReserve; Slots[i] = s; return true; }
-                for (int i = WEAPON_SLOTS; i < SLOT_COUNT; i++)
-                    if (Slots[i].IsEmpty) { Slots[i] = new InventorySlot { item = pItem.Index, magazine = 0, reserve = lReserve }; return true; }
-                return false;
+                if (Slots[DISTRACTION_SLOT].item == pItem.Index) { InventorySlot s = Slots[DISTRACTION_SLOT]; s.reserve += lReserve; Slots[DISTRACTION_SLOT] = s; return true; }
+                DropSlotServer(DISTRACTION_SLOT);
+                Slots[DISTRACTION_SLOT] = new InventorySlot { item = pItem.Index, magazine = 0, reserve = lReserve };
+                return true;
             }
 
             for (int i = 0; i < WEAPON_SLOTS; i++)
@@ -614,7 +634,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
             for (int i = 0; i < WEAPON_SLOTS; i++)
                 if (Slots[i].IsEmpty) { Slots[i] = new InventorySlot { item = pItem.Index, magazine = lMag, reserve = lReserve }; return true; }
 
-            int lReplace = Selected.Value < WEAPON_SLOTS ? Selected.Value : 0;
+            int lReplace = Selected.Value >= 0 && Selected.Value < WEAPON_SLOTS ? Selected.Value : 0;
             DropSlotServer(lReplace);
             Slots[lReplace] = new InventorySlot { item = pItem.Index, magazine = lMag, reserve = lReserve };
             return true;
@@ -646,7 +666,7 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
         {
             Sfx.Play2D("pickup", 0.8f);
             ItemDefinition lItem = GameDatabase.Item(pItem);
-            for (int i = 0; i < SLOT_COUNT; i++)
+            for (int i = 0; i < WEAPON_SLOTS; i++)
                 if (SlotAt(i).item == pItem && lItem != null && lItem.slot == ItemSlot.Weapon) { Select(i); break; }
         }
 

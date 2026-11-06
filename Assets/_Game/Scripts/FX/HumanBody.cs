@@ -71,6 +71,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             if (Built) Rebuild(); else Build();
         }
 
+        /// <summary>The owner's own body: drawn only as a shadow.</summary>
+        public bool ShadowOnly => _shadowOnly;
+
         public void Rebuild()
         {
             if (Model != null)

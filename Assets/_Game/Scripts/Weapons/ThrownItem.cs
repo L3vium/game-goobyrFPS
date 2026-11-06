@@ -99,6 +99,21 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 lShootable?.OnShotServer(new DamageInfo { amount = 20f, type = DamageType.Melee, point = transform.position, attacker = _thrower, attackerTeam = _team });
             }
 
+            if (lKind == ItemKind.RubberDuck)
+            {
+                // Every bounce squeaks and is heard; after a few it lies still, and goes.
+                NoiseSystem.Emit(transform.position, Item.noiseRadius, NoiseKind.Distraction, _thrower);
+                FeedbackRpc(7);
+                if (++_bounces >= 4) { _landed = true; Invoke(nameof(Remove), 8f); }
+                return;
+            }
+            if (lKind == ItemKind.RadioDecoy || lKind == ItemKind.Firecrackers)
+            {
+                _landed = true;
+                StartCoroutine(Noisy(lKind));
+                return;
+            }
+
             if (lKind == ItemKind.Coin || Item.KnocksOut)
             {
                 // Where it lands, the nearest guard or two come to look (see DetectionModel.Responders).
@@ -108,6 +123,22 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 Invoke(nameof(Remove), lKind == ItemKind.Bottle ? 0.05f : 8f);
             }
         }
+
+        /// <summary>A decoy talks for a while; firecrackers go off one after the other. Either way guards come.</summary>
+        private System.Collections.IEnumerator Noisy(ItemKind pKind)
+        {
+            bool lRadio = pKind == ItemKind.RadioDecoy;
+            int lCount = lRadio ? 5 : 9;
+            for (int i = 0; i < lCount; i++)
+            {
+                NoiseSystem.Emit(transform.position, Item.noiseRadius, NoiseKind.Distraction, _thrower);
+                FeedbackRpc(lRadio ? 5 : 6);
+                yield return new WaitForSeconds(lRadio ? 1.7f : Random.Range(0.12f, 0.45f));
+            }
+            Invoke(nameof(Remove), 2f);
+        }
+
+        private int _bounces;
 
         private void PopSmoke()
         {
@@ -140,6 +171,9 @@ namespace Com.IsartDigital.GoobyrFPS.Weapons
                 case 2: Audio.Sfx.Play("brick", transform.position, 1f, 25f); Effects.Dust(transform.position, 0.5f); break;
                 case 3: Audio.Sfx.Play("glass", transform.position, 1f, 30f); Effects.Impact(transform.position, Vector3.up, new Color(0.6f, 0.75f, 0.6f)); break;
                 case 4: Audio.Sfx.Play("metal_clang", transform.position, 1f, 28f); break;
+                case 5: Audio.Sfx.Play("radio", transform.position, 1f, 26f); break;
+                case 6: Audio.Sfx.Play("shot_pistol", transform.position, 0.45f, 32f); Effects.Sparks(transform.position, 8); break;
+                case 7: Audio.Sfx.Play("duck", transform.position, 1f, 22f); break;
             }
             Juice.Squash(transform, 0.3f);
         }

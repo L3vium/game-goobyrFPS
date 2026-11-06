@@ -36,6 +36,52 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             }
         }
 
+        /// <summary>The agent's clothes and loadout, remembered between sessions; a pistol, boots and coins the first time.</summary>
+        public static AgentLook LocalLook
+        {
+            get
+            {
+                if (_look.HasValue) return _look.Value;
+                AgentLook lLook = AgentLook.Default;
+                string lSaved = PlayerPrefs.GetString("hitmen.look", "");
+                string[] lParts = lSaved.Split(',');
+                if (lParts.Length == 8)
+                {
+                    byte.TryParse(lParts[0], out lLook.hat);
+                    byte.TryParse(lParts[1], out lLook.skin);
+                    byte.TryParse(lParts[2], out lLook.top);
+                    byte.TryParse(lParts[3], out lLook.bottom);
+                    byte.TryParse(lParts[4], out lLook.shoes);
+                    short.TryParse(lParts[5], out lLook.weapon);
+                    short.TryParse(lParts[6], out lLook.movement);
+                    short.TryParse(lParts[7], out lLook.distraction);
+                }
+                else
+                {
+                    lLook.weapon = (short)IndexOf(Data.ItemKind.Pistol);
+                    lLook.movement = (short)IndexOf(Data.ItemKind.SpringBoots);
+                    lLook.distraction = (short)IndexOf(Data.ItemKind.Coin);
+                }
+                _look = lLook;
+                return lLook;
+            }
+            set
+            {
+                _look = value;
+                PlayerPrefs.SetString("hitmen.look", string.Join(",", value.hat, value.skin, value.top, value.bottom, value.shoes, value.weapon, value.movement, value.distraction));
+                PlayerPrefs.Save();
+                if (LobbyPlayer.Local != null && LobbyPlayer.Local.IsSpawned) LobbyPlayer.Local.Look.Value = value;
+            }
+        }
+
+        private static AgentLook? _look;
+
+        private static int IndexOf(Data.ItemKind pKind)
+        {
+            Data.ItemDefinition lItem = Data.GameDatabase.Find(pKind);
+            return lItem != null ? lItem.Index : -1;
+        }
+
         /// <summary>The agent's chosen icon (see <see cref="UI.UIIcons.Agent"/>), remembered between sessions.</summary>
         public static int LocalIcon
         {

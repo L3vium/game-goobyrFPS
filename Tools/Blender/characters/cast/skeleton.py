@@ -50,14 +50,14 @@ def V(*a):
 class Build:
     """Skeleton-level description of one body (joints in world space, A-pose)."""
 
-    def __init__(self, shoulder_x=0.19, hip_x=0.09, female=False):
+    def __init__(self, shoulder_x=0.19, hip_x=0.09, female=False, arm_scale=1.0):
         self.female = female
         self.shoulder_x = shoulder_x
         self.hip_x = hip_x
         a = math.radians(ARM_ANGLE)
         self.arm_dir = {"l": V(math.cos(a), 0, -math.sin(a)), "r": V(-math.cos(a), 0, -math.sin(a))}
-        self.upper_arm = 0.300
-        self.forearm = 0.265
+        self.upper_arm = 0.300 * arm_scale
+        self.forearm = 0.265 * arm_scale
         j = {}
         j["root"] = V(0, 0, 0)
         j["pelvis"] = V(0, 0.000, 0.935)

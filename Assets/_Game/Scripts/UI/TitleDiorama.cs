@@ -22,7 +22,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private const float SIZE = 180f, CELL = 3f;
         private const float WOBBLE_SPEED = 0.2f;
 
+        public static TitleDiorama Instance { get; private set; }
+
         private Camera _camera;
+        private HumanBody _agent;
         private readonly Vector3 _eye = new Vector3(-0.6f, 1.5f, -3.9f);
         private readonly Vector3 _look = new Vector3(-0.15f, 1.5f, 0f);
 
@@ -32,6 +35,19 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _bushes = pBushes;
             _rocks = pRocks;
             _ground = pGround;
+        }
+
+        private void Awake() => Instance = this;
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
+        /// <summary>The agent in the scene wears this.</summary>
+        public void Dress(Net.AgentLook pLook)
+        {
+            if (_agent != null) AgentHats.Apply(_agent, pLook);
         }
 
         private void Start()
@@ -136,6 +152,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             HumanBody lBody = lAgent.AddComponent<HumanBody>();
             lBody.Culling = AnimatorCullingMode.AlwaysAnimate;
             lBody.Configure(HumanCast.AGENT, UIFactory.Accent);
+            _agent = lBody;
+            Dress(Net.PlayerIdentity.LocalLook);
             HumanAnimator lAnimator = lAgent.AddComponent<HumanAnimator>();
             lAnimator.Velocity = Vector3.zero;
             lAnimator.Held = HeldKind.Pistol;

@@ -58,7 +58,10 @@ namespace Com.IsartDigital.GoobyrFPS.Match
         }
 
         public const int NO_TEAM = -1;
-        public const int MAX_TEAMS = 8;
+        /// <summary>Team ids: the room's teams first, then one for each agent on their own.</summary>
+        public const int MAX_TEAMS = 12;
+        /// <summary>How many teams a room can make.</summary>
+        public const int MAX_BOXES = 4;
 
         /// <summary>
         /// The team a player actually plays on. FFA gives everyone their own team (their seat),
@@ -131,8 +134,8 @@ namespace Com.IsartDigital.GoobyrFPS.Match
         public static bool IsProtector(int pMask, int pTeam) => pTeam >= 0 && pTeam < 31 && (pMask & (1 << pTeam)) != 0;
 
         /// <summary>
-        /// The mode is what the team boxes say: everyone in one box is co-op, nobody sharing a box
-        /// is free-for-all, anything else is teams.
+        /// The mode is what the teams say (an agent with no team counts as a team of one): everyone on
+        /// one team is co-op, nobody sharing a team is free-for-all, anything else is teams.
         /// </summary>
         public static MatchMode ModeFromBoxes(IReadOnlyList<int> pAgentsPerBox)
         {

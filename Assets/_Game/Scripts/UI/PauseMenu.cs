@@ -51,7 +51,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             AddTab(p, Tab.Contract, "CONTRACT", 1);
             AddTab(p, Tab.Options, "OPTIONS", 2);
             UIFactory.Rule(p, L, new Vector2(80, -424), 340, false, new Color(1, 1, 1, 0.12f), 1f);
-            Button lResume = UIFactory.Button(p, "RESUME", L, new Vector2(80, -470), new Vector2(340, 56), UIFactory.Accent2, () => Toggle(false), 26);
+            UIFactory.Button(p, "RESUME", L, new Vector2(80, -470), new Vector2(340, 56), UIFactory.Accent2, () => Toggle(false), 26);
             UIFactory.Button(p, "LEAVE THE MATCH", L, new Vector2(80, -530), new Vector2(340, 56), UIFactory.Accent2, () =>
             {
                 Toggle(false);
@@ -98,10 +98,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
             foreach (KeyValuePair<Tab, Button> lTab in _tabs)
             {
-                TextMeshProUGUI lLabel = lTab.Value.GetComponentInChildren<TextMeshProUGUI>();
-                lLabel.fontStyle = lTab.Key == pTab ? FontStyles.Bold : FontStyles.Normal;
-                Image lBar = lTab.Value.transform.Find("Bar")?.GetComponent<Image>();
-                if (lBar != null) lBar.color = lTab.Key == pTab ? UIFactory.Accent : new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, 0.4f);
+                lTab.Value.GetComponent<ButtonFx>().Active = lTab.Key == pTab;
             }
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(_tabs[pTab].gameObject);
         }
@@ -157,6 +154,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             UIWidgets.Slider(lList, "Master volume", 0f, 1f, Audio.Sfx.Volume, v => Mathf.RoundToInt(v * 100f) + "%", v => { Audio.Sfx.Volume = v; AudioListener.volume = v; });
             UIWidgets.Section(lList, "VOICE CHAT");
             UIWidgets.Switch(lList, "Push to talk", Audio.VoiceChat.PushToTalk, v => Audio.VoiceChat.PushToTalk = v, "B");
+            UIWidgets.Switch(lList, "Proximity voice chat (host)", LobbyState.Instance == null || LobbyState.Instance.ProximityChat.Value, v =>
+            {
+                if (LobbyState.Instance != null && LobbyState.Instance.IsServer) LobbyState.Instance.ProximityChat.Value = v;
+            });
             KeyBindings.Build(lList);
             return lList;
         }

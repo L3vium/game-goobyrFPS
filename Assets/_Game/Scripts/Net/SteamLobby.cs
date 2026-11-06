@@ -117,6 +117,34 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             Debug.Log($"[Net] steam room open ({(pFriendsOnly ? "friends" : Code)}), lobby {lOpened.Id}");
         }
 
+        /// <summary>A friend for the join screen: in a room of ours when <see cref="lobby"/> isn't 0.</summary>
+        public struct FriendRoom
+        {
+            public string name;
+            public ulong lobby;
+            public bool inGame;
+        }
+
+        /// <summary>Online friends, those in a room first, then those in the game.</summary>
+        public System.Collections.Generic.List<FriendRoom> Friends()
+        {
+            System.Collections.Generic.List<FriendRoom> lList = new System.Collections.Generic.List<FriendRoom>();
+            if (!IsReady) return lList;
+            foreach (Friend lFriend in SteamFriends.GetFriends())
+            {
+                if (!lFriend.IsOnline) continue;
+                bool lInGame = lFriend.IsPlayingThisGame;
+                ulong lLobby = 0;
+                if (lInGame && lFriend.GameInfo.HasValue && lFriend.GameInfo.Value.Lobby.HasValue) lLobby = lFriend.GameInfo.Value.Lobby.Value.Id;
+                lList.Add(new FriendRoom { name = lFriend.Name, lobby = lLobby, inGame = lInGame });
+            }
+            lList.Sort((a, b) => (b.lobby != 0 ? 2 : b.inGame ? 1 : 0).CompareTo(a.lobby != 0 ? 2 : a.inGame ? 1 : 0));
+            return lList;
+        }
+
+        /// <summary>Joins a friend's room, seen in <see cref="Friends"/>.</summary>
+        public void JoinLobby(ulong pLobby) => Join(pLobby);
+
         /// <summary>Finds a public lobby by its code (worldwide) and joins it.</summary>
         public async void JoinByCode(string pCode)
         {

@@ -24,8 +24,8 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         public readonly NetworkVariable<float> TimeLimitMinutes = new NetworkVariable<float>(20f);
         public readonly NetworkVariable<MatchPhase> Phase = new NetworkVariable<MatchPhase>(MatchPhase.Lobby);
         public readonly NetworkVariable<int> AiDifficulty = new NetworkVariable<int>(1);
-        /// <summary>How many team boxes the room shows (a + adds one, agents are dragged between them).</summary>
-        public readonly NetworkVariable<int> BoxCount = new NetworkVariable<int>(1);
+        /// <summary>How many teams the room has made: none to begin with, every agent for themselves.</summary>
+        public readonly NetworkVariable<int> BoxCount = new NetworkVariable<int>(0);
         /// <summary>Which boxes protect the target, one bit per box.</summary>
         public readonly NetworkVariable<int> DefenderMask = new NetworkVariable<int>(0);
         /// <summary>Time of day of the contract, set from the map when it starts (<see cref="FX.TimeOfDay"/>): 0 dawn, 1 noon, 2 dusk, 3 night.</summary>
@@ -71,18 +71,32 @@ namespace Com.IsartDigital.GoobyrFPS.Net
 
         private void Changed<T>(T pOld, T pNew) => OnChanged?.Invoke();
 
-        /// <summary>Host side: every agent plays for the box they stand in, and the boxes make the mode.</summary>
+        /// <summary>Does this team of the room protect the target?</summary>
+        public bool IsProtectingBox(int pBox) => MatchRulesLogic.IsProtector(DefenderMask.Value, pBox);
+
+        /// <summary>Host side: every agent plays for the team they are in or alone, and that makes the mode.</summary>
         public void ResolveTeams()
         {
             if (!IsServer) return;
-            int[] lCounts = new int[Mathf.Max(1, BoxCount.Value)];
+            System.Collections.Generic.List<int> lCounts = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < BoxCount.Value; i++) lCounts.Add(0);
+            int lNextSolo = MatchRulesLogic.MAX_BOXES;
             // A copy: each team change re-sorts LobbyPlayer.All.
             foreach (LobbyPlayer lPlayer in new System.Collections.Generic.List<LobbyPlayer>(LobbyPlayer.All))
             {
                 if (lPlayer.Caster.Value) { lPlayer.Team.Value = MatchRulesLogic.NO_TEAM; continue; }
-                int lBox = Mathf.Clamp(lPlayer.ChosenTeam.Value, 0, lCounts.Length - 1);
-                lPlayer.Team.Value = lBox;
-                lCounts[lBox]++;
+                int lBox = lPlayer.ChosenTeam.Value;
+                if (lBox >= 0 && lBox < BoxCount.Value)
+                {
+                    lPlayer.Team.Value = lBox;
+                    lCounts[lBox]++;
+                }
+                else
+                {
+                    if (lBox >= 0) lPlayer.ChosenTeam.Value = MatchRulesLogic.NO_TEAM;
+                    lPlayer.Team.Value = lNextSolo++;
+                    lCounts.Add(1);
+                }
             }
             Mode.Value = MatchRulesLogic.ModeFromBoxes(lCounts);
             int lUsed = 0;
@@ -92,7 +106,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
 
         // ---------------------------------------------------------------- the team boxes
 
-        /// <summary>Puts a player in a box: the host moves anyone, a player only themselves.</summary>
+        /// <summary>Puts a player in a team, or on their own (-1): the host moves anyone, a player only themselves.</summary>
         [Rpc(SendTo.Server)]
         public void MovePlayerRpc(ulong pClient, int pBox, RpcParams pParams = default)
         {
@@ -100,7 +114,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             if (lSender != NetworkManager.ServerClientId && lSender != pClient) return;
             LobbyPlayer lPlayer = LobbyPlayer.ForClient(pClient);
             if (lPlayer == null) return;
-            lPlayer.ChosenTeam.Value = Mathf.Clamp(pBox, 0, BoxCount.Value - 1);
+            lPlayer.ChosenTeam.Value = pBox < 0 ? MatchRulesLogic.NO_TEAM : Mathf.Min(pBox, BoxCount.Value - 1);
             ResolveTeams();
         }
 
@@ -108,16 +122,19 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         public void AddBoxRpc(RpcParams pParams = default)
         {
             if (pParams.Receive.SenderClientId != NetworkManager.ServerClientId) return;
-            BoxCount.Value = Mathf.Min(BoxCount.Value + 1, MatchRulesLogic.MAX_TEAMS);
+            BoxCount.Value = Mathf.Min(BoxCount.Value + 1, MatchRulesLogic.MAX_BOXES);
         }
 
-        /// <summary>Removes an empty box: the boxes after it close up, with their agents and their orders.</summary>
+        /// <summary>Removes a team: its agents go back on their own, the teams after it close up with their agents and their modes.</summary>
         [Rpc(SendTo.Server)]
         public void RemoveBoxRpc(int pBox, RpcParams pParams = default)
         {
-            if (pParams.Receive.SenderClientId != NetworkManager.ServerClientId || BoxCount.Value <= 1) return;
-            foreach (LobbyPlayer lPlayer in LobbyPlayer.Agents()) if (lPlayer.Team.Value == pBox) return;
-            foreach (LobbyPlayer lPlayer in LobbyPlayer.Agents()) if (lPlayer.ChosenTeam.Value > pBox) lPlayer.ChosenTeam.Value--;
+            if (pParams.Receive.SenderClientId != NetworkManager.ServerClientId || pBox < 0 || pBox >= BoxCount.Value) return;
+            foreach (LobbyPlayer lPlayer in LobbyPlayer.Agents())
+            {
+                if (lPlayer.ChosenTeam.Value == pBox) lPlayer.ChosenTeam.Value = MatchRulesLogic.NO_TEAM;
+                else if (lPlayer.ChosenTeam.Value > pBox) lPlayer.ChosenTeam.Value--;
+            }
             int lBelow = DefenderMask.Value & ((1 << pBox) - 1);
             int lAbove = (DefenderMask.Value >> (pBox + 1)) << pBox;
             DefenderMask.Value = lBelow | lAbove;
@@ -132,11 +149,12 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             DefenderMask.Value ^= 1 << pBox;
         }
 
-        /// <summary>Deals the agents out at random over the boxes there are.</summary>
+        /// <summary>Deals the agents out at random over the teams there are (two are made if there are none).</summary>
         [Rpc(SendTo.Server)]
         public void ShuffleRpc(RpcParams pParams = default)
         {
             if (pParams.Receive.SenderClientId != NetworkManager.ServerClientId) return;
+            if (BoxCount.Value == 0) BoxCount.Value = 2;
             System.Collections.Generic.List<LobbyPlayer> lAgents = LobbyPlayer.Agents();
             System.Collections.Generic.List<int> lBoxes = new System.Collections.Generic.List<int>();
             for (int i = 0; i < lAgents.Count; i++) lBoxes.Add(i % BoxCount.Value);

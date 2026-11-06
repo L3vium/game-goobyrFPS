@@ -44,6 +44,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             PrefabUtility.InstantiatePrefab(PrefabBuilder.GameRoot);
             new GameObject("MenuUI").AddComponent<MenuUI>();
+            TitleSet();
             MapDefinition lMap = GameDatabase.Instance.maps[0];
             RenderSettings.skybox = ArtBuilder.Sky(lMap);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
@@ -55,6 +56,52 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), lPath);
             Scenes();
             Debug.Log("[Build] title scene");
+        }
+
+        /// <summary>The scene behind the title: its plants, its ground's colour, a sun and the first map's grade.</summary>
+        private static void TitleSet()
+        {
+            string lGroundPath = EditorAssets.ROOT + "/Art/Generated/Materials/M_TitleGround.mat";
+            Material lGround = AssetDatabase.LoadAssetAtPath<Material>(lGroundPath);
+            if (lGround == null)
+            {
+                lGround = new Material(Shader.Find("Goobyr/Flat"));
+                AssetDatabase.CreateAsset(lGround, lGroundPath);
+            }
+            lGround.SetColor("_BaseColor", new Color(0.47f, 0.67f, 0.3f));
+            EditorUtility.SetDirty(lGround);
+            new GameObject("TitleDiorama").AddComponent<TitleDiorama>().Setup(
+                VegSet("Veg_JungleTree_A", "Veg_JungleTree_B", "Veg_Ceiba", "Veg_CoconutPalm", "Veg_RoyalPalm", "Veg_TreeFern"),
+                VegSet("Veg_JungleBush_A", "Veg_JungleBush_B", "Veg_Banana"),
+                VegSet("Veg_Rock_A", "Veg_Rock_B", "Veg_Rock_C"),
+                lGround);
+
+            Light lSun = new GameObject("Sun").AddComponent<Light>();
+            lSun.type = LightType.Directional;
+            lSun.transform.rotation = Quaternion.Euler(38f, -28f, 0f);
+            lSun.color = new Color(1f, 0.93f, 0.8f);
+            lSun.intensity = 1.1f;
+            lSun.shadows = LightShadows.Soft;
+            RenderSettings.sun = lSun;
+
+            UnityEngine.Rendering.VolumeProfile lProfile = AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>(EditorAssets.ROOT + "/Art/Generated/Volume_Map_SanLazaro.asset");
+            if (lProfile != null)
+            {
+                UnityEngine.Rendering.Volume lVolume = new GameObject("TitleGrade").AddComponent<UnityEngine.Rendering.Volume>();
+                lVolume.isGlobal = true;
+                lVolume.sharedProfile = lProfile;
+            }
+        }
+
+        private static GameObject[] VegSet(params string[] pNames)
+        {
+            List<GameObject> lSet = new List<GameObject>();
+            foreach (string lName in pNames)
+            {
+                GameObject lPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(EditorAssets.ROOT + "/Art/Generated/Veg/" + lName + ".prefab");
+                if (lPrefab != null) lSet.Add(lPrefab);
+            }
+            return lSet.ToArray();
         }
 
         [MenuItem("Goobyr/Build/Scene List")]

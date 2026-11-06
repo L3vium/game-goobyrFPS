@@ -91,7 +91,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
 
         private static ArchMat _basalt;
         protected override ArchMat CliffMaterial => _basalt != null && _basalt.material != null ? _basalt : _basalt = new ArchMat("rock_basalt", PbrLibrary.Rock("rock_face", new Color(0.5f, 0.5f, 0.52f), new Color(0.38f, 0.38f, 0.4f), 0f, "basalt", 5f, 4f), 5f);
-        protected override (float band, float ledges, bool columns, bool buttresses, bool snow) Strata => (3.2f, 0.3f, true, false, false);
+        protected override (float band, float ledges, bool columns, bool buttresses, bool snow) Strata => (3.2f, 0.3f, false, false, false);
         protected override float BackdropHeight(float x, float z) => 50f + Mathf.Max(0f, LandShape.Fbm(x, z, 240f, 4, 3.1f)) * 160f + LandShape.Ridged(x, z, 120f, 3, 5.5f) * 25f;
         protected override ArchMat BackdropLow => ArchLib.Tinted("forest_leaves_02", new Color(0.55f, 0.75f, 0.45f), "jungle_far", 60f);
         protected override ArchMat BackdropHigh => ArchLib.Tinted("rock_face", new Color(0.45f, 0.5f, 0.45f), "basalt_far", 60f);
@@ -103,9 +103,11 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Vector2 p = new Vector2(x, z);
             if (z > -105f && z < 100f && (LandShape.PathDistance(VIEW_PLAZA, p, out _, out _) < 11f || LandShape.PathDistance(VIEW_DOCK, p, out _, out _) < 11f)) return 0f;
             float n = LandShape.Fbm(x, z, 50f, 3, 2.2f);
-            // Dense jungle on the edges and the slopes, open terraces and pueblo.
-            float lEdge = Mathf.Clamp01((Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) - 150f) / 50f);
-            return Mathf.Clamp01(0.8f + n * 0.4f + lEdge * 0.4f);
+            // Solid jungle at the edges; inside the map, groves and little woods with clearings in between.
+            float lEdge = Mathf.Clamp01((Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) - 170f) / 40f);
+            float lGrove = Mathf.InverseLerp(-0.06f, 0.2f, LandShape.Fbm(x, z, 36f, 2, 9.3f));
+            float lDensity = Mathf.Lerp(0.05f, 0.95f, lGrove * lGrove);
+            return Mathf.Clamp01(Mathf.Max(lDensity * (0.85f + n * 0.3f), lEdge));
         }
 
         protected override string TreeAt(float x, float z, float h, float pRoll, System.Random r, out float pScale)
@@ -210,6 +212,10 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
         {
             ArchOutdoor.ResetCount();
             Water();
+            Rain();
+            SniperTowers();
+            TheFields();
+            TheLab();
             DressPueblo();
             DressCafetal();
             DressAirstrip();
@@ -242,6 +248,75 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             GameObject lRoot = new GameObject("Basalt");
             lRoot.transform.SetParent(K.Env, false);
             lMesh.Flush(lRoot.transform, "SanLazaro_Basalt_" + pSeed);
+        }
+
+        /// <summary>It rains on San Lázaro: a box of drops that follows the camera.</summary>
+        private void Rain()
+        {
+            GameObject lRain = new GameObject("RainFall");
+            lRain.transform.SetParent(K.Lights, false);
+            ParticleSystem lParticles = lRain.AddComponent<ParticleSystem>();
+            ParticleSystem.MainModule lMain = lParticles.main;
+            lMain.startLifetime = 0.9f;
+            lMain.startSpeed = 0f;
+            lMain.startSize = new ParticleSystem.MinMaxCurve(0.012f, 0.022f);
+            lMain.maxParticles = 3000;
+            lMain.simulationSpace = ParticleSystemSimulationSpace.World;
+            lMain.startColor = new Color(0.85f, 0.92f, 1f, 0.42f);
+            ParticleSystem.EmissionModule lEmission = lParticles.emission;
+            lEmission.rateOverTime = 1500f;
+            ParticleSystem.ShapeModule lShape = lParticles.shape;
+            lShape.shapeType = ParticleSystemShapeType.Box;
+            lShape.scale = new Vector3(36f, 1f, 36f);
+            ParticleSystem.VelocityOverLifetimeModule lVelocity = lParticles.velocityOverLifetime;
+            lVelocity.enabled = true;
+            lVelocity.space = ParticleSystemSimulationSpace.World;
+            lVelocity.x = new ParticleSystem.MinMaxCurve(-1.2f, -0.8f);
+            lVelocity.y = new ParticleSystem.MinMaxCurve(-20f, -16f);
+            lVelocity.z = new ParticleSystem.MinMaxCurve(-0.4f, 0.4f);
+            lRain.AddComponent<RainFall>();
+        }
+
+        /// <summary>Sniper towers over each part of the map, a marksman and his rifle on top.</summary>
+        private void SniperTowers()
+        {
+            foreach ((Vector2 lAt, float lYaw) in new[] { (new Vector2(-96f, -62f), 40f), (new Vector2(-40f, 96f), 150f), (new Vector2(170f, 40f), 250f), (new Vector2(-150f, -150f), 60f) })
+            {
+                Vector3 lTop = ArchOutdoor.WaterTower(A, G(lAt, 0f), 10f, lYaw);
+                MarkBuilt(new Rect(lAt.x - 5f, lAt.y - 5f, 10f, 10f));
+                A.Npc(NpcRole.Lookout, lTop + new Vector3(0f, 0.05f, 1f), lYaw, lAt.y > 0f ? ZONE_HACIENDA : ZONE_PUEBLO, Data.ItemKind.Sniper);
+            }
+        }
+
+        /// <summary>The terraces grow something tall now: walls of crop to creep through, in rows along each step.</summary>
+        private void TheFields()
+        {
+            for (int i = 0; i < TERRACES.Length; i++)
+                for (float x = TERRACE_X0 + 14f; x < TERRACE_X1[i] - 8f; x += 19f)
+                {
+                    Vector2 lAt = new Vector2(x, (TERRACES[i].x + TERRACES[i].y) * 0.5f);
+                    if (DistanceToBuilt(lAt, 10f) >= 7f) K.TallGrassField(lAt, 7.5f);
+                }
+        }
+
+        /// <summary>What the fields are for: a camp of tents, tables and drums at the mouth of the quarry's cave.</summary>
+        private void TheLab()
+        {
+            Vector2 c = QUARRY;
+            void Set(string pProp, float pX, float pZ, float pYaw) => K.Prop(pProp, G(c.x + pX, c.y + pZ, 0f), pYaw);
+            Set("TentMilitary", -9f, 6f, 20f);
+            Set("TentMilitary", 8f, 8f, -30f);
+            Set("Table", -3f, -2f, 10f);
+            Set("Table", 2.5f, -3f, -20f);
+            Set("Generator", 11f, -2f, 70f);
+            Set("Barrel", 5f, 2f, 0f);
+            Set("Barrel", 6f, 3.1f, 40f);
+            Set("GasBottle", -5f, -4f, 0f);
+            Set("GasBottle", -5.8f, -3.6f, 0f);
+            Set("Pallet", -11f, -3f, 15f);
+            Set("Pallet", 12f, 3f, -40f);
+            Set("CrateLarge", -12f, 0f, 30f);
+            Poi(G(c, 0f), "The lab", UI.MapPoi.Kind.Landmark);
         }
 
         private void Water()

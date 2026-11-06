@@ -50,7 +50,7 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         public int reinforcementsPerCall = 4;
         public int maxCallsPerZone = 2;
         [Tooltip("Seconds an NPC searches around the last known position before giving up.")]
-        public float searchDuration = 18f;
+        public float searchDuration = 30f;
         [Tooltip("Hit chance of an NPC at 10 m against a standing, moving target.")]
         [Range(0f, 1f)] public float npcAccuracy = 0.32f;
 

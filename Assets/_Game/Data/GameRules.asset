@@ -35,7 +35,7 @@ MonoBehaviour:
   callDuration: 3
   reinforcementsPerCall: 4
   maxCallsPerZone: 2
-  searchDuration: 18
+  searchDuration: 30
   npcAccuracy: 0.32
   ventGasDelay: 6
   ventGasDuration: 10

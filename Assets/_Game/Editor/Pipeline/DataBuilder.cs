@@ -108,6 +108,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lRules.startingLoadout = new List<ItemDefinition> { lItems[1] };
             lRules.npcVisionRange = 14f;
             lRules.npcDetectTime = 2f;
+            lRules.searchDuration = 30f;
             lRules.proofRevealInterval = 15f;
             lRules.proofRevealFastest = 3f;
             lRules.proofRevealRamp = 150f;

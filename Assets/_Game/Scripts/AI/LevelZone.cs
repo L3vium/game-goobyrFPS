@@ -245,21 +245,34 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
             if (pMember.Role == NpcRole.Lookout) return CombatRole.Suppress;
             if (lCount <= 1) return CombatRole.Push;
-            switch (lIndex % 3)
+            switch (lIndex % 4)
             {
                 case 0: return CombatRole.Suppress;
-                case 1: return CombatRole.Flank;
-                default: return lCount > 3 ? CombatRole.Push : CombatRole.Flank;
+                case 2: return CombatRole.Push;
+                default: return CombatRole.Flank;
             }
         }
 
-        /// <summary>Average direction from which the squad already covers this point (flankers go elsewhere).</summary>
-        public Vector3 SquadAngleTo(Vector3 pPoint, Npc pExcept)
+        private readonly List<Npc> _ring = new List<Npc>();
+
+        /// <summary>
+        /// Where around a threat this member belongs: the squad spreads evenly on a circle round it, each
+        /// keeping the side it already is on, so it closes in from every direction.
+        /// </summary>
+        public Vector3 RingDirection(Npc pMember, Vector3 pThreat)
         {
-            Vector3 lSum = Vector3.zero;
+            _ring.Clear();
             foreach (Npc lMember in Members)
-                if (lMember != null && lMember != pExcept && lMember.InCombat) lSum += (lMember.transform.position - pPoint).normalized;
-            return lSum.sqrMagnitude > 0.01f ? lSum.normalized : Vector3.zero;
+                if (lMember != null && lMember.InCombat && lMember.Role != NpcRole.Lookout) _ring.Add(lMember);
+            float Bearing(Npc pNpc) => Mathf.Atan2(pNpc.transform.position.x - pThreat.x, pNpc.transform.position.z - pThreat.z);
+            if (!_ring.Contains(pMember) || _ring.Count < 2)
+            {
+                float lAlone = Bearing(pMember);
+                return new Vector3(Mathf.Sin(lAlone), 0f, Mathf.Cos(lAlone));
+            }
+            _ring.Sort((a, b) => Bearing(a).CompareTo(Bearing(b)));
+            float lAngle = Bearing(_ring[0]) + _ring.IndexOf(pMember) * Mathf.PI * 2f / _ring.Count;
+            return new Vector3(Mathf.Sin(lAngle), 0f, Mathf.Cos(lAngle));
         }
 
         /// <summary>Members actually fighting (shooting, not phoning; a search alone never calls for help), but <paramref name="pExcept"/>.</summary>

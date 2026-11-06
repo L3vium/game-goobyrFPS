@@ -122,33 +122,27 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             TimeLeft.Value = (LobbyState.Instance != null ? LobbyState.Instance.TimeLimitMinutes.Value : GameDatabase.Rules.timeLimitMinutes) * 60f;
             foreach (LevelZone lZone in LevelZone.All) lZone.ResetSquad();
 
-            // Players around one start point, never in sight of a guard post or a patrol.
-            List<MatchPoint> lStarts = MatchPoint.OfKind(MatchPoint.Kind.Start);
-            // Edge starts must be clear of guards; "inside" starts (a picker, a waiter, a petitioner)
-            // come with the pass of their tier and are drawn now and then instead.
-            List<MatchPoint> lEdge = lStarts.FindAll(p => !IsKit(p.Item));
-            List<MatchPoint> lInside = lStarts.FindAll(p => IsKit(p.Item));
-            MatchPoint lPoint = null;
-            if (lInside.Count > 0 && (lEdge.Count == 0 || lRandom.NextDouble() < 0.35)) lPoint = lInside[lRandom.Next(lInside.Count)];
-            else if (lEdge.Count > 0)
-            {
-                int lStartIndex = MatchRulesLogic.PickSafeStart(lEdge.ConvertAll(pPoint => pPoint.transform.position), ThreatPositions(), lRandom);
-                lPoint = lStartIndex >= 0 ? lEdge[lStartIndex] : null;
-            }
-            Transform lStart = lPoint != null ? lPoint.transform : transform;
-            ItemDefinition lKit = lPoint != null && IsKit(lPoint.Item) ? GameDatabase.Find(lPoint.Item) : null;
+            // Each team (and each agent on their own) at a start of its own, drawn among the map's protected
+            // spots, away from every guard post and patrol.
+            List<MatchPoint> lEdge = MatchPoint.OfKind(MatchPoint.Kind.Start).FindAll(p => !IsKit(p.Item));
+            List<int> lOrder = MatchRulesLogic.OrderStarts(lEdge.ConvertAll(pPoint => pPoint.transform.position), ThreatPositions(), lRandom);
+            Dictionary<int, int> lTeamStart = new Dictionary<int, int>(), lTeamMates = new Dictionary<int, int>();
             // Casters only watch: no avatar for them.
             List<LobbyPlayer> lAgents = LobbyPlayer.Agents();
             int lIndex = 0;
             foreach (LobbyPlayer lPlayer in lAgents)
             {
-                float lAngle = lIndex * Mathf.PI * 2f / Mathf.Max(1, lAgents.Count);
-                Vector3 lPosition = lStart.position + new Vector3(Mathf.Cos(lAngle), 0, Mathf.Sin(lAngle)) * (lAgents.Count > 1 ? 2.2f : 0f) + Vector3.up * 0.2f;
+                int lTeam = lPlayer.Team.Value;
+                if (!lTeamStart.ContainsKey(lTeam)) lTeamStart[lTeam] = lTeamStart.Count % Mathf.Max(1, lOrder.Count);
+                Transform lStart = lOrder.Count > 0 ? lEdge[lOrder[lTeamStart[lTeam]]].transform : transform;
+                lTeamMates.TryGetValue(lTeam, out int lMate);
+                lTeamMates[lTeam] = lMate + 1;
+                float lAngle = lMate * Mathf.PI / 3f;
+                Vector3 lPosition = lStart.position + new Vector3(Mathf.Cos(lAngle), 0, Mathf.Sin(lAngle)) * (lMate > 0 ? 1.8f : 0f) + Vector3.up * 0.2f;
                 NetworkObject lAvatar = Instantiate(NetPrefabs.Instance.playerAvatar, lPosition, lStart.rotation);
                 lAvatar.SpawnWithOwnership(lPlayer.OwnerClientId, true);
                 lAvatar.GetComponent<PlayerAvatar>().TeleportOwnerRpc(lPosition, lStart.eulerAngles.y);
                 lAvatar.GetComponent<Damageable>().OnDeathServer += pInfo => HandlePlayerDeath(lAvatar.GetComponent<PlayerAvatar>(), pInfo);
-                if (lKit != null) StartCoroutine(GiveKit(lAvatar.GetComponent<Weapons.WeaponHolder>(), lKit));
                 lPlayer.Alive.Value = true;
                 lPlayer.Kills.Value = 0;
                 lPlayer.NpcKills.Value = 0;
@@ -224,11 +218,6 @@ namespace Com.IsartDigital.GoobyrFPS.Match
         private static bool IsKit(ItemKind pKind) => pKind == ItemKind.Keycard;
 
         /// <summary>The pass of an inside start, once the starting loadout is in (next frame).</summary>
-        private System.Collections.IEnumerator GiveKit(Weapons.WeaponHolder pHolder, ItemDefinition pKit)
-        {
-            yield return null;
-            if (pHolder != null && pHolder.IsSpawned) pHolder.GiveServer(pKit, -1, -1);
-        }
 
         private static readonly ItemKind[] MELEE_KINDS = { ItemKind.Knife, ItemKind.Machete, ItemKind.Bat };
 

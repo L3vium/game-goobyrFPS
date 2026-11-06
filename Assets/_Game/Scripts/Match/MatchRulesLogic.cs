@@ -167,6 +167,24 @@ namespace Com.IsartDigital.GoobyrFPS.Match
             return pViewerTeam == pWatchedTeam;
         }
 
+        /// <summary>
+        /// The starts in the order they are handed out, one per team: the safe ones in random order
+        /// first, then the others, those with the most room first.
+        /// </summary>
+        public static List<int> OrderStarts(IReadOnlyList<UnityEngine.Vector3> pStarts, IReadOnlyList<UnityEngine.Vector3> pThreats, System.Random pRandom)
+        {
+            List<int> lSafe = new List<int>(), lRest = new List<int>();
+            for (int i = 0; i < pStarts.Count; i++) (StartClearance(pStarts[i], pThreats) >= SAFE_START_DISTANCE ? lSafe : lRest).Add(i);
+            for (int i = lSafe.Count - 1; i > 0; i--)
+            {
+                int j = pRandom.Next(i + 1);
+                (lSafe[i], lSafe[j]) = (lSafe[j], lSafe[i]);
+            }
+            lRest.Sort((a, b) => StartClearance(pStarts[b], pThreats).CompareTo(StartClearance(pStarts[a], pThreats)));
+            lSafe.AddRange(lRest);
+            return lSafe;
+        }
+
         /// <summary>Starts must be this far from any guard post or patrol point.</summary>
         public const float SAFE_START_DISTANCE = 50f;
 

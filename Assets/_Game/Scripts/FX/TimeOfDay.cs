@@ -334,13 +334,22 @@ namespace Com.IsartDigital.GoobyrFPS.FX
                 p.fogDensity *= 0.1f;
                 p.fogAmbient = Color.Lerp(p.fogAmbient, Color.white, 0.5f);
                 p.sunIntensity = i == 3 ? 0.65f : 1.1f;
-                p.cloudCoverage = Mathf.Min(p.cloudCoverage, 0.38f);
+                p.cloudCoverage = pBiome == Biome.Jungle ? 0.72f : Mathf.Min(p.cloudCoverage, 0.38f);
                 p.ambient = i == 3 ? 1.5f : 1.15f;
                 if (i == 1)
                 {
                     p.zenith = pBiome == Biome.Desert ? new Color(0.44f, 0.72f, 0.86f) : pBiome == Biome.Jungle ? new Color(0.4f, 0.76f, 0.8f) : new Color(0.5f, 0.76f, 0.88f);
                     p.horizon = pBiome == Biome.Desert ? new Color(0.95f, 0.9f, 0.76f) : new Color(0.86f, 0.95f, 0.93f);
                     p.haze = Color.Lerp(p.horizon, Color.white, 0.4f);
+                    if (pBiome == Biome.Jungle)
+                    {
+                        // Rain clouds: a grey-green sky, the sun behind them.
+                        p.zenith = new Color(0.52f, 0.63f, 0.64f);
+                        p.horizon = new Color(0.76f, 0.83f, 0.8f);
+                        p.haze = new Color(0.8f, 0.85f, 0.82f);
+                        p.sunIntensity = 0.82f;
+                        p.fogDensity *= 2.5f;
+                    }
                 }
                 else if (i == 2)
                 {

@@ -92,6 +92,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lOutside.transform.SetParent(K.Markers, false);
             lOutside.AddComponent<SecurityOutside>().Setup(OutsideTier);
             Dress();
+            StartNooks();
             DressTurretRooms();
             CrowdSpots();
             KeyLoops();
@@ -111,6 +112,30 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             Edges();
             K.CoverSpacing = 1.8f;
             K.DistanceCulling();
+        }
+
+        /// <summary>Every place where agents start is sheltered: stacks and sandbags on three sides, nobody in the open.</summary>
+        private void StartNooks()
+        {
+            foreach (AI.MatchPoint lPoint in K.Markers.GetComponentsInChildren<AI.MatchPoint>())
+            {
+                if (lPoint.PointKind != AI.MatchPoint.Kind.Start || lPoint.Item == Data.ItemKind.Keycard) continue;
+                Vector3 p = lPoint.transform.position;
+                float y = lPoint.transform.eulerAngles.y;
+                if (Built(p.x, p.z)) continue;
+                void Spot(float pX, float pZ, string pProp, float pYaw)
+                {
+                    Vector3 lAt = Off(p, y, pX, 0f, pZ);
+                    lAt.y = K.GroundAt(lAt.x, lAt.z);
+                    K.Prop(pProp, lAt, y + pYaw);
+                }
+                Spot(-3f, 0.5f, "Sandbags", 90f);
+                Spot(3f, 0.5f, "Sandbags", 90f);
+                Spot(0f, -3f, "Sandbags", 0f);
+                Spot(-2.6f, -2.4f, "CrateLarge", 18f);
+                Spot(2.6f, -2.4f, "Crate", -12f);
+                MarkBuilt(new Rect(p.x - 5f, p.z - 5f, 10f, 10f));
+            }
         }
 
         // ---------------------------------------------------------------- planning
@@ -316,7 +341,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return false;
         }
 
-        private float DistanceToBuilt(Vector2 pPoint, float pMax)
+        protected float DistanceToBuilt(Vector2 pPoint, float pMax)
         {
             for (float r = 2f; r <= pMax; r += 2f)
                 for (int a = 0; a < 16; a++)

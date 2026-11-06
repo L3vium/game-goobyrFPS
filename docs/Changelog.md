@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.4 — The squad, the crates and the rain
+
+San Lázaro
+- It rains: drops around you, a grey-green sky, the sound of it on the leaves, quieter under a roof.
+- Groves and little woods with clearings in between instead of a solid forest, solid jungle only at the edges.
+- The terraces are fields of tall crop you can creep through. A camp of tents, tables and drums stands at the
+  quarry's cave. Four sniper towers look over the map.
+
+Every map
+- Where you start: each team, and each agent on their own, starts at a different spot drawn among the map's
+  defined places, away from guards, and those out of doors are sheltered by sandbags and crates.
+- Loot crates with a coral band: open one (F) and a weapon or a gadget comes out, the good ones rarely. They hold
+  the new guns of 0.9.3, the sniper rifle and the grenade launcher. About half the guns that lay around are in crates now.
+
+Enemies
+- A squad in a fight spreads on a circle round you and closes in from every side, each keeping its own side.
+  Fewer stand back and shoot, more come round.
+- They keep looking: 12 s out of sight before a fight turns into a search, and a search lasts 30 s instead of 18.
+- Moving sideways or backwards they go slower, so the walk matches the feet.
+
 ## 0.9.3 — Your agent, your loadout, new hands
 
 My agent

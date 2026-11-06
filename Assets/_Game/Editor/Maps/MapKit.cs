@@ -1191,8 +1191,40 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             if (pKind == MatchPoint.Kind.Extraction) lPoint.AddComponent<ExtractionPoint>().Setup(4.5f);
         }
 
-        public void Weapon(ItemKind pKind, Vector3 pPosition) => Point(MatchPoint.Kind.WeaponSpawn, pPosition, 0f, pKind.ToString(), pKind);
-        public void Gadget(ItemKind pKind, Vector3 pPosition) => Point(MatchPoint.Kind.GadgetSpawn, pPosition, 0f, pKind.ToString(), pKind);
+        private int _dropCounter;
+
+        /// <summary>A crate that holds a weapon or a gadget: a band in the agents' coral says so.</summary>
+        public void LootCrate(Vector3 pPosition)
+        {
+            const float SIZE = 0.95f;
+            GameObject lCrate = Block(Props, "LootCrate", pPosition + Vector3.up * SIZE * 0.4f, new Vector3(SIZE * 1.25f, SIZE * 0.8f, SIZE), new Color(0.6f, 0.42f, 0.25f), GameLayers.INTERACTABLE, false);
+            lCrate.isStatic = false;
+            Block(lCrate.transform, "Band", pPosition + Vector3.up * SIZE * 0.48f, new Vector3(SIZE * 1.27f, SIZE * 0.14f, SIZE * 1.02f), new Color(0.95f, 0.46f, 0.38f), GameLayers.INTERACTABLE, false);
+            Transform lHinge = new GameObject("Hinge").transform;
+            lHinge.SetParent(lCrate.transform, false);
+            lHinge.position = pPosition + new Vector3(0f, SIZE * 0.8f, -SIZE * 0.5f);
+            Block(lHinge, "Lid", pPosition + new Vector3(0f, SIZE * 0.86f, 0f), new Vector3(SIZE * 1.3f, SIZE * 0.14f, SIZE * 1.05f), new Color(0.5f, 0.34f, 0.2f), GameLayers.INTERACTABLE, false);
+            lCrate.AddComponent<Systems.LootCrate>().Setup(lHinge);
+        }
+
+        /// <summary>A found item: on the ground, or (every few) in a crate instead.</summary>
+        private bool Crated(ItemKind pKind, Vector3 pPosition, int pEvery)
+        {
+            if (++_dropCounter % pEvery != 0) return false;
+            LootCrate(pPosition);
+            return true;
+        }
+
+        public void Weapon(ItemKind pKind, Vector3 pPosition)
+        {
+            if (!Crated(pKind, pPosition, 2)) Point(MatchPoint.Kind.WeaponSpawn, pPosition, 0f, pKind.ToString(), pKind);
+        }
+        public void Gadget(ItemKind pKind, Vector3 pPosition)
+        {
+            // Keys and passes stay in sight: they are not found by luck.
+            bool lLoose = pKind is ItemKind.Coin or ItemKind.Rock or ItemKind.Brick or ItemKind.Bottle or ItemKind.Wrench;
+            if (!lLoose || !Crated(pKind, pPosition, 5)) Point(MatchPoint.Kind.GadgetSpawn, pPosition, 0f, pKind.ToString(), pKind);
+        }
         public void UniqueWeapon(ItemKind pKind, Vector3 pPosition, string pHint) => Point(MatchPoint.Kind.UniqueWeaponSpawn, pPosition, 0f, pHint, pKind);
 
         // ---------------------------------------------------------------- finish

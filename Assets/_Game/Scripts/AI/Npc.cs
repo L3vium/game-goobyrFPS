@@ -1262,7 +1262,7 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
 
             // Lost them for a while: the squad sweeps around the last known position.
-            if (lSinceSeen > 7f)
+            if (lSinceSeen > LOST_AFTER)
             {
                 StartSearch(lKnown, GameDatabase.Rules.searchDuration, false);
                 return;
@@ -1295,9 +1295,15 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             }
             else if (lRole == LevelZone.CombatRole.Push || lSinceSeen > 2.5f)
             {
-                // No cover: close in on the known position, but keep a distance.
-                Vector3 lApproach = lKnown + (transform.position - lKnown).normalized * PreferredRange() * 0.6f;
-                MoveTo(lApproach, RUN);
+                // No cover: close in on the known position from its own side, but keep a distance.
+                Vector3 lSide = Zone != null ? Zone.RingDirection(this, lKnown) : (transform.position - lKnown).normalized;
+                MoveTo(lKnown + lSide * PreferredRange() * 0.6f, RUN);
+            }
+            else if (lRole == LevelZone.CombatRole.Flank && Role != NpcRole.Lookout)
+            {
+                // Nobody stands and waits: a flanker keeps walking round to its place.
+                Vector3 lSide = Zone != null ? Zone.RingDirection(this, lKnown) : (transform.position - lKnown).normalized;
+                MoveTo(lKnown + lSide * PreferredRange() * 0.8f, RUN * 0.7f);
             }
             else Stop();
 
@@ -1309,6 +1315,12 @@ namespace Com.IsartDigital.GoobyrFPS.AI
 
             Vector3 lAimPoint = _targetVisible ? _combatTarget.Chest : lKnown + Vector3.up * 1.1f;
             FaceTowards(lAimPoint, 540f);
+            // Sideways and backwards it goes slower: the feet keep up with the walk, and it never skates.
+            if (_agent.hasPath)
+            {
+                float lFacing = Vector3.Dot(_agent.desiredVelocity.normalized, transform.forward);
+                _agent.speed *= Mathf.Lerp(STRAFE_SPEED, 1f, Mathf.Clamp01(lFacing + 0.3f));
+            }
             Vector3 lAimDir = lAimPoint - Eye;
             AimPitch.Value = -Mathf.Asin(Mathf.Clamp(lAimDir.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
 
@@ -1332,12 +1344,17 @@ namespace Com.IsartDigital.GoobyrFPS.AI
             };
         }
 
+        private const float STRAFE_SPEED = 0.6f;
+        private const float RING_PULL = 8f, RING_PULL_FLANK = 20f;
+        /// <summary>Seconds without seeing the target before the squad turns from a fight to a search.</summary>
+        private const float LOST_AFTER = 12f;
+
         private CoverPoint PickCover(Vector3 pThreat, LevelZone.CombatRole pRole)
         {
             CoverPoint lBest = null;
             float lBestScore = float.MinValue;
             float lRange = PreferredRange();
-            Vector3 lSquadDir = Zone != null ? Zone.SquadAngleTo(pThreat, this) : Vector3.zero;
+            Vector3 lPlace = Zone != null ? Zone.RingDirection(this, pThreat) : Vector3.zero;
 
             foreach (CoverPoint lCover in CoverPoint.All)
             {
@@ -1353,11 +1370,9 @@ namespace Com.IsartDigital.GoobyrFPS.AI
                 lScore -= lFromMe * 0.35f;
                 if (lCover.CoversFrom(pThreat)) lScore += 12f; else lScore -= 20f;
                 if (lCover.CanPeek(pThreat)) lScore += 8f;
-                if (pRole == LevelZone.CombatRole.Flank && lSquadDir != Vector3.zero)
-                {
-                    float lAngle = Vector3.Angle(lSquadDir, (lPos - pThreat).normalized);
-                    lScore += Mathf.Clamp(lAngle - 40f, -20f, 60f) * 0.3f;
-                }
+                // Its own side of the circle round the threat, flankers above all.
+                if (lPlace != Vector3.zero && pRole != LevelZone.CombatRole.Suppress)
+                    lScore += Vector3.Dot(lPlace, (lPos - pThreat).normalized) * (pRole == LevelZone.CombatRole.Flank ? RING_PULL_FLANK : RING_PULL);
                 // Don't run across the threat's line of fire.
                 if (Vector3.Dot((lPos - transform.position).normalized, (pThreat - transform.position).normalized) > 0.85f && lFromMe > 6f) lScore -= 10f;
                 if (lScore > lBestScore) { lBestScore = lScore; lBest = lCover; }

@@ -504,3 +504,10 @@ gives the loadout in `WeaponHolder.GiveLoadoutServer`, only items with `ItemDefi
 `Player/MovementGear` runs the movement items on the owner's machine. `Weapons/Viewmodel` is entirely code: poses in camera
 space, curves for actions, springs for recoil. The rigged first-person arms and `Tools/Blender/fp` are gone.
 Items appended to the database keep the earlier indices stable.
+
+## Maps and squads (0.9.4)
+
+`MatchDirector.StartMatchServer` hands one start to each team id (`MatchRulesLogic.OrderStarts`), `RealMap.StartNooks` shelters
+them. `MapKit.Weapon` and `Gadget` put one found item in two (one in five for throwables) in a `Systems/LootCrate`, which rolls its
+own table. `LevelZone.RingDirection` gives each fighter its place on a circle round the threat, used by `Npc.PickCover` and when no
+cover is found. `FX/RainFall` follows the camera on San Lázaro.

@@ -81,7 +81,9 @@ namespace Com.IsartDigital.GoobyrFPS.FX
             _reverb.enabled = false;
             UniversalAdditionalCameraData lWorldData = WorldCamera.GetUniversalAdditionalCameraData();
             lWorldData.renderPostProcessing = true;
-            lWorldData.antialiasing = AntialiasingMode.TemporalAntiAliasing;
+            // TAA turns itself off on a camera with a stack (the arms' overlay), leaving nothing against the shimmer.
+            lWorldData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            lWorldData.antialiasingQuality = AntialiasingQuality.High;
 
             GameObject lView = new GameObject("ViewCamera");
             lView.transform.SetParent(lWorld.transform, false);

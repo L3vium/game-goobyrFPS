@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.IO;
+using Com.IsartDigital.GoobyrFPS.AI;
 using Com.IsartDigital.GoobyrFPS.Data;
 using Com.IsartDigital.GoobyrFPS.FX;
 using Com.IsartDigital.GoobyrFPS.UI;
@@ -46,11 +48,17 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lCamera.clearFlags = CameraClearFlags.Skybox;
             lCamera.GetUniversalAdditionalCameraData().renderPostProcessing = true;
             lRig.transform.position = lFrom;
-            // Nearly level, tipped up just enough: the agent stays in frame, the sky fills the top.
+            // Nearly level, tipped up just enough: the guards stay in frame, the sky fills the top.
             Vector3 lAim = Vector3.ProjectOnPlane(lLook - lFrom, Vector3.up).normalized;
             lRig.transform.rotation = Quaternion.LookRotation(lAim + Vector3.up * 0.1f);
 
-            GameObject lAgent = Agent(lRig.transform, pLand);
+            string lGuard = HumanCast.ForNpc(NpcRole.Guard, 0, Vector3.zero, pMap, null);
+            List<GameObject> lGuards = new List<GameObject>
+            {
+                Guard(lGuard, lRig.transform, pLand, 9f, 3.2f, 165f),
+                Guard(lGuard, lRig.transform, pLand, 13f, -4.6f, 215f),
+                Guard(lGuard, lRig.transform, pLand, 17f, 6.2f, 140f)
+            };
             RenderTexture lTarget = new RenderTexture(WIDTH, HEIGHT, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             lCamera.targetTexture = lTarget;
             lCamera.Render();
@@ -65,7 +73,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             lCamera.targetTexture = null;
             lTarget.Release();
             Object.DestroyImmediate(lRig);
-            if (lAgent != null) Object.DestroyImmediate(lAgent);
+            foreach (GameObject lBody in lGuards) if (lBody != null) Object.DestroyImmediate(lBody);
 
             EditorAssets.EnsureFolder(FOLDER);
             string lPath = $"{FOLDER}/Preview_{pMap.sceneName}.png";
@@ -74,13 +82,6 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             pMap.preview = AssetDatabase.LoadAssetAtPath<Texture2D>(lPath);
             EditorUtility.SetDirty(pMap);
 
-            if (GameDatabase.Instance.maps.Count > 0 && GameDatabase.Instance.maps[0] == pMap)
-            {
-                string lTitleDir = EditorAssets.ART_RESOURCES + "/Title";
-                EditorAssets.EnsureFolder(lTitleDir);
-                File.WriteAllBytes(lTitleDir + "/TitleArt.png", lPng);
-                AssetDatabase.ImportAsset(lTitleDir + "/TitleArt.png", ImportAssetOptions.ForceUpdate);
-            }
             AssetDatabase.SaveAssets();
             Debug.Log($"[Build] {pMap.displayName} picture: {lPath}");
         }
@@ -117,16 +118,17 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
             return lBest;
         }
 
-        /// <summary>An agent a few metres ahead and to one side of the camera, seen from behind, standing on the ground.</summary>
-        private static GameObject Agent(Transform pCamera, Terrain pLand)
+        /// <summary>One of the map's guards, some metres ahead and to one side of the camera, standing on the ground.</summary>
+        private static GameObject Guard(string pCharacter, Transform pCamera, Terrain pLand, float pAhead, float pSide, float pTurn)
         {
-            GameObject lModel = AssetDatabase.LoadAssetAtPath<GameObject>(EditorAssets.ROOT + "/Art/Characters/Chr_Rook/Chr_Rook.fbx");
+            GameObject lModel = AssetDatabase.LoadAssetAtPath<GameObject>($"{CharacterBuilder.DIR}/{pCharacter}/{pCharacter}.fbx");
             if (lModel == null) return null;
             GameObject lAgent = Object.Instantiate(lModel);
             Vector3 lFlat = Vector3.ProjectOnPlane(pCamera.forward, Vector3.up).normalized;
-            Vector3 lAt = pCamera.position + lFlat * 3.4f + pCamera.right * 1.35f;
+            Vector3 lAt = pCamera.position + lFlat * pAhead + pCamera.right * pSide;
+            Quaternion lFacing = Quaternion.LookRotation(lFlat) * Quaternion.Euler(0f, pTurn, 0f);
             lAt.y = pLand.SampleHeight(lAt) + pLand.transform.position.y;
-            lAgent.transform.SetPositionAndRotation(lAt, Quaternion.LookRotation(lFlat));
+            lAgent.transform.SetPositionAndRotation(lAt, lFacing);
             string lClipPath = CharacterBuilder.ANIM_DIR;
             foreach (string lGuid in AssetDatabase.FindAssets("Idle t:AnimationClip", new[] { lClipPath }))
             {
@@ -134,7 +136,7 @@ namespace Com.IsartDigital.GoobyrFPS.EditorTools
                     if (lSub is AnimationClip lClip && lClip.name == CharacterBuilder.REFERENCE_CLIP)
                     {
                         lClip.SampleAnimation(lAgent, 0.5f);
-                        lAgent.transform.SetPositionAndRotation(lAt, Quaternion.LookRotation(lFlat));
+                        lAgent.transform.SetPositionAndRotation(lAt, lFacing);
                         return lAgent;
                     }
             }

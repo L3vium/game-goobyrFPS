@@ -486,3 +486,11 @@ overlaps. The briefing shows the map card (its plan), the mode as explicit cards
   `Logs/grass_bench.json` (GPU and CPU time per pass, tufts and cards drawn); `Wind.Freeze` holds the wind
   for review shots; `Goobyr/Build/Vegetation` and `Goobyr/Build/First Person Arms` rebuild those assets.
 - Command line: `-solo <map> <mode>`, `-host`, `-join <ip>`.
+
+## Front end (0.9.2)
+
+`UI/MenuUI` builds four screens in code over `UI/TitleDiorama`, a living scene the title builder hands its
+plants to. Teams: `LobbyPlayer.ChosenTeam` is a room team (`LobbyState.BoxCount`, at most `MAX_BOXES`) or
+`NO_TEAM`; `LobbyState.ResolveTeams` gives each agent on their own a team id above the boxes, and an agent alone
+counts as a team of one for `ModeFromBoxes`. `DefenderMask` holds each room team's game mode. The pause map
+shows only the target, you, teammates, the active extractions and the proof.

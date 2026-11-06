@@ -13,60 +13,71 @@ using UnityEngine.UI;
 namespace Com.IsartDigital.GoobyrFPS.UI
 {
     /// <summary>
-    /// The whole front of the game in two screens. <b>Title</b>: PLAY, and small icons for the options
-    /// and quit. <b>The room</b>: PLAY opens it at once, and everything happens there - the map on the
-    /// left, the agents on the right in team boxes (a + adds a box, agents are dragged between them,
-    /// a box can protect the target), a role and an icon on each agent's own line, invites under the
-    /// agents. There is no mode to choose: the boxes are the mode (see <see cref="LobbyState.ResolveTeams"/>).
+    /// The front of the game over a living scene (<see cref="TitleDiorama"/>). <b>Title</b>: create a room,
+    /// join one, options, quit, the agent's name. <b>Join</b>: friends and their rooms, or a code.
+    /// <b>The briefing</b>: the map on the left; nobody has a team to begin with, every agent for
+    /// themselves, until teams are made in the middle column and agents dragged into them (each team has
+    /// its game mode); on the right the agents without a team, the name and the start. Esc opens the
+    /// options over any of it.
     /// </summary>
     public class MenuUI : MonoBehaviour
     {
-        private enum Screen { Main, Lobby, Settings }
+        private enum Screen { Main, Join, Lobby, Settings }
 
-        private const string VERSION = "0.9.1";
         private static readonly Vector2 TL = new Vector2(0, 1);
         private static readonly Color Navy = new Color(0.1f, 0.11f, 0.17f, 1f);
+        private static readonly Color Dim = new Color(0.05f, 0.055f, 0.09f, 0.86f);
         private static readonly Color Slate = new Color(1f, 1f, 1f, 0.05f);
 
-        private const float BOX_W = 362f, BOX_GAP = 16f, BOX_TOP = 112f, BOX_BOTTOM = 820f, HEADER_H = 40f, ROW_H = 42f, DROP_H = 44f;
+        // The three columns of the briefing.
+        private const float MAP_X = 110f, MAP_W = 620f, TEAM_X = 790f, TEAM_W = 580f, AGENT_X = 1430f, AGENT_W = 380f;
+        private const float TOP = 214f, HEADER_H = 48f, ROW_H = 42f, DROP_H = 42f, BOX_GAP = 12f;
+        private const float MAP_H = 349f, PLAN = 180f;
         private const int MAX_ROWS = 12;
+        private const float JOIN_TIME = 15f;
 
         private class TeamBox
         {
             public RectTransform rect;
             public Image bar, drop;
-            public TextMeshProUGUI title;
-            public Button protect, remove;
-            public Image protectIcon;
-            public TextMeshProUGUI protectLabel;
+            public TextMeshProUGUI title, modeLabel;
+            public Button mode, remove;
         }
 
         private class AgentRow
         {
             public RectTransform rect;
             public Image back, icon;
-            public Button iconButton, role;
-            public TextMeshProUGUI name, state, roleLabel;
+            public Button iconButton;
+            public TextMeshProUGUI name, state;
             public LobbyPlayer player;
             public AgentRowDrag drag;
         }
 
+        private class FriendRow
+        {
+            public RectTransform rect;
+            public TextMeshProUGUI name, state;
+            public Button join;
+            public ulong lobby;
+        }
+
         private RectTransform _root;
-        private GameObject _main, _lobby, _settings, _iconPicker;
-        private TextMeshProUGUI _status, _mapName, _mapDescription, _playerCount, _startHint, _code, _viewLabel;
-        private TMP_InputField _name, _joinField;
-        private Button _startButton, _readyButton, _copyButton, _invite, _shuffle, _addBox, _left, _right, _viewSwap;
-        private Toggle _proximity;
-        private RawImage _mapPicture, _mapInset;
-        private GameObject _insetFrame;
-        private bool _planBig;
-        private Screen _current;
-        private RectTransform _casterBox;
+        private GameObject _main, _join, _lobby, _settings, _iconPicker;
+        private TextMeshProUGUI _status, _mapName, _mapDescription, _playerCount, _startHint, _code, _joinStatus, _noFriends, _voidHint;
+        private TMP_InputField _titleName, _name, _joinField;
+        private Button _startButton, _readyButton, _copyButton, _invite, _shuffle, _addBox, _left, _right, _roleAgent, _roleCaster;
+        private RawImage _mapPicture, _mapPlan;
+        private GameObject _planFrame;
+        private Screen _current, _beforeSettings;
+        private RectTransform _voidArea, _friendList;
         private readonly List<TeamBox> _boxes = new List<TeamBox>();
         private readonly List<AgentRow> _rows = new List<AgentRow>();
+        private readonly List<FriendRow> _friends = new List<FriendRow>();
         private RectTransform _ghost;
         private TextMeshProUGUI _ghostName;
-        private float _joiningUntil;
+        private float _joiningUntil, _friendsAt;
+        private bool _joining;
 
         private void Start()
         {
@@ -77,40 +88,42 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             Spectator.Stop();
             HumanRagdoll.ClearAll();
 
-            // A camera only so the screen has a known clear colour: the backdrop is a still image.
-            Camera lCamera = new GameObject("MenuCamera").AddComponent<Camera>();
-            lCamera.transform.SetParent(transform, false);
-            lCamera.clearFlags = CameraClearFlags.SolidColor;
-            lCamera.backgroundColor = Navy;
-            lCamera.cullingMask = 0;
+            // Behind the menus, the scene the title builder set up; a plain colour without it.
+            if (FindFirstObjectByType<TitleDiorama>() == null)
+            {
+                Camera lCamera = new GameObject("MenuCamera").AddComponent<Camera>();
+                lCamera.transform.SetParent(transform, false);
+                lCamera.clearFlags = CameraClearFlags.SolidColor;
+                lCamera.backgroundColor = Navy;
+                lCamera.cullingMask = 0;
+            }
 
             Canvas lCanvas = UIFactory.Canvas("MenuCanvas", 20);
             lCanvas.transform.SetParent(transform, false);
             _root = (RectTransform)lCanvas.transform;
 
-            RawImage lBackdrop = UIFactory.Stretch(_root, "Backdrop").gameObject.AddComponent<RawImage>();
-            Texture2D lArt = Resources.Load<Texture2D>("Art/Title/TitleArt");
-            lBackdrop.texture = lArt;
-            lBackdrop.color = lArt != null ? Color.white : Navy;
-            lBackdrop.raycastTarget = false;
-
             BuildMain();
+            BuildJoin();
             BuildLobby();
             BuildSettings();
             BuildIconPicker();
-            _status = UIFactory.Title(_root, "Status", "", 16, UIFactory.Muted, TextAlignmentOptions.Right, new Vector2(1, 0), new Vector2(-70, 14), new Vector2(900, 24), false, 3f);
-            UIFactory.Title(_root, "Version", "v" + VERSION, 13, new Color(1, 1, 1, 0.3f), TextAlignmentOptions.Left, new Vector2(0, 0), new Vector2(70, 8), new Vector2(200, 20), false, 3f);
+            _status = UIFactory.Title(_root, "Status", "", 16, UIFactory.Muted, TextAlignmentOptions.Left, new Vector2(1, 1), new Vector2(-500, -150), new Vector2(620, 24), false, 3f);
 
             Show(NetworkManagerListening() ? Screen.Lobby : Screen.Main);
             NetSession.OnStatus += HandleStatus;
             if (NetSession.Instance != null) NetSession.Instance.EnsureSteam();
+            if (SteamLobby.Instance != null) SteamLobby.Instance.OnJoinFailed += HandleJoinFailed;
         }
 
-        private void OnDestroy() => NetSession.OnStatus -= HandleStatus;
+        private void OnDestroy()
+        {
+            NetSession.OnStatus -= HandleStatus;
+            if (SteamLobby.Instance != null) SteamLobby.Instance.OnJoinFailed -= HandleJoinFailed;
+        }
 
         private void HandleStatus(string pStatus)
         {
-            if (_status != null) _status.text = pStatus;
+            if (_joinStatus != null && _current == Screen.Join) _joinStatus.text = pStatus;
         }
 
         private static bool NetworkManagerListening() => NetSession.Instance != null && NetSession.Instance.Network.IsListening;
@@ -120,11 +133,19 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             _current = pScreen;
             _main.SetActive(pScreen == Screen.Main);
-            _lobby.SetActive(pScreen == Screen.Lobby);
+            _join.SetActive(pScreen == Screen.Join);
+            _lobby.SetActive(pScreen == Screen.Lobby || (pScreen == Screen.Settings && _beforeSettings == Screen.Lobby));
             _settings.SetActive(pScreen == Screen.Settings);
-            GameObject lShown = pScreen switch { Screen.Main => _main, Screen.Lobby => _lobby, _ => _settings };
+            GameObject lShown = pScreen switch { Screen.Main => _main, Screen.Join => _join, Screen.Lobby => _lobby, _ => _settings };
             UIFactory.FadeIn(lShown, 0.25f, Vector2.zero);
             if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+            if (pScreen == Screen.Join) { _friendsAt = 0f; _joinStatus.text = ""; }
+        }
+
+        private void OpenSettings()
+        {
+            _beforeSettings = _current;
+            Show(Screen.Settings);
         }
 
         private static RectTransform Box(Transform pParent, string pName, float pX, float pY, float pWidth, float pHeight) =>
@@ -138,25 +159,28 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             return lText;
         }
 
-        private static Button SmallButton(Transform pParent, string pLabel, float pX, float pY, float pWidth, float pHeight, System.Action pAction, float pFont = 18f, bool pPrimary = false)
+        /// <summary>A section header: small caps over a short accent rule.</summary>
+        private static void Header(Transform pParent, string pText, float pX, float pY)
+        {
+            Label(pParent, pText, 16, UIFactory.Muted, pX, pY, 500, 22, true, 5f);
+            UIFactory.Rule(pParent, TL, new Vector2(pX, -pY - 28), 28, false, UIFactory.Accent, 2f);
+        }
+
+        private static Button MenuButton(Transform pParent, string pLabel, float pX, float pY, float pWidth, float pHeight, System.Action pAction, float pFont = 20f, bool pPrimary = false)
         {
             Button lButton = UIFactory.Button(pParent, pLabel, TL, new Vector2(pX, -pY), new Vector2(pWidth, pHeight), pPrimary ? UIFactory.Accent : UIFactory.Accent2, pAction, pFont);
             ((RectTransform)lButton.transform).pivot = TL;
             ((RectTransform)lButton.transform).anchoredPosition = new Vector2(pX, -pY);
-            lButton.GetComponent<Image>().color = pPrimary ? UIFactory.Accent : Slate;
-            TextMeshProUGUI lText = lButton.GetComponentInChildren<TextMeshProUGUI>();
-            lText.alignment = TextAlignmentOptions.Center;
-            lText.rectTransform.anchoredPosition = Vector2.zero;
-            lText.rectTransform.sizeDelta = new Vector2(pWidth, pHeight);
             return lButton;
         }
 
-        private static Button IconButton(Transform pParent, Sprite pIcon, float pX, float pY, float pSize, System.Action pAction)
+        private static TMP_InputField NameField(Transform pParent, Vector2 pAnchor, Vector2 pPosition, Vector2 pSize)
         {
-            Button lButton = SmallButton(pParent, "", pX, pY, pSize, pSize, pAction);
-            Image lIcon = UIFactory.Panel(lButton.transform, "Icon", UIFactory.Paper, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(pSize * 0.55f, pSize * 0.55f));
-            lIcon.sprite = pIcon;
-            return lButton;
+            TMP_InputField lField = UIFactory.Input(pParent, "YOUR NAME", pAnchor, pPosition, pSize);
+            lField.characterLimit = 24;
+            lField.text = PlayerIdentity.LocalName;
+            lField.onEndEdit.AddListener(v => PlayerIdentity.LocalName = v);
+            return lField;
         }
 
         // ---------------------------------------------------------------- title
@@ -165,19 +189,126 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         {
             _main = UIFactory.Stretch(_root, "Main").gameObject;
             Transform p = _main.transform;
-            Label(p, "HITMEN", 170, UIFactory.Paper, 104, 250, 1100, 190, true, 3f);
-            Button lPlay = SmallButton(p, "PLAY", 110, 470, 440, 104, Play, 54, true);
-            lPlay.GetComponentInChildren<TextMeshProUGUI>().characterSpacing = 3f;
-            IconButton(p, UIIcons.Options, 110, 960, 60, () => Show(Screen.Settings));
-            IconButton(p, UIIcons.Exit, 182, 960, 60, Application.Quit);
+            Label(p, "HITMEN", 230, UIFactory.Paper, 96, 70, 1200, 250, true, 6f);
+
+            (string label, System.Action action)[] lEntries =
+            {
+                ("CREATE A ROOM", CreateRoom),
+                ("JOIN A ROOM", () => Show(Screen.Join)),
+                ("OPTIONS", OpenSettings),
+                ("QUIT", Application.Quit)
+            };
+            for (int i = 0; i < lEntries.Length; i++) MenuButton(p, lEntries[i].label, 110, 370 + i * 104, 540, 88, lEntries[i].action, 40, true);
+
+            // The agent's name, bottom right.
+            UIFactory.Title(p, "AgentLabel", "AGENT NAME", 16, UIFactory.Paper, TextAlignmentOptions.Right, new Vector2(1, 0), new Vector2(-110, 96), new Vector2(380, 24), true, 4f);
+            _titleName = NameField(p, new Vector2(1, 0), new Vector2(-110, 40), new Vector2(380, 56));
+            ((RectTransform)_titleName.transform).pivot = new Vector2(1, 0.5f);
+            UIFactory.Rule(p, new Vector2(1, 0), new Vector2(-110, 114), 380, false, new Color(1, 1, 1, 0.2f), 1f);
         }
 
-        /// <summary>PLAY: a room right away, on Steam when it runs (invites work at once), else on the local network.</summary>
-        private void Play()
+        /// <summary>A room right away, on Steam when it runs (invites work at once), else on the local network.</summary>
+        private void CreateRoom()
         {
             if (SteamReady) NetSession.Instance.HostSteam(false);
             else NetSession.Instance.HostLocal();
             Show(Screen.Lobby);
+        }
+
+        // ---------------------------------------------------------------- join
+
+        private void BuildJoin()
+        {
+            _join = UIFactory.Stretch(_root, "Join").gameObject;
+            _join.AddComponent<Image>().color = Dim;
+            Transform p = _join.transform;
+            Label(p, "JOIN A ROOM", 88, UIFactory.Paper, 104, 70, 1200, 110, true, 4f);
+
+            Header(p, "FRIENDS", 110, 214);
+            _friendList = UIWidgets.ScrollList(p, "Friends", TL, new Vector2(110 + 400, -258), 800f, 640f);
+            _noFriends = Label(p, "", 22, UIFactory.Muted, 110, 262, 800, 34, false, 2f);
+
+            Header(p, "ROOM CODE", 1010, 214);
+            _joinField = UIFactory.Input(p, "ABC-DEF", TL, Vector2.zero, new Vector2(800, 104));
+            ((RectTransform)_joinField.transform).pivot = TL;
+            ((RectTransform)_joinField.transform).anchoredPosition = new Vector2(1010, -258);
+            _joinField.characterLimit = 40;
+            _joinField.textComponent.fontSize = 52;
+            _joinField.textComponent.characterSpacing = 14f;
+            _joinField.onValidateInput = (pText, pIndex, pChar) => char.IsLetterOrDigit(pChar) || pChar == '-' || pChar == '.' ? char.ToUpperInvariant(pChar) : '\0';
+            _joinField.onSubmit.AddListener(_ => JoinByField());
+            Label(p, "ASK THE HOST FOR THE ROOM'S CODE. ON THE SAME NETWORK, AN IP WORKS TOO.", 16, UIFactory.Muted, 1010, 376, 800, 24, false, 2f);
+            MenuButton(p, "JOIN", 1010, 420, 800, 96, JoinByField, 40, true);
+            _joinStatus = Label(p, "", 20, UIFactory.Accent, 1010, 534, 800, 30, true, 2f);
+
+            MenuButton(p, "BACK", 110, 960, 300, 60, () => Show(Screen.Main), 26);
+        }
+
+        private void JoinByField()
+        {
+            string lWhere = _joinField.text.Trim();
+            if (lWhere.Length == 0) return;
+            StartJoining();
+            if (lWhere.Contains(".")) NetSession.Instance.JoinLocal(lWhere);
+            else NetSession.Instance.JoinSteamCode(lWhere);
+        }
+
+        private void JoinFriend(ulong pLobby)
+        {
+            StartJoining();
+            NetSession.Instance.JoinSteamLobby(pLobby);
+        }
+
+        private void StartJoining()
+        {
+            _joining = true;
+            _joiningUntil = Time.unscaledTime + JOIN_TIME;
+            _joinStatus.text = "LOOKING FOR THE ROOM...";
+        }
+
+        private void HandleJoinFailed(string pWhy) => StopJoining(pWhy);
+
+        /// <summary>The attempt is over: the screen stays, it only says why.</summary>
+        private void StopJoining(string pWhy)
+        {
+            if (!_joining) return;
+            _joining = false;
+            if (NetworkManagerListening() && NetSession.Instance != null) NetSession.Instance.Leave();
+            if (_joinStatus != null) _joinStatus.text = pWhy;
+        }
+
+        private void RefreshFriends()
+        {
+            if (Time.unscaledTime < _friendsAt) return;
+            _friendsAt = Time.unscaledTime + 3f;
+            List<SteamLobby.FriendRoom> lFriends = SteamLobby.Instance != null ? SteamLobby.Instance.Friends() : new List<SteamLobby.FriendRoom>();
+            _noFriends.text = !SteamReady ? "STEAM IS NOT RUNNING: USE A CODE OR AN IP." : lFriends.Count == 0 ? "NONE OF YOUR FRIENDS IS ONLINE." : "";
+            while (_friends.Count < lFriends.Count) _friends.Add(BuildFriendRow());
+            for (int i = 0; i < _friends.Count; i++)
+            {
+                FriendRow lRow = _friends[i];
+                bool lOn = i < lFriends.Count;
+                lRow.rect.gameObject.SetActive(lOn);
+                if (!lOn) continue;
+                SteamLobby.FriendRoom lFriend = lFriends[i];
+                lRow.name.text = lFriend.name.ToUpperInvariant();
+                lRow.lobby = lFriend.lobby;
+                lRow.state.text = lFriend.lobby != 0 ? "IN A ROOM" : lFriend.inGame ? "PLAYING" : "ONLINE";
+                lRow.join.gameObject.SetActive(lFriend.lobby != 0);
+            }
+        }
+
+        private FriendRow BuildFriendRow()
+        {
+            FriendRow lRow = new FriendRow();
+            lRow.rect = UIWidgets.Row(_friendList, "Friend", 60f, true);
+            lRow.name = lRow.rect.Find("Label").GetComponent<TextMeshProUGUI>();
+            lRow.name.rectTransform.sizeDelta = new Vector2(420, 60);
+            lRow.state = UIFactory.Title(lRow.rect, "State", "", 15, UIFactory.Muted, TextAlignmentOptions.Right, new Vector2(1, 0.5f), new Vector2(-180, 0), new Vector2(160, 30), true, 2f);
+            lRow.state.rectTransform.pivot = new Vector2(1, 0.5f);
+            lRow.join = UIFactory.Button(lRow.rect, "JOIN", new Vector2(1, 0.5f), new Vector2(-12, 0), new Vector2(150, 44), UIFactory.Accent, () => JoinFriend(lRow.lobby), 22);
+            ((RectTransform)lRow.join.transform).pivot = new Vector2(1, 0.5f);
+            return lRow;
         }
 
         private void BuildSettings()
@@ -185,144 +316,128 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _settings = UIFactory.Stretch(_root, "Settings").gameObject;
             Transform p = _settings.transform;
             _settings.AddComponent<Image>().color = new Color(Navy.r, Navy.g, Navy.b, 0.96f);
-            Label(p, "OPTIONS", 72, UIFactory.Paper, 104, 90, 1100, 90, true, 8f);
-            SettingsPanel.Build(p, TL, new Vector2(110 + 450, -230), 900f);
-            SmallButton(p, "BACK", 110, 960, 240, 56, () => Show(Screen.Main), 24);
+            Label(p, "OPTIONS", 72, UIFactory.Paper, 104, 70, 1100, 90, true, 8f);
+            SettingsPanel.Build(p, TL, new Vector2(110 + 450, -190), 900f, 760f);
+            MenuButton(p, "BACK", 110, 960, 300, 60, CloseSettings, 26);
         }
 
-        // ---------------------------------------------------------------- the room
+        private void CloseSettings() => Show(_beforeSettings);
+
+        // ---------------------------------------------------------------- the briefing
 
         private void BuildLobby()
         {
             _lobby = UIFactory.Stretch(_root, "Lobby").gameObject;
             Transform p = _lobby.transform;
-            _lobby.AddComponent<Image>().color = new Color(Navy.r, Navy.g, Navy.b, 0.97f);
+            _lobby.AddComponent<Image>().color = Dim;
 
-            // Left: the map, as a picture with its plan beside it (a click swaps the two).
-            RectTransform lFrame = Box(p, "MapFrame", 70, 60, 1000, 563);
+            Label(p, "BRIEFING", 72, UIFactory.Paper, 106, 56, 800, 90, true, 5f);
+
+            // The room's code, top right.
+            _code = Label(p, "", 26, UIFactory.Paper, 1080, 92, 600, 36, true, 6f, TextAlignmentOptions.TopRight);
+            _copyButton = MenuButton(p, "COPY", 1700, 80, 110, 52, () =>
+            {
+                if (SteamLobby.Instance != null) GUIUtility.systemCopyBuffer = SteamLobby.Instance.Code;
+                _status.text = "CODE COPIED";
+            }, 20);
+
+            // The map: its picture, the plan in the top left corner of it, its name and its story.
+            Header(p, "MAP", MAP_X, 166);
+            RectTransform lFrame = Box(p, "MapFrame", MAP_X, TOP, MAP_W, MAP_H);
             lFrame.gameObject.AddComponent<Image>().color = new Color(0.05f, 0.055f, 0.09f, 1f);
             _mapPicture = UIFactory.Stretch(lFrame, "Picture").gameObject.AddComponent<RawImage>();
             _mapPicture.raycastTarget = false;
-            _insetFrame = Box(lFrame, "Inset", 1000 - 266, 563 - 266, 256, 256).gameObject;
-            _insetFrame.AddComponent<Image>().color = new Color(0.05f, 0.055f, 0.09f, 0.92f);
-            _mapInset = Box(_insetFrame.transform, "Plan", 4, 4, 248, 248).gameObject.AddComponent<RawImage>();
-            _mapInset.raycastTarget = false;
-            _viewSwap = _insetFrame.AddComponent<Button>();
-            _viewSwap.transition = Selectable.Transition.None;
-            _viewSwap.onClick.AddListener(() => _planBig = !_planBig);
-            _viewLabel = Label(lFrame, "", 13, UIFactory.Muted, 14, 563 - 26, 400, 20, true, 3f);
-            _left = SmallButton(lFrame, "‹", 0, 563 / 2 - 60, 56, 120, () => ChangeMap(-1), 48);
-            _right = SmallButton(lFrame, "›", 1000 - 56, 563 / 2 - 60, 56, 120, () => ChangeMap(1), 48);
-
-            _mapName = Label(p, "", 44, UIFactory.Paper, 70, 640, 1000, 54, true, 5f);
-            _mapDescription = UIFactory.Text(p, "Description", "", 21, UIFactory.Muted, TextAlignmentOptions.TopLeft, TL, Vector2.zero, new Vector2(1000, 84));
+            _planFrame = Box(lFrame, "Plan", 10, 10, PLAN, PLAN).gameObject;
+            Image lPlanBack = _planFrame.AddComponent<Image>();
+            lPlanBack.color = new Color(0.05f, 0.055f, 0.09f, 0.92f);
+            lPlanBack.raycastTarget = false;
+            _mapPlan = Box(_planFrame.transform, "Sheet", 4, 4, PLAN - 8, PLAN - 8).gameObject.AddComponent<RawImage>();
+            _mapPlan.raycastTarget = false;
+            _left = MenuButton(lFrame, "‹", 0, MAP_H / 2 - 56, 56, 112, () => ChangeMap(-1), 48);
+            _right = MenuButton(lFrame, "›", MAP_W - 56, MAP_H / 2 - 56, 56, 112, () => ChangeMap(1), 48);
+            _mapName = Label(p, "", 40, UIFactory.Paper, MAP_X, TOP + MAP_H + 16, MAP_W, 50, true, 3f);
+            _mapDescription = UIFactory.Text(p, "Description", "", 20, UIFactory.Muted, TextAlignmentOptions.TopLeft, TL, Vector2.zero, new Vector2(MAP_W, 180));
             _mapDescription.rectTransform.pivot = TL;
-            _mapDescription.rectTransform.anchoredPosition = new Vector2(70, -696);
+            _mapDescription.rectTransform.anchoredPosition = new Vector2(MAP_X, -(TOP + MAP_H + 70));
+            _mapDescription.textWrappingMode = TextWrappingModes.Normal;
 
-            // Left, under the map: who you are, joining someone else's room, the one global option.
-            Label(p, "AGENT NAME", 14, UIFactory.Muted, 70, 800, 360, 20, true, 4f);
-            _name = UIFactory.Input(p, "YOUR NAME", TL, Vector2.zero, new Vector2(340, 52));
-            ((RectTransform)_name.transform).pivot = TL;
-            ((RectTransform)_name.transform).anchoredPosition = new Vector2(70, -826);
-            _name.characterLimit = 24;
-            _name.text = PlayerIdentity.LocalName;
-            _name.onEndEdit.AddListener(v => PlayerIdentity.LocalName = v);
+            MenuButton(p, "LEAVE", MAP_X, 960, 300, 60, () => { NetSession.Instance.Leave(); Show(Screen.Main); }, 26);
 
-            Label(p, "JOIN A ROOM  ·  CODE OR IP", 14, UIFactory.Muted, 440, 800, 460, 20, true, 4f);
-            _joinField = UIFactory.Input(p, "ABC-DEF", TL, Vector2.zero, new Vector2(320, 52));
-            ((RectTransform)_joinField.transform).pivot = TL;
-            ((RectTransform)_joinField.transform).anchoredPosition = new Vector2(440, -826);
-            _joinField.characterLimit = 40;
-            _joinField.onValidateInput = (pText, pIndex, pChar) => char.IsLetterOrDigit(pChar) || pChar == '-' || pChar == '.' ? char.ToUpperInvariant(pChar) : '\0';
-            _joinField.onSubmit.AddListener(_ => JoinOther());
-            SmallButton(p, "JOIN", 770, 826, 120, 52, JoinOther, 22);
+            // The teams, one under the other.
+            Header(p, "TEAMS", TEAM_X, 166);
+            for (int i = 0; i < MatchRulesLogic.MAX_BOXES; i++) _boxes.Add(BuildBox(p, i));
+            _addBox = MenuButton(p, "+  NEW TEAM", TEAM_X, TOP, TEAM_W, 64, () => LobbyState.Instance?.AddBoxRpc(), 26);
+            _shuffle = MenuButton(p, "SHUFFLE THE TEAMS", TEAM_X, 930, TEAM_W, 90, () => LobbyState.Instance?.ShuffleRpc(), 34);
 
-            RectTransform lOptions = UIWidgets.List(p, "Options", TL, new Vector2(70 + 300, -890), 600f);
-            _proximity = UIWidgets.Switch(lOptions, "Proximity voice chat", true, v =>
-            {
-                LobbyState lState = LobbyState.Instance;
-                if (lState != null && lState.IsServer) lState.ProximityChat.Value = v;
-            });
-
-            SmallButton(p, "LEAVE", 70, 980, 200, 56, () => { NetSession.Instance.Leave(); Show(Screen.Main); }, 22);
-            IconButton(p, UIIcons.Options, 282, 980, 56, () => Show(Screen.Settings));
-
-            // Right: the agents, in their boxes.
-            Label(p, "AGENTS", 30, UIFactory.Paper, 1110, 60, 400, 38, true, 6f);
-            _playerCount = Label(p, "", 16, UIFactory.Muted, 1110, 70, 740, 24, true, 4f, TextAlignmentOptions.TopRight);
-            for (int i = 0; i < MatchRulesLogic.MAX_TEAMS; i++) _boxes.Add(BuildBox(p, i));
-            _casterBox = Box(p, "Casters", 1110, BOX_TOP, BOX_W, HEADER_H);
-            _casterBox.gameObject.AddComponent<Image>().color = Slate;
-            Label(_casterBox, "CASTERS", 18, UIFactory.Muted, 14, 10, 300, 24, true, 4f);
-            _addBox = SmallButton(p, "+  NEW TEAM", 1110, BOX_TOP, BOX_W, HEADER_H, () => LobbyState.Instance?.AddBoxRpc(), 20);
+            // The agents still on their own, you with them or not; the name and the start below.
+            Header(p, "AGENTS", AGENT_X, 166);
+            _playerCount = Label(p, "", 16, UIFactory.Muted, AGENT_X, 166, AGENT_W, 24, true, 4f, TextAlignmentOptions.TopRight);
+            _roleAgent = MenuButton(p, "AGENT", AGENT_X, TOP, AGENT_W / 2 - 3, 50, () => SetCaster(false), 22);
+            _roleCaster = MenuButton(p, "CASTER", AGENT_X + AGENT_W / 2 + 3, TOP, AGENT_W / 2 - 3, 50, () => SetCaster(true), 22);
+            _voidArea = Box(p, "NoTeam", AGENT_X, TOP + 60, AGENT_W, 390);
+            Image lVoid = _voidArea.gameObject.AddComponent<Image>();
+            lVoid.color = new Color(1, 1, 1, 0.025f);
+            lVoid.raycastTarget = false;
+            _voidHint = Label(_voidArea, "EVERY AGENT FOR THEMSELVES", 14, new Color(1, 1, 1, 0.35f), 0, 362, AGENT_W, 20, false, 3f, TextAlignmentOptions.Top);
             for (int i = 0; i < MAX_ROWS; i++) _rows.Add(BuildRow(p));
 
-            // Under the agents: inviting and shuffling belong with them.
-            _invite = SmallButton(p, "INVITE FRIENDS", 1110, 836, 200, 48, () => SteamLobby.Instance?.Invite(), 18);
-            _shuffle = SmallButton(p, "SHUFFLE", 1320, 836, 130, 48, () => LobbyState.Instance?.ShuffleRpc(), 18);
-            _code = Label(p, "", 18, UIFactory.Paper, 1460, 850, 300, 26, true, 4f, TextAlignmentOptions.TopRight);
-            _copyButton = SmallButton(p, "COPY", 1770, 836, 80, 48, () =>
-            {
-                if (SteamLobby.Instance != null) GUIUtility.systemCopyBuffer = SteamLobby.Instance.Code;
-                HandleStatus("CODE COPIED");
-            }, 16);
-
-            _startHint = Label(p, "", 16, UIFactory.Muted, 1110, 900, 740, 24, false, 2f, TextAlignmentOptions.TopRight);
-            _startButton = SmallButton(p, "START CONTRACT", 1110, 930, 740, 106, () => LobbyState.Instance?.StartMatch(), 40, true);
-            _readyButton = SmallButton(p, "READY", 1110, 930, 740, 106, () => { if (LobbyPlayer.Local != null) LobbyPlayer.Local.Ready.Value = !LobbyPlayer.Local.Ready.Value; }, 40, true);
+            _invite = MenuButton(p, "INVITE FRIENDS", AGENT_X, 670, AGENT_W, 50, () => SteamLobby.Instance?.Invite(), 22);
+            Label(p, "AGENT NAME", 15, UIFactory.Paper, AGENT_X, 738, AGENT_W, 22, true, 4f);
+            _name = NameField(p, TL, Vector2.zero, new Vector2(AGENT_W, 56));
+            ((RectTransform)_name.transform).pivot = TL;
+            ((RectTransform)_name.transform).anchoredPosition = new Vector2(AGENT_X, -764);
+            _startHint = Label(p, "", 16, UIFactory.Muted, AGENT_X, 832, AGENT_W, 60, false, 2f);
+            _startHint.textWrappingMode = TextWrappingModes.Normal;
+            _startButton = MenuButton(p, "START CONTRACT", AGENT_X, 900, AGENT_W, 120, () => LobbyState.Instance?.StartMatch(), 42, true);
+            _readyButton = MenuButton(p, "READY", AGENT_X, 900, AGENT_W, 120, () => { if (LobbyPlayer.Local != null) LobbyPlayer.Local.Ready.Value = !LobbyPlayer.Local.Ready.Value; }, 42, true);
 
             // What follows the pointer while an agent is dragged.
-            _ghost = UIFactory.Panel(p, "Ghost", new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, 0.9f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(BOX_W, ROW_H)).rectTransform;
-            _ghostName = UIFactory.Title(_ghost, "Name", "", 20, UIFactory.Ink, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(BOX_W, ROW_H), true, 2f);
+            _ghost = UIFactory.Panel(p, "Ghost", new Color(UIFactory.Accent.r, UIFactory.Accent.g, UIFactory.Accent.b, 0.9f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(AGENT_W, ROW_H)).rectTransform;
+            _ghostName = UIFactory.Title(_ghost, "Name", "", 20, UIFactory.Ink, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(AGENT_W, ROW_H), true, 2f);
             _ghost.gameObject.SetActive(false);
+        }
+
+        private static void SetCaster(bool pCaster)
+        {
+            if (LobbyPlayer.Local != null) PlayerIdentity.JoinAsCaster = pCaster;
         }
 
         private TeamBox BuildBox(Transform pParent, int pIndex)
         {
             TeamBox lBox = new TeamBox();
-            lBox.rect = Box(pParent, "Team" + pIndex, 1110, BOX_TOP, BOX_W, HEADER_H);
+            lBox.rect = Box(pParent, "Team" + pIndex, TEAM_X, TOP, TEAM_W, HEADER_H);
             lBox.rect.gameObject.AddComponent<Image>().color = Slate;
-            lBox.bar = UIFactory.Panel(lBox.rect, "Bar", LobbyPlayer.TeamColor(pIndex), new Vector2(0.5f, 1f), new Vector2(0, -2), new Vector2(BOX_W, 4));
-            lBox.title = Label(lBox.rect, "TEAM " + (pIndex + 1), 18, UIFactory.Paper, 14, 12, 90, 24, true, 3f);
+            lBox.bar = UIFactory.Panel(lBox.rect, "Bar", LobbyPlayer.TeamColor(pIndex), new Vector2(0, 1), new Vector2(3, -HEADER_H / 2), new Vector2(6, HEADER_H));
+            lBox.title = Label(lBox.rect, "TEAM " + (pIndex + 1), 20, UIFactory.Paper, 18, 13, 110, 26, true, 3f);
 
             int lIndex = pIndex;
-            lBox.protect = SmallButton(lBox.rect, "", 100, 6, 198, 30, () => LobbyState.Instance?.ToggleProtectRpc(lIndex), 14);
-            lBox.protectIcon = UIFactory.Panel(lBox.protect.transform, "Icon", UIFactory.Muted, new Vector2(0, 0.5f), new Vector2(14, 0), new Vector2(16, 16));
-            lBox.protectIcon.sprite = UIIcons.Agent(UIIcons.SHIELD);
-            lBox.protectLabel = Label(lBox.protect.transform, "PROTECT THE TARGET", 13, UIFactory.Muted, 30, 8, 170, 18, true, 1.5f);
-            lBox.remove = SmallButton(lBox.rect, "×", BOX_W - 38, 6, 30, 30, () => LobbyState.Instance?.RemoveBoxRpc(lIndex), 22);
-            lBox.drop = Box(lBox.rect, "Drop", 8, HEADER_H, BOX_W - 16, DROP_H - 8).gameObject.AddComponent<Image>();
-            lBox.drop.color = new Color(1, 1, 1, 0.025f);
+            lBox.mode = MenuButton(lBox.rect, "CONTRACT", 130, 7, 390, 34, () => LobbyState.Instance?.ToggleProtectRpc(lIndex), 16);
+            lBox.modeLabel = lBox.mode.GetComponentInChildren<TextMeshProUGUI>();
+            lBox.remove = MenuButton(lBox.rect, "×", TEAM_W - 50, 7, 42, 34, () => LobbyState.Instance?.RemoveBoxRpc(lIndex), 22);
+            lBox.drop = Box(lBox.rect, "Drop", 0, HEADER_H, TEAM_W, DROP_H).gameObject.AddComponent<Image>();
+            lBox.drop.color = new Color(1, 1, 1, 0.02f);
             lBox.drop.raycastTarget = false;
-            Label(lBox.drop.transform, "DROP AN AGENT HERE", 13, new Color(1, 1, 1, 0.3f), 0, 10, BOX_W - 16, 20, false, 3f, TextAlignmentOptions.Top);
+            Label(lBox.drop.transform, "DROP AN AGENT HERE", 14, new Color(1, 1, 1, 0.35f), 0, 12, TEAM_W, 20, false, 3f, TextAlignmentOptions.Top);
             return lBox;
         }
 
         private AgentRow BuildRow(Transform pParent)
         {
             AgentRow lRow = new AgentRow();
-            lRow.rect = Box(pParent, "Agent", 0, 0, BOX_W - 8, ROW_H - 4);
+            lRow.rect = Box(pParent, "Agent", 0, 0, AGENT_W, ROW_H - 4);
             lRow.back = lRow.rect.gameObject.AddComponent<Image>();
             lRow.back.color = new Color(1, 1, 1, 0.045f);
             lRow.drag = lRow.rect.gameObject.AddComponent<AgentRowDrag>();
             lRow.drag.Init(this, lRow.rect);
 
-            lRow.iconButton = SmallButton(lRow.rect, "", 3, 3, 32, 32, () => OpenIconPicker(lRow), 10);
+            lRow.iconButton = MenuButton(lRow.rect, "", 3, 3, 32, 32, () => OpenIconPicker(lRow), 10);
             lRow.icon = UIFactory.Panel(lRow.iconButton.transform, "Icon", UIFactory.Paper, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24, 24));
 
-            lRow.name = Label(lRow.rect, "", 19, UIFactory.Paper, 44, 8, 150, 24, true, 1f);
+            lRow.name = Label(lRow.rect, "", 19, UIFactory.Paper, 44, 8, 230, 24, true, 1f);
             lRow.name.overflowMode = TextOverflowModes.Ellipsis;
-            lRow.state = Label(lRow.rect, "", 13, UIFactory.Muted, 190, 11, 76, 20, true, 1.5f, TextAlignmentOptions.TopRight);
-            lRow.role = SmallButton(lRow.rect, "", BOX_W - 8 - 80, 4, 76, 30, ToggleCaster, 13);
-            lRow.roleLabel = lRow.role.GetComponentInChildren<TextMeshProUGUI>();
+            lRow.state = Label(lRow.rect, "", 13, UIFactory.Muted, 0, 11, 84, 20, true, 1.5f, TextAlignmentOptions.TopRight);
             lRow.rect.gameObject.SetActive(false);
             return lRow;
-        }
-
-        private static void ToggleCaster()
-        {
-            if (LobbyPlayer.Local == null) return;
-            PlayerIdentity.JoinAsCaster = !LobbyPlayer.Local.Caster.Value;
         }
 
         // ---------------------------------------------------------------- icons
@@ -341,11 +456,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             for (int i = 0; i < UIIcons.AGENT_COUNT; i++)
             {
                 int lIcon = i;
-                IconButton(lPanel, UIIcons.Agent(i), 24 + i % 4 * 82, 60 + i / 4 * 86, 78, () =>
+                Button lButton = MenuButton(lPanel, "", 24 + i % 4 * 82, 60 + i / 4 * 86, 78, 78, () =>
                 {
                     PlayerIdentity.LocalIcon = lIcon;
                     _iconPicker.SetActive(false);
                 });
+                Image lImage = UIFactory.Panel(lButton.transform, "Icon", UIFactory.Paper, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(44, 44));
+                lImage.sprite = UIIcons.Agent(i);
             }
             _iconPicker.SetActive(false);
         }
@@ -390,6 +507,7 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                     lState.MovePlayerRpc(lRow.player.OwnerClientId, i);
                     return;
                 }
+            if (RectTransformUtility.RectangleContainsScreenPoint(_voidArea, pScreen, null)) lState.MovePlayerRpc(lRow.player.OwnerClientId, MatchRulesLogic.NO_TEAM);
         }
 
         // ---------------------------------------------------------------- actions
@@ -399,33 +517,35 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             LobbyState lState = LobbyState.Instance;
             if (lState == null || !lState.IsServer) return;
             lState.MapIndex.Value = Mathf.Clamp(lState.MapIndex.Value + pDelta, 0, Mathf.Max(0, GameDatabase.Maps.Count - 1));
-            _planBig = false;
-        }
-
-        /// <summary>Someone else's room: this one closes first, then we dial theirs (a code on Steam, an IP on the network).</summary>
-        private void JoinOther()
-        {
-            string lWhere = _joinField.text.Trim();
-            if (lWhere.Length == 0) return;
-            _joiningUntil = Time.unscaledTime + 12f;
-            NetSession.Instance.Leave();
-            StartCoroutine(JoinAfterLeaving(lWhere));
-        }
-
-        private System.Collections.IEnumerator JoinAfterLeaving(string pWhere)
-        {
-            while (NetSession.Instance.Network.ShutdownInProgress || NetSession.Instance.Network.IsListening) yield return null;
-            if (pWhere.Contains(".")) NetSession.Instance.JoinLocal(pWhere);
-            else NetSession.Instance.JoinSteamCode(pWhere);
         }
 
         // ---------------------------------------------------------------- refresh
 
         private void Update()
         {
-            if (_name != null && !_name.isFocused && !PlayerIdentity.HasCustomName && _name.text != PlayerIdentity.LocalName) _name.SetTextWithoutNotify(PlayerIdentity.LocalName);
+            KeepName(_titleName);
+            KeepName(_name);
+
+            if (GameInput.PausePressed)
+            {
+                if (_current == Screen.Settings) CloseSettings();
+                else if (_current == Screen.Join) Show(Screen.Main);
+                else if (_current == Screen.Lobby) OpenSettings();
+            }
+
+            if (_joining)
+            {
+                if (LobbyState.Instance != null) { _joining = false; Show(Screen.Lobby); }
+                else if (Time.unscaledTime > _joiningUntil) StopJoining("NO ANSWER FROM THAT ROOM");
+            }
+            if (_current == Screen.Join)
+            {
+                RefreshFriends();
+                return;
+            }
+
             bool lGone = !NetworkManagerListening() && Time.timeSinceLevelLoad > 1f && (NetSession.Instance == null || NetSession.Instance.Kind == SessionKind.None);
-            if (_current == Screen.Lobby && lGone && Time.unscaledTime > _joiningUntil) Show(Screen.Main);
+            if (_current == Screen.Lobby && lGone) Show(Screen.Main);
             if (_current != Screen.Lobby) return;
 
             LobbyState lState = LobbyState.Instance;
@@ -437,7 +557,6 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 _startHint.text = "CONNECTING TO THE ROOM...";
                 foreach (TeamBox lBox in _boxes) lBox.rect.gameObject.SetActive(false);
                 foreach (AgentRow lRow in _rows) lRow.rect.gameObject.SetActive(false);
-                _casterBox.gameObject.SetActive(false);
                 _addBox.gameObject.SetActive(false);
                 return;
             }
@@ -446,12 +565,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             RefreshMap(lState, lHost);
             int lAgents = RefreshAgents(lState, lHost, out int lWaiting, out bool lAttackers);
 
-            _proximity.SetIsOnWithoutNotify(lState.ProximityChat.Value);
-            _proximity.interactable = lHost;
+            bool lCaster = LobbyPlayer.Local != null && LobbyPlayer.Local.Caster.Value;
+            Paint(_roleAgent, !lCaster);
+            Paint(_roleCaster, lCaster);
             _invite.gameObject.SetActive(lHost && SteamReady);
-            _shuffle.gameObject.SetActive(lHost && lState.BoxCount.Value > 1);
+            _shuffle.gameObject.SetActive(lHost && lAgents > 1);
             bool lSteamRoom = SteamLobby.Instance != null && !string.IsNullOrEmpty(SteamLobby.Instance.Code);
-            _code.text = lSteamRoom ? "ROOM <color=#" + ColorUtility.ToHtmlStringRGB(UIFactory.Accent) + ">" + SteamLobby.Instance.Code + "</color>" : "";
+            _code.text = lSteamRoom ? "ROOM CODE  <color=#" + ColorUtility.ToHtmlStringRGB(UIFactory.Accent) + ">" + SteamLobby.Instance.Code + "</color>" : "";
             _copyButton.gameObject.SetActive(lSteamRoom);
 
             int lCasters = LobbyPlayer.CasterCount();
@@ -464,6 +584,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             if (LobbyPlayer.Local != null) _readyButton.GetComponentInChildren<TextMeshProUGUI>().text = LobbyPlayer.Local.Ready.Value ? "NOT READY" : "READY";
         }
 
+        private static void KeepName(TMP_InputField pField)
+        {
+            if (pField != null && !pField.isFocused && pField.text != PlayerIdentity.LocalName) pField.SetTextWithoutNotify(PlayerIdentity.LocalName);
+        }
+
+        private static void Paint(Button pButton, bool pOn) => pButton.GetComponent<ButtonFx>().Active = pOn;
+
         private void RefreshMap(LobbyState pState, bool pHost)
         {
             MapDefinition lMap = pState.Map;
@@ -475,29 +602,20 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
             Texture lPlan = lMap != null && lMap.planFloors != null && lMap.planFloors.Length > 0 ? lMap.planFloors[0] : null;
             Texture lShot = lMap != null ? lMap.preview : null;
-            bool lPlanBig = lShot == null || _planBig;
-            _insetFrame.SetActive(lShot != null && lPlan != null);
-            _mapInset.texture = _planBig ? lShot : lPlan;
-            _mapInset.uvRect = new Rect(0, 0, 1, 1);
-            // The plan is square: it fits the frame's height, whole; the screenshot fills the frame.
-            RectTransform lPicture = _mapPicture.rectTransform;
-            _mapPicture.texture = lPlanBig ? lPlan : lShot;
-            _mapPicture.color = _mapPicture.texture != null ? Color.white : new Color(0, 0, 0, 0);
-            lPicture.anchorMin = lPlanBig ? new Vector2(0.5f, 0.5f) : Vector2.zero;
-            lPicture.anchorMax = lPlanBig ? new Vector2(0.5f, 0.5f) : Vector2.one;
-            lPicture.sizeDelta = lPlanBig ? new Vector2(563, 563) : Vector2.zero;
-            lPicture.anchoredPosition = Vector2.zero;
-            _viewLabel.text = lShot != null ? (_planBig ? "CLICK THE PICTURE: VIEW" : "CLICK THE PLAN: FULL MAP") : "";
+            _mapPicture.texture = lShot;
+            _mapPicture.color = lShot != null ? Color.white : new Color(0, 0, 0, 0);
+            _planFrame.SetActive(lPlan != null);
+            _mapPlan.texture = lPlan;
         }
 
-        /// <summary>Lays out the boxes and fills them: two columns, each box as tall as its agents, the next box in the shorter column.</summary>
+        /// <summary>Stacks the teams, with the new-team button after the last; the rest of the agents and the casters go on the right.</summary>
         private int RefreshAgents(LobbyState pState, bool pHost, out int pWaiting, out bool pAttackers)
         {
             pWaiting = 0;
             pAttackers = false;
             int lBoxes = pState.BoxCount.Value;
             List<LobbyPlayer> lAgents = LobbyPlayer.Agents();
-            float[] lColumn = { BOX_TOP, BOX_TOP };
+            float lY = TOP;
             int lRowIndex = 0;
 
             for (int i = 0; i < _boxes.Count; i++)
@@ -508,58 +626,50 @@ namespace Com.IsartDigital.GoobyrFPS.UI
                 if (!lOn) continue;
 
                 int lCount = 0;
-                foreach (LobbyPlayer lAgent in lAgents) if (lAgent.Team.Value == i) lCount++;
+                foreach (LobbyPlayer lAgent in lAgents) if (lAgent.ChosenTeam.Value == i) lCount++;
                 float lHeight = HEADER_H + (lCount > 0 ? lCount * ROW_H + 4f : DROP_H);
-                int lCol = lColumn[1] < lColumn[0] ? 1 : 0;
-                float lX = 1110 + lCol * (BOX_W + BOX_GAP), lY = lColumn[lCol];
-                lBox.rect.anchoredPosition = new Vector2(lX, -lY);
-                lBox.rect.sizeDelta = new Vector2(BOX_W, lHeight);
-                lColumn[lCol] += lHeight + 12f;
+                lBox.rect.anchoredPosition = new Vector2(TEAM_X, -lY);
+                lBox.rect.sizeDelta = new Vector2(TEAM_W, lHeight);
                 lBox.drop.gameObject.SetActive(lCount == 0);
-                lBox.remove.gameObject.SetActive(pHost && lCount == 0 && lBoxes > 1);
+                lBox.remove.gameObject.SetActive(pHost);
 
-                bool lProtects = pState.IsProtector(i);
+                bool lProtects = pState.IsProtectingBox(i);
                 if (!lProtects && lCount > 0) pAttackers = true;
-                lBox.protect.gameObject.SetActive(pHost || lProtects);
-                lBox.protect.interactable = pHost;
-                lBox.protectIcon.color = lProtects ? UIFactory.Accent : UIFactory.Muted;
-                lBox.protectLabel.color = lProtects ? UIFactory.Accent : UIFactory.Muted;
+                lBox.mode.interactable = pHost;
+                lBox.modeLabel.text = lProtects ? "MODE:  PROTECT THE TARGET" : "MODE:  KILL THE TARGET";
+                lBox.mode.GetComponent<ButtonFx>().Active = lProtects;
 
                 float lRowY = HEADER_H;
                 foreach (LobbyPlayer lAgent in lAgents)
                 {
-                    if (lAgent.Team.Value != i || lRowIndex >= _rows.Count) continue;
-                    if (FillRow(_rows[lRowIndex++], lAgent, lX + 4, lY + lRowY, pHost)) pWaiting++;
+                    if (lAgent.ChosenTeam.Value != i || lRowIndex >= _rows.Count) continue;
+                    if (FillRow(_rows[lRowIndex++], lAgent, TEAM_X + 4, lY + lRowY, TEAM_W - 8)) pWaiting++;
                     lRowY += ROW_H;
                 }
+                lY += lHeight + BOX_GAP;
             }
 
-            // The + comes after the last box, in the shorter column.
-            bool lCanAdd = pHost && lBoxes < MatchRulesLogic.MAX_TEAMS;
+            bool lCanAdd = pHost && lBoxes < MatchRulesLogic.MAX_BOXES;
             _addBox.gameObject.SetActive(lCanAdd);
-            if (lCanAdd)
-            {
-                int lCol = lColumn[1] < lColumn[0] ? 1 : 0;
-                ((RectTransform)_addBox.transform).anchoredPosition = new Vector2(1110 + lCol * (BOX_W + BOX_GAP), -lColumn[lCol]);
-                lColumn[lCol] += HEADER_H + 12f;
-            }
+            if (lCanAdd) ((RectTransform)_addBox.transform).anchoredPosition = new Vector2(TEAM_X, -lY);
 
-            // Casters watch: no team, a box of their own in the shorter column.
-            int lCasters = LobbyPlayer.CasterCount();
-            _casterBox.gameObject.SetActive(lCasters > 0);
-            if (lCasters > 0)
+            // On the right: the agents with no team, then the casters.
+            float lVoidY = TOP + 64f;
+            int lSolo = 0;
+            foreach (LobbyPlayer lAgent in lAgents)
             {
-                int lCol = lColumn[1] < lColumn[0] ? 1 : 0;
-                float lX = 1110 + lCol * (BOX_W + BOX_GAP), lY = lColumn[lCol];
-                _casterBox.anchoredPosition = new Vector2(lX, -lY);
-                _casterBox.sizeDelta = new Vector2(BOX_W, HEADER_H + lCasters * ROW_H + 4f);
-                float lRowY = HEADER_H;
-                foreach (LobbyPlayer lPlayer in LobbyPlayer.All)
-                {
-                    if (!lPlayer.Caster.Value || lRowIndex >= _rows.Count) continue;
-                    FillRow(_rows[lRowIndex++], lPlayer, lX + 4, lY + lRowY, pHost);
-                    lRowY += ROW_H;
-                }
+                if (lAgent.ChosenTeam.Value >= 0 || lRowIndex >= _rows.Count) continue;
+                lSolo++;
+                pAttackers = true;
+                if (FillRow(_rows[lRowIndex++], lAgent, AGENT_X + 4, lVoidY, AGENT_W - 8)) pWaiting++;
+                lVoidY += ROW_H;
+            }
+            _voidHint.gameObject.SetActive(lSolo > 0 && lBoxes == 0);
+            foreach (LobbyPlayer lPlayer in LobbyPlayer.All)
+            {
+                if (!lPlayer.Caster.Value || lRowIndex >= _rows.Count) continue;
+                FillRow(_rows[lRowIndex++], lPlayer, AGENT_X + 4, lVoidY, AGENT_W - 8);
+                lVoidY += ROW_H;
             }
 
             for (int i = lRowIndex; i < _rows.Count; i++) { _rows[i].player = null; _rows[i].rect.gameObject.SetActive(false); }
@@ -567,11 +677,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         }
 
         /// <summary>One agent's line. True when the host is still waiting for this agent to be ready.</summary>
-        private static bool FillRow(AgentRow pRow, LobbyPlayer pPlayer, float pX, float pY, bool pHost)
+        private static bool FillRow(AgentRow pRow, LobbyPlayer pPlayer, float pX, float pY, float pWidth)
         {
             pRow.player = pPlayer;
             pRow.rect.gameObject.SetActive(true);
             pRow.rect.anchoredPosition = new Vector2(pX, -pY);
+            pRow.rect.sizeDelta = new Vector2(pWidth, ROW_H - 4);
+            pRow.state.rectTransform.anchoredPosition = new Vector2(pWidth - 92, -11);
             bool lMe = pPlayer == LobbyPlayer.Local;
             bool lIsHost = pPlayer.OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId;
             bool lCaster = pPlayer.Caster.Value;
@@ -580,17 +692,13 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             pRow.name.text = pPlayer.Name.ToUpperInvariant();
             pRow.back.color = lMe ? new Color(1, 1, 1, 0.09f) : new Color(1, 1, 1, 0.045f);
             bool lWaiting = !lIsHost && !lCaster && !pPlayer.Ready.Value;
-            pRow.state.text = lIsHost ? "HOST" : lCaster ? "" : pPlayer.Ready.Value ? "READY" : "WAITING";
-            pRow.state.color = lIsHost ? UIFactory.Accent : pPlayer.Ready.Value ? UIFactory.Good : UIFactory.Muted;
-            // Your role is on your own line; others' lines only say what they are when they cast.
-            pRow.role.gameObject.SetActive(lMe || lCaster);
-            pRow.role.interactable = lMe;
-            pRow.roleLabel.text = lCaster ? "CASTER" : "AGENT";
+            pRow.state.text = lCaster ? "CASTER" : lIsHost ? "HOST" : pPlayer.Ready.Value ? "READY" : "WAITING";
+            pRow.state.color = lCaster ? UIFactory.Muted : lIsHost ? UIFactory.Accent : pPlayer.Ready.Value ? UIFactory.Good : UIFactory.Muted;
             return lWaiting;
         }
     }
 
-    /// <summary>Drags an agent's line to another team box (<see cref="MenuUI.CanDrag"/> says who may).</summary>
+    /// <summary>Drags an agent's line to a team, or out of one (<see cref="MenuUI.CanDrag"/> says who may).</summary>
     public class AgentRowDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         private MenuUI _menu;

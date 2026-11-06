@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.9.2 — The title, the room and the map
+
+The title
+- A living scene again instead of a still picture: an agent at the edge of a jungle clearing, the camera
+  drifting. A huge HITMEN, then CREATE A ROOM, JOIN A ROOM, OPTIONS and QUIT, your name bottom right.
+- No version number anywhere, and no status messages.
+
+Joining
+- JOIN A ROOM is one simple screen: your online friends with a JOIN button when they are in a room, and one
+  box for the room's code (the host reads it top right of their room), or an IP on the same network.
+- A join that fails stays on that screen and says why.
+
+The room
+- Nobody starts in a team: every agent is for themselves, 1v1v1v1, in the list on the right. + NEW TEAM makes
+  a team, up to four, one under the other, and agents are dragged in and out.
+- Each team has its game mode, KILL THE TARGET or PROTECT THE TARGET, as a button on its line. Removing a team
+  sends its agents back on their own.
+- SHUFFLE THE TEAMS is a big button (it makes two teams if there are none).
+- Agent and Caster are one clear pair of buttons. Your name and START CONTRACT are bottom right, LEAVE bottom
+  left. Esc opens the options over the room: there is no gear any more.
+- The map's plan sits in the top left corner of its picture and no longer swaps. The pictures show guards at
+  their post instead of an agent.
+
+Buttons
+- Every button is a visible plate with its text centred, and stays centred on hover.
+
+The map in a match
+- Only four things on it, and in its legend: the target, you, your teammates, the extractions.
+- Radio alerts, zone names, landmarks, entrances, climbs and the rest are gone.
+- The proof's carrier no longer shows live on it either.
+
+Graphics
+- Real anti-aliasing: the one in use silently turned itself off with the first-person arms' camera.
+
 ## 0.9.1 — Controls, shooting and the missing trees
 
 The game is called Hitmen now. Two players ship: `Hitmen.exe`, and `Hitmen Dev.exe` with cheats.

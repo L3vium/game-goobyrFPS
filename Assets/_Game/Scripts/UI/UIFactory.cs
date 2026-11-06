@@ -136,10 +136,10 @@ namespace Com.IsartDigital.GoobyrFPS.UI
 
             Image lBar = Panel(lRoot, "Bar", Accent, new Vector2(0, 0.5f), new Vector2(2, 0), new Vector2(4, pSize.y));
             lBar.rectTransform.localScale = new Vector3(1, 0, 1);
-            TextMeshProUGUI lText = Title(lRoot, "Label", pLabel, Mathf.Min(pFont, pSize.y * 0.6f), Paper, lPrimary ? TextAlignmentOptions.Center : TextAlignmentOptions.Left, new Vector2(0.5f, 0.5f), new Vector2(lPrimary ? 0 : 14, 0), pSize - new Vector2(40, 0), true, 4f);
+            TextMeshProUGUI lText = Title(lRoot, "Label", pLabel, Mathf.Min(pFont, pSize.y * 0.6f), Paper, TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f), Vector2.zero, pSize, true, 2f);
 
             ButtonFx lFx = lRoot.gameObject.AddComponent<ButtonFx>();
-            lFx.Init(lBack, lBar, lText, lPrimary, pColor);
+            lFx.Init(lBack, lBar, lText, lPrimary, lPrimary ? pColor : Accent);
             lButton.onClick.AddListener(() =>
             {
                 Audio.Sfx.Play2D("click", 0.5f);
@@ -227,7 +227,9 @@ namespace Com.IsartDigital.GoobyrFPS.UI
         private bool _primary, _hover, _down;
         private Color _base;
         private float _t;
-        private Vector2 _labelRest;
+
+        /// <summary>This button is the chosen one of its set (a tab, a role, a mode): it stays lit.</summary>
+        public bool Active { get; set; }
 
         public void Init(Image pBack, Image pBar, TextMeshProUGUI pLabel, bool pPrimary, Color pBase)
         {
@@ -236,7 +238,6 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             _label = pLabel;
             _primary = pPrimary;
             _base = pBase;
-            _labelRest = pLabel.rectTransform.anchoredPosition;
         }
 
         public void OnPointerEnter(PointerEventData pData) { _hover = true; Audio.Sfx.Play2D("hover", 0.15f); }
@@ -261,12 +262,12 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             }
             else
             {
-                _back.color = new Color(1, 1, 1, (_down ? 0.16f : 0.08f) * e);
-                _bar.rectTransform.localScale = new Vector3(1, e, 1);
-                _label.rectTransform.anchoredPosition = _labelRest + new Vector2(8f * e, 0);
+                // Always a visible plate: a button looks like a button before the pointer gets there.
+                _back.color = Active ? new Color(_base.r, _base.g, _base.b, lEnabled ? 1f : 0.5f) : new Color(1, 1, 1, !lEnabled ? 0.05f : _down ? 0.3f : Mathf.Lerp(0.13f, 0.24f, e));
+                _bar.rectTransform.localScale = new Vector3(1, 0, 1);
             }
             // Dark ink on the amber fill, light text on the transparent rows.
-            _label.color = !lEnabled ? UIFactory.Muted : _primary ? UIFactory.Ink : Color.Lerp(new Color(0.86f, 0.86f, 0.86f), Color.white, e);
+            _label.color = !lEnabled && !Active ? UIFactory.Muted : _primary || Active ? UIFactory.Ink : Color.Lerp(new Color(0.9f, 0.9f, 0.9f), Color.white, e);
         }
     }
 

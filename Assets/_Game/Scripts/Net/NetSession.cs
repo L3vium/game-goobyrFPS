@@ -148,6 +148,14 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             else Status("COULD NOT HOST ON STEAM");
         }
 
+        public void JoinSteamLobby(ulong pLobby)
+        {
+            UseSteamTransport();
+            SteamLobby.Instance.OnJoinLobby -= JoinSteamOwner;
+            SteamLobby.Instance.OnJoinLobby += JoinSteamOwner;
+            SteamLobby.Instance.JoinLobby(pLobby);
+        }
+
         public void JoinSteamCode(string pCode)
         {
             UseSteamTransport();
@@ -161,7 +169,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
             if (pOwner == PlayerIdentity.LocalSteamId) return;
             if (_networkManager.IsListening)
             {
-                // PLAY opens a room at once: an invite accepted while alone in it closes it first.
+                // An invite accepted while alone in your own room closes it first.
                 if (!_networkManager.IsHost || _networkManager.ConnectedClientsIds.Count > 1) return;
                 _networkManager.Shutdown();
                 StartCoroutine(JoinOwnerAfterShutdown(pOwner));

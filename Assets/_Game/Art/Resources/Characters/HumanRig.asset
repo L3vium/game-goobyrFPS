@@ -13,18 +13,18 @@ MonoBehaviour:
   m_Name: HumanRig
   m_EditorClassIdentifier: Assembly-CSharp::Com.IsartDigital.GoobyrFPS.FX.HumanRig
   pistol:
-    handPosition: {x: 0.015291325, y: 0.05196172, z: 0.0068395534}
-    handRotation: {x: -0.36195052, y: 0.57074785, z: 0.6813314, w: 0.28111646}
-    supportPosition: {x: -0.0158443, y: -0.13175672, z: -0.039008975}
-    supportRotation: {x: 0.12090705, y: -0.8563193, z: -0.41663393, w: 0.2802051}
+    handPosition: {x: 0.015291318, y: 0.051961705, z: 0.006839621}
+    handRotation: {x: -0.36195043, y: 0.57074785, z: 0.68133116, w: 0.28111708}
+    supportPosition: {x: -0.015844436, y: -0.13175672, z: -0.03900896}
+    supportRotation: {x: 0.120906316, y: -0.8563193, z: -0.4166336, w: 0.28020597}
   rifle:
-    handPosition: {x: 0.015291325, y: 0.05196172, z: 0.0068395534}
-    handRotation: {x: -0.36195052, y: 0.57074785, z: 0.6813314, w: 0.28111646}
-    supportPosition: {x: -0.031250842, y: -0.08629757, z: 0.3021313}
-    supportRotation: {x: -0.15716411, y: -0.43459475, z: -0.42244685, w: 0.77972144}
+    handPosition: {x: 0.015291318, y: 0.051961705, z: 0.006839621}
+    handRotation: {x: -0.36195043, y: 0.57074785, z: 0.68133116, w: 0.28111708}
+    supportPosition: {x: -0.031250842, y: -0.08629757, z: 0.3021314}
+    supportRotation: {x: -0.1571644, y: -0.4345942, z: -0.42244607, w: 0.7797221}
   foreEnd: 0.3
-  pinchPosition: {x: -0.022488795, y: 0.08060114, z: 0.04462257}
-  pinchRotation: {x: -0.36195052, y: 0.57074785, z: 0.6813314, w: 0.28111646}
-  leftFistRotation: {x: -0.3619503, y: -0.57074696, z: -0.6813318, w: -0.28111735}
-  leftPalm: {x: -0.006012466, y: 0.051480144, z: -0.00618607}
+  pinchPosition: {x: -0.022488765, y: 0.0806011, z: 0.04462259}
+  pinchRotation: {x: -0.36195043, y: 0.57074785, z: 0.68133116, w: 0.28111708}
+  leftFistRotation: {x: -0.3619506, y: -0.57074666, z: -0.6813323, w: -0.28111634}
+  leftPalm: {x: -0.0060124565, y: 0.05148014, z: -0.0061861514}
   eyeInHead: {x: 3.996803e-15, y: 0.039999735, z: 0.100000024}

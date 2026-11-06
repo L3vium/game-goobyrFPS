@@ -36,15 +36,33 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         /// <summary>Blades and clubs: held in a weapon slot, left click swings for the item's damage.</summary>
         Knife,
         Machete,
-        Bat
+        Bat,
+        Revolver,
+        AssaultRifle,
+        SawedOff,
+        Crossbow,
+        GrenadeLauncher,
+        Katana,
+        FryingPan,
+        /// <summary>Thrown: talks to itself where it lands, and the guards go and look.</summary>
+        RadioDecoy,
+        /// <summary>Thrown: a string of bangs that sound like a fight.</summary>
+        Firecrackers,
+        /// <summary>Thrown: squeaks at every bounce.</summary>
+        RubberDuck,
+        Grapple,
+        JetPack,
+        SpringBoots
     }
 
     public enum ItemSlot
     {
-        /// <summary>Takes one of the two weapon slots.</summary>
+        /// <summary>Takes one of the three weapon slots.</summary>
         Weapon,
-        /// <summary>Stacks in the gadget slots (throwables, C4, poison).</summary>
-        Gadget
+        /// <summary>Stacks in the distraction slot (throwables, C4, poison).</summary>
+        Gadget,
+        /// <summary>The movement slot, on its own key.</summary>
+        Movement
     }
 
     /// <summary>
@@ -62,6 +80,8 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         public Color color = Color.gray;
         [Tooltip("Only one of these exists on a map (rocket launcher, flamethrower).")]
         public bool unique;
+        [Tooltip("Can be chosen in the agent's loadout (the strong weapons are only found on the map).")]
+        public bool inLoadout;
 
         [Header("Firing")]
         public float damage = 50f;
@@ -96,15 +116,17 @@ namespace Com.IsartDigital.GoobyrFPS.Data
         /// <summary>Position in <see cref="GameDatabase.Items"/>; set by the database on load.</summary>
         [System.NonSerialized] public int Index = -1;
 
-        public bool IsGun => kind is ItemKind.Pistol or ItemKind.SilencedPistol or ItemKind.Smg or ItemKind.Shotgun or ItemKind.Sniper;
-        public bool IsThrowable => kind is ItemKind.Coin or ItemKind.Brick or ItemKind.SmokeGrenade or ItemKind.C4 or ItemKind.Rock or ItemKind.Bottle or ItemKind.Wrench;
+        public bool IsGun => kind is ItemKind.Pistol or ItemKind.SilencedPistol or ItemKind.Smg or ItemKind.Shotgun or ItemKind.Sniper or ItemKind.Revolver or ItemKind.AssaultRifle or ItemKind.SawedOff or ItemKind.Crossbow;
+        /// <summary>Fires an explosive projectile instead of a bullet.</summary>
+        public bool IsLauncher => kind is ItemKind.RocketLauncher or ItemKind.GrenadeLauncher;
+        public bool IsThrowable => kind is ItemKind.Coin or ItemKind.Brick or ItemKind.SmokeGrenade or ItemKind.C4 or ItemKind.Rock or ItemKind.Bottle or ItemKind.Wrench or ItemKind.RadioDecoy or ItemKind.Firecrackers or ItemKind.RubberDuck;
         /// <summary>A pass or a tool: carried, never thrown or held as a weapon.</summary>
         public bool IsKey => kind is ItemKind.Invitation or ItemKind.StaffPass or ItemKind.Keycard or ItemKind.Crowbar or ItemKind.CodeNote;
         /// <summary>A heavy throwable: knocks out the NPC it hits.</summary>
         public bool KnocksOut => kind is ItemKind.Brick or ItemKind.Rock or ItemKind.Bottle or ItemKind.Wrench;
         /// <summary>Held like a weapon, swung instead of fired.</summary>
-        public bool IsMelee => kind is ItemKind.Knife or ItemKind.Machete or ItemKind.Bat;
+        public bool IsMelee => kind is ItemKind.Knife or ItemKind.Machete or ItemKind.Bat or ItemKind.Katana or ItemKind.FryingPan;
         public bool IsPoison => kind is ItemKind.Poison or ItemKind.EmeticPoison;
-        public bool UsesAmmo => IsGun || kind is ItemKind.RocketLauncher or ItemKind.Flamethrower;
+        public bool UsesAmmo => IsGun || IsLauncher || kind == ItemKind.Flamethrower;
     }
 }

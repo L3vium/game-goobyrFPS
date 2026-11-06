@@ -11,10 +11,10 @@ namespace Com.IsartDigital.GoobyrFPS.Player
     public static class GameInput
     {
         private static InputActionMap _map;
-        private static InputAction _move, _look, _fire, _aim, _reload, _interact, _crouch, _jump, _sprint, _melee, _throw, _scroll, _map_, _ptt, _pause, _detonate, _score, _nextSpectate, _instinct, _leanLeft, _leanRight, _block, _zoom, _takedown;
+        private static InputAction _move, _look, _fire, _aim, _reload, _interact, _crouch, _jump, _sprint, _melee, _throw, _scroll, _map_, _ptt, _pause, _detonate, _score, _nextSpectate, _instinct, _leanLeft, _leanRight, _block, _zoom, _takedown, _moveItem;
         private static InputActionMap _caster;
         private static InputAction _casterRise, _casterDescend, _casterFast, _casterSwitch, _casterMulti, _casterFly, _casterNext, _casterEyes, _casterClean, _casterReset;
-        private static readonly InputAction[] _slots = new InputAction[Weapons.WeaponHolder.SLOT_COUNT];
+        private static readonly InputAction[] _slots = new InputAction[Weapons.WeaponHolder.WEAPON_SLOTS + 1];
 
         /// <summary>Menus (pause, map screen, chat) switch gameplay input off.</summary>
         public static bool GameplayEnabled { get; set; } = true;
@@ -37,7 +37,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             _pause = _map.FindAction("Pause"); _detonate = _map.FindAction("Detonate"); _score = _map.FindAction("Scoreboard"); _nextSpectate = _map.FindAction("NextSpectate");
             _instinct = _map.FindAction("Instinct");
             _leanLeft = _map.FindAction("LeanLeft"); _leanRight = _map.FindAction("LeanRight");
-            _block = _map.FindAction("Block"); _zoom = _map.FindAction("Zoom"); _takedown = _map.FindAction("Takedown");
+            _block = _map.FindAction("Block"); _zoom = _map.FindAction("Zoom"); _takedown = _map.FindAction("Takedown"); _moveItem = _map.FindAction("MoveItem");
             for (int i = 0; i < _slots.Length; i++) _slots[i] = _map.FindAction("Slot" + (i + 1));
             _map.Enable();
             _caster = InputSystem.actions.FindActionMap("Caster", true);
@@ -83,6 +83,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 if (lBinding.isComposite || lBinding.isPartOfComposite) continue;
                 string lPath = lBinding.effectivePath ?? "";
                 if (!lPath.StartsWith("<Keyboard>") && !lPath.StartsWith("<Mouse>")) continue;
+                // The number row prints its symbol on some layouts: the digit reads better.
+                char lLast = lPath[lPath.Length - 1];
+                if (lPath.Length == "<Keyboard>/1".Length && char.IsDigit(lLast)) return lLast.ToString();
                 return lAction.GetBindingDisplayString(i).ToUpperInvariant();
             }
             return "?";
@@ -119,6 +122,9 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public static bool InstinctHeld { get { Ensure(); return On && _instinct.IsPressed(); } }
         /// <summary>The silent kill, from behind an NPC that has not seen you.</summary>
         public static bool TakedownPressed { get { Ensure(); return On && _takedown.WasPressedThisFrame(); } }
+        /// <summary>The movement item (grapple, boots) is used, or held (jetpack).</summary>
+        public static bool MoveItemPressed { get { Ensure(); return On && _moveItem.WasPressedThisFrame(); } }
+        public static bool MoveItemHeld { get { Ensure(); return On && _moveItem.IsPressed(); } }
         public static bool NextSpectate { get { Ensure(); return On && _nextSpectate.WasPressedThisFrame(); } }
 
         // Menu keys work whatever the gameplay lock.

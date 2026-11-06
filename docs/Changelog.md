@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.9.3 — Your agent, your loadout, new hands
+
+My agent
+- From the room, MY AGENT opens your own screen: your name, your look and your loadout. The agent of the scene
+  behind wears your choices as you make them.
+- Head, skin, body, trousers and shoes change one by one. NEXT OUTFIT goes through whole outfits and RANDOMIZE
+  rolls everything. Hats include a propeller cap that spins, a spring hat that bounces, a traffic cone, a crown,
+  a horned helmet and more.
+- A tie stays in your team's colour so you can tell each other apart.
+
+Loadout
+- You spawn with three things: a movement item, a weapon, a distraction. Any of them can be left empty.
+- Movement: grappling hook (A pulls you to what you aim at), mini jetpack (hold A), spring boots (A throws you up
+  and forward). Landing from them never hurts.
+- Distractions: coin, brick, smoke, plus a radio decoy that talks where it lands, firecrackers, and a rubber duck
+  that squeaks at every bounce. G throws.
+- New weapons: revolver, assault rifle, sawed-off, crossbow (nearly silent), grenade launcher, katana, frying pan.
+  Only the light ones can be chosen in the loadout. The rest have no place on the maps yet: the crates of the next
+  version hold them, and until then only Hitmen Dev's F4 list hands them out.
+
+Inventory
+- Key 1 is bare hands, keys 2 to 4 are three weapons, A is the movement item, G the distraction. The bar shows
+  them all, with your own keys, and the movement item's cooldown or fuel.
+- With nothing in hand, left click punches.
+
+First person
+- All new and all code: fat sleeves ending in mittens, in your agent's colours, instead of the rigged arms. Smaller
+  on screen. Bare hands stay out of sight until they swing, a pistol is held in one hand.
+- New punches, swings, throws and reloads, on short snappy curves.
+- More juice on every shot: the gun jumps on a spring and swells for a beat, a flat flash at the muzzle, cases
+  flying out, magazines dropping.
+
+The cast
+- Long dangling arms and big ears redrawn: narrow at the head, round at the tip, a darker hollow, on all 17 characters.
+- A goofy walk: hips rolling and bouncing, shoulders answering, heads nodding, empty hands swinging wide.
+- Arms no longer wobble off the weapon they hold, which should cure arms going through each other.
+
 ## 0.9.2 — The title, the room and the map
 
 The title

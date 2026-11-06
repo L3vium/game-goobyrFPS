@@ -57,6 +57,8 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public WeaponHolder Weapons { get; private set; }
         public HumanBody Body { get; private set; }
         public HumanAnimator Animator { get; private set; }
+        /// <summary>Owner: the movement item at work.</summary>
+        public MovementGear Gear { get; private set; }
         public LobbyPlayer Player => LobbyPlayer.ForClient(OwnerClientId);
         public string DisplayName => Player != null ? Player.Name : "Agent";
 
@@ -129,6 +131,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
                 Motor.OnDrop += HandleDrop;
                 Motor.OnTraversal += HandleTraversal;
                 Motor.OnFallDamage += pDamage => FallDamageRpc(pDamage);
+                Gear = gameObject.AddComponent<MovementGear>();
             }
             else Controller.enabled = true;
         }
@@ -147,6 +150,7 @@ namespace Com.IsartDigital.GoobyrFPS.Player
             int lSeat = Player != null ? Player.Seat.Value : (int)OwnerClientId;
             Body.Configure(HumanCast.ForAgent(lSeat), LobbyPlayer.TeamColor(pTeam), 1f);
             if (IsOwner) Body.SetShadowOnly(true);
+            if (Player != null) AgentHats.Apply(Body, Player.Look.Value);
             Weapons?.RefreshThirdPerson(true);
         }
 
@@ -366,6 +370,24 @@ namespace Com.IsartDigital.GoobyrFPS.Player
         public void InteractRpc(int pInteractableId, int pHeldItem)
         {
             if (MapSession.Instance != null) MapSession.Instance.HandleInteract(this, pInteractableId, pHeldItem);
+        }
+
+        /// <summary>The noise of the movement items.</summary>
+        [Rpc(SendTo.Server)]
+        public void GearNoiseRpc(Vector3 pPoint, float pRadius)
+        {
+            if (Vector3.Distance(pPoint, transform.position) > 6f) pPoint = transform.position;
+            AI.NoiseSystem.Emit(pPoint, Mathf.Min(pRadius, 10f), AI.NoiseKind.Footstep, OwnerClientId);
+        }
+
+        /// <summary>The others see the grappling hook's rope for as long as it pulls.</summary>
+        [Rpc(SendTo.NotOwner)]
+        public void GrappleRopeRpc(Vector3 pPoint)
+        {
+            LineRenderer lRope = MovementGear.NewRope(transform);
+            lRope.SetPosition(0, transform.position + Vector3.up * 1.2f);
+            lRope.SetPosition(1, pPoint);
+            Destroy(lRope.gameObject, 0.8f);
         }
 
         // ---------------------------------------------------------------- dev cheats (the host checks they are on)

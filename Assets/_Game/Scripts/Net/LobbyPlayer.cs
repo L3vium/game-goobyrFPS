@@ -34,6 +34,9 @@ namespace Com.IsartDigital.GoobyrFPS.Net
         public readonly NetworkVariable<bool> Caster = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public readonly NetworkVariable<bool> TalkingNow = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
+        /// <summary>The agent's clothes, hat and loadout.</summary>
+        public readonly NetworkVariable<AgentLook> Look = new NetworkVariable<AgentLook>(AgentLook.Default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
         /// <summary>The icon the player chose for their agent.</summary>
         public readonly NetworkVariable<int> Icon = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
@@ -66,6 +69,7 @@ namespace Com.IsartDigital.GoobyrFPS.Net
                 SteamId.Value = PlayerIdentity.LocalSteamId;
                 Caster.Value = PlayerIdentity.JoinAsCaster;
                 Icon.Value = PlayerIdentity.LocalIcon;
+                Look.Value = PlayerIdentity.LocalLook;
             }
 
             DisplayName.OnValueChanged += Changed;

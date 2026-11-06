@@ -20,7 +20,8 @@ namespace Com.IsartDigital.GoobyrFPS.UI
             ("Jump", "Player", "Jump", null), ("Run", "Player", "Sprint", null), ("Crouch / slide", "Player", "Crouch", null),
             ("Fire", "Player", "Fire", null), ("Aim", "Player", "Aim", null), ("Reload", "Player", "Reload", null),
             ("Interact", "Player", "Interact", null), ("Takedown", "Player", "Takedown", null), ("Punch", "Player", "Melee", null),
-            ("Slot 1", "Player", "Slot1", null), ("Slot 2", "Player", "Slot2", null), ("Slot 3", "Player", "Slot3", null), ("Slot 4", "Player", "Slot4", null),
+            ("Bare hands", "Player", "Slot1", null), ("Weapon 1", "Player", "Slot2", null), ("Weapon 2", "Player", "Slot3", null), ("Weapon 3", "Player", "Slot4", null),
+            ("Movement item", "Player", "MoveItem", null), ("Distraction", "Player", "Throw", null),
             ("Instinct", "Player", "Instinct", null), ("Zoom", "Player", "Zoom", null), ("Detonate", "Player", "Detonate", null),
             ("Lean left", "Player", "LeanLeft", null), ("Lean right", "Player", "LeanRight", null),
             ("Map", "Player", "Map", null), ("Scoreboard", "Player", "Scoreboard", null), ("Talk", "Player", "PushToTalk", null)

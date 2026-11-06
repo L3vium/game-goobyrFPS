@@ -1,5 +1,5 @@
 # Author : Baptiste Vu Liem
-"""The game's characters: low-poly, flat-coloured, big floppy ears (headless Blender 5.2).
+"""The game's characters: low-poly, flat-coloured, long arms and big soft ears (headless Blender 5.2).
 
   blender -b --factory-startup --python Tools/Blender/characters/wobbly/wobbly_build.py -- all
   blender -b --factory-startup --python Tools/Blender/characters/wobbly/wobbly_build.py -- Chr_Rook Chr_Guard_Snow
@@ -30,6 +30,10 @@ import skeleton  # noqa: E402
 REF_AXES = json.load(open(os.path.join(CAST, "ref_axes.json")))
 # The shared glove hand's bone layout (cast/glove.py), without importing its mesh code's dependencies.
 import glove  # noqa: E402
+
+
+# Long, dangling arms: the same clips play, the hands just hang lower (Humanoid retargets by rotation).
+ARM_SCALE = 1.32
 
 
 def V(*a):
@@ -111,22 +115,29 @@ def blob(m, centre, radii, slot, bone, subdivisions=2, clip_below=None, seed=0):
 
 
 def ear(m, sign, slot, size):
-    """A big flat leaf of an ear, on its own bone so it can flop."""
+    """A big soft leaf of an ear on its own bone: narrow where it joins the head, wide and round at the
+    tip, a little lifted, with a darker hollow on its front."""
     root = V(sign * 0.150, 0.0, 1.625)
     bone = "ear_" + ("l" if sign > 0 else "r")
-    l, h = 0.21 * size, 0.135 * size
-    outline = [(0.0, -0.3), (0.28, -0.52), (0.72, -0.42), (1.0, 0.0), (0.72, 0.5), (0.28, 0.56), (0.0, 0.3)]
-    thick = 0.016
-    front, back = [], []
-    for u, t in outline:
-        p = root + V(sign * u * l, 0.02 * u, t * h + 0.045 * u)
-        front.append(p + V(0, -thick, 0))
-        back.append(p + V(0, thick, 0))
-    verts = front + back
+    l, h = 0.27 * size, 0.135 * size
+    outline = [(0.0, -0.20), (0.18, -0.34), (0.42, -0.62), (0.68, -0.72), (0.90, -0.52), (1.0, -0.06),
+               (0.92, 0.42), (0.70, 0.74), (0.42, 0.70), (0.18, 0.40), (0.0, 0.22)]
+    thick = 0.012
+
+    def at(u, t):
+        # Lifted along its length and curling back at the tip.
+        return root + V(sign * u * l, 0.05 * u * u, t * h + 0.09 * u)
+
+    front = [at(u, t) + V(0, -thick, 0) for u, t in outline]
+    back = [at(u, t) + V(0, thick, 0) for u, t in outline]
     n = len(outline)
     faces = [tuple(range(n)), tuple(range(n, 2 * n))]
     faces += [(i, (i + 1) % n, (i + 1) % n + n, i + n) for i in range(n)]
-    m.add(verts, faces, slot, [{bone: 1.0}] * len(verts))
+    m.add(front + back, faces, slot, [{bone: 1.0}] * (2 * n))
+
+    # The hollow: a smaller leaf just in front.
+    inner = [at(0.14 + u * 0.72, t * 0.68) + V(0, -thick - 0.004, 0) for u, t in outline[1:-1]]
+    m.add(inner, [tuple(range(len(inner)))], "EarIn", [{bone: 1.0}] * len(inner))
 
 
 def body(m, spec, s):
@@ -159,7 +170,7 @@ def body(m, spec, s):
         o, u, v, w = s.hand_frame(side)
         hand = "hand_" + side
         hand_slot = spec.get("hands", "Skin")
-        blob(m, o + u * 0.07, (0.072, 0.075, 0.06), hand_slot, hand, subdivisions=1)
+        blob(m, o + u * 0.075, (0.085, 0.088, 0.07), hand_slot, hand, subdivisions=1)
         chain(m, [o + u * 0.04 + v * 0.04, o + u * 0.11 + v * 0.1], [0.027, 0.022], [{hand: 1.0}, {hand: 1.0}], hand_slot, sides=5)
 
         # Legs: one trouser, folding at the knee.
@@ -258,7 +269,8 @@ SKINS = [(0.98, 0.72, 0.56), (0.86, 0.58, 0.42), (0.62, 0.40, 0.28), (1.0, 0.78,
 
 def look(top, bottom, skin=SKINS[0], shoes=SHOE, hair_col=(0.2, 0.15, 0.12), **more):
     c = {"Top": top, "Bottom": bottom, "Skin": skin, "Shoes": shoes, "Hair": hair_col, "Eyes": EYE, "Pupil": PUPIL,
-         "Team": TEAM, "Shirt": WHITE, "Hat": BLACK, "Hat2": WHITE, "Gear": BLACK, "Gear2": (0.24, 0.22, 0.2)}
+         "Team": TEAM, "Shirt": WHITE, "Hat": BLACK, "Hat2": WHITE, "Gear": BLACK, "Gear2": (0.24, 0.22, 0.2),
+         "EarIn": (skin[0] * 0.86, skin[1] * 0.62, skin[2] * 0.62)}
     c.update(more)
     return c
 
@@ -332,7 +344,7 @@ def export(name):
     for ob in list(bpy.data.objects):
         bpy.data.objects.remove(ob, do_unlink=True)
     spec = SPECS[name]
-    s = skeleton.Build(shoulder_x=0.20 if not spec.get("female") else 0.18, hip_x=0.09, female=spec.get("female", False))
+    s = skeleton.Build(shoulder_x=0.20 if not spec.get("female") else 0.18, hip_x=0.09, female=spec.get("female", False), arm_scale=ARM_SCALE)
     coll = bpy.context.scene.collection
     arm = make_armature(s, coll)
     m = build_mesh(name, spec, s)

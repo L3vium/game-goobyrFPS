@@ -5,6 +5,13 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+### Added
+- `Tools/Editor/ue_rebuild.ps1` / `Rebuild.bat`: compiles C++ with Live Coding when only `.cpp`
+  files changed, otherwise saves, closes, builds and always reopens the editor.
+
+### Changed
+- `ue_remote.py` targets the Hitmen editor when several Unreal editors are open.
+
 ### Known gaps (next)
 - Lobby / session flow not yet tested with real clients (Null in PIE multi-client, Steam in the
   packaged Development build).

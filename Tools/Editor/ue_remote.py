@@ -19,10 +19,13 @@ def run(command, timeout=10.0, exec_mode=remote_execution.MODE_EXEC_FILE):
         deadline = time.time() + timeout
         while not remote.remote_nodes and time.time() < deadline:
             time.sleep(0.2)
-        if not remote.remote_nodes:
+        time.sleep(0.5)  # let every open editor answer the discovery ping
+        # Prefer the Hitmen editor when several projects are open.
+        nodes = [n for n in remote.remote_nodes if n.get("project_name") == "Hitmen"] or remote.remote_nodes
+        if not nodes:
             print("NO_EDITOR: no Unreal editor answered")
             return 2
-        remote.open_command_connection(remote.remote_nodes[0])
+        remote.open_command_connection(nodes[0])
         result = remote.run_command(command, unattended=True, exec_mode=exec_mode)
         for entry in result.get("output", []):
             print(entry.get("output", "").rstrip())

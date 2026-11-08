@@ -28,6 +28,15 @@ void AHitmenGameModeBase::PostLogin(APlayerController* NewPlayer)
 	EnsurePlayerName(NewPlayer ? NewPlayer->GetPlayerState<AHitmenPlayerState>() : nullptr);
 }
 
+void AHitmenGameModeBase::InitGameState()
+{
+	Super::InitGameState();
+	if (AHitmenGameState* GS = GetGameState<AHitmenGameState>())
+	{
+		GS->SetDebugCommandsAllowed(AllowsDebugCommands());
+	}
+}
+
 UHitmenMatchRules* AHitmenGameModeBase::GetRules() const
 {
 	if (CachedRules)

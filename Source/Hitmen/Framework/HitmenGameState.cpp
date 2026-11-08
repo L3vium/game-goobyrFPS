@@ -20,6 +20,7 @@ void AHitmenGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AHitmenGameState, ActiveRetrievalPointsRep);
 	DOREPLIFETIME(AHitmenGameState, SonarPing);
 	DOREPLIFETIME(AHitmenGameState, MatchResult);
+	DOREPLIFETIME(AHitmenGameState, bDebugCommandsAllowed);
 }
 
 void AHitmenGameState::AddPlayerState(APlayerState* PlayerState)

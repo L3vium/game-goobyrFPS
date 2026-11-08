@@ -13,6 +13,7 @@
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Core/HitmenTeamLibrary.h"
 #include "Components/WidgetComponent.h"
+#include "UI/HitmenHUDWidgets.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
@@ -34,6 +35,7 @@ AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	AlertWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	AlertWidget->SetDrawAtDesiredSize(true);
 	AlertWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	AlertWidget->SetWidgetClass(UHitmenAlertIndicatorWidget::StaticClass());
 
 	KeycardPickupClass = AHitmenKeycardPickup::StaticClass();
 }
@@ -47,6 +49,14 @@ void AHitmenNPC::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 void AHitmenNPC::BeginPlay()
 {
 	Super::BeginPlay();
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		AlertWidget->InitWidget();
+		if (UHitmenAlertIndicatorWidget* Indicator = Cast<UHitmenAlertIndicatorWidget>(AlertWidget->GetUserWidgetObject()))
+		{
+			Indicator->SetAlertSource(AlertComponent);
+		}
+	}
 	if (HasAuthority() && DefaultWeapon && DefaultWeapon->WeaponClass)
 	{
 		FActorSpawnParameters Params;

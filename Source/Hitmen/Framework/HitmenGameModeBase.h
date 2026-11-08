@@ -19,6 +19,7 @@ public:
 	AHitmenGameModeBase();
 
 	virtual void PostLogin(APlayerController* NewPlayer) override;
+	virtual void InitGameState() override;
 
 	/** Rules for the current map (map override or project default). */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Rules")

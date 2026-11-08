@@ -17,6 +17,7 @@
 #include "Hitmen.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
 #include "InputMappingContext.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
@@ -73,11 +74,17 @@ void AHitmenPlayerController::RefreshMappingContexts()
 	{
 		Subsystem->AddMappingContext(SpectatorMappingContext, 1);
 	}
+	UEnhancedInputUserSettings* UserSettings = Subsystem->GetUserSettings();
 	for (UInputMappingContext* Context : GameplayMappingContexts)
 	{
 		if (Context)
 		{
 			Subsystem->AddMappingContext(Context, 0);
+			if (UserSettings)
+			{
+				// Makes player-mappable keys appear in Options and applies saved rebinds.
+				UserSettings->RegisterInputMappingContext(Context);
+			}
 		}
 	}
 }

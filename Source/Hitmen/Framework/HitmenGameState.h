@@ -104,6 +104,12 @@ public:
 	void SetSonarPing(const FHitmenSonarPing& Ping);
 	void SetMatchResult(const FHitmenMatchResult& Result);
 
+	/** Debug grants allowed (gym, development builds) — mirrored for the client UI. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Debug")
+	bool AreDebugCommandsAllowed() const { return bDebugCommandsAllowed; }
+
+	void SetDebugCommandsAllowed(bool bAllowed) { bDebugCommandsAllowed = bAllowed; }
+
 	/** Broadcast OnLobbyChanged locally (and to the UI event hub). */
 	void NotifyLobbyChanged();
 
@@ -138,6 +144,9 @@ protected:
 
 	UPROPERTY(ReplicatedUsing=OnRep_MatchResult)
 	FHitmenMatchResult MatchResult;
+
+	UPROPERTY(Replicated)
+	bool bDebugCommandsAllowed = false;
 
 	int32 NextTeamId = 0;
 

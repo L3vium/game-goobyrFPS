@@ -5,6 +5,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-09
+
 ### Added
 - First-person arms (`ABP_FirstPersonArms`, `UHitmenFirstPersonAnimInstance`): shown only with a weapon in hand
   or while punching / acting, holding the weapon's pose, with sway, walk bob and hip / aim offsets. The body is

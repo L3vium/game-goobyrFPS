@@ -256,8 +256,8 @@ smoke, darkness, invisibility) drives perception, kill witnesses and body sighti
 |---|---|
 | `L_TitleScreen` | Menus backdrop |
 | `L_Lobby` | Create room / customization after hosting |
-| `L_Gym` | Debug gym: checker grid, spaced labelled zones showcasing every move, weapon, ability, fixture and AI state |
-| `L_LDTest` | Basic Hitman-like sandbox: town, manor (basement foundations via side stairs), cave and tunnels, windows, gutters, keycard doors, vents, hidden control and breaker rooms, AIs, a basin of mountains and invisible walls |
+| `L_Gym` | Debug gym: checker grid, spaced labelled zones showcasing every move, weapon, ability, fixture, NPC type and AI state (alert states + search with lockers / grass, camera alarm with guards in reinforcement range, stealth kill / body discovery / lighter / VIP carry to a retrieval point) |
+| `L_LDTest` | Basic Hitman-like sandbox: town (gutters beside back windows, street lamps on a breaker in a hidden keycard utility room), walled manor (keycard gates, sealed dining room fed by a crouch vent duct, upstairs keycard control room, basement foundations via exterior side stairs with a keycard breaker room), cave with a ramp down to a tunnel into the basement, a garden-shed secret passage down to the tunnel, AIs, a basin of mountains and invisible walls; checker materials only |
 | `L_Empty_01`, `L_Empty_02` | Empty maps for the team |
 
 ## 13. Architecture invariants

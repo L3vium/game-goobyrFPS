@@ -10,6 +10,10 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "NiagaraComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "TimerManager.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Engine/OverlapResult.h"
 #include "Net/UnrealNetwork.h"
@@ -25,6 +29,8 @@ AHitmenSmokeCloud::AHitmenSmokeCloud()
 	bReplicates = true;
 	Effect = CreateDefaultSubobject<UNiagaraComponent>(TEXT("Effect"));
 	SetRootComponent(Effect);
+	PuffMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Engine/BasicShapes/Sphere.Sphere")));
+	PuffMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/M_Smoke.M_Smoke")));
 }
 
 void AHitmenSmokeCloud::BeginPlay()
@@ -32,12 +38,93 @@ void AHitmenSmokeCloud::BeginPlay()
 	Super::BeginPlay();
 	SetLifeSpan(Lifetime);
 	UHitmenAISubsystem::RegisterSmoke(this);
+	SpawnTime = GetWorld()->GetTimeSeconds();
+
+	const bool bHasNiagara = Effect && Effect->GetAsset() != nullptr;
+	if (GetNetMode() != NM_DedicatedServer && PuffCount > 0 && !(bHasNiagara && bHidePuffsWhenNiagaraAssigned))
+	{
+		BuildPuffs();
+	}
 }
 
 void AHitmenSmokeCloud::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	GetWorld()->GetTimerManager().ClearTimer(PuffTimer);
 	UHitmenAISubsystem::UnregisterSmoke(this);
 	Super::EndPlay(EndPlayReason);
+}
+
+void AHitmenSmokeCloud::BuildPuffs()
+{
+	UStaticMesh* Mesh = PuffMesh.LoadSynchronous();
+	if (!Mesh)
+	{
+		return;
+	}
+	if (UMaterialInterface* Material = PuffMaterial.IsNull() ? nullptr : PuffMaterial.LoadSynchronous())
+	{
+		PuffMaterialInstance = UMaterialInstanceDynamic::Create(Material, this);
+	}
+	const float MeshRadius = FMath::Max(1.f, Mesh->GetBounds().SphereRadius);
+
+	// Seeded from the replicated spawn point so every machine builds a similar cloud.
+	const FIntVector Cell(FMath::RoundToInt32(GetActorLocation().X), FMath::RoundToInt32(GetActorLocation().Y), FMath::RoundToInt32(GetActorLocation().Z));
+	FRandomStream Random(static_cast<int32>(GetTypeHash(Cell)));
+
+	for (int32 Index = 0; Index < PuffCount; ++Index)
+	{
+		FVector Offset = Random.GetUnitVector() * FMath::Pow(Random.GetFraction(), 1.f / 3.f) * Radius * PuffSpread;
+		Offset.Z = FMath::Abs(Offset.Z) * PuffVerticalSpread;
+		const float PuffRadius = Random.FRandRange(PuffMinRadius, FMath::Max(PuffMinRadius, PuffMaxRadius));
+
+		UStaticMeshComponent* Puff = NewObject<UStaticMeshComponent>(this);
+		Puff->SetStaticMesh(Mesh);
+		Puff->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Puff->SetCastShadow(false);
+		Puff->SetCanEverAffectNavigation(false);
+		Puff->SetupAttachment(GetRootComponent());
+		Puff->SetRelativeLocation(Offset);
+		Puff->SetRelativeScale3D(FVector(KINDA_SMALL_NUMBER));
+		if (PuffMaterialInstance)
+		{
+			for (int32 MaterialIndex = 0; MaterialIndex < Puff->GetNumMaterials(); ++MaterialIndex)
+			{
+				Puff->SetMaterial(MaterialIndex, PuffMaterialInstance);
+			}
+		}
+		Puff->RegisterComponent();
+		Puffs.Add(Puff);
+		PuffScales.Add(FVector(PuffRadius / MeshRadius));
+	}
+	UpdatePuffs();
+	GetWorld()->GetTimerManager().SetTimer(PuffTimer, this, &AHitmenSmokeCloud::UpdatePuffs, PuffUpdateInterval, true);
+}
+
+void AHitmenSmokeCloud::UpdatePuffs()
+{
+	const float Age = GetWorld()->GetTimeSeconds() - SpawnTime;
+	const float Grow = PuffGrowTime > 0.f ? FMath::Clamp(Age / PuffGrowTime, 0.f, 1.f) : 1.f;
+	const float FadeStart = FMath::Max(0.f, Lifetime - PuffFadeOutTime);
+	const float Fade = PuffFadeOutTime > 0.f ? FMath::Clamp((Age - FadeStart) / PuffFadeOutTime, 0.f, 1.f) : 0.f;
+	// Ease out on the way in, linear on the way out.
+	const float ScaleAlpha = FMath::InterpEaseOut(0.f, 1.f, Grow, 2.f) * FMath::Lerp(1.f, PuffFadeOutScale, Fade);
+
+	for (int32 Index = 0; Index < Puffs.Num(); ++Index)
+	{
+		if (UStaticMeshComponent* Puff = Puffs[Index])
+		{
+			Puff->SetRelativeScale3D(PuffScales[Index] * FMath::Max(ScaleAlpha, KINDA_SMALL_NUMBER));
+		}
+	}
+	if (PuffMaterialInstance)
+	{
+		PuffMaterialInstance->SetScalarParameterValue(PuffOpacityParameter, 1.f - Fade);
+	}
+	if (Grow >= 1.f && Fade <= 0.f && Age < FadeStart - PuffUpdateInterval)
+	{
+		// Fully grown: idle until the fade starts.
+		GetWorld()->GetTimerManager().SetTimer(PuffTimer, this, &AHitmenSmokeCloud::UpdatePuffs, PuffUpdateInterval, true, FadeStart - Age);
+	}
 }
 
 bool AHitmenSmokeCloud::BlocksSegment(const FVector& Start, const FVector& End) const

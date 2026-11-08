@@ -29,8 +29,12 @@ struct FHitmenSurfaceFeedback
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnHitmenFootstep, TEnumAsByte<EPhysicalSurface>, Surface, FVector, Location, float, NoiseRadius);
 
 /**
- * Call HandleFootstep from the AN_Footstep anim notify. Until animations have notifies,
- * a distance-based fallback fires steps from movement so the system works out of the box.
+ * Call HandleFootstep from the "Hitmen Footstep" anim notify (UAnimNotify_HitmenFootstep, property
+ * FootBone = foot_l / foot_r). Until animations have notifies, a distance-based fallback fires
+ * steps from movement so the system works out of the box; a notify suppresses the fallback.
+ *
+ * Surfaces come from physical materials (DefaultEngine.ini): SurfaceType1 Grass, 2 Stone, 3 Sand,
+ * 4 Wood, 5 Metal. The default table has an entry for each (sound/VFX empty, noise multipliers set).
  */
 UCLASS(ClassGroup=(Hitmen), Blueprintable, meta=(BlueprintSpawnableComponent))
 class HITMEN_API UHitmenFootstepComponent : public UActorComponent
@@ -49,6 +53,7 @@ public:
 	void HandleFootstep(FName FootBone = NAME_None);
 
 protected:
+	/** Per surface type: sound, VFX and AI noise multiplier. Missing surfaces use DefaultFeedback. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep")
 	TMap<TEnumAsByte<EPhysicalSurface>, FHitmenSurfaceFeedback> SurfaceFeedback;
 
@@ -67,6 +72,17 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep", meta=(ClampMin="10", Units="cm"))
 	float CrouchStrideLength = 90.f;
+
+	/** Seconds after an anim notify step during which the distance fallback stays silent. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep", meta=(ClampMin="0", Units="s"))
+	float NotifySuppressesFallbackTime = 1.f;
+
+	/** Ground trace: starts this far above the foot and goes this far down. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep", meta=(ClampMin="0", Units="cm"))
+	float TraceStartHeight = 20.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep", meta=(ClampMin="0", Units="cm"))
+	float TraceLength = 200.f;
 
 	/** Only players make noise for NPCs (NPC steps are purely cosmetic). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep")

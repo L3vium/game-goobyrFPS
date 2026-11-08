@@ -33,7 +33,7 @@ TArray<UHitmenAbilityData*> UHitmenCatalog::GetAbilities(EHitmenAbilitySlot Slot
 FHitmenCosmeticLoadout UHitmenCatalog::MakeRandomCosmetics() const
 {
 	FHitmenCosmeticLoadout Loadout;
-	for (EHitmenCosmeticSlot Slot : { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Top, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Bottom })
+	for (EHitmenCosmeticSlot Slot : { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Legs })
 	{
 		TArray<UHitmenCosmeticItem*> Options = GetCosmeticsForSlot(Slot);
 		// Index == Num means "nothing" for this slot.

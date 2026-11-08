@@ -1,4 +1,5 @@
-// Hitmen — two weapon slots, throw rules, ammo merge on pickup, keycards
+// Hitmen — two weapon slots, throw rules, ammo merge on pickup, keycards. Weapon actors are
+// spawned once and move between hand and world (thrown / swapped / picked up), never respawned.
 
 #pragma once
 
@@ -20,7 +21,7 @@ struct FHitmenInventorySlot
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Inventory")
 	int32 Ammo = 0;
 
-	/** Spawned once when acquired, hidden while not in hand. */
+	/** Spawned once (loadout) or taken from the world; hidden while not in hand, dropped when thrown. */
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Inventory")
 	TObjectPtr<AHitmenWeaponBase> Actor = nullptr;
 
@@ -29,6 +30,7 @@ struct FHitmenInventorySlot
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHitmenInventoryChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenActiveSlotChanged, int32, NewSlot);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenWeaponThrown, UHitmenWeaponData*, Weapon);
 
 UCLASS(ClassGroup=(Hitmen), Blueprintable, meta=(BlueprintSpawnableComponent))
 class HITMEN_API UHitmenInventoryComponent : public UActorComponent
@@ -51,6 +53,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Inventory")
 	FOnHitmenActiveSlotChanged OnActiveSlotChanged;
+
+	/** The item in hand was thrown (every machine; cosmetic: throw montage, juice). */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|Inventory")
+	FOnHitmenWeaponThrown OnWeaponThrown;
 
 	// ---- Queries ----
 	UFUNCTION(BlueprintPure, Category="Hitmen|Inventory")
@@ -82,11 +88,20 @@ public:
 
 	// ---- Server operations ----
 	/**
-	 * Adds a weapon: same type merges ammo, else fills a free slot; bForceReplace swaps the
-	 * active slot (the old weapon is dropped). Ammo < 0 = the weapon's start ammo.
+	 * Adds a new weapon (loadout, debug): same type merges ammo, else spawns its actor once into a
+	 * free slot; bForceReplace swaps the active slot (the old weapon actor is dropped).
+	 * Ammo < 0 = the weapon's start ammo.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Inventory")
 	bool GiveWeapon(UHitmenWeaponData* Weapon, int32 Ammo = -1, bool bForceReplace = false);
+
+	/**
+	 * Takes a weapon lying in the world (the same actor goes to the hand). Same type: its ammo is
+	 * merged and the world actor destroyed. Full: with bAllowSwap the held weapon is dropped where
+	 * the picked one was. Returns true when the world weapon was consumed.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Inventory")
+	bool PickUpWeapon(AHitmenWeaponBase* WorldWeapon, bool bAllowSwap = true);
 
 	/** Merges ammo if the same type is held. Returns true when consumed. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Inventory")
@@ -98,8 +113,8 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Inventory")
 	void AddKeycard(int32 KeycardId);
 
-	/** Removes the active weapon without dropping it (swap pickups). Returns its data/ammo. */
-	bool TakeActive(UHitmenWeaponData*& OutWeapon, int32& OutAmmo);
+	/** Re-attaches carried weapon actors (e.g. after possession: first-person vs body mesh). Any machine. */
+	void RefreshWeaponAttachments();
 
 	// ---- Client requests ----
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Inventory")
@@ -123,6 +138,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Inventory", meta=(ClampMin="0"))
 	float ThrowSpeed = 1400.f;
 
+	/** Distance in front of the eyes where a thrown weapon appears. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Inventory", meta=(ClampMin="0", Units="cm"))
+	float ThrowSpawnDistance = 60.f;
+
+	/** Speed of the old weapon dropped by a forced replace (debug give). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Inventory", meta=(ClampMin="0"))
+	float ReplaceDropSpeed = 300.f;
+
+	/** Server tolerance on the client throw origin. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Inventory", meta=(ClampMin="0", Units="cm"))
+	float ThrowOriginTolerance = 300.f;
+
 	UPROPERTY(ReplicatedUsing=OnRep_Slots)
 	TArray<FHitmenInventorySlot> Slots;
 
@@ -138,15 +165,22 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void Server_ThrowActive(FVector_NetQuantize Origin, FVector_NetQuantizeNormal Direction);
 
+	/** Cosmetic: throw montage / juice on every machine. */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_Thrown(UHitmenWeaponData* Weapon);
+
 	UFUNCTION() void OnRep_Slots();
 	UFUNCTION() void OnRep_ActiveSlot();
 
 	void SetActiveSlotInternal(int32 NewSlot);
 	void RefreshWeaponVisibility();
 	AHitmenWeaponBase* SpawnWeaponActor(UHitmenWeaponData* Weapon);
-	void SpawnThrownPickup(UHitmenWeaponData* Weapon, int32 Ammo, const FVector& Origin, const FVector& Direction);
+	/** Server: removes the slot and puts its actor in the world (thrown when Thrower is set). */
+	void DropSlot(int32 SlotIndex, const FVector& Location, const FRotator& Rotation, const FVector& Velocity, APawn* Thrower);
 	void RemoveSlot(int32 SlotIndex, bool bDestroyActor);
+	void FillSlot(int32 SlotIndex, UHitmenWeaponData* Weapon, int32 Ammo, AHitmenWeaponBase* Actor);
 
+	/** Every machine. */
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnThrow(UHitmenWeaponData* Weapon);
 

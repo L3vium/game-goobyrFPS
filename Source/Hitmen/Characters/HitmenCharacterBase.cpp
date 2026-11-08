@@ -13,7 +13,12 @@
 #include "AI/HitmenAISubsystem.h"
 #include "Interaction/HitmenScanRegistry.h"
 #include "Components/HitmenBodyCarryComponent.h"
+#include "Inventory/HitmenInventoryComponent.h"
+#include "Data/HitmenAnimSet.h"
 #include "Hitmen.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "TimerManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/DamageEvents.h"
@@ -44,6 +49,7 @@ void AHitmenCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AHitmenCharacterBase, bVanished);
 	DOREPLIFETIME(AHitmenCharacterBase, Carrier);
 	DOREPLIFETIME(AHitmenCharacterBase, CarrySocket);
+	DOREPLIFETIME(AHitmenCharacterBase, DeathMontageIndex);
 }
 
 void AHitmenCharacterBase::BeginPlay()
@@ -52,13 +58,158 @@ void AHitmenCharacterBase::BeginPlay()
 	HealthComponent->OnDeath.AddDynamic(this, &AHitmenCharacterBase::HandleDeath);
 	StatusEffectComponent->OnStatusAdded.AddDynamic(this, &AHitmenCharacterBase::HandleStatusAdded);
 	StatusEffectComponent->OnStatusRemoved.AddDynamic(this, &AHitmenCharacterBase::HandleStatusRemoved);
+	// Cosmetic montages from gameplay events (anim set).
+	if (UHitmenCharacterMovementComponent* Movement = GetHitmenMovement())
+	{
+		Movement->OnMantleStarted.AddDynamic(this, &AHitmenCharacterBase::HandleMantleStarted);
+	}
+	if (UHitmenInventoryComponent* Inventory = FindComponentByClass<UHitmenInventoryComponent>())
+	{
+		Inventory->OnWeaponThrown.AddDynamic(this, &AHitmenCharacterBase::HandleWeaponThrown);
+	}
 	UHitmenScanRegistry::Register(this);
 }
 
 void AHitmenCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	GetWorldTimerManager().ClearTimer(DeathRagdollTimer);
 	UHitmenScanRegistry::Unregister(this);
 	Super::EndPlay(EndPlayReason);
+}
+
+void AHitmenCharacterBase::NotifyControllerChanged()
+{
+	Super::NotifyControllerChanged();
+	if (UHitmenInventoryComponent* Inventory = FindComponentByClass<UHitmenInventoryComponent>())
+	{
+		Inventory->RefreshWeaponAttachments();
+	}
+}
+
+// ---- Montages ----
+
+void AHitmenCharacterBase::GetMontageMeshes(TArray<USkeletalMeshComponent*>& OutMeshes) const
+{
+	OutMeshes.Add(GetMesh());
+}
+
+float AHitmenCharacterBase::PlayCosmeticMontage(UAnimMontage* Montage, float PlayRate)
+{
+	if (!Montage || GetNetMode() == NM_DedicatedServer)
+	{
+		return 0.f;
+	}
+	TArray<USkeletalMeshComponent*> Meshes;
+	GetMontageMeshes(Meshes);
+	float Length = 0.f;
+	for (USkeletalMeshComponent* MeshComp : Meshes)
+	{
+		// A montage whose skeleton does not match a mesh simply does not play there.
+		if (UAnimInstance* AnimInstance = MeshComp ? MeshComp->GetAnimInstance() : nullptr)
+		{
+			const float Played = AnimInstance->Montage_Play(Montage, PlayRate);
+			Length = Length > 0.f ? Length : Played;
+		}
+	}
+	return Length;
+}
+
+float AHitmenCharacterBase::PlayAnimSetMontageLocal(EHitmenAnimMontage Montage, int32 Variant)
+{
+	return AnimSet ? PlayCosmeticMontage(AnimSet->GetMontage(Montage, Variant)) : 0.f;
+}
+
+void AHitmenCharacterBase::PlayAnimSetMontage(EHitmenAnimMontage Montage, int32 Variant)
+{
+	if (HasAuthority())
+	{
+		Multicast_PlayAnimSetMontage(Montage, static_cast<uint8>(FMath::Clamp(Variant, 0, static_cast<int32>(MAX_uint8))), false);
+	}
+}
+
+void AHitmenCharacterBase::Multicast_PlayAnimSetMontage_Implementation(EHitmenAnimMontage Montage, uint8 Variant, bool bOwnerPredicted)
+{
+	if (bOwnerPredicted && (HasAuthority() || IsLocallyControlled()))
+	{
+		return;
+	}
+	PlayAnimSetMontageLocal(Montage, Variant);
+}
+
+void AHitmenCharacterBase::HandleMantleStarted(bool bIsVault)
+{
+	const EHitmenAnimMontage Montage = bIsVault ? EHitmenAnimMontage::Vault : EHitmenAnimMontage::Mantle;
+	// Client move replays can fire the event again: never restart a running traversal montage.
+	const UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	UAnimMontage* Asset = AnimSet ? AnimSet->GetMontage(Montage) : nullptr;
+	if (!Asset || (AnimInstance && AnimInstance->Montage_IsPlaying(Asset)))
+	{
+		return;
+	}
+	PlayCosmeticMontage(Asset);
+	// The event runs on the owning client and the server; simulated proxies get it from here.
+	if (HasAuthority())
+	{
+		Multicast_PlayAnimSetMontage(Montage, 0, true);
+	}
+}
+
+void AHitmenCharacterBase::HandleWeaponThrown(UHitmenWeaponData* Weapon)
+{
+	PlayAnimSetMontageLocal(EHitmenAnimMontage::Throw);
+}
+
+int32 AHitmenCharacterBase::ChooseDeathMontageIndex() const
+{
+	const int32 Count = AnimSet ? AnimSet->DeathMontages.Num() : 0;
+	if (Count <= 0)
+	{
+		return INDEX_NONE;
+	}
+	constexpr int32 DirectionalCount = 4; // [Front, Back, Left, Right], see UHitmenAnimSet::DeathMontages
+	const FVector From = -LastHitDirection.GetSafeNormal2D();
+	if (Count != DirectionalCount || From.IsNearlyZero())
+	{
+		return FMath::RandRange(0, Count - 1);
+	}
+	const float Front = FVector::DotProduct(GetActorForwardVector(), From);
+	const float Right = FVector::DotProduct(GetActorRightVector(), From);
+	if (FMath::Abs(Front) >= FMath::Abs(Right))
+	{
+		return Front >= 0.f ? 0 : 1;
+	}
+	return Right < 0.f ? 2 : 3;
+}
+
+float AHitmenCharacterBase::PlayDeathMontage()
+{
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!bPlayDeathMontage || !AnimSet || !AnimInstance || GetNetMode() == NM_DedicatedServer)
+	{
+		return 0.f;
+	}
+	// A stealth kill victim montage is the death animation: let it finish, then ragdoll.
+	if (UAnimMontage* Victim = AnimSet->StealthKillVictimMontage; Victim && AnimInstance->Montage_IsPlaying(Victim))
+	{
+		const float Remaining = Victim->GetPlayLength() - AnimInstance->Montage_GetPosition(Victim);
+		return FMath::Clamp(Remaining, 0.f, DeathRagdollMaxDelay);
+	}
+	const int32 Index = AnimSet->DeathMontages.IsValidIndex(DeathMontageIndex) ? DeathMontageIndex : 0;
+	UAnimMontage* Montage = AnimSet->GetMontage(EHitmenAnimMontage::Death, Index);
+	if (!Montage || PlayCosmeticMontage(Montage) <= 0.f)
+	{
+		return 0.f;
+	}
+	// Ragdoll before the montage blends back to the living pose.
+	return FMath::Clamp(Montage->GetPlayLength() - Montage->GetDefaultBlendOutTime(), 0.f, DeathRagdollMaxDelay);
+}
+
+void AHitmenCharacterBase::HandleDeathRagdollTimer()
+{
+	if (IsDead() && !Carrier && !bVanished)
+	{
+		EnableRagdoll();
+	}
 }
 
 bool AHitmenCharacterBase::CanInteract_Implementation(AActor* Interactor) const
@@ -190,6 +341,17 @@ void AHitmenCharacterBase::OnDamaged(float Damage, AActor* InstigatorActor, bool
 
 void AHitmenCharacterBase::Multicast_DamageFeedback_Implementation(float Damage, bool bHeadshot, FVector_NetQuantize HitLocation)
 {
+	// Existing cosmetic multicast: the hit react rides on it.
+	if (!IsDead())
+	{
+		const UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+		const UAnimMontage* HitReact = AnimSet ? AnimSet->GetMontage(EHitmenAnimMontage::HitReact) : nullptr;
+		const bool bBusy = AnimInstance && AnimInstance->IsAnyMontagePlaying() && !(HitReact && AnimInstance->Montage_IsPlaying(HitReact));
+		if (bHitReactInterruptsMontages || !bBusy)
+		{
+			PlayAnimSetMontageLocal(EHitmenAnimMontage::HitReact);
+		}
+	}
 	Juice_OnDamaged(Damage, bHeadshot, HitLocation);
 }
 
@@ -198,9 +360,22 @@ void AHitmenCharacterBase::HandleDeath(AActor* Killer, AActor* DamageCauser, boo
 	GetCharacterMovement()->DisableMovement();
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	if (HasAuthority())
+	{
+		DeathMontageIndex = ChooseDeathMontageIndex();
+	}
 	if (!Carrier)
 	{
-		EnableRagdoll();
+		// Death montage first (every machine), then the ragdoll.
+		const float RagdollDelay = PlayDeathMontage();
+		if (RagdollDelay > 0.f)
+		{
+			GetWorldTimerManager().SetTimer(DeathRagdollTimer, this, &AHitmenCharacterBase::HandleDeathRagdollTimer, RagdollDelay, false);
+		}
+		else
+		{
+			EnableRagdoll();
+		}
 	}
 
 	if (HasAuthority())
@@ -279,6 +454,10 @@ void AHitmenCharacterBase::OnRep_Body()
 void AHitmenCharacterBase::ApplyBodyState()
 {
 	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (bVanished || Carrier)
+	{
+		GetWorldTimerManager().ClearTimer(DeathRagdollTimer);
+	}
 	if (bVanished)
 	{
 		SetActorHiddenInGame(true);

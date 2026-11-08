@@ -7,13 +7,11 @@
 #include "CoreMinimal.h"
 #include "UI/HitmenUserWidget.h"
 #include "Core/HitmenTypes.h"
+#include "UI/HitmenUIEventSubsystem.h"
 #include "HitmenHUDWidgets.generated.h"
 
 class UTextBlock;
 class UHorizontalBox;
-class UHitmenInventoryComponent;
-class UHitmenAbilityComponent;
-class UHitmenAlertComponent;
 class APawn;
 
 /** Heading strip at the top of the screen. */
@@ -30,6 +28,10 @@ public:
 	/** Degrees visible across the strip. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Compass")
 	float VisibleAngle = 120.f;
+
+	/** Also letter NE / SE / SW / NW (the brief asks for N / S / E / W only). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Compass")
+	bool bShowIntercardinals = false;
 
 protected:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
@@ -118,17 +120,9 @@ protected:
 
 	UFUNCTION() void HandlePawnChanged(APawn* NewPawn);
 	UFUNCTION() void HandlePrompt(const FText& Prompt, bool bVisible);
-	UFUNCTION() void HandleInventoryChanged();
-	UFUNCTION() void HandleActiveSlotChanged(int32 NewSlot);
-	UFUNCTION() void HandleAbilitiesChanged();
-
-	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
-
-	void BindToPawn(APawn* Pawn);
-	void UnbindFromPawn();
-
-	UPROPERTY(Transient) TObjectPtr<UHitmenInventoryComponent> BoundInventory;
-	UPROPERTY(Transient) TObjectPtr<UHitmenAbilityComponent> BoundAbilities;
+	UFUNCTION() void HandleInventoryView(const FHitmenHUDInventoryView& View);
+	UFUNCTION() void HandleAbilityViews(const FHitmenHUDAbilityView& Move, const FHitmenHUDAbilityView& Manipulation);
+	UFUNCTION() void HandleVitals(const FHitmenHUDVitalsView& View);
 };
 
 /** Diamond above an NPC's head, filled by suspicion, coloured by alert state. */
@@ -138,13 +132,15 @@ class HITMEN_API UHitmenAlertIndicatorWidget : public UHitmenUserWidget
 	GENERATED_BODY()
 
 public:
+	/** Pushed by the NPC from its alert component events (the widget holds no gameplay reference). */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Alert")
-	void SetAlertSource(UHitmenAlertComponent* InAlert);
+	void SetAlertView(EHitmenAlertColor InColor, float InSuspicion, bool bInCallingReinforcements);
 
 protected:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	virtual void BuildDefaultLayout() override;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UHitmenAlertComponent> Alert;
+	EHitmenAlertColor Color = EHitmenAlertColor::None;
+	float Suspicion = 0.f;
+	bool bCallingReinforcements = false;
 };

@@ -4,7 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/HitmenAbility.h"
+#include "Abilities/Manipulation/HitmenManipulationAbility.h"
 #include "HitmenManipulationAbilities.generated.h"
 
 class AHitmenProjectile;
@@ -12,7 +12,7 @@ class AHitmenCharacterBase;
 
 /** Throws a projectile class (stone, sleep dart, flashbang, smoke grenade). */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_Throwable : public UHitmenAbility
+class HITMEN_API UHitmenAbility_Throwable : public UHitmenManipulationAbility
 {
 	GENERATED_BODY()
 
@@ -37,7 +37,7 @@ UCLASS(Blueprintable) class HITMEN_API UHitmenAbility_SmokeGrenade : public UHit
 
 /** Triggers a distraction / hackable at range. */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_RemoteDistraction : public UHitmenAbility
+class HITMEN_API UHitmenAbility_RemoteDistraction : public UHitmenManipulationAbility
 {
 	GENERATED_BODY()
 
@@ -50,7 +50,7 @@ protected:
 
 /** The aimed target fights for you for Duration (charmed players are driven by AI). */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_Charm : public UHitmenAbility
+class HITMEN_API UHitmenAbility_Charm : public UHitmenManipulationAbility
 {
 	GENERATED_BODY()
 
@@ -63,7 +63,7 @@ protected:
 
 /** Lighter: vanishes a body so nobody finds it (not the VIP). */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_Lighter : public UHitmenAbility
+class HITMEN_API UHitmenAbility_Lighter : public UHitmenManipulationAbility
 {
 	GENERATED_BODY()
 
@@ -76,7 +76,7 @@ protected:
 
 /** Mark several targets; when one dies, every marked target dies. */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_MultiKill : public UHitmenAbility
+class HITMEN_API UHitmenAbility_MultiKill : public UHitmenManipulationAbility
 {
 	GENERATED_BODY()
 
@@ -107,7 +107,7 @@ protected:
 
 /** Places an actor on the ground in front (trap, wind mine). */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_PlaceDevice : public UHitmenAbility
+class HITMEN_API UHitmenAbility_PlaceDevice : public UHitmenManipulationAbility
 {
 	GENERATED_BODY()
 
@@ -121,9 +121,12 @@ protected:
 UCLASS(Blueprintable) class HITMEN_API UHitmenAbility_Trap : public UHitmenAbility_PlaceDevice { GENERATED_BODY() public: UHitmenAbility_Trap(); };
 UCLASS(Blueprintable) class HITMEN_API UHitmenAbility_WindMine : public UHitmenAbility_PlaceDevice { GENERATED_BODY() public: UHitmenAbility_WindMine(); };
 
-/** Pour into a drink or a vent hatch (poisons sealed rooms on that vent network). */
+/**
+ * Pour into a drink or a vent hatch (poisons sealed rooms on that vent network).
+ * A vent whose rooms are all open refuses the vial: no charge is spent and the player is told why.
+ */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_PoisonVial : public UHitmenAbility
+class HITMEN_API UHitmenAbility_PoisonVial : public UHitmenManipulationAbility
 {
 	GENERATED_BODY()
 
@@ -131,5 +134,9 @@ public:
 	UHitmenAbility_PoisonVial();
 
 protected:
+	/** Shown to the owning player when no room served by the vent is sealed. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Poison")
+	FText RoomNotSealedText;
+
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
 };

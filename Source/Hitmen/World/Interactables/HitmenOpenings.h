@@ -132,6 +132,10 @@ public:
 	virtual bool CanBePoisoned_Implementation() const override { return LinkedRooms.Num() > 0; }
 	virtual void ApplyPoison_Implementation(AActor* Poisoner) override;
 
+	/** Rooms served by this vent network (poison only reaches the sealed ones). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Vent")
+	const TArray<AHitmenRoomVolume*>& GetLinkedRooms() const { return ObjectPtrDecay(LinkedRooms); }
+
 protected:
 	/** Rooms served by this vent network. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Vent")

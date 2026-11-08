@@ -108,6 +108,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Lobby") void DecreaseRetrievalPoints();
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Lobby") void IncreaseRetrievalPoints();
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Lobby") void CycleDifficulty();
+	/** Which: 0 = start interval, 1 = end interval, 2 = ramp duration. Direction: -1 / +1. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Lobby") void AdjustSonarOption(int32 Which, int32 Direction);
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Lobby") void CreateTeam();
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Lobby") void Back();
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Lobby") void Start();
@@ -124,6 +126,11 @@ protected:
 	virtual void BuildDefaultLayout() override;
 	virtual void BindEvents() override;
 	virtual void UnbindEvents() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
+	/** True while the local player types in a name box: lobby refreshes wait so the draft is kept. */
+	bool IsEditingText() const;
+	bool bLobbyRefreshPending = false;
 
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UWidgetSwitcher> ScreenSwitcher;
 	// Lobby

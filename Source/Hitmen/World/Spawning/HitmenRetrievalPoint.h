@@ -8,6 +8,8 @@
 
 class UBoxComponent;
 class UStaticMeshComponent;
+class AHitmenCharacterBase;
+class UHitmenBodyCarryComponent;
 
 UCLASS(Blueprintable)
 class HITMEN_API AHitmenRetrievalPoint : public AActor
@@ -44,6 +46,23 @@ protected:
 
 	UFUNCTION()
 	void HandleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void HandleEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	/** A pawn standing inside started (or stopped) carrying a body: deliver if it is the VIP. */
+	UFUNCTION()
+	void HandleCarryChanged(AHitmenCharacterBase* Body);
+
+	/** Server: delivers if the pawn carries the VIP, the point is active and the pawn is inside. */
+	void TryDeliver(APawn* Pawn);
+
+	/** Server: binds to the carry events of pawns inside (and delivers those already carrying). */
+	void WatchPawn(APawn* Pawn);
+	void UnwatchPawn(APawn* Pawn);
+	void ScanOverlappingPawns();
+
+	TArray<TWeakObjectPtr<UHitmenBodyCarryComponent>> WatchedCarriers;
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnActiveChanged(bool bIsActive);

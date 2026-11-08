@@ -34,11 +34,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon")
 	TSoftObjectPtr<UTexture2D> Icon;
 
-	/** Actor class spawned when equipped (hitscan / projectile / melee child BP). */
+	/**
+	 * Actor class of the weapon (hitscan / projectile / melee child BP). Spawned once (loadout,
+	 * loot, level placement); the same actor is held, holstered, thrown and lies in the world.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon")
 	TSubclassOf<AHitmenWeaponBase> WeaponClass;
 
-	/** Pickup spawned in the world (loot, thrown weapons). */
+	/**
+	 * Level-placement marker class (BP_WeaponPickup). It only hands off to a dropped weapon actor
+	 * at BeginPlay; thrown weapons and loot no longer spawn it.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon")
 	TSubclassOf<AHitmenWeaponPickup> PickupClass;
 
@@ -194,15 +200,18 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<USoundBase> FireSound;
 
+	/** Played by the owner when firing with no ammo left, just before the weapon is thrown. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<USoundBase> DryFireSound;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<USoundBase> ImpactSound;
 
+	/** Played on the owning character for each shot (predicted locally, multicast to others). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<UAnimMontage> FireMontage;
 
+	/** Played on the owning character when the weapon comes into hand (every machine). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<UAnimMontage> EquipMontage;
 

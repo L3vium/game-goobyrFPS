@@ -26,6 +26,9 @@ struct FHitmenActiveStatus
 	TObjectPtr<AActor> Instigator = nullptr;
 };
 
+class UCameraComponent;
+class UMaterialInterface;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenStatusEvent, EHitmenStatusEffect, Status, AActor*, Instigator);
 
 UCLASS(ClassGroup=(Hitmen), Blueprintable, meta=(BlueprintSpawnableComponent))
@@ -37,6 +40,7 @@ public:
 	UHitmenStatusEffectComponent();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Status")
 	FOnHitmenStatusEvent OnStatusAdded;
@@ -105,8 +109,51 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Status|Poison", meta=(ClampMin="0"))
 	float PoisonDamagePerSecond = 20.f;
 
+	// ---- Screen effects: post-process blendables on the locally controlled owner's camera ----
+	/** Distorted view while PillStatus is active. Missing asset = no effect. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
+	TSoftObjectPtr<UMaterialInterface> PillPostProcessMaterial;
+
+	/** White-out while Blinded (flashbang). Missing asset = no effect. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
+	TSoftObjectPtr<UMaterialInterface> BlindPostProcessMaterial;
+
+	/** Status that drives the pill view (the Pill ability applies Boosted). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
+	EHitmenStatusEffect PillStatus = EHitmenStatusEffect::Boosted;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="0", Units="s"))
+	float PillFadeInTime = 1.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="0", Units="s"))
+	float PillFadeOutTime = 1.5f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="0", Units="s"))
+	float BlindFadeInTime = 0.05f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="0", Units="s"))
+	float BlindFadeOutTime = 1.5f;
+
+	/** Timer step while a screen effect fades (no Tick). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="0.005", Units="s"))
+	float ScreenEffectUpdateInterval = 0.033f;
+
 	UPROPERTY(ReplicatedUsing=OnRep_ActiveStatuses)
 	TArray<FHitmenActiveStatus> ActiveStatuses;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> LoadedPillMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> LoadedBlindMaterial;
+
+	TWeakObjectPtr<UCameraComponent> EffectCamera;
+	float PillWeight = 0.f;
+	float BlindWeight = 0.f;
+	float LastScreenEffectUpdateTime = 0.f;
+	bool bPillMaterialLoadTried = false;
+	bool bBlindMaterialLoadTried = false;
+	FTimerHandle ScreenEffectTimer;
 
 	/** Previous replicated set, to raise add/remove events on clients. */
 	TArray<EHitmenStatusEffect> PreviousTypes;
@@ -118,4 +165,12 @@ protected:
 	void UpdateStatuses();
 	void RaiseDiffEvents();
 	float GetServerTime() const;
+
+	/** True on the machine that renders this pawn's camera (owning client or listen host). */
+	bool IsLocalViewer() const;
+	/** Starts the fade timer when a screen effect weight must move toward its status. */
+	void RefreshScreenEffects();
+	void UpdateScreenEffects();
+	void ApplyScreenEffectWeight(UMaterialInterface* Material, float Weight);
+	UMaterialInterface* ResolveMaterial(const TSoftObjectPtr<UMaterialInterface>& Soft, TObjectPtr<UMaterialInterface>& Loaded, bool& bLoadTried) const;
 };

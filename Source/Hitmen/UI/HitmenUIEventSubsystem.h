@@ -9,6 +9,78 @@
 
 class APawn;
 class APlayerController;
+class UTextureRenderTarget2D;
+
+/** One inventory slot as the HUD shows it. */
+USTRUCT(BlueprintType)
+struct FHitmenHUDSlotView
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FText Name;
+	/** Remaining ammo, -1 for weapons without ammo. */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") int32 Ammo = -1;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bEmpty = true;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bActive = false;
+};
+
+/** Weapon slots and acquired keycards. */
+USTRUCT(BlueprintType)
+struct FHitmenHUDInventoryView
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") TArray<FHitmenHUDSlotView> Slots;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") TArray<int32> Keycards;
+};
+
+/** One ability (E move / A manipulation) as the HUD shows it. */
+USTRUCT(BlueprintType)
+struct FHitmenHUDAbilityView
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bValid = false;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FText Name;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") int32 Charges = 0;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") int32 MaxCharges = 0;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float CooldownRemaining = 0.f;
+};
+
+USTRUCT(BlueprintType)
+struct FHitmenHUDVitalsView
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Health = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Armor = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float HealthNormalized = 1.f;
+};
+
+/** An NPC as the minimap / crosshair alert arcs show it. */
+USTRUCT(BlueprintType)
+struct FHitmenHUDAlertBlip
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FVector Location = FVector::ZeroVector;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") EHitmenAlertColor Color = EHitmenAlertColor::None;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") EHitmenAlertState State = EHitmenAlertState::Unaware;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Suspicion = 0.f;
+	/** The NPC is aware of the viewing player (crosshair arcs only show these). */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bTargetsViewer = false;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bCallingReinforcements = false;
+};
+
+/** One player's live view for the spectator grid. */
+USTRUCT(BlueprintType)
+struct FHitmenSpectatorView
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Spectator") TObjectPtr<UTextureRenderTarget2D> RenderTarget = nullptr;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Spectator") FText PlayerName;
+};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenPromptChanged, const FText&, Prompt, bool, bVisible);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenHitMarker, bool, bKill, bool, bHeadshot);
@@ -20,6 +92,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenResult, const FHitmenMatchR
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenDamageTaken, float, DirectionYawDegrees);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenSpectatorMode, uint8, Mode);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHitmenSimpleEvent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenInventoryView, const FHitmenHUDInventoryView&, View);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenAbilityViews, const FHitmenHUDAbilityView&, Move, const FHitmenHUDAbilityView&, Manipulation);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenVitals, const FHitmenHUDVitalsView&, View);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenSpectatorViews, const TArray<FHitmenSpectatorView>&, Views);
 
 /**
  * Local-player event hub. Gameplay code calls the Broadcast* helpers; widgets bind in
@@ -80,6 +156,47 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
 	FOnHitmenSpectatorMode OnSpectatorModeChanged;
 
+	// ---- HUD view models (pushed by the player controller; widgets never touch gameplay) ----
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenInventoryView OnInventoryViewChanged;
+
+	/** Refreshed a few times per second while abilities exist (cooldowns). */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenAbilityViews OnAbilityViewsChanged;
+
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenVitals OnVitalsChanged;
+
+	/** The local pawn started / stopped carrying the VIP body. */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenToggle OnCarryingVIPChanged;
+
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenSimpleEvent OnEmotesChanged;
+
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenSpectatorViews OnSpectatorViewsChanged;
+
+	void SetInventoryView(const FHitmenHUDInventoryView& View) { InventoryView = View; OnInventoryViewChanged.Broadcast(InventoryView); }
+	void SetAbilityViews(const FHitmenHUDAbilityView& Move, const FHitmenHUDAbilityView& Manipulation) { MoveAbilityView = Move; ManipulationAbilityView = Manipulation; OnAbilityViewsChanged.Broadcast(Move, Manipulation); }
+	void SetVitals(const FHitmenHUDVitalsView& View) { VitalsView = View; OnVitalsChanged.Broadcast(VitalsView); }
+	void SetCarryingVIP(bool bCarrying) { if (bCarryingVIP != bCarrying) { bCarryingVIP = bCarrying; OnCarryingVIPChanged.Broadcast(bCarrying); } }
+	void SetEmoteNames(const TArray<FText>& Names) { EmoteNames = Names; OnEmotesChanged.Broadcast(); }
+	void SetSpectatorViews(const TArray<FHitmenSpectatorView>& Views) { SpectatorViews = Views; OnSpectatorViewsChanged.Broadcast(SpectatorViews); }
+	void SetCrosshairSpread(float Degrees) { CrosshairSpread = Degrees; }
+	void SetAlertBlips(TArray<FHitmenHUDAlertBlip>&& Blips) { AlertBlips = MoveTemp(Blips); }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FHitmenHUDInventoryView& GetInventoryView() const { return InventoryView; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FHitmenHUDAbilityView& GetMoveAbilityView() const { return MoveAbilityView; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FHitmenHUDAbilityView& GetManipulationAbilityView() const { return ManipulationAbilityView; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FHitmenHUDVitalsView& GetVitals() const { return VitalsView; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") bool IsCarryingVIP() const { return bCarryingVIP; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const TArray<FText>& GetEmoteNames() const { return EmoteNames; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const TArray<FHitmenSpectatorView>& GetSpectatorViews() const { return SpectatorViews; }
+	/** Current weapon spread in degrees (crosshair ring). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") float GetCrosshairSpread() const { return CrosshairSpread; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const TArray<FHitmenHUDAlertBlip>& GetAlertBlips() const { return AlertBlips; }
+
 	// ---- Broadcast helpers (keep call sites one-liners) ----
 	void BroadcastPawnChanged(APawn* NewPawn) { OnPawnChanged.Broadcast(NewPawn); }
 	void BroadcastPrompt(const FText& Prompt, bool bVisible) { OnInteractionPromptChanged.Broadcast(Prompt, bVisible); }
@@ -112,6 +229,15 @@ public:
 	bool IsEmoteWheelOpen() const { return bEmoteWheelOpen; }
 
 private:
+	UPROPERTY(Transient) FHitmenHUDInventoryView InventoryView;
+	UPROPERTY(Transient) FHitmenHUDAbilityView MoveAbilityView;
+	UPROPERTY(Transient) FHitmenHUDAbilityView ManipulationAbilityView;
+	UPROPERTY(Transient) FHitmenHUDVitalsView VitalsView;
+	UPROPERTY(Transient) TArray<FText> EmoteNames;
+	UPROPERTY(Transient) TArray<FHitmenSpectatorView> SpectatorViews;
+	UPROPERTY(Transient) TArray<FHitmenHUDAlertBlip> AlertBlips;
+	float CrosshairSpread = 1.f;
+	bool bCarryingVIP = false;
 	bool bPauseMenuOpen = false;
 	bool bOptionsOpen = false;
 	bool bEmoteWheelOpen = false;

@@ -89,7 +89,8 @@ protected:
 	TObjectPtr<AHitmenPatrolRoute> PatrolRoute;
 
 	/** Off = only reacts to what it sees and to being hurt: ignores footsteps, gunshots,
-	 *  distractions, radio calls and bodies. */
+	 *  distractions and radio calls. Bodies are still investigated, except by sentries
+	 *  (Stationary + Hold Position + this off). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC|Behavior")
 	bool bReactsToNoises = true;
 
@@ -124,6 +125,15 @@ protected:
 
 	UFUNCTION()
 	void HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState);
+
+	UFUNCTION()
+	void HandleAlertCallingChanged(bool bCalling);
+
+	UFUNCTION()
+	void HandleAlertSuspicionChanged(float Suspicion);
+
+	/** Pushes colour, white fill and call icon to the overhead widget (no reference held by the widget). */
+	void PushAlertView();
 
 	/** Ammo left in the weapon dropped on death. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC", meta=(ClampMin="0"))

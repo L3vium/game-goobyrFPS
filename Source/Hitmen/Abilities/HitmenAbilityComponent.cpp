@@ -4,8 +4,14 @@
 #include "Abilities/HitmenAbility.h"
 #include "Data/HitmenAbilityData.h"
 #include "Weapons/HitmenCombatLibrary.h"
+#include "UI/HitmenUIEventSubsystem.h"
+#include "Interaction/HitmenInteractionComponent.h"
+#include "Interaction/HitmenInteractable.h"
+#include "Hitmen.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Pawn.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 UHitmenAbilityComponent::UHitmenAbilityComponent()
 {
@@ -40,6 +46,11 @@ void UHitmenAbilityComponent::SetAbility(UHitmenAbilityData* AbilityData)
 		RemoveReplicatedSubObject(SlotRef);
 	}
 	UHitmenAbility* NewAbility = NewObject<UHitmenAbility>(GetOwner(), AbilityData->AbilityClass);
+	if (NewAbility->GetSlot() != AbilityData->Slot)
+	{
+		UE_LOG(LogHitmen, Warning, TEXT("%s: data slot does not match the ability family of %s (fix the data asset)."),
+			*GetNameSafe(AbilityData), *GetNameSafe(AbilityData->AbilityClass.Get()));
+	}
 	NewAbility->InitAbility(this, AbilityData);
 	AddReplicatedSubObject(NewAbility);
 	SlotRef = NewAbility;
@@ -173,4 +184,42 @@ void UHitmenAbilityComponent::Multicast_AbilityActivated_Implementation(UHitmenA
 	{
 		Ability->Juice_OnActivated(Location);
 	}
+}
+
+void UHitmenAbilityComponent::Client_AbilityFailed_Implementation(UHitmenAbility* Ability, const FText& Reason)
+{
+	if (Ability)
+	{
+		Ability->Juice_OnFailed(Reason);
+	}
+	OnAbilityFailed.Broadcast(Ability, Reason);
+
+	if (!bShowFailureAsPrompt || Reason.IsEmpty())
+	{
+		return;
+	}
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Cast<APawn>(GetOwner())))
+	{
+		UI->BroadcastPrompt(Reason, true);
+		GetWorld()->GetTimerManager().SetTimer(FailurePromptTimer, this, &UHitmenAbilityComponent::ClearFailurePrompt, FailurePromptDuration, false);
+	}
+}
+
+void UHitmenAbilityComponent::ClearFailurePrompt()
+{
+	APawn* Pawn = Cast<APawn>(GetOwner());
+	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Pawn);
+	if (!UI)
+	{
+		return;
+	}
+	// Give the prompt back to whatever the player is focusing.
+	const UHitmenInteractionComponent* Interaction = Pawn ? Pawn->FindComponentByClass<UHitmenInteractionComponent>() : nullptr;
+	AActor* Focused = Interaction ? Interaction->GetFocusedActor() : nullptr;
+	if (Focused && Focused->GetClass()->ImplementsInterface(UHitmenInteractable::StaticClass()))
+	{
+		UI->BroadcastPrompt(IHitmenInteractable::Execute_GetInteractionText(Focused, Pawn), true);
+		return;
+	}
+	UI->BroadcastPrompt(FText::GetEmpty(), false);
 }

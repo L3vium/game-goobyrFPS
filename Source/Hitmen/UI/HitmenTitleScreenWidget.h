@@ -51,6 +51,7 @@ protected:
 	UFUNCTION() void HandleSessionsFound(const TArray<FHitmenSessionInfo>& Sessions, bool bSuccess);
 	UFUNCTION() void HandleJoinClicked(int32 ResultIndex);
 	UFUNCTION() void HandleCreateComplete(bool bSuccess);
+	UFUNCTION() void HandleJoinComplete(bool bSuccess);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnJoinPanelToggled(bool bOpen);

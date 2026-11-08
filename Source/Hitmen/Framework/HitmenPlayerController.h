@@ -12,6 +12,12 @@ class UInputAction;
 class AHitmenPlayerState;
 class UHitmenWeaponData;
 class UHitmenAbilityData;
+class UHitmenInventoryComponent;
+class UHitmenAbilityComponent;
+class UHitmenHealthComponent;
+class UHitmenBodyCarryComponent;
+class UTextureRenderTarget2D;
+class AHitmenCharacterBase;
 struct FInputActionValue;
 
 /** How a watcher (or a dead player) looks at the match. */
@@ -155,6 +161,15 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Spectator")
 	FOnHitmenSpectatorTargetChanged OnSpectatorTargetChanged;
 
+	/** Grid mode: how many screens are shown (0 = every player). Mouse wheel cycles it. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Spectator")
+	int32 GetSpectatorGridCount() const { return SpectatorGridCount; }
+
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Spectator")
+	void CycleSpectatorGridCount(int32 Direction);
+
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 protected:
 	// ---- Input assets (set in BP_PlayerController) ----
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Contexts")
@@ -183,8 +198,34 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Feedback")
 	TSubclassOf<AActor> LastKnownPositionMarkerClass;
 
+	/** Added to the reported position (the capsule centre); -90 Z puts a mannequin's feet on the floor. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Feedback")
+	FVector LastKnownPositionMarkerOffset = FVector(0.f, 0.f, -90.f);
+
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> LastKnownPositionMarker;
+
+	// ---- Sightroom (Tab) ----
+	/** Enemies inside this radius are shown through walls while the Sightroom is on. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0", Units="cm"))
+	float SightroomEnemyRadius = 2500.f;
+
+	/** Interactables inside this radius are highlighted when directly visible. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0", Units="cm"))
+	float SightroomInteractableRadius = 1800.f;
+
+	// ---- HUD publishing ----
+	/** Seconds between ability cooldown / spread / alert refreshes pushed to the HUD. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|HUD", meta=(ClampMin="0.02", Units="s"))
+	float HUDRefreshInterval = 0.1f;
+
+	// ---- Spectator grid ----
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Spectator")
+	FIntPoint SpectatorCaptureResolution = FIntPoint(640, 360);
+
+	/** Seconds between grid refreshes (players joining / dying). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Spectator", meta=(ClampMin="0.25", Units="s"))
+	float SpectatorGridRefreshInterval = 2.f;
 
 	// ---- Juice hooks (local) ----
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
@@ -218,6 +259,31 @@ protected:
 	void HandleEmoteWheelReleased();
 	void HandlePause();
 	void HandleSpectatorMode();
+
+	// ---- HUD publisher: binds to the pawn's components and pushes view models to the UI hub ----
+	void BindHUDSources(APawn* InPawn);
+	void UnbindHUDSources();
+	void RefreshHUDViews();
+	void PublishEmotes(APawn* InPawn);
+	UFUNCTION() void HandleHUDInventoryChanged();
+	UFUNCTION() void HandleHUDActiveSlotChanged(int32 NewSlot);
+	UFUNCTION() void HandleHUDHealthChanged(UHitmenHealthComponent* HealthComponent, float NewHealth, float Delta, AActor* InstigatorActor);
+	UFUNCTION() void HandleHUDCarryChanged(AHitmenCharacterBase* Body);
+
+	UPROPERTY(Transient) TWeakObjectPtr<UHitmenInventoryComponent> HUDInventory;
+	UPROPERTY(Transient) TWeakObjectPtr<UHitmenAbilityComponent> HUDAbilities;
+	UPROPERTY(Transient) TWeakObjectPtr<UHitmenHealthComponent> HUDHealth;
+	UPROPERTY(Transient) TWeakObjectPtr<UHitmenBodyCarryComponent> HUDCarry;
+	FTimerHandle HUDRefreshTimer;
+
+	// ---- Spectator grid captures (owned here, shown by the spectator widget through the UI hub) ----
+	void RebuildSpectatorGrid();
+	void StopSpectatorCaptures();
+
+	UPROPERTY(Transient) TArray<TObjectPtr<UTextureRenderTarget2D>> SpectatorRenderTargets;
+	TArray<TWeakObjectPtr<APawn>> CapturedPawns;
+	FTimerHandle SpectatorGridTimer;
+	int32 SpectatorGridCount = 0;
 
 	class IHitmenInputReceiver* GetReceiver() const;
 	bool IsGameplayInputBlocked() const;

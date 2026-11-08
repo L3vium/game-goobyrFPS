@@ -1,4 +1,4 @@
-// Hitmen — weapon in the world: walking over the same type takes its ammo, F swaps or picks up
+// Hitmen — level-placed weapon marker: hands off to a dropped weapon actor at BeginPlay
 
 #pragma once
 
@@ -7,8 +7,14 @@
 #include "HitmenWeaponPickup.generated.h"
 
 class UHitmenWeaponData;
-class USphereComponent;
+class AHitmenWeaponBase;
 
+/**
+ * Weapons live as one actor for their whole life (AHitmenWeaponBase has a Dropped state that is
+ * its own world pickup). This marker only exists so level designers can place a weapon: at
+ * BeginPlay (or InitPickup when spawned by code) the server spawns the weapon actor in the
+ * Dropped state at this transform and destroys the marker. It shows the weapon mesh in the editor.
+ */
 UCLASS(Blueprintable)
 class HITMEN_API AHitmenWeaponPickup : public AHitmenInteractableBase
 {
@@ -17,52 +23,34 @@ class HITMEN_API AHitmenWeaponPickup : public AHitmenInteractableBase
 public:
 	AHitmenWeaponPickup();
 
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 
-	/** Server: what this pickup contains. Ammo < 0 = start ammo. */
+	/** Server: what to spawn. Ammo < 0 = start ammo. Hands off immediately if already playing. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Pickup")
 	void InitPickup(UHitmenWeaponData* InWeapon, int32 InAmmo);
 
-	/** Server: physics throw; hitting a pawn deals the weapon's throw damage once. */
+	/** Server: legacy throw (NPC drops) — forwarded to the spawned weapon actor. */
 	void Throw(const FVector& Velocity, APawn* Thrower);
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Pickup")
 	UHitmenWeaponData* GetWeapon() const { return Weapon; }
 
-	// IHitmenInteractable
-	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
-	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
-	virtual void Interact_Implementation(AActor* Interactor) override;
+	/** The weapon actor this marker handed off to (server). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Pickup")
+	AHitmenWeaponBase* GetSpawnedWeapon() const { return SpawnedWeapon; }
 
 protected:
 	/** Weapon placed by a level designer (overridden by InitPickup). */
-	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_Weapon, BlueprintReadOnly, Category="Hitmen|Pickup")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Pickup")
 	TObjectPtr<UHitmenWeaponData> Weapon;
 
-	UPROPERTY(EditAnywhere, Replicated, BlueprintReadOnly, Category="Hitmen|Pickup")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Pickup")
 	int32 Ammo = -1;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
-	TObjectPtr<USphereComponent> AutoPickupSphere;
-
-	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Pickup", meta=(ClampMin="0"))
-	float ThrownPickupDelay = 0.6f;
-
-	UFUNCTION() void OnRep_Weapon();
-
-	UFUNCTION()
-	void HandleAutoPickupOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
-
-	UFUNCTION()
-	void HandleThrownHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
-
-	void ApplyWeaponVisual();
-	void TryAutoAmmo(AActor* Other);
-
 	UPROPERTY(Transient)
-	TObjectPtr<APawn> LastThrower;
+	TObjectPtr<AHitmenWeaponBase> SpawnedWeapon;
 
-	float PickupEnabledTime = 0.f;
-	bool bThrowDamageDone = false;
+	void HandOff();
+	void ApplyEditorVisual();
 };

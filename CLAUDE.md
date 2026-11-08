@@ -37,7 +37,8 @@ Engine: `C:\Program Files\Epic Games\UE_5.7`.
     for behavior trees (`Tools/Editor/hitmen_build_ai.py`): rebuilding trees inside the running
     editor crashed it.
 - New `UCLASS`/`UPROPERTY`/`UFUNCTION` need a full build (Live Coding cannot add reflected
-  types); the script handles it. Batch header changes into milestones to limit restarts.
+  types); the script handles it. **Prefer Live Coding**: plan header/reflection changes up front,
+  build once per milestone, then iterate in `.cpp` with `-Mode auto` so the editor stays open.
 - The Unreal MCP endpoint is served by the editor (`127.0.0.1:3000/mcp`): it is down while the
   editor is closed, and a session started with the editor closed needs `/mcp` → reconnect.
 - Player builds (`RunUAT BuildCookRun`): Shipping → `Builds/Windows`, Development (cheats) →
@@ -54,6 +55,10 @@ editor when it is connected. Otherwise use Python remote execution (enabled in `
   `hitmen_content.py` (assets), `hitmen_levels.py` (maps), `hitmen_build_all.py` (both; filter
   with the `HITMEN_BUILD_STEPS` env var). Headless, editor closed:
   `UnrealEditor-Cmd.exe Hitmen.uproject -run=pythonscript -script="Tools/Editor/hitmen_build_all.py"`.
+- **Blueprint graphs and LD go through the MCP** in the open editor (Juice events, comment groups,
+  LDTest/Gym edits). `L_Gym` and `L_LDTest` are hand-edited: the level builder only creates them
+  when missing (`HITMEN_FORCE_MAPS=L_Gym,L_LDTest` regenerates and wipes edits). The content
+  builder never recreates an existing asset, so authored graphs survive a re-run.
 - After rebuilding a map, bake its navmesh (`Tools/Editor/ue_bake_nav.sh`); runtime generation
   does not finish reliably in PIE.
 - `Tools/Editor/ue_shot.sh <map>` plays a map in PIE and saves a HighResShot for UI checks.

@@ -87,6 +87,14 @@ namespace
 		}
 	}
 
+	void SetBool(UObject* Node, FName PropertyName, bool bValue)
+	{
+		if (FBoolProperty* Prop = FindFProperty<FBoolProperty>(Node->GetClass(), PropertyName))
+		{
+			Prop->SetPropertyValue_InContainer(Node, bValue);
+		}
+	}
+
 	void SetObject(UObject* Node, FName PropertyName, UObject* Value)
 	{
 		if (FObjectPropertyBase* Prop = FindFProperty<FObjectPropertyBase>(Node->GetClass(), PropertyName))
@@ -211,13 +219,24 @@ namespace
 			}
 		}
 
-		void KeyIsSet(UBehaviorTreeGraphNode* Target, FName Key)
+		/** Blackboard "is set" condition. Observer aborts: None for static keys (sniper, stationary),
+		 *  Both for live keys so a change preempts the running branch (seeing the target, calling). */
+		void KeyIsSet(UBehaviorTreeGraphNode* Target, FName Key, EBTFlowAbortMode::Type AbortMode = EBTFlowAbortMode::None)
 		{
 			if (UObject* Decorator = this->Decorator(Target, UBTDecorator_Blackboard::StaticClass()))
 			{
 				SetKey(Decorator, TEXT("BlackboardKey"), Key);
 				SetEnumByte(Decorator, TEXT("BasicOperation"), 0 /* Set */);
+				SetEnumByte(Decorator, TEXT("FlowAbortMode"), static_cast<uint8>(AbortMode));
 			}
+		}
+
+		/** Move that re-paths when its blackboard location changes (new noise, new sighting). */
+		UBehaviorTreeGraphNode* MoveToObserved(UBehaviorTreeGraphNode* Parent, FName Key, float Radius, int32 X, int32 Y, int32 ParentPin = 0)
+		{
+			UBehaviorTreeGraphNode* Node = MoveTo(Parent, Key, Radius, X, Y, ParentPin);
+			SetBool(Node->NodeInstance, TEXT("bObserveBlackboardValue"), true);
+			return Node;
 		}
 
 		void FocusOn(UBehaviorTreeGraphNode* Target, FName Key)
@@ -310,21 +329,23 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 	{
 		FTreeBuilder B(Investigate, Blackboard);
 		UBehaviorTreeGraphNode* Seq = B.Composite(UBTComposite_Sequence::StaticClass(), B.Root, 0, 150);
-		B.MoveTo(Seq, HitmenBBKeys::InvestigateLocation, 150.f, -300, 320);
+		B.MoveToObserved(Seq, HitmenBBKeys::InvestigateLocation, 150.f, -300, 320);
 		B.Task(UBTTask_HitmenLookAround::StaticClass(), Seq, 0, 320);
 		UBehaviorTreeGraphNode* Wait = B.Task(UBTTask_Wait::StaticClass(), Seq, 300, 320);
 		SetFloat(Wait->NodeInstance, TEXT("WaitTime"), 1.f);
 		B.Finish();
 	}
 
-	// ---- BT_Search: sweep reachable points around the last known position ----
+	// ---- BT_Search: scored hiding places around the last known position, one after another,
+	//      a look-around at each (the root loops it until the search times out) ----
 	UBehaviorTree* Search = CreateOrLoadAsset<UBehaviorTree>(Folder, TEXT("BT_Search"));
 	{
 		FTreeBuilder B(Search, Blackboard);
 		UBehaviorTreeGraphNode* Seq = B.Composite(UBTComposite_Sequence::StaticClass(), B.Root, 0, 150);
 		B.Task(UBTTask_HitmenFindSearchPoint::StaticClass(), Seq, -300, 320);
 		B.MoveTo(Seq, HitmenBBKeys::MoveLocation, 100.f, 0, 320);
-		B.Task(UBTTask_HitmenLookAround::StaticClass(), Seq, 300, 320);
+		UBehaviorTreeGraphNode* Look = B.Task(UBTTask_HitmenLookAround::StaticClass(), Seq, 300, 320);
+		SetFloat(Look->NodeInstance, TEXT("Duration"), 2.5f);
 		B.Finish();
 	}
 
@@ -337,53 +358,60 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		B.Finish();
 	}
 
-	// ---- BT_Sniper: keep the long-range slot and shoot ----
+	// ---- BT_Sniper: keep the long-range slot; shoot while visible (moving to the slot in parallel),
+	//      otherwise reposition and keep watching. Never falls through to the close-range chase. ----
 	UBehaviorTree* Sniper = CreateOrLoadAsset<UBehaviorTree>(Folder, TEXT("BT_Sniper"));
 	{
 		FTreeBuilder B(Sniper, Blackboard);
-		UBehaviorTreeGraphNode* Seq = B.Composite(UBTComposite_Sequence::StaticClass(), B.Root, 0, 150);
-		B.FocusOn(Seq, HitmenBBKeys::TargetActor);
-		B.Task(UBTTask_HitmenFindFlankPosition::StaticClass(), Seq, -300, 320);
-		B.MoveTo(Seq, HitmenBBKeys::MoveLocation, 150.f, 0, 320);
-		UBehaviorTreeGraphNode* Shoot = B.Task(UBTTask_HitmenShoot::StaticClass(), Seq, 300, 320);
+		UBehaviorTreeGraphNode* Sel = B.Composite(UBTComposite_Selector::StaticClass(), B.Root, 0, 150);
+		B.FocusOn(Sel, HitmenBBKeys::TargetActor);
+
+		UBehaviorTreeGraphNode* Parallel = B.Add<UBehaviorTreeGraphNode_SimpleParallel>(UBTComposite_SimpleParallel::StaticClass(), Sel, -300, 320);
+		B.KeyIsSet(Parallel, HitmenBBKeys::TargetVisible, EBTFlowAbortMode::Both);
+		UBehaviorTreeGraphNode* Shoot = B.Task(UBTTask_HitmenShoot::StaticClass(), Parallel, -450, 520, 0);
 		SetFloat(Shoot->NodeInstance, TEXT("BurstDuration"), 2.5f);
+		UBehaviorTreeGraphNode* Reposition = B.Add<UBehaviorTreeGraphNode_Composite>(UBTComposite_Sequence::StaticClass(), Parallel, -150, 520, 1);
+		B.Task(UBTTask_HitmenFindFlankPosition::StaticClass(), Reposition, -250, 720);
+		B.MoveTo(Reposition, HitmenBBKeys::MoveLocation, 150.f, -50, 720);
+
+		UBehaviorTreeGraphNode* Watch = B.Composite(UBTComposite_Sequence::StaticClass(), Sel, 300, 320);
+		B.Task(UBTTask_HitmenFindFlankPosition::StaticClass(), Watch, 150, 520);
+		B.MoveTo(Watch, HitmenBBKeys::MoveLocation, 150.f, 350, 520);
+		UBehaviorTreeGraphNode* WatchWait = B.Task(UBTTask_Wait::StaticClass(), Watch, 550, 520);
+		SetFloat(WatchWait->NodeInstance, TEXT("WaitTime"), 1.f);
 		B.Finish();
 	}
 
-	// ---- BT_Combat: call for help (if not engaged), snipers, flank + shoot, chase ----
+	// ---- BT_Combat: hold position, snipers, flank + shoot, chase. Reinforcement calls live at the
+	//      root (any alerted NPC that is not fighting); the cooldown is in C++ (match rules). ----
 	UBehaviorTree* Combat = CreateOrLoadAsset<UBehaviorTree>(Folder, TEXT("BT_Combat"));
 	{
 		FTreeBuilder B(Combat, Blackboard);
 		UBehaviorTreeGraphNode* Sel = B.Composite(UBTComposite_Selector::StaticClass(), B.Root, 0, 150);
 		B.FocusOn(Sel, HitmenBBKeys::TargetActor);
 
-		UBehaviorTreeGraphNode* CallNode = B.Subtree(Call, Sel, -900, 360);
-		B.KeyIsSet(CallNode, HitmenBBKeys::CanCallReinforcements);
-		if (UObject* Cooldown = B.Decorator(CallNode, UBTDecorator_Cooldown::StaticClass()))
-		{
-			SetFloat(Cooldown, TEXT("CoolDownTime"), 15.f);
-		}
-
 		// Holds position: shoot while visible, otherwise keep facing the target. Never moves.
 		UBehaviorTreeGraphNode* Hold = B.Composite(UBTComposite_Selector::StaticClass(), Sel, -675, 360);
 		B.KeyIsSet(Hold, HitmenBBKeys::HoldPosition);
 		UBehaviorTreeGraphNode* HoldShoot = B.Task(UBTTask_HitmenShoot::StaticClass(), Hold, -800, 560);
-		B.KeyIsSet(HoldShoot, HitmenBBKeys::TargetVisible);
+		B.KeyIsSet(HoldShoot, HitmenBBKeys::TargetVisible, EBTFlowAbortMode::Both);
 		UBehaviorTreeGraphNode* HoldWait = B.Task(UBTTask_Wait::StaticClass(), Hold, -600, 560);
 		SetFloat(HoldWait->NodeInstance, TEXT("WaitTime"), 0.3f);
 
 		UBehaviorTreeGraphNode* SniperNode = B.Subtree(Sniper, Sel, -450, 360);
 		B.KeyIsSet(SniperNode, HitmenBBKeys::IsSniper);
 
+		// Seeing the target aborts the chase / look-around at once (lower priority), losing it
+		// ends the shooting branch (self).
 		UBehaviorTreeGraphNode* Parallel = B.Add<UBehaviorTreeGraphNode_SimpleParallel>(UBTComposite_SimpleParallel::StaticClass(), Sel, 0, 360);
-		B.KeyIsSet(Parallel, HitmenBBKeys::TargetVisible);
+		B.KeyIsSet(Parallel, HitmenBBKeys::TargetVisible, EBTFlowAbortMode::Both);
 		B.Task(UBTTask_HitmenShoot::StaticClass(), Parallel, -150, 560, 0);
 		UBehaviorTreeGraphNode* Flank = B.Add<UBehaviorTreeGraphNode_Composite>(UBTComposite_Sequence::StaticClass(), Parallel, 150, 560, 1);
 		B.Task(UBTTask_HitmenFindFlankPosition::StaticClass(), Flank, 0, 760);
 		B.MoveTo(Flank, HitmenBBKeys::MoveLocation, 100.f, 300, 760);
 
 		UBehaviorTreeGraphNode* Chase = B.Composite(UBTComposite_Sequence::StaticClass(), Sel, 600, 360);
-		B.MoveTo(Chase, HitmenBBKeys::LastKnownLocation, 120.f, 450, 560);
+		B.MoveToObserved(Chase, HitmenBBKeys::LastKnownLocation, 120.f, 450, 560);
 		B.Task(UBTTask_HitmenLookAround::StaticClass(), Chase, 750, 560);
 		B.Finish();
 	}
@@ -394,6 +422,14 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		FTreeBuilder B(Root, Blackboard);
 		UBehaviorTreeGraphNode* Sel = B.Composite(UBTComposite_Selector::StaticClass(), B.Root, 0, 150);
 
+		// Radio call: any alerted NPC that is not fighting (C++ computes CanCallReinforcements:
+		// cooldown, min alert time, no relays). Both: starts as soon as allowed, aborts the moment
+		// the NPC must fight (target visible) or is suppressed; damage interrupts it in the task.
+		UBehaviorTreeGraphNode* CallNode = B.Subtree(Call, Sel, -1850, 360);
+		B.KeyIsSet(CallNode, HitmenBBKeys::CanCallReinforcements, EBTFlowAbortMode::Both);
+
+		// Alert-state decorators observe AlertState with aborts Both (seeing the target preempts
+		// search / investigate / patrol).
 		UBehaviorTreeGraphNode* CombatNode = B.Subtree(Combat, Sel, -1400, 360);
 		B.AlertIs(CombatNode, { EHitmenAlertState::Combat });
 

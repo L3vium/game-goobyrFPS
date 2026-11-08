@@ -11,8 +11,15 @@
 class USphereComponent;
 class UNiagaraComponent;
 class UHitmenAbilityData;
+class UStaticMesh;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
 
-/** Blocks NPC sight through its sphere (players are blocked by the visual). */
+/**
+ * Blocks NPC sight through its sphere (players are blocked by the visual).
+ * Visual: the Niagara slot (team VFX) or, while none is assigned, a fallback cloud of basic-shape
+ * puffs that grow in and fade out over the lifetime (cosmetic, built on every machine).
+ */
 UCLASS(Blueprintable)
 class HITMEN_API AHitmenSmokeCloud : public AActor
 {
@@ -39,6 +46,65 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke", meta=(ClampMin="0", Units="s"))
 	float Lifetime = 12.f;
+
+	// ---- Fallback puffs (shown while no Niagara system is assigned) ----
+	/** Hide the puffs when the Effect component has a Niagara system. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback")
+	bool bHidePuffsWhenNiagaraAssigned = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback", meta=(ClampMin="0", ClampMax="64"))
+	int32 PuffCount = 14;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback")
+	TSoftObjectPtr<UStaticMesh> PuffMesh;
+
+	/** Translucent material; its PuffOpacityParameter scalar is driven for the fade. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback")
+	TSoftObjectPtr<UMaterialInterface> PuffMaterial;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback")
+	FName PuffOpacityParameter = TEXT("Opacity");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback", meta=(ClampMin="0", Units="cm"))
+	float PuffMinRadius = 120.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback", meta=(ClampMin="0", Units="cm"))
+	float PuffMaxRadius = 240.f;
+
+	/** Puff centres are spread within Radius times this. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback", meta=(ClampMin="0", ClampMax="1"))
+	float PuffSpread = 0.7f;
+
+	/** Vertical squash of the spread (smoke hugs the ground); puffs stay above the origin. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback", meta=(ClampMin="0", ClampMax="1"))
+	float PuffVerticalSpread = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback", meta=(ClampMin="0", Units="s"))
+	float PuffGrowTime = 1.2f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback", meta=(ClampMin="0", Units="s"))
+	float PuffFadeOutTime = 2.5f;
+
+	/** Puff scale reached at the end of the fade (also hides it when the material has no opacity parameter). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback", meta=(ClampMin="0"))
+	float PuffFadeOutScale = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback", meta=(ClampMin="0.01", Units="s"))
+	float PuffUpdateInterval = 0.05f;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UStaticMeshComponent>> Puffs;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> PuffMaterialInstance;
+
+	/** Full scale of each puff (parallel to Puffs). */
+	TArray<FVector> PuffScales;
+	float SpawnTime = 0.f;
+	FTimerHandle PuffTimer;
+
+	void BuildPuffs();
+	void UpdatePuffs();
 };
 
 /** Stepping on it traps NPCs (long) and players (short). */

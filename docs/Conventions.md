@@ -32,22 +32,24 @@ C++ classes use the `Hitmen` prefix after the Unreal letter: `AHitmenWeaponBase`
 ## Content folders
 ```
 Content/Hitmen/
-  Core/            GameModes, GameInstance, PlayerController, GameState BPs
-  Characters/      Player/ NPC/ Shared/   (BP_, ABP_, Anims/, Meshes/)
-  Weapons/         <WeaponName>/  (BP_, DA_, Meshes/, VFX/, SFX/)
-  Abilities/       Move/<Name>/  Manipulation/<Name>/
+  Core/            BP_GM_*, BP_GameInstance, BP_GameState, BP_PlayerState, BP_PlayerController, BP_SpectatorPawn
+  Characters/      Player/ (BP_PlayerCharacter, BP_LastKnownGhost, Anims/ABP_FirstPerson)  NPC/  Shared/Anims/
+  Weapons/         Blueprints/ (family BPs)  Projectiles/  Pickups/   (weapon data: Data/Weapons/DA_Weapon_*)
+  Abilities/       Move/<Name>/  Manipulation/<Name>/  Actors/  Pickups/
   World/           Interactables/<Type>/  Spawning/  Vehicles/
-  AI/              BehaviorTrees/  Blackboards/  EQS/  Tasks/
-  UI/              Menus/  Lobby/  HUD/  Common/  Fonts/  Textures/
+  AI/              BP_AIController, BP_PatrolRoute, BehaviorTrees/ (BT_* and BB_NPC, generated together)
+  UI/              Menus/  Lobby/  HUD/   (WBP_* are value carriers over C++ default layouts)
   Input/           Actions/  Contexts/
   Maps/            L_TitleScreen, L_Lobby, L_Gym, L_LDTest, L_Empty_01, L_Empty_02
-  Materials/       Master/  Instances/  PostProcess/
-  VFX/             <Category>/
-  Audio/           SFX/<Category>/  Music/  Ambience/  Attenuation/
-  Data/            Rules/  Maps/  Weapons/  Abilities/  AnimSets/  Cosmetics/
+  Materials/       Master/  Instances/ (MI_<Colour> props, MI_Grid_<Colour> checker LD)  PostProcess/ (PP_*)
+  VFX/             <Category>/                       (created by the team with the first asset)
+  Audio/           Mixes/ (SCM_Volume)  SFX/<Category>/  Music/  Ambience/
+  Data/            Rules/  Maps/  Weapons/  Abilities/  AnimSets/  Cosmetics/  DA_Catalog
   Physics/         PM_ physical materials
 ```
-Third-party packs stay in their own root folders (`Vefects/`, `Weapons_Free/`, `Characters/`).
+The Content root holds only `Hitmen/` and source packs: engine templates (`Characters/` mannequins,
+`LevelPrototyping/` checker materials, `Weapons/` template guns) and marketplace packs (`Vefects/`,
+`Weapons_Free/`). Level geometry uses the checker materials (`MI_PrototypeGrid_*`, `MI_Grid_*`).
 
 ## C++ source folders
 ```
@@ -63,6 +65,11 @@ Source/Hitmen/
   event wire across the graph.
 - Collapse repeated logic into functions or macros; keep graphs formatted with
   Blueprint Assistant (`F` on a selection).
+- `UHitmenBlueprintGraphTools::LayOutConventionGraphs` (editor Python / MCP) adds an **Init**
+  graph (BeginPlay, green box) and a **Juice** graph with one stub per `Juice_On…` hook of the
+  native parents (purple box) to a Blueprint; Blueprint children of Blueprints inherit their
+  parent's graphs instead. Hooks declared on components (inventory, melee, carry…) are overridden
+  in a Blueprint subclass of the component.
 - Group every block with a comment box using the project colour code:
 
 | Block | Colour | RGB |

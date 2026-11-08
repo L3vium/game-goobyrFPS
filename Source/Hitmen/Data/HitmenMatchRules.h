@@ -78,17 +78,19 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Carry", meta=(ClampMin="0.05", ClampMax="1"))
 	float CarrySpeedMultiplier = 0.65f;
 
-	/** Seconds between sonar pings when carrying starts. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sonar", meta=(ClampMin="0.1"))
-	float SonarStartInterval = 12.f;
+	/** Sonar timing (seconds). Lobby options: hide one to fix its value by design. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Lobby Options")
+	FHitmenFloatOption SonarStartInterval = { 12.f, 2.f, 30.f, true };
 
-	/** Seconds between pings once the ramp is over. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sonar", meta=(ClampMin="0.1"))
-	float SonarEndInterval = 2.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Lobby Options")
+	FHitmenFloatOption SonarEndInterval = { 2.f, 0.5f, 10.f, true };
 
-	/** Seconds of carrying to go from start to end interval. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sonar", meta=(ClampMin="0.1"))
-	float SonarRampDuration = 90.f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Lobby Options")
+	FHitmenFloatOption SonarRampDuration = { 90.f, 10.f, 300.f, true };
+
+	/** Step used by the lobby +/- buttons for the sonar options. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Lobby Options", meta=(ClampMin="0.1"))
+	float SonarLobbyStep = 1.f;
 
 	/** Optional shaping of the ramp (0..1 -> 0..1). Linear when null. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sonar")
@@ -108,7 +110,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", ClampMax="1"))
 	float OcclusionMultiplier = 0.45f;
 
-	/** Only the N nearest NPCs react to one noise. */
+	/** Only the N nearest NPCs that can hear react to one noise, for every noise type (gunshots and
+	 *  explosions included). Keep it at 1-2; per-type exceptions in NoiseResponderOverrides. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="1"))
 	int32 MaxNoiseResponders = 2;
 
@@ -143,10 +146,63 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI", meta=(ClampMin="0", Units="cm"))
 	float WitnessKillRadius = 2000.f;
 
+	// ---- AI: hearing caps, reinforcement calls, search, flanking (owned by the AI code) ----
+	/** Per noise type replacement for MaxNoiseResponders (a missing type uses MaxNoiseResponders). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Hearing")
+	TMap<EHitmenNoiseType, int32> NoiseResponderOverrides;
+
+	/** Seconds between two reinforcement calls of one NPC, counted from the call start. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Reinforcements", meta=(ClampMin="0", Units="s"))
+	float ReinforcementCallCooldown = 15.f;
+
+	/** Seconds an NPC must have been alerted (yellow / red / search) before it may call. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Reinforcements", meta=(ClampMin="0", Units="s"))
+	float ReinforcementCallMinAlertTime = 1.5f;
+
+	/** Yellow NPCs investigating a real threat (sighting, body, gunfire) may call, not only searching
+	 *  ones and red ones without line of sight. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Reinforcements")
+	bool bInvestigatingNPCsCallReinforcements = true;
+
+	/** NPCs alerted by a call may call in turn (off = no chain reaction across the map). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Reinforcements")
+	bool bReinforcementCallsRelay = false;
+
+	/** Seconds a searched spot stays "already searched" for every NPC. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Search", meta=(ClampMin="0", Units="s"))
+	float SearchSpotClaimLifetime = 20.f;
+
+	/** Two search spots closer than this are the same spot. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Search", meta=(ClampMin="0", Units="cm"))
+	float SearchSpotClaimRadius = 300.f;
+
+	/** Probe flank slots on other floors so one flanker takes another level / route (stairs). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Flanking")
+	bool bFlankUseOtherLevels = true;
+
+	/** Typical height between two floors of the maps. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Flanking", meta=(ClampMin="1", Units="cm"))
+	float FlankFloorHeight = 300.f;
+
+	/** Floors probed above and below the target. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Flanking", meta=(ClampMin="0", ClampMax="3"))
+	int32 FlankHeightLevels = 1;
+
+	/** Horizontal tolerance when snapping a flank slot to the navmesh. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Flanking", meta=(ClampMin="0", Units="cm"))
+	float FlankProjectionRadius = 300.f;
+
 	const FHitmenDifficultyPreset& GetPreset(EHitmenDifficulty InDifficulty) const;
 
 	/** Sonar interval after CarryTime seconds of carrying. */
-	float GetSonarInterval(float CarryTime) const;
+	/** Interval for the given carry time using the lobby's sonar timing. */
+	float GetSonarInterval(float CarryTime, const FHitmenLobbySettings& Settings) const;
+
+	/** Lobby settings filled with every option's default value. */
+	FHitmenLobbySettings MakeDefaultLobbySettings() const;
+
+	/** Clamps to each option's range and forces hidden options back to their designed value. */
+	FHitmenLobbySettings SanitizeLobbySettings(const FHitmenLobbySettings& Requested) const;
 
 	virtual FPrimaryAssetId GetPrimaryAssetId() const override
 	{

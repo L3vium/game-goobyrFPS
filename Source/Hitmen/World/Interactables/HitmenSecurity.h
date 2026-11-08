@@ -18,6 +18,9 @@ class UDecalComponent;
 class UBoxComponent;
 class ULightComponent;
 class UPointLightComponent;
+class UMaterialInterface;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenCameraDisabledChanged, bool, bDisabled);
 
 /** Sweeping camera. Its cone is visible (white, red when it sees you) and it calls reinforcements. */
 UCLASS(Blueprintable)
@@ -41,7 +44,11 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
 	bool IsSeeingIntruder() const { return bSeeingIntruder; }
 
-	/** Renders the camera view into a target (monitors). */
+	/** Every machine: the camera was disabled / re-enabled (monitors show "no signal"). */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|Camera")
+	FOnHitmenCameraDisabledChanged OnDisabledChanged;
+
+	/** Renders the camera view into a target (monitors). Does nothing while disabled. */
 	void CaptureTo(UTextureRenderTarget2D* Target);
 
 protected:
@@ -102,6 +109,9 @@ protected:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> ColorMaterials;
 
+	/** Last disabled state broadcast on this machine (OnRep_Visuals also fires for bSeeingIntruder). */
+	bool bLastBroadcastDisabled = false;
+
 	UFUNCTION() void OnRep_Visuals();
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
@@ -150,10 +160,24 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Monitor", meta=(ClampMin="0.02"))
 	float RefreshInterval = 0.2f;
 
+	/** Shown on the screen slot while the linked camera is disabled (no capture runs meanwhile). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Monitor")
+	TSoftObjectPtr<UMaterialInterface> NoSignalMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/M_Monitor_NoSignal.M_Monitor_NoSignal")));
+
 	UPROPERTY(Transient)
 	TObjectPtr<UTextureRenderTarget2D> RenderTarget;
 
+	/** Live feed material (render target), restored when the camera comes back. */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> FeedMaterial;
+
 	void Refresh();
+
+	UFUNCTION()
+	void HandleCameraDisabledChanged(bool bCameraDisabled);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnSignalChanged(bool bHasSignal);
 
 	FTimerHandle RefreshTimer;
 };

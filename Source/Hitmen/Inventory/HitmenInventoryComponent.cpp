@@ -2,7 +2,6 @@
 
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Weapons/HitmenWeaponBase.h"
-#include "Weapons/HitmenWeaponPickup.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Data/HitmenWeaponData.h"
 #include "Net/UnrealNetwork.h"
@@ -116,20 +115,68 @@ bool UHitmenInventoryComponent::GiveWeapon(UHitmenWeaponData* Weapon, int32 Ammo
 		{
 			return false;
 		}
-		Target = Slots.IsValidIndex(ActiveSlot) ? ActiveSlot : 0;
+		// The old weapon actor goes to the world (dropped in front), never destroyed.
 		FVector Origin, Direction;
 		UHitmenCombatLibrary::GetAimPoint(Cast<APawn>(GetOwner()), Origin, Direction);
-		SpawnThrownPickup(Slots[Target].Weapon, Slots[Target].Ammo, Origin, Direction * 0.2f);
-		RemoveSlot(Target, true);
+		DropSlot(Slots.IsValidIndex(ActiveSlot) ? ActiveSlot : 0, Origin + Direction * ThrowSpawnDistance, Direction.Rotation(), Direction * ReplaceDropSpeed, nullptr);
+		Target = Slots.IndexOfByPredicate([](const FHitmenInventorySlot& S) { return S.IsEmpty(); });
+		if (Target == INDEX_NONE)
+		{
+			return false;
+		}
 	}
 
-	FHitmenInventorySlot& Slot = Slots[Target];
-	Slot.Weapon = Weapon;
-	Slot.Ammo = Weapon->bUsesAmmo ? FMath::Clamp(Amount, 0, Weapon->MaxAmmo) : 0;
-	Slot.Actor = SpawnWeaponActor(Weapon);
-	SetActiveSlotInternal(Target);
-	OnRep_Slots();
+	FillSlot(Target, Weapon, Amount, SpawnWeaponActor(Weapon));
 	return true;
+}
+
+bool UHitmenInventoryComponent::PickUpWeapon(AHitmenWeaponBase* WorldWeapon, bool bAllowSwap)
+{
+	if (!GetOwner()->HasAuthority() || !IsValid(WorldWeapon) || !WorldWeapon->IsDropped() || !WorldWeapon->GetWeaponData())
+	{
+		return false;
+	}
+	UHitmenWeaponData* Weapon = WorldWeapon->GetWeaponData();
+	const int32 Amount = WorldWeapon->GetDroppedAmmo();
+
+	// Same type: merge its ammo; the world copy is redundant.
+	if (HasWeaponType(Weapon))
+	{
+		TryAddAmmo(Weapon, Amount);
+		WorldWeapon->Destroy();
+		return true;
+	}
+
+	int32 Target = Slots.IndexOfByPredicate([](const FHitmenInventorySlot& S) { return S.IsEmpty(); });
+	if (Target == INDEX_NONE)
+	{
+		if (!bAllowSwap)
+		{
+			return false;
+		}
+		// Swap: the held weapon takes the picked weapon's place in the world.
+		const FTransform PlaceAt = WorldWeapon->GetActorTransform();
+		DropSlot(Slots.IsValidIndex(ActiveSlot) ? ActiveSlot : 0, PlaceAt.GetLocation(), PlaceAt.Rotator(), FVector::ZeroVector, nullptr);
+		Target = Slots.IndexOfByPredicate([](const FHitmenInventorySlot& S) { return S.IsEmpty(); });
+		if (Target == INDEX_NONE)
+		{
+			return false;
+		}
+	}
+
+	WorldWeapon->PickUp(Cast<APawn>(GetOwner()));
+	FillSlot(Target, Weapon, Amount, WorldWeapon);
+	return true;
+}
+
+void UHitmenInventoryComponent::FillSlot(int32 SlotIndex, UHitmenWeaponData* Weapon, int32 Ammo, AHitmenWeaponBase* Actor)
+{
+	FHitmenInventorySlot& Slot = Slots[SlotIndex];
+	Slot.Weapon = Weapon;
+	Slot.Ammo = Weapon->bUsesAmmo ? FMath::Clamp(Ammo, 0, Weapon->MaxAmmo) : 0;
+	Slot.Actor = Actor;
+	SetActiveSlotInternal(SlotIndex);
+	OnRep_Slots();
 }
 
 bool UHitmenInventoryComponent::TryAddAmmo(UHitmenWeaponData* Weapon, int32 Amount)
@@ -184,18 +231,6 @@ void UHitmenInventoryComponent::AddKeycard(int32 KeycardId)
 	}
 }
 
-bool UHitmenInventoryComponent::TakeActive(UHitmenWeaponData*& OutWeapon, int32& OutAmmo)
-{
-	if (!GetOwner()->HasAuthority() || !Slots.IsValidIndex(ActiveSlot) || Slots[ActiveSlot].IsEmpty())
-	{
-		return false;
-	}
-	OutWeapon = Slots[ActiveSlot].Weapon;
-	OutAmmo = Slots[ActiveSlot].Ammo;
-	RemoveSlot(ActiveSlot, true);
-	return true;
-}
-
 void UHitmenInventoryComponent::RemoveSlot(int32 SlotIndex, bool bDestroyActor)
 {
 	if (!Slots.IsValidIndex(SlotIndex))
@@ -218,22 +253,28 @@ void UHitmenInventoryComponent::RemoveSlot(int32 SlotIndex, bool bDestroyActor)
 	OnRep_Slots();
 }
 
-void UHitmenInventoryComponent::SpawnThrownPickup(UHitmenWeaponData* Weapon, int32 Ammo, const FVector& Origin, const FVector& Direction)
+void UHitmenInventoryComponent::DropSlot(int32 SlotIndex, const FVector& Location, const FRotator& Rotation, const FVector& Velocity, APawn* Thrower)
 {
-	if (!Weapon)
+	if (!Slots.IsValidIndex(SlotIndex) || Slots[SlotIndex].IsEmpty())
 	{
 		return;
 	}
-	const TSubclassOf<AHitmenWeaponPickup> PickupClass = Weapon->PickupClass ? Weapon->PickupClass : TSubclassOf<AHitmenWeaponPickup>(AHitmenWeaponPickup::StaticClass());
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	Params.Instigator = Cast<APawn>(GetOwner());
-	Params.Owner = GetOwner();
-	const FVector SpawnLocation = Origin + Direction.GetSafeNormal() * 60.f;
-	if (AHitmenWeaponPickup* Pickup = GetWorld()->SpawnActor<AHitmenWeaponPickup>(PickupClass, SpawnLocation, Direction.Rotation(), Params))
+	const FHitmenInventorySlot Dropped = Slots[SlotIndex];
+	RemoveSlot(SlotIndex, false);
+	if (Dropped.Actor)
 	{
-		Pickup->InitPickup(Weapon, Ammo);
-		Pickup->Throw(Direction.GetSafeNormal() * ThrowSpeed, Params.Instigator);
+		Dropped.Actor->Drop(Dropped.Ammo, Location, Rotation, Velocity, Thrower);
+	}
+}
+
+void UHitmenInventoryComponent::RefreshWeaponAttachments()
+{
+	for (const FHitmenInventorySlot& Slot : Slots)
+	{
+		if (Slot.Actor)
+		{
+			Slot.Actor->RefreshAttachment();
+		}
 	}
 }
 
@@ -284,12 +325,18 @@ void UHitmenInventoryComponent::Server_ThrowActive_Implementation(FVector_NetQua
 		return;
 	}
 	// Never trust a client origin far from the pawn.
-	const FVector SafeOrigin = FVector::Dist(Origin, GetOwner()->GetActorLocation()) < 300.f ? FVector(Origin) : GetOwner()->GetActorLocation();
+	const FVector SafeOrigin = FVector::Dist(Origin, GetOwner()->GetActorLocation()) < ThrowOriginTolerance ? FVector(Origin) : GetOwner()->GetActorLocation();
+	const FVector Dir = FVector(Direction).GetSafeNormal();
 	UHitmenWeaponData* Weapon = Slots[ActiveSlot].Weapon;
-	const int32 Ammo = Slots[ActiveSlot].Ammo;
+	// The weapon actor itself flies and becomes the world pickup.
+	DropSlot(ActiveSlot, SafeOrigin + Dir * ThrowSpawnDistance, Dir.Rotation(), Dir * ThrowSpeed, Cast<APawn>(GetOwner()));
+	Multicast_Thrown(Weapon);
+}
+
+void UHitmenInventoryComponent::Multicast_Thrown_Implementation(UHitmenWeaponData* Weapon)
+{
 	Juice_OnThrow(Weapon);
-	SpawnThrownPickup(Weapon, Ammo, SafeOrigin, Direction);
-	RemoveSlot(ActiveSlot, true);
+	OnWeaponThrown.Broadcast(Weapon);
 }
 
 void UHitmenInventoryComponent::StartFire()
@@ -318,6 +365,11 @@ void UHitmenInventoryComponent::SetActiveSlotInternal(int32 NewSlot)
 
 void UHitmenInventoryComponent::RefreshWeaponVisibility()
 {
+	// Server only: the weapon state replicates and every machine applies it.
+	if (!GetOwner()->HasAuthority())
+	{
+		return;
+	}
 	for (int32 Index = 0; Index < Slots.Num(); ++Index)
 	{
 		if (AHitmenWeaponBase* Weapon = Slots[Index].Actor)

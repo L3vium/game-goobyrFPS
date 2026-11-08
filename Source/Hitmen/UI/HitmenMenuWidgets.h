@@ -6,6 +6,7 @@
 #include "CoreMinimal.h"
 #include "UI/HitmenUserWidget.h"
 #include "Core/HitmenTypes.h"
+#include "UI/HitmenUIEventSubsystem.h"
 #include "HitmenMenuWidgets.generated.h"
 
 class UButton;
@@ -152,19 +153,14 @@ protected:
 	virtual void BuildDefaultLayout() override;
 	virtual void BindEvents() override;
 	virtual void UnbindEvents() override;
-	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	UFUNCTION() void HandleModeChanged(uint8 Mode);
-
-	void RebuildGrid();
-	void StopCaptures();
+	UFUNCTION() void HandleViewsChanged(const TArray<FHitmenSpectatorView>& Views);
 
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> ModeText;
 	UPROPERTY(Transient) TObjectPtr<UUniformGridPanel> Grid;
-	UPROPERTY(Transient) TArray<TObjectPtr<UTextureRenderTarget2D>> RenderTargets;
-	UPROPERTY(Transient) TArray<TObjectPtr<APawn>> CapturedPawns;
 
-	float GridRefreshAccumulator = 0.f;
+	uint8 CurrentMode = 0;
 };
 
 /** Winner + reason, shown until the return to the lobby. */

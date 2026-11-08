@@ -7,6 +7,9 @@
 #include "Core/HitmenTypes.h"
 #include "HitmenGameInstance.generated.h"
 
+class USoundMix;
+class USoundClass;
+
 UCLASS()
 class HITMEN_API UHitmenGameInstance : public UGameInstance
 {
@@ -38,6 +41,28 @@ public:
 	void OpenGym();
 
 protected:
+	/** Mix pushed at startup; Options volumes override its classes (set in BP_GameInstance). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Audio")
+	TSoftObjectPtr<USoundMix> VolumeSoundMix;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Audio")
+	TSoftObjectPtr<USoundClass> MasterSoundClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Audio")
+	TSoftObjectPtr<USoundClass> MusicSoundClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Audio")
+	TSoftObjectPtr<USoundClass> SFXSoundClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Audio")
+	TSoftObjectPtr<USoundClass> VoiceSoundClass;
+
+	/** Applies the Options volumes to the sound mix. */
+	UFUNCTION()
+	void ApplyAudioSettings();
+
+	void HandlePostLoadMap(UWorld* LoadedWorld);
+
 	void HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
 	void HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
 };

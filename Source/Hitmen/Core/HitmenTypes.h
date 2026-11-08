@@ -83,10 +83,12 @@ enum class EHitmenAbilitySlot : uint8
 UENUM(BlueprintType)
 enum class EHitmenCosmeticSlot : uint8
 {
+	/** Hat, cap, moustache, glasses... */
 	Head,
-	Top,
+	/** Jacket, vest, coat... */
 	Body,
-	Bottom
+	/** Trousers, boots... */
+	Legs
 };
 
 UENUM(BlueprintType)
@@ -168,13 +170,10 @@ struct FHitmenCosmeticLoadout
 	TObjectPtr<UHitmenCosmeticItem> Head = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Cosmetics")
-	TObjectPtr<UHitmenCosmeticItem> Top = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Cosmetics")
 	TObjectPtr<UHitmenCosmeticItem> Body = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Cosmetics")
-	TObjectPtr<UHitmenCosmeticItem> Bottom = nullptr;
+	TObjectPtr<UHitmenCosmeticItem> Legs = nullptr;
 
 	UHitmenCosmeticItem* GetSlot(EHitmenCosmeticSlot Slot) const;
 	void SetSlot(EHitmenCosmeticSlot Slot, UHitmenCosmeticItem* Item);
@@ -264,6 +263,18 @@ struct FHitmenLobbySettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Lobby")
 	EHitmenDifficulty Difficulty = EHitmenDifficulty::Normal;
+
+	/** Seconds between sonar pings of the carried VIP body when carrying starts. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Lobby")
+	float SonarStartInterval = 12.f;
+
+	/** Seconds between pings once the ramp is over. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Lobby")
+	float SonarEndInterval = 2.f;
+
+	/** Seconds of carrying to go from the start to the end interval. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Lobby")
+	float SonarRampDuration = 90.f;
 };
 
 /** Result of a finished match. */

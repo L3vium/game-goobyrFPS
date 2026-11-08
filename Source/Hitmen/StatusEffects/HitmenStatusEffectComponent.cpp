@@ -2,6 +2,9 @@
 
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Components/HitmenHealthComponent.h"
+#include "Camera/CameraComponent.h"
+#include "Materials/MaterialInterface.h"
+#include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
@@ -16,6 +19,20 @@ UHitmenStatusEffectComponent::UHitmenStatusEffectComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
+	PillPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/M_PP_Pill.M_PP_Pill")));
+	BlindPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/M_PP_Blind.M_PP_Blind")));
+}
+
+void UHitmenStatusEffectComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(UpdateTimer);
+		World->GetTimerManager().ClearTimer(ScreenEffectTimer);
+	}
+	ApplyScreenEffectWeight(LoadedPillMaterial, 0.f);
+	ApplyScreenEffectWeight(LoadedBlindMaterial, 0.f);
+	Super::EndPlay(EndPlayReason);
 }
 
 void UHitmenStatusEffectComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -133,6 +150,119 @@ void UHitmenStatusEffectComponent::RaiseDiffEvents()
 		}
 	}
 	PreviousTypes = MoveTemp(Current);
+	RefreshScreenEffects();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Screen effects (pill distortion, flashbang white-out)
+// ---------------------------------------------------------------------------------------------
+
+bool UHitmenStatusEffectComponent::IsLocalViewer() const
+{
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	return Pawn && Pawn->IsLocallyControlled() && Pawn->IsPlayerControlled() && GetNetMode() != NM_DedicatedServer;
+}
+
+UMaterialInterface* UHitmenStatusEffectComponent::ResolveMaterial(const TSoftObjectPtr<UMaterialInterface>& Soft, TObjectPtr<UMaterialInterface>& Loaded, bool& bLoadTried) const
+{
+	if (!Loaded && !bLoadTried)
+	{
+		bLoadTried = true;
+		if (!Soft.IsNull())
+		{
+			Loaded = Soft.LoadSynchronous();
+		}
+	}
+	return Loaded;
+}
+
+void UHitmenStatusEffectComponent::RefreshScreenEffects()
+{
+	const bool bLocal = IsLocalViewer();
+	if (!bLocal && PillWeight <= 0.f && BlindWeight <= 0.f)
+	{
+		return;
+	}
+	const float PillTarget = bLocal && HasStatus(PillStatus) ? 1.f : 0.f;
+	const float BlindTarget = bLocal && HasStatus(EHitmenStatusEffect::Blinded) ? 1.f : 0.f;
+	if (FMath::IsNearlyEqual(PillWeight, PillTarget) && FMath::IsNearlyEqual(BlindWeight, BlindTarget))
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (World && !World->GetTimerManager().IsTimerActive(ScreenEffectTimer))
+	{
+		LastScreenEffectUpdateTime = World->GetTimeSeconds();
+		World->GetTimerManager().SetTimer(ScreenEffectTimer, this, &UHitmenStatusEffectComponent::UpdateScreenEffects, ScreenEffectUpdateInterval, true);
+	}
+}
+
+void UHitmenStatusEffectComponent::UpdateScreenEffects()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	const float Now = World->GetTimeSeconds();
+	const float DeltaTime = FMath::Max(0.f, Now - LastScreenEffectUpdateTime);
+	LastScreenEffectUpdateTime = Now;
+
+	const bool bLocal = IsLocalViewer();
+	const float PillTarget = bLocal && HasStatus(PillStatus) ? 1.f : 0.f;
+	const float BlindTarget = bLocal && HasStatus(EHitmenStatusEffect::Blinded) ? 1.f : 0.f;
+
+	auto Step = [DeltaTime](float Current, float Target, float FadeIn, float FadeOut)
+	{
+		const float FadeTime = Target > Current ? FadeIn : FadeOut;
+		return FadeTime <= 0.f ? Target : FMath::FInterpConstantTo(Current, Target, DeltaTime, 1.f / FadeTime);
+	};
+	PillWeight = Step(PillWeight, PillTarget, PillFadeInTime, PillFadeOutTime);
+	BlindWeight = Step(BlindWeight, BlindTarget, BlindFadeInTime, BlindFadeOutTime);
+
+	ApplyScreenEffectWeight(ResolveMaterial(PillPostProcessMaterial, LoadedPillMaterial, bPillMaterialLoadTried), PillWeight);
+	ApplyScreenEffectWeight(ResolveMaterial(BlindPostProcessMaterial, LoadedBlindMaterial, bBlindMaterialLoadTried), BlindWeight);
+
+	if (FMath::IsNearlyEqual(PillWeight, PillTarget) && FMath::IsNearlyEqual(BlindWeight, BlindTarget))
+	{
+		World->GetTimerManager().ClearTimer(ScreenEffectTimer);
+	}
+}
+
+void UHitmenStatusEffectComponent::ApplyScreenEffectWeight(UMaterialInterface* Material, float Weight)
+{
+	if (!Material)
+	{
+		return;
+	}
+	UCameraComponent* Camera = EffectCamera.Get();
+	if (!Camera && GetOwner())
+	{
+		Camera = GetOwner()->FindComponentByClass<UCameraComponent>();
+		EffectCamera = Camera;
+	}
+	if (!Camera)
+	{
+		return;
+	}
+	TArray<FWeightedBlendable>& Blendables = Camera->PostProcessSettings.WeightedBlendables.Array;
+	const int32 Index = Blendables.IndexOfByPredicate([Material](const FWeightedBlendable& Blendable) { return Blendable.Object.Get() == Material; });
+	if (Weight <= 0.f)
+	{
+		if (Index != INDEX_NONE)
+		{
+			Blendables.RemoveAt(Index);
+		}
+		return;
+	}
+	if (Index != INDEX_NONE)
+	{
+		Blendables[Index].Weight = Weight;
+	}
+	else
+	{
+		Blendables.Add(FWeightedBlendable(Weight, Material));
+	}
 }
 
 bool UHitmenStatusEffectComponent::HasStatus(EHitmenStatusEffect Type) const

@@ -30,6 +30,7 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PossessedBy(AController* NewController) override;
 
@@ -144,6 +145,13 @@ protected:
 	virtual void HandleStatusAdded(EHitmenStatusEffect Status, AActor* StatusInstigator) override;
 	virtual void HandleStatusRemoved(EHitmenStatusEffect Status, AActor* StatusInstigator) override;
 	virtual void HandleDeath(AActor* Killer, AActor* DamageCauser, bool bHeadshot) override;
+
+	/** The local player's first-person arms play montages too. */
+	virtual void GetMontageMeshes(TArray<USkeletalMeshComponent*>& OutMeshes) const override;
+
+	/** Local player: FOV and ladder direction from Options; re-applied whenever Options are saved. */
+	UFUNCTION()
+	void ApplyUserSettings();
 
 	void BeginCharm(AActor* Charmer);
 	void EndCharm();

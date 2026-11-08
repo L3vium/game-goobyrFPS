@@ -5,18 +5,18 @@
 #include "UI/HitmenUIEventSubsystem.h"
 #include "Framework/HitmenPlayerController.h"
 #include "Framework/HitmenGameState.h"
+#include "Characters/HitmenCharacterBase.h"  // GameState::GetVIP() type only
 #include "Framework/HitmenGameInstance.h"
 #include "Framework/HitmenPlayerState.h"
-#include "Characters/HitmenCharacterBase.h"
-#include "Characters/HitmenPlayerCharacter.h"
 #include "Core/HitmenGameSettings.h"
 #include "Core/HitmenUserSettings.h"
 #include "Data/HitmenCatalog.h"
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenAbilityData.h"
-#include "Data/HitmenAnimSet.h"
 #include "Data/HitmenMapDefinition.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/OverlaySlot.h"
+#include "Components/Overlay.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -30,9 +30,7 @@
 #include "Components/ScrollBox.h"
 #include "Components/Image.h"
 #include "Components/UniformGridPanel.h"
-#include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
-#include "Kismet/KismetRenderingLibrary.h"
 #include "EnhancedInputSubsystems.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
 #include "Rendering/DrawElements.h"
@@ -564,13 +562,9 @@ void UHitmenEmoteWheelWidget::UnbindEvents()
 TArray<FText> UHitmenEmoteWheelWidget::GetEmoteNames() const
 {
 	TArray<FText> Names;
-	const AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(GetOwningPlayerPawn());
-	if (const UHitmenAnimSet* AnimSet = Character ? Character->GetAnimSet() : nullptr)
+	if (const UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
-		for (const FHitmenEmote& Emote : AnimSet->Emotes)
-		{
-			Names.Add(Emote.DisplayName);
-		}
+		Names = UI->GetEmoteNames();
 	}
 	if (Names.IsEmpty())
 	{
@@ -646,6 +640,8 @@ void UHitmenSpectatorWidget::BindEvents()
 	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
 		UI->OnSpectatorModeChanged.AddUniqueDynamic(this, &UHitmenSpectatorWidget::HandleModeChanged);
+		UI->OnSpectatorViewsChanged.AddUniqueDynamic(this, &UHitmenSpectatorWidget::HandleViewsChanged);
+		HandleViewsChanged(UI->GetSpectatorViews());
 	}
 }
 
@@ -654,99 +650,62 @@ void UHitmenSpectatorWidget::UnbindEvents()
 	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
 		UI->OnSpectatorModeChanged.RemoveAll(this);
+		UI->OnSpectatorViewsChanged.RemoveAll(this);
 	}
-	StopCaptures();
 }
 
 void UHitmenSpectatorWidget::HandleModeChanged(uint8 Mode)
 {
+	CurrentMode = Mode;
 	const EHitmenSpectatorMode SpectatorMode = static_cast<EHitmenSpectatorMode>(Mode);
 	if (ModeText)
 	{
 		const FText ModeName = SpectatorMode == EHitmenSpectatorMode::FreeFly ? LOCTEXT("FreeFly", "FREE FLY")
-			: SpectatorMode == EHitmenSpectatorMode::Follow ? LOCTEXT("Follow", "FOLLOW") : LOCTEXT("Grid", "ALL SCREENS");
-		ModeText->SetText(FText::Format(LOCTEXT("SpectatorHint", "{0}     [LMB/RMB] switch player     [Space] change view"), ModeName));
+			: SpectatorMode == EHitmenSpectatorMode::Follow ? LOCTEXT("Follow", "FOLLOW") : LOCTEXT("Grid", "MULTI-SCREEN");
+		const FText Hint = SpectatorMode == EHitmenSpectatorMode::Grid
+			? LOCTEXT("GridHint", "[Wheel] number of screens     [LMB/RMB] switch player     [V] change view")
+			: LOCTEXT("SpectatorHint", "[LMB/RMB] switch player     [V] change view");
+		ModeText->SetText(FText::Format(LOCTEXT("SpectatorLine", "{0}     {1}"), ModeName, Hint));
 	}
-	if (SpectatorMode == EHitmenSpectatorMode::Grid)
+	if (Grid && SpectatorMode != EHitmenSpectatorMode::Grid)
 	{
-		RebuildGrid();
-	}
-	else
-	{
-		StopCaptures();
-	}
-}
-
-void UHitmenSpectatorWidget::StopCaptures()
-{
-	for (APawn* Pawn : CapturedPawns)
-	{
-		if (const AHitmenPlayerCharacter* Character = Cast<AHitmenPlayerCharacter>(Pawn))
-		{
-			Character->GetSpectatorCapture()->bCaptureEveryFrame = false;
-			Character->GetSpectatorCapture()->TextureTarget = nullptr;
-		}
-	}
-	CapturedPawns.Reset();
-	RenderTargets.Reset();
-	if (Grid)
-	{
-		Grid->ClearChildren();
 		Grid->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
-void UHitmenSpectatorWidget::RebuildGrid()
+void UHitmenSpectatorWidget::HandleViewsChanged(const TArray<FHitmenSpectatorView>& Views)
 {
-	StopCaptures();
-	const AHitmenPlayerController* PC = GetHitmenPC();
-	if (!PC || !Grid)
+	if (!Grid)
 	{
 		return;
 	}
-	const TArray<APawn*> Targets = PC->GetSpectatableTargets();
-	const int32 Columns = FMath::Max(1, FMath::CeilToInt(FMath::Sqrt(static_cast<float>(Targets.Num()))));
-	for (int32 Index = 0; Index < Targets.Num(); ++Index)
+	Grid->ClearChildren();
+	const int32 Columns = FMath::Max(1, FMath::CeilToInt(FMath::Sqrt(static_cast<float>(Views.Num()))));
+	for (int32 Index = 0; Index < Views.Num(); ++Index)
 	{
-		AHitmenPlayerCharacter* Character = Cast<AHitmenPlayerCharacter>(Targets[Index]);
-		if (!Character)
+		const FHitmenSpectatorView& View = Views[Index];
+		if (!View.RenderTarget)
 		{
 			continue;
 		}
-		UTextureRenderTarget2D* Target = UKismetRenderingLibrary::CreateRenderTarget2D(this, 640, 360);
-		Character->GetSpectatorCapture()->TextureTarget = Target;
-		Character->GetSpectatorCapture()->bCaptureEveryFrame = true;
-		Character->GetSpectatorCapture()->Activate();
-		RenderTargets.Add(Target);
-		CapturedPawns.Add(Character);
-
-		UImage* View = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+		UOverlay* Cell = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass());
+		UImage* Image = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
 		FSlateBrush Brush;
-		Brush.SetResourceObject(Target);
-		Brush.ImageSize = FVector2D(640.f, 360.f);
-		View->SetBrush(Brush);
-		Grid->AddChildToUniformGrid(View, Index / Columns, Index % Columns);
-	}
-	Grid->SetVisibility(ESlateVisibility::HitTestInvisible);
-}
-
-void UHitmenSpectatorWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
-{
-	Super::NativeTick(MyGeometry, InDeltaTime);
-	// Players join/die: refresh the grid now and then.
-	const AHitmenPlayerController* PC = GetHitmenPC();
-	if (PC && PC->GetSpectatorMode() == EHitmenSpectatorMode::Grid)
-	{
-		GridRefreshAccumulator += InDeltaTime;
-		if (GridRefreshAccumulator > 2.f)
+		Brush.SetResourceObject(View.RenderTarget);
+		Brush.ImageSize = FVector2D(View.RenderTarget->SizeX, View.RenderTarget->SizeY);
+		Image->SetBrush(Brush);
+		Cell->AddChildToOverlay(Image);
+		UTextBlock* Name = HitmenUI::MakeText(WidgetTree, View.PlayerName, 14);
+		if (UOverlaySlot* NameSlot = Cell->AddChildToOverlay(Name))
 		{
-			GridRefreshAccumulator = 0.f;
-			if (PC->GetSpectatableTargets().Num() != CapturedPawns.Num())
-			{
-				RebuildGrid();
-			}
+			NameSlot->SetHorizontalAlignment(HAlign_Left);
+			NameSlot->SetVerticalAlignment(VAlign_Top);
+			NameSlot->SetPadding(FMargin(8.f, 6.f));
 		}
+		Grid->AddChildToUniformGrid(Cell, Index / Columns, Index % Columns);
 	}
+	const bool bGrid = static_cast<EHitmenSpectatorMode>(CurrentMode) == EHitmenSpectatorMode::Grid && !Views.IsEmpty();
+	Grid->SetVisibility(bGrid ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 }
 
 // =============================================================================================

@@ -49,8 +49,24 @@ public:
 	/** Pauses/resumes thinking (stun, sleep, trap). */
 	void SetBrainPaused(bool bPaused);
 
+	/** Sight radius after the difficulty's NPCSightRangeMultiplier. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|AI")
+	float GetEffectiveSightRadius() const;
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|AI")
+	float GetPeripheralVisionHalfAngle() const { return PeripheralVisionHalfAngle; }
+
+	/** Full sight test (range, cone, walls, smoke, darkness, hidden status) against any actor. */
+	bool CanSeeActorNow(const AActor* Actor) const;
+
+	/** Pushes the alert state into the blackboard (also called on a timer). */
+	void SyncBlackboard();
+
 protected:
-	/** Root tree (BT_NPC) with its subtrees. */
+	virtual void BeginPlay() override;
+
+	/** Root tree (BT_NPC) with its subtrees. Empty = Project Settings -> Hitmen -> Default Behavior Tree
+	 *  (bare AHitmenAIController, e.g. a charmed player). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI")
 	TObjectPtr<UBehaviorTree> BehaviorTree;
 
@@ -82,8 +98,14 @@ protected:
 	void EvaluateSight();
 	bool CanReallySee(const AActor* Actor) const;
 	bool IsAlarming(const AActor* Actor) const;
-	void SyncBlackboard();
+	bool IsPawnCharmed() const;
+
+	/** Applies the sight values and the difficulty multiplier to the sight sense. */
+	void ApplySightConfig();
 
 	TSet<TWeakObjectPtr<AActor>> PerceivedActors;
 	FTimerHandle SightTimer;
+
+	/** The alert component was created by this controller (charmed player) and is destroyed with it. */
+	bool bOwnsRuntimeAlert = false;
 };

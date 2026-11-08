@@ -1,6 +1,7 @@
 """Hitmen level builder: every map is generated from engine shapes + the checker material.
 Re-running rebuilds the maps from scratch (hand edits to these maps are overwritten)."""
 import math
+import os
 import unreal
 from hitmen_common import *
 
@@ -14,7 +15,8 @@ GRID_ALT = "/Game/LevelPrototyping/Materials/MI_PrototypeGrid_Gray_02"
 
 
 def mi(name):
-    return path("Materials", "Instances", name)
+    """Level geometry uses the checker twin of each colour (MI_Red -> MI_Grid_Red)."""
+    return path("Materials", "Instances", "MI_Grid_" + name[3:] if name.startswith("MI_") else name)
 
 
 def bp(rel):
@@ -780,12 +782,27 @@ def link_map_definitions():
             save(data)
 
 
+# Maps hand-edited in the editor (through the Unreal MCP) after their first generation. The builder
+# only bootstraps them when missing; set HITMEN_FORCE_MAPS=L_Gym,L_LDTest to regenerate (wipes edits).
+HAND_EDITED_MAPS = ("L_Gym", "L_LDTest")
+FORCED_MAPS = [m.strip() for m in os.environ.get("HITMEN_FORCE_MAPS", "").split(",") if m.strip()]
+
+
+def should_build(name):
+    if name in HAND_EDITED_MAPS and EAL.does_asset_exist(path("Maps", name)) and name not in FORCED_MAPS:
+        log("map", name, "kept (hand-edited; HITMEN_FORCE_MAPS to regenerate)")
+        return False
+    return True
+
+
 def run():
     build_title()
     build_lobby()
     build_empty("L_Empty_01")
     build_empty("L_Empty_02")
-    build_gym()
-    build_ldtest()
+    if should_build("L_Gym"):
+        build_gym()
+    if should_build("L_LDTest"):
+        build_ldtest()
     link_map_definitions()
     LES.load_level(path("Maps", "L_TitleScreen"))

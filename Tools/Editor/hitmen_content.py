@@ -144,6 +144,18 @@ def build_materials(physical):
             set_props(mi, phys_material=physical[surface])
         save(mi)
         instances[name] = mi
+        # Checker (prototype grid) twin for level geometry: same tint, same physical surface.
+        grid = create("MI_Grid_" + name[3:], inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        set_props(grid, parent=load("/Game/LevelPrototyping/Materials/M_PrototypeGrid"))
+        tint = unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0)
+        for param in ("SurfaceColor", "TopSurfaceColor"):
+            MEL.set_material_instance_vector_parameter_value(grid, param, tint)
+        MEL.set_material_instance_vector_parameter_value(grid, "GridColor", unreal.LinearColor(rgb[0] * 0.35, rgb[1] * 0.35, rgb[2] * 0.35, 1.0))
+        MEL.set_material_instance_vector_parameter_value(grid, "SubGridColor", unreal.LinearColor(rgb[0] * 0.7, rgb[1] * 0.7, rgb[2] * 0.7, 1.0))
+        if surface:
+            set_props(grid, phys_material=physical[surface])
+        save(grid)
+        instances["MI_Grid_" + name[3:]] = grid
 
     # Translucent unlit "Color" (camera cones, retrieval beacons).
     cone = new_material("M_Hitmen_TranslucentColor", folder)
@@ -204,8 +216,89 @@ def build_materials(physical):
     MEL.recompile_material(pp)
     save(pp)
 
+    # Pill: wavy, colour-shifted view. Weight = blendable weight driven by the status component.
+    pill = new_material("PP_Pill", path("Materials", "PostProcess"))
+    set_props(pill, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
+    pill_scene = MEL.create_material_expression(pill, unreal.MaterialExpressionSceneTexture, -700, 0)
+    set_props(pill_scene, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
+    pill_uv = MEL.create_material_expression(pill, unreal.MaterialExpressionScreenPosition, -1100, 0)
+    pill_time = MEL.create_material_expression(pill, unreal.MaterialExpressionTime, -1100, 200)
+
+    def custom_node(material, x, y, names, output, code, description):
+        node = MEL.create_material_expression(material, unreal.MaterialExpressionCustom, x, y)
+        node_inputs = []
+        for input_name in names:
+            ci = unreal.CustomInput()
+            ci.set_editor_property("input_name", input_name)
+            node_inputs.append(ci)
+        set_props(node, output_type=output, description=description, inputs=node_inputs, code=code)
+        return node
+
+    # Wavy UVs -> scene colour sampled there -> hue rotation that breathes over time.
+    pill_warp = custom_node(pill, -900, 0, ("UV", "T"), unreal.CustomMaterialOutputType.CMOT_FLOAT2,
+                            "return UV + float2(sin(UV.y * 18 + T * 2.3), cos(UV.x * 14 + T * 1.7)) * 0.006;", "PillWarp")
+    pill_shift = custom_node(pill, -300, 0, ("C", "T"), unreal.CustomMaterialOutputType.CMOT_FLOAT3,
+                             "float3 s = float3(C.g, C.b, C.r);\nreturn lerp(C.rgb, s, 0.35 + 0.15 * sin(T * 1.3)) * 1.1;", "PillShift")
+    MEL.connect_material_expressions(pill_uv, "ViewportUV", pill_warp, "UV")
+    MEL.connect_material_expressions(pill_time, "", pill_warp, "T")
+    MEL.connect_material_expressions(pill_warp, "", pill_scene, "UVs")
+    MEL.connect_material_expressions(pill_scene, "Color", pill_shift, "C")
+    MEL.connect_material_expressions(pill_time, "", pill_shift, "T")
+    MEL.connect_material_property(pill_shift, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(pill)
+    save(pill)
+
+    # Flashbang blinding: the scene washes out to white.
+    blind = new_material("PP_Blind", path("Materials", "PostProcess"))
+    set_props(blind, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
+    blind_scene = MEL.create_material_expression(blind, unreal.MaterialExpressionSceneTexture, -700, 0)
+    set_props(blind_scene, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
+    blind_white = MEL.create_material_expression(blind, unreal.MaterialExpressionConstant3Vector, -700, 200)
+    set_props(blind_white, constant=unreal.LinearColor(1.6, 1.6, 1.6, 1))
+    blind_lerp = MEL.create_material_expression(blind, unreal.MaterialExpressionLinearInterpolate, -300, 0)
+    blind_alpha = MEL.create_material_expression(blind, unreal.MaterialExpressionConstant, -700, 350)
+    set_props(blind_alpha, r=0.92)
+    MEL.connect_material_expressions(blind_scene, "Color", blind_lerp, "A")
+    MEL.connect_material_expressions(blind_white, "", blind_lerp, "B")
+    MEL.connect_material_expressions(blind_alpha, "", blind_lerp, "Alpha")
+    MEL.connect_material_property(blind_lerp, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(blind)
+    save(blind)
+
+    # Smoke puffs: translucent grey, faded through the "Opacity" parameter.
+    smoke = new_material("M_Smoke", folder)
+    set_props(smoke, blend_mode=unreal.BlendMode.BLEND_TRANSLUCENT, shading_model=unreal.MaterialShadingModel.MSM_UNLIT, two_sided=True)
+    smoke_color = MEL.create_material_expression(smoke, unreal.MaterialExpressionVectorParameter, -500, 0)
+    set_props(smoke_color, parameter_name="Color", default_value=unreal.LinearColor(0.55, 0.55, 0.58, 1))
+    smoke_opacity = MEL.create_material_expression(smoke, unreal.MaterialExpressionScalarParameter, -500, 200)
+    set_props(smoke_opacity, parameter_name="Opacity", default_value=0.85)
+    MEL.connect_material_property(smoke_color, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.connect_material_property(smoke_opacity, "", unreal.MaterialProperty.MP_OPACITY)
+    MEL.recompile_material(smoke)
+    save(smoke)
+
+    # Monitor of a disabled camera: animated grey static.
+    no_signal = new_material("M_Monitor_NoSignal", folder)
+    set_props(no_signal, shading_model=unreal.MaterialShadingModel.MSM_UNLIT)
+    ns_uv = MEL.create_material_expression(no_signal, unreal.MaterialExpressionTextureCoordinate, -900, 0)
+    ns_time = MEL.create_material_expression(no_signal, unreal.MaterialExpressionTime, -900, 200)
+    ns_noise = MEL.create_material_expression(no_signal, unreal.MaterialExpressionCustom, -400, 0)
+    ns_inputs = []
+    for input_name in ("UV", "T"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", input_name)
+        ns_inputs.append(ci)
+    set_props(ns_noise, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="NoSignal", inputs=ns_inputs,
+              code="float2 p = floor(UV * 160 + frac(T * 7.0) * 97.0);\nfloat n = frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);\nreturn n.xxx * 0.35;")
+    MEL.connect_material_expressions(ns_uv, "", ns_noise, "UV")
+    MEL.connect_material_expressions(ns_time, "", ns_noise, "T")
+    MEL.connect_material_property(ns_noise, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(no_signal)
+    save(no_signal)
+
     log("materials:", len(instances), "instances")
-    return {"color": color, "cone": cone, "decal": decal, "screen": screen, "pp": pp, "mi": instances}
+    return {"color": color, "cone": cone, "decal": decal, "screen": screen, "pp": pp, "mi": instances,
+            "pp_pill": pill, "pp_blind": blind, "smoke": smoke, "no_signal": no_signal}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -265,7 +358,48 @@ def build_animation():
               death_montages=[d for d in deaths if d], emotes=emotes,
               menu_idles=[load(ANIMS + "/Unarmed/MM_Idle")])
     save(anim_set)
+
+    if abp:
+        # The ABP reads every animation from the anim set (UHitmenAnimInstance variables), plays
+        # montages through a slot, and previews the mannequin set in the editor.
+        try:
+            unreal.get_default_object(abp.generated_class()).set_editor_property("anim_set", anim_set)
+        except Exception as error:
+            log("WARN anim set default on ABP:", error)
+        unreal.HitmenAnimGraphTools.ensure_slot_before_output(abp, "DefaultSlot", False)
+        wired = unreal.HitmenAnimGraphTools.bind_asset_pins_to_anim_set(abp, anim_set, True)
+        log("animation: ABP asset pins bound to the anim set:", wired)
+        save(abp)
+
+    locomotion = load(ANIMS + "/Unarmed/BS_Idle_Walk_Run")
+    if locomotion:
+        # Only the dominant clip of the blend fires footsteps (walk and run would both step).
+        try:
+            set_props(locomotion, notify_trigger_mode=unreal.NotifyTriggerMode.HIGHEST_WEIGHTED_ANIMATION)
+            save(locomotion)
+        except Exception as error:
+            log("WARN blend space notify mode:", error)
+    add_footstep_notifies()
     return abp, anim_set
+
+
+def add_footstep_notifies():
+    """Two steps per cycle (left at 0, right at half) on every walk / jog clip; idempotent."""
+    count = 0
+    for gait in ("Walk", "Jog"):
+        for direction in ("Fwd", "Bwd", "Left", "Right", "Fwd_Left", "Fwd_Right", "Bwd_Left", "Bwd_Right"):
+            seq = load("%s/Unarmed/%s/MF_Unarmed_%s_%s" % (ANIMS, gait, gait, direction))
+            if not seq or unreal.AnimationLibrary.is_valid_anim_notify_track_name(seq, "Footsteps"):
+                continue
+            unreal.AnimationLibrary.add_animation_notify_track(seq, "Footsteps")
+            length = unreal.AnimationLibrary.get_sequence_length(seq)
+            for time, bone in ((0.0, "foot_l"), (length * 0.5, "foot_r")):
+                notify = unreal.AnimationLibrary.add_animation_notify_event(seq, "Footsteps", time, unreal.AnimNotify_HitmenFootstep)
+                if notify:
+                    notify.set_editor_property("foot_bone", bone)
+            save(seq)
+            count += 1
+    log("animation: footstep notifies added to", count, "clips")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -370,6 +504,8 @@ def build_abilities(projectiles, mats):
     mi = mats["mi"]
     actor_folder = path("Abilities", "Actors")
     smoke_cloud = make_blueprint("BP_SmokeCloud", actor_folder, unreal.HitmenSmokeCloud)
+    set_props(cdo(smoke_cloud), puff_material=mats["smoke"], puff_mesh=load(SHAPES["sphere"]))
+    save(smoke_cloud)
     trap = make_blueprint("BP_Trap", actor_folder, unreal.HitmenTrap)
     set_mesh(component(cdo(trap), "mesh"), SHAPES["cylinder"], (0.8, 0.8, 0.05), mi["MI_Metal"])
     wind = make_blueprint("BP_WindMine", actor_folder, unreal.HitmenWindMine)
@@ -427,13 +563,19 @@ def build_abilities(projectiles, mats):
 def build_cosmetics(mats):
     mi = mats["mi"]
     S = unreal.HitmenCosmeticSlot
+    # Three slots (head / body / legs), placeholder basic shapes the team replaces with real meshes.
     items = [
         ("Fedora", S.HEAD, "cylinder", (0.32, 0.32, 0.08), "head", (0, 10, 18), mi["MI_Dark"]),
         ("Beanie", S.HEAD, "sphere", (0.24, 0.24, 0.14), "head", (0, 8, 14), mi["MI_Red"]),
+        ("Cap", S.HEAD, "cylinder", (0.26, 0.26, 0.05), "head", (0, 10, 16), mi["MI_Blue"]),
         ("Moustache", S.HEAD, "cube", (0.06, 0.012, 0.012), "head", (10, 0, -3), mi["MI_Dark"]),
-        ("Scarf", S.TOP, "cylinder", (0.22, 0.22, 0.06), "neck_01", (0, 0, 0), mi["MI_Yellow"]),
+        ("Glasses", S.HEAD, "cube", (0.16, 0.02, 0.03), "head", (11, 0, 4), mi["MI_Glass"]),
+        ("Scarf", S.BODY, "cylinder", (0.22, 0.22, 0.06), "neck_01", (0, 0, 0), mi["MI_Yellow"]),
         ("Backpack", S.BODY, "cube", (0.3, 0.15, 0.4), "spine_03", (0, -25, 0), mi["MI_Green"]),
-        ("Belt", S.BOTTOM, "cylinder", (0.32, 0.32, 0.04), "pelvis", (0, 0, 0), mi["MI_Wood"]),
+        ("Vest", S.BODY, "cube", (0.42, 0.28, 0.45), "spine_03", (0, 0, 0), mi["MI_Dark"]),
+        ("Belt", S.LEGS, "cylinder", (0.32, 0.32, 0.04), "pelvis", (0, 0, 0), mi["MI_Wood"]),
+        ("Holster", S.LEGS, "cube", (0.1, 0.06, 0.2), "thigh_r", (0, 12, -10), mi["MI_Dark"]),
+        ("KneePad", S.LEGS, "sphere", (0.12, 0.12, 0.12), "calf_r", (0, 8, 0), mi["MI_Metal"]),
     ]
     result = []
     for name, slot, shape, scale, socket, offset, material in items:
@@ -512,13 +654,26 @@ def build_widgets():
 def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, weapons):
     core = path("Core")
     pc = make_blueprint("BP_PlayerController", core, unreal.HitmenPlayerController)
-    marker = make_blueprint("BP_LastKnownMarker", path("Characters", "Player"), unreal.StaticMeshActor)
-    marker_cdo = cdo(marker)
-    smc = component(marker_cdo, "static_mesh_component")
-    set_mesh(smc, SHAPES["cylinder"], (0.6, 0.6, 1.8), mats["cone"], location=(0, 0, 90))
-    if smc:
-        smc.set_collision_profile_name("NoCollision")
-        set_props(smc, mobility=unreal.ComponentMobility.MOVABLE)
+    # Last-known-position silhouette: a translucent mannequin ghost in an idle pose.
+    ghost_mi = create("MI_LastKnownGhost", path("Materials", "Instances"), unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    if ghost_mi:
+        MEL.set_material_instance_parent(ghost_mi, mats["cone"])
+        MEL.set_material_instance_vector_parameter_value(ghost_mi, "Color", unreal.LinearColor(0.85, 0.9, 1.0, 0.35))
+        save(ghost_mi)
+    marker = make_blueprint("BP_LastKnownGhost", path("Characters", "Player"), unreal.SkeletalMeshActor)
+    skel = component(cdo(marker), "skeletal_mesh_component")
+    if skel:
+        manny_ghost = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
+        set_props(skel, skeletal_mesh_asset=manny_ghost, cast_shadow=False, mobility=unreal.ComponentMobility.MOVABLE,
+                  animation_mode=unreal.AnimationMode.ANIMATION_SINGLE_NODE)
+        skel.set_collision_profile_name("NoCollision")
+        idle = load("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle")
+        if idle:
+            data = unreal.SingleAnimationPlayData()
+            set_props(data, anim_to_play=idle, saved_looping=True, saved_playing=False)
+            set_props(skel, animation_data=data)
+        if ghost_mi and manny_ghost:
+            set_props(skel, override_materials=[ghost_mi] * max(1, len(manny_ghost.get_editor_property("materials"))))
     save(marker)
 
     set_props(cdo(pc), gameplay_mapping_contexts=[imc], spectator_mapping_context=spectator_imc,
@@ -532,7 +687,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
 
     manny = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
     quinn = load("/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple")
-    fp_abp = load("/Game/FirstPerson/Anims/ABP_FP_Copy")
+    fp_abp = load("/Game/Hitmen/Characters/Player/Anims/ABP_FirstPerson")
 
     player = make_blueprint("BP_PlayerCharacter", path("Characters", "Player"), unreal.HitmenPlayerCharacter)
     pcdo = cdo(player)
@@ -546,6 +701,9 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     sight = component(pcdo, "sightroom_component")
     if sight:
         set_props(sight, post_process_material=mats["pp"])
+    status = component(pcdo, "status_effect_component")
+    if status:
+        set_props(status, pill_post_process_material=mats["pp_pill"], blind_post_process_material=mats["pp_blind"])
     save(player)
 
     ai = make_blueprint("BP_AIController", path("AI"), unreal.HitmenAIController)
@@ -553,6 +711,9 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     if bt:
         set_props(cdo(ai), behavior_tree=bt)
     save(ai)
+    # A charmed player is possessed by the same behavior-tree controller as the NPCs.
+    set_props(cdo(player), charmed_controller_class=gen_class(ai))
+    save(player)
 
     npc = make_blueprint("BP_NPC_Guard", path("Characters", "NPC"), unreal.HitmenNPC)
     ncdo = cdo(npc)
@@ -589,11 +750,21 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
         save(bp)
         huds[name] = bp
 
+    game_state = make_blueprint("BP_GameState", core, unreal.HitmenGameState)
+    save(game_state)
+    player_state = make_blueprint("BP_PlayerState", core, unreal.HitmenPlayerState)
+    save(player_state)
+    spectator_pawn = make_blueprint("BP_SpectatorPawn", core, unreal.HitmenSpectatorPawn)
+    save(spectator_pawn)
+    build_game_instance(core)
+
     modes = {}
     for name, cls, hud, pawn in (("BP_GM_Menu", unreal.HitmenMenuGameMode, "BP_HUD_Menu", None), ("BP_GM_Lobby", unreal.HitmenLobbyGameMode, "BP_HUD_Lobby", None),
                                  ("BP_GM_Match", unreal.HitmenMatchGameMode, "BP_HUD_Match", player), ("BP_GM_Gym", unreal.HitmenGymGameMode, "BP_HUD_Match", player)):
         bp = make_blueprint(name, core, cls)
-        props = dict(hud_class=gen_class(huds[hud]), player_controller_class=gen_class(pc))
+        props = dict(hud_class=gen_class(huds[hud]), player_controller_class=gen_class(pc),
+                     game_state_class=gen_class(game_state), player_state_class=gen_class(player_state),
+                     spectator_class=gen_class(spectator_pawn))
         if pawn:
             props["default_pawn_class"] = gen_class(pawn)
         set_props(cdo(bp), **props)
@@ -601,6 +772,20 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
         modes[name] = bp
     log("framework: game modes", len(modes))
     return modes, {"player": player, "npc": npc, "sniper": sniper, "vip": vip, "civilian": civilian}
+
+
+def build_game_instance(core):
+    """BP_GameInstance with the Options volume mix (engine Master / Music / SFX / Voice classes)."""
+    mix = create("SCM_Volume", path("Audio", "Mixes"), unreal.SoundMix, unreal.SoundMixFactory())
+    save(mix)
+    for sub_folder in ("SFX", "Ambience", "Music"):
+        ensure_folder(path("Audio", sub_folder))
+    gi = make_blueprint("BP_GameInstance", core, unreal.HitmenGameInstance)
+    set_props(cdo(gi), volume_sound_mix=mix,
+              master_sound_class=load("/Engine/EngineSounds/Master"), music_sound_class=load("/Engine/EngineSounds/Music"),
+              sfx_sound_class=load("/Engine/EngineSounds/SFX"), voice_sound_class=load("/Engine/EngineSounds/Voice"))
+    save(gi)
+    return gi
 
 
 # ---------------------------------------------------------------------------------------------
@@ -645,7 +830,8 @@ def build_world(mats, weapons):
     if decal_comp:
         decal_comp.set_decal_material(mats["decal"])
     save(bps["BP_SecurityCamera"])
-    fixture("BP_SecurityMonitor", unreal.HitmenSecurityMonitor, W + "/Security", {"screen": ("cube", (0.8, 0.05, 0.5), mats["screen"], None)})
+    fixture("BP_SecurityMonitor", unreal.HitmenSecurityMonitor, W + "/Security", {"screen": ("cube", (0.8, 0.05, 0.5), mats["screen"], None)},
+            {"no_signal_material": mats["no_signal"]})
     fixture("BP_ControlConsole", unreal.HitmenControlConsole, W + "/Security", {"mesh": ("cube", (1.2, 0.6, 1.0), mi["MI_Dark"], (0, 0, 50))})
     fixture("BP_Turret", unreal.HitmenTurret, W + "/Security",
             {"base": ("cylinder", (0.5, 0.5, 1.0), mi["MI_Metal"], (0, 0, 50)), "head": ("cube", (0.8, 0.3, 0.3), mi["MI_Dark"], (0, 0, 110))})

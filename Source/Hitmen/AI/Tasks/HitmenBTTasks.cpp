@@ -15,6 +15,8 @@
 #include "Data/HitmenMatchRules.h"
 #include "Framework/HitmenGameModeBase.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "GameFramework/Character.h"
+#include "Components/CapsuleComponent.h"
 #include "NavigationSystem.h"
 #include "Animation/AnimInstance.h"
 #include "Engine/World.h"
@@ -158,7 +160,10 @@ void UBTTask_HitmenShoot::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 	const AHitmenCharacterBase* TargetCharacter = Cast<AHitmenCharacterBase>(Target);
 	if (!Pawn || !Target || (TargetCharacter && TargetCharacter->IsDead()) || !BB->GetValueAsBool(HitmenBBKeys::TargetVisible))
 	{
-		AI->ClearFocus(EAIFocusPriority::Gameplay);
+		if (AI)
+		{
+			AI->ClearFocus(EAIFocusPriority::Gameplay);
+		}
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
 	}
@@ -175,12 +180,18 @@ void UBTTask_HitmenShoot::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 			Melee->Punch();
 		}
 	}
-	else if (UHitmenInventoryComponent* Inventory = Pawn->FindComponentByClass<UHitmenInventoryComponent>())
+	else
 	{
-		// Charmed players shoot with whatever they hold.
-		if (AHitmenWeaponBase* Weapon = Inventory->GetActiveWeapon())
+		// Charmed players (bare AHitmenAIController + default tree) shoot with whatever they hold,
+		// or punch when unarmed.
+		UHitmenInventoryComponent* Inventory = Pawn->FindComponentByClass<UHitmenInventoryComponent>();
+		if (AHitmenWeaponBase* Weapon = Inventory ? Inventory->GetActiveWeapon() : nullptr)
 		{
-			Weapon->FireAt(AimPoint, 4.f);
+			Weapon->FireAt(AimPoint, CharmedAimErrorDegrees);
+		}
+		else if (UHitmenMeleeComponent* Melee = Pawn->FindComponentByClass<UHitmenMeleeComponent>())
+		{
+			Melee->Punch();
 		}
 	}
 
@@ -227,28 +238,114 @@ EBTNodeResult::Type UBTTask_HitmenFindSearchPoint::ExecuteTask(UBehaviorTreeComp
 {
 	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
 	const APawn* Pawn = OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr;
-	if (!BB || !Pawn)
+	UWorld* World = Pawn ? Pawn->GetWorld() : nullptr;
+	if (!BB || !Pawn || !World)
 	{
 		return EBTNodeResult::Failed;
 	}
-	const FVector Center = BB->GetValueAsVector(bUseInvestigateLocation ? HitmenBBKeys::InvestigateLocation : HitmenBBKeys::LastKnownLocation);
-	FVector Point = Center;
-	// Several tries, keep the one farthest from where we stand (sweeps the area instead of jittering).
-	float BestDistance = -1.f;
-	for (int32 Try = 0; Try < 4; ++Try)
+	FVector Center = BB->GetValueAsVector(bUseInvestigateLocation ? HitmenBBKeys::InvestigateLocation : HitmenBBKeys::LastKnownLocation);
+	if (!FAISystem::IsValidLocation(Center) || Center.IsNearlyZero())
 	{
-		FVector Candidate;
-		if (RandomReachablePoint(Pawn->GetWorld(), Center, SearchRadius, Candidate))
+		Center = Pawn->GetActorLocation();
+	}
+	const UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(Pawn);
+
+	// ---- Candidates ----
+	struct FCandidate { FVector Location; bool bHidingSpot; };
+	TArray<FCandidate> Candidates;
+	const FVector ProjectExtent(NavProjectionRadius, NavProjectionRadius, NavProjectionRadius);
+	auto AddProjected = [&Candidates, Nav, &ProjectExtent](const FVector& Raw, bool bHidingSpot)
+	{
+		FNavLocation Projected;
+		if (Nav && Nav->ProjectPointToNavigation(Raw, Projected, ProjectExtent))
 		{
-			const float Distance = FVector::DistSquared(Candidate, Pawn->GetActorLocation());
-			if (Distance > BestDistance)
-			{
-				BestDistance = Distance;
-				Point = Candidate;
-			}
+			Candidates.Add({ Projected.Location, bHidingSpot });
+		}
+	};
+	if (AI && MaxHidingSpotCandidates > 0)
+	{
+		TArray<AActor*> Spots;
+		AI->GetHidingSpotsNear(Center, SearchRadius, Spots);
+		Spots.Sort([&Center](const AActor& A, const AActor& B)
+		{
+			return FVector::DistSquared(A.GetActorLocation(), Center) < FVector::DistSquared(B.GetActorLocation(), Center);
+		});
+		for (int32 Index = 0; Index < Spots.Num() && Index < MaxHidingSpotCandidates; ++Index)
+		{
+			const AActor* Spot = Spots[Index];
+			AddProjected(Spot->GetActorLocation() + Spot->GetActorForwardVector() * HidingSpotStandOff, true);
 		}
 	}
-	BB->SetValueAsVector(HitmenBBKeys::MoveLocation, Point);
+	AddProjected(Center, false);
+	for (int32 Index = 0; Index < NavCandidateCount; ++Index)
+	{
+		FVector Point;
+		if (RandomReachablePoint(World, Center, SearchRadius, Point))
+		{
+			Candidates.Add({ Point, false });
+		}
+	}
+	if (Candidates.Num() == 0)
+	{
+		BB->SetValueAsVector(HitmenBBKeys::MoveLocation, Center);
+		return EBTNodeResult::Succeeded;
+	}
+
+	// ---- Scoring ----
+	const ACharacter* Character = Cast<ACharacter>(Pawn);
+	const float EyeAboveFloor = (Character && Character->GetCapsuleComponent() ? Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f) + Pawn->BaseEyeHeight;
+	const FVector SelfEye = Pawn->GetPawnViewLocation();
+	// The last known position is a capsule center: lift it by the eye height above that center.
+	const FVector CenterEye = Center + FVector::UpVector * Pawn->BaseEyeHeight;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenSearchLOS), false, Pawn);
+	auto IsVisibleFrom = [World, &Params](const FVector& From, const FVector& To)
+	{
+		FHitResult Hit;
+		return !World->LineTraceSingleByChannel(Hit, From, To, ECC_Visibility, Params);
+	};
+
+	int32 BestIndex = 0;
+	float BestScore = -TNumericLimits<float>::Max();
+	for (int32 Index = 0; Index < Candidates.Num(); ++Index)
+	{
+		const FCandidate& Candidate = Candidates[Index];
+		const FVector Eye = Candidate.Location + FVector::UpVector * EyeAboveFloor;
+		float Score = ProximityWeight * (1.f - FMath::Clamp(FVector::Dist(Candidate.Location, Center) / FMath::Max(SearchRadius, 1.f), 0.f, 1.f));
+		if (!IsVisibleFrom(CenterEye, Eye))
+		{
+			Score += HiddenFromLastKnownWeight;
+		}
+		if (!IsVisibleFrom(SelfEye, Eye))
+		{
+			Score += HiddenFromSelfWeight;
+		}
+		if (Candidate.bHidingSpot)
+		{
+			Score += HidingSpotWeight;
+		}
+		else if (FVector::Dist2D(Candidate.Location, Pawn->GetActorLocation()) < MinStepDistance)
+		{
+			Score -= TooClosePenalty;
+		}
+		if (AI && AI->IsSearchSpotClaimed(Candidate.Location))
+		{
+			Score -= ClaimedPenalty;
+		}
+		Score += FMath::FRand() * RandomWeight;
+		if (Score > BestScore)
+		{
+			BestScore = Score;
+			BestIndex = Index;
+		}
+	}
+
+	const FVector Chosen = Candidates[BestIndex].Location;
+	if (AI)
+	{
+		AI->ClaimSearchSpot(Pawn, Chosen);
+	}
+	BB->SetValueAsVector(HitmenBBKeys::MoveLocation, Chosen);
 	return EBTNodeResult::Succeeded;
 }
 
@@ -301,8 +398,7 @@ void UBTTask_HitmenCallReinforcements::TickTask(UBehaviorTreeComponent& OwnerCom
 		return;
 	}
 	Memory[0] += DeltaSeconds;
-	const AHitmenGameModeBase* GM = OwnerComp.GetWorld()->GetAuthGameMode<AHitmenGameModeBase>();
-	const float Duration = GM ? GM->GetRules()->ReinforcementCallDuration : 3.5f;
+	const float Duration = UHitmenAISubsystem::GetRules(Alert).ReinforcementCallDuration;
 	if (Memory[0] >= Duration)
 	{
 		Alert->SetCallingReinforcements(false);

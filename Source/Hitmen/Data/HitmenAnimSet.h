@@ -11,6 +11,22 @@ class UAnimMontage;
 class UBlendSpace;
 class UAimOffsetBlendSpace;
 
+/** Montages of the set that gameplay code plays by name (replicated as this enum). */
+UENUM(BlueprintType)
+enum class EHitmenAnimMontage : uint8
+{
+	Mantle,
+	Vault,
+	Throw,
+	HitReact,
+	/** Variant = index in DeathMontages. */
+	Death,
+	Interact,
+	Punch,
+	CallReinforcements,
+	SearchLookAround
+};
+
 USTRUCT(BlueprintType)
 struct FHitmenEmote
 {
@@ -27,8 +43,9 @@ struct FHitmenEmote
 };
 
 /**
- * Animation set read by UHitmenAnimInstance. ABP_ graphs reference these variables
- * (never hard-coded sequences), so changing an animation = changing this asset.
+ * Animation set read by UHitmenAnimInstance. ABP_ graphs reference the anim instance variables
+ * resolved from this asset (never hard-coded sequences), so changing an animation = changing
+ * this asset. Empty optional entries fall back (crouch -> stand, loops -> idle) in the instance.
  */
 UCLASS(BlueprintType)
 class HITMEN_API UHitmenAnimSet : public UPrimaryDataAsset
@@ -36,6 +53,10 @@ class HITMEN_API UHitmenAnimSet : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
+	/** Montage for a gameplay event (Variant picks among DeathMontages). Null when not set. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Anim")
+	UAnimMontage* GetMontage(EHitmenAnimMontage Montage, int32 Variant = 0) const;
+
 	// ---- Locomotion ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Locomotion")
 	TObjectPtr<UAnimSequenceBase> Idle;
@@ -93,6 +114,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Combat")
 	TObjectPtr<UAnimMontage> HitReactMontage;
 
+	/**
+	 * Death montages. With 4 entries the order is by where the killing hit came from:
+	 * [Front, Back, Left, Right]; otherwise one is picked at random. Ragdoll follows.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Combat")
 	TArray<TObjectPtr<UAnimMontage>> DeathMontages;
 

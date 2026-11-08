@@ -7,6 +7,7 @@
 #include "OnlineSubsystemUtils.h"
 #include "Interfaces/OnlineFriendsInterface.h"
 #include "Interfaces/OnlineIdentityInterface.h"
+#include "Interfaces/OnlinePresenceInterface.h"
 #include "Online/OnlineSessionNames.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
@@ -121,6 +122,11 @@ void UHitmenSessionSubsystem::FindRooms(bool bLAN)
 		return;
 	}
 
+	// Public search and friends list run in parallel; PublishResults merges whatever has arrived.
+	bPublicSearchDone = false;
+	bPublicSearchSucceeded = false;
+	bFriendsRead = false;
+	FriendSessionResults.Reset();
 	ReadFriends();
 
 	SessionSearch = MakeShared<FOnlineSessionSearch>();
@@ -139,7 +145,8 @@ void UHitmenSessionSubsystem::FindRooms(bool bLAN)
 	if (!bStarted)
 	{
 		Sessions->ClearOnFindSessionsCompleteDelegate_Handle(FindHandle);
-		OnFindSessionsComplete.Broadcast(TArray<FHitmenSessionInfo>(), false);
+		bPublicSearchDone = true;
+		PublishResults();
 	}
 }
 
@@ -149,44 +156,107 @@ void UHitmenSessionSubsystem::HandleFindComplete(bool bSuccess)
 	{
 		Sessions->ClearOnFindSessionsCompleteDelegate_Handle(FindHandle);
 	}
+	bPublicSearchDone = true;
+	bPublicSearchSucceeded = bSuccess;
+	PublishResults();
+}
 
-	LastResults.Reset();
-	if (bSuccess && SessionSearch.IsValid())
+void UHitmenSessionSubsystem::QueryFriendSessions()
+{
+	const IOnlineSessionPtr Sessions = GetSessionInterface();
+	if (!Sessions.IsValid() || !IsUsingSteam() || OnlineFriendIds.IsEmpty())
 	{
-		for (int32 Index = 0; Index < SessionSearch->SearchResults.Num(); ++Index)
+		return;
+	}
+	if (!FindFriendHandle.IsValid())
+	{
+		FindFriendHandle = Sessions->AddOnFindFriendSessionCompleteDelegate_Handle(0,
+			FOnFindFriendSessionCompleteDelegate::CreateUObject(this, &UHitmenSessionSubsystem::HandleFindFriendSessionComplete));
+	}
+	for (const FUniqueNetIdRef& FriendId : OnlineFriendIds)
+	{
+		if (Sessions->FindFriendSession(0, *FriendId))
 		{
-			const FOnlineSessionSearchResult& Result = SessionSearch->SearchResults[Index];
-			FString Tag;
-			Result.Session.SessionSettings.Get(GameTagKey, Tag);
-			if (Tag != GameTagValue)
-			{
-				continue;
-			}
+			++PendingFriendQueries;
+		}
+	}
+}
 
-			FHitmenSessionInfo& Info = LastResults.AddDefaulted_GetRef();
-			Info.ResultIndex = Index;
-			Result.Session.SessionSettings.Get(RoomNameKey, Info.RoomName);
-			Info.HostName = Result.Session.OwningUserName;
-			Info.MaxPlayers = Result.Session.SessionSettings.NumPublicConnections;
-			Info.CurrentPlayers = Info.MaxPlayers - Result.Session.NumOpenPublicConnections;
-			Info.PingMs = Result.PingInMs;
-			Info.bIsFriend = Result.Session.OwningUserId.IsValid() && FriendIds.Contains(Result.Session.OwningUserId->ToString());
-			if (Info.RoomName.IsEmpty())
-			{
-				Info.RoomName = Info.HostName;
-			}
+void UHitmenSessionSubsystem::HandleFindFriendSessionComplete(int32 LocalUserNum, bool bWasSuccessful, const TArray<FOnlineSessionSearchResult>& Results)
+{
+	PendingFriendQueries = FMath::Max(0, PendingFriendQueries - 1);
+	if (bWasSuccessful)
+	{
+		FriendSessionResults.Append(Results);
+	}
+	if (PendingFriendQueries == 0)
+	{
+		if (const IOnlineSessionPtr Sessions = GetSessionInterface())
+		{
+			Sessions->ClearOnFindFriendSessionCompleteDelegate_Handle(0, FindFriendHandle);
+		}
+		FindFriendHandle.Reset();
+	}
+	PublishResults();
+}
+
+void UHitmenSessionSubsystem::PublishResults()
+{
+	if (!bPublicSearchDone)
+	{
+		// The list is shown once the public search answers; friend sessions are merged later.
+		return;
+	}
+
+	JoinableResults.Reset();
+	LastResults.Reset();
+	TSet<FString> SeenSessions;
+	auto AddResult = [this, &SeenSessions](const FOnlineSessionSearchResult& Result, bool bForceFriend)
+	{
+		FString Tag;
+		Result.Session.SessionSettings.Get(GameTagKey, Tag);
+		const FString SessionId = Result.GetSessionIdStr();
+		if (Tag != GameTagValue || SeenSessions.Contains(SessionId))
+		{
+			return;
+		}
+		SeenSessions.Add(SessionId);
+
+		FHitmenSessionInfo& Info = LastResults.AddDefaulted_GetRef();
+		Info.ResultIndex = JoinableResults.Add(Result);
+		Result.Session.SessionSettings.Get(RoomNameKey, Info.RoomName);
+		Info.HostName = Result.Session.OwningUserName;
+		Info.MaxPlayers = Result.Session.SessionSettings.NumPublicConnections;
+		Info.CurrentPlayers = Info.MaxPlayers - Result.Session.NumOpenPublicConnections;
+		Info.PingMs = Result.PingInMs;
+		Info.bIsFriend = bForceFriend || (Result.Session.OwningUserId.IsValid() && FriendIds.Contains(Result.Session.OwningUserId->ToString()));
+		if (Info.RoomName.IsEmpty())
+		{
+			Info.RoomName = Info.HostName;
+		}
+	};
+
+	for (const FOnlineSessionSearchResult& Result : FriendSessionResults)
+	{
+		AddResult(Result, true);
+	}
+	if (bPublicSearchSucceeded && SessionSearch.IsValid())
+	{
+		for (const FOnlineSessionSearchResult& Result : SessionSearch->SearchResults)
+		{
+			AddResult(Result, false);
 		}
 	}
 
 	// Friends first.
 	LastResults.StableSort([](const FHitmenSessionInfo& A, const FHitmenSessionInfo& B) { return A.bIsFriend && !B.bIsFriend; });
-	OnFindSessionsComplete.Broadcast(LastResults, bSuccess);
+	OnFindSessionsComplete.Broadcast(LastResults, bPublicSearchSucceeded || !FriendSessionResults.IsEmpty());
 }
 
 void UHitmenSessionSubsystem::JoinRoom(int32 ResultIndex)
 {
 	const IOnlineSessionPtr Sessions = GetSessionInterface();
-	if (!Sessions.IsValid() || !SessionSearch.IsValid() || !SessionSearch->SearchResults.IsValidIndex(ResultIndex))
+	if (!Sessions.IsValid() || !JoinableResults.IsValidIndex(ResultIndex))
 	{
 		OnJoinSessionComplete.Broadcast(false);
 		return;
@@ -198,8 +268,8 @@ void UHitmenSessionSubsystem::JoinRoom(int32 ResultIndex)
 	const ULocalPlayer* LP = GetGameInstance()->GetFirstGamePlayer();
 	const FUniqueNetIdRepl NetId = LP ? LP->GetPreferredUniqueNetId() : FUniqueNetIdRepl();
 	const bool bStarted = NetId.IsValid()
-		? Sessions->JoinSession(*NetId, HitmenSessionName, SessionSearch->SearchResults[ResultIndex])
-		: Sessions->JoinSession(0, HitmenSessionName, SessionSearch->SearchResults[ResultIndex]);
+		? Sessions->JoinSession(*NetId, HitmenSessionName, JoinableResults[ResultIndex])
+		: Sessions->JoinSession(0, HitmenSessionName, JoinableResults[ResultIndex]);
 	if (!bStarted)
 	{
 		Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinHandle);
@@ -275,9 +345,20 @@ void UHitmenSessionSubsystem::ReadFriends()
 			TArray<TSharedRef<FOnlineFriend>> List;
 			Friends->GetFriendsList(0, ListName, List);
 			FriendIds.Reset();
+			OnlineFriendIds.Reset();
 			for (const TSharedRef<FOnlineFriend>& Friend : List)
 			{
 				FriendIds.Add(Friend->GetUserId()->ToString());
+				const FOnlineUserPresence& Presence = Friend->GetPresence();
+				if (Presence.bIsOnline && Presence.bIsPlayingThisGame)
+				{
+					OnlineFriendIds.Add(Friend->GetUserId());
+				}
 			}
+			bFriendsRead = true;
+			// Re-flag rooms already listed (the friends list may arrive after the search) and look
+			// for friends' rooms the public search did not return.
+			PublishResults();
+			QueryFriendSessions();
 		}));
 }

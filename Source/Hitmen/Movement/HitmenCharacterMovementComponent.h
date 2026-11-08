@@ -1,4 +1,4 @@
-// Hitmen — predicted movement: sprint, crouch-slide, ledge grab / vault, ladders and ziplines
+// Hitmen — predicted movement: sprint, crouch-slide, ledge grab / vault, ladders, ziplines, jetpack
 
 #pragma once
 
@@ -165,6 +165,37 @@ public:
 	/** Forces leaving a climb (teleports, deaths, abilities). */
 	void StopClimbing(bool bJumpOff);
 
+	// ---- Jetpack (client-predicted: the thrust wish travels in the saved move flags) ----
+	/**
+	 * Enables the jetpack with the equipping ability's tunables (server and every client).
+	 * Disabled: thrust is ignored and fuel stops simulating.
+	 */
+	void ConfigureJetpack(bool bEnabled, float InMaxFuel, float InFuelRechargePerSecond, float InLiftSpeed, float InLiftInterpSpeed);
+
+	/** Owning client (and listen-server host): hold / release the thrust. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Movement|Jetpack")
+	void SetJetpackThrust(bool bThrust) { bWantsJetpackThrust = bThrust; }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement|Jetpack")
+	bool IsJetpackEnabled() const { return bJetpackEnabled; }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement|Jetpack")
+	bool WantsJetpackThrust() const { return bWantsJetpackThrust; }
+
+	/** Thrust actually applied this move (held, enabled, fuel left, not climbing / mantling). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement|Jetpack")
+	bool IsJetpackThrusting() const;
+
+	/** Predicted fuel in seconds of thrust (authoritative on the server). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement|Jetpack")
+	float GetJetpackFuel() const { return JetpackFuel; }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement|Jetpack")
+	float GetJetpackFuelNormalized() const { return JetpackMaxFuel > 0.f ? JetpackFuel / JetpackMaxFuel : 0.f; }
+
+	/** Owning client: adopt the server's fuel when the prediction drifted. */
+	void ReconcileJetpackFuel(float ServerFuel, float Tolerance);
+
 	// UCharacterMovementComponent
 	virtual float GetMaxSpeed() const override;
 	virtual float GetMaxBrakingDeceleration() const override;
@@ -190,6 +221,9 @@ protected:
 	bool TryStartMantle();
 	void FinishMantle();
 
+	/** Thrust and fuel step, run per move on the owning client and the server. */
+	void UpdateJetpack(float DeltaSeconds);
+
 	AActor* FindClimbableActor() const;
 	bool ShouldGrabClimbable(const IHitmenClimbable& Climbable, bool& bOutFromTop) const;
 	void StartClimb(AActor* ClimbableActor, bool bFromTop);
@@ -202,6 +236,15 @@ protected:
 
 	bool bWantsToSprint = false;
 	bool bClimbRelativeToCamera = false;
+
+	// Jetpack state (tunables come from the equipped ability)
+	bool bWantsJetpackThrust = false;
+	bool bJetpackEnabled = false;
+	float JetpackFuel = 0.f;
+	float JetpackMaxFuel = 0.f;
+	float JetpackFuelRechargePerSecond = 0.f;
+	float JetpackLiftSpeed = 0.f;
+	float JetpackLiftInterpSpeed = 0.f;
 
 	// Slide state
 	float SlideStartTime = -100.f;
@@ -224,17 +267,20 @@ protected:
 	bool bPrevPressedJump = false;
 };
 
-/** Saved move carrying the sprint flag for prediction / replay. */
+/** Saved move carrying the sprint and jetpack flags (and the fuel at move start) for prediction / replay. */
 class FSavedMove_Hitmen : public FSavedMove_Character
 {
 public:
 	typedef FSavedMove_Character Super;
 
 	uint8 bSavedWantsToSprint : 1;
+	uint8 bSavedWantsJetpackThrust : 1;
+	float SavedJetpackFuel = 0.f;
 
 	virtual void Clear() override;
 	virtual uint8 GetCompressedFlags() const override;
 	virtual bool CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const override;
+	virtual void CombineWith(const FSavedMove_Character* OldMove, ACharacter* InCharacter, APlayerController* PC, const FVector& OldStartLocation) override;
 	virtual void SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData) override;
 	virtual void PrepMoveFor(ACharacter* C) override;
 };

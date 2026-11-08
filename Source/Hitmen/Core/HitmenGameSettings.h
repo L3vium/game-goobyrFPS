@@ -9,6 +9,7 @@
 class UHitmenMatchRules;
 class UHitmenMapDefinition;
 class UHitmenCatalog;
+class UBehaviorTree;
 
 /**
  * Project-wide defaults editable from Project Settings. Gameplay code reads these through
@@ -36,6 +37,12 @@ public:
 	/** Maps in carousel order. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Data")
 	TArray<TSoftObjectPtr<UHitmenMapDefinition>> Maps;
+
+	// ---- AI ----
+	/** Tree run by an AHitmenAIController that has none of its own (charmed players possessed by the
+	 *  bare C++ controller). NPC controller Blueprints set their own tree. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="AI")
+	TSoftObjectPtr<UBehaviorTree> DefaultBehaviorTree;
 
 	// ---- Levels ----
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Levels")

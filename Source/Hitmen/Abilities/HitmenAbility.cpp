@@ -154,6 +154,14 @@ AActor* UHitmenAbility::SpawnOwnedActor(TSubclassOf<AActor> Class, const FTransf
 	return World->SpawnActor<AActor>(Class, Transform, Params);
 }
 
+void UHitmenAbility::NotifyFailed(const FText& Reason) const
+{
+	if (OwnerComponent)
+	{
+		OwnerComponent->Client_AbilityFailed(const_cast<UHitmenAbility*>(this), Reason);
+	}
+}
+
 void UHitmenAbility::PlayActivatedJuice(const FVector& Location) const
 {
 	if (OwnerComponent)

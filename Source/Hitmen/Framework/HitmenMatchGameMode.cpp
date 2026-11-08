@@ -40,12 +40,7 @@ void AHitmenMatchGameMode::InitGameState()
 	else
 	{
 		// Launched directly in PIE: use rule defaults.
-		const UHitmenMatchRules* Rules = GetRules();
-		FHitmenLobbySettings Settings;
-		Settings.bProximityChat = Rules->ProximityChat.Value;
-		Settings.RetrievalPointCount = Rules->RetrievalPointCount.Value;
-		Settings.Difficulty = static_cast<EHitmenDifficulty>(FMath::Clamp(Rules->Difficulty.Value, 0, 2));
-		GS->SetLobbySettings(Settings);
+		GS->SetLobbySettings(GetRules()->MakeDefaultLobbySettings());
 	}
 	GS->SetMatchPhase(EHitmenMatchPhase::Playing);
 }
@@ -84,7 +79,12 @@ void AHitmenMatchGameMode::SelectVIP(FRandomStream& Stream)
 	const int32 MaxCandidates = GetRules()->MaxVIPCandidates;
 	if (Candidates.Num() > MaxCandidates)
 	{
-		UE_LOG(LogHitmen, Warning, TEXT("Match: %d VIP candidates placed, only the first %d are used."), Candidates.Num(), MaxCandidates);
+		// Too many candidates placed: keep a random subset so every placement can be picked.
+		UE_LOG(LogHitmen, Log, TEXT("Match: %d VIP candidates placed, %d drawn at random."), Candidates.Num(), MaxCandidates);
+		for (int32 Index = Candidates.Num() - 1; Index > 0; --Index)
+		{
+			Candidates.Swap(Index, Stream.RandRange(0, Index));
+		}
 		Candidates.SetNum(MaxCandidates);
 	}
 	if (Candidates.IsEmpty())
@@ -310,6 +310,7 @@ void AHitmenMatchGameMode::HandlePlayerDeath(AController* VictimController)
 		{
 			P->UnPossess();
 			P->ChangeState(NAME_Spectating);
+			P->ClientGotoState(NAME_Spectating);
 			P->Client_EnterSpectatorMode(false);
 		}
 	}), DeathSpectateDelay, false);
@@ -344,7 +345,7 @@ void AHitmenMatchGameMode::TickSonar()
 		return;
 	}
 	const float CarryTime = GetWorld()->GetTimeSeconds() - CarryStartTime;
-	const float Interval = GetRules()->GetSonarInterval(CarryTime);
+	const float Interval = GetRules()->GetSonarInterval(CarryTime, GS->GetLobbySettings());
 
 	FHitmenSonarPing Ping;
 	Ping.Location = Carrier->GetActorLocation();

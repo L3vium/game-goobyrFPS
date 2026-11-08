@@ -44,6 +44,47 @@ namespace
 // Patrol
 // ---------------------------------------------------------------------------------------------
 
+UBTTask_HitmenFacePost::UBTTask_HitmenFacePost()
+{
+	NodeName = TEXT("Face Post");
+	bNotifyTick = true;
+}
+
+EBTNodeResult::Type UBTTask_HitmenFacePost::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	const AHitmenNPC* NPC = Cast<AHitmenNPC>(OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr);
+	if (!NPC)
+	{
+		return EBTNodeResult::Failed;
+	}
+	OwnerComp.GetAIOwner()->ClearFocus(EAIFocusPriority::Gameplay);
+	return EBTNodeResult::InProgress;
+}
+
+void UBTTask_HitmenFacePost::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
+{
+	AHitmenNPC* NPC = Cast<AHitmenNPC>(OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr);
+	if (!NPC)
+	{
+		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		return;
+	}
+	const float Current = NPC->GetActorRotation().Yaw;
+	const float Wanted = NPC->GetPostRotation().Yaw;
+	const float Delta = FMath::FindDeltaAngleDegrees(Current, Wanted);
+	if (FMath::Abs(Delta) <= Tolerance)
+	{
+		NPC->SetActorRotation(NPC->GetPostRotation());
+		OwnerComp.GetAIOwner()->SetControlRotation(NPC->GetPostRotation());
+		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+		return;
+	}
+	const float Step = FMath::Clamp(Delta, -TurnSpeedDegrees * DeltaSeconds, TurnSpeedDegrees * DeltaSeconds);
+	const FRotator NewRotation(0.f, Current + Step, 0.f);
+	NPC->SetActorRotation(NewRotation);
+	OwnerComp.GetAIOwner()->SetControlRotation(NewRotation);
+}
+
 UBTTask_HitmenFindPatrolPoint::UBTTask_HitmenFindPatrolPoint()
 {
 	NodeName = TEXT("Find Patrol Point");
@@ -58,7 +99,9 @@ EBTNodeResult::Type UBTTask_HitmenFindPatrolPoint::ExecuteTask(UBehaviorTreeComp
 		return EBTNodeResult::Failed;
 	}
 
-	if (const AHitmenPatrolRoute* Route = NPC->GetPatrolRoute(); Route && Route->GetPointCount() > 0)
+	// Stationary NPCs ignore any route: their patrol is their post.
+	const AHitmenPatrolRoute* Route = NPC->GetBehavior() == EHitmenNPCBehavior::Patrol ? NPC->GetPatrolRoute() : nullptr;
+	if (Route && Route->GetPointCount() > 0)
 	{
 		const int32 Index = NPC->AdvancePatrolIndex(Route->GetPointCount());
 		const FHitmenPatrolPoint* Point = Route->GetPoint(Index);

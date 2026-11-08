@@ -27,6 +27,8 @@ namespace HitmenBBKeys
 	extern HITMEN_API const FName HomeLocation;
 	extern HITMEN_API const FName UseActor;
 	extern HITMEN_API const FName CanCallReinforcements;
+	extern HITMEN_API const FName IsStationary;
+	extern HITMEN_API const FName HoldPosition;
 }
 
 UCLASS(Blueprintable)

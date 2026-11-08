@@ -78,6 +78,10 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Alert")
 	void SetCallingReinforcements(bool bCalling);
 
+	/** Off = deaf: noises, distractions, radio calls and bodies are ignored (sight and damage only). */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Alert")
+	void SetReactsToNoises(bool bReacts) { bReactsToNoises = bReacts; }
+
 	/** Puts the NPC into combat with a given target (charm, debug). */
 	void EngageTarget(AActor* NewTarget);
 
@@ -122,6 +126,7 @@ protected:
 	FVector InvestigateLocation = FVector::ZeroVector;
 	bool bTargetVisible = false;
 	bool bSuppressed = false;
+	bool bReactsToNoises = true;
 	float LastSeenTime = -100.f;
 	float StateEnterTime = 0.f;
 	float LastDamageTime = -100.f;

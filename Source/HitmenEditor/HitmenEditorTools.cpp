@@ -119,10 +119,19 @@ namespace
 			: Tree(InTree)
 		{
 			Tree->BlackboardAsset = Blackboard;
-			if (Tree->BTGraph)
+			// Rebuild from scratch: purge the old graph, its nodes and every old node instance.
+			// Reusing them loses decorators of the new tree (one per decorator of the old tree).
+			Tree->BTGraph = nullptr;
+			Tree->RootNode = nullptr;
+			Tree->RootDecorators.Reset();
+			Tree->RootDecoratorOps.Reset();
+			TArray<UObject*> OldInners;
+			GetObjectsWithOuter(Tree, OldInners, /*bIncludeNestedObjects*/ false);
+			for (UObject* Old : OldInners)
 			{
-				// Rebuild from scratch: move the old graph out of the way.
-				Tree->BTGraph->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
+				Old->SetFlags(RF_Transient);
+				Old->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
+				Old->MarkAsGarbage();
 			}
 			Graph = CastChecked<UBehaviorTreeGraph>(FBlueprintEditorUtils::CreateNewGraph(Tree, NAME_None, UBehaviorTreeGraph::StaticClass(), UEdGraphSchema_BehaviorTree::StaticClass()));
 			Tree->BTGraph = Graph;
@@ -258,6 +267,8 @@ namespace
 		AddKey(HitmenBBKeys::TargetVisible, NewObject<UBlackboardKeyType_Bool>(Blackboard));
 		AddKey(HitmenBBKeys::IsSniper, NewObject<UBlackboardKeyType_Bool>(Blackboard));
 		AddKey(HitmenBBKeys::CanCallReinforcements, NewObject<UBlackboardKeyType_Bool>(Blackboard));
+		AddKey(HitmenBBKeys::IsStationary, NewObject<UBlackboardKeyType_Bool>(Blackboard));
+		AddKey(HitmenBBKeys::HoldPosition, NewObject<UBlackboardKeyType_Bool>(Blackboard));
 		AddKey(HitmenBBKeys::UseActor, ObjectKey(AActor::StaticClass()));
 		Blackboard->MarkPackageDirty();
 		return Blackboard;
@@ -276,6 +287,19 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		B.Task(UBTTask_HitmenFindPatrolPoint::StaticClass(), Seq, -450, 320);
 		B.MoveTo(Seq, HitmenBBKeys::MoveLocation, 80.f, -150, 320);
 		B.Task(UBTTask_HitmenUseActor::StaticClass(), Seq, 150, 320);
+		UBehaviorTreeGraphNode* Wait = B.Task(UBTTask_WaitBlackboardTime::StaticClass(), Seq, 450, 320);
+		SetKey(Wait->NodeInstance, TEXT("BlackboardKey"), HitmenBBKeys::WaitTime);
+		B.Finish();
+	}
+
+	// ---- BT_Guard: stationary NPC, back to its post, face its placement direction, wait ----
+	UBehaviorTree* Guard = CreateOrLoadAsset<UBehaviorTree>(Folder, TEXT("BT_Guard"));
+	{
+		FTreeBuilder B(Guard, Blackboard);
+		UBehaviorTreeGraphNode* Seq = B.Composite(UBTComposite_Sequence::StaticClass(), B.Root, 0, 150);
+		B.Task(UBTTask_HitmenFindPatrolPoint::StaticClass(), Seq, -450, 320);
+		B.MoveTo(Seq, HitmenBBKeys::MoveLocation, 60.f, -150, 320);
+		B.Task(UBTTask_HitmenFacePost::StaticClass(), Seq, 150, 320);
 		UBehaviorTreeGraphNode* Wait = B.Task(UBTTask_WaitBlackboardTime::StaticClass(), Seq, 450, 320);
 		SetKey(Wait->NodeInstance, TEXT("BlackboardKey"), HitmenBBKeys::WaitTime);
 		B.Finish();
@@ -340,6 +364,14 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 			SetFloat(Cooldown, TEXT("CoolDownTime"), 15.f);
 		}
 
+		// Holds position: shoot while visible, otherwise keep facing the target. Never moves.
+		UBehaviorTreeGraphNode* Hold = B.Composite(UBTComposite_Selector::StaticClass(), Sel, -675, 360);
+		B.KeyIsSet(Hold, HitmenBBKeys::HoldPosition);
+		UBehaviorTreeGraphNode* HoldShoot = B.Task(UBTTask_HitmenShoot::StaticClass(), Hold, -800, 560);
+		B.KeyIsSet(HoldShoot, HitmenBBKeys::TargetVisible);
+		UBehaviorTreeGraphNode* HoldWait = B.Task(UBTTask_Wait::StaticClass(), Hold, -600, 560);
+		SetFloat(HoldWait->NodeInstance, TEXT("WaitTime"), 0.3f);
+
 		UBehaviorTreeGraphNode* SniperNode = B.Subtree(Sniper, Sel, -450, 360);
 		B.KeyIsSet(SniperNode, HitmenBBKeys::IsSniper);
 
@@ -362,8 +394,14 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		FTreeBuilder B(Root, Blackboard);
 		UBehaviorTreeGraphNode* Sel = B.Composite(UBTComposite_Selector::StaticClass(), B.Root, 0, 150);
 
-		UBehaviorTreeGraphNode* CombatNode = B.Subtree(Combat, Sel, -1000, 360);
+		UBehaviorTreeGraphNode* CombatNode = B.Subtree(Combat, Sel, -1400, 360);
 		B.AlertIs(CombatNode, { EHitmenAlertState::Combat });
+
+		// Holding NPCs search and investigate by looking around from their post.
+		UBehaviorTreeGraphNode* HoldLook = B.Composite(UBTComposite_Sequence::StaticClass(), Sel, -950, 360);
+		B.KeyIsSet(HoldLook, HitmenBBKeys::HoldPosition);
+		B.AlertIs(HoldLook, { EHitmenAlertState::Searching, EHitmenAlertState::Investigating });
+		B.Task(UBTTask_HitmenLookAround::StaticClass(), HoldLook, -950, 560);
 
 		UBehaviorTreeGraphNode* SearchNode = B.Subtree(Search, Sel, -550, 360);
 		B.AlertIs(SearchNode, { EHitmenAlertState::Searching });
@@ -377,7 +415,10 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		UBehaviorTreeGraphNode* Stare = B.Task(UBTTask_Wait::StaticClass(), Suspicious, 350, 560);
 		SetFloat(Stare->NodeInstance, TEXT("WaitTime"), 0.4f);
 
-		B.Subtree(Patrol, Sel, 800, 360);
+		UBehaviorTreeGraphNode* GuardNode = B.Subtree(Guard, Sel, 800, 360);
+		B.KeyIsSet(GuardNode, HitmenBBKeys::IsStationary);
+
+		B.Subtree(Patrol, Sel, 1200, 360);
 		B.Finish();
 	}
 	return true;

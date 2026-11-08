@@ -181,7 +181,9 @@ def patrol(points, waits=None, folder="AI"):
     return route
 
 
-def npc(kind, loc, yaw=0, route=None, keycard=None, folder="AI"):
+def npc(kind, loc, yaw=0, route=None, keycard=None, folder="AI", stationary=False, sentry=False):
+    """Place an NPC. stationary = stands at its post facing yaw; sentry = stationary, sight only,
+    never leaves its post."""
     cls = {"guard": "Characters/NPC/BP_NPC_Guard", "sniper": "Characters/NPC/BP_NPC_Sniper",
            "vip": "Characters/NPC/BP_NPC_VIPCandidate", "civilian": "Characters/NPC/BP_NPC_Civilian"}[kind]
     actor = spawn(bp(cls), (loc[0], loc[1], loc[2] + 100), (0, yaw, 0), None, folder)
@@ -189,6 +191,11 @@ def npc(kind, loc, yaw=0, route=None, keycard=None, folder="AI"):
         actor.set_editor_property("patrol_route", route)
     if actor and keycard is not None:
         actor.set_editor_property("carried_keycard", keycard)
+    if actor and (stationary or sentry):
+        actor.set_editor_property("behavior", unreal.HitmenNPCBehavior.STATIONARY)
+    if actor and sentry:
+        actor.set_editor_property("reacts_to_noises", False)
+        actor.set_editor_property("hold_position", True)
     return actor
 
 
@@ -480,9 +487,11 @@ def build_gym():
     # ---- Row 5: AI pens ----
     y = 6500
     text((-9000, y - 900, 250), "AI", 160, color=(1, 0.8, 0.1))
-    pens = [("Patrolling guard", "guard"), ("Guard with keycard 1", "guard"), ("VIP candidate", "vip"), ("Civilian", "civilian"), ("Sniper (tower)", "sniper")]
-    for i, (label, kind) in enumerate(pens):
-        x = -8000 + i * 3500
+    pens = [("Patrolling guard", "guard", "patrol"), ("Guard with keycard 1", "guard", "patrol"),
+            ("Stationary guard", "guard", "stationary"), ("Sentry: sight only, holds position", "guard", "sentry"),
+            ("VIP candidate", "vip", ""), ("Civilian", "civilian", ""), ("Sniper (tower)", "sniper", "")]
+    for i, (label, kind, mode) in enumerate(pens):
+        x = -9000 + i * 3000
         wall((x - 1200, y + 1200), (x + 1200, y + 1200), 0, 300, 25, (), GRID_DARK, "Gym/AI")
         wall((x - 1200, y - 600), (x - 1200, y + 1200), 0, 300, 25, (), GRID_DARK, "Gym/AI")
         wall((x + 1200, y - 600), (x + 1200, y + 1200), 0, 300, 25, (), GRID_DARK, "Gym/AI")
@@ -492,8 +501,9 @@ def build_gym():
             ladder((x, y + 575, 0), -90, 600)
             npc("sniper", (x, y + 800, 600), -90, folder="Gym/AI")
         else:
-            route = patrol([(x - 700, y, 100), (x + 700, y, 100), (x + 700, y + 900, 100), (x - 700, y + 900, 100)], folder="Gym/AI") if i < 2 else None
-            npc(kind, (x, y + 300, 0), -90, route=route, keycard=1 if i == 1 else None, folder="Gym/AI")
+            route = patrol([(x - 700, y, 100), (x + 700, y, 100), (x + 700, y + 900, 100), (x - 700, y + 900, 100)], folder="Gym/AI") if mode == "patrol" else None
+            npc(kind, (x, y + 300, 0), -90, route=route, keycard=1 if i == 1 else None, folder="Gym/AI",
+                stationary=mode == "stationary", sentry=mode == "sentry")
     save_map()
 
 
@@ -735,9 +745,10 @@ def build_ldtest():
         route = patrol(route_points, folder="AI/Routes")
         start = route_points[0]
         npc("guard", (start[0], start[1], start[2] - 100), 0, route=route, keycard=1 if i in (2, 5) else None, folder="AI/Guards")
-    for gx, gy, gz in ((mx - 400, my - cd / 2 + 300, 0), (mx + 400, my - cd / 2 + 300, 0), (hx1 - 200, hy0 - 200, 0), (mx, my + cd / 2 - 300, 0),
-                       (-4300, -2600, 0), (-6500, 3200, 0)):
-        npc("guard", (gx, gy, gz), 180, folder="AI/Guards")
+    # Stationary guards; the pair at the manor gate are sentries (sight only, never leave the gate).
+    for i, (gx, gy, gz) in enumerate(((mx - 400, my - cd / 2 + 300, 0), (mx + 400, my - cd / 2 + 300, 0), (hx1 - 200, hy0 - 200, 0),
+                                      (mx, my + cd / 2 - 300, 0), (-4300, -2600, 0), (-6500, 3200, 0))):
+        npc("guard", (gx, gy, gz), 180, folder="AI/Guards", stationary=True, sentry=i < 2)
     for gx, gy in ((-2200, 500), (-2700, -1200), (-1900, 3600), (mx - 2000, my + 1800)):
         npc("civilian", (gx, gy, 0), 90, folder="AI/Civilians")
 

@@ -214,7 +214,7 @@ void UHitmenAlertComponent::LoseSightOf(AActor* Seen)
 
 void UHitmenAlertComponent::HearNoise(const FVector& Location, EHitmenNoiseType Type, AActor* NoiseInstigator, float Distance)
 {
-	if (bSuppressed)
+	if (bSuppressed || !bReactsToNoises)
 	{
 		return;
 	}
@@ -248,7 +248,7 @@ void UHitmenAlertComponent::HearNoise(const FVector& Location, EHitmenNoiseType 
 
 void UHitmenAlertComponent::SeeBody(AHitmenCharacterBase* Body)
 {
-	if (bSuppressed || !Body || KnownBodies.Contains(Body))
+	if (bSuppressed || !bReactsToNoises || !Body || KnownBodies.Contains(Body))
 	{
 		return;
 	}
@@ -286,7 +286,7 @@ void UHitmenAlertComponent::OnDamagedBy(AActor* DamageInstigator)
 
 void UHitmenAlertComponent::ReceiveReinforcementCall(const FVector& Location, AActor* CallTarget)
 {
-	if (bSuppressed || AlertState == EHitmenAlertState::Combat)
+	if (bSuppressed || !bReactsToNoises || AlertState == EHitmenAlertState::Combat)
 	{
 		return;
 	}

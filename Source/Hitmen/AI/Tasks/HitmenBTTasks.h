@@ -27,6 +27,25 @@ protected:
 	float DefaultWaitTime = 4.f;
 };
 
+/** Turns a stationary NPC back to the direction it was placed facing. */
+UCLASS(meta=(DisplayName="Hitmen Face Post"))
+class HITMEN_API UBTTask_HitmenFacePost : public UBTTaskNode
+{
+	GENERATED_BODY()
+
+public:
+	UBTTask_HitmenFacePost();
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+	virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
+
+protected:
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="1", Units="deg"))
+	float TurnSpeedDegrees = 180.f;
+
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="deg"))
+	float Tolerance = 3.f;
+};
+
 /** Shoots at TargetActor for a burst while it is visible. */
 UCLASS(meta=(DisplayName="Hitmen Shoot Target"))
 class HITMEN_API UBTTask_HitmenShoot : public UBTTaskNode

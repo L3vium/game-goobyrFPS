@@ -41,6 +41,22 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
 	AHitmenPatrolRoute* GetPatrolRoute() const { return PatrolRoute; }
 
+	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
+	EHitmenNPCBehavior GetBehavior() const { return Behavior; }
+
+	/** Stationary NPC that never leaves its post, even in combat or while searching. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
+	bool HoldsPosition() const { return Behavior == EHitmenNPCBehavior::Stationary && bHoldPosition; }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
+	bool CanHearNoises() const { return bReactsToNoises; }
+
+	/** Where a stationary NPC stands guard and which way it faces (its placement). */
+	FVector GetPostLocation() const { return PostLocation; }
+	FRotator GetPostRotation() const { return PostRotation; }
+
+	virtual void PostInitializeComponents() override;
+
 	/** Next patrol index (owned by the NPC so routes can be shared). */
 	int32 AdvancePatrolIndex(int32 PointCount);
 
@@ -65,8 +81,25 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
 	TObjectPtr<UHitmenWeaponData> DefaultWeapon;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
+	/** Patrol walks PatrolRoute; Stationary stands at its placement, facing its placement direction. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC|Behavior")
+	EHitmenNPCBehavior Behavior = EHitmenNPCBehavior::Patrol;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC|Behavior", meta=(EditCondition="Behavior==EHitmenNPCBehavior::Patrol", EditConditionHides))
 	TObjectPtr<AHitmenPatrolRoute> PatrolRoute;
+
+	/** Off = only reacts to what it sees and to being hurt: ignores footsteps, gunshots,
+	 *  distractions, radio calls and bodies. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC|Behavior")
+	bool bReactsToNoises = true;
+
+	/** Never leaves its post: shoots what it sees, turns toward attackers, searches by looking
+	 *  around. Combined with React To Noises off, this is a sentry. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC|Behavior", meta=(EditCondition="Behavior==EHitmenNPCBehavior::Stationary", EditConditionHides))
+	bool bHoldPosition = false;
+
+	FVector PostLocation = FVector::ZeroVector;
+	FRotator PostRotation = FRotator::ZeroRotator;
 
 	/** Snipers keep their distance instead of closing in. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")

@@ -32,6 +32,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Generated content (`Tools/Editor/hitmen_build_all.py`): input (AZERTY, rebindable), materials incl. Sightroom post-process, data for 12 weapons / 21 abilities / cosmetics / rules / maps, BP_ children of every class, WBP_ widgets, behavior trees, and maps L_TitleScreen, L_Lobby, L_Empty_01/02, L_Gym, L_LDTest.
 - Editor tooling: `ue_remote.py` (Python in the open editor), `ue_shot.sh` (PIE capture), `ue_bake_nav.sh`; baked navmeshes; level builder fixes (rotations, in-place rebuild, title lighting, labels, team starts).
 - NPC walk speed per alert state (calm/alert/combat) and NPC damage scaled by the difficulty preset
+- Packaged player builds: Shipping in `Builds/Windows`, Development in `Builds/Windows Dev`
 
 ### Removed
 - Unity project, template Horror/Shooter variants, marketplace demo maps.

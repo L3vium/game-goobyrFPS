@@ -3,18 +3,9 @@
 #include "UI/HitmenHUDWidgets.h"
 #include "UI/HitmenUIFactory.h"
 #include "UI/HitmenUIEventSubsystem.h"
-#include "AI/HitmenAISubsystem.h"
-#include "AI/HitmenAlertComponent.h"
-#include "Characters/HitmenCharacterBase.h"
-#include "Components/HitmenHealthComponent.h"
-#include "Components/HitmenBodyCarryComponent.h"
 #include "Framework/HitmenGameState.h"
-#include "Inventory/HitmenInventoryComponent.h"
-#include "Abilities/HitmenAbilityComponent.h"
-#include "Abilities/HitmenAbility.h"
-#include "Data/HitmenWeaponData.h"
-#include "Data/HitmenAbilityData.h"
-#include "Weapons/HitmenWeaponBase.h"
+#include "Characters/HitmenCharacterBase.h"  // GameState::GetVIP() type only
+#include "GameFramework/Pawn.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -101,8 +92,9 @@ int32 UHitmenCompassWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 			continue;
 		}
 		const bool bCardinal = Step % 3 == 0;
+		const bool bMainCardinal = Step % 6 == 0;
 		DrawLine(OutDrawElements, LayerId, AllottedGeometry, FVector2D(X, Size.Y - (bCardinal ? 12.f : 6.f)), FVector2D(X, Size.Y), HitmenUI::Text() * FLinearColor(1.f, 1.f, 1.f, 0.6f), 1.5f);
-		if (bCardinal)
+		if (bCardinal && (bMainCardinal || bShowIntercardinals))
 		{
 			const TCHAR* Letter = Letters[(Step / 3) % 8];
 			DrawText(OutDrawElements, LayerId + 1, AllottedGeometry, Letter, FVector2D(X - 8.f, 0.f), Step % 6 == 0 ? 16 : 11, HitmenUI::Text());
@@ -114,8 +106,8 @@ int32 UHitmenCompassWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
 	if (Pawn && GS)
 	{
-		const UHitmenBodyCarryComponent* Carry = Pawn->FindComponentByClass<UHitmenBodyCarryComponent>();
-		if (Carry && Carry->IsCarrying())
+		const UHitmenUIEventSubsystem* UI = GetUIEvents();
+		if (UI && UI->IsCarryingVIP())
 		{
 			for (const AActor* Point : GS->GetActiveRetrievalPoints())
 			{
@@ -194,43 +186,28 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 	DrawBox(OutDrawElements, LayerId, AllottedGeometry, Center - FVector2D(1.5f), FVector2D(3.f), White);
 
 	// Ring sized by weapon spread.
-	float Spread = 1.f;
-	if (const UHitmenInventoryComponent* Inventory = Pawn ? Pawn->FindComponentByClass<UHitmenInventoryComponent>() : nullptr)
-	{
-		if (const AHitmenWeaponBase* Weapon = Inventory->GetActiveWeapon())
-		{
-			Spread = Weapon->GetCurrentSpread();
-		}
-	}
+	const UHitmenUIEventSubsystem* UI = GetUIEvents();
+	const float Spread = UI ? UI->GetCrosshairSpread() : 1.f;
 	const float RingRadius = 10.f + Spread * SpreadScale;
 	DrawArc(OutDrawElements, LayerId, AllottedGeometry, Center, RingRadius, 0.f, 360.f, White * FLinearColor(1.f, 1.f, 1.f, 0.55f), 1.5f, 32);
 
 	// Alert arcs: NPCs aware of you, placed toward them.
-	if (Pawn && PC)
+	if (Pawn && PC && UI)
 	{
-		if (const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this))
+		const float ViewYaw = PC->GetControlRotation().Yaw;
+		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
 		{
-			const float ViewYaw = PC->GetControlRotation().Yaw;
-			for (const UHitmenAlertComponent* Alert : AI->GetAlertComponents())
+			if (Blip.Color == EHitmenAlertColor::None || !Blip.bTargetsViewer)
 			{
-				const AActor* NPC = Alert->GetOwner();
-				const EHitmenAlertColor Color = Alert->GetAlertColor();
-				if (!NPC || Color == EHitmenAlertColor::None || (Alert->GetTarget() && Alert->GetTarget() != Pawn))
-				{
-					continue;
-				}
-				if (Alert->GetAlertState() == EHitmenAlertState::Suspicious && Alert->GetTarget() != Pawn)
-				{
-					continue;
-				}
-				const float Yaw = RelativeYaw(NPC->GetActorLocation() - Pawn->GetActorLocation(), ViewYaw);
-				FLinearColor Tint = HitmenAlert::ToLinearColor(Color);
-				if (Color == EHitmenAlertColor::White)
-				{
-					Tint.A = FMath::Lerp(0.3f, 1.f, Alert->GetSuspicion());
-				}
-				DrawArc(OutDrawElements, LayerId + 1, AllottedGeometry, Center, RingRadius + 26.f, Yaw - 14.f, Yaw + 14.f, Tint, 4.f);
+				continue;
 			}
+			const float Yaw = RelativeYaw(Blip.Location - Pawn->GetActorLocation(), ViewYaw);
+			FLinearColor Tint = HitmenAlert::ToLinearColor(Blip.Color);
+			if (Blip.Color == EHitmenAlertColor::White)
+			{
+				Tint.A = FMath::Lerp(0.3f, 1.f, Blip.Suspicion);
+			}
+			DrawArc(OutDrawElements, LayerId + 1, AllottedGeometry, Center, RingRadius + 26.f, Yaw - 14.f, Yaw + 14.f, Tint, 4.f);
 		}
 	}
 
@@ -312,25 +289,19 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		return Point;
 	};
 
-	if (const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this))
+	if (const UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
-		for (const UHitmenAlertComponent* Alert : AI->GetAlertComponents())
+		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
 		{
-			const AHitmenCharacterBase* NPC = Cast<AHitmenCharacterBase>(Alert->GetOwner());
-			if (!NPC || NPC->IsDead())
-			{
-				continue;
-			}
-			const EHitmenAlertColor Color = Alert->GetAlertColor();
-			if (bOnlyShowAlertedNPCs && Color == EHitmenAlertColor::None)
+			if (bOnlyShowAlertedNPCs && Blip.Color == EHitmenAlertColor::None)
 			{
 				continue;
 			}
 			bool bInside = false;
-			const FVector2D Point = ToMap(NPC->GetActorLocation(), bInside);
+			const FVector2D Point = ToMap(Blip.Location, bInside);
 			if (bInside)
 			{
-				const FLinearColor Tint = Color == EHitmenAlertColor::None ? HitmenUI::TextDim() : HitmenAlert::ToLinearColor(Color);
+				const FLinearColor Tint = Blip.Color == EHitmenAlertColor::None ? HitmenUI::TextDim() : HitmenAlert::ToLinearColor(Blip.Color);
 				DrawBox(OutDrawElements, LayerId + 2, AllottedGeometry, Point - FVector2D(3.f), FVector2D(6.f), Tint);
 			}
 		}
@@ -389,20 +360,25 @@ void UHitmenHUDWidget::BuildDefaultLayout()
 	InventoryPanel->SetContent(InventoryRow);
 	HitmenUI::AddToCanvas(Canvas, InventoryPanel, FAnchors(0.5f, 1.f), FVector2D(0.f, -24.f), FVector2D(0.5f, 1.f));
 
-	// Abilities and health, bottom left.
-	UVerticalBox* Left = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	// Square minimap, bottom left.
+	const float MinimapSize = 220.f;
+	const float Margin = 24.f;
+	Minimap = WidgetTree->ConstructWidget<UHitmenMinimapWidget>(UHitmenMinimapWidget::StaticClass());
+	Minimap->SetVisibility(ESlateVisibility::HitTestInvisible);
+	HitmenUI::AddToCanvas(Canvas, Minimap, FAnchors(0.f, 1.f), FVector2D(Margin, -Margin), FVector2D(0.f, 1.f), FVector2D(MinimapSize, MinimapSize));
+
+	// Abilities and health, bottom right (the minimap owns the bottom left).
+	UVerticalBox* Right = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	MoveAbilityText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 15);
 	ManipulationAbilityText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 15);
 	HealthText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 15, TEXT("Regular"), HitmenUI::TextDim());
-	HitmenUI::AddToVBox(Left, MoveAbilityText);
-	HitmenUI::AddToVBox(Left, ManipulationAbilityText);
-	HitmenUI::AddToVBox(Left, HealthText);
-	HitmenUI::AddToCanvas(Canvas, Left, FAnchors(0.f, 1.f), FVector2D(28.f, -24.f), FVector2D(0.f, 1.f));
-
-	// Square minimap, bottom right.
-	Minimap = WidgetTree->ConstructWidget<UHitmenMinimapWidget>(UHitmenMinimapWidget::StaticClass());
-	Minimap->SetVisibility(ESlateVisibility::HitTestInvisible);
-	HitmenUI::AddToCanvas(Canvas, Minimap, FAnchors(1.f, 1.f), FVector2D(-24.f, -24.f), FVector2D(1.f, 1.f), FVector2D(220.f, 220.f));
+	MoveAbilityText->SetJustification(ETextJustify::Right);
+	ManipulationAbilityText->SetJustification(ETextJustify::Right);
+	HealthText->SetJustification(ETextJustify::Right);
+	HitmenUI::AddToVBox(Right, MoveAbilityText, FMargin(0.f), false, HAlign_Right);
+	HitmenUI::AddToVBox(Right, ManipulationAbilityText, FMargin(0.f), false, HAlign_Right);
+	HitmenUI::AddToVBox(Right, HealthText, FMargin(0.f), false, HAlign_Right);
+	HitmenUI::AddToCanvas(Canvas, Right, FAnchors(1.f, 1.f), FVector2D(-Margin - 4.f, -Margin), FVector2D(1.f, 1.f));
 }
 
 void UHitmenHUDWidget::BindEvents()
@@ -411,8 +387,15 @@ void UHitmenHUDWidget::BindEvents()
 	{
 		UI->OnPawnChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandlePawnChanged);
 		UI->OnInteractionPromptChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandlePrompt);
+		UI->OnInventoryViewChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleInventoryView);
+		UI->OnAbilityViewsChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleAbilityViews);
+		UI->OnVitalsChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleVitals);
+		// Catch up with views published before this widget existed.
+		HandleInventoryView(UI->GetInventoryView());
+		HandleAbilityViews(UI->GetMoveAbilityView(), UI->GetManipulationAbilityView());
+		HandleVitals(UI->GetVitals());
 	}
-	BindToPawn(GetOwningPlayerPawn());
+	HandlePawnChanged(GetOwningPlayerPawn());
 }
 
 void UHitmenHUDWidget::UnbindEvents()
@@ -421,52 +404,15 @@ void UHitmenHUDWidget::UnbindEvents()
 	{
 		UI->OnPawnChanged.RemoveAll(this);
 		UI->OnInteractionPromptChanged.RemoveAll(this);
+		UI->OnInventoryViewChanged.RemoveAll(this);
+		UI->OnAbilityViewsChanged.RemoveAll(this);
+		UI->OnVitalsChanged.RemoveAll(this);
 	}
-	UnbindFromPawn();
 }
 
 void UHitmenHUDWidget::HandlePawnChanged(APawn* NewPawn)
 {
-	BindToPawn(NewPawn);
-}
-
-void UHitmenHUDWidget::BindToPawn(APawn* Pawn)
-{
-	UnbindFromPawn();
-	if (!Pawn)
-	{
-		SetVisibility(ESlateVisibility::Collapsed);
-		return;
-	}
-	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-	BoundInventory = Pawn->FindComponentByClass<UHitmenInventoryComponent>();
-	BoundAbilities = Pawn->FindComponentByClass<UHitmenAbilityComponent>();
-	if (BoundInventory)
-	{
-		BoundInventory->OnInventoryChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleInventoryChanged);
-		BoundInventory->OnActiveSlotChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleActiveSlotChanged);
-	}
-	if (BoundAbilities)
-	{
-		BoundAbilities->OnAbilitiesChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleAbilitiesChanged);
-	}
-	HandleInventoryChanged();
-	HandleAbilitiesChanged();
-}
-
-void UHitmenHUDWidget::UnbindFromPawn()
-{
-	if (BoundInventory)
-	{
-		BoundInventory->OnInventoryChanged.RemoveAll(this);
-		BoundInventory->OnActiveSlotChanged.RemoveAll(this);
-	}
-	if (BoundAbilities)
-	{
-		BoundAbilities->OnAbilitiesChanged.RemoveAll(this);
-	}
-	BoundInventory = nullptr;
-	BoundAbilities = nullptr;
+	SetVisibility(NewPawn ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 }
 
 void UHitmenHUDWidget::HandlePrompt(const FText& Prompt, bool bVisible)
@@ -477,35 +423,25 @@ void UHitmenHUDWidget::HandlePrompt(const FText& Prompt, bool bVisible)
 	}
 }
 
-void UHitmenHUDWidget::HandleActiveSlotChanged(int32 NewSlot)
+void UHitmenHUDWidget::HandleInventoryView(const FHitmenHUDInventoryView& View)
 {
-	HandleInventoryChanged();
-}
-
-void UHitmenHUDWidget::HandleInventoryChanged()
-{
-	if (!BoundInventory)
+	auto SlotLabel = [&View](int32 Index) -> FText
 	{
-		return;
-	}
-	const TArray<FHitmenInventorySlot>& Slots = BoundInventory->GetSlots();
-	auto SlotLabel = [this, &Slots](int32 Index) -> FText
-	{
-		if (!Slots.IsValidIndex(Index) || Slots[Index].IsEmpty())
+		if (!View.Slots.IsValidIndex(Index) || View.Slots[Index].bEmpty)
 		{
 			return FText::Format(LOCTEXT("EmptySlot", "{0}  -"), FText::AsNumber(Index + 1));
 		}
-		const UHitmenWeaponData* Data = Slots[Index].Weapon;
-		const FText Ammo = Data->bUsesAmmo ? FText::AsNumber(Slots[Index].Ammo) : FText::FromString(TEXT("-"));
-		const FText Marker = BoundInventory->GetActiveSlot() == Index ? FText::FromString(TEXT("> ")) : FText::GetEmpty();
-		return FText::Format(LOCTEXT("Slot", "{0}{1}  {2}  {3}"), Marker, FText::AsNumber(Index + 1), Data->DisplayName, Ammo);
+		const FHitmenHUDSlotView& SlotView = View.Slots[Index];
+		const FText Ammo = SlotView.Ammo >= 0 ? FText::AsNumber(SlotView.Ammo) : FText::FromString(TEXT("-"));
+		const FText Marker = SlotView.bActive ? FText::FromString(TEXT("> ")) : FText::GetEmpty();
+		return FText::Format(LOCTEXT("Slot", "{0}{1}  {2}  {3}"), Marker, FText::AsNumber(Index + 1), SlotView.Name, Ammo);
 	};
 	if (SlotOneText) { SlotOneText->SetText(SlotLabel(0)); }
 	if (SlotTwoText) { SlotTwoText->SetText(SlotLabel(1)); }
 	if (KeycardText)
 	{
 		FString Cards;
-		for (const int32 Card : BoundInventory->GetKeycards())
+		for (const int32 Card : View.Keycards)
 		{
 			Cards += FString::Printf(TEXT(" [K%d]"), Card);
 		}
@@ -513,49 +449,43 @@ void UHitmenHUDWidget::HandleInventoryChanged()
 	}
 }
 
-void UHitmenHUDWidget::HandleAbilitiesChanged()
+void UHitmenHUDWidget::HandleAbilityViews(const FHitmenHUDAbilityView& Move, const FHitmenHUDAbilityView& Manipulation)
 {
-	// Text is refreshed every tick for cooldowns; nothing else to cache.
-}
-
-void UHitmenHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
-{
-	Super::NativeTick(MyGeometry, InDeltaTime);
-	auto AbilityLabel = [](const UHitmenAbility* Ability, const TCHAR* Key) -> FText
+	auto AbilityLabel = [](const FHitmenHUDAbilityView& View, const TCHAR* Key) -> FText
 	{
-		if (!Ability || !Ability->GetData())
+		if (!View.bValid)
 		{
 			return FText::FromString(FString::Printf(TEXT("[%s]  -"), Key));
 		}
-		FString Text = FString::Printf(TEXT("[%s]  %s"), Key, *Ability->GetData()->DisplayName.ToString());
-		if (Ability->GetMaxCharges() > 0)
+		FString Text = FString::Printf(TEXT("[%s]  %s"), Key, *View.Name.ToString());
+		if (View.MaxCharges > 0)
 		{
-			Text += FString::Printf(TEXT("  x%d"), Ability->GetCharges());
+			Text += FString::Printf(TEXT("  x%d"), View.Charges);
 		}
-		if (Ability->GetCooldownRemaining() > 0.f)
+		if (View.CooldownRemaining > 0.f)
 		{
-			Text += FString::Printf(TEXT("  %.1fs"), Ability->GetCooldownRemaining());
+			Text += FString::Printf(TEXT("  %.1fs"), View.CooldownRemaining);
 		}
 		return FText::FromString(Text);
 	};
-	if (BoundAbilities)
+	if (MoveAbilityText) { MoveAbilityText->SetText(AbilityLabel(Move, TEXT("E"))); }
+	if (ManipulationAbilityText) { ManipulationAbilityText->SetText(AbilityLabel(Manipulation, TEXT("A"))); }
+}
+
+void UHitmenHUDWidget::HandleVitals(const FHitmenHUDVitalsView& View)
+{
+	if (!HealthText)
 	{
-		if (MoveAbilityText) { MoveAbilityText->SetText(AbilityLabel(BoundAbilities->GetAbility(EHitmenAbilitySlot::Move), TEXT("E"))); }
-		if (ManipulationAbilityText) { ManipulationAbilityText->SetText(AbilityLabel(BoundAbilities->GetAbility(EHitmenAbilitySlot::Manipulation), TEXT("A"))); }
+		return;
 	}
-	if (HealthText)
+	// Health only shows when hurt (minimal HUD).
+	if (View.HealthNormalized < 0.999f)
 	{
-		const AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(GetOwningPlayerPawn());
-		const UHitmenHealthComponent* Health = Character ? Character->GetHealth() : nullptr;
-		// Health only shows when hurt (minimal HUD).
-		if (Health && Health->GetHealthNormalized() < 0.999f)
-		{
-			HealthText->SetText(FText::Format(LOCTEXT("Health", "HEALTH {0}  ARMOR {1}"), FText::AsNumber(FMath::RoundToInt(Health->GetHealth())), FText::AsNumber(FMath::RoundToInt(Health->GetArmor()))));
-		}
-		else
-		{
-			HealthText->SetText(FText::GetEmpty());
-		}
+		HealthText->SetText(FText::Format(LOCTEXT("Health", "HEALTH {0}  ARMOR {1}"), FText::AsNumber(FMath::RoundToInt(View.Health)), FText::AsNumber(FMath::RoundToInt(View.Armor))));
+	}
+	else
+	{
+		HealthText->SetText(FText::GetEmpty());
 	}
 }
 
@@ -572,26 +502,28 @@ void UHitmenAlertIndicatorWidget::BuildDefaultLayout()
 	SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
-void UHitmenAlertIndicatorWidget::SetAlertSource(UHitmenAlertComponent* InAlert)
+void UHitmenAlertIndicatorWidget::SetAlertView(EHitmenAlertColor InColor, float InSuspicion, bool bInCallingReinforcements)
 {
-	Alert = InAlert;
+	Color = InColor;
+	Suspicion = FMath::Clamp(InSuspicion, 0.f, 1.f);
+	bCallingReinforcements = bInCallingReinforcements;
 }
 
 int32 UHitmenAlertIndicatorWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-	if (!Alert || Alert->GetAlertColor() == EHitmenAlertColor::None)
+	if (Color == EHitmenAlertColor::None)
 	{
 		return LayerId;
 	}
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
 	const FVector2D C = Size * 0.5f;
 	const float R = FMath::Min(Size.X, Size.Y) * 0.45f;
-	const FLinearColor Color = HitmenAlert::ToLinearColor(Alert->GetAlertColor());
+	const FLinearColor Tint = HitmenAlert::ToLinearColor(Color);
 	const TArray<FVector2D> Diamond = { C + FVector2D(0, -R), C + FVector2D(R, 0), C + FVector2D(0, R), C + FVector2D(-R, 0), C + FVector2D(0, -R) };
-	FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Diamond, ESlateDrawEffect::None, Color, true, 2.5f);
+	FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Diamond, ESlateDrawEffect::None, Tint, true, 2.5f);
 
 	// Fill from the bottom by suspicion (white) or fully (yellow / red).
-	const float Fill = Alert->GetAlertColor() == EHitmenAlertColor::White ? Alert->GetSuspicion() : 1.f;
+	const float Fill = Color == EHitmenAlertColor::White ? Suspicion : 1.f;
 	const int32 Lines = 10;
 	for (int32 Index = 0; Index < Lines; ++Index)
 	{
@@ -602,9 +534,9 @@ int32 UHitmenAlertIndicatorWidget::NativePaint(const FPaintArgs& Args, const FGe
 		}
 		const float Y = C.Y + R - T * 2.f * R;
 		const float HalfWidth = R - FMath::Abs(Y - C.Y);
-		DrawLine(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(C.X - HalfWidth, Y), FVector2D(C.X + HalfWidth, Y), Color * FLinearColor(1.f, 1.f, 1.f, 0.8f), 2.f);
+		DrawLine(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(C.X - HalfWidth, Y), FVector2D(C.X + HalfWidth, Y), Tint * FLinearColor(1.f, 1.f, 1.f, 0.8f), 2.f);
 	}
-	if (Alert->IsCallingReinforcements())
+	if (bCallingReinforcements)
 	{
 		DrawText(OutDrawElements, LayerId + 2, AllottedGeometry, TEXT("!"), FVector2D(C.X + R + 2.f, C.Y - R), 14, HitmenUI::Accent());
 	}

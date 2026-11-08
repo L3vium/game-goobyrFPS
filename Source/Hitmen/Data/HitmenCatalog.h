@@ -34,9 +34,21 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Catalog")
 	TArray<TObjectPtr<UHitmenCosmeticItem>> Cosmetics;
 
-	/** Player icons shown in the lobby. */
+	/** Player icons shown in the lobby. When empty, the coloured glyph icons below are used. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Catalog")
 	TArray<TSoftObjectPtr<UTexture2D>> PlayerIcons;
+
+	/** Placeholder icons (no texture needed): one colour + glyph per icon. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Catalog")
+	TArray<FLinearColor> FallbackIconColors = {
+		FLinearColor(0.85f, 0.10f, 0.10f), FLinearColor(0.95f, 0.55f, 0.05f), FLinearColor(0.95f, 0.85f, 0.10f), FLinearColor(0.20f, 0.75f, 0.25f),
+		FLinearColor(0.10f, 0.65f, 0.85f), FLinearColor(0.25f, 0.30f, 0.90f), FLinearColor(0.65f, 0.25f, 0.85f), FLinearColor(0.90f, 0.90f, 0.90f) };
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Catalog")
+	TArray<FString> FallbackIconGlyphs = { TEXT("A"), TEXT("B"), TEXT("C"), TEXT("D"), TEXT("E"), TEXT("F"), TEXT("G"), TEXT("H") };
+
+	/** Number of icons a player can cycle through. */
+	int32 GetIconCount() const { return PlayerIcons.Num() > 0 ? PlayerIcons.Num() : FMath::Max(1, FallbackIconColors.Num()); }
 
 	/** Random names used when no Steam name is available. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Catalog")

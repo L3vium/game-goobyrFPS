@@ -4,7 +4,7 @@
 #include "Data/HitmenCatalog.h"
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenAbilityData.h"
-#include "Weapons/HitmenWeaponPickup.h"
+#include "Weapons/HitmenWeaponBase.h"
 #include "Abilities/HitmenAbilityActors.h"
 #include "Components/BillboardComponent.h"
 #include "Engine/World.h"
@@ -24,19 +24,22 @@ namespace
 			return Items.IsEmpty() ? nullptr : Items[Stream.RandRange(0, Items.Num() - 1)];
 		}
 		float Roll = Stream.FRandRange(0.f, Total);
+		T* LastValid = nullptr;
 		for (T* Item : Items)
 		{
 			if (!Item)
 			{
 				continue;
 			}
+			LastValid = Item;
 			Roll -= Item->LootWeight;
 			if (Roll <= 0.f)
 			{
 				return Item;
 			}
 		}
-		return Items.Last();
+		// Float rounding can leave a tiny remainder: never return a null entry.
+		return LastValid;
 	}
 }
 
@@ -64,12 +67,8 @@ void AHitmenLootSpawnPoint::SpawnLoot(const UHitmenCatalog* Catalog, FRandomStre
 		}
 		if (UHitmenWeaponData* Weapon = PickWeighted(Options, Stream))
 		{
-			const TSubclassOf<AHitmenWeaponPickup> PickupClass = Weapon->PickupClass ? Weapon->PickupClass : TSubclassOf<AHitmenWeaponPickup>(AHitmenWeaponPickup::StaticClass());
-			if (AHitmenWeaponPickup* Pickup = GetWorld()->SpawnActor<AHitmenWeaponPickup>(PickupClass, GetActorTransform(), Params))
-			{
-				Pickup->InitPickup(Weapon, -1);
-				SpawnedLoot = Pickup;
-			}
+			// The weapon actor itself lies here (spawned once; picking it up moves it to the hand).
+			SpawnedLoot = AHitmenWeaponBase::SpawnDropped(this, Weapon, -1, GetActorTransform());
 		}
 		return;
 	}

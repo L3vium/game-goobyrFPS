@@ -1,5 +1,10 @@
 // Hitmen — NPC awareness state machine (unaware -> white -> yellow -> red -> search), replicated
 // for overhead indicators, minimap and HUD.
+//
+// White (Suspicious) = saw you, not alerted. Losing sight after a long enough look turns it yellow
+// (Investigating the last seen spot); a short glimpse just cools down. Red (Combat) only when the
+// white fill completes while seeing you, when attacked, when witnessing a kill or hearing close
+// gunfire. Yellow-search (Searching) = lost you, scores likely hiding places.
 
 #pragma once
 
@@ -12,6 +17,7 @@ class AHitmenCharacterBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenAlertStateChanged, EHitmenAlertState, OldState, EHitmenAlertState, NewState);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenCallingChanged, bool, bCalling);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenSuspicionChanged, float, Suspicion);
 
 UCLASS(ClassGroup=(Hitmen), Blueprintable, meta=(BlueprintSpawnableComponent))
 class HITMEN_API UHitmenAlertComponent : public UActorComponent
@@ -31,6 +37,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Alert")
 	FOnHitmenCallingChanged OnCallingChanged;
+
+	/** White fill changed (server and clients): overhead indicators push it to their widget. */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|Alert")
+	FOnHitmenSuspicionChanged OnSuspicionChanged;
 
 	// ---- Queries (all machines) ----
 	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
@@ -61,6 +71,20 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
 	float GetLastDamageTime() const { return LastDamageTime; }
 
+	// ---- Server queries ----
+	/** Would react to a noise now (not deaf, not asleep, not busy shooting a visible target). */
+	bool WouldReactToNoise() const;
+
+	/** Would answer a reinforcement call now (hears radio calls, not already fighting). */
+	bool WouldAnswerCall() const;
+
+	/**
+	 * May start (or keep) a reinforcement call: alerted but not fighting (searching, investigating a
+	 * real threat, or red without line of sight), past the cooldown and the minimum alert time, and
+	 * not itself alerted by a call (unless relays are allowed). Never while shooting a visible target.
+	 */
+	bool CanCallReinforcementsNow() const;
+
 	// ---- Stimuli (server) ----
 	/** A hostile is visible this frame (called repeatedly while seen). */
 	void SeeHostile(AActor* Seen, float DeltaTime, bool bAlarming);
@@ -71,6 +95,9 @@ public:
 	void OnDamagedBy(AActor* DamageInstigator);
 	void ReceiveReinforcementCall(const FVector& Location, AActor* CallTarget);
 
+	/** Searches around a point without a known target (charmed pawns hunting for their new side). */
+	void StartSearchAround(const FVector& Location);
+
 	/** Forces a state (BT tasks, charm, debug). */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Alert")
 	void SetAlertState(EHitmenAlertState NewState);
@@ -78,9 +105,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Alert")
 	void SetCallingReinforcements(bool bCalling);
 
-	/** Off = deaf: noises, distractions, radio calls and bodies are ignored (sight and damage only). */
+	/** Off = deaf: noises, distractions and radio calls are ignored (sight and damage only). */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Alert")
 	void SetReactsToNoises(bool bReacts) { bReactsToNoises = bReacts; }
+
+	/** Off = bodies are ignored (sentries: Hold Position + React To Noises off). */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Alert")
+	void SetReactsToBodies(bool bReacts) { bReactsToBodies = bReacts; }
 
 	/** Puts the NPC into combat with a given target (charm, debug). */
 	void EngageTarget(AActor* NewTarget);
@@ -109,11 +140,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="1"))
 	float AlarmingMultiplier = 2.5f;
 
+	/** White fill reached when sight is lost that turns white into yellow (investigate the last seen
+	 *  spot). Below it, the glimpse just cools down. 0 = any glimpse investigates; 1 = never. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", ClampMax="1"))
+	float InvestigateSuspicionThreshold = 0.35f;
+
+	/** Seconds without seeing the hostile before a white NPC counts it as lost. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="s"))
+	float LoseSightGraceTime = 0.5f;
+
+	/** Rise rate multiplier for an NPC already alerted (yellow): it fills faster when it sees you again. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="1"))
+	float AlertedSuspicionMultiplier = 2.f;
+
 	// ---- Replicated state ----
 	UPROPERTY(ReplicatedUsing=OnRep_AlertState)
 	EHitmenAlertState AlertState = EHitmenAlertState::Unaware;
 
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing=OnRep_Suspicion)
 	float Suspicion = 0.f;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Calling)
@@ -127,21 +171,37 @@ protected:
 	bool bTargetVisible = false;
 	bool bSuppressed = false;
 	bool bReactsToNoises = true;
+	bool bReactsToBodies = true;
+	/** The current investigation comes from a real threat (sighting, body, damage, gunfire), not a
+	 *  footstep or a distraction: such an investigator may call reinforcements. */
+	bool bThreatInvestigation = false;
+	/** Alerted by someone else's radio call (does not relay it unless the rules allow it). */
+	bool bAlertedByCall = false;
 	float LastSeenTime = -100.f;
 	float StateEnterTime = 0.f;
 	float LastDamageTime = -100.f;
+	/** When the NPC last went from calm (unaware / white) to alerted (yellow / red / search). */
+	float AlertedSinceTime = 0.f;
+	float LastCallStartTime = -UE_BIG_NUMBER;
 	TSet<TWeakObjectPtr<AHitmenCharacterBase>> KnownBodies;
 	EHitmenAlertState PreviousRepState = EHitmenAlertState::Unaware;
 
 	UFUNCTION() void OnRep_AlertState();
 	UFUNCTION() void OnRep_Calling();
+	UFUNCTION() void OnRep_Suspicion();
 
-	void SetInvestigate(const FVector& Location);
+	/** Server: writes Suspicion and fires OnSuspicionChanged when it moved. */
+	void SetSuspicionValue(float NewSuspicion);
+
+	void SetInvestigate(const FVector& Location, bool bThreat);
 	float GetRuleLoseTime() const;
 	float GetRuleSearchTime() const;
 	float GetRuleInvestigateTime() const;
 	float GetDifficultySuspicionMultiplier() const;
-	void UpdateLastKnownMarker(bool bShow) const;
+	bool IsOwnerCharmed() const;
+
+	/** Tells the AI subsystem which target this NPC is searching (ref-counted last known position marker). */
+	void RefreshSearchMarker();
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState);

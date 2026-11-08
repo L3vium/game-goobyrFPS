@@ -128,10 +128,49 @@ void UHitmenAbility_Jetpack::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(UHitmenAbility_Jetpack, Fuel);
 }
 
+UHitmenCharacterMovementComponent* UHitmenAbility_Jetpack::GetMovement() const
+{
+	const AHitmenCharacterBase* Character = GetOwnerCharacter();
+	return Character ? Character->GetHitmenMovement() : nullptr;
+}
+
+void UHitmenAbility_Jetpack::OnEquipped()
+{
+	Fuel = MaxFuel;
+	if (UHitmenCharacterMovementComponent* Movement = GetMovement())
+	{
+		Movement->ConfigureJetpack(true, MaxFuel, FuelRechargePerSecond, LiftSpeed, LiftInterpSpeed);
+	}
+}
+
+void UHitmenAbility_Jetpack::OnUnequipped()
+{
+	if (UHitmenCharacterMovementComponent* Movement = GetMovement())
+	{
+		Movement->ConfigureJetpack(false, 0.f, 0.f, 0.f, 0.f);
+	}
+}
+
+void UHitmenAbility_Jetpack::LocalPress(const FVector& AimOrigin, const FVector& AimDirection)
+{
+	// Owning client and listen-server host: the flag travels to the server in the saved moves.
+	if (UHitmenCharacterMovementComponent* Movement = GetMovement())
+	{
+		Movement->SetJetpackThrust(true);
+	}
+}
+
+void UHitmenAbility_Jetpack::LocalRelease()
+{
+	if (UHitmenCharacterMovementComponent* Movement = GetMovement())
+	{
+		Movement->SetJetpackThrust(false);
+	}
+}
+
 bool UHitmenAbility_Jetpack::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
-	bThrusting = Fuel > 0.f;
-	if (bThrusting)
+	if (Fuel > 0.f)
 	{
 		PlayActivatedJuice(GetOwnerCharacter()->GetActorLocation());
 	}
@@ -140,51 +179,44 @@ bool UHitmenAbility_Jetpack::Activate(const FVector& AimOrigin, const FVector& A
 
 void UHitmenAbility_Jetpack::Release(const FVector& AimOrigin, const FVector& AimDirection)
 {
-	bThrusting = false;
 	Juice_OnEnded();
-}
-
-void UHitmenAbility_Jetpack::ApplyThrust(float DeltaTime)
-{
-	AHitmenCharacterBase* Character = GetOwnerCharacter();
-	UHitmenCharacterMovementComponent* Movement = Character ? Character->GetHitmenMovement() : nullptr;
-	if (!Movement || !bThrusting || Fuel <= 0.f)
-	{
-		return;
-	}
-	if (!Movement->IsFalling())
-	{
-		Movement->SetMovementMode(MOVE_Falling);
-	}
-	Movement->Velocity.Z = FMath::FInterpTo(Movement->Velocity.Z, LiftSpeed, DeltaTime, 6.f);
 }
 
 void UHitmenAbility_Jetpack::TickAbility(float DeltaTime)
 {
-	const AHitmenCharacterBase* Character = GetOwnerCharacter();
-	const UHitmenCharacterMovementComponent* Movement = Character ? Character->GetHitmenMovement() : nullptr;
-	if (bThrusting && Fuel > 0.f)
+	// Server: the movement component owns the simulation; mirror its fuel for the UI.
+	const UHitmenCharacterMovementComponent* Movement = GetMovement();
+	if (!Movement)
 	{
-		Fuel = FMath::Max(0.f, Fuel - DeltaTime);
-		ApplyThrust(DeltaTime);
-		if (Fuel <= 0.f)
-		{
-			bThrusting = false;
-			Juice_OnEnded();
-		}
+		return;
 	}
-	else if (Movement && Movement->IsMovingOnGround())
+	Fuel = Movement->GetJetpackFuel();
+	const bool bThrusting = Movement->IsJetpackThrusting();
+	if (bWasThrusting && !bThrusting && Movement->WantsJetpackThrust() && Fuel <= 0.f)
 	{
-		Fuel = FMath::Min(MaxFuel, Fuel + FuelRechargePerSecond * DeltaTime);
+		Juice_OnEnded(); // Ran dry while held.
 	}
+	bWasThrusting = bThrusting;
 }
 
 void UHitmenAbility_Jetpack::LocalTick(float DeltaTime)
 {
-	if (Fuel > 0.f)
+	// Owning client: correct a drifted prediction while idle.
+	if (UHitmenCharacterMovementComponent* Movement = GetMovement())
 	{
-		ApplyThrust(DeltaTime);
+		Movement->ReconcileJetpackFuel(Fuel, FuelReconcileTolerance);
 	}
+}
+
+float UHitmenAbility_Jetpack::GetFuelNormalized() const
+{
+	const APawn* Pawn = GetOwnerPawn();
+	const UHitmenCharacterMovementComponent* Movement = GetMovement();
+	if (Pawn && Pawn->IsLocallyControlled() && Movement && Movement->IsJetpackEnabled())
+	{
+		return Movement->GetJetpackFuelNormalized();
+	}
+	return MaxFuel > 0.f ? Fuel / MaxFuel : 0.f;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -265,6 +297,14 @@ bool UHitmenAbility_Hook::Activate(const FVector& AimOrigin, const FVector& AimD
 	}
 	PlayActivatedJuice(HookPoint);
 	return true;
+}
+
+void UHitmenAbility_Hook::OnRep_Hooked()
+{
+	if (bHooked)
+	{
+		PullTime = 0.f;
+	}
 }
 
 void UHitmenAbility_Hook::Pull(float DeltaTime)

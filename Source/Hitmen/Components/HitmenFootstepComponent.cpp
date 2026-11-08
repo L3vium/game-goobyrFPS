@@ -15,6 +15,20 @@ UHitmenFootstepComponent::UHitmenFootstepComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickInterval = 0.05f;
+
+	// One entry per project surface (DefaultEngine.ini) so the team only drops sounds/VFX in.
+	// Noise multipliers: sand muffles, metal rings out.
+	auto AddSurface = [this](EPhysicalSurface Surface, float NoiseMultiplier)
+	{
+		FHitmenSurfaceFeedback Feedback;
+		Feedback.NoiseMultiplier = NoiseMultiplier;
+		SurfaceFeedback.Add(Surface, Feedback);
+	};
+	AddSurface(SurfaceType1, 0.8f);  // Grass
+	AddSurface(SurfaceType2, 1.f);   // Stone
+	AddSurface(SurfaceType3, 0.6f);  // Sand
+	AddSurface(SurfaceType4, 1.1f);  // Wood
+	AddSurface(SurfaceType5, 1.4f);  // Metal
 }
 
 void UHitmenFootstepComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -27,7 +41,7 @@ void UHitmenFootstepComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	const float Travelled = FVector::Dist2D(Location, LastLocation);
 	LastLocation = Location;
 
-	if (!bUseDistanceFallback || !Movement || !Movement->IsMovingOnGround() || Movement->IsSliding() || GetWorld()->GetTimeSeconds() - LastNotifyTime < 1.f)
+	if (!bUseDistanceFallback || !Movement || !Movement->IsMovingOnGround() || Movement->IsSliding() || GetWorld()->GetTimeSeconds() - LastNotifyTime < NotifySuppressesFallbackTime)
 	{
 		DistanceAccumulator = 0.f;
 		return;
@@ -73,13 +87,13 @@ void UHitmenFootstepComponent::HandleFootstep(FName FootBone)
 	FVector Origin = Owner->GetActorLocation();
 	if (const ACharacter* Character = Cast<ACharacter>(Owner); Character && FootBone != NAME_None && Character->GetMesh())
 	{
-		Origin = Character->GetMesh()->GetSocketLocation(FootBone) + FVector::UpVector * 20.f;
+		Origin = Character->GetMesh()->GetSocketLocation(FootBone) + FVector::UpVector * TraceStartHeight;
 	}
 
 	FHitResult Hit;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenFootstep), false, Owner);
 	Params.bReturnPhysicalMaterial = true;
-	if (!GetWorld()->LineTraceSingleByChannel(Hit, Origin, Origin - FVector::UpVector * 200.f, ECC_Visibility, Params))
+	if (!GetWorld()->LineTraceSingleByChannel(Hit, Origin, Origin - FVector::UpVector * TraceLength, ECC_Visibility, Params))
 	{
 		return;
 	}

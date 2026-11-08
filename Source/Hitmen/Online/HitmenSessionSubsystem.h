@@ -90,10 +90,25 @@ private:
 	void HandleFindComplete(bool bSuccess);
 	void HandleJoinComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);
 	void HandleDestroyComplete(FName SessionName, bool bSuccess);
+	void HandleFindFriendSessionComplete(int32 LocalUserNum, bool bWasSuccessful, const TArray<FOnlineSessionSearchResult>& Results);
+
+	/** Asks Steam for the session of every online friend (rooms that a public search may miss). */
+	void QueryFriendSessions();
+	/** Merges public results and friend sessions into LastResults / JoinableResults and broadcasts. */
+	void PublishResults();
 
 	TSharedPtr<FOnlineSessionSearch> SessionSearch;
 	TArray<FHitmenSessionInfo> LastResults;
+	/** Public search results then friend sessions; FHitmenSessionInfo::ResultIndex indexes this. */
+	TArray<FOnlineSessionSearchResult> JoinableResults;
+	TArray<FOnlineSessionSearchResult> FriendSessionResults;
 	TSet<FString> FriendIds;
+	TArray<FUniqueNetIdRef> OnlineFriendIds;
+	FDelegateHandle FindFriendHandle;
+	int32 PendingFriendQueries = 0;
+	bool bPublicSearchDone = false;
+	bool bPublicSearchSucceeded = false;
+	bool bFriendsRead = false;
 
 	FDelegateHandle CreateHandle;
 	FDelegateHandle FindHandle;

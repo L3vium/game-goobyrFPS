@@ -134,5 +134,10 @@ void UHitmenInteractionComponent::Server_Interact_Implementation(AActor* Target)
 	if (IHitmenInteractable::Execute_CanInteract(Target, Pawn))
 	{
 		IHitmenInteractable::Execute_Interact(Target, Pawn);
+		// One interact montage for every interactable (doors, pickups, bodies, consoles...).
+		if (AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(Pawn))
+		{
+			Character->PlayAnimSetMontage(EHitmenAnimMontage::Interact);
+		}
 	}
 }

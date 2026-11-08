@@ -11,7 +11,7 @@
 
 namespace
 {
-	const EHitmenCosmeticSlot AllSlots[] = { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Top, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Bottom };
+	const EHitmenCosmeticSlot AllSlots[] = { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Legs };
 }
 
 UHitmenCosmeticComponent::UHitmenCosmeticComponent()

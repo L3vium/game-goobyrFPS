@@ -7,10 +7,9 @@ UHitmenCosmeticItem* FHitmenCosmeticLoadout::GetSlot(EHitmenCosmeticSlot Slot) c
 {
 	switch (Slot)
 	{
-	case EHitmenCosmeticSlot::Head:   return Head;
-	case EHitmenCosmeticSlot::Top:    return Top;
-	case EHitmenCosmeticSlot::Body:   return Body;
-	case EHitmenCosmeticSlot::Bottom: return Bottom;
+	case EHitmenCosmeticSlot::Head: return Head;
+	case EHitmenCosmeticSlot::Body: return Body;
+	case EHitmenCosmeticSlot::Legs: return Legs;
 	}
 	return nullptr;
 }
@@ -19,10 +18,9 @@ void FHitmenCosmeticLoadout::SetSlot(EHitmenCosmeticSlot Slot, UHitmenCosmeticIt
 {
 	switch (Slot)
 	{
-	case EHitmenCosmeticSlot::Head:   Head = Item; break;
-	case EHitmenCosmeticSlot::Top:    Top = Item; break;
-	case EHitmenCosmeticSlot::Body:   Body = Item; break;
-	case EHitmenCosmeticSlot::Bottom: Bottom = Item; break;
+	case EHitmenCosmeticSlot::Head: Head = Item; break;
+	case EHitmenCosmeticSlot::Body: Body = Item; break;
+	case EHitmenCosmeticSlot::Legs: Legs = Item; break;
 	}
 }
 

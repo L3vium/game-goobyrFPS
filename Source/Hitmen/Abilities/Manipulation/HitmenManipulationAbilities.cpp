@@ -7,6 +7,8 @@
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Weapons/HitmenProjectile.h"
 #include "Core/HitmenInterfaces.h"
+#include "World/Interactables/HitmenHazards.h"
+#include "World/Interactables/HitmenOpenings.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
@@ -257,6 +259,28 @@ UHitmenAbility_PoisonVial::UHitmenAbility_PoisonVial()
 	Cooldown = 5.f;
 	MaxCharges = 2;
 	Range = 250.f;
+	RoomNotSealedText = NSLOCTEXT("Hitmen", "RoomNotSealed", "Room not sealed");
+}
+
+namespace
+{
+	/** Rooms served by a poisonable vent; returns false for targets without rooms (drinks). */
+	bool GetServedRooms(const AActor* Target, TArray<AHitmenRoomVolume*>& OutRooms)
+	{
+		const AHitmenVentHatch* Vent = Cast<AHitmenVentHatch>(Target);
+		if (!Vent)
+		{
+			return false;
+		}
+		for (AHitmenRoomVolume* Room : Vent->GetLinkedRooms())
+		{
+			if (Room)
+			{
+				OutRooms.Add(Room);
+			}
+		}
+		return true;
+	}
 }
 
 bool UHitmenAbility_PoisonVial::Activate(const FVector& AimOrigin, const FVector& AimDirection)
@@ -269,6 +293,13 @@ bool UHitmenAbility_PoisonVial::Activate(const FVector& AimOrigin, const FVector
 	AActor* Target = Hit.GetActor();
 	if (!Target || !Target->GetClass()->ImplementsInterface(UHitmenPoisonable::StaticClass()) || !IHitmenPoisonable::Execute_CanBePoisoned(Target))
 	{
+		return false;
+	}
+	// Vents only gas sealed rooms: check before the charge is consumed.
+	TArray<AHitmenRoomVolume*> Rooms;
+	if (GetServedRooms(Target, Rooms) && !Rooms.ContainsByPredicate([](const AHitmenRoomVolume* Room) { return Room->IsSealed(); }))
+	{
+		NotifyFailed(RoomNotSealedText);
 		return false;
 	}
 	IHitmenPoisonable::Execute_ApplyPoison(Target, GetOwnerPawn());

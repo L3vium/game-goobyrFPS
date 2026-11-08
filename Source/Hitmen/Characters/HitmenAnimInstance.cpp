@@ -9,6 +9,10 @@
 #include "AI/HitmenAlertComponent.h"
 #include "Core/HitmenInterfaces.h"
 #include "Characters/HitmenNPC.h"
+#include "Data/HitmenAnimSet.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/AimOffsetBlendSpace.h"
 #include "KismetAnimationLibrary.h"
 
 void UHitmenAnimInstance::NativeInitializeAnimation()
@@ -16,10 +20,35 @@ void UHitmenAnimInstance::NativeInitializeAnimation()
 	Super::NativeInitializeAnimation();
 	HitmenCharacter = Cast<AHitmenCharacterBase>(TryGetPawnOwner());
 	HitmenMovement = HitmenCharacter ? HitmenCharacter->GetHitmenMovement() : nullptr;
-	if (HitmenCharacter && !AnimSet)
+	// The character's set wins; the ABP default only serves previews and characters without one.
+	if (HitmenCharacter && HitmenCharacter->GetAnimSet())
 	{
 		AnimSet = HitmenCharacter->GetAnimSet();
 	}
+	ResolveAnimSet();
+}
+
+void UHitmenAnimInstance::ResolveAnimSet()
+{
+	if (!AnimSet)
+	{
+		return;
+	}
+	LocomotionBlendSpace = AnimSet->Locomotion;
+	IdleAnim = AnimSet->Idle;
+	JumpStartAnim = AnimSet->JumpStart;
+	JumpLoopAnim = AnimSet->FallLoop ? AnimSet->FallLoop.Get() : AnimSet->JumpStart.Get();
+	LandAnim = AnimSet->Land;
+	// Optional entries fall back so a bound graph node never plays nothing (reference pose).
+	CrouchIdleAnim = AnimSet->CrouchIdle ? AnimSet->CrouchIdle.Get() : IdleAnim.Get();
+	CrouchLocomotionBlendSpace = AnimSet->CrouchLocomotion ? AnimSet->CrouchLocomotion.Get() : LocomotionBlendSpace.Get();
+	SlideAnim = AnimSet->Slide ? AnimSet->Slide.Get() : CrouchIdleAnim.Get();
+	LadderClimbAnim = AnimSet->LadderClimb ? AnimSet->LadderClimb.Get() : IdleAnim.Get();
+	ZiplineAnim = AnimSet->ZiplineHang ? AnimSet->ZiplineHang.Get() : LadderClimbAnim.Get();
+	StunnedLoopAnim = AnimSet->StunnedLoop ? AnimSet->StunnedLoop.Get() : IdleAnim.Get();
+	AsleepLoopAnim = AnimSet->SleepLoop ? AnimSet->SleepLoop.Get() : StunnedLoopAnim.Get();
+	CarryBodyAnim = AnimSet->CarryBodyPose ? AnimSet->CarryBodyPose.Get() : IdleAnim.Get();
+	AimOffsetBlendSpace = AnimSet->AimOffset;
 }
 
 void UHitmenAnimInstance::NativeUpdateAnimation(float DeltaSeconds)

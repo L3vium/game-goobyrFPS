@@ -4,7 +4,6 @@
 #include "AI/HitmenAlertComponent.h"
 #include "AI/HitmenAIController.h"
 #include "Weapons/HitmenWeaponBase.h"
-#include "Weapons/HitmenWeaponPickup.h"
 #include "World/Interactables/HitmenKeycardPickup.h"
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenMatchRules.h"
@@ -59,20 +58,22 @@ void AHitmenNPC::BeginPlay()
 {
 	Super::BeginPlay();
 	AlertComponent->SetReactsToNoises(bReactsToNoises);
+	// Bodies are a visual cue: only sentries (Hold Position + deaf) ignore them, because a sentry's
+	// job is to never be lured off its gate. A deaf patrol / stationary NPC still investigates bodies.
+	AlertComponent->SetReactsToBodies(!(HoldsPosition() && !bReactsToNoises));
 	if (Behavior == EHitmenNPCBehavior::Patrol && !PatrolRoute && HasAuthority())
 	{
 		UE_LOG(LogTemp, Verbose, TEXT("%s patrols without a route: it stands at its post."), *GetName());
 	}
 	AlertComponent->OnAlertStateChanged.AddDynamic(this, &AHitmenNPC::HandleAlertStateChanged);
-	HandleAlertStateChanged(EHitmenAlertState::Unaware, AlertComponent->GetAlertState());
 	if (GetNetMode() != NM_DedicatedServer)
 	{
+		// The overhead widget holds no reference to the alert component: the NPC pushes the view.
 		AlertWidget->InitWidget();
-		if (UHitmenAlertIndicatorWidget* Indicator = Cast<UHitmenAlertIndicatorWidget>(AlertWidget->GetUserWidgetObject()))
-		{
-			Indicator->SetAlertSource(AlertComponent);
-		}
+		AlertComponent->OnCallingChanged.AddDynamic(this, &AHitmenNPC::HandleAlertCallingChanged);
+		AlertComponent->OnSuspicionChanged.AddDynamic(this, &AHitmenNPC::HandleAlertSuspicionChanged);
 	}
+	HandleAlertStateChanged(EHitmenAlertState::Unaware, AlertComponent->GetAlertState());
 	if (HasAuthority() && DefaultWeapon && DefaultWeapon->WeaponClass)
 	{
 		FActorSpawnParameters Params;
@@ -88,8 +89,31 @@ void AHitmenNPC::BeginPlay()
 	}
 }
 
+void AHitmenNPC::HandleAlertCallingChanged(bool bCalling)
+{
+	PushAlertView();
+}
+
+void AHitmenNPC::HandleAlertSuspicionChanged(float Suspicion)
+{
+	PushAlertView();
+}
+
+void AHitmenNPC::PushAlertView()
+{
+	if (GetNetMode() == NM_DedicatedServer || !AlertComponent || !AlertWidget)
+	{
+		return;
+	}
+	if (UHitmenAlertIndicatorWidget* Indicator = Cast<UHitmenAlertIndicatorWidget>(AlertWidget->GetUserWidgetObject()))
+	{
+		Indicator->SetAlertView(AlertComponent->GetAlertColor(), AlertComponent->GetSuspicion(), AlertComponent->IsCallingReinforcements());
+	}
+}
+
 void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState)
 {
+	PushAlertView();
 	if (UHitmenCharacterMovementComponent* Movement = GetHitmenMovement())
 	{
 		switch (NewState)
@@ -175,17 +199,10 @@ void AHitmenNPC::HandleDeath(AActor* Killer, AActor* DamageCauser, bool bHeadsho
 				Keycard->SetKeycardId(CarriedKeycard);
 			}
 		}
-		if (Weapon && DefaultWeapon)
+		if (Weapon)
 		{
-			FActorSpawnParameters Params;
-			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-			const TSubclassOf<AHitmenWeaponPickup> PickupClass = DefaultWeapon->PickupClass ? DefaultWeapon->PickupClass : TSubclassOf<AHitmenWeaponPickup>(AHitmenWeaponPickup::StaticClass());
-			if (AHitmenWeaponPickup* Pickup = GetWorld()->SpawnActor<AHitmenWeaponPickup>(PickupClass, Weapon->GetActorLocation(), Weapon->GetActorRotation(), Params))
-			{
-				Pickup->InitPickup(DefaultWeapon, DroppedWeaponAmmo);
-				Pickup->Throw(FVector::UpVector * 150.f, nullptr);
-			}
-			Weapon->Destroy();
+			// The weapon actor itself becomes the world pickup (spawned once, never respawned).
+			Weapon->Drop(DroppedWeaponAmmo, Weapon->GetActorLocation(), Weapon->GetActorRotation(), FVector::UpVector * 150.f, nullptr);
 			Weapon = nullptr;
 		}
 		if (AController* AI = GetController())
@@ -206,8 +223,8 @@ void AHitmenNPC::HandleStatusAdded(EHitmenStatusEffect Status, AActor* StatusIns
 	}
 	if (Status == EHitmenStatusEffect::Charmed)
 	{
-		// New side: forget the old target, look for hostiles of the new team.
-		AlertComponent->SetAlertState(EHitmenAlertState::Searching);
+		// New side: forget the old target, look for hostiles of the new team from here.
+		AlertComponent->StartSearchAround(GetActorLocation());
 	}
 	RefreshBrainPause();
 }

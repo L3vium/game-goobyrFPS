@@ -14,6 +14,20 @@
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Abilities/HitmenAbilityComponent.h"
 #include "Data/HitmenAbilityData.h"
+#include "Data/HitmenWeaponData.h"
+#include "Data/HitmenAnimSet.h"
+#include "Abilities/HitmenAbility.h"
+#include "Weapons/HitmenWeaponBase.h"
+#include "Components/HitmenBodyCarryComponent.h"
+#include "Components/HitmenSightroomComponent.h"
+#include "Characters/HitmenCharacterBase.h"
+#include "Characters/HitmenPlayerCharacter.h"
+#include "AI/HitmenAISubsystem.h"
+#include "AI/HitmenAlertComponent.h"
+#include "Components/SceneCaptureComponent2D.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Kismet/KismetRenderingLibrary.h"
+#include "TimerManager.h"
 #include "Hitmen.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -139,6 +153,15 @@ void AHitmenPlayerController::SetupInputComponent()
 void AHitmenPlayerController::SetPawn(APawn* InPawn)
 {
 	Super::SetPawn(InPawn);
+	if (IsLocalController())
+	{
+		BindHUDSources(InPawn);
+		// The controller owns the Sightroom radii so a 3C swap keeps them.
+		if (UHitmenSightroomComponent* Sightroom = InPawn ? InPawn->FindComponentByClass<UHitmenSightroomComponent>() : nullptr)
+		{
+			Sightroom->SetScanRadii(SightroomEnemyRadius, SightroomInteractableRadius);
+		}
+	}
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
 	{
 		UI->BroadcastPawnChanged(InPawn);
@@ -163,7 +186,209 @@ void AHitmenPlayerController::OnPossess(APawn* InPawn)
 
 IHitmenInputReceiver* AHitmenPlayerController::GetReceiver() const
 {
-	return Cast<IHitmenInputReceiver>(GetPawn());
+	// While spectating, GetPawn() is null and the free-fly pawn is the spectator pawn.
+	return Cast<IHitmenInputReceiver>(GetPawnOrSpectator());
+}
+
+void AHitmenPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindHUDSources();
+	StopSpectatorCaptures();
+	Super::EndPlay(EndPlayReason);
+}
+
+// ---------------------------------------------------------------------------------------------
+// HUD publisher: the only place that reads gameplay components for the HUD
+// ---------------------------------------------------------------------------------------------
+
+void AHitmenPlayerController::BindHUDSources(APawn* InPawn)
+{
+	UnbindHUDSources();
+	if (!InPawn || InPawn->IsA<ASpectatorPawn>())
+	{
+		return;
+	}
+	HUDInventory = InPawn->FindComponentByClass<UHitmenInventoryComponent>();
+	HUDAbilities = InPawn->FindComponentByClass<UHitmenAbilityComponent>();
+	HUDHealth = InPawn->FindComponentByClass<UHitmenHealthComponent>();
+	HUDCarry = InPawn->FindComponentByClass<UHitmenBodyCarryComponent>();
+	if (UHitmenInventoryComponent* Inventory = HUDInventory.Get())
+	{
+		Inventory->OnInventoryChanged.AddUniqueDynamic(this, &AHitmenPlayerController::HandleHUDInventoryChanged);
+		Inventory->OnActiveSlotChanged.AddUniqueDynamic(this, &AHitmenPlayerController::HandleHUDActiveSlotChanged);
+	}
+	if (UHitmenHealthComponent* Health = HUDHealth.Get())
+	{
+		Health->OnHealthChanged.AddUniqueDynamic(this, &AHitmenPlayerController::HandleHUDHealthChanged);
+	}
+	if (UHitmenBodyCarryComponent* Carry = HUDCarry.Get())
+	{
+		Carry->OnCarryChanged.AddUniqueDynamic(this, &AHitmenPlayerController::HandleHUDCarryChanged);
+	}
+	HandleHUDInventoryChanged();
+	HandleHUDHealthChanged(HUDHealth.Get(), 0.f, 0.f, nullptr);
+	HandleHUDCarryChanged(nullptr);
+	PublishEmotes(InPawn);
+	RefreshHUDViews();
+	GetWorldTimerManager().SetTimer(HUDRefreshTimer, this, &AHitmenPlayerController::RefreshHUDViews, HUDRefreshInterval, true);
+}
+
+void AHitmenPlayerController::UnbindHUDSources()
+{
+	if (UHitmenInventoryComponent* Inventory = HUDInventory.Get())
+	{
+		Inventory->OnInventoryChanged.RemoveAll(this);
+		Inventory->OnActiveSlotChanged.RemoveAll(this);
+	}
+	if (UHitmenHealthComponent* Health = HUDHealth.Get())
+	{
+		Health->OnHealthChanged.RemoveAll(this);
+	}
+	if (UHitmenBodyCarryComponent* Carry = HUDCarry.Get())
+	{
+		Carry->OnCarryChanged.RemoveAll(this);
+	}
+	HUDInventory = nullptr;
+	HUDAbilities = nullptr;
+	HUDHealth = nullptr;
+	HUDCarry = nullptr;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HUDRefreshTimer);
+	}
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+	{
+		UI->SetCarryingVIP(false);
+		UI->SetAlertBlips(TArray<FHitmenHUDAlertBlip>());
+	}
+}
+
+void AHitmenPlayerController::HandleHUDActiveSlotChanged(int32 NewSlot)
+{
+	HandleHUDInventoryChanged();
+}
+
+void AHitmenPlayerController::HandleHUDInventoryChanged()
+{
+	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
+	const UHitmenInventoryComponent* Inventory = HUDInventory.Get();
+	if (!UI || !Inventory)
+	{
+		return;
+	}
+	FHitmenHUDInventoryView View;
+	const TArray<FHitmenInventorySlot>& Slots = Inventory->GetSlots();
+	for (int32 Index = 0; Index < Slots.Num(); ++Index)
+	{
+		FHitmenHUDSlotView& SlotView = View.Slots.AddDefaulted_GetRef();
+		SlotView.bActive = Inventory->GetActiveSlot() == Index;
+		SlotView.bEmpty = Slots[Index].IsEmpty();
+		if (!SlotView.bEmpty && Slots[Index].Weapon)
+		{
+			SlotView.Name = Slots[Index].Weapon->DisplayName;
+			SlotView.Ammo = Slots[Index].Weapon->bUsesAmmo ? Slots[Index].Ammo : -1;
+		}
+	}
+	View.Keycards = Inventory->GetKeycards();
+	UI->SetInventoryView(View);
+}
+
+void AHitmenPlayerController::HandleHUDHealthChanged(UHitmenHealthComponent* HealthComponent, float NewHealth, float Delta, AActor* InstigatorActor)
+{
+	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
+	const UHitmenHealthComponent* Health = HUDHealth.Get();
+	if (!UI || !Health)
+	{
+		return;
+	}
+	FHitmenHUDVitalsView View;
+	View.Health = Health->GetHealth();
+	View.Armor = Health->GetArmor();
+	View.HealthNormalized = Health->GetHealthNormalized();
+	UI->SetVitals(View);
+}
+
+void AHitmenPlayerController::HandleHUDCarryChanged(AHitmenCharacterBase* Body)
+{
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+	{
+		const UHitmenBodyCarryComponent* Carry = HUDCarry.Get();
+		UI->SetCarryingVIP(Carry && Carry->IsCarrying());
+	}
+}
+
+void AHitmenPlayerController::PublishEmotes(APawn* InPawn)
+{
+	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
+	if (!UI)
+	{
+		return;
+	}
+	TArray<FText> Names;
+	const AHitmenCharacterBase* HitmenCharacter = Cast<AHitmenCharacterBase>(InPawn);
+	if (const UHitmenAnimSet* AnimSet = HitmenCharacter ? HitmenCharacter->GetAnimSet() : nullptr)
+	{
+		for (const FHitmenEmote& Emote : AnimSet->Emotes)
+		{
+			Names.Add(Emote.DisplayName);
+		}
+	}
+	UI->SetEmoteNames(Names);
+}
+
+void AHitmenPlayerController::RefreshHUDViews()
+{
+	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
+	const APawn* ViewPawn = GetPawn();
+	if (!UI || !ViewPawn)
+	{
+		return;
+	}
+
+	// Abilities (cooldowns tick down, so they are polled at the HUD refresh rate).
+	auto MakeAbilityView = [](const UHitmenAbility* Ability)
+	{
+		FHitmenHUDAbilityView View;
+		if (Ability && Ability->GetData())
+		{
+			View.bValid = true;
+			View.Name = Ability->GetData()->DisplayName;
+			View.Charges = Ability->GetCharges();
+			View.MaxCharges = Ability->GetMaxCharges();
+			View.CooldownRemaining = Ability->GetCooldownRemaining();
+		}
+		return View;
+	};
+	const UHitmenAbilityComponent* Abilities = HUDAbilities.Get();
+	UI->SetAbilityViews(MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Move) : nullptr),
+		MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Manipulation) : nullptr));
+
+	// Crosshair spread.
+	const UHitmenInventoryComponent* Inventory = HUDInventory.Get();
+	const AHitmenWeaponBase* Weapon = Inventory ? Inventory->GetActiveWeapon() : nullptr;
+	UI->SetCrosshairSpread(Weapon ? Weapon->GetCurrentSpread() : 1.f);
+
+	// NPC alert blips (minimap colours, crosshair arcs).
+	TArray<FHitmenHUDAlertBlip> Blips;
+	if (const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this))
+	{
+		for (const UHitmenAlertComponent* Alert : AI->GetAlertComponents())
+		{
+			const AHitmenCharacterBase* NPC = Alert ? Cast<AHitmenCharacterBase>(Alert->GetOwner()) : nullptr;
+			if (!NPC || NPC->IsDead())
+			{
+				continue;
+			}
+			FHitmenHUDAlertBlip& Blip = Blips.AddDefaulted_GetRef();
+			Blip.Location = NPC->GetActorLocation();
+			Blip.Color = Alert->GetAlertColor();
+			Blip.State = Alert->GetAlertState();
+			Blip.Suspicion = Alert->GetSuspicion();
+			Blip.bTargetsViewer = Alert->GetTarget() == ViewPawn;
+			Blip.bCallingReinforcements = Alert->IsCallingReinforcements();
+		}
+	}
+	UI->SetAlertBlips(MoveTemp(Blips));
 }
 
 bool AHitmenPlayerController::IsGameplayInputBlocked() const
@@ -333,6 +558,12 @@ void AHitmenPlayerController::HandleSwitchSlot(const FInputActionValue& Value)
 	const float Direction = Value.Get<float>();
 	if (FMath::IsNearlyZero(Direction))
 	{
+		return;
+	}
+	if (bSpectating && SpectatorMode == EHitmenSpectatorMode::Grid)
+	{
+		// Mouse wheel in the grid: one, two, three... or every screen.
+		CycleSpectatorGridCount(Direction > 0.f ? 1 : -1);
 		return;
 	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_SwitchSlot(Direction); }
@@ -543,7 +774,7 @@ void AHitmenPlayerController::Client_ShowLastKnownPosition_Implementation(FVecto
 	}
 	if (LastKnownPositionMarker)
 	{
-		LastKnownPositionMarker->SetActorLocation(Location);
+		LastKnownPositionMarker->SetActorLocation(FVector(Location) + LastKnownPositionMarkerOffset);
 		LastKnownPositionMarker->SetActorHiddenInGame(!bShow);
 	}
 }
@@ -657,6 +888,16 @@ void AHitmenPlayerController::SetSpectatorMode(EHitmenSpectatorMode NewMode)
 	}
 	SpectatorMode = NewMode;
 	ApplySpectatorView();
+	if (SpectatorMode == EHitmenSpectatorMode::Grid)
+	{
+		RebuildSpectatorGrid();
+		GetWorldTimerManager().SetTimer(SpectatorGridTimer, this, &AHitmenPlayerController::RebuildSpectatorGrid, SpectatorGridRefreshInterval, true);
+	}
+	else
+	{
+		GetWorldTimerManager().ClearTimer(SpectatorGridTimer);
+		StopSpectatorCaptures();
+	}
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
 	{
 		UI->OnSpectatorModeChanged.Broadcast(static_cast<uint8>(SpectatorMode));
@@ -700,6 +941,103 @@ void AHitmenPlayerController::SpectatePrevious()
 		SpectatorMode = EHitmenSpectatorMode::Follow;
 	}
 	ApplySpectatorView();
+}
+
+void AHitmenPlayerController::CycleSpectatorGridCount(int32 Direction)
+{
+	const int32 Available = GetSpectatableTargets().Num();
+	if (Available <= 0)
+	{
+		return;
+	}
+	// 0 means "all": cycle 1, 2, ... Available-1, all.
+	int32 Current = SpectatorGridCount <= 0 || SpectatorGridCount >= Available ? Available : SpectatorGridCount;
+	Current = (Current - 1 + FMath::Sign(Direction) + Available) % Available + 1;
+	SpectatorGridCount = Current >= Available ? 0 : Current;
+	if (SpectatorMode == EHitmenSpectatorMode::Grid)
+	{
+		RebuildSpectatorGrid();
+	}
+}
+
+void AHitmenPlayerController::StopSpectatorCaptures()
+{
+	for (const TWeakObjectPtr<APawn>& CapturedPawn : CapturedPawns)
+	{
+		if (const AHitmenPlayerCharacter* Captured = Cast<AHitmenPlayerCharacter>(CapturedPawn.Get()))
+		{
+			if (USceneCaptureComponent2D* Capture = Captured->GetSpectatorCapture())
+			{
+				Capture->bCaptureEveryFrame = false;
+				Capture->TextureTarget = nullptr;
+				Capture->Deactivate();
+			}
+		}
+	}
+	const bool bHadViews = !CapturedPawns.IsEmpty();
+	CapturedPawns.Reset();
+	if (bHadViews)
+	{
+		if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+		{
+			UI->SetSpectatorViews(TArray<FHitmenSpectatorView>());
+		}
+	}
+}
+
+void AHitmenPlayerController::RebuildSpectatorGrid()
+{
+	TArray<APawn*> Targets = GetSpectatableTargets();
+	if (SpectatorGridCount > 0 && Targets.Num() > SpectatorGridCount)
+	{
+		// Keep the followed player first so a smaller grid still shows them.
+		if (APawn* Followed = SpectatorTarget.Get(); Followed && Targets.Contains(Followed))
+		{
+			Targets.Remove(Followed);
+			Targets.Insert(Followed, 0);
+		}
+		Targets.SetNum(SpectatorGridCount);
+	}
+
+	// Unchanged set: nothing to rebuild (the timer calls this every few seconds).
+	bool bSame = Targets.Num() == CapturedPawns.Num();
+	for (int32 Index = 0; bSame && Index < Targets.Num(); ++Index)
+	{
+		bSame = CapturedPawns[Index].Get() == Targets[Index];
+	}
+	if (bSame && !Targets.IsEmpty())
+	{
+		return;
+	}
+
+	StopSpectatorCaptures();
+	TArray<FHitmenSpectatorView> Views;
+	for (int32 Index = 0; Index < Targets.Num(); ++Index)
+	{
+		AHitmenPlayerCharacter* Captured = Cast<AHitmenPlayerCharacter>(Targets[Index]);
+		USceneCaptureComponent2D* Capture = Captured ? Captured->GetSpectatorCapture() : nullptr;
+		if (!Capture)
+		{
+			continue;
+		}
+		if (!SpectatorRenderTargets.IsValidIndex(Index) || !SpectatorRenderTargets[Index])
+		{
+			SpectatorRenderTargets.SetNum(FMath::Max(SpectatorRenderTargets.Num(), Index + 1));
+			SpectatorRenderTargets[Index] = UKismetRenderingLibrary::CreateRenderTarget2D(this, SpectatorCaptureResolution.X, SpectatorCaptureResolution.Y);
+		}
+		Capture->TextureTarget = SpectatorRenderTargets[Index];
+		Capture->bCaptureEveryFrame = true;
+		Capture->Activate();
+		CapturedPawns.Add(Captured);
+
+		FHitmenSpectatorView& View = Views.AddDefaulted_GetRef();
+		View.RenderTarget = SpectatorRenderTargets[Index];
+		View.PlayerName = Captured->GetPlayerState() ? FText::FromString(Captured->GetPlayerState()->GetPlayerName()) : FText::GetEmpty();
+	}
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+	{
+		UI->SetSpectatorViews(Views);
+	}
 }
 
 void AHitmenPlayerController::ApplySpectatorView()

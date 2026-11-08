@@ -82,18 +82,50 @@ void AHitmenPlayerCharacter::BeginPlay()
 	Super::BeginPlay();
 	if (IsLocallyControlled())
 	{
-		if (const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
+		if (UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
 		{
-			BaseFOV = Settings->FieldOfView;
-			FirstPersonCamera->SetFieldOfView(BaseFOV);
-			if (UHitmenCharacterMovementComponent* Movement = GetHitmenMovement())
-			{
-				Movement->SetClimbRelativeToCamera(Settings->bClimbRelativeToCamera);
-			}
-			Server_SetClimbRelative(Settings->bClimbRelativeToCamera);
+			Settings->OnHitmenSettingsChanged.AddUniqueDynamic(this, &AHitmenPlayerCharacter::ApplyUserSettings);
 		}
+		ApplyUserSettings();
 	}
 	SetupProximityVoice();
+}
+
+void AHitmenPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
+	{
+		Settings->OnHitmenSettingsChanged.RemoveAll(this);
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void AHitmenPlayerCharacter::GetMontageMeshes(TArray<USkeletalMeshComponent*>& OutMeshes) const
+{
+	Super::GetMontageMeshes(OutMeshes);
+	if (IsLocallyControlled() && FirstPersonMesh)
+	{
+		OutMeshes.AddUnique(FirstPersonMesh);
+	}
+}
+
+void AHitmenPlayerCharacter::ApplyUserSettings()
+{
+	const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
+	if (!Settings || !IsLocallyControlled())
+	{
+		return;
+	}
+	BaseFOV = Settings->FieldOfView;
+	if (!bIsAiming)
+	{
+		FirstPersonCamera->SetFieldOfView(BaseFOV);
+	}
+	if (UHitmenCharacterMovementComponent* Movement = GetHitmenMovement())
+	{
+		Movement->SetClimbRelativeToCamera(Settings->bClimbRelativeToCamera);
+	}
+	Server_SetClimbRelative(Settings->bClimbRelativeToCamera);
 }
 
 void AHitmenPlayerCharacter::PossessedBy(AController* NewController)

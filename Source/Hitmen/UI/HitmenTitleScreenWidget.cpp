@@ -97,6 +97,7 @@ void UHitmenTitleScreenWidget::BindEvents()
 	{
 		Sessions->OnFindSessionsComplete.AddUniqueDynamic(this, &UHitmenTitleScreenWidget::HandleSessionsFound);
 		Sessions->OnCreateSessionComplete.AddUniqueDynamic(this, &UHitmenTitleScreenWidget::HandleCreateComplete);
+		Sessions->OnJoinSessionComplete.AddUniqueDynamic(this, &UHitmenTitleScreenWidget::HandleJoinComplete);
 	}
 }
 
@@ -106,6 +107,16 @@ void UHitmenTitleScreenWidget::UnbindEvents()
 	{
 		Sessions->OnFindSessionsComplete.RemoveAll(this);
 		Sessions->OnCreateSessionComplete.RemoveAll(this);
+		Sessions->OnJoinSessionComplete.RemoveAll(this);
+	}
+}
+
+void UHitmenTitleScreenWidget::HandleJoinComplete(bool bSuccess)
+{
+	if (JoinStatusText)
+	{
+		JoinStatusText->SetText(bSuccess ? LOCTEXT("JoinTravel", "Connecting to the room...")
+			: LOCTEXT("JoinFailed", "Could not join this room (full, closed or unreachable). Refresh and try again."));
 	}
 }
 

@@ -4,14 +4,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/HitmenAbility.h"
+#include "Abilities/Move/HitmenMoveAbility.h"
 #include "HitmenMoveAbilities.generated.h"
 
 class AHitmenProjectile;
 
 /** Hold to aim, release to teleport to the aimed point (Dishonored-like). */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_Blink : public UHitmenAbility
+class HITMEN_API UHitmenAbility_Blink : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 
@@ -35,7 +35,7 @@ protected:
 
 /** Passive: one extra jump in the air. */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_DoubleJump : public UHitmenAbility
+class HITMEN_API UHitmenAbility_DoubleJump : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 
@@ -48,9 +48,13 @@ protected:
 	int32 JumpCount = 2;
 };
 
-/** Hold to fly up while fuel lasts; fuel recharges on the ground. */
+/**
+ * Hold to fly up while fuel lasts; fuel recharges on the ground.
+ * Thrust and fuel are simulated by UHitmenCharacterMovementComponent from a saved-move flag, so
+ * the owning client predicts them like sprint. The server copies its fuel here for the UI.
+ */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_Jetpack : public UHitmenAbility
+class HITMEN_API UHitmenAbility_Jetpack : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 
@@ -59,36 +63,49 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual bool WantsTick() const override { return true; }
 	virtual void TickAbility(float DeltaTime) override;
-	virtual void LocalPress(const FVector& AimOrigin, const FVector& AimDirection) override { bThrusting = true; }
-	virtual void LocalRelease() override { bThrusting = false; }
+	virtual void LocalPress(const FVector& AimOrigin, const FVector& AimDirection) override;
+	virtual void LocalRelease() override;
 	virtual void LocalTick(float DeltaTime) override;
+	virtual void OnEquipped() override;
+	virtual void OnUnequipped() override;
 
+	/** Predicted on the owning client, replicated for everyone else. */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Ability|Jetpack")
-	float GetFuelNormalized() const { return MaxFuel > 0.f ? Fuel / MaxFuel : 0.f; }
+	float GetFuelNormalized() const;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack", meta=(ClampMin="0"))
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack", meta=(ClampMin="0", Units="s"))
 	float MaxFuel = 3.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack", meta=(ClampMin="0"))
 	float FuelRechargePerSecond = 0.75f;
 
-	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack", meta=(ClampMin="0"))
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack", meta=(ClampMin="0", Units="cm/s"))
 	float LiftSpeed = 550.f;
+
+	/** How fast the vertical speed converges to LiftSpeed. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack", meta=(ClampMin="0"))
+	float LiftInterpSpeed = 6.f;
+
+	/** Owning client snaps its predicted fuel to the server's when they differ by more (idle only). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack", meta=(ClampMin="0", Units="s"))
+	float FuelReconcileTolerance = 0.3f;
 
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
 	virtual void Release(const FVector& AimOrigin, const FVector& AimDirection) override;
-	void ApplyThrust(float DeltaTime);
+
+	class UHitmenCharacterMovementComponent* GetMovement() const;
 
 	UPROPERTY(Replicated)
 	float Fuel = 3.f;
 
-	bool bThrusting = false;
+	/** Server: thrust state last tick, to fire Juice_OnEnded when the fuel runs out. */
+	bool bWasThrusting = false;
 };
 
 /** Burst of speed in the input direction. */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_Dash : public UHitmenAbility
+class HITMEN_API UHitmenAbility_Dash : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 
@@ -109,7 +126,7 @@ protected:
 
 /** Grapple to a surface and get pulled toward it. */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_Hook : public UHitmenAbility
+class HITMEN_API UHitmenAbility_Hook : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 
@@ -136,7 +153,11 @@ protected:
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
 	void Pull(float DeltaTime);
 
-	UPROPERTY(Replicated)
+	/** Clients restart their local pull timer for every new hook (it is only reset on the server otherwise). */
+	UFUNCTION()
+	void OnRep_Hooked();
+
+	UPROPERTY(ReplicatedUsing=OnRep_Hooked)
 	bool bHooked = false;
 
 	UPROPERTY(Replicated)
@@ -147,7 +168,7 @@ protected:
 
 /** Swap positions with the aimed character (NPC or player). */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_Transposition : public UHitmenAbility
+class HITMEN_API UHitmenAbility_Transposition : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 
@@ -157,7 +178,7 @@ protected:
 
 /** Applies a status to the owner for Duration (pill boost, invisibility). */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_SelfStatus : public UHitmenAbility
+class HITMEN_API UHitmenAbility_SelfStatus : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 
@@ -192,7 +213,7 @@ public:
 
 /** Instant armor plates plus damage resistance for Duration. */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_Armor : public UHitmenAbility
+class HITMEN_API UHitmenAbility_Armor : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 
@@ -208,7 +229,7 @@ protected:
 
 /** First press throws a sticky charge, second press detonates it. */
 UCLASS(Blueprintable)
-class HITMEN_API UHitmenAbility_C4 : public UHitmenAbility
+class HITMEN_API UHitmenAbility_C4 : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 

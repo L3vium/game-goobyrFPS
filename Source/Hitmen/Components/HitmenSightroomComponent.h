@@ -33,6 +33,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Sightroom")
 	bool IsSightroomActive() const { return bSightroomActive; }
 
+	/** Radii come from the player controller (Hitmen|Sightroom) when it possesses the pawn. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Sightroom")
+	void SetScanRadii(float InEnemyRadius, float InInteractableRadius) { EnemyRadius = FMath::Max(0.f, InEnemyRadius); InteractableRadius = FMath::Max(0.f, InInteractableRadius); }
+
 	/** 0..1 progress of the expanding scan wave. */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Sightroom")
 	float GetScanProgress() const { return ScanProgress; }

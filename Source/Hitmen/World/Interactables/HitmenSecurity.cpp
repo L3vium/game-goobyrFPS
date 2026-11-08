@@ -198,6 +198,12 @@ void AHitmenSecurityCamera::OnRep_Visuals()
 {
 	ViewCone->SetVisibility(!bDisabled);
 	FloorDecal->SetVisibility(!bDisabled);
+	if (bLastBroadcastDisabled != bDisabled)
+	{
+		bLastBroadcastDisabled = bDisabled;
+		// Monitors swap to "no signal" and stop requesting captures; CaptureTo refuses meanwhile.
+		OnDisabledChanged.Broadcast(bDisabled);
+	}
 	const FLinearColor Color = bSeeingIntruder ? AlertColor : IdleColor;
 	for (UMaterialInstanceDynamic* Material : ColorMaterials)
 	{
@@ -237,11 +243,36 @@ void AHitmenSecurityMonitor::BeginPlay()
 		return;
 	}
 	RenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(this, 512, 288);
-	if (UMaterialInstanceDynamic* Material = Screen->CreateDynamicMaterialInstance(ScreenMaterialIndex))
+	FeedMaterial = Screen->CreateDynamicMaterialInstance(ScreenMaterialIndex);
+	if (FeedMaterial)
 	{
-		Material->SetTextureParameterValue(ScreenTextureParameter, RenderTarget);
+		FeedMaterial->SetTextureParameterValue(ScreenTextureParameter, RenderTarget);
 	}
-	GetWorldTimerManager().SetTimer(RefreshTimer, this, &AHitmenSecurityMonitor::Refresh, RefreshInterval, true);
+	LinkedCamera->OnDisabledChanged.AddDynamic(this, &AHitmenSecurityMonitor::HandleCameraDisabledChanged);
+	HandleCameraDisabledChanged(LinkedCamera->IsCameraDisabled());
+}
+
+void AHitmenSecurityMonitor::HandleCameraDisabledChanged(bool bCameraDisabled)
+{
+	if (bCameraDisabled)
+	{
+		// Stop refreshing (no capture cost) and show the "no signal" screen instead of a frozen frame.
+		GetWorldTimerManager().ClearTimer(RefreshTimer);
+		if (UMaterialInterface* NoSignal = NoSignalMaterial.LoadSynchronous())
+		{
+			Screen->SetMaterial(ScreenMaterialIndex, NoSignal);
+		}
+	}
+	else
+	{
+		if (FeedMaterial)
+		{
+			Screen->SetMaterial(ScreenMaterialIndex, FeedMaterial);
+		}
+		GetWorldTimerManager().SetTimer(RefreshTimer, this, &AHitmenSecurityMonitor::Refresh, RefreshInterval, true);
+		Refresh();
+	}
+	Juice_OnSignalChanged(!bCameraDisabled);
 }
 
 void AHitmenSecurityMonitor::Refresh()

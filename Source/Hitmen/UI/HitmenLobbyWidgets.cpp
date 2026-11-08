@@ -30,21 +30,21 @@
 #include "Components/ScrollBox.h"
 #include "Components/WidgetSwitcher.h"
 #include "Engine/Texture2D.h"
+#include "Framework/Application/SlateApplication.h"
 
 #define LOCTEXT_NAMESPACE "HitmenLobby"
 
 namespace
 {
-	const EHitmenCosmeticSlot CosmeticSlots[] = { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Top, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Bottom };
+	const EHitmenCosmeticSlot CosmeticSlots[] = { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Legs };
 
 	FText CosmeticSlotName(EHitmenCosmeticSlot Slot)
 	{
 		switch (Slot)
 		{
-		case EHitmenCosmeticSlot::Head:   return LOCTEXT("Head", "HEAD");
-		case EHitmenCosmeticSlot::Top:    return LOCTEXT("Top", "TOP");
-		case EHitmenCosmeticSlot::Body:   return LOCTEXT("Body", "BODY");
-		default:                          return LOCTEXT("Bottom", "BOTTOM");
+		case EHitmenCosmeticSlot::Head: return LOCTEXT("Head", "HEAD");
+		case EHitmenCosmeticSlot::Body: return LOCTEXT("Body", "BODY");
+		default:                        return LOCTEXT("Legs", "LEGS");
 		}
 	}
 
@@ -143,17 +143,26 @@ void UHitmenPlayerEntryWidget::Refresh()
 		NameEdit->SetText(Name);
 		NameEdit->SetVisibility(bLocal ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
-	if (IconText)
-	{
-		IconText->SetText(FText::Format(LOCTEXT("Icon", "#{0}"), FText::AsNumber(PlayerState->GetIconIndex() + 1)));
-	}
+	const UHitmenCatalog* Catalog = UHitmenGameSettings::Get()->LoadCatalog();
+	const int32 Icon = PlayerState->GetIconIndex();
+	UTexture2D* IconTexture = Catalog && Catalog->PlayerIcons.IsValidIndex(Icon) ? Catalog->PlayerIcons[Icon].LoadSynchronous() : nullptr;
 	if (IconImage)
 	{
-		const UHitmenCatalog* Catalog = UHitmenGameSettings::Get()->LoadCatalog();
-		if (Catalog && Catalog->PlayerIcons.IsValidIndex(PlayerState->GetIconIndex()))
+		IconImage->SetVisibility(IconTexture ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (IconTexture)
 		{
-			IconImage->SetBrushFromTexture(Catalog->PlayerIcons[PlayerState->GetIconIndex()].LoadSynchronous());
+			IconImage->SetBrushFromTexture(IconTexture);
 		}
+	}
+	if (IconText)
+	{
+		const bool bGlyph = !IconTexture && Catalog && Catalog->FallbackIconGlyphs.Num() > 0;
+		IconText->SetText(bGlyph ? FText::FromString(Catalog->FallbackIconGlyphs[Icon % Catalog->FallbackIconGlyphs.Num()])
+			: IconTexture ? FText::GetEmpty() : FText::Format(LOCTEXT("Icon", "#{0}"), FText::AsNumber(Icon + 1)));
+	}
+	if (IconButton && Catalog && !IconTexture && Catalog->FallbackIconColors.Num() > 0)
+	{
+		IconButton->SetBackgroundColor(Catalog->FallbackIconColors[Icon % Catalog->FallbackIconColors.Num()]);
 	}
 	if (WatcherButton)
 	{
@@ -189,7 +198,7 @@ void UHitmenPlayerEntryWidget::HandleIconClicked()
 		return;
 	}
 	const UHitmenCatalog* Catalog = UHitmenGameSettings::Get()->LoadCatalog();
-	const int32 Count = FMath::Max(1, Catalog ? Catalog->PlayerIcons.Num() : 8);
+	const int32 Count = Catalog ? Catalog->GetIconCount() : 1;
 	const int32 Next = (PlayerState->GetIconIndex() + 1) % Count;
 	if (AHitmenPlayerController* PC = GetHitmenPC())
 	{
@@ -478,6 +487,12 @@ void UHitmenLobbyWidget::HandlePhaseChanged(EHitmenMatchPhase Phase)
 
 void UHitmenLobbyWidget::HandleLobbyChanged()
 {
+	if (IsEditingText())
+	{
+		// Rebuilding now would wipe the name being typed; NativeTick refreshes once editing ends.
+		bLobbyRefreshPending = true;
+		return;
+	}
 	const AHitmenGameState* GS = GetHitmenGameState();
 	const bool bCustomization = GS && GS->GetMatchPhase() == EHitmenMatchPhase::Customization;
 	if (ScreenSwitcher && ScreenSwitcher->GetActiveWidgetIndex() != (bCustomization ? 1 : 0))
@@ -566,25 +581,43 @@ void UHitmenLobbyWidget::RebuildOptions()
 	{
 		AddOption(FText::Format(LOCTEXT("Proximity", "PROXIMITY CHAT: {0}"), Settings.bProximityChat ? LOCTEXT("On", "ON") : LOCTEXT("Off", "OFF")), 0);
 	}
-	if (!Rules || Rules->RetrievalPointCount.bShowInLobbyUI)
+	// "-  LABEL  +" row; the buttons send MinusIndex / MinusIndex + 1 to HandleOptionClicked.
+	auto AddStepper = [this, bHost](const FText& Label, int32 MinusIndex)
 	{
 		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 		UHitmenListButton* Minus = WidgetTree->ConstructWidget<UHitmenListButton>(UHitmenListButton::StaticClass());
-		Minus->Setup(LOCTEXT("Minus", "-"), 1, EHitmenButtonStyle::Solid, 16);
+		Minus->Setup(LOCTEXT("Minus", "-"), MinusIndex, EHitmenButtonStyle::Solid, 16);
 		Minus->SetIsEnabled(bHost);
 		Minus->OnItemClicked.AddUniqueDynamic(this, &UHitmenLobbyWidget::HandleOptionClicked);
 		UHitmenListButton* Plus = WidgetTree->ConstructWidget<UHitmenListButton>(UHitmenListButton::StaticClass());
-		Plus->Setup(LOCTEXT("Plus", "+"), 2, EHitmenButtonStyle::Solid, 16);
+		Plus->Setup(LOCTEXT("Plus", "+"), MinusIndex + 1, EHitmenButtonStyle::Solid, 16);
 		Plus->SetIsEnabled(bHost);
 		Plus->OnItemClicked.AddUniqueDynamic(this, &UHitmenLobbyWidget::HandleOptionClicked);
 		HitmenUI::AddToHBox(Row, Minus);
-		HitmenUI::AddToHBox(Row, HitmenUI::MakeText(WidgetTree, FText::Format(LOCTEXT("Retrieval", "RETRIEVAL POINTS: {0}"), FText::AsNumber(Settings.RetrievalPointCount)), 16), FMargin(12.f, 0.f));
+		HitmenUI::AddToHBox(Row, HitmenUI::MakeText(WidgetTree, Label, 16), FMargin(12.f, 0.f));
 		HitmenUI::AddToHBox(Row, Plus);
 		HitmenUI::AddToVBox(OptionsBox, Row, FMargin(0.f, 3.f), false, HAlign_Left);
+	};
+	auto Seconds = [](float Value) { return FText::AsNumber(FMath::RoundToInt(Value)); };
+	if (!Rules || Rules->RetrievalPointCount.bShowInLobbyUI)
+	{
+		AddStepper(FText::Format(LOCTEXT("Retrieval", "RETRIEVAL POINTS: {0}"), FText::AsNumber(Settings.RetrievalPointCount)), 1);
 	}
 	if (!Rules || Rules->Difficulty.bShowInLobbyUI)
 	{
 		AddOption(FText::Format(LOCTEXT("Difficulty", "DIFFICULTY: {0}"), DifficultyName(Settings.Difficulty)), 3);
+	}
+	if (!Rules || Rules->SonarStartInterval.bShowInLobbyUI)
+	{
+		AddStepper(FText::Format(LOCTEXT("SonarStart", "SONAR FIRST INTERVAL: {0}s"), Seconds(Settings.SonarStartInterval)), 4);
+	}
+	if (!Rules || Rules->SonarEndInterval.bShowInLobbyUI)
+	{
+		AddStepper(FText::Format(LOCTEXT("SonarEnd", "SONAR FASTEST INTERVAL: {0}s"), Seconds(Settings.SonarEndInterval)), 6);
+	}
+	if (!Rules || Rules->SonarRampDuration.bShowInLobbyUI)
+	{
+		AddStepper(FText::Format(LOCTEXT("SonarRamp", "SONAR SPEED-UP TIME: {0}s"), Seconds(Settings.SonarRampDuration)), 8);
 	}
 }
 
@@ -695,8 +728,56 @@ void UHitmenLobbyWidget::HandleOptionClicked(int32 Index)
 	case 1: DecreaseRetrievalPoints(); break;
 	case 2: IncreaseRetrievalPoints(); break;
 	case 3: CycleDifficulty(); break;
+	case 4: AdjustSonarOption(0, -1); break;
+	case 5: AdjustSonarOption(0, 1); break;
+	case 6: AdjustSonarOption(1, -1); break;
+	case 7: AdjustSonarOption(1, 1); break;
+	case 8: AdjustSonarOption(2, -1); break;
+	case 9: AdjustSonarOption(2, 1); break;
 	default: break;
 	}
+}
+
+void UHitmenLobbyWidget::AdjustSonarOption(int32 Which, int32 Direction)
+{
+	const AHitmenGameState* GS = GetHitmenGameState();
+	const UHitmenMatchRules* Rules = UHitmenGameSettings::Get()->LoadDefaultRules();
+	if (!GS)
+	{
+		return;
+	}
+	FHitmenLobbySettings Settings = GS->GetLobbySettings();
+	const float Step = (Rules ? Rules->SonarLobbyStep : 1.f) * FMath::Sign(Direction);
+	// The ramp is long: step it ten times faster.
+	switch (Which)
+	{
+	case 0: Settings.SonarStartInterval += Step; break;
+	case 1: Settings.SonarEndInterval += Step * 0.5f; break;
+	case 2: Settings.SonarRampDuration += Step * 10.f; break;
+	default: return;
+	}
+	// The server clamps to each option's range.
+	SendSettings(Settings);
+}
+
+void UHitmenLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (bLobbyRefreshPending && !IsEditingText())
+	{
+		bLobbyRefreshPending = false;
+		HandleLobbyChanged();
+	}
+}
+
+bool UHitmenLobbyWidget::IsEditingText() const
+{
+	if (!FSlateApplication::IsInitialized())
+	{
+		return false;
+	}
+	const TSharedPtr<SWidget> Focused = FSlateApplication::Get().GetKeyboardFocusedWidget();
+	return Focused.IsValid() && Focused->GetType() == FName(TEXT("SEditableText")) && HasFocusedDescendants();
 }
 
 void UHitmenLobbyWidget::CreateTeam()

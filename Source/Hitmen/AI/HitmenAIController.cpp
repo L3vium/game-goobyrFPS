@@ -9,6 +9,9 @@
 #include "Movement/HitmenCharacterMovementComponent.h"
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Core/HitmenTeamLibrary.h"
+#include "Core/HitmenGameSettings.h"
+#include "Data/HitmenMatchRules.h"
+#include "Framework/HitmenGameState.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "BehaviorTree/BehaviorTree.h"
@@ -50,6 +53,33 @@ AHitmenAIController::AHitmenAIController()
 	bWantsPlayerState = false;
 }
 
+float AHitmenAIController::GetEffectiveSightRadius() const
+{
+	// The sense config holds the radius already scaled by the difficulty.
+	return SightConfig ? SightConfig->SightRadius : SightRadius;
+}
+
+void AHitmenAIController::ApplySightConfig()
+{
+	// Difficulty scales both radii (the lobby difficulty is only known once the game state exists).
+	float Multiplier = 1.f;
+	if (const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr)
+	{
+		Multiplier = UHitmenAISubsystem::GetRules(this).GetPreset(GS->GetLobbySettings().Difficulty).NPCSightRangeMultiplier;
+	}
+	SightConfig->SightRadius = SightRadius * Multiplier;
+	SightConfig->LoseSightRadius = LoseSightRadius * Multiplier;
+	SightConfig->PeripheralVisionAngleDegrees = PeripheralVisionHalfAngle;
+	PerceptionComponent->RequestStimuliListenerUpdate();
+}
+
+void AHitmenAIController::BeginPlay()
+{
+	Super::BeginPlay();
+	// Placed NPCs are possessed before the game state carries the lobby difficulty: apply again.
+	ApplySightConfig();
+}
+
 void AHitmenAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -59,24 +89,29 @@ void AHitmenAIController::OnPossess(APawn* InPawn)
 	}
 
 	// Apply editable sight values (constructor ran before BP defaults).
-	SightConfig->SightRadius = SightRadius;
-	SightConfig->LoseSightRadius = LoseSightRadius;
-	SightConfig->PeripheralVisionAngleDegrees = PeripheralVisionHalfAngle;
-	PerceptionComponent->RequestStimuliListenerUpdate();
+	ApplySightConfig();
 
 	Alert = InPawn->FindComponentByClass<UHitmenAlertComponent>();
+	bOwnsRuntimeAlert = false;
 	if (!Alert)
 	{
-		// Charmed players get a temporary alert component.
-		Alert = NewObject<UHitmenAlertComponent>(InPawn, TEXT("RuntimeAlert"));
+		// Charmed players get a temporary alert component (unique name: a player can be charmed twice).
+		Alert = NewObject<UHitmenAlertComponent>(InPawn, MakeUniqueObjectName(InPawn, UHitmenAlertComponent::StaticClass(), TEXT("RuntimeAlert")));
 		Alert->RegisterComponent();
+		bOwnsRuntimeAlert = true;
 	}
-	Alert->OnAlertStateChanged.AddDynamic(this, &AHitmenAIController::HandleAlertStateChanged);
-	PerceptionComponent->OnTargetPerceptionUpdated.AddDynamic(this, &AHitmenAIController::HandleTargetPerceptionUpdated);
+	Alert->OnAlertStateChanged.AddUniqueDynamic(this, &AHitmenAIController::HandleAlertStateChanged);
+	PerceptionComponent->OnTargetPerceptionUpdated.AddUniqueDynamic(this, &AHitmenAIController::HandleTargetPerceptionUpdated);
 
-	if (BehaviorTree)
+	// Bare controllers (charmed players) fall back to the project's default NPC tree.
+	UBehaviorTree* Tree = BehaviorTree;
+	if (!Tree)
 	{
-		RunBehaviorTree(BehaviorTree);
+		Tree = UHitmenGameSettings::Get()->DefaultBehaviorTree.LoadSynchronous();
+	}
+	if (Tree)
+	{
+		RunBehaviorTree(Tree);
 	}
 	if (Blackboard)
 	{
@@ -90,11 +125,10 @@ void AHitmenAIController::OnPossess(APawn* InPawn)
 		}
 	}
 
-	// Charmed pawns go straight for the nearest hostile.
-	if (const AHitmenCharacterBase* HitmenCharacter = Cast<AHitmenCharacterBase>(InPawn);
-		HitmenCharacter && HitmenCharacter->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Charmed))
+	// Charmed pawns hunt hostiles of their new side, starting where they stand.
+	if (IsPawnCharmed())
 	{
-		Alert->SetAlertState(EHitmenAlertState::Searching);
+		Alert->StartSearchAround(InPawn->GetActorLocation());
 	}
 
 	GetWorldTimerManager().SetTimer(SightTimer, this, &AHitmenAIController::EvaluateSight, SightEvaluationInterval, true);
@@ -107,12 +141,15 @@ void AHitmenAIController::OnUnPossess()
 	if (Alert)
 	{
 		Alert->OnAlertStateChanged.RemoveAll(this);
-		if (Alert->GetFName() == TEXT("RuntimeAlert"))
+		if (bOwnsRuntimeAlert)
 		{
+			Alert->SetAlertState(EHitmenAlertState::Unaware);
+			Alert->SetSuppressed(true);
 			Alert->DestroyComponent();
 		}
 	}
 	Alert = nullptr;
+	bOwnsRuntimeAlert = false;
 	PerceivedActors.Reset();
 	Super::OnUnPossess();
 }
@@ -160,31 +197,21 @@ void AHitmenAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 
 bool AHitmenAIController::CanReallySee(const AActor* Actor) const
 {
-	const APawn* Self = GetPawn();
-	if (!Self || !Actor)
-	{
-		return false;
-	}
-	const FVector Eye = Self->GetPawnViewLocation();
-	const FVector Point = Actor->GetActorLocation();
+	// Perception already did range, cone and walls: smoke, darkness and hidden status remain.
 	const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
-	if (AI && AI->IsSightBlocked(Eye, Point))
-	{
-		return false;
-	}
-	// Blackout: nobody is seen inside (or from inside) a dark zone.
-	if (AI && (AI->IsLocationDark(Point) || AI->IsLocationDark(Eye)))
-	{
-		return false;
-	}
-	if (const AHitmenCharacterBase* HitmenCharacter = Cast<AHitmenCharacterBase>(Actor))
-	{
-		if (!HitmenCharacter->IsDead() && HitmenCharacter->GetStatusEffects()->IsHiddenFromSight())
-		{
-			return false;
-		}
-	}
-	return true;
+	return AI && AI->CanObserverSee(GetPawn(), Actor, 0.f, 180.f, false);
+}
+
+bool AHitmenAIController::CanSeeActorNow(const AActor* Actor) const
+{
+	const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
+	return AI && AI->CanObserverSee(GetPawn(), Actor, GetEffectiveSightRadius(), PeripheralVisionHalfAngle, true);
+}
+
+bool AHitmenAIController::IsPawnCharmed() const
+{
+	const AHitmenCharacterBase* HitmenCharacter = Cast<AHitmenCharacterBase>(GetPawn());
+	return HitmenCharacter && HitmenCharacter->GetStatusEffects() && HitmenCharacter->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Charmed);
 }
 
 bool AHitmenAIController::IsAlarming(const AActor* Actor) const
@@ -214,7 +241,11 @@ void AHitmenAIController::EvaluateSight()
 		return;
 	}
 
-	bool bSawTarget = false;
+	// Keep the current target while it is visible; otherwise take the nearest visible hostile.
+	AActor* CurrentTarget = Alert->GetTarget();
+	bool bCurrentTargetVisible = false;
+	AActor* NearestHostile = nullptr;
+	float NearestDistanceSquared = TNumericLimits<float>::Max();
 	for (auto It = PerceivedActors.CreateIterator(); It; ++It)
 	{
 		AActor* Actor = It->Get();
@@ -241,13 +272,21 @@ void AHitmenAIController::EvaluateSight()
 		}
 		if (UHitmenTeamLibrary::AreHostile(Self, Actor) && Cast<APawn>(Actor))
 		{
-			// Prefer the current target; otherwise the first hostile seen.
-			if (!Alert->GetTarget() || Alert->GetTarget() == Actor || !bSawTarget)
+			if (Actor == CurrentTarget)
 			{
-				Alert->SeeHostile(Actor, SightEvaluationInterval, IsAlarming(Actor));
-				bSawTarget |= Alert->GetTarget() == Actor;
+				bCurrentTargetVisible = true;
+			}
+			const float DistanceSquared = FVector::DistSquared(Self->GetActorLocation(), Actor->GetActorLocation());
+			if (DistanceSquared < NearestDistanceSquared)
+			{
+				NearestDistanceSquared = DistanceSquared;
+				NearestHostile = Actor;
 			}
 		}
+	}
+	if (AActor* Seen = bCurrentTargetVisible ? CurrentTarget : NearestHostile)
+	{
+		Alert->SeeHostile(Seen, SightEvaluationInterval, IsAlarming(Seen));
 	}
 	SyncBlackboard();
 }
@@ -268,6 +307,6 @@ void AHitmenAIController::SyncBlackboard()
 	Blackboard->SetValueAsVector(HitmenBBKeys::LastKnownLocation, Alert->GetLastKnownLocation());
 	Blackboard->SetValueAsVector(HitmenBBKeys::InvestigateLocation, Alert->GetInvestigateLocation());
 	Blackboard->SetValueAsBool(HitmenBBKeys::TargetVisible, Alert->IsTargetVisible());
-	// An NPC fighting cannot call; one that is alerted but not engaged can.
-	Blackboard->SetValueAsBool(HitmenBBKeys::CanCallReinforcements, Alert->GetAlertState() == EHitmenAlertState::Combat && !Alert->IsTargetVisible());
+	// An NPC fighting cannot call; one that is alerted but not engaged can (charmed pawns never call).
+	Blackboard->SetValueAsBool(HitmenBBKeys::CanCallReinforcements, !IsPawnCharmed() && Alert->CanCallReinforcementsNow());
 }

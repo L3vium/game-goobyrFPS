@@ -1,4 +1,5 @@
-// Hitmen — anim instance base: exposes state; ABP_ graphs read animations from the AnimSet
+// Hitmen — anim instance base: exposes state and the animations of the AnimSet; ABP_ graphs
+// read these variables (never hard-coded assets)
 
 #pragma once
 
@@ -10,6 +11,9 @@
 class AHitmenCharacterBase;
 class UHitmenCharacterMovementComponent;
 class UHitmenAnimSet;
+class UAnimSequenceBase;
+class UBlendSpace;
+class UAimOffsetBlendSpace;
 
 UCLASS()
 class HITMEN_API UHitmenAnimInstance : public UAnimInstance
@@ -20,11 +24,43 @@ public:
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
+	/** Re-reads the animation variables from AnimSet (call after swapping the set at runtime). */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Anim")
+	void ResolveAnimSet();
+
 protected:
-	/** Animation set of the owner (override per ABP for previews). */
+	/**
+	 * Animation set used for previews and as a fallback. At runtime the owning character's
+	 * AnimSet wins when it has one.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Anim")
 	TObjectPtr<UHitmenAnimSet> AnimSet;
 
+	// ---- Animations resolved from AnimSet (graph nodes bind their asset pins to these) ----
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UBlendSpace> LocomotionBlendSpace;
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> IdleAnim;
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> JumpStartAnim;
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> JumpLoopAnim;
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> LandAnim;
+	/** Falls back to IdleAnim. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> CrouchIdleAnim;
+	/** Falls back to LocomotionBlendSpace. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UBlendSpace> CrouchLocomotionBlendSpace;
+	/** Falls back to CrouchIdleAnim. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> SlideAnim;
+	/** Falls back to IdleAnim. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> LadderClimbAnim;
+	/** Falls back to LadderClimbAnim. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> ZiplineAnim;
+	/** Falls back to IdleAnim. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> StunnedLoopAnim;
+	/** Falls back to StunnedLoopAnim. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> AsleepLoopAnim;
+	/** Falls back to IdleAnim. */
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAnimSequenceBase> CarryBodyAnim;
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim|Assets") TObjectPtr<UAimOffsetBlendSpace> AimOffsetBlendSpace;
+
+	// ---- State ----
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Anim") float Speed = 0.f;
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Anim") float Direction = 0.f;
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Anim") float AimPitch = 0.f;

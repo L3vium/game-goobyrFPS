@@ -1,4 +1,4 @@
-// Hitmen — editor-only module: content builders callable from editor Python
+// Hitmen — editor-only module: content builders and graph tools callable from editor Python
 
 using UnrealBuildTool;
 
@@ -22,7 +22,12 @@ public class HitmenEditor : ModuleRules
 			"BehaviorTreeEditor",
 			"AssetTools",
 			"AssetRegistry",
-			"GameplayTasks"
+			"GameplayTasks",
+			// Anim graph tools (HitmenAnimGraphTools)
+			"AnimGraph",
+			"AnimGraphRuntime",
+			"BlueprintGraph",
+			"Kismet"
 		});
 	}
 }

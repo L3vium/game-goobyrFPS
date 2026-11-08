@@ -180,12 +180,72 @@ void UHitmenCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float
 		}
 	}
 	bPrevPressedJump = bJumpHeld;
+
+	UpdateJetpack(DeltaSeconds);
 }
 
 void UHitmenCharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 {
 	Super::UpdateFromCompressedFlags(Flags);
 	bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
+	bWantsJetpackThrust = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Jetpack
+// ---------------------------------------------------------------------------------------------
+
+void UHitmenCharacterMovementComponent::ConfigureJetpack(bool bEnabled, float InMaxFuel, float InFuelRechargePerSecond, float InLiftSpeed, float InLiftInterpSpeed)
+{
+	bJetpackEnabled = bEnabled;
+	JetpackMaxFuel = FMath::Max(0.f, InMaxFuel);
+	JetpackFuelRechargePerSecond = FMath::Max(0.f, InFuelRechargePerSecond);
+	JetpackLiftSpeed = InLiftSpeed;
+	JetpackLiftInterpSpeed = FMath::Max(0.f, InLiftInterpSpeed);
+	JetpackFuel = bEnabled ? JetpackMaxFuel : 0.f;
+	if (!bEnabled)
+	{
+		bWantsJetpackThrust = false;
+	}
+}
+
+bool UHitmenCharacterMovementComponent::IsJetpackThrusting() const
+{
+	if (!bJetpackEnabled || !bWantsJetpackThrust || JetpackFuel <= 0.f || IsClimbing() || IsMantling())
+	{
+		return false;
+	}
+	const AHitmenCharacterBase* Owner = Cast<AHitmenCharacterBase>(CharacterOwner);
+	return !Owner || (!Owner->IsDead() && Owner->GetMovementSpeedMultiplier() > 0.f);
+}
+
+void UHitmenCharacterMovementComponent::UpdateJetpack(float DeltaSeconds)
+{
+	if (!bJetpackEnabled || DeltaSeconds <= 0.f)
+	{
+		return;
+	}
+	if (IsJetpackThrusting())
+	{
+		JetpackFuel = FMath::Max(0.f, JetpackFuel - DeltaSeconds);
+		if (!IsFalling())
+		{
+			SetMovementMode(MOVE_Falling);
+		}
+		Velocity.Z = FMath::FInterpTo(Velocity.Z, JetpackLiftSpeed, DeltaSeconds, JetpackLiftInterpSpeed);
+	}
+	else if (IsMovingOnGround())
+	{
+		JetpackFuel = FMath::Min(JetpackMaxFuel, JetpackFuel + JetpackFuelRechargePerSecond * DeltaSeconds);
+	}
+}
+
+void UHitmenCharacterMovementComponent::ReconcileJetpackFuel(float ServerFuel, float Tolerance)
+{
+	if (bJetpackEnabled && !bWantsJetpackThrust && FMath::Abs(JetpackFuel - ServerFuel) > Tolerance)
+	{
+		JetpackFuel = FMath::Clamp(ServerFuel, 0.f, JetpackMaxFuel);
+	}
 }
 
 void UHitmenCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
@@ -672,6 +732,8 @@ void FSavedMove_Hitmen::Clear()
 {
 	Super::Clear();
 	bSavedWantsToSprint = false;
+	bSavedWantsJetpackThrust = false;
+	SavedJetpackFuel = 0.f;
 }
 
 uint8 FSavedMove_Hitmen::GetCompressedFlags() const
@@ -681,16 +743,33 @@ uint8 FSavedMove_Hitmen::GetCompressedFlags() const
 	{
 		Result |= FLAG_Custom_0;
 	}
+	if (bSavedWantsJetpackThrust)
+	{
+		Result |= FLAG_Custom_1;
+	}
 	return Result;
 }
 
 bool FSavedMove_Hitmen::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
 {
-	if (bSavedWantsToSprint != static_cast<FSavedMove_Hitmen*>(NewMove.Get())->bSavedWantsToSprint)
+	const FSavedMove_Hitmen* Other = static_cast<FSavedMove_Hitmen*>(NewMove.Get());
+	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || bSavedWantsJetpackThrust != Other->bSavedWantsJetpackThrust)
 	{
 		return false;
 	}
 	return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
+}
+
+void FSavedMove_Hitmen::CombineWith(const FSavedMove_Character* OldMove, ACharacter* InCharacter, APlayerController* PC, const FVector& OldStartLocation)
+{
+	Super::CombineWith(OldMove, InCharacter, PC, OldStartLocation);
+	// The combined move replays from the old move's start: rewind the fuel too so it is not spent twice.
+	const FSavedMove_Hitmen* Old = static_cast<const FSavedMove_Hitmen*>(OldMove);
+	SavedJetpackFuel = Old->SavedJetpackFuel;
+	if (UHitmenCharacterMovementComponent* Movement = InCharacter ? Cast<UHitmenCharacterMovementComponent>(InCharacter->GetCharacterMovement()) : nullptr)
+	{
+		Movement->JetpackFuel = Old->SavedJetpackFuel;
+	}
 }
 
 void FSavedMove_Hitmen::SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData)
@@ -699,6 +778,8 @@ void FSavedMove_Hitmen::SetMoveFor(ACharacter* C, float InDeltaTime, FVector con
 	if (const UHitmenCharacterMovementComponent* Movement = Cast<UHitmenCharacterMovementComponent>(C->GetCharacterMovement()))
 	{
 		bSavedWantsToSprint = Movement->bWantsToSprint;
+		bSavedWantsJetpackThrust = Movement->bWantsJetpackThrust;
+		SavedJetpackFuel = Movement->JetpackFuel;
 	}
 }
 
@@ -708,6 +789,9 @@ void FSavedMove_Hitmen::PrepMoveFor(ACharacter* C)
 	if (UHitmenCharacterMovementComponent* Movement = Cast<UHitmenCharacterMovementComponent>(C->GetCharacterMovement()))
 	{
 		Movement->bWantsToSprint = bSavedWantsToSprint;
+		Movement->bWantsJetpackThrust = bSavedWantsJetpackThrust;
+		// Replays start from the fuel this move started with.
+		Movement->JetpackFuel = SavedJetpackFuel;
 	}
 }
 

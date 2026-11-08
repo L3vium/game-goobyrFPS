@@ -11,6 +11,7 @@ class UHitmenAbility;
 class UHitmenAbilityData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHitmenAbilitiesChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenAbilityFailed, UHitmenAbility*, Ability, const FText&, Reason);
 
 UCLASS(ClassGroup=(Hitmen), Blueprintable, meta=(BlueprintSpawnableComponent))
 class HITMEN_API UHitmenAbilityComponent : public UActorComponent
@@ -26,6 +27,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Abilities")
 	FOnHitmenAbilitiesChanged OnAbilitiesChanged;
 
+	/** Owning client: a use was refused by the server, with the reason to show. */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|Abilities")
+	FOnHitmenAbilityFailed OnAbilityFailed;
+
 	/** Server: equips an ability in its slot (replaces the previous one). */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Abilities")
 	void SetAbility(UHitmenAbilityData* AbilityData);
@@ -40,7 +45,22 @@ public:
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_AbilityActivated(UHitmenAbility* Ability, FVector_NetQuantize Location);
 
+	/** Server -> owning client: the ability refused to activate (no charge spent). */
+	UFUNCTION(Client, Reliable)
+	void Client_AbilityFailed(UHitmenAbility* Ability, const FText& Reason);
+
 protected:
+	/** Also show failure reasons in the centre prompt (until the UI has a dedicated toast). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities")
+	bool bShowFailureAsPrompt = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities", meta=(ClampMin="0.1", Units="s"))
+	float FailurePromptDuration = 1.5f;
+
+	FTimerHandle FailurePromptTimer;
+
+	void ClearFailurePrompt();
+
 	UPROPERTY(ReplicatedUsing=OnRep_Abilities)
 	TObjectPtr<UHitmenAbility> MoveAbility;
 

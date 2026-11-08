@@ -59,7 +59,7 @@ Shown under the map carousel. Every option has a default in the match rules data
 - Proximity voice chat (on/off)
 - Number of retrieval points
 - Difficulty (drives loot counts, AI parameters, NPC damage multiplier). NPCs stroll on patrol (170 cm/s), walk briskly when investigating or searching (320) and run in combat (480).
-- Sonar timing (interval start/end, ramp duration)
+- Sonar timing: first interval, fastest interval, speed-up time (`FHitmenFloatOption`s)
 
 ## 4. Flow & screens
 1. **Title screen** — huge bold **HITMEN** title top-left; square, left-aligned buttons:
@@ -68,16 +68,17 @@ Shown under the map carousel. Every option has a default in the match rules data
    right with idle animations. A small **debug** button bottom-right opens the Gym.
 2. **Join** — the title screen darkened; joinable rooms, then Steam friends' rooms.
 3. **Create Room** — left: map carousel (arrows hide at the ends) and match options;
-   right: players list (rename, icon), a dashed **+ Create team** button, drag & drop players
+   right: players list (rename, icon — coloured glyphs until the team adds icon textures to
+   `DA_Catalog.PlayerIcons`), a dashed **+ Create team** button, drag & drop players
    into teams, Protect/Attack toggle per team, Watcher toggle for players without a team.
    Bottom-left **Back**, bottom-right **Start**.
-4. **Customization** — left: the assassin's look (head: hat/moustache…, top, body, bottom,
-   randomize, name — defaults to the Steam name or a random name); right: the loadout
-   (one weapon, one move ability, one manipulation ability).
+4. **Customization** — left: the assassin's look in three slots (head: hat, cap, moustache,
+   glasses…; body; legs), randomize, name (defaults to the Steam name or a random name); right:
+   the loadout (one weapon, one move ability, one manipulation ability).
 5. **Match** — then results.
 
-Watchers get a spectator mode: free fly, single-player view (switch between players at will),
-multi-screen grid (1, 2, 3… all players).
+Watchers get a spectator mode (`V` cycles): free fly, single-player view (LMB / RMB switch between
+players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players follow teammates.
 
 ## 5. Controls (defaults, AZERTY, all rebindable)
 | Action | Key |
@@ -108,21 +109,23 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   item: if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
   stays. Firing with an empty magazine and no reserve throws the weapon where you look. No weapon
   in hand = fists (melee).
-- **Ammo**: walking over a weapon of the same type picks its ammo automatically and removes it;
-  a different type shows **Swap** on `F`. The pistol is silenced.
+- **Ammo**: one ammo pool per weapon (no magazine / reload). Walking over a weapon of the same
+  type picks its ammo automatically and removes it; a different type shows **Swap** on `F`. The
+  pistol is silenced.
 - **Keycards**: acquired items shown next to the inventory, cannot be dropped. Doors may require
   a keycard ID (0, 1, 2…). NPCs can carry keycards and drop them on death.
 - **Stealth kill**: `F` behind an unaware target plays a kill montage.
 - **Sightroom (`Tab`)**: a scan sweeps the surroundings; enemies within a radius are shown in
   white through walls, interactables in white only when in line of sight, the target in red at
-  any distance. No waypoint in normal view.
+  any distance. No waypoint in normal view. Radii live on the player controller
+  (`Hitmen|Sightroom`) so a 3C swap keeps them.
 - **Emotes**: hold `R` for a radial wheel.
 - **Footsteps**: different sounds per surface (grass, stone, sand, wood, metal) through physical
   materials and an anim notify.
 
 ## 7. Weapons
-All weapons share ammo, magazine, fire rate, spread, damage, headshot multiplier, noise radius,
-silenced flag, mesh/VFX/SFX soft references — every value is in a `DA_Weapon_*` data asset.
+All weapons share ammo, fire rate, spread, damage, headshot multiplier, noise radius, silenced
+flag, mesh/VFX/SFX/montage soft references — every value is in a `DA_Weapon_*` data asset.
 
 | Weapon | Family | Notes |
 |---|---|---|
@@ -140,18 +143,23 @@ silenced flag, mesh/VFX/SFX soft references — every value is in a `DA_Weapon_*
 | Black hole | Projectile | pulls pawns and physics to a point |
 
 ## 8. Abilities
-One **move** ability (`E`) and one **manipulation** ability (`A`) per loadout. Every ability has
-its own data asset (cooldown, charges, range, duration, plus specific values). All abilities
-affect NPCs **and players**.
+One **move** ability (`E`) and one **manipulation** ability (`A`) per loadout. C++ families:
+`UHitmenAbility` → `UHitmenMoveAbility` / `UHitmenManipulationAbility` → each ability. A
+`DA_Ability_*` data asset names the ability (display, icon, class); its tuning (cooldown, charges,
+range, duration, specific values) is on the `BP_Ability_*` class defaults. All abilities affect
+NPCs **and players**. A failed use (e.g. poisoning an unsealed room) reports the reason to the
+user and does not spend a charge.
 
 **Move**: Blink (Dishonored-like teleport), Double jump, Jetpack, Dash, Hook (grapple),
 Transposition (swap positions with an aimed NPC/player), Pill (boost damage/speed/resistance with
-a distorted view), Invisibility, Armor, C4 (place, then detonate).
+a distorted view, `PP_Pill`), Invisibility, Armor, C4 (place, then detonate). The jetpack is
+client-predicted like sprint.
 
 **Manipulation**: Stone (throw, noise), Remote distraction (activate a distraction at range),
 Sleep dart (one target), Charm (target becomes an ally and attacks others; a charmed player is
-driven by AI, reckless), Flashbang (stuns around), Smoke grenade (blocks sight for NPCs and
-players), Lighter (vanish a body), Multi-kill (mark several targets; killing one kills all),
+driven by the NPC behavior tree, reckless), Flashbang (stuns around, blinds players with
+`PP_Blind`), Smoke grenade (blocks sight for NPCs and players; basic-shape puffs until a Niagara
+system is assigned), Lighter (vanish a body), Multi-kill (mark several targets; killing one kills all),
 Trap (NPCs stuck; players freed after a delay), Wind mine (big knockback), Poison vial (pour in a
 drink, or in a vent to poison the sealed rooms it serves).
 
@@ -170,13 +178,13 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Hackable distraction | Silent, interact or remote-activate |
 | Turret | Shoots players; wired to a hack panel, hacked = shoots NPCs |
 | Security camera | Visible cone (white → red when you are inside, also on the floor); spotting calls reinforcements |
-| Control room / monitors | Each monitor shows a linked camera; the console disables only its linked cameras |
+| Control room / monitors | Each monitor shows a linked camera ("no signal" while it is disabled); the console disables only its linked cameras |
 | Circuit breaker | Turns off its linked lights: NPCs cannot see (only hear), players see less |
 | Vent | Crouch-size duct with small doors; poison spreads to linked rooms only if fully closed |
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
-| Mounted machine gun | Use from behind, 180° arc |
-| Tank | Enter, third-person view, cannon |
+| Mounted machine gun | Use from behind only, 180° arc; takes damage, part of it reaches the gunner |
+| Tank | Enter, third-person view, cannon; server-driven from any client; damageable, driver ejected when destroyed |
 | Teleporter | Fixed pair: in → out |
 | Retrieval point candidate | See §2 |
 | Weapon / item spawn candidate | See §2 |
@@ -197,6 +205,9 @@ Options on any NPC:
   attackers, searches and investigates by looking around.
 - Stationary + React To Noises off + Hold Position = a **sentry** (manor gate in LDTest, gym pen).
 
+Whoever sees: one shared sight test (`UHitmenAISubsystem::CanObserverSee`: range, cone, walls,
+smoke, darkness, invisibility) drives perception, kill witnesses and body sightings.
+
 | State | Meaning | Indicator |
 |---|---|---|
 | Unaware | Routine (patrol, idle) | none |
@@ -205,26 +216,36 @@ Options on any NPC:
 | Red | Found you, attacks | red |
 | Yellow (search) | Lost you, searches likely spots | yellow |
 
-- Attacking an NPC, or an NPC seeing a kill nearby / hearing loud gunfire close → straight to red.
-- Losing sight for a while → search state (EQS over places you could be).
-- **Last known position**: a silhouette is shown where you were last seen.
+- **White → yellow**: a white NPC that loses you after its fill passed `InvestigateSuspicionThreshold`
+  goes yellow and walks to where it saw you; below it, it cools down. Red when the fill completes
+  while it sees you, when shot, when it witnesses a kill, hears close gunfire, or was already
+  searching for you.
+- Losing sight for a while → search state: C++ scoring of hiding spots (lockers, tall grass,
+  actors tagged `HitmenHidingSpot`), the last known position and reachable nav points, favouring
+  spots out of sight; spots are claimed so NPCs split up.
+- **Last known position**: a mannequin ghost (`BP_LastKnownGhost`) is shown where you were last
+  seen while at least one NPC searches for you; never on your corpse.
 - **Hearing**: running is heard far, walking only close, crouching not at all; gunshots have a
-  radius (silenced: none). Radii are moderate, occluded by walls, and only the 1–2 nearest NPCs
-  respond.
-- **Bodies, distractions, weapons** are investigated.
-- **Squad tactics**: alerted NPCs coordinate to surround the player (flank left via stairs,
-  push forward…), staying close except snipers.
-- **Reinforcement call**: an NPC not in combat can call (icon above its head); if not
-  interrupted by damage before the timer ends, NPCs in a radius are alerted. Cameras call too.
-- Behavior Tree with subtrees: `BT_NPC` → `BT_Combat` (→ `BT_CallReinforcements`, `BT_Sniper`,
-  hold-position branch), `BT_Search`, `BT_Investigate`, `BT_Guard` (stationary), `BT_Patrol`.
-  Charmed pawns reuse the search/combat branches. Trees are generated by
+  radius (silenced: none). Radii are moderate, occluded by walls, and only the
+  `MaxNoiseResponders` (2) nearest NPCs that would react respond, for every noise type.
+- **Bodies, distractions, weapons** are investigated. Only sentries ignore bodies.
+- **Squad tactics**: alerted NPCs take slots around the player; when the fight spans floors one
+  flanker takes another floor / the stairs while another pushes directly; snipers keep far, high
+  slots.
+- **Reinforcement call**: an alerted NPC that is not shooting at a visible target calls (icon
+  above its head); if not interrupted by damage before the timer ends, NPCs in a radius are
+  alerted. NPCs alerted by a call do not relay it (`bReinforcementCallsRelay`). Cameras call too.
+- Behavior Tree with subtrees: `BT_NPC` → `BT_CallReinforcements` (top, aborts on sight),
+  `BT_Combat` (→ `BT_Sniper`, hold-position branch), `BT_Search`, `BT_Investigate`, `BT_Guard`
+  (stationary), `BT_Patrol`. "Target visible" decorators abort lower branches immediately.
+  Charmed pawns (players included) reuse the search/combat branches. Trees are generated by
   `Tools/Editor/hitmen_build_ai.py` (headless, see CLAUDE.md).
 
 ## 11. HUD
-- **Compass** (top): N/S/E/W only; optional VIP marker; retrieval directions while carrying.
-- **Inventory** (bottom centre) with keycards next to it.
-- **Minimap** (bottom right, square): alert states in white/yellow/red.
+- **Compass** (top): N/S/E/W only (`bShowIntercardinals` off); optional VIP marker; retrieval
+  directions while carrying.
+- **Inventory** (bottom centre) with keycards next to it. Abilities and health bottom right.
+- **Minimap** (bottom left, square): alert states in white/yellow/red, sonar pings.
 - **Crosshair** with a ring; hit marker; red cross on a headshot kill.
 - **Interaction prompt** at screen centre (Open, Swap, Hack, Climb…).
 - **Alert indicators** above NPCs and at screen centre.
@@ -248,8 +269,10 @@ Options on any NPC:
   `AHitmenWeaponBase` → hitscan / projectile / melee; `UHitmenAbility` → move / manipulation;
   `AHitmenInteractableBase` → every fixture.
 - **Events, not polling.** Objects talk through delegates bound at BeginPlay. The UI never holds
-  hard references to gameplay actors: widgets bind to `UHitmenUIEventSubsystem`, PlayerState and
-  GameState delegates. Tick is only used for continuous work and disabled otherwise.
+  hard references to gameplay actors: the player controller binds to its pawn's components and
+  pushes view models (inventory, abilities, vitals, carry, alert blips, emotes, spectator views)
+  to `UHitmenUIEventSubsystem`; widgets bind to it, PlayerState and GameState only. NPC overhead
+  indicators are pushed by the NPC. Tick is only used for continuous work and disabled otherwise.
 - **Spawn once, show/hide.** Weapons and attachments are created at BeginPlay and hidden.
 - **Input lives in the PlayerController.** All Enhanced Input bindings are made in
   `AHitmenPlayerController`; the pawn only exposes functions, so the 3C Blueprint can be swapped.
@@ -257,5 +280,7 @@ Options on any NPC:
   spawns. Character movement is client-predicted through `UHitmenCharacterMovementComponent`.
 - **Data-driven tuning (GD tools).** `Project Settings → Hitmen` (`UHitmenGameSettings`) and
   data assets (`DA_MatchRules_*`, `DA_Weapon_*`, `DA_Ability_*`, `DA_Map_*`, `DA_AnimSet_*`).
+- **Framework Blueprints.** `BP_GameInstance` (Options volume mix), `BP_GameState`,
+  `BP_PlayerState`, `BP_SpectatorPawn`, `BP_PlayerController` and the `BP_GM_*` game modes.
 - **Animations in one place.** `UHitmenAnimInstance` exposes state; a `DA_AnimSet_*` lists every
   sequence, blend space and montage so ABPs swap animations without code.

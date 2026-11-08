@@ -12,6 +12,8 @@ class UHitmenAbilityData;
 class AHitmenCharacterBase;
 
 /**
+ * Families: UHitmenMoveAbility (E) and UHitmenManipulationAbility (A) fix the slot; every concrete
+ * ability derives from one of them.
  * Gameplay values are EditDefaultsOnly on each class and set in the BP_Ability_* child.
  * Server: Activate / Release / TickAbility. Owning client: LocalPress / LocalRelease / LocalTick
  * for responsive movement abilities (both sides apply the same motion).
@@ -70,6 +72,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Ability")
 	AHitmenCharacterBase* GetOwnerCharacter() const;
 
+	/** Slot of the family (set by UHitmenMoveAbility / UHitmenManipulationAbility). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Ability")
+	EHitmenAbilitySlot GetSlot() const { return Slot; }
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Ability")
 	APawn* GetOwnerPawn() const;
 
@@ -87,7 +93,15 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnAimPreview(bool bVisible, FVector Location);
 
+	/** Owning client only: the use was refused with a reason ("Room not sealed"). */
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnFailed(const FText& Reason);
+
 protected:
+	/** Fixed by the family base class; the data asset's slot must match it. */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Common")
+	EHitmenAbilitySlot Slot = EHitmenAbilitySlot::Move;
+
 	/** Seconds between uses. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Common", meta=(ClampMin="0"))
 	float Cooldown = 8.f;
@@ -123,6 +137,9 @@ protected:
 
 	void CommitUse();
 	float GetServerTime() const;
+
+	/** Server: tells the owning player why the use was refused (no charge is spent). */
+	void NotifyFailed(const FText& Reason) const;
 
 	// ---- Helpers ----
 	bool AimTrace(const FVector& Origin, const FVector& Direction, FHitResult& OutHit, float TraceRadius = 0.f) const;

@@ -5,7 +5,15 @@
 
 TArray<AActor*> UHitmenSpawnDistributionSubsystem::SelectSpread(const TArray<AActor*>& Candidates, int32 Count, float Randomness, FRandomStream& Stream)
 {
-	TArray<AActor*> Pool = Candidates.FilterByPredicate([](const AActor* A) { return A != nullptr; });
+	TArray<AActor*> Pool;
+	for (AActor* Candidate : Candidates)
+	{
+		// Skip nulls and duplicates (a duplicate would be picked twice and break the count).
+		if (IsValid(Candidate))
+		{
+			Pool.AddUnique(Candidate);
+		}
+	}
 	TArray<AActor*> Selected;
 	Count = FMath::Clamp(Count, 0, Pool.Num());
 	if (Count == 0)
@@ -18,16 +26,18 @@ TArray<AActor*> UHitmenSpawnDistributionSubsystem::SelectSpread(const TArray<AAc
 
 	while (Selected.Num() < Count && Pool.Num() > 0)
 	{
-		// Score = distance to the nearest already selected point.
+		// Score = distance to the nearest already selected point. Linear distance (not squared):
+		// the Randomness band below is a fraction of the best distance, as documented.
 		TArray<TPair<AActor*, float>> Scored;
 		float MaxScore = 0.f;
 		for (AActor* Candidate : Pool)
 		{
-			float Nearest = TNumericLimits<float>::Max();
+			float NearestSq = TNumericLimits<float>::Max();
 			for (const AActor* Picked : Selected)
 			{
-				Nearest = FMath::Min(Nearest, FVector::DistSquared(Candidate->GetActorLocation(), Picked->GetActorLocation()));
+				NearestSq = FMath::Min(NearestSq, FVector::DistSquared(Candidate->GetActorLocation(), Picked->GetActorLocation()));
 			}
+			const float Nearest = FMath::Sqrt(NearestSq);
 			Scored.Emplace(Candidate, Nearest);
 			MaxScore = FMath::Max(MaxScore, Nearest);
 		}

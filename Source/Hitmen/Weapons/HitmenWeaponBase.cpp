@@ -6,15 +6,24 @@
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Characters/HitmenPlayerCharacter.h"
+#include "Core/HitmenTeamLibrary.h"
+#include "Interaction/HitmenScanRegistry.h"
 #include "AI/HitmenAISubsystem.h"
+#include "Hitmen.h"
+#include "Components/BoxComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/CollisionProfile.h"
+#include "Animation/AnimMontage.h"
+#include "Sound/SoundBase.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/DamageType.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
@@ -24,10 +33,28 @@ AHitmenWeaponBase::AHitmenWeaponBase()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = true;
+	// Movement only replicates while dropped (physics); in hand every machine attaches locally.
 	SetReplicatingMovement(false);
+	bNetUseOwnerRelevancy = true;
+
+	DropCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("DropCollision"));
+	DropCollision->InitBoxExtent(DropCollisionExtent);
+	DropCollision->SetCollisionProfileName(UCollisionProfile::PhysicsActor_ProfileName);
+	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	DropCollision->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	// A gun on the floor must not block sight traces (AI, Sightroom, footsteps).
+	DropCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+	DropCollision->SetCollisionResponseToChannel(HITMEN_TRACE_INTERACT, ECR_Block);
+	DropCollision->SetCollisionResponseToChannel(HITMEN_TRACE_WEAPON, ECR_Ignore);
+	DropCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	DropCollision->SetSimulatePhysics(false);
+	DropCollision->SetNotifyRigidBodyCollision(true);
+	DropCollision->SetGenerateOverlapEvents(false);
+	DropCollision->SetCanEverAffectNavigation(false);
+	SetRootComponent(DropCollision);
 
 	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-	SetRootComponent(Root);
+	Root->SetupAttachment(DropCollision);
 
 	StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
 	StaticMesh->SetupAttachment(Root);
@@ -36,6 +63,14 @@ AHitmenWeaponBase::AHitmenWeaponBase()
 	SkeletalMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMesh"));
 	SkeletalMesh->SetupAttachment(Root);
 	SkeletalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	AutoPickupSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AutoPickupSphere"));
+	AutoPickupSphere->SetupAttachment(DropCollision);
+	AutoPickupSphere->InitSphereRadius(AutoPickupRadius);
+	AutoPickupSphere->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+	AutoPickupSphere->SetGenerateOverlapEvents(true);
+	AutoPickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	AutoPickupSphere->SetCanEverAffectNavigation(false);
 }
 
 void AHitmenWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -43,6 +78,28 @@ void AHitmenWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHitmenWeaponBase, WeaponData);
 	DOREPLIFETIME(AHitmenWeaponBase, OwnerPawn);
+	DOREPLIFETIME(AHitmenWeaponBase, WeaponState);
+}
+
+void AHitmenWeaponBase::BeginPlay()
+{
+	Super::BeginPlay();
+	AutoPickupSphere->SetSphereRadius(AutoPickupRadius);
+	if (HasAuthority())
+	{
+		AutoPickupSphere->OnComponentBeginOverlap.AddDynamic(this, &AHitmenWeaponBase::HandleAutoPickupBeginOverlap);
+		AutoPickupSphere->OnComponentEndOverlap.AddDynamic(this, &AHitmenWeaponBase::HandleAutoPickupEndOverlap);
+		DropCollision->OnComponentHit.AddDynamic(this, &AHitmenWeaponBase::HandleDropHit);
+	}
+	UHitmenScanRegistry::Register(this);
+}
+
+void AHitmenWeaponBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UHitmenScanRegistry::Unregister(this);
+	UnwatchAllInventories();
+	GetWorldTimerManager().ClearAllTimersForObject(this);
+	Super::EndPlay(EndPlayReason);
 }
 
 void AHitmenWeaponBase::InitWeapon(UHitmenWeaponData* InData, APawn* InOwner)
@@ -52,10 +109,46 @@ void AHitmenWeaponBase::InitWeapon(UHitmenWeaponData* InData, APawn* InOwner)
 	ApplyVisualsFromData();
 }
 
+AHitmenWeaponBase* AHitmenWeaponBase::SpawnDropped(UObject* WorldContextObject, UHitmenWeaponData* InData, int32 InAmmo, const FTransform& Transform)
+{
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!World || World->GetNetMode() == NM_Client || !InData || !InData->WeaponClass)
+	{
+		return nullptr;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AHitmenWeaponBase* Weapon = World->SpawnActor<AHitmenWeaponBase>(InData->WeaponClass, Transform, Params);
+	if (Weapon)
+	{
+		Weapon->InitWeapon(InData, nullptr);
+		Weapon->Drop(InAmmo, Transform.GetLocation(), Transform.Rotator(), FVector::ZeroVector, nullptr);
+	}
+	return Weapon;
+}
+
 void AHitmenWeaponBase::OnRep_WeaponData()
 {
 	ApplyVisualsFromData();
-	SetEquipped(bIsEquipped);
+	ApplyWeaponState();
+}
+
+void AHitmenWeaponBase::OnRep_OwnerPawn()
+{
+	// The attach parent depends on the owner (first-person mesh for the local player).
+	ApplyWeaponState();
+}
+
+void AHitmenWeaponBase::OnRep_WeaponState()
+{
+	ApplyWeaponState();
+}
+
+void AHitmenWeaponBase::OnRep_AttachmentReplication()
+{
+	// Intentionally not calling Super: the server's attach parent (its own first-person mesh for
+	// the host) is wrong on other machines. Every machine attaches from the replicated state.
+	ApplyWeaponState();
 }
 
 void AHitmenWeaponBase::ApplyVisualsFromData()
@@ -72,6 +165,39 @@ void AHitmenWeaponBase::ApplyVisualsFromData()
 	if (!SkeletalMesh->GetSkeletalMeshAsset() && !WeaponData->SkeletalMesh.IsNull())
 	{
 		SkeletalMesh->SetSkeletalMesh(WeaponData->SkeletalMesh.LoadSynchronous());
+	}
+	if (!StaticMesh->GetStaticMesh() && !SkeletalMesh->GetSkeletalMeshAsset())
+	{
+		// Placeholder until the team assigns a mesh, so dropped weapons stay visible.
+		if (UStaticMesh* Placeholder = PlaceholderMesh.LoadSynchronous())
+		{
+			StaticMesh->SetStaticMesh(Placeholder);
+			StaticMesh->SetRelativeScale3D(PlaceholderScale);
+		}
+	}
+
+	// Fit the drop box to the visuals (in grip space) and remember the offset that centres them.
+	FBox Bounds(ForceInit);
+	if (bFitDropCollisionToMesh)
+	{
+		if (SkeletalMesh->GetSkeletalMeshAsset())
+		{
+			Bounds += SkeletalMesh->CalcBounds(SkeletalMesh->GetRelativeTransform()).GetBox();
+		}
+		else if (StaticMesh->GetStaticMesh())
+		{
+			Bounds += StaticMesh->CalcBounds(StaticMesh->GetRelativeTransform()).GetBox();
+		}
+	}
+	if (Bounds.IsValid)
+	{
+		DropCenter = Bounds.GetCenter();
+		DropCollision->SetBoxExtent(Bounds.GetExtent().ComponentMax(FVector(MinDropCollisionExtent)), true);
+	}
+	else
+	{
+		DropCenter = FVector::ZeroVector;
+		DropCollision->SetBoxExtent(DropCollisionExtent, true);
 	}
 }
 
@@ -93,25 +219,354 @@ USceneComponent* AHitmenWeaponBase::GetAttachParent() const
 	return OwnerPawn ? OwnerPawn->GetRootComponent() : nullptr;
 }
 
+// ---- State ----
+
 void AHitmenWeaponBase::SetEquipped(bool bEquipped)
 {
-	bIsEquipped = bEquipped;
-	SetActorHiddenInGame(!bEquipped);
-	if (!bEquipped)
+	if (!HasAuthority() || WeaponState == EHitmenWeaponState::Dropped)
+	{
+		return;
+	}
+	const EHitmenWeaponState NewState = bEquipped ? EHitmenWeaponState::InHand : EHitmenWeaponState::Holstered;
+	if (NewState != WeaponState || !bStateApplied)
+	{
+		WeaponState = NewState;
+		ApplyWeaponState();
+	}
+}
+
+void AHitmenWeaponBase::ApplyWeaponState()
+{
+	const bool bFirstApply = !bStateApplied;
+	const EHitmenWeaponState Previous = AppliedState;
+	bStateApplied = true;
+	AppliedState = WeaponState;
+
+	if (WeaponState == EHitmenWeaponState::Dropped)
 	{
 		StopFire();
-	}
-	if (USceneComponent* Parent = GetAttachParent())
-	{
-		const FName Socket = WeaponData ? WeaponData->AttachSocket : NAME_None;
-		AttachToComponent(Parent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Socket);
-		if (WeaponData)
+		if (GetAttachParentActor())
 		{
-			SetActorRelativeTransform(WeaponData->AttachOffset);
+			DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		}
+		Root->SetRelativeLocation(-DropCenter);
+		SetActorHiddenInGame(false);
+		DropCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		// Clients simulate too; replicated movement corrects them.
+		DropCollision->SetSimulatePhysics(true);
+		AutoPickupSphere->SetCollisionEnabled(HasAuthority() ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+	}
+	else
+	{
+		DropCollision->SetSimulatePhysics(false);
+		DropCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		AutoPickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Root->SetRelativeLocation(FVector::ZeroVector);
+
+		const bool bInHand = WeaponState == EHitmenWeaponState::InHand;
+		SetActorHiddenInGame(!bInHand);
+		if (!bInHand)
+		{
+			StopFire();
+		}
+		if (USceneComponent* Parent = GetAttachParent())
+		{
+			const FName Socket = WeaponData ? WeaponData->AttachSocket : NAME_None;
+			AttachToComponent(Parent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Socket);
+			if (WeaponData)
+			{
+				SetActorRelativeTransform(WeaponData->AttachOffset);
+			}
 		}
 	}
-	Juice_OnEquipped(bEquipped);
+
+	// Transitions only: ammo updates re-apply the same state without replaying juice.
+	const bool bWasInHand = !bFirstApply && Previous == EHitmenWeaponState::InHand;
+	const bool bNowInHand = WeaponState == EHitmenWeaponState::InHand;
+	if (bWasInHand != bNowInHand)
+	{
+		Juice_OnEquipped(bNowInHand);
+		if (bNowInHand && !bFirstApply && WeaponData && GetNetMode() != NM_DedicatedServer)
+		{
+			if (AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerPawn))
+			{
+				Character->PlayCosmeticMontage(WeaponData->EquipMontage.LoadSynchronous());
+			}
+		}
+	}
+	const bool bWasDropped = !bFirstApply && Previous == EHitmenWeaponState::Dropped;
+	const bool bNowDropped = WeaponState == EHitmenWeaponState::Dropped;
+	if (bWasDropped != bNowDropped)
+	{
+		Juice_OnDropped(bNowDropped);
+	}
 }
+
+void AHitmenWeaponBase::Drop(int32 InAmmo, const FVector& Location, const FRotator& Rotation, const FVector& Velocity, APawn* Thrower)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	StopFire();
+	DroppedAmmo = InAmmo;
+	LastThrower = Thrower;
+	bThrowDamageDone = Thrower == nullptr;
+	bConsumed = false;
+	bPickupActive = false;
+	UnwatchAllInventories();
+
+	OwnerPawn = nullptr;
+	SetOwner(nullptr);
+	SetInstigator(nullptr);
+	WeaponState = EHitmenWeaponState::Dropped;
+	SetReplicatingMovement(true);
+	ApplyWeaponState();
+
+	SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	// A thrown weapon hits pawns until its first impact; then pawns walk through it.
+	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, Thrower ? ECR_Block : ECR_Ignore);
+	DropCollision->SetPhysicsLinearVelocity(Velocity);
+	const FVector Spin = Thrower
+		? FVector(ThrowAngularVelocity.X * (FMath::RandBool() ? 1.f : -1.f), ThrowAngularVelocity.Y, ThrowAngularVelocity.Z)
+		: FVector::ZeroVector;
+	DropCollision->SetPhysicsAngularVelocityInDegrees(Spin);
+	ForceNetUpdate();
+
+	GetWorldTimerManager().ClearTimer(PickupActivationTimer);
+	if (ThrownPickupDelay > 0.f)
+	{
+		GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, ThrownPickupDelay, false);
+	}
+	else
+	{
+		ActivatePickup();
+	}
+}
+
+void AHitmenWeaponBase::PickUp(APawn* NewOwner)
+{
+	if (!HasAuthority() || !NewOwner)
+	{
+		return;
+	}
+	GetWorldTimerManager().ClearTimer(PickupActivationTimer);
+	bPickupActive = false;
+	UnwatchAllInventories();
+	LastThrower = nullptr;
+	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+
+	SetReplicatingMovement(false);
+	OwnerPawn = NewOwner;
+	SetOwner(NewOwner);
+	SetInstigator(NewOwner);
+	WeaponState = EHitmenWeaponState::Holstered;
+	ApplyWeaponState();
+	ForceNetUpdate();
+}
+
+int32 AHitmenWeaponBase::GetDroppedAmmo() const
+{
+	if (DroppedAmmo >= 0)
+	{
+		return DroppedAmmo;
+	}
+	return WeaponData ? WeaponData->StartAmmo : 0;
+}
+
+// ---- Dropped pickup (server) ----
+
+void AHitmenWeaponBase::ActivatePickup()
+{
+	if (!HasAuthority() || !IsDropped())
+	{
+		return;
+	}
+	bPickupActive = true;
+	ScanOverlappingPawns();
+}
+
+void AHitmenWeaponBase::ScanOverlappingPawns()
+{
+	TArray<AActor*> Overlapping;
+	AutoPickupSphere->GetOverlappingActors(Overlapping, APawn::StaticClass());
+	for (AActor* Actor : Overlapping)
+	{
+		WatchInventory(Cast<APawn>(Actor));
+		TryAutoAmmo(Actor);
+		if (!IsValid(this) || bConsumed)
+		{
+			return;
+		}
+	}
+}
+
+void AHitmenWeaponBase::HandleAutoPickupBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (!IsDropped())
+	{
+		return;
+	}
+	WatchInventory(Cast<APawn>(OtherActor));
+	TryAutoAmmo(OtherActor);
+}
+
+void AHitmenWeaponBase::HandleAutoPickupEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	UnwatchInventory(Cast<APawn>(OtherActor));
+}
+
+void AHitmenWeaponBase::HandleWatchedInventoryChanged()
+{
+	if (bPickupActive && IsDropped() && !bConsumed)
+	{
+		ScanOverlappingPawns();
+	}
+}
+
+void AHitmenWeaponBase::WatchInventory(APawn* Pawn)
+{
+	UHitmenInventoryComponent* Inventory = Pawn && Pawn->IsPlayerControlled() ? Pawn->FindComponentByClass<UHitmenInventoryComponent>() : nullptr;
+	if (Inventory && !WatchedInventories.Contains(TWeakObjectPtr<UHitmenInventoryComponent>(Inventory)))
+	{
+		WatchedInventories.Add(TWeakObjectPtr<UHitmenInventoryComponent>(Inventory));
+		Inventory->OnInventoryChanged.AddUniqueDynamic(this, &AHitmenWeaponBase::HandleWatchedInventoryChanged);
+	}
+}
+
+void AHitmenWeaponBase::UnwatchInventory(APawn* Pawn)
+{
+	UHitmenInventoryComponent* Inventory = Pawn ? Pawn->FindComponentByClass<UHitmenInventoryComponent>() : nullptr;
+	if (Inventory && WatchedInventories.Remove(TWeakObjectPtr<UHitmenInventoryComponent>(Inventory)) > 0)
+	{
+		Inventory->OnInventoryChanged.RemoveDynamic(this, &AHitmenWeaponBase::HandleWatchedInventoryChanged);
+	}
+}
+
+void AHitmenWeaponBase::UnwatchAllInventories()
+{
+	for (const TWeakObjectPtr<UHitmenInventoryComponent>& Weak : WatchedInventories)
+	{
+		if (UHitmenInventoryComponent* Inventory = Weak.Get())
+		{
+			Inventory->OnInventoryChanged.RemoveDynamic(this, &AHitmenWeaponBase::HandleWatchedInventoryChanged);
+		}
+	}
+	WatchedInventories.Reset();
+}
+
+void AHitmenWeaponBase::TryAutoAmmo(AActor* Other)
+{
+	if (!HasAuthority() || !bPickupActive || bConsumed || !IsDropped() || !WeaponData || !WeaponData->bUsesAmmo)
+	{
+		return;
+	}
+	APawn* Pawn = Cast<APawn>(Other);
+	if (!Pawn || !Pawn->IsPlayerControlled())
+	{
+		return;
+	}
+	if (const AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(Pawn); Character && Character->IsDead())
+	{
+		return;
+	}
+	UHitmenInventoryComponent* Inventory = Pawn->FindComponentByClass<UHitmenInventoryComponent>();
+	if (!Inventory || !Inventory->HasWeaponType(WeaponData))
+	{
+		return;
+	}
+	// Same weapon type: take its ammunition and remove it, no key press. Guard first: TryAddAmmo
+	// broadcasts OnInventoryChanged, which re-enters HandleWatchedInventoryChanged.
+	bConsumed = true;
+	UnwatchAllInventories();
+	const int32 Amount = DroppedAmmo >= 0 ? FMath::Max(DroppedAmmo, WeaponData->AmmoPerPickup) : WeaponData->AmmoPerPickup;
+	if (Inventory->TryAddAmmo(WeaponData, Amount))
+	{
+		Destroy();
+		return;
+	}
+	bConsumed = false;
+}
+
+void AHitmenWeaponBase::HandleDropHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
+{
+	if (!IsDropped() || bThrowDamageDone)
+	{
+		return;
+	}
+	if (OtherActor == LastThrower)
+	{
+		return;
+	}
+	// First impact of a throw: hurt a hostile pawn once, then become a plain pickup.
+	bThrowDamageDone = true;
+	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	if (WeaponData && LastThrower && Cast<APawn>(OtherActor) && UHitmenTeamLibrary::AreHostile(LastThrower, OtherActor))
+	{
+		UGameplayStatics::ApplyPointDamage(OtherActor, WeaponData->ThrowDamage, DropCollision->GetPhysicsLinearVelocity().GetSafeNormal(), Hit, LastThrower->GetController(), this, UDamageType::StaticClass());
+	}
+}
+
+// ---- Interaction / Sightroom ----
+
+bool AHitmenWeaponBase::CanInteract_Implementation(AActor* Interactor) const
+{
+	if (!IsDropped() || !WeaponData || bConsumed)
+	{
+		return false;
+	}
+	// Server: respect the post-throw delay (clients show the prompt; the server decides).
+	if (HasAuthority() && !bPickupActive)
+	{
+		return false;
+	}
+	return Interactor && Interactor->FindComponentByClass<UHitmenInventoryComponent>() != nullptr;
+}
+
+FText AHitmenWeaponBase::GetInteractionText_Implementation(AActor* Interactor) const
+{
+	if (!WeaponData)
+	{
+		return FText::GetEmpty();
+	}
+	const UHitmenInventoryComponent* Inventory = Interactor ? Interactor->FindComponentByClass<UHitmenInventoryComponent>() : nullptr;
+	if (Inventory && !Inventory->HasFreeSlot() && !Inventory->HasWeaponType(WeaponData))
+	{
+		return FText::Format(NSLOCTEXT("Hitmen", "SwapWeapon", "Swap for {0}"), WeaponData->DisplayName);
+	}
+	return FText::Format(NSLOCTEXT("Hitmen", "PickUpWeapon", "Pick up {0}"), WeaponData->DisplayName);
+}
+
+void AHitmenWeaponBase::Interact_Implementation(AActor* Interactor)
+{
+	if (!HasAuthority() || !IHitmenInteractable::Execute_CanInteract(this, Interactor))
+	{
+		return;
+	}
+	if (UHitmenInventoryComponent* Inventory = Interactor->FindComponentByClass<UHitmenInventoryComponent>())
+	{
+		Inventory->PickUpWeapon(this, true);
+	}
+}
+
+EHitmenScanCategory AHitmenWeaponBase::GetScanCategory_Implementation(const AActor* Observer) const
+{
+	return IsDropped() ? EHitmenScanCategory::Interactable : EHitmenScanCategory::None;
+}
+
+void AHitmenWeaponBase::SetScanHighlight_Implementation(bool bEnabled, int32 StencilValue)
+{
+	for (UPrimitiveComponent* Primitive : { static_cast<UPrimitiveComponent*>(StaticMesh.Get()), static_cast<UPrimitiveComponent*>(SkeletalMesh.Get()) })
+	{
+		if (Primitive)
+		{
+			Primitive->SetRenderCustomDepth(bEnabled);
+			Primitive->SetCustomDepthStencilValue(bEnabled ? StencilValue : 0);
+		}
+	}
+}
+
+// ---- Firing ----
 
 FVector AHitmenWeaponBase::GetMuzzleLocation() const
 {
@@ -172,7 +627,7 @@ void AHitmenWeaponBase::Tick(float DeltaSeconds)
 
 bool AHitmenWeaponBase::CanFireNow() const
 {
-	if (!WeaponData || !bIsEquipped || !OwnerPawn)
+	if (!WeaponData || !IsEquipped() || !OwnerPawn)
 	{
 		return false;
 	}
@@ -276,9 +731,13 @@ void AHitmenWeaponBase::FireOnce()
 		return;
 	}
 
-	// Empty: throw the weapon where we look.
+	// Empty (one ammo pool, no reserve): dry click, then throw the weapon where we look.
 	if (GetOwnerAmmo() < WeaponData->AmmoPerShot)
 	{
+		if (USoundBase* DrySound = WeaponData->DryFireSound.LoadSynchronous())
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, DrySound, GetMuzzleLocation());
+		}
 		Juice_OnDryFire();
 		if (UHitmenInventoryComponent* Inventory = OwnerPawn->FindComponentByClass<UHitmenInventoryComponent>())
 		{
@@ -318,7 +777,7 @@ void AHitmenWeaponBase::FireOnce()
 
 void AHitmenWeaponBase::Server_Fire_Implementation(FVector_NetQuantize Origin, FVector_NetQuantizeNormal Direction, int32 Seed, float Charge)
 {
-	if (!WeaponData || !OwnerPawn || !bIsEquipped)
+	if (!WeaponData || !OwnerPawn || !IsEquipped())
 	{
 		return;
 	}
@@ -419,6 +878,11 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	if (USoundBase* Sound = WeaponData->FireSound.LoadSynchronous())
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, Sound, Origin);
+	}
+	// Same cosmetic path as the FX: predicted on the shooter, multicast to everyone else.
+	if (AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerPawn))
+	{
+		Character->PlayCosmeticMontage(WeaponData->FireMontage.LoadSynchronous());
 	}
 	UNiagaraSystem* Tracer = WeaponData->TracerFX.LoadSynchronous();
 	UNiagaraSystem* ImpactFX = WeaponData->ImpactFX.LoadSynchronous();

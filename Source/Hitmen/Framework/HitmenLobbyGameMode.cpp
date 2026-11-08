@@ -37,12 +37,7 @@ void AHitmenLobbyGameMode::InitGameState()
 		return;
 	}
 
-	const UHitmenMatchRules* Rules = GetRules();
-	FHitmenLobbySettings Settings;
-	Settings.bProximityChat = Rules->ProximityChat.Value;
-	Settings.RetrievalPointCount = Rules->RetrievalPointCount.Value;
-	Settings.Difficulty = static_cast<EHitmenDifficulty>(FMath::Clamp(Rules->Difficulty.Value, 0, 2));
-	GS->SetLobbySettings(Settings);
+	GS->SetLobbySettings(GetRules()->MakeDefaultLobbySettings());
 }
 
 bool AHitmenLobbyGameMode::IsHost(const APlayerController* PC) const
@@ -116,14 +111,9 @@ void AHitmenLobbyGameMode::RequestSetLobbySettings(AHitmenPlayerController* Requ
 	{
 		return;
 	}
-	const UHitmenMatchRules* Rules = GetRules();
-	FHitmenLobbySettings Clamped = Settings;
-	Clamped.MapIndex = FMath::Clamp(Clamped.MapIndex, 0, FMath::Max(0, UHitmenGameSettings::Get()->GetMapCount() - 1));
-	Clamped.RetrievalPointCount = FMath::Clamp(Clamped.RetrievalPointCount, Rules->RetrievalPointCount.Min, Rules->RetrievalPointCount.Max);
 	// Options hidden by design keep their designed value.
-	if (!Rules->ProximityChat.bShowInLobbyUI)       { Clamped.bProximityChat = Rules->ProximityChat.Value; }
-	if (!Rules->RetrievalPointCount.bShowInLobbyUI) { Clamped.RetrievalPointCount = Rules->RetrievalPointCount.Value; }
-	if (!Rules->Difficulty.bShowInLobbyUI)          { Clamped.Difficulty = static_cast<EHitmenDifficulty>(Rules->Difficulty.Value); }
+	FHitmenLobbySettings Clamped = GetRules()->SanitizeLobbySettings(Settings);
+	Clamped.MapIndex = FMath::Clamp(Clamped.MapIndex, 0, FMath::Max(0, UHitmenGameSettings::Get()->GetMapCount() - 1));
 	GS->SetLobbySettings(Clamped);
 }
 

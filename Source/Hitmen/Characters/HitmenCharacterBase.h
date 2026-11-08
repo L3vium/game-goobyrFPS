@@ -8,6 +8,7 @@
 #include "Core/HitmenInterfaces.h"
 #include "Core/HitmenTeamLibrary.h"
 #include "Interaction/HitmenInteractable.h"
+#include "Data/HitmenAnimSet.h"
 #include "HitmenCharacterBase.generated.h"
 
 class UHitmenHealthComponent;
@@ -16,6 +17,8 @@ class UHitmenFootstepComponent;
 class UHitmenCosmeticComponent;
 class UHitmenCharacterMovementComponent;
 class UHitmenAnimSet;
+class UHitmenWeaponData;
+class UAnimMontage;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenBodyStateChanged, AHitmenCharacterBase*, Character);
 
@@ -32,6 +35,8 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 	virtual bool CanJumpInternal_Implementation() const override;
+	/** Re-attaches carried weapons: the attach mesh depends on local control. */
+	virtual void NotifyControllerChanged() override;
 
 	// ---- Components ----
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")
@@ -48,6 +53,15 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")
 	UHitmenAnimSet* GetAnimSet() const { return AnimSet; }
+
+	// ---- Montages (cosmetic) ----
+	/** Local only: plays a montage on the body mesh of this machine. Returns its length (0 if not played). */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Animation")
+	float PlayCosmeticMontage(UAnimMontage* Montage, float PlayRate = 1.f);
+
+	/** Server: plays an anim-set montage on every machine (unreliable multicast, cosmetic). */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Animation")
+	void PlayAnimSetMontage(EHitmenAnimMontage Montage, int32 Variant = 0);
 
 	// ---- State ----
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")
@@ -126,6 +140,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Damage", meta=(ClampMin="0"))
 	float DeathImpulse = 6000.f;
 
+	/** Play a death montage (anim set) before the ragdoll. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Animation")
+	bool bPlayDeathMontage = true;
+
+	/** Longest time a death montage may delay the ragdoll. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Animation", meta=(ClampMin="0", Units="s", EditCondition="bPlayDeathMontage"))
+	float DeathRagdollMaxDelay = 1.5f;
+
+	/** Hit reacts interrupt other montages (fire, mantle...). Off: only when nothing else plays. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Animation")
+	bool bHitReactInterruptsMontages = false;
+
 	UPROPERTY(Replicated)
 	bool bIsVIP = false;
 
@@ -137,6 +163,12 @@ protected:
 
 	UPROPERTY(Replicated)
 	FName CarrySocket = NAME_None;
+
+	/** Server-picked death montage (from the hit direction), replicated with the death. */
+	UPROPERTY(Replicated)
+	int32 DeathMontageIndex = INDEX_NONE;
+
+	FTimerHandle DeathRagdollTimer;
 
 	FVector LastHitDirection = FVector::ZeroVector;
 	FName LastHitBone = NAME_None;
@@ -161,6 +193,38 @@ protected:
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_DamageFeedback(float Damage, bool bHeadshot, FVector_NetQuantize HitLocation);
+
+	/**
+	 * bOwnerPredicted: the owning client and the server already played it (movement events run
+	 * on both), so only the other machines play it.
+	 */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayAnimSetMontage(EHitmenAnimMontage Montage, uint8 Variant, bool bOwnerPredicted);
+
+	/** Plays an anim-set montage on this machine. Returns its length (0 if not played). */
+	float PlayAnimSetMontageLocal(EHitmenAnimMontage Montage, int32 Variant = 0);
+
+	/**
+	 * Meshes that play cosmetic montages on this machine (body mesh by default). The player can
+	 * add its first-person mesh when locally controlled.
+	 */
+	virtual void GetMontageMeshes(TArray<USkeletalMeshComponent*>& OutMeshes) const;
+
+	/** CMC traversal event (owning client + server): mantle / vault montage. */
+	UFUNCTION()
+	void HandleMantleStarted(bool bIsVault);
+
+	/** Inventory throw event (every machine): throw montage. */
+	UFUNCTION()
+	void HandleWeaponThrown(UHitmenWeaponData* Weapon);
+
+	/** Server: death montage index from the last hit direction. */
+	int32 ChooseDeathMontageIndex() const;
+
+	/** Plays the death montage if any; returns the delay before the ragdoll (0 = ragdoll now). */
+	float PlayDeathMontage();
+
+	void HandleDeathRagdollTimer();
 
 	// ---- Juice hooks (cosmetic only, every machine) ----
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")

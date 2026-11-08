@@ -1,22 +1,46 @@
-// Hitmen — weapon base: data-driven, predicted firing, spawned once and shown/hidden
+// Hitmen — weapon base: data-driven, predicted firing; one actor for its whole life (in hand,
+// holstered, or lying in the world as its own pickup)
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Core/HitmenTypes.h"
+#include "Core/HitmenInterfaces.h"
+#include "Interaction/HitmenInteractable.h"
 #include "HitmenWeaponBase.generated.h"
 
 class UHitmenWeaponData;
+class UHitmenInventoryComponent;
 class UStaticMeshComponent;
 class USkeletalMeshComponent;
+class UStaticMesh;
+class UBoxComponent;
+class USphereComponent;
+
+/** Where the weapon actor currently is. Replicated; every machine derives visuals from it. */
+UENUM(BlueprintType)
+enum class EHitmenWeaponState : uint8
+{
+	/** Carried, hidden (other slot). */
+	Holstered,
+	/** Carried, shown and usable. */
+	InHand,
+	/** Lying in the world: physics, pickup prompt, auto-ammo. */
+	Dropped
+};
 
 /**
  * Firing flow: the owning client predicts cosmetics and sends Server_Fire with a seed; the
  * server validates rate and ammo, resolves hits (FireServer) and multicasts effects to others.
  * NPCs call FireAt on the server. Children: hitscan, projectile, melee.
+ *
+ * Lifetime: spawned once (loadout, loot, level placement). Throwing or swapping puts the same
+ * actor in the Dropped state (it becomes the world pickup); picking it up re-attaches it. Only a
+ * same-type ammo merge destroys it (its ammo moved into the held weapon).
  */
 UCLASS(Abstract, Blueprintable)
-class HITMEN_API AHitmenWeaponBase : public AActor
+class HITMEN_API AHitmenWeaponBase : public AActor, public IHitmenInteractable, public IHitmenScannable
 {
 	GENERATED_BODY()
 
@@ -24,16 +48,48 @@ public:
 	AHitmenWeaponBase();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
+	/** Attachment differs per machine (first-person mesh locally): never take the server's. */
+	virtual void OnRep_AttachmentReplication() override;
 
 	/** Server: called right after spawn. */
 	void InitWeapon(UHitmenWeaponData* InData, APawn* InOwner);
 
-	/** Shows/attaches when in hand, hides when holstered. Runs on every machine. */
+	/**
+	 * Server: spawns a weapon lying in the world (loot, level placement, legacy pickups).
+	 * Ammo < 0 = the weapon's start ammo.
+	 */
+	static AHitmenWeaponBase* SpawnDropped(UObject* WorldContextObject, UHitmenWeaponData* InData, int32 InAmmo, const FTransform& Transform);
+
+	/** Server: shows/attaches when in hand, hides when holstered. No effect while dropped. */
 	void SetEquipped(bool bEquipped);
 
+	/**
+	 * Server: hand (or world) -> world. The actor detaches, simulates physics and becomes the
+	 * pickup. A thrower makes it a thrown weapon (hurts the first hostile pawn it hits).
+	 * Ammo < 0 = the weapon's start ammo.
+	 */
+	void Drop(int32 InAmmo, const FVector& Location, const FRotator& Rotation, const FVector& Velocity, APawn* Thrower);
+
+	/** Server: world -> hand. The inventory then sets the slot and calls SetEquipped. */
+	void PickUp(APawn* NewOwner);
+
+	/** Any machine: re-applies the current state (the attach parent may have changed, e.g. on possession). */
+	void RefreshAttachment() { ApplyWeaponState(); }
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
-	bool IsEquipped() const { return bIsEquipped; }
+	bool IsEquipped() const { return WeaponState == EHitmenWeaponState::InHand; }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
+	bool IsDropped() const { return WeaponState == EHitmenWeaponState::Dropped; }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
+	EHitmenWeaponState GetWeaponState() const { return WeaponState; }
+
+	/** Server: ammo this weapon carries while dropped (start ammo if never set). */
+	int32 GetDroppedAmmo() const;
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	UHitmenWeaponData* GetWeaponData() const { return WeaponData; }
@@ -60,7 +116,21 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	FVector GetMuzzleLocation() const;
 
+	// IHitmenInteractable (dropped weapons: pick up / swap)
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	virtual void Interact_Implementation(AActor* Interactor) override;
+
+	// IHitmenScannable (dropped weapons show as interactables in the Sightroom)
+	virtual EHitmenScanCategory GetScanCategory_Implementation(const AActor* Observer) const override;
+	virtual void SetScanHighlight_Implementation(bool bEnabled, int32 StencilValue) override;
+
 protected:
+	/** Physics body of the dropped weapon (actor root). No collision while carried. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UBoxComponent> DropCollision;
+
+	/** Grip pivot: the visuals hang under it. Offset to centre the mesh on the box when dropped. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<USceneComponent> Root;
 
@@ -72,11 +142,52 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<USkeletalMeshComponent> SkeletalMesh;
 
+	/** Walking over a dropped weapon of a type you hold takes its ammo. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<USphereComponent> AutoPickupSphere;
+
 	UPROPERTY(ReplicatedUsing=OnRep_WeaponData, BlueprintReadOnly, Category="Hitmen|Weapon")
 	TObjectPtr<UHitmenWeaponData> WeaponData;
 
-	UPROPERTY(Replicated, BlueprintReadOnly, Category="Hitmen|Weapon")
+	UPROPERTY(ReplicatedUsing=OnRep_OwnerPawn, BlueprintReadOnly, Category="Hitmen|Weapon")
 	TObjectPtr<APawn> OwnerPawn;
+
+	UPROPERTY(ReplicatedUsing=OnRep_WeaponState, BlueprintReadOnly, Category="Hitmen|Weapon")
+	EHitmenWeaponState WeaponState = EHitmenWeaponState::Holstered;
+
+	/** Server: ammo carried while dropped (-1 = start ammo). */
+	UPROPERTY(Transient)
+	int32 DroppedAmmo = -1;
+
+	// ---- Dropped tuning ----
+	/** Seconds after a drop before it can be picked up (avoids re-grabbing a weapon just thrown). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0", Units="s"))
+	float ThrownPickupDelay = 0.6f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0", Units="cm"))
+	float AutoPickupRadius = 70.f;
+
+	/** Fit the drop box to the mesh bounds; otherwise DropCollisionExtent is used. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup")
+	bool bFitDropCollisionToMesh = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(Units="cm"))
+	FVector DropCollisionExtent = FVector(30.f, 8.f, 10.f);
+
+	/** Minimum half-size of the fitted box (thin meshes must not tunnel through floors). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0", Units="cm"))
+	float MinDropCollisionExtent = 4.f;
+
+	/** Spin given to a thrown weapon (deg/s; X gets a random sign). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup")
+	FVector ThrowAngularVelocity = FVector(360.f, 720.f, 0.f);
+
+	/** Shown when the data has no mesh (placeholder until the team assigns one). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Visuals")
+	TSoftObjectPtr<UStaticMesh> PlaceholderMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Engine/BasicShapes/Cube.Cube")));
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Visuals")
+	FVector PlaceholderScale = FVector(0.5f, 0.12f, 0.15f);
 
 	/**
 	 * Server: resolve one trigger pull. OutImpacts receives hit points for effects.
@@ -93,10 +204,15 @@ protected:
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_FireEffects(FVector_NetQuantize Origin, const TArray<FVector_NetQuantize>& Impacts);
 
-	/** Spawns muzzle / tracer / impact effects and sounds from data, then calls the juice hook. */
+	/** Spawns muzzle / tracer / impact effects and sounds from data, plays the fire montage, then calls the juice hook. */
 	virtual void PlayFireEffects(const FVector& Origin, const TArray<FVector>& Impacts, bool bLocallyPredicted);
 
 	UFUNCTION() void OnRep_WeaponData();
+	UFUNCTION() void OnRep_OwnerPawn();
+	UFUNCTION() void OnRep_WeaponState();
+
+	/** Applies WeaponState on this machine: attach/hide/physics/collision, equip juice on transitions. */
+	void ApplyWeaponState();
 
 	void ApplyVisualsFromData();
 	void FireOnce();
@@ -107,6 +223,27 @@ protected:
 	USceneComponent* GetAttachParent() const;
 	void ReportShotNoise(const FVector& Origin) const;
 
+	// ---- Dropped pickup (server) ----
+	void ActivatePickup();
+	void TryAutoAmmo(AActor* Other);
+	void ScanOverlappingPawns();
+	void WatchInventory(APawn* Pawn);
+	void UnwatchInventory(APawn* Pawn);
+	void UnwatchAllInventories();
+
+	UFUNCTION()
+	void HandleAutoPickupBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void HandleAutoPickupEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	/** A pawn standing in the sphere changed its inventory (its weapon may now match). */
+	UFUNCTION()
+	void HandleWatchedInventoryChanged();
+
+	UFUNCTION()
+	void HandleDropHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
 	// ---- Juice hooks (cosmetic only) ----
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnFired(bool bLocallyPredicted);
@@ -114,6 +251,7 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnImpact(FVector ImpactPoint);
 
+	/** Fires on transitions only (holstered <-> in hand). */
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnEquipped(bool bEquipped);
 
@@ -123,15 +261,30 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnSpinUp(bool bStarted);
 
+	/** The weapon became a world pickup (true) or was picked up (false). */
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnDropped(bool bDropped);
+
+	UPROPERTY(Transient)
+	TObjectPtr<APawn> LastThrower;
+
+	TArray<TWeakObjectPtr<UHitmenInventoryComponent>> WatchedInventories;
+
 	FTimerHandle FireTimer;
 	FTimerHandle SpinUpTimer;
-	bool bIsEquipped = false;
+	FTimerHandle PickupActivationTimer;
+	EHitmenWeaponState AppliedState = EHitmenWeaponState::Holstered;
+	bool bStateApplied = false;
 	bool bTriggerHeld = false;
 	bool bSpunUp = false;
+	bool bPickupActive = false;
+	bool bThrowDamageDone = false;
+	bool bConsumed = false;
 	int32 BurstRemaining = 0;
 	float LastFireTime = -100.f;
 	float LastServerFireTime = -100.f;
 	float CurrentBloom = 0.f;
 	float ChargeStartTime = -1.f;
 	int32 ShotCounter = 0;
+	FVector DropCenter = FVector::ZeroVector;
 };

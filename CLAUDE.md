@@ -43,6 +43,8 @@ Engine: `C:\Program Files\Epic Games\UE_5.7`.
 - Player builds (`RunUAT BuildCookRun`): Shipping → `Builds/Windows`, Development (cheats) →
   `Builds/Windows Dev`. Both are versioned through LFS. RunUAT breaks on an archive path with a
   space: archive to `Builds/_DevTmp`, flatten the nested `Windows/` folder, then move it.
+  Pass `-NoCompileEditor` to package with the editor open (UBT refuses to build the editor
+  target while Live Coding is active).
 
 ## Editor access
 The Unreal MCP server (`mcp__unreal-engine__*`, McpAutomationBridge plugin) drives the open

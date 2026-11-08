@@ -144,6 +144,18 @@ def build_materials(physical):
             set_props(mi, phys_material=physical[surface])
         save(mi)
         instances[name] = mi
+        # Checker (prototype grid) twin for level geometry: same tint, same physical surface.
+        grid = create("MI_Grid_" + name[3:], inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        set_props(grid, parent=load("/Game/LevelPrototyping/Materials/M_PrototypeGrid"))
+        tint = unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0)
+        for param in ("SurfaceColor", "TopSurfaceColor"):
+            MEL.set_material_instance_vector_parameter_value(grid, param, tint)
+        MEL.set_material_instance_vector_parameter_value(grid, "GridColor", unreal.LinearColor(rgb[0] * 0.35, rgb[1] * 0.35, rgb[2] * 0.35, 1.0))
+        MEL.set_material_instance_vector_parameter_value(grid, "SubGridColor", unreal.LinearColor(rgb[0] * 0.7, rgb[1] * 0.7, rgb[2] * 0.7, 1.0))
+        if surface:
+            set_props(grid, phys_material=physical[surface])
+        save(grid)
+        instances["MI_Grid_" + name[3:]] = grid
 
     # Translucent unlit "Color" (camera cones, retrieval beacons).
     cone = new_material("M_Hitmen_TranslucentColor", folder)

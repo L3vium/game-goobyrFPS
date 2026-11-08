@@ -15,7 +15,8 @@ GRID_ALT = "/Game/LevelPrototyping/Materials/MI_PrototypeGrid_Gray_02"
 
 
 def mi(name):
-    return path("Materials", "Instances", name)
+    """Level geometry uses the checker twin of each colour (MI_Red -> MI_Grid_Red)."""
+    return path("Materials", "Instances", "MI_Grid_" + name[3:] if name.startswith("MI_") else name)
 
 
 def bp(rel):

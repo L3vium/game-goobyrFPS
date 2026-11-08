@@ -5,6 +5,13 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+### Known gaps (next)
+- Lobby / session flow not yet tested with real clients (Null in PIE multi-client, Steam in the
+  packaged Development build).
+- Blueprint event graphs are mostly empty value carriers: `Juice_On…` stubs, colour-coded comment
+  groups and Blueprint Assistant formatting are left for the team.
+- Placeholder art only (engine shapes, checker material, mannequins); no SFX/VFX assigned yet.
+
 ## [0.1.0] - 2026-11-08
 
 ### Added

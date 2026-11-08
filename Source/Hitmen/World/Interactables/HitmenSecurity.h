@@ -1,0 +1,350 @@
+// Hitmen — security: cameras (visible cone, alarms), monitors, control consoles, turrets and
+// their hack panels, circuit breakers, light fixtures, blackout volumes
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "Interaction/HitmenInteractableBase.h"
+#include "Core/HitmenInterfaces.h"
+#include "Core/HitmenTeamLibrary.h"
+#include "AI/HitmenAISubsystem.h"
+#include "HitmenSecurity.generated.h"
+
+class USceneCaptureComponent2D;
+class UTextureRenderTarget2D;
+class UMaterialInstanceDynamic;
+class UDecalComponent;
+class UBoxComponent;
+class ULightComponent;
+class UPointLightComponent;
+
+/** Sweeping camera. Its cone is visible (white, red when it sees you) and it calls reinforcements. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenSecurityCamera : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenSecurityCamera();
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Camera")
+	void SetCameraDisabled(bool bDisabled);
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
+	bool IsCameraDisabled() const { return bDisabled; }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
+	bool IsSeeingIntruder() const { return bSeeingIntruder; }
+
+	/** Renders the camera view into a target (monitors). */
+	void CaptureTo(UTextureRenderTarget2D* Target);
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<USceneComponent> Root;
+
+	/** Rotating head (yaw sweep). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<USceneComponent> Head;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Body;
+
+	/** Visible view cone (translucent mesh, color parameter "Color"). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> ViewCone;
+
+	/** Footprint of the cone on the floor (decal, color parameter "Color"). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UDecalComponent> FloorDecal;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<USceneCaptureComponent2D> Capture;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0", Units="cm"))
+	float ViewDistance = 1800.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="1", ClampMax="89", Units="deg"))
+	float ViewHalfAngle = 28.f;
+
+	/** Total sweep arc (0 = static). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0", ClampMax="350", Units="deg"))
+	float SweepAngle = 90.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0"))
+	float SweepSpeed = 0.4f;
+
+	/** Seconds of continuous sight before the alarm. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0"))
+	float DetectionTime = 1.2f;
+
+	/** Seconds between two alarms. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0"))
+	float AlarmCooldown = 10.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
+	FLinearColor IdleColor = FLinearColor(1.f, 1.f, 1.f, 0.25f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
+	FLinearColor AlertColor = FLinearColor(1.f, 0.05f, 0.05f, 0.4f);
+
+	UPROPERTY(ReplicatedUsing=OnRep_Visuals)
+	bool bDisabled = false;
+
+	UPROPERTY(ReplicatedUsing=OnRep_Visuals)
+	bool bSeeingIntruder = false;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> ColorMaterials;
+
+	UFUNCTION() void OnRep_Visuals();
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnAlarm(AActor* Intruder);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnSeeingChanged(bool bSeeing);
+
+	APawn* FindIntruder() const;
+	void RaiseAlarm(APawn* Intruder);
+
+	float SweepTime = 0.f;
+	float SeenTime = 0.f;
+	float LastAlarmTime = -1000.f;
+	FRotator BaseHeadRotation;
+};
+
+/** Screen showing one camera's view. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenSecurityMonitor : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenSecurityMonitor();
+	virtual void BeginPlay() override;
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Screen;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Monitor")
+	TObjectPtr<AHitmenSecurityCamera> LinkedCamera;
+
+	/** Material slot index of the screen and its texture parameter name. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Monitor")
+	int32 ScreenMaterialIndex = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Monitor")
+	FName ScreenTextureParameter = TEXT("ScreenTexture");
+
+	/** Only refresh when a local player is this close (performance). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Monitor", meta=(ClampMin="0"))
+	float RefreshDistance = 1500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Monitor", meta=(ClampMin="0.02"))
+	float RefreshInterval = 0.2f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextureRenderTarget2D> RenderTarget;
+
+	void Refresh();
+
+	FTimerHandle RefreshTimer;
+};
+
+/** Control room console: disables / enables every linked camera. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenControlConsole : public AHitmenInteractableBase, public IHitmenRemoteActivatable
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenControlConsole();
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	virtual bool CanRemoteActivate_Implementation() const override { return true; }
+	virtual void RemoteActivate_Implementation(AActor* Activator) override { OnInteracted(Activator); }
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console")
+	TArray<TObjectPtr<AHitmenSecurityCamera>> LinkedCameras;
+
+	UPROPERTY(Replicated)
+	bool bCamerasDisabled = false;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void OnInteracted(AActor* Interactor) override;
+};
+
+/** Auto turret. Shoots players; once hacked it shoots for the hacker's side. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenTurret : public AActor, public IHitmenTeamMember
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenTurret();
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void Tick(float DeltaSeconds) override;
+	virtual int32 GetHitmenTeamId_Implementation() const override { return TeamId; }
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Turret")
+	void Hack(AActor* Hacker);
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Turret")
+	bool IsHacked() const { return bHacked; }
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<USceneComponent> Root;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Base;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Head;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0", Units="cm"))
+	float Range = 2500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0"))
+	float Damage = 8.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0.02"))
+	float FireInterval = 0.15f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0"))
+	float TurnSpeed = 120.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0"))
+	float AimErrorDegrees = 2.f;
+
+	UPROPERTY(Replicated)
+	int32 TeamId = HitmenTeams::NPC;
+
+	UPROPERTY(Replicated)
+	bool bHacked = false;
+
+	UPROPERTY(Replicated)
+	TObjectPtr<AActor> CurrentTarget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> HackedBy;
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_Fire(FVector_NetQuantize Impact);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnFire(FVector Impact);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnHacked();
+
+	AActor* FindTarget() const;
+	float LastFireTime = 0.f;
+	float RetargetAccumulator = 0.f;
+};
+
+/** Wired panel that hacks its turret. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenHackPanel : public AHitmenInteractableBase, public IHitmenRemoteActivatable
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenHackPanel();
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+	virtual bool CanRemoteActivate_Implementation() const override;
+	virtual void RemoteActivate_Implementation(AActor* Activator) override { OnInteracted(Activator); }
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|HackPanel")
+	TObjectPtr<AHitmenTurret> LinkedTurret;
+
+	virtual void OnInteracted(AActor* Interactor) override;
+};
+
+/** A lamp; turned off by its circuit breaker. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenLightFixture : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenLightFixture();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Light")
+	void SetPowered(bool bPowered);
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Mesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UPointLightComponent> Light;
+
+	UPROPERTY(ReplicatedUsing=OnRep_Powered)
+	bool bPowered = true;
+
+	UFUNCTION() void OnRep_Powered();
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnPowerChanged(bool bOn);
+};
+
+/** Area that becomes dark when its breaker is off: NPCs cannot see inside it. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenBlackoutVolume : public AActor, public IHitmenDarkZone
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenBlackoutVolume();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	virtual bool IsLocationDark(const FVector& Location) const override;
+
+	void SetDark(bool bInDark) { bDark = bInDark; }
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UBoxComponent> Bounds;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category="Hitmen|Blackout")
+	bool bDark = false;
+};
+
+/** Circuit breaker: cuts power to its lights and darkens its volumes. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenCircuitBreaker : public AHitmenInteractableBase, public IHitmenRemoteActivatable
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenCircuitBreaker();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	virtual bool CanRemoteActivate_Implementation() const override { return true; }
+	virtual void RemoteActivate_Implementation(AActor* Activator) override { OnInteracted(Activator); }
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Breaker")
+	TArray<TObjectPtr<AHitmenLightFixture>> LinkedLights;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Breaker")
+	TArray<TObjectPtr<AHitmenBlackoutVolume>> LinkedVolumes;
+
+	UPROPERTY(Replicated)
+	bool bPowered = true;
+
+	virtual void OnInteracted(AActor* Interactor) override;
+};

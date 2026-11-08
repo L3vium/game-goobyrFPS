@@ -332,6 +332,16 @@ void UHitmenAbility_Hook::Pull(float DeltaTime)
 // Transposition
 // ---------------------------------------------------------------------------------------------
 
+AActor* UHitmenAbility_Transposition::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
+{
+	if (AHitmenCharacterBase* Target = AimCharacter(Origin, Direction))
+	{
+		OutAction = NSLOCTEXT("Hitmen", "HintTransposition", "Swap places");
+		return Target;
+	}
+	return nullptr;
+}
+
 bool UHitmenAbility_Transposition::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
 	AHitmenCharacterBase* Self = GetOwnerCharacter();

@@ -2,6 +2,7 @@
 
 #include "Components/HitmenMeleeComponent.h"
 #include "Characters/HitmenCharacterBase.h"
+#include "Characters/HitmenPlayerCharacter.h"
 #include "Components/HitmenHealthComponent.h"
 #include "Data/HitmenAnimSet.h"
 #include "Core/HitmenTeamLibrary.h"
@@ -27,7 +28,25 @@ void UHitmenMeleeComponent::Punch()
 		return;
 	}
 	LastPunchTime = GetWorld()->GetTimeSeconds();
+	// Predicted on the puncher: arms show at once, the server confirms the hit.
+	PlayPunchLocal();
 	Server_Punch();
+}
+
+void UHitmenMeleeComponent::PlayPunchLocal()
+{
+	AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(GetOwner());
+	if (!Character || GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	const UHitmenAnimSet* Set = Character->GetAnimSet();
+	const float Length = Character->PlayCosmeticMontage(Set ? Set->PunchMontage.Get() : nullptr, PunchPlayRate);
+	if (AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Character); Player && Player->IsLocallyControlled())
+	{
+		Player->ShowFirstPersonArms(FMath::Max(Length / FMath::Max(PunchPlayRate, 0.1f), PunchCooldown) + 0.2f);
+	}
+	Juice_OnPunch();
 }
 
 void UHitmenMeleeComponent::Server_Punch_Implementation()
@@ -55,12 +74,13 @@ void UHitmenMeleeComponent::Server_Punch_Implementation()
 
 void UHitmenMeleeComponent::Multicast_PlayPunch_Implementation()
 {
-	const AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(GetOwner());
-	if (Character && Character->GetAnimSet() && Character->GetAnimSet()->PunchMontage && Character->GetMesh()->GetAnimInstance())
+	// The puncher already played it (prediction).
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	if (Pawn && Pawn->IsLocallyControlled() && Pawn->IsPlayerControlled())
 	{
-		Character->GetMesh()->GetAnimInstance()->Montage_Play(Character->GetAnimSet()->PunchMontage);
+		return;
 	}
-	Juice_OnPunch();
+	PlayPunchLocal();
 }
 
 bool UHitmenMeleeComponent::IsValidStealthKillVictim(const AHitmenCharacterBase* Victim) const

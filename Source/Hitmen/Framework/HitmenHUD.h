@@ -24,6 +24,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|HUD")
 	UUserWidget* GetPrimaryWidget() const { return PrimaryWidget; }
 
+	/** Front-end HUD (title, lobby): the cursor is always shown and gameplay keys are ignored. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|HUD")
+	bool IsMenuHUD() const { return bPrimaryIsMenu; }
+
+	/** Single owner of the input mode: menu HUD, pause, options, emote wheel, results. */
+	void RefreshInputMode();
+
 protected:
 	/** Always-on widget: title menu, lobby screen or match HUD. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|HUD")
@@ -63,5 +70,4 @@ protected:
 
 	UUserWidget* CreateHidden(TSubclassOf<UUserWidget> Class, int32 ZOrder);
 	void SetShown(UUserWidget* Widget, bool bShown);
-	void RefreshInputMode();
 };

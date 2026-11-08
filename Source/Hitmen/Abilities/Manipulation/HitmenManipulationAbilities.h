@@ -43,6 +43,7 @@ class HITMEN_API UHitmenAbility_RemoteDistraction : public UHitmenManipulationAb
 
 public:
 	UHitmenAbility_RemoteDistraction();
+	virtual AActor* FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const override;
 
 protected:
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
@@ -56,6 +57,7 @@ class HITMEN_API UHitmenAbility_Charm : public UHitmenManipulationAbility
 
 public:
 	UHitmenAbility_Charm();
+	virtual AActor* FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const override;
 
 protected:
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;

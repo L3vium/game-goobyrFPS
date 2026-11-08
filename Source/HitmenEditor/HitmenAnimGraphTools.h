@@ -9,6 +9,7 @@
 
 class UAnimBlueprint;
 class UHitmenAnimSet;
+class UAnimSequenceBase;
 
 UCLASS()
 class HITMENEDITOR_API UHitmenAnimGraphTools : public UBlueprintFunctionLibrary
@@ -44,4 +45,12 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
 	static bool EnsureSlotBeforeOutput(UAnimBlueprint* AnimBlueprint, FName SlotName = NAME_None, bool bCompile = true);
+
+	/**
+	 * Single-pose graph: Sequence Player (asset pin bound to PoseVariable, preview asset
+	 * PreviewPose) -> Slot (DefaultSlot) -> Output Pose. Used by ABP_FirstPersonArms. Leaves an
+	 * existing graph alone when it already has a sequence player wired to the variable.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
+	static bool BuildPoseSlotGraph(UAnimBlueprint* AnimBlueprint, UAnimSequenceBase* PreviewPose, FName PoseVariable, bool bCompile = true);
 };

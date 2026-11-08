@@ -24,7 +24,14 @@ enum class EHitmenAnimMontage : uint8
 	Interact,
 	Punch,
 	CallReinforcements,
-	SearchLookAround
+	SearchLookAround,
+	ClimbEnter,
+	ClimbExitTop,
+	LockerEnter,
+	LockerExit,
+	ZiplineEnter,
+	Pickpocket,
+	ParachuteLand
 };
 
 USTRUCT(BlueprintType)
@@ -98,6 +105,35 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Traversal")
 	TObjectPtr<UAnimMontage> VaultMontage;
 
+	/** Grabbing a ladder / gutter / pipe. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Traversal")
+	TObjectPtr<UAnimMontage> ClimbEnterMontage;
+
+	/** Pulling up over the top of a ladder / gutter / pipe. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Traversal")
+	TObjectPtr<UAnimMontage> ClimbExitTopMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Traversal")
+	TObjectPtr<UAnimMontage> ZiplineEnterMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Traversal")
+	TObjectPtr<UAnimMontage> LockerEnterMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Traversal")
+	TObjectPtr<UAnimMontage> LockerExitMontage;
+
+	/** Looping pose under the canopy during the match intro. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Traversal")
+	TObjectPtr<UAnimSequenceBase> ParachuteLoop;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Traversal")
+	TObjectPtr<UAnimMontage> ParachuteLandMontage;
+
+	// ---- First person (arms mesh, ABP_FirstPersonArms) ----
+	/** Arms pose with no weapon in hand (shown only while punching / acting). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|FirstPerson")
+	TObjectPtr<UAnimSequenceBase> FirstPersonUnarmedPose;
+
 	// ---- Combat ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Combat")
 	TObjectPtr<UAnimMontage> PunchMontage;
@@ -126,6 +162,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Combat")
 	TObjectPtr<UAnimMontage> InteractMontage;
+
+	/** Lifting a keycard from an unaware NPC. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Combat")
+	TObjectPtr<UAnimMontage> PickpocketMontage;
 
 	// ---- NPC ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|NPC")

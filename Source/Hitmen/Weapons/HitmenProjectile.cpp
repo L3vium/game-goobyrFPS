@@ -1,6 +1,10 @@
 // Hitmen — projectiles
 
 #include "Weapons/HitmenProjectile.h"
+#include "NiagaraComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "Characters/HitmenPlayerCharacter.h"
+#include "Data/HitmenSoundSet.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Abilities/HitmenAbilityActors.h"
 #include "Characters/HitmenCharacterBase.h"
@@ -55,6 +59,10 @@ void AHitmenProjectile::BeginPlay()
 	if (AActor* OwnerActor = GetOwner())
 	{
 		Collision->IgnoreActorWhenMoving(OwnerActor, true);
+	}
+	if (TrailEffect && GetNetMode() != NM_DedicatedServer)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAttached(TrailEffect, Mesh, NAME_None, FVector::ZeroVector, FRotator::ZeroRotator, EAttachLocation::SnapToTarget, true);
 	}
 	if (HasAuthority())
 	{
@@ -168,14 +176,30 @@ void AHitmenProjectile::Multicast_Impact_Implementation(FVector_NetQuantize Loca
 	USoundBase* Sound = bExploded ? ExplosionSound.Get() : ImpactSound.Get();
 	if (Effect)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Effect, Location);
+		const FVector Scale(bExploded ? ExplosionEffectScale : 1.f);
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Effect, Location, FRotator::ZeroRotator, Scale);
 	}
 	if (Sound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, Sound, Location);
 	}
+	else if (bExploded)
+	{
+		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::Explosion, Location);
+	}
 	if (bExploded)
 	{
+		// Shake the view of nearby local players.
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			const APlayerController* PC = It->Get();
+			AHitmenPlayerCharacter* Player = PC && PC->IsLocalController() ? Cast<AHitmenPlayerCharacter>(PC->GetPawn()) : nullptr;
+			const float Distance = Player ? FVector::Dist(Player->GetActorLocation(), Location) : BIG_NUMBER;
+			if (Player && Distance < ExplosionShakeRadius)
+			{
+				Player->AddCameraShake(ExplosionShakeIntensity * (1.f - Distance / ExplosionShakeRadius), 0.6f);
+			}
+		}
 		Juice_OnExplode(Location);
 	}
 	else

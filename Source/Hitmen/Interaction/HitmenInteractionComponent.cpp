@@ -1,6 +1,7 @@
 // Hitmen — interaction component
 
 #include "Interaction/HitmenInteractionComponent.h"
+#include "Characters/HitmenNPC.h"
 #include "Interaction/HitmenInteractable.h"
 #include "Components/HitmenMeleeComponent.h"
 #include "Characters/HitmenCharacterBase.h"
@@ -11,6 +12,8 @@
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "Components/MeshComponent.h"
+#include "Materials/MaterialInterface.h"
 
 UHitmenInteractionComponent::UHitmenInteractionComponent()
 {
@@ -21,33 +24,88 @@ UHitmenInteractionComponent::UHitmenInteractionComponent()
 void UHitmenInteractionComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	const APawn* Pawn = Cast<APawn>(GetOwner());
-	if (Pawn && Pawn->IsLocallyControlled())
-	{
-		GetWorld()->GetTimerManager().SetTimer(TraceTimer, this, &UHitmenInteractionComponent::UpdateFocus, TraceInterval, true);
-	}
+	// A respawned pawn begins play before it is possessed, so the trace cannot wait for local
+	// control here: it always runs (cheap, 12 Hz) and does nothing unless the pawn is the local
+	// player's (UpdateFocus).
+	StartFocusTrace();
 }
 
 void UHitmenInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	GetWorld()->GetTimerManager().ClearTimer(TraceTimer);
+	StopFocusTrace();
 	SetFocus(nullptr, FText::GetEmpty());
 	Super::EndPlay(EndPlayReason);
+}
+
+void UHitmenInteractionComponent::StartFocusTrace()
+{
+	if (UWorld* World = GetWorld(); World && World->GetNetMode() != NM_DedicatedServer && !World->GetTimerManager().IsTimerActive(TraceTimer))
+	{
+		World->GetTimerManager().SetTimer(TraceTimer, this, &UHitmenInteractionComponent::UpdateFocus, TraceInterval, true);
+	}
+}
+
+void UHitmenInteractionComponent::StopFocusTrace()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(TraceTimer);
+	}
+}
+
+void UHitmenInteractionComponent::SetActorHighlight(AActor* Actor, UMaterialInterface* OverlayMaterial, bool bEnabled)
+{
+	if (!Actor || !OverlayMaterial)
+	{
+		return;
+	}
+	TInlineComponentArray<UMeshComponent*> Meshes(Actor);
+	for (UMeshComponent* Mesh : Meshes)
+	{
+		if (!Mesh || !Mesh->IsVisible())
+		{
+			continue;
+		}
+		if (bEnabled)
+		{
+			Mesh->SetOverlayMaterial(OverlayMaterial);
+		}
+		else if (Mesh->GetOverlayMaterial() == OverlayMaterial)
+		{
+			Mesh->SetOverlayMaterial(nullptr);
+		}
+	}
 }
 
 void UHitmenInteractionComponent::UpdateFocus()
 {
 	APawn* Pawn = Cast<APawn>(GetOwner());
-	if (!Pawn || !Pawn->IsLocallyControlled())
+	if (!Pawn || !Pawn->IsLocallyControlled() || !Pawn->IsPlayerControlled())
 	{
+		// Not (or no longer) the local player's pawn: nothing focused, no prompt.
+		if (FocusedActor.IsValid() || !FocusedPrompt.IsEmpty())
+		{
+			SetFocus(nullptr, FText::GetEmpty());
+		}
+		return;
+	}
+	if (const AHitmenCharacterBase* Self = Cast<AHitmenCharacterBase>(Pawn); Self && Self->IsDead())
+	{
+		SetFocus(nullptr, FText::GetEmpty());
 		return;
 	}
 
-	// Stealth kill takes priority.
+	// Stealth kill takes priority (a keycard carrier is pickpocketed first: the kill comes after).
 	if (const UHitmenMeleeComponent* Melee = Pawn->FindComponentByClass<UHitmenMeleeComponent>())
 	{
 		if (AActor* Victim = Melee->FindStealthKillTarget())
 		{
+			const AHitmenNPC* NPC = Cast<AHitmenNPC>(Victim);
+			if (NPC && NPC->CanBePickpocketedBy(Pawn))
+			{
+				SetFocus(Victim, IHitmenInteractable::Execute_GetInteractionText(Victim, Pawn));
+				return;
+			}
 			SetFocus(Victim, NSLOCTEXT("Hitmen", "Eliminate", "Eliminate"));
 			return;
 		}
@@ -86,6 +144,13 @@ void UHitmenInteractionComponent::SetFocus(AActor* NewFocus, const FText& Prompt
 	}
 	FocusedActor = NewFocus;
 	FocusedPrompt = Prompt;
+	if (HighlightedActor.Get() != NewFocus)
+	{
+		SetActorHighlight(HighlightedActor.Get(), FocusOverlayMaterial, false);
+		// Bodies and NPCs (stealth kill, carry, pickpocket) glow too: they are what F acts on.
+		SetActorHighlight(NewFocus, FocusOverlayMaterial, true);
+		HighlightedActor = NewFocus;
+	}
 	OnFocusChanged.Broadcast(NewFocus, Prompt);
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Cast<APawn>(GetOwner())))
 	{
@@ -99,6 +164,11 @@ bool UHitmenInteractionComponent::TryInteract()
 	if (!Pawn)
 	{
 		return false;
+	}
+	if (const AHitmenNPC* NPC = Cast<AHitmenNPC>(FocusedActor.Get()); NPC && NPC->CanBePickpocketedBy(Pawn))
+	{
+		Server_Interact(FocusedActor.Get());
+		return true;
 	}
 	if (UHitmenMeleeComponent* Melee = Pawn->FindComponentByClass<UHitmenMeleeComponent>())
 	{

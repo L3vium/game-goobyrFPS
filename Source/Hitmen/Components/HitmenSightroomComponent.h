@@ -57,6 +57,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0.02", Units="s"))
 	float RefreshInterval = 0.15f;
 
+	/** Seconds for the world to fade into / out of the scan look. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0.01", Units="s"))
+	float FadeDuration = 0.35f;
+
 	/** Post-process material reading custom depth stencils (PP_Sightroom). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom|Juice")
 	TObjectPtr<UMaterialInterface> PostProcessMaterial;
@@ -77,5 +81,8 @@ protected:
 
 	bool bSightroomActive = false;
 	float ScanProgress = 0.f;
+	/** 0..1 blend of the post-process (fades out after release). */
+	float FadeAlpha = 0.f;
+	void ApplyPostProcess();
 	float RefreshAccumulator = 0.f;
 };

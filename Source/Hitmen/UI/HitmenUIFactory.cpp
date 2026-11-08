@@ -1,6 +1,13 @@
 // Hitmen — UI factory
 
 #include "UI/HitmenUIFactory.h"
+#include "Engine/Font.h"
+#include "Engine/World.h"
+#include "Data/HitmenMapDefinition.h"
+#include "Core/HitmenGameSettings.h"
+#include "Rendering/SlateRenderer.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/TextBlock.h"
 #include "Components/Button.h"
@@ -19,16 +26,139 @@
 
 namespace HitmenUI
 {
-	FLinearColor Background() { return FLinearColor(0.02f, 0.02f, 0.025f, 0.85f); }
-	FLinearColor Panel()      { return FLinearColor(0.06f, 0.06f, 0.07f, 0.92f); }
-	FLinearColor PanelLight() { return FLinearColor(0.14f, 0.14f, 0.16f, 0.95f); }
-	FLinearColor Text()       { return FLinearColor(0.96f, 0.96f, 0.96f, 1.f); }
-	FLinearColor TextDim()    { return FLinearColor(0.6f, 0.6f, 0.62f, 1.f); }
-	FLinearColor Accent()     { return FLinearColor(0.84f, 0.11f, 0.17f, 1.f); }
+	FLinearColor Background() { return FLinearColor(0.012f, 0.013f, 0.016f, 0.88f); }
+	FLinearColor Panel()      { return FLinearColor(0.03f, 0.033f, 0.04f, 0.9f); }
+	FLinearColor PanelLight() { return FLinearColor(0.085f, 0.09f, 0.1f, 0.92f); }
+	FLinearColor Text()       { return FLinearColor(0.95f, 0.95f, 0.95f, 1.f); }
+	FLinearColor TextDim()    { return FLinearColor(0.52f, 0.54f, 0.58f, 1.f); }
+	FLinearColor Accent()     { return FLinearColor(0.80f, 0.06f, 0.08f, 1.f); }
+	FLinearColor Hairline()   { return FLinearColor(1.f, 1.f, 1.f, 0.16f); }
+	FLinearColor Warning()    { return FLinearColor(1.f, 0.74f, 0.08f, 1.f); }
+
+	static const UObject* GetUIFont()
+	{
+		static TWeakObjectPtr<const UObject> Cached;
+		static bool bTried = false;
+		if (!Cached.IsValid() && !bTried)
+		{
+			bTried = true;
+			Cached = LoadObject<UObject>(nullptr, TEXT("/Game/Hitmen/UI/Fonts/FNT_Barlow.FNT_Barlow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		}
+		return Cached.Get();
+	}
 
 	FSlateFontInfo Font(int32 Size, FName Typeface)
 	{
-		return FCoreStyle::GetDefaultFontStyle(Typeface, Size);
+		if (const UObject* FontObject = GetUIFont())
+		{
+			const FName Face = Typeface == TEXT("Black") ? FName(TEXT("Bold")) : Typeface;
+			return FSlateFontInfo(FontObject, Size, Face);
+		}
+		return FCoreStyle::GetDefaultFontStyle(Typeface == TEXT("SemiBold") || Typeface == TEXT("Medium") ? FName(TEXT("Bold")) : Typeface, Size);
+	}
+
+	FSlateFontInfo SpacedFont(int32 Size, FName Typeface, int32 LetterSpacing)
+	{
+		FSlateFontInfo Info = Font(Size, Typeface);
+		Info.LetterSpacing = LetterSpacing;
+		return Info;
+	}
+
+	FVector2D MeasureText(const FString& InText, const FSlateFontInfo& FontInfo)
+	{
+		const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+		return Measure->Measure(InText, FontInfo);
+	}
+
+	void PaintLine(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D A, FVector2D B, const FLinearColor& Color, float Thickness)
+	{
+		TArray<FVector2D> Points = { A, B };
+		FSlateDrawElement::MakeLines(Out, Layer, Geo.ToPaintGeometry(), Points, ESlateDrawEffect::None, Color, true, Thickness);
+	}
+
+	void PaintLines(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const TArray<FVector2D>& Points, const FLinearColor& Color, float Thickness)
+	{
+		FSlateDrawElement::MakeLines(Out, Layer, Geo.ToPaintGeometry(), Points, ESlateDrawEffect::None, Color, true, Thickness);
+	}
+
+	void PaintBox(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Position, FVector2D Size, const FLinearColor& Color)
+	{
+		FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(FVector2f(Size), FSlateLayoutTransform(FVector2f(Position))), FCoreStyle::Get().GetBrush("WhiteBrush"), ESlateDrawEffect::None, Color);
+	}
+
+	void PaintFrame(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Position, FVector2D Size, const FLinearColor& Color, float Thickness)
+	{
+		const FVector2D A = Position;
+		const FVector2D B = Position + FVector2D(Size.X, 0.f);
+		const FVector2D C = Position + Size;
+		const FVector2D D = Position + FVector2D(0.f, Size.Y);
+		PaintLines(Out, Layer, Geo, { A, B, C, D, A }, Color, Thickness);
+	}
+
+	void PaintArc(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Radius, float StartDeg, float EndDeg, const FLinearColor& Color, float Thickness, int32 Segments)
+	{
+		TArray<FVector2D> Points;
+		for (int32 Index = 0; Index <= Segments; ++Index)
+		{
+			const float Angle = FMath::DegreesToRadians(FMath::Lerp(StartDeg, EndDeg, static_cast<float>(Index) / Segments));
+			Points.Add(Center + FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)) * Radius);
+		}
+		PaintLines(Out, Layer, Geo, Points, Color, Thickness);
+	}
+
+	FVector2D PaintText(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FString& InText, FVector2D Position, const FSlateFontInfo& FontInfo, const FLinearColor& Color)
+	{
+		const FVector2D Size = MeasureText(InText, FontInfo);
+		FSlateDrawElement::MakeText(Out, Layer, Geo.ToPaintGeometry(FVector2f(Size + FVector2D(4.f, 2.f)), FSlateLayoutTransform(FVector2f(Position))), InText, FontInfo, ESlateDrawEffect::None, Color);
+		return Size;
+	}
+
+	void PaintGradient(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Position, FVector2D Size, const FLinearColor& From, const FLinearColor& To, bool bHorizontal)
+	{
+		TArray<FSlateGradientStop> Stops;
+		Stops.Add(FSlateGradientStop(FVector2D::ZeroVector, From));
+		Stops.Add(FSlateGradientStop(bHorizontal ? FVector2D(Size.X, 0.f) : FVector2D(0.f, Size.Y), To));
+		FSlateDrawElement::MakeGradient(Out, Layer, Geo.ToPaintGeometry(FVector2f(Size), FSlateLayoutTransform(FVector2f(Position))), Stops,
+			bHorizontal ? Orient_Vertical : Orient_Horizontal, ESlateDrawEffect::None);
+	}
+
+	FVector2D PaintKey(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FString& Key, FVector2D Position, int32 FontSize, float Alpha)
+	{
+		const FSlateFontInfo KeyFont = Font(FontSize, TEXT("SemiBold"));
+		const FVector2D TextSize = MeasureText(Key, KeyFont);
+		const float Height = FontSize * 1.55f;
+		const FVector2D Size(FMath::Max(Height, TextSize.X + FontSize * 0.9f), Height);
+		PaintBox(Out, Layer, Geo, Position, Size, FLinearColor(1.f, 1.f, 1.f, 0.92f * Alpha));
+		PaintText(Out, Layer + 1, Geo, Key, Position + (Size - TextSize) * 0.5f, KeyFont, FLinearColor(0.02f, 0.02f, 0.025f, Alpha));
+		return Size;
+	}
+
+	void PaintImage(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FSlateBrush* Brush, FVector2D Position, FVector2D Size, const FLinearColor& Tint)
+	{
+		if (Brush)
+		{
+			FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(FVector2f(Size), FSlateLayoutTransform(FVector2f(Position))), Brush, ESlateDrawEffect::None, Tint);
+		}
+	}
+
+	const UHitmenMapDefinition* FindCurrentMap(const UObject* WorldContext)
+	{
+		const UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
+		if (!World)
+		{
+			return nullptr;
+		}
+		const FString Current = UWorld::RemovePIEPrefix(World->GetOutermost()->GetName());
+		const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+		for (int32 Index = 0; Index < Settings->Maps.Num(); ++Index)
+		{
+			const UHitmenMapDefinition* Map = Settings->LoadMap(Index);
+			if (Map && Map->Level.ToSoftObjectPath().GetLongPackageName() == Current)
+			{
+				return Map;
+			}
+		}
+		return nullptr;
 	}
 
 	UTextBlock* MakeText(UWidgetTree* Tree, const FText& InText, int32 Size, FName Typeface, FLinearColor Color)

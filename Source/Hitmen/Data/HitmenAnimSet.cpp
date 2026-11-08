@@ -16,6 +16,13 @@ UAnimMontage* UHitmenAnimSet::GetMontage(EHitmenAnimMontage Montage, int32 Varia
 	case EHitmenAnimMontage::Punch:              return PunchMontage;
 	case EHitmenAnimMontage::CallReinforcements: return CallReinforcementsMontage;
 	case EHitmenAnimMontage::SearchLookAround:   return SearchLookAroundMontage;
+	case EHitmenAnimMontage::ClimbEnter:         return ClimbEnterMontage;
+	case EHitmenAnimMontage::ClimbExitTop:       return ClimbExitTopMontage;
+	case EHitmenAnimMontage::LockerEnter:        return LockerEnterMontage;
+	case EHitmenAnimMontage::LockerExit:         return LockerExitMontage;
+	case EHitmenAnimMontage::ZiplineEnter:       return ZiplineEnterMontage;
+	case EHitmenAnimMontage::Pickpocket:         return PickpocketMontage ? PickpocketMontage.Get() : InteractMontage.Get();
+	case EHitmenAnimMontage::ParachuteLand:      return ParachuteLandMontage;
 	default:                                     return nullptr;
 	}
 }

@@ -1,6 +1,10 @@
 // Hitmen — security fixtures
 
 #include "World/Interactables/HitmenSecurity.h"
+#include "Engine/StaticMesh.h"
+#include "UObject/ConstructorHelpers.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Data/HitmenSoundSet.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Hitmen.h"
@@ -62,7 +66,9 @@ void AHitmenSecurityCamera::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 void AHitmenSecurityCamera::BeginPlay()
 {
 	Super::BeginPlay();
-	BaseHeadRotation = Head->GetRelativeRotation();
+	// Cameras watch the floor: the cone ends in a round footprint where it meets the ground.
+	BaseHeadRotation = Head->GetRelativeRotation() + FRotator(-LookDownAngle, 0.f, 0.f);
+	Head->SetRelativeRotation(BaseHeadRotation);
 	Capture->FOVAngle = ViewHalfAngle * 2.f;
 
 	// Cone length / width follow the view settings (default mesh: engine cone pointing up).
@@ -71,21 +77,8 @@ void AHitmenSecurityCamera::BeginPlay()
 	ViewCone->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
 	ViewCone->SetRelativeScale3D(FVector(Radius / 50.f, Radius / 50.f, ViewDistance / 100.f));
 
-	// Footprint on the floor: project straight down where the cone hits the ground.
-	FHitResult Ground;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenCameraFloor), false, this);
-	const FVector Eye = Head->GetComponentLocation();
-	const FVector Along = Eye + Head->GetForwardVector() * ViewDistance;
-	FVector FloorPoint = Along;
-	if (GetWorld()->LineTraceSingleByChannel(Ground, Eye, Along, ECC_Visibility, Params))
-	{
-		FloorPoint = Ground.ImpactPoint;
-	}
-	const float FootRadius = FMath::Tan(FMath::DegreesToRadians(ViewHalfAngle)) * FVector::Dist(Eye, FloorPoint);
 	FloorDecal->SetUsingAbsoluteRotation(true);
-	FloorDecal->SetWorldLocation(FloorPoint);
-	FloorDecal->SetWorldRotation(FRotator(-90.f, Head->GetComponentRotation().Yaw, 0.f));
-	FloorDecal->DecalSize = FVector(400.f, FootRadius, FootRadius);
+	UpdateFootprint();
 
 	for (UMeshComponent* MeshComp : { static_cast<UMeshComponent*>(ViewCone.Get()) })
 	{
@@ -102,6 +95,23 @@ void AHitmenSecurityCamera::BeginPlay()
 	SetActorTickEnabled(HasAuthority() || SweepAngle > 0.f);
 }
 
+void AHitmenSecurityCamera::UpdateFootprint()
+{
+	// Where the cone axis meets the ground: a disc whose radius matches the cone there.
+	FHitResult Ground;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenCameraFloor), false, this);
+	const FVector Eye = Head->GetComponentLocation();
+	const FVector Along = Eye + Head->GetForwardVector() * ViewDistance;
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(Ground, Eye, Along, ECC_Visibility, Params);
+	const FVector FloorPoint = bHit ? Ground.ImpactPoint : Along;
+	const float FootRadius = FMath::Tan(FMath::DegreesToRadians(ViewHalfAngle)) * FVector::Dist(Eye, FloorPoint);
+	FloorDecal->SetVisibility(bHit && !bDisabled);
+	FloorDecal->SetWorldLocation(FloorPoint);
+	FloorDecal->SetWorldRotation(FRotator(-90.f, Head->GetComponentRotation().Yaw, 0.f));
+	FloorDecal->DecalSize = FVector(120.f, FootRadius, FootRadius);
+	FloorDecal->MarkRenderStateDirty();
+}
+
 void AHitmenSecurityCamera::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -115,6 +125,7 @@ void AHitmenSecurityCamera::Tick(float DeltaSeconds)
 		SweepTime += DeltaSeconds * SweepSpeed;
 		const float Yaw = FMath::Sin(SweepTime) * SweepAngle * 0.5f;
 		Head->SetRelativeRotation(BaseHeadRotation + FRotator(0.f, Yaw, 0.f));
+		UpdateFootprint();
 	}
 	if (!HasAuthority())
 	{
@@ -291,12 +302,78 @@ void AHitmenSecurityMonitor::Refresh()
 AHitmenControlConsole::AHitmenControlConsole()
 {
 	InteractionText = NSLOCTEXT("Hitmen", "DisableCameras", "Disable cameras");
+	Screen = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Screen"));
+	Screen->SetupAttachment(Root);
+	// Above the back of the desk, facing the operator (+X), parallel to the desk front.
+	Screen->SetRelativeLocation(FVector(-18.f, 0.f, 145.f));
+	Screen->SetRelativeScale3D(FVector(0.04f, 0.95f, 0.55f));
+	Screen->SetCollisionResponseToChannel(HITMEN_TRACE_INTERACT, ECR_Block);
 }
 
 void AHitmenControlConsole::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHitmenControlConsole, bCamerasDisabled);
+}
+
+void AHitmenControlConsole::BeginPlay()
+{
+	Super::BeginPlay();
+	if (GetNetMode() == NM_DedicatedServer || LinkedCameras.IsEmpty())
+	{
+		return;
+	}
+	RenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(this, 512, 288);
+	FeedMaterial = Screen->CreateDynamicMaterialInstance(0);
+	if (FeedMaterial)
+	{
+		FeedMaterial->SetTextureParameterValue(ScreenTextureParameter, RenderTarget);
+	}
+	ApplyScreenState();
+}
+
+void AHitmenControlConsole::OnRep_CamerasDisabled()
+{
+	ApplyScreenState();
+}
+
+void AHitmenControlConsole::ApplyScreenState()
+{
+	if (GetNetMode() == NM_DedicatedServer || !RenderTarget)
+	{
+		return;
+	}
+	if (bCamerasDisabled)
+	{
+		GetWorldTimerManager().ClearTimer(RefreshTimer);
+		if (UMaterialInterface* NoSignal = NoSignalMaterial.LoadSynchronous())
+		{
+			Screen->SetMaterial(0, NoSignal);
+		}
+		return;
+	}
+	if (FeedMaterial)
+	{
+		Screen->SetMaterial(0, FeedMaterial);
+	}
+	GetWorldTimerManager().SetTimer(RefreshTimer, this, &AHitmenControlConsole::RefreshScreen, RefreshInterval, true);
+	RefreshScreen();
+}
+
+void AHitmenControlConsole::RefreshScreen()
+{
+	FeedTime += RefreshInterval;
+	if (FeedTime >= FeedCycleTime)
+	{
+		FeedTime = 0.f;
+		FeedIndex = (FeedIndex + 1) % FMath::Max(1, LinkedCameras.Num());
+	}
+	const APawn* LocalPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+	AHitmenSecurityCamera* Camera = LinkedCameras.IsValidIndex(FeedIndex) ? LinkedCameras[FeedIndex].Get() : nullptr;
+	if (Camera && LocalPawn && FVector::Dist(LocalPawn->GetActorLocation(), GetActorLocation()) <= RefreshDistance)
+	{
+		Camera->CaptureTo(RenderTarget);
+	}
 }
 
 FText AHitmenControlConsole::GetInteractionText_Implementation(AActor* Interactor) const
@@ -307,6 +384,8 @@ FText AHitmenControlConsole::GetInteractionText_Implementation(AActor* Interacto
 void AHitmenControlConsole::OnInteracted(AActor* Interactor)
 {
 	bCamerasDisabled = !bCamerasDisabled;
+	OnRep_CamerasDisabled();
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::Hack, GetActorLocation());
 	for (AHitmenSecurityCamera* Camera : LinkedCameras)
 	{
 		if (Camera)
@@ -333,6 +412,47 @@ AHitmenTurret::AHitmenTurret()
 	Head = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Head"));
 	Head->SetupAttachment(Root);
 	Head->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
+	Head->SetCollisionResponseToChannel(HITMEN_TRACE_INTERACT, ECR_Block);
+	Base->SetCollisionResponseToChannel(HITMEN_TRACE_INTERACT, ECR_Block);
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	Barrel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Barrel"));
+	Barrel->SetupAttachment(Head);
+	Barrel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Laser = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Laser"));
+	Laser->SetupAttachment(Head);
+	Laser->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Laser->SetCastShadow(false);
+	Laser->SetVisibility(false);
+	if (Cylinder.Succeeded())
+	{
+		Barrel->SetStaticMesh(Cylinder.Object);
+		Laser->SetStaticMesh(Cylinder.Object);
+	}
+	Barrel->SetRelativeLocationAndRotation(FVector(45.f, 0.f, 0.f), FRotator(-90.f, 0.f, 0.f));
+	Barrel->SetRelativeScale3D(FVector(0.08f, 0.08f, 0.7f));
+}
+
+FText AHitmenTurret::GetInteractionText_Implementation(AActor* Interactor) const
+{
+	return NSLOCTEXT("Hitmen", "HackTurret", "Hack turret");
+}
+
+void AHitmenTurret::UpdateLaser()
+{
+	AActor* Target = CurrentTarget;
+	if (!Target || GetNetMode() == NM_DedicatedServer)
+	{
+		Laser->SetVisibility(false);
+		return;
+	}
+	const FVector Start = Head->GetComponentLocation();
+	const FVector End = Target->GetActorLocation();
+	const float Length = FVector::Dist(Start, End);
+	// The laser follows the head's aim (it sweeps onto the target while turning).
+	Laser->SetWorldLocationAndRotation(Start + Head->GetForwardVector() * Length * 0.5f, FRotationMatrix::MakeFromZ(Head->GetForwardVector()).Rotator());
+	Laser->SetWorldScale3D(FVector(0.012f, 0.012f, Length / 100.f));
+	Laser->SetVisibility(true);
 }
 
 void AHitmenTurret::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -396,6 +516,22 @@ void AHitmenTurret::Tick(float DeltaSeconds)
 		const FRotator Desired = (CurrentTarget->GetActorLocation() - Head->GetComponentLocation()).Rotation();
 		Head->SetWorldRotation(FMath::RInterpConstantTo(Head->GetComponentRotation(), Desired, DeltaSeconds, TurnSpeed));
 	}
+	if (BarrelRestLocation.IsZero())
+	{
+		BarrelRestLocation = Barrel->GetRelativeLocation();
+	}
+	BarrelOffset = FMath::FInterpTo(BarrelOffset, 0.f, DeltaSeconds, 14.f);
+	Barrel->SetRelativeLocation(BarrelRestLocation - FVector(BarrelOffset, 0.f, 0.f));
+	if (LastTarget.Get() != CurrentTarget)
+	{
+		LastTarget = CurrentTarget;
+		TargetAcquiredTime = GetWorld()->GetTimeSeconds();
+		if (CurrentTarget)
+		{
+			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::TurretLockOn, Head->GetComponentLocation());
+		}
+	}
+	UpdateLaser();
 	if (!HasAuthority())
 	{
 		return;
@@ -406,7 +542,8 @@ void AHitmenTurret::Tick(float DeltaSeconds)
 		RetargetAccumulator = 0.f;
 		CurrentTarget = FindTarget();
 	}
-	if (!CurrentTarget || GetWorld()->GetTimeSeconds() - LastFireTime < FireInterval)
+	if (!CurrentTarget || GetWorld()->GetTimeSeconds() - LastFireTime < FireInterval
+		|| GetWorld()->GetTimeSeconds() - TargetAcquiredTime < LockOnTime)
 	{
 		return;
 	}
@@ -433,6 +570,23 @@ void AHitmenTurret::Tick(float DeltaSeconds)
 
 void AHitmenTurret::Multicast_Fire_Implementation(FVector_NetQuantize Impact)
 {
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		BarrelOffset = BarrelKick;
+		const FVector Muzzle = Barrel->GetComponentLocation() + Head->GetForwardVector() * 40.f;
+		if (MuzzleFX)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, MuzzleFX, Muzzle, Head->GetComponentRotation());
+		}
+		if (ImpactFX)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ImpactFX, Impact);
+		}
+		if (FireSound)
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, FireSound, Muzzle);
+		}
+	}
 	Juice_OnFire(Impact);
 }
 

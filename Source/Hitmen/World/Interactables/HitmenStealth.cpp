@@ -1,6 +1,11 @@
 // Hitmen — stealth fixtures
 
 #include "World/Interactables/HitmenStealth.h"
+#include "Data/HitmenAnimSet.h"
+#include "GameFramework/PlayerController.h"
+#include "Hitmen.h"
+#include "UObject/ConstructorHelpers.h"
+#include "World/HitmenGeometry.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "AI/HitmenAISubsystem.h"
@@ -18,13 +23,65 @@
 
 AHitmenLocker::AHitmenLocker()
 {
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	InteractionText = NSLOCTEXT("Hitmen", "Hide", "Hide");
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(HitmenGeometry::CubePath);
+	auto MakePanel = [this](const TCHAR* Name, USceneComponent* Parent)
+	{
+		UStaticMeshComponent* Panel = CreateDefaultSubobject<UStaticMeshComponent>(Name);
+		Panel->SetupAttachment(Parent);
+		if (Cube.Succeeded())
+		{
+			Panel->SetStaticMesh(Cube.Object);
+		}
+		Panel->SetCollisionProfileName(TEXT("BlockAllDynamic"));
+		Panel->SetCollisionResponseToChannel(HITMEN_TRACE_INTERACT, ECR_Block);
+		return Panel;
+	};
+	if (Cube.Succeeded())
+	{
+		Mesh->SetStaticMesh(Cube.Object);
+	}
+	PanelLeft = MakePanel(TEXT("PanelLeft"), Root);
+	PanelRight = MakePanel(TEXT("PanelRight"), Root);
+	PanelTop = MakePanel(TEXT("PanelTop"), Root);
+	PanelBottom = MakePanel(TEXT("PanelBottom"), Root);
+	DoorHinge = CreateDefaultSubobject<USceneComponent>(TEXT("DoorHinge"));
+	DoorHinge->SetupAttachment(Root);
+	DoorUpper = MakePanel(TEXT("DoorUpper"), DoorHinge);
+	DoorLower = MakePanel(TEXT("DoorLower"), DoorHinge);
 }
 
 void AHitmenLocker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHitmenLocker, Occupant);
+}
+
+void AHitmenLocker::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	const float T = WallThickness;
+	const float HalfD = Depth * 0.5f;
+	const float HalfW = Width * 0.5f;
+	HitmenGeometry::SetBox(Mesh, FVector(-HalfD + T * 0.5f, 0.f, Height * 0.5f), FVector(T, Width, Height));
+	HitmenGeometry::SetBox(PanelLeft, FVector(0.f, -HalfW + T * 0.5f, Height * 0.5f), FVector(Depth, T, Height));
+	HitmenGeometry::SetBox(PanelRight, FVector(0.f, HalfW - T * 0.5f, Height * 0.5f), FVector(Depth, T, Height));
+	HitmenGeometry::SetBox(PanelTop, FVector(0.f, 0.f, Height - T * 0.5f), FVector(Depth, Width, T));
+	HitmenGeometry::SetBox(PanelBottom, FVector(0.f, 0.f, T * 0.5f), FVector(Depth, Width, T));
+	// Door hinged on the front-left edge, split by the eye slit.
+	DoorHinge->SetRelativeLocation(FVector(HalfD - T * 0.5f, -HalfW, 0.f));
+	const float SlitBottom = SlitHeight - SlitGap * 0.5f;
+	const float SlitTop = SlitHeight + SlitGap * 0.5f;
+	HitmenGeometry::SetBox(DoorLower, FVector(0.f, HalfW, SlitBottom * 0.5f), FVector(T, Width, SlitBottom));
+	HitmenGeometry::SetBox(DoorUpper, FVector(0.f, HalfW, (SlitTop + Height) * 0.5f), FVector(T, Width, Height - SlitTop));
+	for (UStaticMeshComponent* Panel : { PanelLeft.Get(), PanelRight.Get(), PanelTop.Get(), PanelBottom.Get(), DoorUpper.Get(), DoorLower.Get() })
+	{
+		HitmenGeometry::InheritLook(Panel, Mesh);
+	}
+	DoorHinge->SetRelativeRotation(FRotator::ZeroRotator);
 }
 
 bool AHitmenLocker::CanInteract_Implementation(AActor* Interactor) const
@@ -47,15 +104,78 @@ void AHitmenLocker::OnInteracted(AActor* Interactor)
 	if (Occupant == Character)
 	{
 		Character->GetStatusEffects()->RemoveStatus(EHitmenStatusEffect::Hidden);
-		Character->TeleportTo(GetActorTransform().TransformPosition(ExitOffset), Character->GetActorRotation());
-		Character->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
 		Occupant = nullptr;
-		return;
 	}
-	Occupant = Character;
-	Character->GetCharacterMovement()->StopMovementImmediately();
-	Character->TeleportTo(GetActorTransform().TransformPosition(InsideOffset), GetActorRotation());
-	Character->GetStatusEffects()->ApplyStatus(EHitmenStatusEffect::Hidden, 0.f, 1.f, this);
+	else
+	{
+		Occupant = Character;
+		Character->GetStatusEffects()->ApplyStatus(EHitmenStatusEffect::Hidden, 0.f, 1.f, this);
+	}
+	OnRep_Occupant();
+}
+
+void AHitmenLocker::OnRep_Occupant()
+{
+	if (AHitmenCharacterBase* Previous = AppliedOccupant.Get(); Previous && Previous != Occupant)
+	{
+		ApplyOccupant(Previous, false);
+	}
+	if (Occupant && AppliedOccupant.Get() != Occupant)
+	{
+		ApplyOccupant(Occupant, true);
+	}
+	AppliedOccupant = Occupant;
+	StartDoorCycle();
+	Juice_OnOccupantChanged(Occupant != nullptr);
+}
+
+void AHitmenLocker::ApplyOccupant(AHitmenCharacterBase* Character, bool bInside)
+{
+	UCharacterMovementComponent* Movement = Character->GetCharacterMovement();
+	if (bInside)
+	{
+		// Inside the hollow cabinet, facing out through the slit, unable to walk.
+		Character->MoveIgnoreActorAdd(this);
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+		const FRotator Facing(0.f, GetActorRotation().Yaw, 0.f);
+		Character->SetActorLocationAndRotation(GetActorTransform().TransformPosition(InsideOffset), Facing, false, nullptr, ETeleportType::TeleportPhysics);
+		if (APlayerController* PC = Cast<APlayerController>(Character->GetController()); PC && PC->IsLocalController())
+		{
+			PC->SetControlRotation(Facing);
+		}
+		Character->PlayCosmeticMontage(Character->GetAnimSet() ? Character->GetAnimSet()->GetMontage(EHitmenAnimMontage::LockerEnter) : nullptr);
+	}
+	else
+	{
+		Character->SetActorLocation(GetActorTransform().TransformPosition(ExitOffset), false, nullptr, ETeleportType::TeleportPhysics);
+		Character->MoveIgnoreActorRemove(this);
+		if (!Character->IsDead())
+		{
+			Movement->SetMovementMode(MOVE_Falling);
+		}
+		Character->PlayCosmeticMontage(Character->GetAnimSet() ? Character->GetAnimSet()->GetMontage(EHitmenAnimMontage::LockerExit) : nullptr);
+	}
+}
+
+void AHitmenLocker::StartDoorCycle()
+{
+	DoorCycleStart = GetWorld()->GetTimeSeconds();
+	SetActorTickEnabled(true);
+}
+
+void AHitmenLocker::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	const float Alpha = FMath::Clamp((GetWorld()->GetTimeSeconds() - DoorCycleStart) / DoorCycleTime, 0.f, 1.f);
+	// Opens, lets the occupant through, closes again (smooth).
+	const float Open = FMath::Sin(Alpha * PI);
+	DoorHinge->SetRelativeRotation(FRotator(0.f, -DoorOpenAngle * FMath::SmoothStep(0.f, 1.f, Open), 0.f));
+	if (Alpha >= 1.f)
+	{
+		DoorHinge->SetRelativeRotation(FRotator::ZeroRotator);
+		SetActorTickEnabled(false);
+	}
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -214,6 +214,10 @@ protected:
 	UFUNCTION()
 	void HandleMantleStarted(bool bIsVault);
 
+	/** CMC traversal event (owning client + server): climb enter / ladder top exit / zipline. */
+	UFUNCTION()
+	void HandleTraversalMontage(EHitmenAnimMontage Montage);
+
 	/** Inventory throw event (every machine): throw montage. */
 	UFUNCTION()
 	void HandleWeaponThrown(UHitmenWeaponData* Weapon);

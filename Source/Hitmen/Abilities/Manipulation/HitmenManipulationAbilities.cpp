@@ -74,6 +74,19 @@ UHitmenAbility_RemoteDistraction::UHitmenAbility_RemoteDistraction()
 	Range = 3000.f;
 }
 
+AActor* UHitmenAbility_RemoteDistraction::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
+{
+	FHitResult Hit;
+	AActor* Target = AimTrace(Origin, Direction, Hit, 30.f) ? Hit.GetActor() : nullptr;
+	if (Target && Target->GetClass()->ImplementsInterface(UHitmenRemoteActivatable::StaticClass())
+		&& IHitmenRemoteActivatable::Execute_CanRemoteActivate(Target))
+	{
+		OutAction = NSLOCTEXT("Hitmen", "HintRemoteActivate", "Activate remotely");
+		return Target;
+	}
+	return nullptr;
+}
+
 bool UHitmenAbility_RemoteDistraction::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
 	FHitResult Hit;
@@ -101,6 +114,16 @@ UHitmenAbility_Charm::UHitmenAbility_Charm()
 	Cooldown = 25.f;
 	Duration = 12.f;
 	Range = 2500.f;
+}
+
+AActor* UHitmenAbility_Charm::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
+{
+	if (AHitmenCharacterBase* Target = AimCharacter(Origin, Direction))
+	{
+		OutAction = NSLOCTEXT("Hitmen", "HintCharm", "Charm");
+		return Target;
+	}
+	return nullptr;
 }
 
 bool UHitmenAbility_Charm::Activate(const FVector& AimOrigin, const FVector& AimDirection)

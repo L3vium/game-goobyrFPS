@@ -1,6 +1,7 @@
 // Hitmen — sightroom
 
 #include "Components/HitmenSightroomComponent.h"
+#include "Data/HitmenSoundSet.h"
 #include "Interaction/HitmenScanRegistry.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Framework/HitmenGameState.h"
@@ -42,17 +43,18 @@ void UHitmenSightroomComponent::SetSightroomActive(bool bActive)
 		return;
 	}
 	bSightroomActive = bActive;
-	ScanProgress = 0.f;
-	RefreshAccumulator = RefreshInterval;
-	SetComponentTickEnabled(bActive);
-	if (UCameraComponent* Camera = GetCamera(); Camera && PostProcessInstance)
+	if (bActive)
 	{
-		Camera->PostProcessSettings.AddBlendable(PostProcessInstance, bActive ? 1.f : 0.f);
+		ScanProgress = 0.f;
 	}
+	RefreshAccumulator = RefreshInterval;
+	// Keeps ticking after release to fade the look out.
+	SetComponentTickEnabled(true);
 	if (!bActive)
 	{
 		ClearHighlights();
 	}
+	UHitmenSoundLibrary::PlayHitmenSound2D(this, bActive ? EHitmenSound::SightroomOn : EHitmenSound::SightroomOff);
 	Juice_OnSightroomChanged(bActive);
 	OnSightroomChanged.Broadcast(bActive);
 }
@@ -60,18 +62,43 @@ void UHitmenSightroomComponent::SetSightroomActive(bool bActive)
 void UHitmenSightroomComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	ScanProgress = FMath::Min(1.f, ScanProgress + DeltaTime / ScanDuration);
-	if (PostProcessInstance)
+	FadeAlpha = FMath::FInterpConstantTo(FadeAlpha, bSightroomActive ? 1.f : 0.f, DeltaTime, 1.f / FadeDuration);
+	if (bSightroomActive)
 	{
-		PostProcessInstance->SetScalarParameterValue(TEXT("ScanProgress"), ScanProgress);
-		PostProcessInstance->SetScalarParameterValue(TEXT("ScanRadius"), EnemyRadius * ScanProgress);
-		PostProcessInstance->SetVectorParameterValue(TEXT("ScanOrigin"), GetOwner()->GetActorLocation());
+		ScanProgress = FMath::Min(1.f, ScanProgress + DeltaTime / ScanDuration);
+	}
+	ApplyPostProcess();
+	if (!bSightroomActive)
+	{
+		if (FadeAlpha <= 0.f)
+		{
+			SetComponentTickEnabled(false);
+		}
+		return;
 	}
 	RefreshAccumulator += DeltaTime;
 	if (RefreshAccumulator >= RefreshInterval)
 	{
 		RefreshAccumulator = 0.f;
 		Refresh();
+	}
+}
+
+void UHitmenSightroomComponent::ApplyPostProcess()
+{
+	if (!PostProcessInstance)
+	{
+		return;
+	}
+	// The wave keeps travelling to the edge of the scan; the grid and the cool tint fade with FadeAlpha.
+	const float Eased = 1.f - FMath::Pow(1.f - ScanProgress, 3.f);
+	PostProcessInstance->SetScalarParameterValue(TEXT("ScanProgress"), ScanProgress);
+	PostProcessInstance->SetScalarParameterValue(TEXT("ScanRadius"), EnemyRadius * Eased);
+	PostProcessInstance->SetScalarParameterValue(TEXT("Fade"), FadeAlpha);
+	PostProcessInstance->SetVectorParameterValue(TEXT("ScanOrigin"), GetOwner()->GetActorLocation());
+	if (UCameraComponent* Camera = GetCamera())
+	{
+		Camera->PostProcessSettings.AddBlendable(PostProcessInstance, FadeAlpha > 0.f ? 1.f : 0.f);
 	}
 }
 

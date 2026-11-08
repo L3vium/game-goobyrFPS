@@ -7,6 +7,8 @@
 #include "Core/HitmenTypes.h"
 #include "HitmenAbilityComponent.generated.h"
 
+class UMaterialInterface;
+
 class UHitmenAbility;
 class UHitmenAbilityData;
 
@@ -22,6 +24,8 @@ public:
 	UHitmenAbilityComponent();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Abilities")
@@ -56,6 +60,21 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities", meta=(ClampMin="0.1", Units="s"))
 	float FailurePromptDuration = 1.5f;
+
+	/** Glow on remote-ability targets under the crosshair (overlay material). Empty = no glow. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities")
+	TObjectPtr<UMaterialInterface> HintOverlayMaterial;
+
+	/** Seconds between two target scans for the hint (local player only). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities", meta=(ClampMin="0.02", Units="s"))
+	float HintScanInterval = 0.1f;
+
+	/** Local: highlights the target the manipulation (then move) ability would act on. */
+	void UpdateTargetHint();
+	void ClearTargetHint();
+
+	FTimerHandle HintTimer;
+	TWeakObjectPtr<AActor> HintedActor;
 
 	FTimerHandle FailurePromptTimer;
 

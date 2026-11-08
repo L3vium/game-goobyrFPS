@@ -164,7 +164,7 @@ public:
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
-	/** True when the user stands behind the gun (the only side it can be used from). */
+	/** True when the user stands behind the gun. */
 	UFUNCTION(BlueprintPure, Category="Hitmen|MountedGun")
 	bool IsUserBehind(const AActor* User) const;
 
@@ -174,6 +174,17 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UCameraComponent> Camera;
+
+	/** Tripod and shield plate (engine shapes until the team assigns meshes). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Tripod;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Shield;
+
+	/** Off: the gun can only be used by someone standing behind it. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun")
+	bool bUsableFromAnySide = true;
 
 	/** Half of the firing arc. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="0", ClampMax="180", Units="deg"))

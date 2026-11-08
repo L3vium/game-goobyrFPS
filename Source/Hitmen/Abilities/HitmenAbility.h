@@ -40,6 +40,12 @@ public:
 
 	// ---- Owning client flow ----
 	virtual void LocalPress(const FVector& AimOrigin, const FVector& AimDirection) {}
+
+	/**
+	 * Local hint: what this ability would act on from this aim (it glows at range and the action
+	 * shows under it). Null = no hint (throwables, self abilities).
+	 */
+	virtual AActor* FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const { return nullptr; }
 	virtual void LocalRelease() {}
 	virtual void LocalTick(float DeltaTime) {}
 

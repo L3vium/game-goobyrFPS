@@ -62,6 +62,7 @@ void AHitmenCharacterBase::BeginPlay()
 	if (UHitmenCharacterMovementComponent* Movement = GetHitmenMovement())
 	{
 		Movement->OnMantleStarted.AddDynamic(this, &AHitmenCharacterBase::HandleMantleStarted);
+		Movement->OnTraversalMontage.AddDynamic(this, &AHitmenCharacterBase::HandleTraversalMontage);
 	}
 	if (UHitmenInventoryComponent* Inventory = FindComponentByClass<UHitmenInventoryComponent>())
 	{
@@ -147,6 +148,16 @@ void AHitmenCharacterBase::HandleMantleStarted(bool bIsVault)
 		return;
 	}
 	PlayCosmeticMontage(Asset);
+	// The event runs on the owning client and the server; simulated proxies get it from here.
+	if (HasAuthority())
+	{
+		Multicast_PlayAnimSetMontage(Montage, 0, true);
+	}
+}
+
+void AHitmenCharacterBase::HandleTraversalMontage(EHitmenAnimMontage Montage)
+{
+	PlayAnimSetMontageLocal(Montage);
 	// The event runs on the owning client and the server; simulated proxies get it from here.
 	if (HasAuthority())
 	{
@@ -358,8 +369,9 @@ void AHitmenCharacterBase::Multicast_DamageFeedback_Implementation(float Damage,
 void AHitmenCharacterBase::HandleDeath(AActor* Killer, AActor* DamageCauser, bool bHeadshot)
 {
 	GetCharacterMovement()->DisableMovement();
-	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
-	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	// The standing capsule would stay where the body fell from and block traces (F on the dropped
+	// gun, the body, sight lines): the ragdoll mesh is the body from now on.
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	if (HasAuthority())
 	{
 		DeathMontageIndex = ChooseDeathMontageIndex();

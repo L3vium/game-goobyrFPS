@@ -49,7 +49,19 @@ protected:
 	float MinFacingDot = 0.15f;
 };
 
-/** Cable between the actor and EndPoint; forward moves along your view. */
+/** Which way a zipline can be ridden. */
+UENUM(BlueprintType)
+enum class EHitmenZiplineDirection : uint8
+{
+	/** From either end to the other. */
+	Both,
+	/** Only from the actor (start) to EndPoint. */
+	StartToEnd,
+	/** Only from EndPoint back to the actor. */
+	EndToStart
+};
+
+/** Cable between the actor and EndPoint. F at an end rides it to the other end on its own. */
 UCLASS(Blueprintable)
 class HITMEN_API AHitmenZipline : public AHitmenInteractableBase, public IHitmenClimbable
 {
@@ -58,7 +70,13 @@ class HITMEN_API AHitmenZipline : public AHitmenInteractableBase, public IHitmen
 public:
 	AHitmenZipline();
 	virtual void OnConstruction(const FTransform& Transform) override;
-	virtual bool CanInteract_Implementation(AActor* Interactor) const override { return false; }
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	virtual float GetClimbOffset() const override { return LandingClearance; }
+
+	/** +1 = ride toward EndPoint, -1 = toward the start, 0 = not allowed from there. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Zipline")
+	float GetRideDirectionFrom(const FVector& Location) const;
 
 	virtual EHitmenClimbType GetClimbType() const override { return EHitmenClimbType::Zipline; }
 	virtual FVector GetClimbStart() const override { return GetActorLocation(); }
@@ -74,6 +92,26 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Zipline", meta=(ClampMin="0"))
 	float Speed = 900.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Zipline")
+	EHitmenZiplineDirection Direction = EHitmenZiplineDirection::Both;
+
+	/** The rider lets go this far before the anchor (lands on the platform, not in the post). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Zipline", meta=(ClampMin="0", Units="cm"))
+	float LandingClearance = 160.f;
+
+	/** Anchor posts at both ends (what F is used on). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> StartPost;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> EndPost;
+
+	/** Height of the posts below the cable anchors. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Zipline", meta=(ClampMin="0", Units="cm"))
+	float PostHeight = 260.f;
+
+	virtual void OnInteracted(AActor* Interactor) override;
 };
 
 /** Launches characters high. */

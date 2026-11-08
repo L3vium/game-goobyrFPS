@@ -1,6 +1,9 @@
 // Hitmen — openings
 
 #include "World/Interactables/HitmenOpenings.h"
+#include "Hitmen.h"
+#include "UObject/ConstructorHelpers.h"
+#include "World/HitmenGeometry.h"
 #include "World/Interactables/HitmenHazards.h"
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Characters/HitmenNPC.h"
@@ -116,7 +119,8 @@ FText AHitmenDoor::GetInteractionText_Implementation(AActor* Interactor) const
 {
 	if (!bOpen && !HasKeycard(Interactor))
 	{
-		return FText::Format(NSLOCTEXT("Hitmen", "Locked", "Locked - keycard {0}"), FText::AsNumber(RequiredKeycard));
+		// The action stays readable; the reason sits in brackets after it.
+		return FText::Format(NSLOCTEXT("Hitmen", "LockedDoor", "{0}  [Locked - Keycard {1}]"), OpenText, FText::AsNumber(RequiredKeycard));
 	}
 	return Super::GetInteractionText_Implementation(Interactor);
 }
@@ -154,17 +158,64 @@ AHitmenWindow::AHitmenWindow()
 {
 	OpenText = NSLOCTEXT("Hitmen", "OpenWindow", "Open window");
 	CloseText = NSLOCTEXT("Hitmen", "CloseWindow", "Close window");
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(HitmenGeometry::CubePath);
+	auto MakePiece = [this](const TCHAR* Name, USceneComponent* Parent)
+	{
+		UStaticMeshComponent* Piece = CreateDefaultSubobject<UStaticMeshComponent>(Name);
+		Piece->SetupAttachment(Parent);
+		if (Cube.Succeeded())
+		{
+			Piece->SetStaticMesh(Cube.Object);
+		}
+		Piece->SetCollisionProfileName(TEXT("BlockAllDynamic"));
+		Piece->SetCollisionResponseToChannel(HITMEN_TRACE_INTERACT, ECR_Block);
+		return Piece;
+	};
+	FrameTop = MakePiece(TEXT("FrameTop"), Root);
+	FrameLeft = MakePiece(TEXT("FrameLeft"), Root);
+	FrameRight = MakePiece(TEXT("FrameRight"), Root);
+	LeftHinge = CreateDefaultSubobject<USceneComponent>(TEXT("LeftHinge"));
+	LeftHinge->SetupAttachment(Root);
+	RightHinge = CreateDefaultSubobject<USceneComponent>(TEXT("RightHinge"));
+	RightHinge->SetupAttachment(Root);
+	LeftShutter = MakePiece(TEXT("LeftShutter"), LeftHinge);
+	RightShutter = MakePiece(TEXT("RightShutter"), RightHinge);
+	if (Cube.Succeeded())
+	{
+		Mesh->SetStaticMesh(Cube.Object);
+	}
 }
 
-void AHitmenWindow::BeginPlay()
+void AHitmenWindow::OnConstruction(const FTransform& Transform)
 {
-	Super::BeginPlay();
-	ClosedLocation = Mesh->GetRelativeLocation();
+	Super::OnConstruction(Transform);
+	// Origin = floor; the opening spans [SillHeight, SillHeight + Height] and [-Width/2, Width/2].
+	const float T = FrameThickness;
+	const float Z0 = SillHeight;
+	const float Z1 = SillHeight + Height;
+	HitmenGeometry::SetBox(Mesh, FVector(0.f, 0.f, Z0 - T * 0.5f), FVector(FrameDepth, Width + 2.f * T, T));
+	HitmenGeometry::SetBox(FrameTop, FVector(0.f, 0.f, Z1 + T * 0.5f), FVector(FrameDepth, Width + 2.f * T, T));
+	HitmenGeometry::SetBox(FrameLeft, FVector(0.f, -(Width + T) * 0.5f, (Z0 + Z1) * 0.5f), FVector(FrameDepth, T, Height));
+	HitmenGeometry::SetBox(FrameRight, FVector(0.f, (Width + T) * 0.5f, (Z0 + Z1) * 0.5f), FVector(FrameDepth, T, Height));
+	for (UStaticMeshComponent* Piece : { FrameTop.Get(), FrameLeft.Get(), FrameRight.Get() })
+	{
+		HitmenGeometry::InheritLook(Piece, Mesh);
+	}
+	// Hinges on the outer edges; each shutter covers half the opening.
+	LeftHinge->SetRelativeLocation(FVector(0.f, -Width * 0.5f, (Z0 + Z1) * 0.5f));
+	RightHinge->SetRelativeLocation(FVector(0.f, Width * 0.5f, (Z0 + Z1) * 0.5f));
+	HitmenGeometry::SetBox(LeftShutter, FVector(0.f, Width * 0.25f, 0.f), FVector(ShutterThickness, Width * 0.5f - 1.f, Height - 1.f));
+	HitmenGeometry::SetBox(RightShutter, FVector(0.f, -Width * 0.25f, 0.f), FVector(ShutterThickness, Width * 0.5f - 1.f, Height - 1.f));
+	ApplyOpenAlpha(bOpen ? 1.f : 0.f);
 }
 
 void AHitmenWindow::ApplyOpenAlpha(float Alpha)
 {
-	Mesh->SetRelativeLocation(ClosedLocation + FVector::UpVector * SlideDistance * Alpha);
+	// Both shutters swing toward the side away from the opener (OpenDirection).
+	const float Angle = ShutterOpenAngle * Alpha * OpenDirection;
+	LeftHinge->SetRelativeRotation(FRotator(0.f, -Angle, 0.f));
+	RightHinge->SetRelativeRotation(FRotator(0.f, Angle, 0.f));
 }
 
 // ---------------------------------------------------------------------------------------------

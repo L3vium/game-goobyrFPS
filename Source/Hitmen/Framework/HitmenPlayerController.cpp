@@ -5,6 +5,8 @@
 #include "Framework/HitmenGameState.h"
 #include "Framework/HitmenLobbyGameMode.h"
 #include "Framework/HitmenGameModeBase.h"
+#include "Framework/HitmenHUD.h"
+#include "Blueprint/UserWidget.h"
 #include "Core/HitmenInterfaces.h"
 #include "Core/HitmenUserSettings.h"
 #include "Core/HitmenTeamLibrary.h"
@@ -50,6 +52,19 @@ void AHitmenPlayerController::BeginPlay()
 	{
 		RefreshMappingContexts();
 		SendPreferredProfile();
+		// The HUD owns the input mode (menu screens keep the cursor); it may not exist yet.
+		RefreshInputMode();
+	}
+}
+
+void AHitmenPlayerController::RefreshInputMode()
+{
+	if (AHitmenHUD* HitmenHUD = Cast<AHitmenHUD>(GetHUD()))
+	{
+		HitmenHUD->RefreshInputMode();
+	}
+	else
+	{
 		SetMenuInputMode(false);
 	}
 }
@@ -614,9 +629,13 @@ void AHitmenPlayerController::HandlePause()
 		UI->SetOptionsOpen(false);
 		return;
 	}
-	const bool bOpen = !UI->IsPauseMenuOpen();
-	UI->SetPauseMenuOpen(bOpen);
-	SetMenuInputMode(bOpen);
+	// Front-end screens have no pause menu (Esc is handled by their own Back buttons).
+	if (const AHitmenHUD* HitmenHUD = Cast<AHitmenHUD>(GetHUD()); HitmenHUD && HitmenHUD->IsMenuHUD())
+	{
+		return;
+	}
+	// The HUD reacts to the toggle and sets the input mode.
+	UI->SetPauseMenuOpen(!UI->IsPauseMenuOpen());
 }
 
 void AHitmenPlayerController::HandleSpectatorMode()
@@ -632,10 +651,24 @@ void AHitmenPlayerController::SelectEmote(int32 EmoteIndex)
 	if (IHitmenInputReceiver* R = GetReceiver()) { R->Input_Emote(EmoteIndex); }
 }
 
-void AHitmenPlayerController::SetMenuInputMode(bool bMenu)
+void AHitmenPlayerController::SetMenuInputMode(bool bMenu, bool bUIOnly)
 {
-	if (bMenu)
+	if (bMenu && bUIOnly)
 	{
+		// Front end: the viewport never captures the mouse, so the cursor can't vanish on a click.
+		FInputModeUIOnly Mode;
+		if (const AHitmenHUD* HitmenHUD = Cast<AHitmenHUD>(GetHUD()); HitmenHUD && HitmenHUD->GetPrimaryWidget())
+		{
+			Mode.SetWidgetToFocus(HitmenHUD->GetPrimaryWidget()->TakeWidget());
+		}
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(Mode);
+		SetShowMouseCursor(true);
+		bEnableClickEvents = false;
+	}
+	else if (bMenu)
+	{
+		// In-match overlays (pause, options, results): game input keeps running (Esc closes).
 		FInputModeGameAndUI Mode;
 		Mode.SetHideCursorDuringCapture(false);
 		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);

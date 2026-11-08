@@ -118,6 +118,6 @@ void AHitmenHUD::RefreshInputMode()
 		return;
 	}
 	const bool bResults = ResultsWidget && ResultsWidget->IsVisible();
-	const bool bMenu = bPrimaryIsMenu || UI->IsPauseMenuOpen() || UI->IsOptionsOpen() || UI->IsEmoteWheelOpen() || bResults;
-	PC->SetMenuInputMode(bMenu);
+	const bool bOverlay = UI->IsPauseMenuOpen() || UI->IsOptionsOpen() || UI->IsEmoteWheelOpen() || bResults;
+	PC->SetMenuInputMode(bPrimaryIsMenu || bOverlay, bPrimaryIsMenu);
 }

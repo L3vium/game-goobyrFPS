@@ -76,6 +76,9 @@ public:
 	/** Server: world -> hand. The inventory then sets the slot and calls SetEquipped. */
 	void PickUp(APawn* NewOwner);
 
+	/** Server: a dropped weapon floats at this exact point (container shelves, racks). */
+	void StartHoveringAt(const FVector& Location, const FRotator& Rotation);
+
 	/** Any machine: re-applies the current state (the attach parent may have changed, e.g. on possession). */
 	void RefreshAttachment() { ApplyWeaponState(); }
 
@@ -97,7 +100,7 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	APawn* GetOwnerPawn() const { return OwnerPawn; }
 
-	/** Current spread half-angle (hip/aim + bloom), for the crosshair ring. */
+	/** Spread half-angle (hip or aim). Fixed: firing never widens it. */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	float GetCurrentSpread() const;
 
@@ -155,6 +158,10 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_WeaponState, BlueprintReadOnly, Category="Hitmen|Weapon")
 	EHitmenWeaponState WeaponState = EHitmenWeaponState::Holstered;
 
+	/** Dropped and settled: physics off, floating and turning (every machine bobs locally). */
+	UPROPERTY(ReplicatedUsing=OnRep_Hovering, BlueprintReadOnly, Category="Hitmen|Weapon")
+	bool bHovering = false;
+
 	/** Server: ammo carried while dropped (-1 = start ammo). */
 	UPROPERTY(Transient)
 	int32 DroppedAmmo = -1;
@@ -189,6 +196,32 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Visuals")
 	FVector PlaceholderScale = FVector(0.5f, 0.12f, 0.15f);
 
+	// ---- Lying in the world: once it lands it floats and turns (no physics) ----
+	/** Height of the weapon centre above the ground while floating. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0", Units="cm"))
+	float HoverHeight = 45.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0", Units="cm"))
+	float HoverBobAmplitude = 6.f;
+
+	/** Bob cycles per second. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0"))
+	float HoverBobFrequency = 0.6f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(Units="deg"))
+	float HoverSpinSpeed = 45.f;
+
+	/** Below this speed for SettleTime the physics stops and the weapon floats. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0", Units="cm/s"))
+	float SettleSpeed = 40.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0", Units="s"))
+	float SettleTime = 0.25f;
+
+	/** A drop that never settles (stuck on a slope) floats anyway after this long. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0", Units="s"))
+	float MaxFallTime = 3.f;
+
 	/**
 	 * Server: resolve one trigger pull. OutImpacts receives hit points for effects.
 	 * Charge is 0..1 for charge weapons, 1 otherwise.
@@ -210,6 +243,18 @@ protected:
 	UFUNCTION() void OnRep_WeaponData();
 	UFUNCTION() void OnRep_OwnerPawn();
 	UFUNCTION() void OnRep_WeaponState();
+	UFUNCTION() void OnRep_Hovering();
+
+	/** Server: physics off, lifted to the hover height above the ground under it. */
+	void StartHovering();
+	void ApplyHoverState();
+	void UpdateDropped(float DeltaSeconds);
+
+	/** The mesh that is shown (skeletal when there is one, else static). */
+	UPrimitiveComponent* GetVisualComponent() const;
+
+	/** First-person FOV / scale rendering while on the local player's arms. */
+	void SetFirstPersonVisuals(bool bFirstPerson);
 
 	/** Applies WeaponState on this machine: attach/hide/physics/collision, equip juice on transitions. */
 	void ApplyWeaponState();
@@ -283,7 +328,9 @@ protected:
 	int32 BurstRemaining = 0;
 	float LastFireTime = -100.f;
 	float LastServerFireTime = -100.f;
-	float CurrentBloom = 0.f;
+	float SlowTime = 0.f;
+	float DropTime = 0.f;
+	float HoverPhase = 0.f;
 	float ChargeStartTime = -1.f;
 	int32 ShotCounter = 0;
 	FVector DropCenter = FVector::ZeroVector;

@@ -5,9 +5,11 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-08
+
 ### Added
 - Unreal Engine 5.7 project replacing the Unity prototype; Unreal `.gitignore` and LFS
-  `.gitattributes` (lockable `.uasset`/`.umap`).
+  `.gitattributes` (LFS for `.uasset`/`.umap`, media and build binaries).
 - `docs/GAME.md` (design + architecture invariants), `docs/Conventions.md` (prefixes, folders,
   Blueprint colour code), this changelog, `CLAUDE.md`.
 - Module `Hitmen` (C++): core types, team rules, interfaces, `Project Settings > Hitmen`, player options, data assets (match rules, maps, weapons, abilities, cosmetics, anim sets, catalog); Steam/voice/trace-channel/surface config.

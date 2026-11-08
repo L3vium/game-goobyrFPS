@@ -160,9 +160,9 @@ void UHitmenPlayerEntryWidget::Refresh()
 		IconText->SetText(bGlyph ? FText::FromString(Catalog->FallbackIconGlyphs[Icon % Catalog->FallbackIconGlyphs.Num()])
 			: IconTexture ? FText::GetEmpty() : FText::Format(LOCTEXT("Icon", "#{0}"), FText::AsNumber(Icon + 1)));
 	}
-	if (IconButton && Catalog && !IconTexture && Catalog->FallbackIconColors.Num() > 0)
+	if (IconText && Catalog && !IconTexture && Catalog->FallbackIconColors.Num() > 0)
 	{
-		IconButton->SetBackgroundColor(Catalog->FallbackIconColors[Icon % Catalog->FallbackIconColors.Num()]);
+		IconText->SetColorAndOpacity(FSlateColor(Catalog->FallbackIconColors[Icon % Catalog->FallbackIconColors.Num()]));
 	}
 	if (WatcherButton)
 	{
@@ -384,9 +384,15 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	HitmenUI::AddToHBox(Carousel, NextMapButton);
 	HitmenUI::AddToVBox(Left, Carousel, FMargin(0.f, 6.f, 0.f, 20.f));
 	HitmenUI::AddToVBox(Left, HitmenUI::MakeText(WidgetTree, LOCTEXT("Options", "OPTIONS"), 18, TEXT("Bold"), HitmenUI::TextDim()));
+	// Options scroll inside the column, which stops above the bottom-left BACK button.
+	UScrollBox* OptionsScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
 	OptionsBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	HitmenUI::AddToVBox(Left, OptionsBox);
-	HitmenUI::AddToCanvas(LobbyCanvas, Left, FAnchors(0.f, 0.f), FVector2D(0.f, 110.f), FVector2D::ZeroVector);
+	OptionsScroll->AddChild(OptionsBox);
+	HitmenUI::AddToVBox(Left, OptionsScroll, FMargin(0.f, 4.f), /*bFill*/ true);
+	UCanvasPanelSlot* LeftSlot = HitmenUI::AddToCanvas(LobbyCanvas, Left, FAnchors(0.f, 0.f, 0.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
+	LeftSlot->SetAutoSize(false);
+	// Left, top, width, bottom margin (room for BACK).
+	LeftSlot->SetOffsets(FMargin(0.f, 110.f, 620.f, 90.f));
 
 	// Right: players and teams, vertical.
 	UScrollBox* RightScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());

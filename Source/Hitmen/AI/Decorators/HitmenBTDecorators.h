@@ -21,6 +21,9 @@ public:
 	virtual bool CalculateRawConditionValue(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) const override;
 	virtual FString GetStaticDescription() const override;
 
+	/** Used by the editor tree builder. */
+	void SetAllowedStates(const TArray<EHitmenAlertState>& InStates) { AllowedStates = InStates; }
+
 protected:
 	UPROPERTY(EditAnywhere, Category="Hitmen")
 	TArray<EHitmenAlertState> AllowedStates;

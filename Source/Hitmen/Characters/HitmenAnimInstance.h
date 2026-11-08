@@ -45,8 +45,8 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Anim") EHitmenAlertState AlertState = EHitmenAlertState::Unaware;
 
 	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim")
-	TObjectPtr<AHitmenCharacterBase> Character;
+	TObjectPtr<AHitmenCharacterBase> HitmenCharacter;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UHitmenCharacterMovementComponent> Movement;
+	TObjectPtr<UHitmenCharacterMovementComponent> HitmenMovement;
 };

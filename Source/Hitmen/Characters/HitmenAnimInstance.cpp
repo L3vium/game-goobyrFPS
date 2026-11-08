@@ -14,46 +14,46 @@
 void UHitmenAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
-	Character = Cast<AHitmenCharacterBase>(TryGetPawnOwner());
-	Movement = Character ? Character->GetHitmenMovement() : nullptr;
-	if (Character && !AnimSet)
+	HitmenCharacter = Cast<AHitmenCharacterBase>(TryGetPawnOwner());
+	HitmenMovement = HitmenCharacter ? HitmenCharacter->GetHitmenMovement() : nullptr;
+	if (HitmenCharacter && !AnimSet)
 	{
-		AnimSet = Character->GetAnimSet();
+		AnimSet = HitmenCharacter->GetAnimSet();
 	}
 }
 
 void UHitmenAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
-	if (!Character || !Movement)
+	if (!HitmenCharacter || !HitmenMovement)
 	{
 		return;
 	}
-	const FVector Velocity = Character->GetVelocity();
+	const FVector Velocity = HitmenCharacter->GetVelocity();
 	Speed = Velocity.Size2D();
-	Direction = UKismetAnimationLibrary::CalculateDirection(Velocity, Character->GetActorRotation());
-	AimPitch = FRotator::NormalizeAxis(Character->GetBaseAimRotation().Pitch);
-	bIsFalling = Movement->IsFalling();
-	bIsCrouching = Movement->IsCrouching();
-	bIsSprinting = Movement->IsSprinting();
-	bIsSliding = Movement->IsSliding();
-	bIsMantling = Movement->IsMantling();
-	bIsClimbing = Movement->IsClimbing();
-	const IHitmenClimbable* Climbable = Cast<IHitmenClimbable>(Movement->GetClimbTarget());
+	Direction = UKismetAnimationLibrary::CalculateDirection(Velocity, HitmenCharacter->GetActorRotation());
+	AimPitch = FRotator::NormalizeAxis(HitmenCharacter->GetBaseAimRotation().Pitch);
+	bIsFalling = HitmenMovement->IsFalling();
+	bIsCrouching = HitmenMovement->IsCrouching();
+	bIsSprinting = HitmenMovement->IsSprinting();
+	bIsSliding = HitmenMovement->IsSliding();
+	bIsMantling = HitmenMovement->IsMantling();
+	bIsClimbing = HitmenMovement->IsClimbing();
+	const IHitmenClimbable* Climbable = Cast<IHitmenClimbable>(HitmenMovement->GetClimbTarget());
 	bIsZiplining = bIsClimbing && Climbable && Climbable->GetClimbType() == EHitmenClimbType::Zipline;
-	ClimbAxis = Movement->GetClimbAxisInput();
-	bIsAiming = Character->IsAiming();
-	bIsDead = Character->IsDead();
+	ClimbAxis = HitmenMovement->GetClimbAxisInput();
+	bIsAiming = HitmenCharacter->IsAiming();
+	bIsDead = HitmenCharacter->IsDead();
 
-	const UHitmenInventoryComponent* Inventory = Character->FindComponentByClass<UHitmenInventoryComponent>();
+	const UHitmenInventoryComponent* Inventory = HitmenCharacter->FindComponentByClass<UHitmenInventoryComponent>();
 	bHasWeapon = Inventory ? Inventory->GetActiveWeapon() != nullptr : false;
-	if (const AHitmenNPC* NPC = Cast<AHitmenNPC>(Character))
+	if (const AHitmenNPC* NPC = Cast<AHitmenNPC>(HitmenCharacter))
 	{
 		bHasWeapon = NPC->GetWeapon() != nullptr;
 		AlertState = NPC->GetAlert() ? NPC->GetAlert()->GetAlertState() : EHitmenAlertState::Unaware;
 	}
-	const UHitmenBodyCarryComponent* Carry = Character->FindComponentByClass<UHitmenBodyCarryComponent>();
+	const UHitmenBodyCarryComponent* Carry = HitmenCharacter->FindComponentByClass<UHitmenBodyCarryComponent>();
 	bIsCarryingBody = Carry && Carry->IsCarrying();
-	bIsStunned = Character->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Stunned);
-	bIsAsleep = Character->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Asleep);
+	bIsStunned = HitmenCharacter->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Stunned);
+	bIsAsleep = HitmenCharacter->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Asleep);
 }

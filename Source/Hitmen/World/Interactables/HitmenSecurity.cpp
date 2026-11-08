@@ -71,6 +71,22 @@ void AHitmenSecurityCamera::BeginPlay()
 	ViewCone->SetRelativeRotation(FRotator(90.f, 0.f, 0.f));
 	ViewCone->SetRelativeScale3D(FVector(Radius / 50.f, Radius / 50.f, ViewDistance / 100.f));
 
+	// Footprint on the floor: project straight down where the cone hits the ground.
+	FHitResult Ground;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenCameraFloor), false, this);
+	const FVector Eye = Head->GetComponentLocation();
+	const FVector Along = Eye + Head->GetForwardVector() * ViewDistance;
+	FVector FloorPoint = Along;
+	if (GetWorld()->LineTraceSingleByChannel(Ground, Eye, Along, ECC_Visibility, Params))
+	{
+		FloorPoint = Ground.ImpactPoint;
+	}
+	const float FootRadius = FMath::Tan(FMath::DegreesToRadians(ViewHalfAngle)) * FVector::Dist(Eye, FloorPoint);
+	FloorDecal->SetUsingAbsoluteRotation(true);
+	FloorDecal->SetWorldLocation(FloorPoint);
+	FloorDecal->SetWorldRotation(FRotator(-90.f, Head->GetComponentRotation().Yaw, 0.f));
+	FloorDecal->DecalSize = FVector(400.f, FootRadius, FootRadius);
+
 	for (UMeshComponent* MeshComp : { static_cast<UMeshComponent*>(ViewCone.Get()) })
 	{
 		if (UMaterialInterface* Material = MeshComp->GetMaterial(0))

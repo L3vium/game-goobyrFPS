@@ -8,6 +8,8 @@
 #include "Movement/HitmenCharacterMovementComponent.h"
 #include "Framework/HitmenGameModeBase.h"
 #include "Framework/HitmenPlayerController.h"
+#include "Framework/HitmenGameState.h"
+#include "Data/HitmenMatchRules.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Interaction/HitmenScanRegistry.h"
 #include "Components/HitmenBodyCarryComponent.h"
@@ -150,6 +152,14 @@ float AHitmenCharacterBase::TakeDamage(float DamageAmount, FDamageEvent const& D
 	if (const AHitmenCharacterBase* InstigatorCharacter = Cast<AHitmenCharacterBase>(InstigatorActor))
 	{
 		Damage *= InstigatorCharacter->GetStatusEffects()->GetOutgoingDamageMultiplier();
+		// NPC shots scale with the difficulty chosen in the lobby.
+		if (!InstigatorCharacter->IsPlayerControlled() && GM)
+		{
+			if (const AHitmenGameState* GS = GetWorld()->GetGameState<AHitmenGameState>())
+			{
+				Damage *= GM->GetRules()->GetPreset(GS->GetLobbySettings().Difficulty).NPCDamageMultiplier;
+			}
+		}
 	}
 
 	const float Dealt = HealthComponent->ApplyDamage(Damage, InstigatorActor, DamageCauser, bHeadshot);

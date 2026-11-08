@@ -58,7 +58,7 @@ Shown under the map carousel. Every option has a default in the match rules data
 
 - Proximity voice chat (on/off)
 - Number of retrieval points
-- Difficulty (drives loot counts, AI parameters)
+- Difficulty (drives loot counts, AI parameters, NPC damage multiplier). NPCs stroll on patrol (170 cm/s), walk briskly when investigating or searching (320) and run in combat (480).
 - Sonar timing (interval start/end, ramp duration)
 
 ## 4. Flow & screens

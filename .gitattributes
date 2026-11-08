@@ -12,6 +12,7 @@
 *.inl     text eol=lf diff=cpp
 *.cs      text eol=lf diff=csharp
 *.py      text eol=lf diff=python
+*.sh      text eol=lf
 *.md      text eol=lf
 *.json    text eol=lf
 *.uproject text eol=lf

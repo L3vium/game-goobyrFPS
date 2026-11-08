@@ -79,6 +79,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC")
 	TSubclassOf<AHitmenKeycardPickup> KeycardPickupClass;
 
+	/** Walk speed per awareness: patrols stroll, searches walk briskly, combat runs. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Movement", meta=(ClampMin="0", Units="cm/s"))
+	float CalmWalkSpeed = 170.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Movement", meta=(ClampMin="0", Units="cm/s"))
+	float AlertWalkSpeed = 320.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Movement", meta=(ClampMin="0", Units="cm/s"))
+	float CombatWalkSpeed = 480.f;
+
+	UFUNCTION()
+	void HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState);
+
 	/** Ammo left in the weapon dropped on death. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC", meta=(ClampMin="0"))
 	int32 DroppedWeaponAmmo = 10;

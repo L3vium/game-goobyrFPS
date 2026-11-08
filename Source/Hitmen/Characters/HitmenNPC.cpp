@@ -15,6 +15,7 @@
 #include "Components/WidgetComponent.h"
 #include "UI/HitmenHUDWidgets.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Movement/HitmenCharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 
@@ -49,6 +50,8 @@ void AHitmenNPC::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 void AHitmenNPC::BeginPlay()
 {
 	Super::BeginPlay();
+	AlertComponent->OnAlertStateChanged.AddDynamic(this, &AHitmenNPC::HandleAlertStateChanged);
+	HandleAlertStateChanged(EHitmenAlertState::Unaware, AlertComponent->GetAlertState());
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		AlertWidget->InitWidget();
@@ -68,6 +71,20 @@ void AHitmenNPC::BeginPlay()
 		{
 			Weapon->InitWeapon(DefaultWeapon, this);
 			Weapon->SetEquipped(true);
+		}
+	}
+}
+
+void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState)
+{
+	if (UHitmenCharacterMovementComponent* Movement = GetHitmenMovement())
+	{
+		switch (NewState)
+		{
+		case EHitmenAlertState::Combat:        Movement->WalkSpeed = CombatWalkSpeed; break;
+		case EHitmenAlertState::Investigating:
+		case EHitmenAlertState::Searching:     Movement->WalkSpeed = AlertWalkSpeed; break;
+		default:                               Movement->WalkSpeed = CalmWalkSpeed; break;
 		}
 	}
 }

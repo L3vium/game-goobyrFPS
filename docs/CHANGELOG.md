@@ -44,6 +44,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   `UHitmenAnimGraphTools`) and has a montage slot.
 - Footstep notifies on the walk / jog clips; default per-surface footstep entries.
 - "No signal" material on monitors of disabled cameras.
+- Blueprint graphs laid out by convention through the Unreal MCP and
+  `UHitmenBlueprintGraphTools`: every Blueprint has an Init graph (BeginPlay) and a Juice graph
+  with one stub per `Juice_On…` hook, in colour-coded comment boxes.
+- Gym AI row: alert states and search, camera alarm with responders, bodies.
 
 ### Changed
 - `ue_remote.py` targets the Hitmen editor when several Unreal editors are open.
@@ -56,6 +60,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Noise responders capped at 2 for every noise type; reinforcement calls come from alerted NPCs
   that are not shooting (never relayed by default); only sentries ignore bodies.
 - VIP candidates beyond 15 are drawn at random.
+- Content root tidied: the template first-person ABP moved to
+  `Hitmen/Characters/Player/Anims/ABP_FirstPerson`; unused template input and touch assets removed.
+- LDTest reconnected (basement, tunnel, upper floor), 130 cm doorways, secret shed passage, vent
+  duct, breaker rooms, street lamps, checker materials (`MI_Grid_*`).
 
 ### Fixed
 - Rebuilding a behavior tree over an existing one lost decorators (one per old decorator), so

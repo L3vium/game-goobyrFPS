@@ -687,7 +687,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
 
     manny = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
     quinn = load("/Game/Characters/Mannequins/Meshes/SKM_Quinn_Simple")
-    fp_abp = load("/Game/FirstPerson/Anims/ABP_FP_Copy")
+    fp_abp = load("/Game/Hitmen/Characters/Player/Anims/ABP_FirstPerson")
 
     player = make_blueprint("BP_PlayerCharacter", path("Characters", "Player"), unreal.HitmenPlayerCharacter)
     pcdo = cdo(player)

@@ -5,6 +5,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-08
+
 ### Added
 - `Tools/Editor/ue_rebuild.ps1` / `Rebuild.bat`: compiles C++ with Live Coding when only `.cpp`
   files changed, otherwise saves, closes, builds and always reopens the editor.
@@ -84,8 +86,13 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   directly.
 
 ### Known gaps (next)
-- Lobby / session flow not yet tested with real clients (Null in PIE multi-client, Steam in the
-  packaged Development build).
+- Lobby / session flow not yet tested with real clients (Null in PIE multi-client, Steam friends'
+  rooms in the packaged Development build with two Steam accounts). Charm, spectator, camera
+  alarm and the attack chain were verified on the listen-server host only; tank / jetpack client
+  prediction needs a two-client PIE session.
+- `Juice_On…` graphs are empty stubs for the team to fill; component hooks need Blueprint
+  subclasses of the components.
+- Title-screen ambience slot still has no sound (no usable engine ambience asset).
 - Placeholder art only (engine shapes, checker material, mannequins); no SFX/VFX assigned yet.
 
 ## [0.1.0] - 2026-11-08

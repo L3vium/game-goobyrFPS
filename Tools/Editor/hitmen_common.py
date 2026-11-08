@@ -103,7 +103,7 @@ def set_mesh(comp, mesh_path, scale=None, material=None, location=None, rotation
     if location is not None:
         comp.set_editor_property("relative_location", unreal.Vector(*location))
     if rotation is not None:
-        comp.set_editor_property("relative_rotation", unreal.Rotator(*rotation))
+        comp.set_editor_property("relative_rotation", unreal.Rotator(pitch=rotation[0], yaw=rotation[1], roll=rotation[2]))
     if material is not None:
         mat = unreal.load_asset(material) if isinstance(material, str) else material
         if mat:

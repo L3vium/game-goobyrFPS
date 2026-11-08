@@ -23,9 +23,9 @@
 # Unreal config (the engine writes CRLF on Windows)
 *.ini     text eol=crlf
 
-# Unreal assets — binary, LFS, lockable for the team
-*.uasset  filter=lfs diff=lfs merge=lfs -text lockable
-*.umap    filter=lfs diff=lfs merge=lfs -text lockable
+# Unreal assets - binary, LFS (enable lockable + git lfs lock if the team wants file locking)
+*.uasset  filter=lfs diff=lfs merge=lfs -text
+*.umap    filter=lfs diff=lfs merge=lfs -text
 
 # Source art / media
 *.fbx     filter=lfs diff=lfs merge=lfs -text

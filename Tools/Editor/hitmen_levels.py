@@ -32,16 +32,20 @@ def bp(rel):
 def new_map(name):
     asset_path = path("Maps", name)
     if EAL.does_asset_exist(asset_path):
-        unreal.EditorLoadingAndSavingUtils.new_blank_map(False)
-        EAL.delete_asset(asset_path)
-    LES.new_level(asset_path)
+        # Rebuild in place: clear every generated actor (keep world settings / default brush).
+        LES.load_level(asset_path)
+        for actor in EAS.get_all_level_actors():
+            if not isinstance(actor, unreal.WorldSettings) and type(actor) is not unreal.Brush:
+                EAS.destroy_actor(actor)
+    else:
+        LES.new_level(asset_path)
     log("map", name)
 
 
 def spawn(cls, loc, rot=(0, 0, 0), label=None, folder=None):
     if cls is None:
         return None
-    actor = EAS.spawn_actor_from_class(cls, unreal.Vector(*loc), unreal.Rotator(*rot))
+    actor = EAS.spawn_actor_from_class(cls, unreal.Vector(*loc), unreal.Rotator(pitch=rot[0], yaw=rot[1], roll=rot[2]))
     if actor:
         if label:
             actor.set_actor_label(label)
@@ -68,7 +72,7 @@ def floor(center, size, material=GRID, folder="Geometry"):
     return box((center[0], center[1], center[2] - 10), (size[0], size[1], 20), material, folder=folder)
 
 
-def text(loc, string, size=90, yaw=0.0, color=(1, 1, 1), folder="Labels"):
+def text(loc, string, size=90, yaw=-90.0, color=(1, 1, 1), folder="Labels"):
     actor = spawn(unreal.TextRenderActor, loc, (0, yaw, 0), "Label_" + string[:20], folder)
     comp = actor.text_render
     comp.set_text(string)
@@ -243,13 +247,20 @@ def build_title():
     environment(sun_pitch=-60, intensity=0.0, fog=0.02)
     for x in (300, 1200, 2100):
         spot = spawn(unreal.SpotLight, (x, 0, 850), (-90, 0, 0), None, "Lighting")
-        spot.spot_light_component.set_editor_property("intensity", 40000.0)
-        spot.spot_light_component.set_editor_property("outer_cone_angle", 50.0)
-    key = spawn(unreal.SpotLight, (-100, 500, 400), (-25, -60, 0), "KeyLight", "Lighting")
-    key.spot_light_component.set_editor_property("intensity", 60000.0)
+        spot.spot_light_component.set_editor_property("intensity", 6000.0)
+        spot.spot_light_component.set_editor_property("outer_cone_angle", 40.0)
+    for x in (-200, 500, 1200, 1900, 2600):
+        for y in (-700, 700):
+            fill = spawn(unreal.PointLight, (x, y, 650), label=None, folder="Lighting")
+            fill.point_light_component.set_editor_property("intensity", 4000.0)
+            fill.point_light_component.set_editor_property("attenuation_radius", 1600.0)
+            fill.point_light_component.set_editor_property("light_color", unreal.Color(255, 214, 170, 255))
+    key = spawn(unreal.SpotLight, (-150, 60, 330), (-30, 25, 0), "KeyLight", "Lighting")
+    key.spot_light_component.set_editor_property("intensity", 12000.0)
+    key.spot_light_component.set_editor_property("outer_cone_angle", 30.0)
 
     # The assassin (engine mannequin) on the right, idling.
-    manny = spawn(unreal.SkeletalMeshActor, (150, 170, 0), (0, -150, 0), "Assassin", "Museum")
+    manny = spawn(unreal.SkeletalMeshActor, (120, 150, 0), (0, 115, 0), "Assassin", "Museum")
     comp = manny.skeletal_mesh_component
     comp.set_skeletal_mesh_asset(load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"))
     comp.set_editor_property("animation_mode", unreal.AnimationMode.ANIMATION_SINGLE_NODE)
@@ -258,9 +269,9 @@ def build_title():
     anim.set_editor_property("saved_looping", True)
     anim.set_editor_property("saved_playing", True)
     comp.set_editor_property("animation_data", anim)
-    box((150, 170, 192), (34, 34, 10), mi("MI_Dark"), folder="Museum", shape="cylinder")  # hat brim placeholder
+    
 
-    camera = spawn(unreal.CameraActor, (-420, -40, 160), (-2, 8, 0), "MenuCamera", "Camera")
+    camera = spawn(unreal.CameraActor, (-380, -60, 165), (-4, 6, 0), "MenuCamera", "Camera")
     camera.set_editor_property("auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
     camera.camera_component.set_editor_property("field_of_view", 70.0)
     spawn(unreal.AmbientSound, (1200, 0, 300), label="MuseumAmbience (assign a sound)", folder="Audio")
@@ -741,10 +752,11 @@ def build_ldtest():
     for loc in loot_i:
         spawn(bp("World/Spawning/BP_LootSpawn_Item"), loc, folder="Gameplay/Loot")
     # One sheltered start per team, in the corners.
-    for (sx, sy) in ((-8000, -8000), (8000, -8000), (-8000, 8000), (8000, 8000)):
-        box((sx, sy + 450, 200), (1000, 40, 400), GRID_ALT, folder="Gameplay/Starts")
+    corners = ((-6200, -6800), (7600, -6400), (-6800, 6800), (6800, 5600))
+    for (sx, sy) in corners:
+        box((sx, sy + 450 * (1 if sy < 0 else -1), 200), (1000, 40, 400), GRID_ALT, folder="Gameplay/Starts")
         box((sx + 450 * (1 if sx < 0 else -1), sy, 200), (40, 1000, 400), GRID_ALT, folder="Gameplay/Starts")
-    team_starts([(-8000, -8000, 45), (8000, -8000, 135), (-8000, 8000, -45), (8000, 8000, -135)])
+    team_starts([(corners[0][0], corners[0][1], 45), (corners[1][0], corners[1][1], 135), (corners[2][0], corners[2][1], -45), (corners[3][0], corners[3][1], -135)])
     save_map()
 
 

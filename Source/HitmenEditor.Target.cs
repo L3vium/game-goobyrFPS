@@ -1,15 +1,15 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Hitmen — editor target
 
 using UnrealBuildTool;
 using System.Collections.Generic;
 
-public class FPSEditorTarget : TargetRules
+public class HitmenEditorTarget : TargetRules
 {
-	public FPSEditorTarget(TargetInfo Target) : base(Target)
+	public HitmenEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.V6;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
-		ExtraModuleNames.Add("FPS");
+		ExtraModuleNames.Add("Hitmen");
 	}
 }

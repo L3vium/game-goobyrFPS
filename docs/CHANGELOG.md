@@ -10,6 +10,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   `.gitattributes` (lockable `.uasset`/`.umap`).
 - `docs/GAME.md` (design + architecture invariants), `docs/Conventions.md` (prefixes, folders,
   Blueprint colour code), this changelog, `CLAUDE.md`.
+- Module `Hitmen` (C++): core types, team rules, interfaces, `Project Settings > Hitmen`, player options, data assets (match rules, maps, weapons, abilities, cosmetics, anim sets, catalog); Steam/voice/trace-channel/surface config.
 
 ### Removed
 - Unity project, template Horror/Shooter variants, marketplace demo maps.

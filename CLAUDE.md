@@ -1,6 +1,6 @@
 # Hitmen — working agreements
 
-Multiplayer Hitman-like on **Unreal Engine 5.7** (`Hitman.uproject`, C++ module `Hitmen`).
+Multiplayer Hitman-like on **Unreal Engine 5.7** (`Hitmen.uproject`, C++ module `Hitmen`).
 This repo is the **code-first base**: systems in C++, Blueprints for values and juice. The team
 makes graphics, juice, balancing, LD, PCG, VFX and audio. Design: `docs/GAME.md`.
 Conventions (prefixes, folders, BP colour code): `docs/Conventions.md`. History: `docs/CHANGELOG.md`.
@@ -21,7 +21,7 @@ Everything (docs, comments, commits) is in English.
 ## Build
 Engine: `C:\Program Files\Epic Games\UE_5.7`.
 - Editor build (editor closed):
-  `"C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat" HitmenEditor Win64 Development -Project="%CD%\Hitman.uproject" -WaitMutex`
+  `"C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat" HitmenEditor Win64 Development -Project="%CD%\Hitmen.uproject" -WaitMutex`
 - Player builds (`RunUAT BuildCookRun`): Shipping → `Builds/Windows`, Development (cheats) →
   `Builds/Windows Dev`. Both are versioned through LFS.
 - New `UCLASS`/`UPROPERTY`/`UFUNCTION` need the editor closed and a full build (Live Coding

@@ -33,6 +33,9 @@ Engine: `C:\Program Files\Epic Games\UE_5.7`.
     3 the editor did not answer after reopening.
   - Live Coding patches are lost when the editor closes; with the editor closed the script builds
     first, so use it to open the editor too.
+  - `-RunPython <script.py>` runs editor Python headless between the build and the reopen. Use it
+    for behavior trees (`Tools/Editor/hitmen_build_ai.py`): rebuilding trees inside the running
+    editor crashed it.
 - New `UCLASS`/`UPROPERTY`/`UFUNCTION` need a full build (Live Coding cannot add reflected
   types); the script handles it. Batch header changes into milestones to limit restarts.
 - The Unreal MCP endpoint is served by the editor (`127.0.0.1:3000/mcp`): it is down while the

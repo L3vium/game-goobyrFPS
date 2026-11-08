@@ -23,6 +23,7 @@ param(
     [switch] $NoSave,     # abort instead of saving dirty packages before closing
     [switch] $NoReopen,   # leave the editor closed after a full build (CI only)
     [switch] $FullOnError, # Live Coding failed -> full rebuild to print the compiler errors (agents)
+    [string] $RunPython,  # editor Python run headless (editor closed) after the build, before reopening
     [int] $ReadyTimeout = 420
 )
 
@@ -110,7 +111,11 @@ function Wait-EditorReady {
         if ((Get-Value $ping 'READY') -eq '1') { Say 'Editor is open and ready (MCP and remote execution available).'; return $true }
         Start-Sleep -Seconds 5
     }
-    Say 'WARNING: the editor did not answer in time. Check it manually.'
+    if ((Test-Path $EditorLog) -and ((Get-Content $EditorLog -Tail 50) -match 'Incompatible or missing module')) {
+        Say 'WARNING: the editor is asking to rebuild a module (the last build failed). Fix the code and run this script again; answering No closes it.'
+    } else {
+        Say 'WARNING: the editor did not answer in time. Check it manually.'
+    }
     return $false
 }
 
@@ -197,13 +202,20 @@ print('DIRTY=' + ';'.join(names))
 
 function Invoke-FullBuild {
     Get-Process LiveCodingConsole -ErrorAction SilentlyContinue | Stop-Process -Force
-    Say "Building HitmenEditor (log: $BuildLog)..."
+    # A crash report window keeps the crashed editor (and its DLLs) alive: close it.
+    Get-Process CrashReportClientEditor -ErrorAction SilentlyContinue | Stop-Process -Force
     New-Item -ItemType Directory -Force (Split-Path $BuildLog) | Out-Null
     $errLog = "$BuildLog.err"
-    $p = Start-Process -FilePath $BuildBat -NoNewWindow -Wait -PassThru `
-        -RedirectStandardOutput $BuildLog -RedirectStandardError $errLog `
-        -ArgumentList @('HitmenEditor', 'Win64', 'Development', "-Project=`"$Uproject`"", '-WaitMutex', '-NoHotReload')
-    $lines = @(Get-Content $BuildLog) + @(Get-Content $errLog -ErrorAction SilentlyContinue)
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Say "Building HitmenEditor (log: $BuildLog)..."
+        $p = Start-Process -FilePath $BuildBat -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $BuildLog -RedirectStandardError $errLog `
+            -ArgumentList @('HitmenEditor', 'Win64', 'Development', "-Project=`"$Uproject`"", '-WaitMutex', '-NoHotReload')
+        $lines = @(Get-Content $BuildLog) + @(Get-Content $errLog -ErrorAction SilentlyContinue)
+        # A DLL still locked by a dying process: wait and link again.
+        if ($p.ExitCode -ne 0 -and ($lines -match 'LNK1104|LNK1168')) { Say 'A binary is locked, retrying in 5 s...'; Start-Sleep -Seconds 5; continue }
+        break
+    }
     $errors = $lines | Where-Object { $_ -match ': (fatal )?error |error C\d+|error LNK\d+|ERROR:' } | Select-Object -First 25
     if ($p.ExitCode -eq 0) {
         Set-Content -Path $Stamp -Value (Get-Date -Format o)
@@ -217,6 +229,7 @@ function Invoke-FullBuild {
 
 # ---------------------------------------------------------------- main
 $editorOpen = [bool] (Get-HitmenEditor)
+if ($RunPython) { $Mode = 'full' }   # the headless step needs the editor closed
 if ($Mode -eq 'auto') {
     if (-not $editorOpen) { $Mode = 'full'; Say 'Editor closed: full build.' }
     elseif (Test-NeedsFullBuild) { $Mode = 'full' }
@@ -238,6 +251,16 @@ $closed = Close-HitmenEditor
 if (-not $closed) { exit 2 }
 try {
     if (-not (Invoke-FullBuild)) { $exitCode = 1 }
+    elseif ($RunPython) {
+        $script = (Resolve-Path $RunPython).Path
+        $pyLog = Join-Path $Root 'Saved\Logs\HitmenRunPython.log'
+        Say "Running $RunPython headless (log: $pyLog)..."
+        $cmdExe = Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+        $py = Start-Process -FilePath $cmdExe -NoNewWindow -Wait -PassThru -RedirectStandardOutput $pyLog -RedirectStandardError "$pyLog.err" `
+            -ArgumentList @("`"$Uproject`"", '-run=pythonscript', "-script=`"$script`"", '-unattended', '-nopause', '-nosplash')
+        Get-Content $pyLog | Where-Object { $_ -match 'LogPython|Error:' } | Select-Object -Last 15 | ForEach-Object { Write-Host "  $_" }
+        if ($py.ExitCode -ne 0) { Say "Headless Python failed (exit $($py.ExitCode))."; $exitCode = 1 }
+    }
 }
 finally {
     if (-not $NoReopen) {

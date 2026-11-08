@@ -57,25 +57,39 @@ Shown under the map carousel. Every option has a default in the match rules data
 `bShowInLobbyUI` flag so designers can hide it and fix its value.
 
 - Proximity voice chat (on/off)
-- Number of retrieval points
-- Difficulty (drives loot counts, AI parameters, NPC damage multiplier). NPCs stroll on patrol (170 cm/s), walk briskly when investigating or searching (320) and run in combat (480).
-- Sonar timing: first interval, fastest interval, speed-up time (`FHitmenFloatOption`s)
+- Difficulty (drives the number of retrieval points — Easy 4, Normal 3, Hard 2 —, loot counts, AI
+  parameters and the NPC damage multiplier). NPCs stroll on patrol (170 cm/s), walk briskly when
+  investigating or searching (320) and run in combat (480).
 
-## 4. Flow & screens
-1. **Title screen** — huge bold **HITMEN** title top-left; square, left-aligned buttons:
-   **Join** (dashed outline, no fill) above **Create Room**, **Options**, **Quit**. A museum-like
-   backdrop built from basic shapes with ambient sound; the assassin (engine mannequin) on the
-   right with idle animations. A small **debug** button bottom-right opens the Gym.
-2. **Join** — the title screen darkened; joinable rooms, then Steam friends' rooms.
-3. **Create Room** — left: map carousel (arrows hide at the ends) and match options;
-   right: players list (rename, icon — coloured glyphs until the team adds icon textures to
-   `DA_Catalog.PlayerIcons`), a dashed **+ Create team** button, drag & drop players
-   into teams, Protect/Attack toggle per team, Watcher toggle for players without a team.
-   Bottom-left **Back**, bottom-right **Start**.
-4. **Customization** — left: the assassin's look in three slots (head: hat, cap, moustache,
-   glasses…; body; legs), randomize, name (defaults to the Steam name or a random name); right:
-   the loadout (one weapon, one move ability, one manipulation ability).
-5. **Match** — then results.
+Designer-only values (match rules asset, never in the lobby): sonar timing (first interval, fastest
+interval, speed-up time) and the per-difficulty presets.
+
+The whole front end is **one scene** (`L_FrontEnd`): title, room and agent screens never load a
+level. The camera blends between `CameraActor`s tagged `Shot_Title`, `Shot_Lobby` and
+`Shot_Customization` (the match phase picks the shot; `AHitmenHUD::ShotBlendTime`). Creating a room
+starts listening in place; joining players load `L_FrontEnd` once; a finished match travels back
+to it, in the room.
+
+1. **Title screen** — the **HITMEN** logo and the buttons vertically centred on the left: **Join**,
+   **Create Room**, **Options**, **Quit**, plus a small **debug** button (Gym). The museum hall
+   behind, the assassin (engine mannequin) idling on the right.
+2. **Join** — joinable rooms, then Steam friends' rooms.
+3. **Create Room** (briefing room) — left: a large top-down map tile (the baked schematic, map name,
+   prev / next arrow buttons on square backgrounds) and two options: proximity chat and difficulty.
+   Right: player rows (white name, colour swatch), a dashed **+ Create team** button, whole-row
+   drag & drop into team panels (the target panel lights up), Protect/Attack per team, a
+   **Watcher** checkbox for players without a team. Bottom: **Back** and **Next**.
+4. **Your agent** (stage) — the mannequin stands on the left; arrows on both sides of its head,
+   body and legs change the look live; the name is edited here. Below: the loadout as square cards
+   (weapon, move, manipulation); hovering a card opens a carousel above it (wheel or click).
+   **Ready** only: when every non-watcher is ready a 5 s countdown starts the match (un-ready
+   cancels it).
+5. **Match** — intro (parachute drop, "Dropping in", map name, 3-2-1), play, then results.
+
+Spawns: maps carry many `BP_TeamStart` points. Each team (or solo player) takes a random free point
+and teammates take the nearest free points around it. During the intro (`bParachuteIntro`,
+`IntroDropHeight`, `IntroDuration` on the match game mode) everyone falls from above their point
+under a canopy, steering a little; control returns on landing. The Gym skips the intro.
 
 Watchers get a spectator mode (`V` cycles): free fly, single-player view (LMB / RMB switch between
 players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players follow teammates.
@@ -276,13 +290,15 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
 - **Scope** overlay for the sniper. **Sightroom** (Tab): a scan wave, a grid on the floor, a cool world.
 - **Alert indicators** above NPCs and at screen centre.
-- **Pause map**: your position, the VIP, retrieval points.
+- **Pause map**: the baked schematic, north up, about two thirds of the screen, wheel to zoom around
+  you; a legend on the left toggles each marker type (you, teammates, VIP, retrieval points,
+  alerted guards, cameras). Debug tools sit flush against the right edge.
+- **Intro**: "Dropping in", the map name and a 3-2-1 countdown during the parachute drop.
 
 ## 12. Maps
 | Map | Purpose |
 |---|---|
-| `L_TitleScreen` | Menus backdrop |
-| `L_Lobby` | Create room / customization after hosting |
+| `L_FrontEnd` | The whole front end in one scene: museum hall (title), briefing room (create room), agent stage (`BP_AgentPreview`, "Your agent"); one tagged camera per screen |
 | `L_Gym` | Debug gym: a compact walled hall (74 x 74 m) laid out like a mini LD — movement course with the traversal metrics, armoury (weapons, containers, loot points), abilities, fixtures, and an AI pen (spline patrol, guard group, keycard guard to pickpocket, sentry, sniper, VIP, search spots, camera alarm); every station is labelled just above itself |
 | `L_LDTest` | Basic Hitman-like sandbox: town (gutters beside back windows, street lamps on a breaker in a hidden keycard utility room), walled manor (keycard gates, sealed dining room fed by a crouch vent duct, upstairs keycard control room, basement foundations via exterior side stairs with a keycard breaker room), cave with a ramp down to a tunnel into the basement, a garden-shed secret passage down to the tunnel, AIs, a basin of mountains and invisible walls; checker materials only |
 | `L_Empty_01`, `L_Empty_02` | Empty maps for the team |

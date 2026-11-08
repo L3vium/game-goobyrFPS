@@ -119,6 +119,22 @@ protected:
 	float SwitchDirection = 1.f;
 };
 
+/** Match intro: map name, "dropping in" and the countdown while players parachute in. */
+UCLASS()
+class HITMEN_API UHitmenIntroWidget : public UHitmenUserWidget
+{
+	GENERATED_BODY()
+
+protected:
+	virtual void NativeConstruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+
+	FText MapName;
+	float Alpha = 0.f;
+	int32 LastSecond = -1;
+};
+
 /** World-anchored hint: "[A] Charm" under the remote-ability target, following it on screen. */
 UCLASS()
 class HITMEN_API UHitmenWorldHintWidget : public UHitmenUserWidget

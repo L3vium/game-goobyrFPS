@@ -1,6 +1,8 @@
 // Hitmen — HUD elements
 
 #include "UI/HitmenHUDElements.h"
+#include "Data/HitmenMapDefinition.h"
+#include "Framework/HitmenGameState.h"
 #include "UI/HitmenUIFactory.h"
 #include "Data/HitmenSoundSet.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
@@ -498,5 +500,62 @@ int32 UHitmenWorldHintWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 	const FVector2D KeySize = HitmenUI::PaintKey(OutDrawElements, LayerId + 1, AllottedGeometry, Hint.Key.ToString(), Position, 15);
 	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Label, Position + FVector2D(KeySize.X + 8.f, (KeySize.Y - LabelSize.Y) * 0.5f), LabelFont,
 		FLinearColor(0.55f, 0.85f, 1.f, 1.f));
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
+}
+
+// =============================================================================================
+// Intro countdown
+// =============================================================================================
+
+void UHitmenIntroWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	const UHitmenMapDefinition* Map = HitmenUI::FindCurrentMap(this);
+	MapName = Map ? Map->DisplayName : FText::GetEmpty();
+	SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void UHitmenIntroWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
+	const bool bIntro = GS && GS->GetMatchPhase() == EHitmenMatchPhase::Intro;
+	Alpha = FMath::FInterpConstantTo(Alpha, bIntro ? 1.f : 0.f, InDeltaTime, 2.5f);
+	const int32 Second = GS ? FMath::CeilToInt(GS->GetPhaseCountdownRemaining()) : 0;
+	if (bIntro && Second != LastSecond && Second > 0 && Second <= 3)
+	{
+		UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::Countdown);
+	}
+	if (LastSecond > 0 && Second == 0 && bIntro)
+	{
+		UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::MatchStart);
+	}
+	LastSecond = Second;
+}
+
+int32 UHitmenIntroWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
+{
+	if (Alpha <= 0.01f)
+	{
+		return LayerId;
+	}
+	const FVector2D Size = AllottedGeometry.GetLocalSize();
+	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
+	const int32 Seconds = GS ? FMath::CeilToInt(GS->GetPhaseCountdownRemaining()) : 0;
+	HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, FVector2D(Size.X, Size.Y * 0.4f), FLinearColor(0, 0, 0, 0.75f * Alpha), FLinearColor(0, 0, 0, 0), false);
+	const FSlateFontInfo Overline = HitmenUI::SpacedFont(18, TEXT("Medium"), 300);
+	const FSlateFontInfo Title = HitmenUI::SpacedFont(64, TEXT("Bold"), 40);
+	const FSlateFontInfo Count = HitmenUI::Font(96, TEXT("Bold"));
+	const FString Over = TEXT("DROPPING IN");
+	const FString Name = MapName.ToString().ToUpper();
+	const FString Number = Seconds > 0 ? FString::FromInt(Seconds) : FString(TEXT("GO"));
+	const FVector2D OverSize = HitmenUI::MeasureText(Over, Overline);
+	const FVector2D NameSize = HitmenUI::MeasureText(Name, Title);
+	const FVector2D CountSize = HitmenUI::MeasureText(Number, Count);
+	const float Y = Size.Y * 0.08f;
+	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Over, FVector2D((Size.X - OverSize.X) * 0.5f, Y), Overline, HitmenUI::TextDim() * FLinearColor(1, 1, 1, Alpha));
+	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Name, FVector2D((Size.X - NameSize.X) * 0.5f, Y + 26.f), Title, HitmenUI::Text() * FLinearColor(1, 1, 1, Alpha));
+	HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(Size.X * 0.5f - 50.f, Y + 26.f + NameSize.Y + 6.f), FVector2D(100.f, 4.f), HitmenUI::Accent() * FLinearColor(1, 1, 1, Alpha));
+	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Number, FVector2D((Size.X - CountSize.X) * 0.5f, Y + 40.f + NameSize.Y), Count, HitmenUI::Text() * FLinearColor(1, 1, 1, Alpha));
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
 }

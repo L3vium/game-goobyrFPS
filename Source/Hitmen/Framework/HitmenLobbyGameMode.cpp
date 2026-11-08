@@ -11,6 +11,7 @@
 #include "Data/HitmenCatalog.h"
 #include "Hitmen.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
 
 AHitmenLobbyGameMode::AHitmenLobbyGameMode()
 {
@@ -26,10 +27,12 @@ void AHitmenLobbyGameMode::InitGameState()
 	{
 		return;
 	}
-	GS->SetMatchPhase(EHitmenMatchPhase::Lobby);
-
 	UHitmenGameInstance* GI = GetGameInstance<UHitmenGameInstance>();
-	if (GI && GI->bHasPendingMatch)
+	const bool bReturningFromMatch = GI && GI->bHasPendingMatch;
+	// The front end opens on the title unless it is already hosting (back from a match, joined).
+	GS->SetMatchPhase(bStartOnTitle && !bReturningFromMatch && GetNetMode() == NM_Standalone ? EHitmenMatchPhase::Title : EHitmenMatchPhase::Lobby);
+
+	if (bReturningFromMatch)
 	{
 		// Returning from a match: keep teams and options.
 		GS->SetLobbySettings(GI->PendingLobbySettings);
@@ -133,6 +136,8 @@ void AHitmenLobbyGameMode::RequestBackToLobby(AHitmenPlayerController* Requester
 {
 	if (AHitmenGameState* GS = GetGameState<AHitmenGameState>(); GS && IsHost(Requester))
 	{
+		GetWorldTimerManager().ClearTimer(LaunchTimer);
+		GS->SetPhaseCountdown(0.f);
 		GS->SetMatchPhase(EHitmenMatchPhase::Lobby);
 	}
 }
@@ -160,17 +165,66 @@ void AHitmenLobbyGameMode::RequestLaunch(AHitmenPlayerController* Requester)
 
 void AHitmenLobbyGameMode::NotifyReadyChanged()
 {
-	const AHitmenGameState* GS = GetGameState<AHitmenGameState>();
-	if (!bAutoLaunchWhenAllReady || !GS || GS->GetMatchPhase() != EHitmenMatchPhase::Customization)
+	AHitmenGameState* GS = GetGameState<AHitmenGameState>();
+	if (!bAutoLaunchWhenAllReady || !GS)
 	{
 		return;
 	}
+	bool bAllReady = GS->GetMatchPhase() == EHitmenMatchPhase::Customization;
+	int32 Players = 0;
 	for (const AHitmenPlayerState* PS : GS->GetHitmenPlayers())
 	{
-		if (!PS->IsWatcher() && !PS->IsReady())
+		if (!PS->IsWatcher())
 		{
-			return;
+			++Players;
+			bAllReady &= PS->IsReady();
 		}
 	}
+	bAllReady &= Players > 0;
+	if (bAllReady && !GetWorldTimerManager().IsTimerActive(LaunchTimer))
+	{
+		// Everyone is ready: a short countdown, then the match.
+		GS->SetPhaseCountdown(LaunchCountdown);
+		GetWorldTimerManager().SetTimer(LaunchTimer, this, &AHitmenLobbyGameMode::HandleLaunchTimer, FMath::Max(0.01f, LaunchCountdown), false);
+	}
+	else if (!bAllReady && GetWorldTimerManager().IsTimerActive(LaunchTimer))
+	{
+		GetWorldTimerManager().ClearTimer(LaunchTimer);
+		GS->SetPhaseCountdown(0.f);
+	}
+}
+
+void AHitmenLobbyGameMode::HandleLaunchTimer()
+{
+	if (AHitmenGameState* GS = GetGameState<AHitmenGameState>())
+	{
+		GS->SetPhaseCountdown(0.f);
+	}
 	RequestLaunch(nullptr);
+}
+
+void AHitmenLobbyGameMode::OpenLobby()
+{
+	AHitmenGameState* GS = GetGameState<AHitmenGameState>();
+	if (!GS || GS->GetMatchPhase() != EHitmenMatchPhase::Title)
+	{
+		return;
+	}
+	GS->SetLobbySettings(GetRules()->MakeDefaultLobbySettings());
+	for (AHitmenPlayerState* PS : GS->GetHitmenPlayers())
+	{
+		PS->SetReady(false);
+	}
+	GS->SetMatchPhase(EHitmenMatchPhase::Lobby);
+}
+
+void AHitmenLobbyGameMode::ReturnToTitlePhase()
+{
+	GetWorldTimerManager().ClearTimer(LaunchTimer);
+	if (AHitmenGameState* GS = GetGameState<AHitmenGameState>())
+	{
+		GS->SetPhaseCountdown(0.f);
+		GS->SetTeams(TArray<FHitmenTeam>());
+		GS->SetMatchPhase(EHitmenMatchPhase::Title);
+	}
 }

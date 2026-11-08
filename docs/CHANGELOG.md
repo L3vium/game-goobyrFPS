@@ -40,6 +40,16 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   and status (Suspicious / Alerted / Searching / Spotted / Under fire).
 - Map baker (`UHitmenContentTools::BakeMapTexture`): top-down schematic textures `T_Map_*` for every map.
 - Sightroom: scan wave from the player, floor grid behind it, cool desaturated world, fade in / out.
+- Front end in one scene (`L_FrontEnd`, replaces `L_TitleScreen` and `L_Lobby`): title, room and agent screens
+  blend between tagged cameras (`Shot_<Phase>`) with no level load; creating a room listens in place.
+- Your agent: the mannequin on the stage with look arrows beside its head, body and legs (live), name editing,
+  loadout cards with a hover carousel.
+- Ready-only start: when every non-watcher is ready a 5 s countdown launches the match.
+- Match intro: parachute drop above your spawn (canopy, slight steering, control on landing) with a
+  "Dropping in" / 3-2-1 overlay; spawn clusters (random point per team, teammates next to each other); 16 spread
+  spawn points in LDTest.
+- Pause map: the baked schematic at two thirds of the screen, wheel zoom, a clickable legend to toggle each marker
+  type; debug tools flush right.
 - UI font: Barlow Condensed (OFL, `Tools/Fonts`) as `FNT_Barlow`; menu kit (`HitmenMenuKit`): menu buttons with an
   accent bar, arrow buttons, toggles, cards, choice carousel, backdrop.
 
@@ -54,12 +64,20 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - NPCs hit softer (difficulty damage x0.3 / x0.45 / x0.7) and walk / run with path acceleration (locomotion plays).
 - Security cameras: shorter, narrower cone aimed at the floor with a round footprint that follows the sweep.
 - Civilians removed (`BP_NPC_Civilian` deleted).
+- Lobby: player rows without letter glyphs, white names, whole-row drag & drop, Watcher checkbox, large map tile
+  with square arrow buttons; options reduced to proximity chat and difficulty. The retrieval-point count moved
+  into the difficulty presets; sonar timings are designer-only (match rules).
+- Title screen: logo and buttons vertically centred on the left. All menus restyled (pause, options, results).
 
 ### Fixed
 - `F` did nothing after a respawn (the focus trace only started when the pawn was already possessed).
 - Front-end screens lost the mouse cursor (Escape toggled an invisible pause; the input mode was set in two places).
 - Dead NPC capsules blocked the dropped gun and the body; dropped keycards were invisible and could not be taken.
 - The locker teleported you into its solid mesh; window lintels stopped the vault probe.
+- The chosen loadout and look were lost after a non-seamless travel (PIE, reconnects): the game instance keeps them
+  and re-sends them after every travel; a pawn spawned before they arrive is equipped during the intro.
+- Long guns (rifles, shotgun, sniper) were held sideways in first person; every gun now uses the two-hand hold.
+- Menu input mode tried to focus a non-focusable widget.
 
 ## [0.2.0] - 2026-11-08
 

@@ -463,6 +463,10 @@ void UHitmenHUDWidget::BuildDefaultLayout()
 	InventoryBar = WidgetTree->ConstructWidget<UHitmenInventoryBarWidget>(UHitmenInventoryBarWidget::StaticClass());
 	HitmenUI::AddToCanvas(Canvas, InventoryBar, FAnchors(0.5f, 1.f), FVector2D(0.f, -Margin), FVector2D(0.5f, 1.f), FVector2D(1100.f, 110.f));
 
+	// Match intro (dropping in + countdown), over everything.
+	Intro = WidgetTree->ConstructWidget<UHitmenIntroWidget>(UHitmenIntroWidget::StaticClass());
+	if (UCanvasPanelSlot* IntroSlot = Canvas->AddChildToCanvas(Intro)) { IntroSlot->SetAnchors(Full); IntroSlot->SetOffsets(FMargin(0.f)); }
+
 	// Square minimap, bottom left.
 	const float MinimapSize = 230.f;
 	Minimap = WidgetTree->ConstructWidget<UHitmenMinimapWidget>(UHitmenMinimapWidget::StaticClass());

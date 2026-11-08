@@ -587,8 +587,17 @@ def build_weapons(mats):
     pistol_vis = dict(first_person_pose=pistol_pose, fire_montage=pistol_fire, equip_montage=pistol_equip, **gun_fx)
     pistol_vis["muzzle_fx"] = fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_Aligned_X_OS")
     pistol_vis["fire_sound"] = load(SFX + "SFX_DustPuff_Cue")
-    rifle_vis = dict(first_person_pose=rifle_pose, fire_montage=rifle_fire, equip_montage=rifle_equip, **gun_fx)
+    # First person, every gun uses the two-hand pistol hold (the arms offsets are tuned for it); the body keeps the
+    # rifle montages. Swap first_person_pose per weapon once dedicated first-person rifle poses exist.
+    rifle_vis = dict(first_person_pose=pistol_pose, fire_montage=rifle_fire, equip_montage=rifle_equip, **gun_fx)
+    # The pack's long guns face another axis than its pistol: tilted and turned so the barrel meets the crosshair
+    # from the hip hold, and a little smaller so the stock does not fill the view (tuned live in PIE).
+    long_offset = unreal.Transform()
+    long_offset.rotation = unreal.Rotator(roll=0.0, pitch=45.0, yaw=-25.0).quaternion()
+    long_offset.scale3d = unreal.Vector(0.75, 0.75, 0.75)
+    rifle_vis["first_person_attach_offset"] = long_offset
     launcher_vis = dict(rifle_vis)
+    launcher_vis["first_person_attach_offset"] = fp_offset
     launcher_vis["fire_sound"] = load("/Game/Weapons/GrenadeLauncher/Audio/FirstPersonTemplateWeaponFire02")
 
     A = unreal.HitmenFireMode
@@ -618,7 +627,7 @@ def build_weapons(mats):
                    static_mesh=sniper_mesh, skeletal_mesh=None, visual_transform=pack(0.55), **rifle_vis)),
         "Bow": ("Bow", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=60.0, damage=90.0, charge_to_fire=True, full_charge_time=1.0,
                 projectile_class=gen_class(arrow), projectile_speed=5000.0, silenced=True, noise_radius=0.0, start_ammo=12, max_ammo=30,
-                ammo_per_pickup=6, recoil_pitch=0.8, first_person_pose=rifle_pose)),
+                ammo_per_pickup=6, recoil_pitch=0.8, first_person_pose=pistol_pose)),
         "RocketLauncher": ("Rocket launcher", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=40.0, projectile_class=gen_class(rocket),
                            projectile_speed=3000.0, start_ammo=4, max_ammo=8, ammo_per_pickup=2, noise_radius=5000.0, recoil_pitch=4.0,
                            back_blast_fx=fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_OS"),
@@ -741,15 +750,15 @@ def build_rules():
     rules = make_data("DA_MatchRules_Default", path("Data", "Rules"), unreal.HitmenMatchRules)
     D = unreal.HitmenDifficulty
 
-    def preset(weapons, items, sight, suspicion, damage, aim):
+    def preset(retrieval, weapons, items, sight, suspicion, damage, aim):
         p = unreal.HitmenDifficultyPreset()
-        set_props(p, weapon_spawn_count=weapons, item_spawn_count=items, npc_sight_range_multiplier=sight,
+        set_props(p, retrieval_point_count=retrieval, weapon_spawn_count=weapons, item_spawn_count=items, npc_sight_range_multiplier=sight,
                   npc_suspicion_rate_multiplier=suspicion, npc_damage_multiplier=damage, npc_aim_error_degrees=aim)
         return p
 
-    set_props(rules, difficulty_presets={D.EASY: preset(10, 10, 0.8, 0.7, 0.3, 7.0),
-                                         D.NORMAL: preset(6, 6, 1.0, 1.0, 0.45, 4.0),
-                                         D.HARD: preset(4, 4, 1.2, 1.4, 0.7, 2.5)})
+    set_props(rules, difficulty_presets={D.EASY: preset(4, 10, 10, 0.8, 0.7, 0.3, 7.0),
+                                         D.NORMAL: preset(3, 6, 6, 1.0, 1.0, 0.45, 4.0),
+                                         D.HARD: preset(2, 4, 4, 1.2, 1.4, 0.7, 2.5)})
     save(rules)
     return rules
 
@@ -893,6 +902,14 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
             set_props(skel, override_materials=[ghost_mi] * max(1, len(manny_ghost.get_editor_property("materials"))))
     save(marker)
 
+    # The agent standing in the front-end scene (title backdrop, "Your agent" screen).
+    preview = make_blueprint("BP_AgentPreview", path("Characters", "Player"), unreal.HitmenAgentPreview)
+    preview_body = component(cdo(preview), "body")
+    if preview_body:
+        set_props(preview_body, skeletal_mesh_asset=load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"))
+    set_props(cdo(preview), idle_animation=load("/Game/Characters/Mannequins/Anims/Unarmed/MM_Idle"))
+    save(preview)
+
     set_props(cdo(pc), gameplay_mapping_contexts=[imc], spectator_mapping_context=spectator_imc,
               move_action=actions["IA_Move"], look_action=actions["IA_Look"], jump_action=actions["IA_Jump"],
               crouch_action=actions["IA_Crouch"], sprint_action=actions["IA_Sprint"], fire_action=actions["IA_Fire"],
@@ -969,7 +986,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     huds = {}
     hud_folder = path("UI", "HUD")
     for name, props in (("BP_HUD_Menu", dict(primary_widget_class=gen_class(widgets["WBP_TitleScreen"]), primary_is_menu=True, options_class=gen_class(widgets["WBP_Options"]))),
-                        ("BP_HUD_Lobby", dict(primary_widget_class=gen_class(widgets["WBP_Lobby"]), primary_is_menu=True, options_class=gen_class(widgets["WBP_Options"]))),
+                        ("BP_HUD_Lobby", dict(primary_widget_class=gen_class(widgets["WBP_TitleScreen"]), primary_is_menu=True, options_class=gen_class(widgets["WBP_Options"]))),
                         ("BP_HUD_Match", dict(primary_widget_class=gen_class(widgets["WBP_HUD"]), pause_menu_class=gen_class(widgets["WBP_PauseMenu"]),
                                               options_class=gen_class(widgets["WBP_Options"]), emote_wheel_class=gen_class(widgets["WBP_EmoteWheel"]),
                                               spectator_class=gen_class(widgets["WBP_Spectator"]), results_class=gen_class(widgets["WBP_Results"])))):

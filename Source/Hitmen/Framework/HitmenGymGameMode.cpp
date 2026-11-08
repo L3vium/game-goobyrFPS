@@ -7,4 +7,5 @@ AHitmenGymGameMode::AHitmenGymGameMode()
 	bWinConditionsEnabled = false;
 	bActivateAllCandidates = true;
 	RespawnDelay = 2.f;
+	bParachuteIntro = false;
 }

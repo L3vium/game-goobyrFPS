@@ -1,6 +1,8 @@
 // Hitmen — game instance
 
 #include "Framework/HitmenGameInstance.h"
+#include "Engine/World.h"
+#include "Framework/HitmenLobbyGameMode.h"
 #include "Core/HitmenGameSettings.h"
 #include "Online/HitmenSessionSubsystem.h"
 #include "Hitmen.h"
@@ -90,6 +92,17 @@ void UHitmenGameInstance::ReturnToTitle()
 	if (UHitmenSessionSubsystem* Sessions = GetSubsystem<UHitmenSessionSubsystem>())
 	{
 		Sessions->DestroySession();
+	}
+	// Host in the front end: stop listening and go back to the title shot, no reload.
+	UWorld* World = GetWorld();
+	if (AHitmenLobbyGameMode* LobbyMode = World ? World->GetAuthGameMode<AHitmenLobbyGameMode>() : nullptr)
+	{
+		if (World->GetNetDriver())
+		{
+			GEngine->ShutdownWorldNetDriver(World);
+		}
+		LobbyMode->ReturnToTitlePhase();
+		return;
 	}
 	const TSoftObjectPtr<UWorld>& Title = UHitmenGameSettings::Get()->TitleLevel;
 	if (!Title.IsNull())

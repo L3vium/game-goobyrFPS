@@ -139,6 +139,7 @@ protected:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenScopeWidget> Scope;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenInventoryBarWidget> InventoryBar;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenWorldHintWidget> WorldHint;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenIntroWidget> Intro;
 
 	UFUNCTION() void HandlePawnChanged(APawn* NewPawn);
 	UFUNCTION() void HandlePrompt(const FText& Prompt, bool bVisible);

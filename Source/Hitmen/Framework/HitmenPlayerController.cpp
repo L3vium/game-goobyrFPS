@@ -6,6 +6,7 @@
 #include "Framework/HitmenLobbyGameMode.h"
 #include "Framework/HitmenGameModeBase.h"
 #include "Framework/HitmenHUD.h"
+#include "Framework/HitmenGameInstance.h"
 #include "Blueprint/UserWidget.h"
 #include "Core/HitmenInterfaces.h"
 #include "Core/HitmenUserSettings.h"
@@ -52,6 +53,12 @@ void AHitmenPlayerController::BeginPlay()
 	{
 		RefreshMappingContexts();
 		SendPreferredProfile();
+		// After a travel the PlayerState may be fresh: re-send the agent chosen in the front end.
+		if (const UHitmenGameInstance* GI = GetGameInstance<UHitmenGameInstance>())
+		{
+			if (GI->bHasLocalLoadout) { Server_SetLoadout(GI->LocalLoadout); }
+			if (GI->bHasLocalCosmetics) { Server_SetCosmetics(GI->LocalCosmetics); }
+		}
 		// The HUD owns the input mode (menu screens keep the cursor); it may not exist yet.
 		RefreshInputMode();
 	}
@@ -659,7 +666,9 @@ void AHitmenPlayerController::SetMenuInputMode(bool bMenu, bool bUIOnly)
 		FInputModeUIOnly Mode;
 		if (const AHitmenHUD* HitmenHUD = Cast<AHitmenHUD>(GetHUD()); HitmenHUD && HitmenHUD->GetPrimaryWidget())
 		{
-			Mode.SetWidgetToFocus(HitmenHUD->GetPrimaryWidget()->TakeWidget());
+			UUserWidget* Primary = HitmenHUD->GetPrimaryWidget();
+			Primary->SetIsFocusable(true);
+			Mode.SetWidgetToFocus(Primary->TakeWidget());
 		}
 		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		SetInputMode(Mode);
@@ -712,11 +721,29 @@ void AHitmenPlayerController::Server_SetIcon_Implementation(int32 IconIndex)
 void AHitmenPlayerController::Server_SetCosmetics_Implementation(const FHitmenCosmeticLoadout& Cosmetics)
 {
 	if (AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>()) { PS->SetCosmetics(Cosmetics); }
+	if (AHitmenPlayerCharacter* Agent = Cast<AHitmenPlayerCharacter>(GetPawn()))
+	{
+		Agent->ApplyCosmetics(Cosmetics);
+	}
 }
 
 void AHitmenPlayerController::Server_SetLoadout_Implementation(const FHitmenLoadout& Loadout)
 {
-	if (AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>()) { PS->SetLoadout(Loadout); }
+	AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
+	if (!PS)
+	{
+		return;
+	}
+	const FHitmenLoadout Previous = PS->GetLoadout();
+	const bool bChanged = Previous.Weapon != Loadout.Weapon || Previous.MoveAbility != Loadout.MoveAbility || Previous.ManipulationAbility != Loadout.ManipulationAbility;
+	PS->SetLoadout(Loadout);
+	// The pawn may have spawned before this arrived (non-seamless travel): equip it during the intro.
+	const AHitmenGameState* GS = GetWorld()->GetGameState<AHitmenGameState>();
+	AHitmenPlayerCharacter* Agent = Cast<AHitmenPlayerCharacter>(GetPawn());
+	if (bChanged && Agent && GS && GS->GetMatchPhase() == EHitmenMatchPhase::Intro)
+	{
+		Agent->ApplyLoadout(Loadout);
+	}
 }
 
 void AHitmenPlayerController::Server_SetReady_Implementation(bool bReady)

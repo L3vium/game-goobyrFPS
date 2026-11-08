@@ -42,13 +42,47 @@ void AHitmenMatchGameMode::InitGameState()
 		// Launched directly in PIE: use rule defaults.
 		GS->SetLobbySettings(GetRules()->MakeDefaultLobbySettings());
 	}
-	GS->SetMatchPhase(EHitmenMatchPhase::Playing);
+	GS->SetMatchPhase(bParachuteIntro ? EHitmenMatchPhase::Intro : EHitmenMatchPhase::Playing);
 }
 
 void AHitmenMatchGameMode::StartPlay()
 {
 	Super::StartPlay();
 	SetupMatch();
+	if (bParachuteIntro)
+	{
+		if (AHitmenGameState* GS = GetGameState<AHitmenGameState>())
+		{
+			GS->SetPhaseCountdown(IntroDuration);
+		}
+		GetWorldTimerManager().SetTimer(IntroTimer, this, &AHitmenMatchGameMode::HandleIntroEnd, FMath::Max(0.01f, IntroDuration), false);
+	}
+}
+
+void AHitmenMatchGameMode::HandleIntroEnd()
+{
+	if (AHitmenGameState* GS = GetGameState<AHitmenGameState>(); GS && GS->GetMatchPhase() == EHitmenMatchPhase::Intro)
+	{
+		GS->SetPhaseCountdown(0.f);
+		GS->SetMatchPhase(EHitmenMatchPhase::Playing);
+	}
+}
+
+APawn* AHitmenMatchGameMode::SpawnDefaultPawnAtTransform_Implementation(AController* NewPlayer, const FTransform& SpawnTransform)
+{
+	const AHitmenGameState* GS = GetGameState<AHitmenGameState>();
+	const bool bDrop = bParachuteIntro && GS && GS->GetMatchPhase() == EHitmenMatchPhase::Intro;
+	FTransform Transform = SpawnTransform;
+	if (bDrop)
+	{
+		Transform.AddToTranslation(FVector(0.f, 0.f, IntroDropHeight));
+	}
+	APawn* Pawn = Super::SpawnDefaultPawnAtTransform_Implementation(NewPlayer, Transform);
+	if (AHitmenPlayerCharacter* Character = Cast<AHitmenPlayerCharacter>(Pawn); Character && bDrop)
+	{
+		Character->StartParachute();
+	}
+	return Pawn;
 }
 
 void AHitmenMatchGameMode::SetupMatch()
@@ -185,57 +219,46 @@ int32 AHitmenMatchGameMode::GetSpawnGroup(const AController* Player) const
 
 AActor* AHitmenMatchGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
-	const int32 Group = GetSpawnGroup(Player);
-	const AHitmenGameState* GS = GetGameState<AHitmenGameState>();
-
-	// Map lobby teams onto start groups: team order -> group index 0..N, solos after.
-	int32 DesiredGroupIndex = 0;
-	if (GS)
-	{
-		const AHitmenPlayerState* PS = Player->GetPlayerState<AHitmenPlayerState>();
-		if (PS && PS->IsInTeam())
-		{
-			DesiredGroupIndex = GS->GetTeams().IndexOfByPredicate([PS](const FHitmenTeam& T) { return T.TeamId == PS->GetLobbyTeamId(); });
-		}
-		else if (PS)
-		{
-			const TArray<AHitmenPlayerState*> Solos = GS->GetPlayersWithoutTeam();
-			DesiredGroupIndex = GS->GetTeams().Num() + Solos.IndexOfByKey(PS);
-		}
-	}
-
-	TArray<AHitmenTeamStart*> Starts;
-	TSet<int32> Groups;
+	TArray<AActor*> Starts;
 	for (TActorIterator<AHitmenTeamStart> It(GetWorld()); It; ++It)
 	{
 		Starts.Add(*It);
-		Groups.Add(It->SpawnGroup);
 	}
 	if (Starts.IsEmpty())
 	{
 		return Super::ChoosePlayerStart_Implementation(Player);
 	}
-
-	TArray<int32> SortedGroups = Groups.Array();
-	SortedGroups.Sort();
-	const int32 TargetGroup = SortedGroups[FMath::Max(0, DesiredGroupIndex) % SortedGroups.Num()];
-
-	TArray<AActor*>& Used = UsedStarts.FindOrAdd(Group);
-	AHitmenTeamStart* Fallback = nullptr;
-	for (AHitmenTeamStart* Start : Starts)
+	TArray<AActor*> Free = Starts.FilterByPredicate([this](AActor* Start) { return !TakenStarts.Contains(Start); });
+	if (Free.IsEmpty())
 	{
-		if (Start->SpawnGroup != TargetGroup)
+		// Respawns (gym): every start is usable again.
+		TakenStarts.Reset();
+		Free = Starts;
+	}
+	// One random anchor per team (or solo player); teammates take the free starts closest to it.
+	const int32 Group = GetSpawnGroup(Player);
+	AActor* Anchor = SpawnAnchors.FindRef(Group).Get();
+	AActor* Chosen = nullptr;
+	if (!Anchor)
+	{
+		Chosen = Free[FMath::RandRange(0, Free.Num() - 1)];
+		SpawnAnchors.Add(Group, Chosen);
+	}
+	else
+	{
+		float Best = BIG_NUMBER;
+		for (AActor* Start : Free)
 		{
-			continue;
-		}
-		Fallback = Fallback ? Fallback : Start;
-		if (!Used.Contains(Start))
-		{
-			Used.Add(Start);
-			return Start;
+			const float Distance = FVector::DistSquared(Start->GetActorLocation(), Anchor->GetActorLocation());
+			if (Distance < Best)
+			{
+				Best = Distance;
+				Chosen = Start;
+			}
 		}
 	}
-	return Fallback ? Fallback : Starts[0];
+	TakenStarts.Add(Chosen);
+	return Chosen;
 }
 
 void AHitmenMatchGameMode::SetPlayerDefaults(APawn* PlayerPawn)

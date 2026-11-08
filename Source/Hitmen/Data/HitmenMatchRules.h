@@ -16,6 +16,10 @@ struct FHitmenDifficultyPreset
 	GENERATED_BODY()
 
 	/** Weapon spawn candidates activated at match start. */
+	/** Retrieval points activated at match start (the lobby no longer edits this directly). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Difficulty", meta=(ClampMin="1"))
+	int32 RetrievalPointCount = 3;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Difficulty", meta=(ClampMin="0"))
 	int32 WeaponSpawnCount = 6;
 
@@ -52,8 +56,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Lobby Options")
 	FHitmenBoolOption ProximityChat = { true, true };
 
+	/** Fallback only: the count comes from the difficulty preset. Hidden from the lobby. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Lobby Options")
-	FHitmenIntOption RetrievalPointCount = { 3, 1, 8, true };
+	FHitmenIntOption RetrievalPointCount = { 3, 1, 8, false };
 
 	/** Value is an EHitmenDifficulty index. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Lobby Options")

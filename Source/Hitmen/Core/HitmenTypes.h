@@ -57,8 +57,12 @@ enum class EHitmenAlertColor : uint8
 UENUM(BlueprintType)
 enum class EHitmenMatchPhase : uint8
 {
+	/** Front end before hosting: title / join screens. */
+	Title,
 	Lobby,
 	Customization,
+	/** Match start: players drop in (parachute) before control is given. */
+	Intro,
 	Playing,
 	Ended
 };

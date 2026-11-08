@@ -73,6 +73,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Camera")
 	void AddCameraShake(float Intensity, float Duration);
 
+	/** Server: starts the intro drop (no control, slow fall under a canopy until landing). */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Intro")
+	void StartParachute();
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Intro")
+	bool IsParachuting() const { return bParachuting; }
+
+	virtual void Landed(const FHitResult& Hit) override;
+
 	/** Local: shows the first-person arms for a moment (punch, throw, interact). */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Camera")
 	void ShowFirstPersonArms(float Duration);
@@ -139,6 +148,27 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UHitmenEmoteComponent> EmoteComponent;
+
+	/** Canopy shown during the intro drop (engine shapes until the team assigns a mesh). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> ParachuteCanopy;
+
+	/** Fall speed under the canopy. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="50", Units="cm/s"))
+	float ParachuteFallSpeed = 520.f;
+
+	/** Gentle drift of the canopy while falling (cm/s). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0", Units="cm/s"))
+	float ParachuteDrift = 60.f;
+
+	UPROPERTY(ReplicatedUsing=OnRep_Parachuting)
+	bool bParachuting = false;
+
+	UFUNCTION()
+	void OnRep_Parachuting();
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnParachute(bool bDeployed);
 
 	// ---- Camera ----
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera", meta=(ClampMin="1"))

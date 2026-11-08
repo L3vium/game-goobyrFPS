@@ -29,6 +29,20 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Travel")
 	bool bHasPendingMatch = false;
 
+	/** Client: the local player's chosen loadout and look, re-sent after every travel (a
+	 *  non-seamless travel or a reconnect gives the player a fresh PlayerState). */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Travel")
+	FHitmenLoadout LocalLoadout;
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Travel")
+	FHitmenCosmeticLoadout LocalCosmetics;
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Travel")
+	bool bHasLocalLoadout = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Travel")
+	bool bHasLocalCosmetics = false;
+
 	void StorePendingMatch(const FHitmenLobbySettings& Settings, const TArray<FHitmenTeam>& Teams);
 	void ClearPendingMatch();
 

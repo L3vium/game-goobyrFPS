@@ -24,8 +24,27 @@ class HITMEN_API UHitmenPauseMapWidget : public UHitmenUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	/** Legend categories: 0 you, 1 teammates, 2 VIP, 3 retrieval points, 4 alerted NPCs, 5 cameras. */
+	static constexpr int32 CategoryCount = 6;
+	static FText GetCategoryName(int32 Category);
+	static FLinearColor GetCategoryColor(int32 Category);
+
+	void SetCategoryVisible(int32 Category, bool bVisible) { if (Category >= 0 && Category < CategoryCount) { bCategoryVisible[Category] = bVisible; } }
+	bool IsCategoryVisible(int32 Category) const { return Category >= 0 && Category < CategoryCount && bCategoryVisible[Category]; }
+
 protected:
+	virtual void NativeConstruct() override;
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+	virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+
+	FSlateBrush MapBrush;
+	bool bHasMap = false;
+	FBox2D Bounds = FBox2D(FVector2D(-20000.f), FVector2D(20000.f));
+	FText MapName;
+	bool bCategoryVisible[CategoryCount] = { true, true, true, true, true, true };
+	/** 1 = whole map; zooms around the player with the wheel. */
+	float Zoom = 1.f;
 };
 
 /** Gym / development panel: grant every weapon, ability and keycard. */
@@ -59,11 +78,11 @@ protected:
 	virtual void BuildDefaultLayout() override;
 	virtual void BindEvents() override;
 
-	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UButton> ResumeButton;
-	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UButton> OptionsButton;
-	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UButton> LeaveButton;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UHitmenPauseMapWidget> Map;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UHitmenDebugPanelWidget> DebugPanel;
+	UPROPERTY(Transient) TArray<TObjectPtr<class UHitmenToggle>> LegendToggles;
+
+	UFUNCTION() void HandleLegendToggled(bool bChecked);
 };
 
 /** One rebindable action: name + key button; click then press a key. */

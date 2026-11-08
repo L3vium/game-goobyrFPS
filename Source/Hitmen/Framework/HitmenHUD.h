@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "Core/HitmenTypes.h"
 #include "HitmenHUD.generated.h"
 
 class UUserWidget;
@@ -67,6 +68,13 @@ protected:
 	UFUNCTION() void HandleEmoteWheelToggled(bool bOpen);
 	UFUNCTION() void HandleSpectatorMode(uint8 Mode);
 	UFUNCTION() void HandleMatchEnded(const struct FHitmenMatchResult& Result);
+	UFUNCTION() void HandlePhaseChanged(EHitmenMatchPhase Phase);
+
+	/** Front end: blends the view to the camera tagged "Shot_<Phase>" (Shot_Title, Shot_Lobby...). */
+	void ApplyCameraShot(EHitmenMatchPhase Phase, bool bBlend);
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|HUD", meta=(ClampMin="0", Units="s"))
+	float ShotBlendTime = 1.2f;
 
 	UUserWidget* CreateHidden(TSubclassOf<UUserWidget> Class, int32 ZOrder);
 	void SetShown(UUserWidget* Widget, bool bShown);

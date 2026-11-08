@@ -1,6 +1,12 @@
 // Hitmen — overlays
 
 #include "UI/HitmenMenuWidgets.h"
+#include "GameFramework/PlayerState.h"
+#include "Engine/Texture2D.h"
+#include "EngineUtils.h"
+#include "Core/HitmenTeamLibrary.h"
+#include "World/Interactables/HitmenSecurity.h"
+#include "UI/HitmenMenuKit.h"
 #include "UI/HitmenUIFactory.h"
 #include "UI/HitmenUIEventSubsystem.h"
 #include "Framework/HitmenPlayerController.h"
@@ -64,42 +70,158 @@ namespace
 // Pause map
 // =============================================================================================
 
+FText UHitmenPauseMapWidget::GetCategoryName(int32 Category)
+{
+	switch (Category)
+	{
+	case 0: return LOCTEXT("LegendYou", "You");
+	case 1: return LOCTEXT("LegendTeam", "Teammates");
+	case 2: return LOCTEXT("LegendVIP", "Target (VIP)");
+	case 3: return LOCTEXT("LegendRetrieval", "Retrieval points");
+	case 4: return LOCTEXT("LegendAlerted", "Alerted guards");
+	default: return LOCTEXT("LegendCameras", "Cameras");
+	}
+}
+
+FLinearColor UHitmenPauseMapWidget::GetCategoryColor(int32 Category)
+{
+	switch (Category)
+	{
+	case 0: return HitmenUI::Text();
+	case 1: return FLinearColor(0.3f, 0.7f, 1.f);
+	case 2: return HitmenUI::Accent();
+	case 3: return HitmenUI::Warning();
+	case 4: return FLinearColor(1.f, 0.45f, 0.1f);
+	default: return FLinearColor(0.75f, 0.75f, 0.8f);
+	}
+}
+
+void UHitmenPauseMapWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	bHasMap = false;
+	if (const UHitmenMapDefinition* Map = HitmenUI::FindCurrentMap(this))
+	{
+		Bounds = Map->WorldBounds;
+		MapName = Map->DisplayName;
+		if (UTexture2D* Texture = Map->MapTexture.LoadSynchronous())
+		{
+			MapBrush.SetResourceObject(Texture);
+			MapBrush.ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+			bHasMap = true;
+		}
+	}
+	SetVisibility(ESlateVisibility::Visible);
+}
+
+FReply UHitmenPauseMapWidget::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	Zoom = FMath::Clamp(Zoom * (InMouseEvent.GetWheelDelta() > 0.f ? 1.25f : 0.8f), 1.f, 5.f);
+	return FReply::Handled();
+}
+
 int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-	const FVector2D Size = AllottedGeometry.GetLocalSize();
-	PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, HitmenUI::Panel());
+	const FVector2D Area = AllottedGeometry.GetLocalSize();
+	const float Side = FMath::Min(Area.X, Area.Y);
+	const FVector2D Origin = (Area - FVector2D(Side)) * 0.5f;
+	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, Origin, FVector2D(Side), FLinearColor(0.03f, 0.035f, 0.04f, 0.95f));
 
-	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
-	const UHitmenMapDefinition* Map = GS ? UHitmenGameSettings::Get()->LoadMap(GS->GetLobbySettings().MapIndex) : nullptr;
-	const FBox2D Bounds = Map ? Map->WorldBounds : FBox2D(FVector2D(-20000.f), FVector2D(20000.f));
 	const FVector2D Extent = Bounds.GetSize();
+	const APawn* Pawn = GetOwningPlayerPawn();
+	// Zoom keeps the player in view; north (+X) up.
+	FVector2D Focus = Bounds.GetCenter();
+	if (Pawn && Zoom > 1.f)
+	{
+		Focus = FVector2D(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
+	}
+	const float WorldSide = FMath::Max(Extent.X, Extent.Y) / Zoom;
+	const FVector2D ViewMin(Focus.X - WorldSide * 0.5f, Focus.Y - WorldSide * 0.5f);
 	auto ToMap = [&](const FVector& World)
 	{
-		const FVector2D Alpha((World.Y - Bounds.Min.Y) / FMath::Max(1.f, Extent.Y), 1.f - (World.X - Bounds.Min.X) / FMath::Max(1.f, Extent.X));
-		return FVector2D(FMath::Clamp(Alpha.X, 0.f, 1.f) * Size.X, FMath::Clamp(Alpha.Y, 0.f, 1.f) * Size.Y);
+		const FVector2D Alpha((World.Y - ViewMin.Y) / WorldSide, 1.f - (World.X - ViewMin.X) / WorldSide);
+		return Origin + Alpha * Side;
 	};
-
+	OutDrawElements.PushClip(FSlateClippingZone(AllottedGeometry));
+	if (bHasMap)
+	{
+		const FVector2D TopLeft = ToMap(FVector(Bounds.Max.X, Bounds.Min.Y, 0.f));
+		const FVector2D BottomRight = ToMap(FVector(Bounds.Min.X, Bounds.Max.Y, 0.f));
+		HitmenUI::PaintImage(OutDrawElements, LayerId + 1, AllottedGeometry, &MapBrush, TopLeft, BottomRight - TopLeft);
+	}
+	auto Marker = [&](int32 Category, const FVector& World, const FString& Label, float Size)
+	{
+		if (!bCategoryVisible[Category])
+		{
+			return;
+		}
+		const FVector2D P = ToMap(World);
+		const FLinearColor Color = GetCategoryColor(Category);
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, P - FVector2D(Size * 0.5f + 2.f), FVector2D(Size + 4.f), FLinearColor(0.f, 0.f, 0.f, 0.7f));
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 4, AllottedGeometry, P - FVector2D(Size * 0.5f), FVector2D(Size), Color);
+		if (!Label.IsEmpty())
+		{
+			HitmenUI::PaintText(OutDrawElements, LayerId + 4, AllottedGeometry, Label, P + FVector2D(Size, -Size - 4.f), HitmenUI::SpacedFont(14, TEXT("SemiBold"), 100), Color);
+		}
+	};
+	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
 	if (GS)
 	{
 		for (const AActor* Point : GS->GetActiveRetrievalPoints())
 		{
-			const FVector2D P = ToMap(Point->GetActorLocation());
-			PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, P - FVector2D(6.f), FVector2D(12.f), FLinearColor(1.f, 0.78f, 0.1f));
+			Marker(3, Point->GetActorLocation(), TEXT(""), 14.f);
 		}
 		if (const AActor* VIP = GS->GetVIP())
 		{
-			const FVector2D P = ToMap(VIP->GetActorLocation());
-			PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, P - FVector2D(6.f), FVector2D(12.f), GS->IsVIPDead() ? FLinearColor(1.f, 0.78f, 0.1f) : HitmenUI::Accent());
-			PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, TEXT("VIP"), P + FVector2D(8.f, -8.f), 12, HitmenUI::Text());
+			Marker(2, VIP->GetActorLocation(), TEXT("TARGET"), 14.f);
+		}
+		const int32 MyTeam = Pawn ? UHitmenTeamLibrary::GetTeamId(Pawn) : HitmenTeams::Neutral;
+		for (const APlayerState* PS : GS->PlayerArray)
+		{
+			const APawn* Mate = PS ? PS->GetPawn() : nullptr;
+			if (Mate && Mate != Pawn && MyTeam != HitmenTeams::Neutral && UHitmenTeamLibrary::GetTeamId(Mate) == MyTeam)
+			{
+				Marker(1, Mate->GetActorLocation(), PS->GetPlayerName().ToUpper(), 10.f);
+			}
 		}
 	}
-	if (const APawn* Pawn = GetOwningPlayerPawn())
+	if (const UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
-		const FVector2D P = ToMap(Pawn->GetActorLocation());
-		PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, P - FVector2D(5.f), FVector2D(10.f), HitmenUI::Text());
-		PaintText(OutDrawElements, LayerId + 3, AllottedGeometry, TEXT("YOU"), P + FVector2D(8.f, -8.f), 12, HitmenUI::Text());
+		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
+		{
+			if (Blip.Color != EHitmenAlertColor::None)
+			{
+				Marker(4, Blip.Location, TEXT(""), 9.f);
+			}
+		}
 	}
-	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
+	for (TActorIterator<AHitmenSecurityCamera> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsCameraDisabled())
+		{
+			Marker(5, It->GetActorLocation(), TEXT(""), 8.f);
+		}
+	}
+	if (Pawn && bCategoryVisible[0])
+	{
+		// You: an arrow along your view.
+		const FVector2D P = ToMap(Pawn->GetActorLocation());
+		const float Yaw = FMath::DegreesToRadians(Pawn->GetControlRotation().Yaw);
+		const FVector2D Dir(FMath::Sin(Yaw), -FMath::Cos(Yaw));
+		const FVector2D SideDir(-Dir.Y, Dir.X);
+		HitmenUI::PaintLines(OutDrawElements, LayerId + 5, AllottedGeometry, { P + Dir * 12.f, P - Dir * 8.f + SideDir * 8.f, P - Dir * 4.f, P - Dir * 8.f - SideDir * 8.f, P + Dir * 12.f }, HitmenUI::Text(), 2.5f);
+		HitmenUI::PaintText(OutDrawElements, LayerId + 5, AllottedGeometry, TEXT("YOU"), P + FVector2D(14.f, -10.f), HitmenUI::SpacedFont(14, TEXT("SemiBold"), 120), HitmenUI::Text());
+	}
+	OutDrawElements.PopClip();
+	// Frame, name and compass letter (dark bands keep the text readable on a light map).
+	HitmenUI::PaintGradient(OutDrawElements, LayerId + 6, AllottedGeometry, Origin, FVector2D(Side, 70.f), FLinearColor(0.f, 0.f, 0.f, 0.75f), FLinearColor(0.f, 0.f, 0.f, 0.f), false);
+	HitmenUI::PaintGradient(OutDrawElements, LayerId + 6, AllottedGeometry, Origin + FVector2D(0.f, Side - 50.f), FVector2D(Side, 50.f), FLinearColor(0.f, 0.f, 0.f, 0.f), FLinearColor(0.f, 0.f, 0.f, 0.7f), false);
+	HitmenUI::PaintFrame(OutDrawElements, LayerId + 7, AllottedGeometry, Origin, FVector2D(Side), HitmenUI::Hairline(), 1.f);
+	HitmenUI::PaintText(OutDrawElements, LayerId + 7, AllottedGeometry, MapName.ToString().ToUpper(), Origin + FVector2D(18.f, 14.f), HitmenUI::SpacedFont(26, TEXT("Bold"), 60), HitmenUI::Text());
+	HitmenUI::PaintText(OutDrawElements, LayerId + 7, AllottedGeometry, TEXT("N"), Origin + FVector2D(Side * 0.5f - 6.f, 8.f), HitmenUI::Font(20, TEXT("Bold")), HitmenUI::Accent());
+	const FString ZoomText = FString::Printf(TEXT("WHEEL TO ZOOM  -  x%.1f"), Zoom);
+	HitmenUI::PaintText(OutDrawElements, LayerId + 7, AllottedGeometry, ZoomText, Origin + FVector2D(18.f, Side - 30.f), HitmenUI::SpacedFont(13, TEXT("Medium"), 160), HitmenUI::TextDim());
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 8, InWidgetStyle, bParentEnabled);
 }
 
 // =============================================================================================
@@ -207,39 +329,82 @@ void UHitmenDebugPanelWidget::HandleGodClicked(int32 Index)
 
 void UHitmenPauseMenuWidget::BuildDefaultLayout()
 {
-	UBorder* Dim = HitmenUI::MakePanel(WidgetTree, HitmenUI::Background(), FMargin(60.f));
 	UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
-	Dim->SetContent(Canvas);
-	WidgetTree->RootWidget = Dim;
+	WidgetTree->RootWidget = Canvas;
+	UHitmenBackdrop* Backdrop = WidgetTree->ConstructWidget<UHitmenBackdrop>(UHitmenBackdrop::StaticClass());
+	Backdrop->LeftCoverage = 0.75f;
+	Backdrop->RightCoverage = 0.4f;
+	Backdrop->SetVisibility(ESlateVisibility::HitTestInvisible);
+	UCanvasPanelSlot* BackSlot = HitmenUI::AddToCanvas(Canvas, Backdrop, FAnchors(0.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
+	BackSlot->SetOffsets(FMargin(0.f));
 
+	// Left: title, actions, then the map legend.
 	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Paused", "PAUSE"), 64, TEXT("Black")));
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("StillRunning", "The match keeps running."), 14, TEXT("Regular"), HitmenUI::TextDim()), FMargin(0.f, 0.f, 0.f, 20.f));
-	ResumeButton = HitmenUI::MakeButton(WidgetTree, LOCTEXT("Resume", "RESUME"), 22, EHitmenButtonStyle::Solid);
-	OptionsButton = HitmenUI::MakeButton(WidgetTree, LOCTEXT("Options", "OPTIONS"), 22, EHitmenButtonStyle::Solid);
-	LeaveButton = HitmenUI::MakeButton(WidgetTree, LOCTEXT("Leave", "LEAVE MATCH"), 22, EHitmenButtonStyle::Dashed);
-	for (UButton* Button : { ResumeButton.Get(), OptionsButton.Get(), LeaveButton.Get() })
+	HitmenUI::AddToCanvas(Canvas, Column, FAnchors(0.f, 0.f), FVector2D(96.f, 84.f), FVector2D::ZeroVector);
+	UTextBlock* Overline = HitmenUI::MakeText(WidgetTree, LOCTEXT("InProgress", "CONTRACT IN PROGRESS"), 15, TEXT("Medium"), HitmenUI::TextDim());
+	Overline->SetFont(HitmenUI::SpacedFont(15, TEXT("Medium"), 260));
+	HitmenUI::AddToVBox(Column, Overline);
+	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Paused", "PAUSED"), 76, TEXT("Bold")), FMargin(0.f, -10.f, 0.f, 0.f));
+	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("StillRunning", "The match keeps running."), 18, TEXT("Italic"), HitmenUI::TextDim()), FMargin(2.f, 0.f, 0.f, 26.f));
+	struct FEntry { FText Label; EHitmenMenuButtonKind Kind; FName Handler; };
+	const FEntry Entries[] = {
+		{ LOCTEXT("Resume", "Resume"), EHitmenMenuButtonKind::Secondary, GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, Resume) },
+		{ LOCTEXT("Options", "Options"), EHitmenMenuButtonKind::Secondary, GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, OpenOptions) },
+		{ LOCTEXT("Leave", "Leave match"), EHitmenMenuButtonKind::Back, GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, LeaveMatch) } };
+	for (const FEntry& Entry : Entries)
 	{
-		USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-		Size->SetWidthOverride(320.f);
-		Size->SetContent(Button);
-		HitmenUI::AddToVBox(Column, Size, FMargin(0.f, 5.f), false, HAlign_Left);
+		UHitmenMenuButton* Button = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
+		Button->Setup(Entry.Label, Entry.Kind);
+		FScriptDelegate Delegate;
+		Delegate.BindUFunction(this, Entry.Handler);
+		Button->OnClicked.Add(Delegate);
+		HitmenUI::AddToVBox(Column, Button, FMargin(-22.f, 2.f, 0.f, 2.f), false, HAlign_Left);
 	}
-	HitmenUI::AddToCanvas(Canvas, Column, FAnchors(0.f, 0.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
+	UTextBlock* LegendTitle = HitmenUI::MakeText(WidgetTree, LOCTEXT("Legend", "MAP LEGEND"), 15, TEXT("Medium"), HitmenUI::TextDim());
+	LegendTitle->SetFont(HitmenUI::SpacedFont(15, TEXT("Medium"), 260));
+	HitmenUI::AddToVBox(Column, LegendTitle, FMargin(0.f, 40.f, 0.f, 10.f));
+	for (int32 Category = 0; Category < UHitmenPauseMapWidget::CategoryCount; ++Category)
+	{
+		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+		UBorder* Swatch = HitmenUI::MakePanel(WidgetTree, UHitmenPauseMapWidget::GetCategoryColor(Category), FMargin(0.f));
+		USizeBox* SwatchSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+		SwatchSize->SetWidthOverride(10.f);
+		SwatchSize->SetHeightOverride(10.f);
+		SwatchSize->SetContent(Swatch);
+		HitmenUI::AddToHBox(Row, SwatchSize, FMargin(0.f, 0.f, 12.f, 0.f));
+		UHitmenToggle* Toggle = WidgetTree->ConstructWidget<UHitmenToggle>(UHitmenToggle::StaticClass());
+		Toggle->Setup(UHitmenPauseMapWidget::GetCategoryName(Category), true, 18);
+		Toggle->OnToggled.AddDynamic(this, &UHitmenPauseMenuWidget::HandleLegendToggled);
+		HitmenUI::AddToHBox(Row, Toggle);
+		HitmenUI::AddToVBox(Column, Row, FMargin(0.f, 3.f));
+		LegendToggles.Add(Toggle);
+	}
 
+	// The map takes most of the screen.
 	Map = WidgetTree->ConstructWidget<UHitmenPauseMapWidget>(UHitmenPauseMapWidget::StaticClass());
-	HitmenUI::AddToCanvas(Canvas, Map, FAnchors(0.5f, 0.5f), FVector2D(80.f, 0.f), FVector2D(0.5f, 0.5f), FVector2D(560.f, 560.f));
+	UCanvasPanelSlot* MapSlot = HitmenUI::AddToCanvas(Canvas, Map, FAnchors(0.24f, 0.05f, 0.82f, 0.95f), FVector2D::ZeroVector, FVector2D::ZeroVector);
+	MapSlot->SetOffsets(FMargin(0.f));
 
+	// Debug tools flush against the right edge.
 	DebugPanel = WidgetTree->ConstructWidget<UHitmenDebugPanelWidget>(UHitmenDebugPanelWidget::StaticClass());
-	UCanvasPanelSlot* DebugSlot = HitmenUI::AddToCanvas(Canvas, DebugPanel, FAnchors(1.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D(1.f, 0.f));
-	DebugSlot->SetOffsets(FMargin(-300.f, 0.f, 300.f, 0.f));
+	UCanvasPanelSlot* DebugSlot = HitmenUI::AddToCanvas(Canvas, DebugPanel, FAnchors(1.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
+	DebugSlot->SetOffsets(FMargin(-280.f, 0.f, 280.f, 0.f));
+}
+
+void UHitmenPauseMenuWidget::HandleLegendToggled(bool bChecked)
+{
+	if (!Map)
+	{
+		return;
+	}
+	for (int32 Category = 0; Category < LegendToggles.Num(); ++Category)
+	{
+		Map->SetCategoryVisible(Category, LegendToggles[Category]->IsChecked());
+	}
 }
 
 void UHitmenPauseMenuWidget::BindEvents()
 {
-	if (ResumeButton) { ResumeButton->OnClicked.AddUniqueDynamic(this, &UHitmenPauseMenuWidget::Resume); }
-	if (OptionsButton) { OptionsButton->OnClicked.AddUniqueDynamic(this, &UHitmenPauseMenuWidget::OpenOptions); }
-	if (LeaveButton) { LeaveButton->OnClicked.AddUniqueDynamic(this, &UHitmenPauseMenuWidget::LeaveMatch); }
 	if (DebugPanel)
 	{
 		const AHitmenGameState* GS = GetHitmenGameState();

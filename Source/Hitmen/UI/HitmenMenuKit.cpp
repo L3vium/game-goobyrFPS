@@ -7,6 +7,7 @@
 #include "Components/Button.h"
 #include "Components/ButtonSlot.h"
 #include "Components/TextBlock.h"
+#include "Components/SizeBox.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/Texture2D.h"
@@ -256,6 +257,19 @@ void UHitmenToggle::Setup(const FText& InLabel, bool bInChecked, int32 InFontSiz
 	bChecked = bInChecked;
 	FontSize = InFontSize;
 	SetVisibility(ESlateVisibility::Visible);
+	// Painted widget: a sized root gives it a real desired size in boxes.
+	if (WidgetTree)
+	{
+		USizeBox* Box = Cast<USizeBox>(WidgetTree->RootWidget);
+		if (!Box)
+		{
+			Box = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+			WidgetTree->RootWidget = Box;
+		}
+		const FVector2D Desired = GetDesiredSizeForPaint();
+		Box->SetWidthOverride(Desired.X + 4.f);
+		Box->SetHeightOverride(Desired.Y + 4.f);
+	}
 }
 
 FVector2D UHitmenToggle::GetDesiredSizeForPaint() const

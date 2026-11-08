@@ -1,6 +1,10 @@
 // Hitmen — player character
 
 #include "Characters/HitmenPlayerCharacter.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
+#include "Data/HitmenSoundSet.h"
 #include "Framework/HitmenPlayerState.h"
 #include "Framework/HitmenGameState.h"
 #include "AI/HitmenAIController.h"
@@ -79,6 +83,18 @@ AHitmenPlayerCharacter::AHitmenPlayerCharacter(const FObjectInitializer& ObjectI
 	SightroomComponent = CreateDefaultSubobject<UHitmenSightroomComponent>(TEXT("Sightroom"));
 	EmoteComponent = CreateDefaultSubobject<UHitmenEmoteComponent>(TEXT("Emote"));
 
+	ParachuteCanopy = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ParachuteCanopy"));
+	ParachuteCanopy->SetupAttachment(GetCapsuleComponent());
+	ParachuteCanopy->SetRelativeLocation(FVector(0.f, 0.f, 330.f));
+	ParachuteCanopy->SetRelativeScale3D(FVector(4.2f, 3.2f, 0.7f));
+	ParachuteCanopy->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ParachuteCanopy->SetVisibility(false);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CanopyMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (CanopyMesh.Succeeded())
+	{
+		ParachuteCanopy->SetStaticMesh(CanopyMesh.Object);
+	}
+
 	CharmedControllerClass = AHitmenAIController::StaticClass();
 }
 
@@ -86,6 +102,7 @@ void AHitmenPlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(AHitmenPlayerCharacter, bIsAiming, COND_SkipOwner);
+	DOREPLIFETIME(AHitmenPlayerCharacter, bParachuting);
 }
 
 void AHitmenPlayerCharacter::BeginPlay()
@@ -170,9 +187,68 @@ void AHitmenPlayerCharacter::PossessedBy(AController* NewController)
 	}
 }
 
+void AHitmenPlayerCharacter::StartParachute()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	bParachuting = true;
+	OnRep_Parachuting();
+}
+
+void AHitmenPlayerCharacter::OnRep_Parachuting()
+{
+	ParachuteCanopy->SetVisibility(bParachuting);
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->AirControl = bParachuting ? 0.f : 0.35f;
+		if (bParachuting)
+		{
+			Movement->SetMovementMode(MOVE_Falling);
+		}
+	}
+	if (bParachuting)
+	{
+		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::Parachute, GetActorLocation());
+	}
+	Juice_OnParachute(bParachuting);
+}
+
+void AHitmenPlayerCharacter::Landed(const FHitResult& Hit)
+{
+	Super::Landed(Hit);
+	if (bParachuting)
+	{
+		if (HasAuthority())
+		{
+			bParachuting = false;
+			OnRep_Parachuting();
+			PlayAnimSetMontage(EHitmenAnimMontage::ParachuteLand);
+		}
+		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::Landing, GetActorLocation());
+		if (IsLocallyControlled())
+		{
+			AddCameraShake(1.2f, 0.35f);
+		}
+	}
+}
+
 void AHitmenPlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (bParachuting)
+	{
+		// Slow, steady descent with a little drift; the canopy sways.
+		if (UCharacterMovementComponent* Movement = GetCharacterMovement(); Movement && (HasAuthority() || IsLocallyControlled()))
+		{
+			const float Time = GetWorld()->GetTimeSeconds();
+			Movement->Velocity.Z = FMath::Max(Movement->Velocity.Z, -ParachuteFallSpeed);
+			Movement->Velocity.X = FMath::Sin(Time * 0.7f) * ParachuteDrift;
+			Movement->Velocity.Y = FMath::Cos(Time * 0.5f) * ParachuteDrift;
+		}
+		ParachuteCanopy->SetRelativeRotation(FRotator(FMath::Sin(GetWorld()->GetTimeSeconds() * 1.3f) * 6.f, 0.f, FMath::Cos(GetWorld()->GetTimeSeconds()) * 5.f));
+	}
 	if (bDeathCameraActive)
 	{
 		UpdateDeathCamera(DeltaSeconds);
@@ -460,7 +536,7 @@ bool AHitmenPlayerCharacter::CanAct() const
 
 void AHitmenPlayerCharacter::Input_Move(const FVector2D& Axis)
 {
-	if (!CanAct() || !StatusEffectComponent->CanMove())
+	if (!CanAct() || !StatusEffectComponent->CanMove() || bParachuting)
 	{
 		return;
 	}
@@ -494,7 +570,7 @@ void AHitmenPlayerCharacter::Input_Look(const FVector2D& Axis)
 
 void AHitmenPlayerCharacter::Input_JumpPressed()
 {
-	if (CanAct())
+	if (CanAct() && !bParachuting)
 	{
 		Jump();
 	}

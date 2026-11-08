@@ -11,7 +11,7 @@ if HERE not in sys.path:
     sys.path.append(HERE)
 
 STEPS = os.environ.get("HITMEN_RUN_STEPS", "content,levels")
-FORCE = os.environ.get("HITMEN_RUN_FORCE_MAPS", "L_Gym")
+FORCE = os.environ.get("HITMEN_RUN_FORCE_MAPS", "")
 
 os.environ["HITMEN_BUILD_STEPS"] = STEPS
 os.environ["HITMEN_FORCE_MAPS"] = FORCE

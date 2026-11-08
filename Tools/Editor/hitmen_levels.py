@@ -233,12 +233,24 @@ def ability_pickup(loc, ability, folder="Gameplay/Loot"):
 
 
 # ---------------------------------------------------------------------------------------------
-# Title screen: a museum hall, the assassin on the right, ambient sound
+# Front end: one scene for the title (museum), the room (briefing room) and "Your agent" (stage).
+# The HUD blends between CameraActors tagged Shot_<Phase>; no level ever loads between screens.
 # ---------------------------------------------------------------------------------------------
 
-def build_title():
-    new_map("L_TitleScreen")
-    game_mode("BP_GM_Menu")
+def shot(name, loc, rot, fov=70.0):
+    camera = spawn(unreal.CameraActor, loc, rot, name, "Cameras")
+    camera.camera_component.set_editor_property("field_of_view", fov)
+    camera.camera_component.set_editor_property("constrain_aspect_ratio", False)
+    camera.tags = [unreal.Name(name)]
+    return camera
+
+
+def build_front_end():
+    new_map("L_FrontEnd")
+    game_mode("BP_GM_Lobby")
+    environment(sun_pitch=-60, intensity=0.0, fog=0.02)
+
+    # ---- Museum hall (title) ----
     floor((1200, 0, 0), (3600, 2400, 0), mi("MI_White"))
     box((1200, 0, 900), (3600, 2400, 20), mi("MI_Dark"), folder="Museum")
     for side in (-1, 1):
@@ -246,19 +258,15 @@ def build_title():
         for i in range(6):
             x = -200 + i * 600
             box((x, side * 1050, 400), (90, 90, 800), mi("MI_White"), folder="Museum", shape="cylinder")
-            # Paintings in gold frames.
             if i % 2 == 0:
                 box((x + 300, side * 1170, 360), (260, 20, 180), mi("MI_Gold"), folder="Museum")
                 box((x + 300, side * 1160, 360), (220, 10, 140), mi(["MI_Red", "MI_Blue", "MI_Green"][i // 2 % 3]), folder="Museum")
-    wall((3000, -1200), (3000, 1200), 0, 900, 40, material=mi("MI_Stone"), folder="Museum")
-    box((2980, 0, 420), (20, 500, 320), mi("MI_Gold"), folder="Museum")
-    box((2970, 0, 420), (10, 440, 260), mi("MI_Dark"), folder="Museum")
-    # Pedestals with sculptures.
-    for x, y, shape, mat in ((900, -500, "sphere", "MI_White"), (1700, 450, "cone", "MI_Gold"), (2300, -300, "cube", "MI_Stone")):
+    wall((-600, -1200), (-600, 1200), 0, 900, 40, material=mi("MI_Stone"), folder="Museum")
+    # The far wall opens onto the briefing room (the camera flies through it).
+    wall((3000, -1200), (3000, 1200), 0, 900, 40, openings=[(1200, 700, 0, 520)], material=mi("MI_Stone"), folder="Museum")
+    for x, y, shape, mat in ((900, -500, "sphere", "MI_White"), (1700, 450, "cone", "MI_Gold"), (2300, -500, "cube", "MI_Stone")):
         box((x, y, 60), (120, 120, 120), mi("MI_Dark"), folder="Museum")
         box((x, y, 180), (90, 90, 120), mi(mat), folder="Museum", shape=shape)
-    # Lighting: dim ambience, spotlights.
-    environment(sun_pitch=-60, intensity=0.0, fog=0.02)
     for x in (300, 1200, 2100):
         spot = spawn(unreal.SpotLight, (x, 0, 850), (-90, 0, 0), None, "Lighting")
         spot.spot_light_component.set_editor_property("intensity", 6000.0)
@@ -268,12 +276,10 @@ def build_title():
             fill = spawn(unreal.PointLight, (x, y, 650), label=None, folder="Lighting")
             fill.point_light_component.set_editor_property("intensity", 4000.0)
             fill.point_light_component.set_editor_property("attenuation_radius", 1600.0)
-            fill.point_light_component.set_editor_property("light_color", unreal.Color(255, 214, 170, 255))
+            fill.point_light_component.set_editor_property("light_color", unreal.Color(r=255, g=214, b=170, a=255))
     key = spawn(unreal.SpotLight, (-150, 60, 330), (-30, 25, 0), "KeyLight", "Lighting")
     key.spot_light_component.set_editor_property("intensity", 12000.0)
     key.spot_light_component.set_editor_property("outer_cone_angle", 30.0)
-
-    # The assassin (engine mannequin) on the right, idling.
     manny = spawn(unreal.SkeletalMeshActor, (120, 150, 0), (0, 115, 0), "Assassin", "Museum")
     comp = manny.skeletal_mesh_component
     comp.set_skeletal_mesh_asset(load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"))
@@ -283,22 +289,85 @@ def build_title():
     anim.set_editor_property("saved_looping", True)
     anim.set_editor_property("saved_playing", True)
     comp.set_editor_property("animation_data", anim)
-    
-
-    camera = spawn(unreal.CameraActor, (-380, -60, 165), (-4, 6, 0), "MenuCamera", "Camera")
-    camera.set_editor_property("auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
-    camera.camera_component.set_editor_property("field_of_view", 70.0)
+    title_cam = shot("Shot_Title", (-380, -60, 165), (-4, 6, 0))
+    title_cam.set_editor_property("auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
     spawn(unreal.AmbientSound, (1200, 0, 300), label="MuseumAmbience (assign a sound)", folder="Audio")
+
+    # ---- Briefing room (lobby) ----
+    floor((4300, 0, 0), (2600, 2400, 0), mi("MI_Dark"))
+    box((4300, 0, 620), (2600, 2400, 20), mi("MI_Dark"), folder="Briefing")
+    for side in (-1, 1):
+        wall((3000, side * 1200), (5600, side * 1200), 0, 620, 40, material=mi("MI_Stone"), folder="Briefing")
+    wall((5600, -1200), (5600, 1200), 0, 620, 40, material=mi("MI_Stone"), folder="Briefing")
+    # Map table: dark slab with a lit schematic top, chairs around.
+    box((4000, 350, 40), (1000, 560, 80), mi("MI_Dark"), folder="Briefing/Table")
+    box((4000, 350, 84), (940, 500, 6), mi("MI_Dark"), folder="Briefing/Table")
+    box((4000, 350, 88), (700, 360, 2), mi("MI_Blue"), folder="Briefing/Table")
+    for i in range(4):
+        box((3650 + i * 230, 350 + 400, 45), (60, 60, 90), mi("MI_Stone"), folder="Briefing/Table")
+        box((3650 + i * 230, 350 - 400, 45), (60, 60, 90), mi("MI_Stone"), folder="Briefing/Table")
+    # Screens on the side wall.
+    for i, mat in enumerate(("MI_Red", "MI_Blue", "MI_White")):
+        box((3600 + i * 600, 1170, 330), (480, 16, 270), mi("MI_Dark"), folder="Briefing/Screens")
+        box((3600 + i * 600, 1160, 330), (440, 6, 230), mi(mat), folder="Briefing/Screens")
+    for x in (3500, 4500):
+        lamp = spawn(unreal.SpotLight, (x, 350, 600), (-90, 0, 0), None, "Lighting")
+        lamp.spot_light_component.set_editor_property("intensity", 2500.0)
+        lamp.spot_light_component.set_editor_property("outer_cone_angle", 35.0)
+        lamp.spot_light_component.set_editor_property("light_color", unreal.Color(r=200, g=220, b=255, a=255))
+    shot("Shot_Lobby", (3250, -650, 430), (-28, 40, 0))
+
+    # ---- Agent stage (customization): the agent stands on the left third of the frame ----
+    sx, sy = 5000, -600
+    box((sx, sy, 5), (320, 320, 10), mi("MI_Stone"), folder="Stage", shape="cylinder")
+    spawn(bp("Characters/Player/BP_AgentPreview"), (sx, sy, 10), (0, 72, 0), "AgentPreview", "Stage")
+    stage_key = spawn(unreal.SpotLight, (sx - 250, sy + 150, 420), (-55, -30, 0), "StageKey", "Lighting")
+    stage_key.spot_light_component.set_editor_property("intensity", 6000.0)
+    stage_key.spot_light_component.set_editor_property("outer_cone_angle", 28.0)
+    stage_rim = spawn(unreal.SpotLight, (sx + 260, sy - 200, 380), (-45, 145, 0), "StageRim", "Lighting")
+    stage_rim.spot_light_component.set_editor_property("intensity", 9000.0)
+    stage_rim.spot_light_component.set_editor_property("outer_cone_angle", 30.0)
+    stage_rim.spot_light_component.set_editor_property("light_color", unreal.Color(r=255, g=90, b=80, a=255))
+    shot("Shot_Customization", (sx - 480, sy + 130, 125), (-3, 0, 0))
     save_map()
 
 
-def build_lobby():
-    new_map("L_Lobby")
-    game_mode("BP_GM_Lobby")
-    floor((0, 0, 0), (3000, 3000, 0), mi("MI_Dark"))
-    environment(intensity=1.0, fog=0.03)
-    camera = spawn(unreal.CameraActor, (-600, 0, 200), (-10, 0, 0), "LobbyCamera", "Camera")
-    camera.set_editor_property("auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
+def respread_ldtest_spawns(count=16, half=8200):
+    """Many spawn points spread over open ground (the match picks one cluster per team at random).
+    Idempotent: replaces every team start. Also clears leftover civilian placements."""
+    LES.load_level(path("Maps", "L_LDTest"))
+    world = UES.get_editor_world()
+    for actor in EAS.get_all_level_actors():
+        name = actor.get_class().get_name()
+        if "TeamStart" in name or "Civilian" in name or "Civilian" in actor.get_actor_label():
+            EAS.destroy_actor(actor)
+    candidates = []
+    step = 700
+    for gx in range(-half, half + 1, step):
+        for gy in range(-half, half + 1, step):
+            hit = unreal.SystemLibrary.line_trace_single(world, unreal.Vector(gx, gy, 4000), unreal.Vector(gx, gy, -200),
+                                                         unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [], unreal.DrawDebugTrace.NONE, True)
+            if not hit:
+                continue
+            impact = hit.to_tuple()[4]
+            if impact.z > 40:          # roofs, crates: outdoors on the ground only
+                continue
+            blocked = unreal.SystemLibrary.sphere_trace_single(world, unreal.Vector(gx, gy, impact.z + 140), unreal.Vector(gx, gy, impact.z + 141), 120.0,
+                                                               unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [], unreal.DrawDebugTrace.NONE, True)
+            if blocked:
+                continue
+            candidates.append((gx, gy, impact.z))
+    # Farthest-point selection from a fixed seed so re-runs give the same layout.
+    chosen = []
+    if candidates:
+        chosen.append(min(candidates, key=lambda c: (c[0] + half) ** 2 + (c[1] + half) ** 2))
+    while candidates and len(chosen) < count:
+        best = max(candidates, key=lambda c: min((c[0] - o[0]) ** 2 + (c[1] - o[1]) ** 2 for o in chosen))
+        chosen.append(best)
+    for x, y, z in chosen:
+        yaw = math.degrees(math.atan2(-y, -x))   # face the map centre
+        spawn(bp("World/Spawning/BP_TeamStart"), (x, y, z + 120), (0, yaw, 0), None, "Gameplay/Starts")
+    log("LDTest spawns", len(chosen), "from", len(candidates), "candidates")
     save_map()
 
 
@@ -879,15 +948,23 @@ def should_build(name):
     return True
 
 
+OLD_FRONT_END_MAPS = ("L_TitleScreen", "L_Lobby")
+
+
 def run():
-    build_title()
-    build_lobby()
+    build_front_end()
     build_empty("L_Empty_01")
     build_empty("L_Empty_02")
     if should_build("L_Gym"):
         build_gym()
     if should_build("L_LDTest"):
         build_ldtest()
+    respread_ldtest_spawns()
     link_map_definitions()
     bake_map_textures()
-    LES.load_level(path("Maps", "L_TitleScreen"))
+    LES.load_level(path("Maps", "L_FrontEnd"))
+    # The title screen and lobby maps were merged into L_FrontEnd.
+    for name in OLD_FRONT_END_MAPS:
+        if EAL.does_asset_exist(path("Maps", name)):
+            EAL.delete_asset(path("Maps", name))
+            log("deleted old map", name)

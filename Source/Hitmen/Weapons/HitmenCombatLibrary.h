@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Core/HitmenTypes.h"
 #include "HitmenCombatLibrary.generated.h"
 
 UCLASS()
@@ -20,6 +21,10 @@ public:
 	static void Explode(const UObject* WorldContextObject, FVector Origin, float Radius, float Damage, AActor* DamageCauser, AController* InstigatorController, float NoiseRadius = 4000.f, float Impulse = 150000.f);
 
 	/** Eye location and view direction of a pawn (camera for players, eyes for NPCs). */
+	/** Make a noise NPCs can hear: graded, occluded, only the nearest responders react. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|AI", meta=(WorldContext="WorldContextObject"))
+	static void ReportNoise(const UObject* WorldContextObject, FVector Location, float Radius, AActor* NoiseInstigator, EHitmenNoiseType Type);
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Combat")
 	static void GetAimPoint(const APawn* Pawn, FVector& OutLocation, FVector& OutDirection);
 

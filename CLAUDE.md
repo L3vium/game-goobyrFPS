@@ -21,13 +21,30 @@ Everything (docs, comments, commits) is in English.
 
 ## Build
 Engine: `C:\Program Files\Epic Games\UE_5.7`.
-- Editor build (editor closed):
-  `"C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat" HitmenEditor Win64 Development -Project="%CD%\Hitmen.uproject" -WaitMutex`
+- **Compile C++ only through `Tools/Editor/ue_rebuild.ps1`** (`Tools/Editor/Rebuild.bat` for a
+  double-click). Never close the editor or run `Build.bat` by hand: the script guarantees the
+  editor ends up open again.
+  `powershell -NoProfile -ExecutionPolicy Bypass -File Tools/Editor/ue_rebuild.ps1 [-Mode auto|live|full] [-FullOnError]`
+  - `auto`: only `.cpp` changed → Live Coding patches the open editor. A header, Build.cs,
+    `.uproject` or new file changed, or the editor is closed → stop PIE, save dirty packages,
+    close, `Build.bat`, reopen (in a `finally`, even on a failed build) and wait until it answers.
+  - Exit 0 ok · 1 compile error (editor open; errors in the Live Coding window, or rerun with
+    `-FullOnError` to print them) · 2 the editor would not close or save (nothing touched) ·
+    3 the editor did not answer after reopening.
+  - Live Coding patches are lost when the editor closes; with the editor closed the script builds
+    first, so use it to open the editor too.
+  - `-RunPython <script.py>` runs editor Python headless between the build and the reopen. Use it
+    for behavior trees (`Tools/Editor/hitmen_build_ai.py`): rebuilding trees inside the running
+    editor crashed it.
+- New `UCLASS`/`UPROPERTY`/`UFUNCTION` need a full build (Live Coding cannot add reflected
+  types); the script handles it. Batch header changes into milestones to limit restarts.
+- The Unreal MCP endpoint is served by the editor (`127.0.0.1:3000/mcp`): it is down while the
+  editor is closed, and a session started with the editor closed needs `/mcp` → reconnect.
 - Player builds (`RunUAT BuildCookRun`): Shipping → `Builds/Windows`, Development (cheats) →
-  `Builds/Windows Dev`. Both are versioned through LFS.
-- New `UCLASS`/`UPROPERTY`/`UFUNCTION` need the editor closed and a full build (Live Coding
-  cannot add reflected types). Claude may save, close and relaunch the editor for this; batch C++
-  changes into milestones.
+  `Builds/Windows Dev`. Both are versioned through LFS. RunUAT breaks on an archive path with a
+  space: archive to `Builds/_DevTmp`, flatten the nested `Windows/` folder, then move it.
+  Pass `-NoCompileEditor` to package with the editor open (UBT refuses to build the editor
+  target while Live Coding is active).
 
 ## Editor access
 The Unreal MCP server (`mcp__unreal-engine__*`, McpAutomationBridge plugin) drives the open

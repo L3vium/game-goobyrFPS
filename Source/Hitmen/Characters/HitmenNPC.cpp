@@ -47,9 +47,22 @@ void AHitmenNPC::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(AHitmenNPC, Weapon);
 }
 
+void AHitmenNPC::PostInitializeComponents()
+{
+	// Before Super: a placed NPC is auto-possessed there, and its controller reads the post.
+	PostLocation = GetActorLocation();
+	PostRotation = FRotator(0.f, GetActorRotation().Yaw, 0.f);
+	Super::PostInitializeComponents();
+}
+
 void AHitmenNPC::BeginPlay()
 {
 	Super::BeginPlay();
+	AlertComponent->SetReactsToNoises(bReactsToNoises);
+	if (Behavior == EHitmenNPCBehavior::Patrol && !PatrolRoute && HasAuthority())
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("%s patrols without a route: it stands at its post."), *GetName());
+	}
 	AlertComponent->OnAlertStateChanged.AddDynamic(this, &AHitmenNPC::HandleAlertStateChanged);
 	HandleAlertStateChanged(EHitmenAlertState::Unaware, AlertComponent->GetAlertState());
 	if (GetNetMode() != NM_DedicatedServer)

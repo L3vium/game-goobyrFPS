@@ -19,6 +19,16 @@ enum class EHitmenTeamRole : uint8
 	Protect
 };
 
+/** What an NPC does while calm. */
+UENUM(BlueprintType)
+enum class EHitmenNPCBehavior : uint8
+{
+	/** Walks its patrol route (stands at its post if it has none). */
+	Patrol,
+	/** Stands at its post, facing the way it was placed; returns there after an alert. */
+	Stationary
+};
+
 /** NPC awareness, mirrored on HUD, minimap and overhead indicators. */
 UENUM(BlueprintType)
 enum class EHitmenAlertState : uint8

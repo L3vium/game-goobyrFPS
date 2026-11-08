@@ -74,3 +74,8 @@ FVector UHitmenCombatLibrary::RandomConeDirection(const FVector& Direction, floa
 	FRandomStream Stream(Seed * 7919 + Index * 104729);
 	return Stream.VRandCone(Direction, FMath::DegreesToRadians(FMath::Max(0.f, HalfAngleDegrees)));
 }
+
+void UHitmenCombatLibrary::ReportNoise(const UObject* WorldContextObject, FVector Location, float Radius, AActor* NoiseInstigator, EHitmenNoiseType Type)
+{
+	UHitmenAISubsystem::ReportNoise(WorldContextObject, Location, Radius, NoiseInstigator, Type);
+}

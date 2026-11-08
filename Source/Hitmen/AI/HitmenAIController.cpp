@@ -30,6 +30,8 @@ namespace HitmenBBKeys
 	const FName HomeLocation = TEXT("HomeLocation");
 	const FName UseActor = TEXT("UseActor");
 	const FName CanCallReinforcements = TEXT("CanCallReinforcements");
+	const FName IsStationary = TEXT("IsStationary");
+	const FName HoldPosition = TEXT("HoldPosition");
 }
 
 AHitmenAIController::AHitmenAIController()
@@ -81,7 +83,10 @@ void AHitmenAIController::OnPossess(APawn* InPawn)
 		Blackboard->SetValueAsVector(HitmenBBKeys::HomeLocation, InPawn->GetActorLocation());
 		if (const AHitmenNPC* NPC = Cast<AHitmenNPC>(InPawn))
 		{
+			Blackboard->SetValueAsVector(HitmenBBKeys::HomeLocation, NPC->GetPostLocation());
 			Blackboard->SetValueAsBool(HitmenBBKeys::IsSniper, NPC->IsSniper());
+			Blackboard->SetValueAsBool(HitmenBBKeys::IsStationary, NPC->GetBehavior() == EHitmenNPCBehavior::Stationary);
+			Blackboard->SetValueAsBool(HitmenBBKeys::HoldPosition, NPC->HoldsPosition());
 		}
 	}
 

@@ -5,6 +5,25 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+### Added
+- `Tools/Editor/ue_rebuild.ps1` / `Rebuild.bat`: compiles C++ with Live Coding when only `.cpp`
+  files changed, otherwise saves, closes, builds and always reopens the editor.
+- Two NPC types: **Patrol** (route) and **Stationary** (holds its post and facing, `BT_Guard`).
+  New options: React To Noises (off = sight and damage only) and Hold Position (never moves;
+  shoots on sight, searches by looking around). Sentries at the LDTest manor gate; gym pens for
+  every type.
+- `Report Noise` Blueprint node (`UHitmenCombatLibrary::ReportNoise`).
+- `ue_rebuild.ps1 -RunPython <script>` runs editor Python headless between the build and the
+  reopen; `Tools/Editor/hitmen_build_ai.py` regenerates the behavior trees that way.
+
+### Changed
+- `ue_remote.py` targets the Hitmen editor when several Unreal editors are open.
+
+### Fixed
+- Rebuilding a behavior tree over an existing one lost decorators (one per old decorator), so
+  NPCs neither moved nor shot; the builder now purges the old tree first.
+- `ue_rebuild.ps1` closes leftover crash reporters and retries a link blocked by a locked DLL.
+
 ### Known gaps (next)
 - Lobby / session flow not yet tested with real clients (Null in PIE multi-client, Steam in the
   packaged Development build).

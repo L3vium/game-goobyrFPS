@@ -172,6 +172,9 @@ class HITMEN_API UHitmenAbility_Transposition : public UHitmenMoveAbility
 {
 	GENERATED_BODY()
 
+public:
+	virtual AActor* FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const override;
+
 protected:
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
 };

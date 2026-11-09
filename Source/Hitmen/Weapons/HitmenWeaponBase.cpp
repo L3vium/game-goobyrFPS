@@ -79,6 +79,7 @@ void AHitmenWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AHitmenWeaponBase, WeaponData);
 	DOREPLIFETIME(AHitmenWeaponBase, OwnerPawn);
 	DOREPLIFETIME(AHitmenWeaponBase, WeaponState);
+	DOREPLIFETIME(AHitmenWeaponBase, bHovering);
 }
 
 void AHitmenWeaponBase::BeginPlay()
@@ -166,6 +167,15 @@ void AHitmenWeaponBase::ApplyVisualsFromData()
 	{
 		SkeletalMesh->SetSkeletalMesh(WeaponData->SkeletalMesh.LoadSynchronous());
 	}
+	// The mesh pack's orientation / scale (data), under the grip pivot.
+	StaticMesh->SetRelativeTransform(WeaponData->VisualTransform);
+	SkeletalMesh->SetRelativeTransform(WeaponData->VisualTransform);
+	// Only one visual is ever shown: the skeletal mesh when there is one (animated parts).
+	if (SkeletalMesh->GetSkeletalMeshAsset())
+	{
+		StaticMesh->SetStaticMesh(nullptr);
+		StaticMesh->SetVisibility(false);
+	}
 	if (!StaticMesh->GetStaticMesh() && !SkeletalMesh->GetSkeletalMeshAsset())
 	{
 		// Placeholder until the team assigns a mesh, so dropped weapons stay visible.
@@ -242,6 +252,7 @@ void AHitmenWeaponBase::ApplyWeaponState()
 	bStateApplied = true;
 	AppliedState = WeaponState;
 
+	SetFirstPersonVisuals(false);
 	if (WeaponState == EHitmenWeaponState::Dropped)
 	{
 		StopFire();
@@ -249,19 +260,28 @@ void AHitmenWeaponBase::ApplyWeaponState()
 		{
 			DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		}
-		Root->SetRelativeLocation(-DropCenter);
+		Root->SetRelativeLocationAndRotation(-DropCenter, FRotator::ZeroRotator);
 		SetActorHiddenInGame(false);
-		DropCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		// Clients simulate too; replicated movement corrects them.
-		DropCollision->SetSimulatePhysics(true);
 		AutoPickupSphere->SetCollisionEnabled(HasAuthority() ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+		SetActorTickEnabled(true);
+		if (bHovering)
+		{
+			ApplyHoverState();
+		}
+		else
+		{
+			DropCollision->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			// Clients simulate too; replicated movement corrects them.
+			DropCollision->SetSimulatePhysics(true);
+		}
 	}
 	else
 	{
 		DropCollision->SetSimulatePhysics(false);
 		DropCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		AutoPickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Root->SetRelativeLocation(FVector::ZeroVector);
+		Root->SetRelativeLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+		SetActorTickEnabled(false);
 
 		const bool bInHand = WeaponState == EHitmenWeaponState::InHand;
 		SetActorHiddenInGame(!bInHand);
@@ -273,9 +293,13 @@ void AHitmenWeaponBase::ApplyWeaponState()
 		{
 			const FName Socket = WeaponData ? WeaponData->AttachSocket : NAME_None;
 			AttachToComponent(Parent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Socket);
+			// The local player's first-person arms use their own offset and FOV / scale rendering.
+			const AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(OwnerPawn);
+			const bool bFirstPerson = Player && Parent == Player->GetFirstPersonMesh();
+			SetFirstPersonVisuals(bFirstPerson);
 			if (WeaponData)
 			{
-				SetActorRelativeTransform(WeaponData->AttachOffset);
+				SetActorRelativeTransform(bFirstPerson ? WeaponData->FirstPersonAttachOffset : WeaponData->AttachOffset);
 			}
 		}
 	}
@@ -319,6 +343,9 @@ void AHitmenWeaponBase::Drop(int32 InAmmo, const FVector& Location, const FRotat
 	OwnerPawn = nullptr;
 	SetOwner(nullptr);
 	SetInstigator(nullptr);
+	bHovering = false;
+	SlowTime = 0.f;
+	DropTime = 0.f;
 	WeaponState = EHitmenWeaponState::Dropped;
 	SetReplicatingMovement(true);
 	ApplyWeaponState();
@@ -357,6 +384,7 @@ void AHitmenWeaponBase::PickUp(APawn* NewOwner)
 	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 
 	SetReplicatingMovement(false);
+	bHovering = false;
 	OwnerPawn = NewOwner;
 	SetOwner(NewOwner);
 	SetInstigator(NewOwner);
@@ -579,7 +607,8 @@ FVector AHitmenWeaponBase::GetMuzzleLocation() const
 	{
 		return StaticMesh->GetSocketLocation(Socket);
 	}
-	return GetActorLocation() + GetActorForwardVector() * 40.f;
+	const FVector Offset = WeaponData ? WeaponData->MuzzleOffset : FVector(40.f, 0.f, 0.f);
+	return GetActorTransform().TransformPosition(Offset);
 }
 
 int32 AHitmenWeaponBase::GetOwnerAmmo() const
@@ -599,8 +628,7 @@ float AHitmenWeaponBase::GetCurrentSpread() const
 		return 0.f;
 	}
 	const AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerPawn);
-	const float Base = (Character && Character->IsAiming()) ? WeaponData->AimSpread : WeaponData->HipSpread;
-	return Base + CurrentBloom;
+	return (Character && Character->IsAiming()) ? WeaponData->AimSpread : WeaponData->HipSpread;
 }
 
 float AHitmenWeaponBase::GetCharge() const
@@ -615,14 +643,114 @@ float AHitmenWeaponBase::GetCharge() const
 void AHitmenWeaponBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (WeaponData && CurrentBloom > 0.f && !bTriggerHeld)
+	if (IsDropped())
 	{
-		CurrentBloom = FMath::Max(0.f, CurrentBloom - WeaponData->BloomRecoveryPerSecond * DeltaSeconds);
+		UpdateDropped(DeltaSeconds);
 	}
-	if (CurrentBloom <= 0.f && !bTriggerHeld)
+	else
 	{
 		SetActorTickEnabled(false);
 	}
+}
+
+// ---- Lying in the world: fall, settle, float ----
+
+void AHitmenWeaponBase::UpdateDropped(float DeltaSeconds)
+{
+	if (bHovering)
+	{
+		// Cosmetic bob and turn on every machine (the actor itself stays still).
+		HoverPhase += DeltaSeconds;
+		const float Bob = FMath::Sin(HoverPhase * HoverBobFrequency * UE_TWO_PI) * HoverBobAmplitude;
+		Root->SetRelativeLocationAndRotation(FRotator(0.f, HoverPhase * HoverSpinSpeed, 0.f).RotateVector(-DropCenter) + FVector(0.f, 0.f, Bob),
+			FRotator(0.f, HoverPhase * HoverSpinSpeed, 0.f));
+		return;
+	}
+	if (!HasAuthority())
+	{
+		return;
+	}
+	DropTime += DeltaSeconds;
+	const bool bSlow = DropCollision->GetPhysicsLinearVelocity().Size() < SettleSpeed;
+	SlowTime = bSlow ? SlowTime + DeltaSeconds : 0.f;
+	if ((SlowTime >= SettleTime && DropTime > ThrownPickupDelay * 0.5f) || DropTime >= MaxFallTime)
+	{
+		StartHovering();
+	}
+}
+
+void AHitmenWeaponBase::StartHovering()
+{
+	if (!HasAuthority() || !IsDropped() || bHovering)
+	{
+		return;
+	}
+	// Float at a fixed height above whatever is under it, upright.
+	FVector Location = GetActorLocation();
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenWeaponHover), false, this);
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Location + FVector(0.f, 0.f, 50.f), Location - FVector(0.f, 0.f, 400.f), ECC_Visibility, Params))
+	{
+		Location = Hit.Location + FVector(0.f, 0.f, HoverHeight);
+	}
+	bHovering = true;
+	HoverPhase = FMath::FRand() * 10.f;
+	DropCollision->SetSimulatePhysics(false);
+	SetActorLocationAndRotation(Location, FRotator(0.f, GetActorRotation().Yaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
+	ApplyHoverState();
+	ForceNetUpdate();
+}
+
+void AHitmenWeaponBase::StartHoveringAt(const FVector& Location, const FRotator& Rotation)
+{
+	if (!HasAuthority() || !IsDropped())
+	{
+		return;
+	}
+	bHovering = true;
+	HoverPhase = FMath::FRand() * 10.f;
+	DropCollision->SetSimulatePhysics(false);
+	SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	ApplyHoverState();
+	ForceNetUpdate();
+}
+
+void AHitmenWeaponBase::OnRep_Hovering()
+{
+	if (bHovering && IsDropped())
+	{
+		ApplyHoverState();
+	}
+}
+
+void AHitmenWeaponBase::ApplyHoverState()
+{
+	DropCollision->SetSimulatePhysics(false);
+	// Still traceable (F to pick up) and overlappable (auto ammo); no more physics.
+	DropCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	SetActorTickEnabled(true);
+}
+
+UPrimitiveComponent* AHitmenWeaponBase::GetVisualComponent() const
+{
+	if (SkeletalMesh->GetSkeletalMeshAsset())
+	{
+		return SkeletalMesh;
+	}
+	return StaticMesh;
+}
+
+void AHitmenWeaponBase::SetFirstPersonVisuals(bool bFirstPerson)
+{
+	const EFirstPersonPrimitiveType Type = bFirstPerson ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::None;
+	StaticMesh->FirstPersonPrimitiveType = Type;
+	SkeletalMesh->FirstPersonPrimitiveType = Type;
+	// The local player's own weapon does not cast a shadow from the view (the body's shadow does).
+	StaticMesh->SetCastShadow(!bFirstPerson);
+	SkeletalMesh->SetCastShadow(!bFirstPerson);
+	StaticMesh->MarkRenderStateDirty();
+	SkeletalMesh->MarkRenderStateDirty();
 }
 
 bool AHitmenWeaponBase::CanFireNow() const
@@ -648,7 +776,6 @@ void AHitmenWeaponBase::StartFire()
 		return;
 	}
 	bTriggerHeld = true;
-	SetActorTickEnabled(true);
 
 	if (WeaponData->bChargeToFire)
 	{
@@ -761,15 +888,14 @@ void AHitmenWeaponBase::FireOnce()
 	SimulateImpacts(Origin, SpreadDirection, Seed, Impacts);
 	PlayFireEffects(GetMuzzleLocation(), Impacts, true);
 
-	CurrentBloom = FMath::Min(WeaponData->MaxBloom, CurrentBloom + WeaponData->SpreadPerShot);
-	if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()))
+	// The view kicks up, then comes back down smoothly (spring on the player character).
+	if (AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(OwnerPawn))
 	{
-		PC->AddPitchInput(-WeaponData->RecoilPitch);
-		PC->AddYawInput(FMath::FRandRange(-WeaponData->RecoilYawRandom, WeaponData->RecoilYawRandom));
-		if (WeaponData->FireCameraShake)
-		{
-			PC->ClientStartCameraShake(WeaponData->FireCameraShake);
-		}
+		Player->AddRecoil(WeaponData->RecoilPitch, FMath::FRandRange(-WeaponData->RecoilYawRandom, WeaponData->RecoilYawRandom));
+	}
+	if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()); PC && WeaponData->FireCameraShake)
+	{
+		PC->ClientStartCameraShake(WeaponData->FireCameraShake);
 	}
 
 	Server_Fire(Origin, SpreadDirection, Seed, Charge);
@@ -874,6 +1000,10 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	if (UNiagaraSystem* Muzzle = WeaponData->MuzzleFX.LoadSynchronous())
 	{
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Muzzle, Origin, GetActorRotation());
+	}
+	if (UNiagaraSystem* BackBlast = WeaponData->BackBlastFX.LoadSynchronous())
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, BackBlast, GetActorTransform().TransformPosition(WeaponData->BackBlastOffset), (-GetActorForwardVector()).Rotation());
 	}
 	if (USoundBase* Sound = WeaponData->FireSound.LoadSynchronous())
 	{

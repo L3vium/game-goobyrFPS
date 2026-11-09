@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Data/HitmenAnimSet.h"
 #include "HitmenCharacterMovementComponent.generated.h"
 
 class IHitmenClimbable;
@@ -17,7 +18,33 @@ enum class EHitmenCustomMovement : uint8
 	Mantle
 };
 
+/** What Space would do in front of the character (shown at the crosshair). */
+UENUM(BlueprintType)
+enum class EHitmenTraversalAction : uint8
+{
+	None,
+	/** Low obstacle (up to VaultMaxHeight): over it in one motion. */
+	Vault,
+	/** Ledge (up to MantleMaxHeight) with room on top: climb and stand on it. */
+	Climb,
+	/** Thin wall too high to vault: climb up and drop on the far side. */
+	ClimbOver
+};
+
+/** A planned ledge grab / vault: cubic path from Start to Target. */
+struct FHitmenMantlePlan
+{
+	EHitmenTraversalAction Action = EHitmenTraversalAction::None;
+	FVector Start = FVector::ZeroVector;
+	FVector ControlA = FVector::ZeroVector;
+	FVector ControlB = FVector::ZeroVector;
+	FVector Target = FVector::ZeroVector;
+	float Duration = 0.4f;
+	float LedgeHeight = 0.f;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenTraversal, bool, bIsVault);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenTraversalMontage, EHitmenAnimMontage, Montage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenMovementStateChanged, EHitmenCustomMovement, NewState);
 
 /**
@@ -41,12 +68,16 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Movement")
 	FOnHitmenMovementStateChanged OnCustomMovementChanged;
 
+	/** Owning client + server: climb enter, ladder top exit, zipline grab (anim-set montage). */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|Movement")
+	FOnHitmenTraversalMontage OnTraversalMontage;
+
 	// ---- Speeds ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="0", Units="cm/s"))
-	float WalkSpeed = 380.f;
+	float WalkSpeed = 480.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="0", Units="cm/s"))
-	float SprintSpeed = 680.f;
+	float SprintSpeed = 820.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="0", ClampMax="1"))
 	float AimSpeedMultiplier = 0.65f;
@@ -56,8 +87,13 @@ public:
 	float SprintMinForwardDot = 0.5f;
 
 	// ---- Slide ----
+	/** Crouching while moving at least this fast starts a slide (keep above WalkSpeed). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
-	float SlideMinStartSpeed = 300.f;
+	float SlideMinStartSpeed = 560.f;
+
+	/** Crouch-walking never slides: only a sprint (or a fall) does. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide")
+	bool bSlideRequiresSprint = true;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
 	float SlideImpulse = 250.f;
@@ -84,7 +120,7 @@ public:
 	// ---- Ledge grab / vault ----
 	/** Max height above the feet of a ledge you can climb onto. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
-	float MantleMaxHeight = 230.f;
+	float MantleMaxHeight = 250.f;
 
 	/** Obstacles up to this height can be vaulted over instead of climbed. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
@@ -112,6 +148,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0.05", Units="s"))
 	float VaultDuration = 0.4f;
 
+	/** Climbing over a thin wall (up, over, down on the far side). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0.05", Units="s"))
+	float ClimbOverDuration = 0.75f;
+
+	/** Clearance kept above a ledge / wall top while passing over it. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
+	float MantleClearance = 18.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle")
 	bool bAllowAirMantle = true;
 
@@ -129,6 +173,14 @@ public:
 	/** Zipline: capsule hangs this far below the cable. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0", Units="cm"))
 	float ZiplineHangOffset = 110.f;
+
+	/** Pull-up over the top of a ladder / gutter / pipe (no snap). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0.05", Units="s"))
+	float LadderExitDuration = 0.55f;
+
+	/** Zipline rides start slow and accelerate to the cable speed over this time. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0", Units="s"))
+	float ZiplineAccelerationTime = 0.5f;
 
 	// ---- State API ----
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Movement")
@@ -164,6 +216,23 @@ public:
 
 	/** Forces leaving a climb (teleports, deaths, abilities). */
 	void StopClimbing(bool bJumpOff);
+
+	/** What Space would do right now in front of the character (crosshair hint). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
+	EHitmenTraversalAction QueryTraversalAction() const;
+
+	/** 0..1 progress of the current ledge grab / vault (0 when not mantling). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
+	float GetMantleAlpha() const;
+
+	/**
+	 * Owning client and server (F on a zipline): rides the cable to its end on its own.
+	 * Direction +1 = toward the cable end, -1 = toward its start.
+	 */
+	void StartZiplineRide(AActor* ZiplineActor, float Direction);
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
+	bool IsZiplining() const;
 
 	// ---- Jetpack (client-predicted: the thrust wish travels in the saved move flags) ----
 	/**
@@ -219,6 +288,10 @@ protected:
 	bool GetSlideSurface(FHitResult& OutHit) const;
 
 	bool TryStartMantle();
+	/** Computes the ledge grab / vault in front (Forward = move intent). Const: also used for the hint. */
+	bool PlanMantle(const FVector& Forward, FHitmenMantlePlan& OutPlan) const;
+	void StartMantlePlan(const FHitmenMantlePlan& Plan);
+	void StartLadderExit(const IHitmenClimbable& Climbable);
 	void FinishMantle();
 
 	/** Thrust and fuel step, run per move on the owning client and the server. */
@@ -252,8 +325,11 @@ protected:
 
 	// Mantle state
 	FVector MantleStart = FVector::ZeroVector;
-	FVector MantlePeak = FVector::ZeroVector;
+	FVector MantleControlA = FVector::ZeroVector;
+	FVector MantleControlB = FVector::ZeroVector;
 	FVector MantleTarget = FVector::ZeroVector;
+	EHitmenTraversalAction MantleAction = EHitmenTraversalAction::None;
+	bool bMantleFromClimb = false;
 	float MantleElapsed = 0.f;
 	float MantleTotal = 0.f;
 	bool bMantleIsVault = false;
@@ -265,6 +341,10 @@ protected:
 	float ClimbAxisInput = 0.f;
 	float LastClimbExitTime = -100.f;
 	bool bPrevPressedJump = false;
+
+	// Zipline ride state (auto ride toward ZiplineDirection)
+	float ZiplineDirection = 1.f;
+	float ZiplineRideTime = 0.f;
 };
 
 /** Saved move carrying the sprint and jetpack flags (and the fuel at move start) for prediction / replay. */

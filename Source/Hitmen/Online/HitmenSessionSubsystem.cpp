@@ -1,6 +1,7 @@
 // Hitmen — sessions
 
 #include "Online/HitmenSessionSubsystem.h"
+#include "Framework/HitmenLobbyGameMode.h"
 #include "Core/HitmenGameSettings.h"
 #include "Hitmen.h"
 #include "OnlineSubsystem.h"
@@ -105,6 +106,19 @@ void UHitmenSessionSubsystem::HandleCreateComplete(FName SessionName, bool bSucc
 
 	if (bSuccess)
 	{
+		// Already in the front end: start listening in this world and open the lobby (no reload).
+		UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
+		AHitmenLobbyGameMode* LobbyMode = World ? World->GetAuthGameMode<AHitmenLobbyGameMode>() : nullptr;
+		if (LobbyMode && World->GetNetMode() == NM_Standalone)
+		{
+			FURL ListenURL;
+			ListenURL.AddOption(TEXT("listen"));
+			if (World->Listen(ListenURL))
+			{
+				LobbyMode->OpenLobby();
+				return;
+			}
+		}
 		const TSoftObjectPtr<UWorld>& Lobby = UHitmenGameSettings::Get()->LobbyLevel;
 		if (!Lobby.IsNull())
 		{

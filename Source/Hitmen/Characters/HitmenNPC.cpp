@@ -1,6 +1,13 @@
 // Hitmen — NPC
 
 #include "Characters/HitmenNPC.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Data/HitmenAnimSet.h"
+#include "Data/HitmenSoundSet.h"
+#include "Inventory/HitmenInventoryComponent.h"
+#include "AI/HitmenGuardGroup.h"
 #include "AI/HitmenAlertComponent.h"
 #include "AI/HitmenAIController.h"
 #include "Weapons/HitmenWeaponBase.h"
@@ -26,6 +33,35 @@ AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->bUseControllerDesiredRotation = true;
+	// Path following drives acceleration (not just velocity): the locomotion graph walks / runs.
+	GetCharacterMovement()->GetNavMovementProperties()->bUseAccelerationForPaths = true;
+	GetCharacterMovement()->bRequestedMoveUseAcceleration = true;
+	PrimaryActorTick.bCanEverTick = true;
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	KeycardMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("KeycardMesh"));
+	KeycardMesh->SetupAttachment(GetMesh(), KeycardBone);
+	KeycardMesh->SetRelativeLocationAndRotation(FVector(0.f, -14.f, 18.f), FRotator(0.f, 0.f, 90.f));
+	KeycardMesh->SetRelativeScale3D(FVector(0.09f, 0.055f, 0.01f));
+	KeycardMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	KeycardMesh->SetVisibility(false);
+	AimLaser = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AimLaser"));
+	AimLaser->SetupAttachment(GetRootComponent());
+	AimLaser->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	AimLaser->SetCastShadow(false);
+	AimLaser->SetVisibility(false);
+	AimLaser->SetUsingAbsoluteLocation(true);
+	AimLaser->SetUsingAbsoluteRotation(true);
+	AimLaser->SetUsingAbsoluteScale(true);
+	if (Cube.Succeeded())
+	{
+		KeycardMesh->SetStaticMesh(Cube.Object);
+	}
+	if (Cylinder.Succeeded())
+	{
+		AimLaser->SetStaticMesh(Cylinder.Object);
+	}
 
 	AlertComponent = CreateDefaultSubobject<UHitmenAlertComponent>(TEXT("Alert"));
 
@@ -44,6 +80,99 @@ void AHitmenNPC::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHitmenNPC, Weapon);
+	DOREPLIFETIME(AHitmenNPC, CarriedKeycard);
+}
+
+void AHitmenNPC::OnRep_CarriedKeycard()
+{
+	KeycardMesh->SetVisibility(CarriedKeycard >= 0 && !IsDead());
+}
+
+void AHitmenNPC::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	// Snipers: a thin red line from the weapon to the target while aiming (every machine).
+	if (!bIsSniper || GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	const AActor* Target = AlertComponent ? AlertComponent->GetTarget() : nullptr;
+	const bool bAiming = Target && !IsDead() && AlertComponent->GetAlertState() == EHitmenAlertState::Combat && Weapon;
+	AimLaser->SetVisibility(bAiming);
+	if (bAiming)
+	{
+		const FVector Start = Weapon->GetMuzzleLocation();
+		FVector End = Target->GetActorLocation();
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenSniperLaser), false, this);
+		Params.AddIgnoredActor(Weapon);
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+		{
+			End = Hit.ImpactPoint;
+		}
+		const float Length = FVector::Dist(Start, End);
+		AimLaser->SetWorldLocationAndRotation((Start + End) * 0.5f, FRotationMatrix::MakeFromZ(End - Start).Rotator());
+		AimLaser->SetWorldScale3D(FVector(0.01f, 0.01f, Length / 100.f));
+	}
+}
+
+void AHitmenNPC::SetGuardGroup(AHitmenGuardGroup* Group)
+{
+	GuardGroup = Group;
+}
+
+AHitmenGuardGroup* AHitmenNPC::GetGuardGroup() const
+{
+	return GuardGroup.Get();
+}
+
+bool AHitmenNPC::CanBePickpocketedBy(const AActor* Thief) const
+{
+	if (!Thief || IsDead() || CarriedKeycard < 0 || !IsUnawareOf(Thief))
+	{
+		return false;
+	}
+	const FVector ToThief = (Thief->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+	return FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), ToThief) <= PickpocketMaxDot;
+}
+
+bool AHitmenNPC::CanInteract_Implementation(AActor* Interactor) const
+{
+	return CanBePickpocketedBy(Interactor) || Super::CanInteract_Implementation(Interactor);
+}
+
+FText AHitmenNPC::GetInteractionText_Implementation(AActor* Interactor) const
+{
+	if (CanBePickpocketedBy(Interactor))
+	{
+		return FText::Format(NSLOCTEXT("Hitmen", "Pickpocket", "Pickpocket keycard {0}"), FText::AsNumber(CarriedKeycard));
+	}
+	return Super::GetInteractionText_Implementation(Interactor);
+}
+
+void AHitmenNPC::Interact_Implementation(AActor* Interactor)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	if (CanBePickpocketedBy(Interactor))
+	{
+		if (UHitmenInventoryComponent* Inventory = Interactor->FindComponentByClass<UHitmenInventoryComponent>())
+		{
+			Inventory->AddKeycard(CarriedKeycard);
+			CarriedKeycard = INDEX_NONE;
+			OnRep_CarriedKeycard();
+			if (AHitmenCharacterBase* Thief = Cast<AHitmenCharacterBase>(Interactor))
+			{
+				Thief->PlayAnimSetMontage(EHitmenAnimMontage::Pickpocket);
+			}
+			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::Pickpocket, GetActorLocation());
+			Juice_OnPickpocketed(Interactor);
+		}
+		return;
+	}
+	Super::Interact_Implementation(Interactor);
 }
 
 void AHitmenNPC::PostInitializeComponents()
@@ -57,6 +186,9 @@ void AHitmenNPC::PostInitializeComponents()
 void AHitmenNPC::BeginPlay()
 {
 	Super::BeginPlay();
+	KeycardMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, KeycardBone);
+	OnRep_CarriedKeycard();
+	SetActorTickEnabled(bIsSniper);
 	AlertComponent->SetReactsToNoises(bReactsToNoises);
 	// Bodies are a visual cue: only sentries (Hold Position + deaf) ignore them, because a sentry's
 	// job is to never be lured off its gate. A deaf patrol / stationary NPC still investigates bodies.
@@ -194,9 +326,18 @@ void AHitmenNPC::HandleDeath(AActor* Killer, AActor* DamageCauser, bool bHeadsho
 		{
 			FActorSpawnParameters Params;
 			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-			if (AHitmenKeycardPickup* Keycard = GetWorld()->SpawnActor<AHitmenKeycardPickup>(KeycardPickupClass, GetActorLocation(), FRotator::ZeroRotator, Params))
+			// On the floor under the body, not at the capsule centre.
+			FVector DropLocation = GetActorLocation();
+			FHitResult Ground;
+			FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(HitmenKeycardDrop), false, this);
+			if (GetWorld()->LineTraceSingleByChannel(Ground, DropLocation, DropLocation - FVector(0.f, 0.f, 300.f), ECC_Visibility, GroundParams))
+			{
+				DropLocation = Ground.Location;
+			}
+			if (AHitmenKeycardPickup* Keycard = GetWorld()->SpawnActor<AHitmenKeycardPickup>(KeycardPickupClass, DropLocation, FRotator(0.f, FMath::FRand() * 360.f, 0.f), Params))
 			{
 				Keycard->SetKeycardId(CarriedKeycard);
+				KeycardMesh->SetVisibility(false);
 			}
 		}
 		if (Weapon)

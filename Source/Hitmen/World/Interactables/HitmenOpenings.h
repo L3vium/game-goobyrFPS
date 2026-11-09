@@ -107,16 +107,56 @@ class HITMEN_API AHitmenWindow : public AHitmenOpeningBase
 
 public:
 	AHitmenWindow();
-	virtual void BeginPlay() override;
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 protected:
-	/** How far the pane slides up when open. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Window", meta=(Units="cm"))
-	float SlideDistance = 90.f;
+	/**
+	 * A thin square frame (Mesh is the sill) with two shutters that swing open sideways, away from
+	 * whoever opens it. Open = vaultable (Space while moving into it). Actor origin = floor.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Window", meta=(ClampMin="0", Units="cm"))
+	float SillHeight = 100.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Window", meta=(ClampMin="40", Units="cm"))
+	float Width = 120.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Window", meta=(ClampMin="40", Units="cm"))
+	float Height = 120.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Window", meta=(ClampMin="1", Units="cm"))
+	float FrameThickness = 6.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Window", meta=(ClampMin="1", Units="cm"))
+	float FrameDepth = 12.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Window", meta=(ClampMin="0.5", Units="cm"))
+	float ShutterThickness = 3.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Window", meta=(Units="deg"))
+	float ShutterOpenAngle = 105.f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> FrameTop;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> FrameLeft;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> FrameRight;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<USceneComponent> LeftHinge;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<USceneComponent> RightHinge;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> LeftShutter;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> RightShutter;
 
 	virtual void ApplyOpenAlpha(float Alpha) override;
-
-	FVector ClosedLocation;
 };
 
 /** Small hatch into a vent duct. Accepts poison: sealed rooms on the network get gassed. */

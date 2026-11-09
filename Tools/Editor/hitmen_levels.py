@@ -80,7 +80,7 @@ def text(loc, string, size=90, yaw=-90.0, color=(1, 1, 1), folder="Labels"):
     comp.set_text(string)
     comp.set_editor_property("world_size", size)
     comp.set_editor_property("horizontal_alignment", unreal.HorizTextAligment.EHTA_CENTER)
-    comp.set_editor_property("text_render_color", unreal.Color(int(color[0] * 255), int(color[1] * 255), int(color[2] * 255), 255))
+    comp.set_editor_property("text_render_color", unreal.Color(r=int(color[0] * 255), g=int(color[1] * 255), b=int(color[2] * 255), a=255))
     return actor
 
 
@@ -171,7 +171,7 @@ def ladder(loc, yaw, height, gutter=False, folder="Gameplay/Traversal"):
     return actor
 
 
-def patrol(points, waits=None, folder="AI"):
+def patrol(points, waits=None, folder="AI", curved=False):
     route = spawn(bp("AI/BP_PatrolRoute"), points[0], label="PatrolRoute", folder=folder)
     entries = []
     for i, p in enumerate(points):
@@ -180,6 +180,11 @@ def patrol(points, waits=None, folder="AI"):
         e.set_editor_property("wait_time", (waits or [3.0] * len(points))[i])
         entries.append(e)
     route.set_editor_property("points", entries)
+    if curved:
+        try:
+            route.set_editor_property("curved", True)
+        except Exception as error:
+            log("WARN curved patrol:", error)
     return route
 
 
@@ -187,7 +192,7 @@ def npc(kind, loc, yaw=0, route=None, keycard=None, folder="AI", stationary=Fals
     """Place an NPC. stationary = stands at its post facing yaw; sentry = stationary, sight only,
     never leaves its post."""
     cls = {"guard": "Characters/NPC/BP_NPC_Guard", "sniper": "Characters/NPC/BP_NPC_Sniper",
-           "vip": "Characters/NPC/BP_NPC_VIPCandidate", "civilian": "Characters/NPC/BP_NPC_Civilian"}[kind]
+           "vip": "Characters/NPC/BP_NPC_VIPCandidate"}[kind]
     actor = spawn(bp(cls), (loc[0], loc[1], loc[2] + 100), (0, yaw, 0), None, folder)
     if actor and route:
         actor.set_editor_property("patrol_route", route)
@@ -228,12 +233,24 @@ def ability_pickup(loc, ability, folder="Gameplay/Loot"):
 
 
 # ---------------------------------------------------------------------------------------------
-# Title screen: a museum hall, the assassin on the right, ambient sound
+# Front end: one scene for the title (museum), the room (briefing room) and "Your agent" (stage).
+# The HUD blends between CameraActors tagged Shot_<Phase>; no level ever loads between screens.
 # ---------------------------------------------------------------------------------------------
 
-def build_title():
-    new_map("L_TitleScreen")
-    game_mode("BP_GM_Menu")
+def shot(name, loc, rot, fov=70.0):
+    camera = spawn(unreal.CameraActor, loc, rot, name, "Cameras")
+    camera.camera_component.set_editor_property("field_of_view", fov)
+    camera.camera_component.set_editor_property("constrain_aspect_ratio", False)
+    camera.tags = [unreal.Name(name)]
+    return camera
+
+
+def build_front_end():
+    new_map("L_FrontEnd")
+    game_mode("BP_GM_Lobby")
+    environment(sun_pitch=-60, intensity=0.0, fog=0.02)
+
+    # ---- Museum hall (title) ----
     floor((1200, 0, 0), (3600, 2400, 0), mi("MI_White"))
     box((1200, 0, 900), (3600, 2400, 20), mi("MI_Dark"), folder="Museum")
     for side in (-1, 1):
@@ -241,19 +258,15 @@ def build_title():
         for i in range(6):
             x = -200 + i * 600
             box((x, side * 1050, 400), (90, 90, 800), mi("MI_White"), folder="Museum", shape="cylinder")
-            # Paintings in gold frames.
             if i % 2 == 0:
                 box((x + 300, side * 1170, 360), (260, 20, 180), mi("MI_Gold"), folder="Museum")
                 box((x + 300, side * 1160, 360), (220, 10, 140), mi(["MI_Red", "MI_Blue", "MI_Green"][i // 2 % 3]), folder="Museum")
-    wall((3000, -1200), (3000, 1200), 0, 900, 40, material=mi("MI_Stone"), folder="Museum")
-    box((2980, 0, 420), (20, 500, 320), mi("MI_Gold"), folder="Museum")
-    box((2970, 0, 420), (10, 440, 260), mi("MI_Dark"), folder="Museum")
-    # Pedestals with sculptures.
-    for x, y, shape, mat in ((900, -500, "sphere", "MI_White"), (1700, 450, "cone", "MI_Gold"), (2300, -300, "cube", "MI_Stone")):
+    wall((-600, -1200), (-600, 1200), 0, 900, 40, material=mi("MI_Stone"), folder="Museum")
+    # The far wall opens onto the briefing room (the camera flies through it).
+    wall((3000, -1200), (3000, 1200), 0, 900, 40, openings=[(1200, 700, 0, 520)], material=mi("MI_Stone"), folder="Museum")
+    for x, y, shape, mat in ((900, -500, "sphere", "MI_White"), (1700, 450, "cone", "MI_Gold"), (2300, -500, "cube", "MI_Stone")):
         box((x, y, 60), (120, 120, 120), mi("MI_Dark"), folder="Museum")
         box((x, y, 180), (90, 90, 120), mi(mat), folder="Museum", shape=shape)
-    # Lighting: dim ambience, spotlights.
-    environment(sun_pitch=-60, intensity=0.0, fog=0.02)
     for x in (300, 1200, 2100):
         spot = spawn(unreal.SpotLight, (x, 0, 850), (-90, 0, 0), None, "Lighting")
         spot.spot_light_component.set_editor_property("intensity", 6000.0)
@@ -263,12 +276,10 @@ def build_title():
             fill = spawn(unreal.PointLight, (x, y, 650), label=None, folder="Lighting")
             fill.point_light_component.set_editor_property("intensity", 4000.0)
             fill.point_light_component.set_editor_property("attenuation_radius", 1600.0)
-            fill.point_light_component.set_editor_property("light_color", unreal.Color(255, 214, 170, 255))
+            fill.point_light_component.set_editor_property("light_color", unreal.Color(r=255, g=214, b=170, a=255))
     key = spawn(unreal.SpotLight, (-150, 60, 330), (-30, 25, 0), "KeyLight", "Lighting")
     key.spot_light_component.set_editor_property("intensity", 12000.0)
     key.spot_light_component.set_editor_property("outer_cone_angle", 30.0)
-
-    # The assassin (engine mannequin) on the right, idling.
     manny = spawn(unreal.SkeletalMeshActor, (120, 150, 0), (0, 115, 0), "Assassin", "Museum")
     comp = manny.skeletal_mesh_component
     comp.set_skeletal_mesh_asset(load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple"))
@@ -278,22 +289,85 @@ def build_title():
     anim.set_editor_property("saved_looping", True)
     anim.set_editor_property("saved_playing", True)
     comp.set_editor_property("animation_data", anim)
-    
-
-    camera = spawn(unreal.CameraActor, (-380, -60, 165), (-4, 6, 0), "MenuCamera", "Camera")
-    camera.set_editor_property("auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
-    camera.camera_component.set_editor_property("field_of_view", 70.0)
+    title_cam = shot("Shot_Title", (-380, -60, 165), (-4, 6, 0))
+    title_cam.set_editor_property("auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
     spawn(unreal.AmbientSound, (1200, 0, 300), label="MuseumAmbience (assign a sound)", folder="Audio")
+
+    # ---- Briefing room (lobby) ----
+    floor((4300, 0, 0), (2600, 2400, 0), mi("MI_Dark"))
+    box((4300, 0, 620), (2600, 2400, 20), mi("MI_Dark"), folder="Briefing")
+    for side in (-1, 1):
+        wall((3000, side * 1200), (5600, side * 1200), 0, 620, 40, material=mi("MI_Stone"), folder="Briefing")
+    wall((5600, -1200), (5600, 1200), 0, 620, 40, material=mi("MI_Stone"), folder="Briefing")
+    # Map table: dark slab with a lit schematic top, chairs around.
+    box((4000, 350, 40), (1000, 560, 80), mi("MI_Dark"), folder="Briefing/Table")
+    box((4000, 350, 84), (940, 500, 6), mi("MI_Dark"), folder="Briefing/Table")
+    box((4000, 350, 88), (700, 360, 2), mi("MI_Blue"), folder="Briefing/Table")
+    for i in range(4):
+        box((3650 + i * 230, 350 + 400, 45), (60, 60, 90), mi("MI_Stone"), folder="Briefing/Table")
+        box((3650 + i * 230, 350 - 400, 45), (60, 60, 90), mi("MI_Stone"), folder="Briefing/Table")
+    # Screens on the side wall.
+    for i, mat in enumerate(("MI_Red", "MI_Blue", "MI_White")):
+        box((3600 + i * 600, 1170, 330), (480, 16, 270), mi("MI_Dark"), folder="Briefing/Screens")
+        box((3600 + i * 600, 1160, 330), (440, 6, 230), mi(mat), folder="Briefing/Screens")
+    for x in (3500, 4500):
+        lamp = spawn(unreal.SpotLight, (x, 350, 600), (-90, 0, 0), None, "Lighting")
+        lamp.spot_light_component.set_editor_property("intensity", 2500.0)
+        lamp.spot_light_component.set_editor_property("outer_cone_angle", 35.0)
+        lamp.spot_light_component.set_editor_property("light_color", unreal.Color(r=200, g=220, b=255, a=255))
+    shot("Shot_Lobby", (3250, -650, 430), (-28, 40, 0))
+
+    # ---- Agent stage (customization): the agent stands on the left third of the frame ----
+    sx, sy = 5000, -600
+    box((sx, sy, 5), (320, 320, 10), mi("MI_Stone"), folder="Stage", shape="cylinder")
+    spawn(bp("Characters/Player/BP_AgentPreview"), (sx, sy, 10), (0, 72, 0), "AgentPreview", "Stage")
+    stage_key = spawn(unreal.SpotLight, (sx - 250, sy + 150, 420), (-55, -30, 0), "StageKey", "Lighting")
+    stage_key.spot_light_component.set_editor_property("intensity", 6000.0)
+    stage_key.spot_light_component.set_editor_property("outer_cone_angle", 28.0)
+    stage_rim = spawn(unreal.SpotLight, (sx + 260, sy - 200, 380), (-45, 145, 0), "StageRim", "Lighting")
+    stage_rim.spot_light_component.set_editor_property("intensity", 9000.0)
+    stage_rim.spot_light_component.set_editor_property("outer_cone_angle", 30.0)
+    stage_rim.spot_light_component.set_editor_property("light_color", unreal.Color(r=255, g=90, b=80, a=255))
+    shot("Shot_Customization", (sx - 480, sy + 130, 125), (-3, 0, 0))
     save_map()
 
 
-def build_lobby():
-    new_map("L_Lobby")
-    game_mode("BP_GM_Lobby")
-    floor((0, 0, 0), (3000, 3000, 0), mi("MI_Dark"))
-    environment(intensity=1.0, fog=0.03)
-    camera = spawn(unreal.CameraActor, (-600, 0, 200), (-10, 0, 0), "LobbyCamera", "Camera")
-    camera.set_editor_property("auto_activate_for_player", unreal.AutoReceiveInput.PLAYER0)
+def respread_ldtest_spawns(count=16, half=8200):
+    """Many spawn points spread over open ground (the match picks one cluster per team at random).
+    Idempotent: replaces every team start. Also clears leftover civilian placements."""
+    LES.load_level(path("Maps", "L_LDTest"))
+    world = UES.get_editor_world()
+    for actor in EAS.get_all_level_actors():
+        name = actor.get_class().get_name()
+        if "TeamStart" in name or "Civilian" in name or "Civilian" in actor.get_actor_label():
+            EAS.destroy_actor(actor)
+    candidates = []
+    step = 700
+    for gx in range(-half, half + 1, step):
+        for gy in range(-half, half + 1, step):
+            hit = unreal.SystemLibrary.line_trace_single(world, unreal.Vector(gx, gy, 4000), unreal.Vector(gx, gy, -200),
+                                                         unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [], unreal.DrawDebugTrace.NONE, True)
+            if not hit:
+                continue
+            impact = hit.to_tuple()[4]
+            if impact.z > 40:          # roofs, crates: outdoors on the ground only
+                continue
+            blocked = unreal.SystemLibrary.sphere_trace_single(world, unreal.Vector(gx, gy, impact.z + 140), unreal.Vector(gx, gy, impact.z + 141), 120.0,
+                                                               unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [], unreal.DrawDebugTrace.NONE, True)
+            if blocked:
+                continue
+            candidates.append((gx, gy, impact.z))
+    # Farthest-point selection from a fixed seed so re-runs give the same layout.
+    chosen = []
+    if candidates:
+        chosen.append(min(candidates, key=lambda c: (c[0] + half) ** 2 + (c[1] + half) ** 2))
+    while candidates and len(chosen) < count:
+        best = max(candidates, key=lambda c: min((c[0] - o[0]) ** 2 + (c[1] - o[1]) ** 2 for o in chosen))
+        chosen.append(best)
+    for x, y, z in chosen:
+        yaw = math.degrees(math.atan2(-y, -x))   # face the map centre
+        spawn(bp("World/Spawning/BP_TeamStart"), (x, y, z + 120), (0, yaw, 0), None, "Gameplay/Starts")
+    log("LDTest spawns", len(chosen), "from", len(candidates), "candidates")
     save_map()
 
 
@@ -310,202 +384,269 @@ def build_empty(name):
 
 
 # ---------------------------------------------------------------------------------------------
-# Debug gym: every move, weapon, ability, fixture and AI state, spaced and labelled
+# Debug gym: a compact, walled showcase ("mini LD") — every move, weapon, ability, fixture and
+# AI behaviour packed along short loops, each station labelled just above itself.
 # ---------------------------------------------------------------------------------------------
+
+GYM_HALF = 3700          # hall is 74 x 74 m
+GYM_WALL_H = 900
+LABEL_GAP = 60           # labels float this far above the top of what they describe
+
+
+def label(x, y, top, string, size=36, color=(1, 1, 1), yaw=-90.0, folder="Labels"):
+    """A label right above a station (top = height of the thing it names)."""
+    return text((x, y, top + LABEL_GAP), string, size, yaw, color, folder)
+
+
+def zone_title(x, y, string, folder="Labels"):
+    return text((x, y, 520), string, 110, color=(1, 0.78, 0.1), folder=folder)
+
+
+def block(x, y, w, d, h, material=GRID_DARK, folder="Gym/Movement", z0=0.0):
+    return box((x, y, z0 + h / 2.0), (w, d, h), material, folder=folder)
+
 
 def build_gym():
     new_map("L_Gym")
     game_mode("BP_GM_Gym")
-    floor((0, 0, 0), (24000, 24000, 0), GRID)
-    environment()
-    nav_bounds((0, 0, 0), (12000, 12000, 2000))
-    team_starts([(0, -9000, 90)])
-    text((0, -8200, 300), "HITMEN DEBUG GYM", 220)
-    text((0, -7900, 150), "Esc: debug panel (weapons, abilities, keycards, god mode)", 60)
+    H = GYM_HALF
+    floor((0, 0, 0), (2 * H, 2 * H, 0), GRID)
+    # Perimeter: tall walls, so the view never runs to an endless floor.
+    for start, end in (((-H, -H), (H, -H)), ((H, -H), (H, H)), ((H, H), (-H, H)), ((-H, H), (-H, -H))):
+        wall(start, end, 0, GYM_WALL_H, 60, material=GRID_ALT, folder="Gym/Hall")
+    environment(sun_pitch=-55, intensity=6.0, fog=0.004)
+    nav_bounds((0, 0, 0), (H + 200, H + 200, 1500))
+    # Spawn: south-west, facing north toward the movement course.
+    team_starts([(-2300, -3150, 90)])
+    text((-1300, -3450, 260), "HITMEN GYM", 120)
+    text((-1300, -3450, 190), "Esc: debug panel - weapons, abilities, keycards, god mode", 34)
 
-    # ---- Row 1: movement course ----
-    y = -6500
-    text((-9000, y - 700, 250), "MOVEMENT", 160, color=(1, 0.8, 0.1))
-    for i, h in enumerate((50, 100, 140, 200, 240, 350)):
-        x = -9000 + i * 900
-        box((x, y, h / 2.0), (400, 60, h), GRID_DARK, folder="Gym/Movement")
-        text((x, y - 300, h + 80), "%d cm %s" % (h, "vault" if h <= 120 else ("ledge grab" if h <= 230 else "too high")), 50)
-    # Window frame with sill (open the window, vault through).
-    x = -3200
-    wall((x - 300, y), (x + 300, y), 0, 350, 25, [(300, 120, 100, 220)], GRID_DARK, "Gym/Movement")
-    win = spawn(bp("World/Interactables/Window/BP_Window"), (x, y, 0), folder="Gym/Movement")
-    text((x, y - 300, 420), "Window (F open, vault)", 50)
-    # Ladder and gutter on tall walls.
-    x = -2000
-    box((x, y + 200, 200), (400, 400, 400), GRID_DARK, folder="Gym/Movement")
-    ladder((x, y - 25, 0), -90, 400)
-    text((x, y - 300, 480), "Ladder (walk into it)", 50)
-    x = -1100
-    box((x, y + 200, 300), (400, 400, 600), GRID_DARK, folder="Gym/Movement")
-    ladder((x, y - 25, 0), -90, 600, gutter=True)
-    text((x, y - 300, 680), "Gutter", 50)
-    # Zipline between two towers.
-    box((0, y, 400), (300, 300, 800), GRID_DARK, folder="Gym/Movement")
-    box((2000, y, 150), (300, 300, 300), GRID_DARK, folder="Gym/Movement")
-    ladder((0, y - 175, 0), -90, 800)
-    zip_line = spawn(bp("World/Interactables/Zipline/BP_Zipline"), (150, y, 900), folder="Gym/Movement")
+    # =========================== A. MOVEMENT (west, a loop going north) ===========================
+    X = -2400
+    zone_title(X, -3000, "MOVEMENT")
+    G = "Gym/Movement"
+    # Metrics: what Space does at each height.
+    block(X, -2550, 420, 60, 50, folder=G)
+    label(X, -2550, 50, "STEP  50 cm  (walk / jump)")
+    block(X, -2150, 420, 60, 120, folder=G)
+    label(X, -2150, 120, "VAULT  120 cm  (Space)")
+    block(X, -1650, 420, 320, 250, folder=G)
+    label(X, -1650, 250, "LEDGE GRAB  250 cm  (Space: climb on top)")
+    stairs((X + 260, -1500, 0), 270, 250, 450, width=160, folder=G)
+    block(X, -1000, 420, 25, 250, folder=G)
+    label(X, -1000, 250, "CLIMB OVER  thin 250 cm wall")
+    # Window in a wall: F to open, Space to vault through.
+    wall((X - 350, -500), (X + 350, -500), 0, 320, 25, [(350, 120, 100, 220)], GRID_DARK, G)
+    spawn(bp("World/Interactables/Window/BP_Window"), (X, -500, 0), folder=G)
+    label(X, -500, 320, "WINDOW  F open  -  Space vault")
+    # Ladder and gutter up to a platform; zipline down from it to the east.
+    block(X, 300, 500, 500, 400, folder=G)
+    ladder((X, 25, 0), -90, 400)
+    label(X - 120, 60, 400, "LADDER")
+    block(X - 600, 300, 300, 300, 600, folder=G)
+    ladder((X - 600, 125, 0), -90, 600, gutter=True)
+    label(X - 600, 140, 600, "GUTTER")
+    block(X - 375, 300, 150, 120, 400, folder=G, z0=0)  # bridge from the gutter top down to the platform
+    zip_start = (X + 200, 300, 400 + 260)
+    zip_end_platform = (X + 1700, 300)
+    block(zip_end_platform[0], zip_end_platform[1], 500, 500, 120, folder=G)
+    stairs((zip_end_platform[0] + 250, 300, 0), 0, 120, 300, width=200, folder=G)
+    zip_line = spawn(bp("World/Interactables/Zipline/BP_Zipline"), zip_start, folder=G)
     if zip_line:
-        zip_line.set_editor_property("end_point", unreal.Vector(1700, 0, -500))
-    text((1000, y - 400, 950), "Zipline", 60)
-    # Jump pad, slide lane, stairs, teleporters, locker, tall grass.
-    spawn(bp("World/Interactables/JumpPad/BP_JumpPad"), (3000, y, 0), folder="Gym/Movement")
-    text((3000, y - 300, 200), "Jump pad", 50)
-    box((4200, y, -5), (2000, 300, 10), mi("MI_Blue"), folder="Gym/Movement")
-    text((4200, y - 300, 150), "Slide lane (sprint + crouch)", 50)
-    stairs((5600, y - 100, 0), 0, 300, 600)
-    text((5900, y - 300, 420), "Stairs", 50)
-    tp_a = spawn(bp("World/Interactables/Teleporter/BP_Teleporter"), (7200, y, 0), (0, 0, 0), folder="Gym/Movement")
-    tp_b = spawn(bp("World/Interactables/Teleporter/BP_Teleporter"), (7200, y + 2000, 0), (0, 180, 0), folder="Gym/Movement")
+        zip_line.set_editor_property("end_point", unreal.Vector(zip_end_platform[0] - zip_start[0], 0, 120 + 260 - zip_start[2]))
+    label(X + 900, 300, 560, "ZIPLINE  F at a post")
+    # Jump pad onto a high ledge; teleporter back to the start.
+    spawn(bp("World/Interactables/JumpPad/BP_JumpPad"), (X, 1100, 0), folder=G)
+    label(X, 1100, 20, "JUMP PAD")
+    block(X, 1600, 500, 400, 500, folder=G)
+    tp_a = spawn(bp("World/Interactables/Teleporter/BP_Teleporter"), (X, 1600, 500), (0, 0, 0), folder=G)
+    tp_b = spawn(bp("World/Interactables/Teleporter/BP_Teleporter"), (X + 600, -3050, 0), (0, 90, 0), folder=G)
     if tp_a and tp_b:
         tp_a.set_editor_property("destination", tp_b)
         tp_b.set_editor_property("destination", tp_a)
-    text((7200, y - 300, 200), "Teleporter pair", 50)
-    spawn(bp("World/Interactables/Locker/BP_Locker"), (8400, y, 0), (0, -90, 0), folder="Gym/Movement")
-    text((8400, y - 300, 260), "Locker (hide)", 50)
-    spawn(bp("World/Interactables/Grass/BP_TallGrass"), (9800, y, 55), folder="Gym/Movement")
-    text((9800, y - 400, 200), "Tall grass (crouch)", 50)
+    label(X, 1600, 520, "TELEPORTER  (back to start)")
+    # Slide lane along the west wall.
+    box((-3300, -500, -4), (260, 5000, 8), mi("MI_Blue"), folder=G)
+    label(-3300, -2900, 0, "SLIDE  sprint + crouch", 30)
+    # Tall grass and a locker to break line of sight.
+    spawn(bp("World/Interactables/Grass/BP_TallGrass"), (X, 2600, 55), folder=G)
+    label(X, 2600, 110, "TALL GRASS  crouch inside")
+    spawn(bp("World/Interactables/Locker/BP_Locker"), (X - 700, 2200, 0), (0, 0, 0), folder=G)
+    label(X - 700, 2200, 215, "LOCKER  F hide")
 
-    # ---- Row 2: weapons ----
-    y = -3500
-    text((-9000, y - 700, 250), "WEAPONS", 160, color=(1, 0.8, 0.1))
+    # =========================== B. ARMOURY (centre-south) ===========================
+    G = "Gym/Armoury"
+    zone_title(0, -3000, "ARMOURY")
     weapons = ["Pistol", "SMG", "AssaultRifle", "BurstRifle", "Shotgun", "Minigun", "Sniper", "Bow", "RocketLauncher", "GrenadeLauncher", "BlackHole", "Sword"]
     for i, name in enumerate(weapons):
-        x = -9000 + i * 1500
-        box((x, y, 50), (120, 120, 100), mi("MI_Dark"), folder="Gym/Weapons")
-        weapon_pickup((x, y, 130), name, "Gym/Weapons")
-        text((x, y - 250, 220), name, 50)
-    # Targets: barrels, breakable wall.
-    for i in range(4):
-        spawn(bp("World/Interactables/Barrel/BP_ExplosiveBarrel"), (-9000 + i * 400, y + 1300, 0), folder="Gym/Weapons")
-    text((-8400, y + 1000, 200), "Explosive barrels", 50)
-    spawn(bp("World/Interactables/Breakable/BP_BreakableWall"), (-5500, y + 1300, 0), folder="Gym/Weapons")
-    text((-5500, y + 1000, 380), "Breakable wall (explosions)", 50)
-
-    # ---- Row 3: abilities ----
-    y = -1000
-    text((-9000, y - 700, 250), "ABILITIES  (E move / A manipulation)", 140, color=(1, 0.8, 0.1))
+        x = -1000 + (i % 6) * 400
+        y = -2600 if i < 6 else -2100
+        block(x, y, 140, 140, 90, mi("MI_Dark"), G)
+        weapon_pickup((x, y, 140), name, G)
+        label(x, y, 200, name.upper(), 26)
+    # Containers: fixed contents and random contents.
+    fixed = spawn(bp("World/Interactables/Container/BP_Container"), (-600, -1500, 0), (0, -90, 0), folder=G)
+    if fixed:
+        entries = []
+        for weapon, item in (("Sniper", None), ("Shotgun", None), (None, "SmokeGrenade"), (None, "Flashbang")):
+            e = unreal.HitmenContainerEntry()
+            if weapon:
+                e.set_editor_property("weapon", load(path("Data", "Weapons", "DA_Weapon_" + weapon)))
+            if item:
+                e.set_editor_property("item", load(path("Data", "Abilities", "DA_Ability_" + item)))
+            entries.append(e)
+        fixed.set_editor_property("contents", entries)
+    label(-600, -1500, 160, "CONTAINER  fixed contents")
+    random_box = spawn(bp("World/Interactables/Container/BP_Container_Random"), (200, -1500, 0), (0, -90, 0), folder=G)
+    label(200, -1500, 160, "CONTAINER  random contents")
+    # Loot points restricted to a list (one picked at random when play starts).
+    loot = spawn(bp("World/Spawning/BP_LootSpawn_Weapon"), (900, -1500, 40), folder=G)
+    if loot:
+        loot.set_editor_property("weapon_overrides", [load(path("Data", "Weapons", "DA_Weapon_" + w)) for w in ("SMG", "AssaultRifle", "Shotgun")])
+    label(900, -1500, 120, "LOOT POINT  SMG / rifle / shotgun", 26)
+    # Targets: barrels and a breakable wall.
+    for i in range(3):
+        spawn(bp("World/Interactables/Barrel/BP_ExplosiveBarrel"), (-900 + i * 250, -800, 0), folder=G)
+    label(-650, -800, 100, "EXPLOSIVE BARRELS")
+    spawn(bp("World/Interactables/Breakable/BP_BreakableWall"), (300, -800, 0), folder=G)
+    label(300, -800, 300, "BREAKABLE WALL  explosions")
+    # Abilities: 3 rows of 7 pickups.
     abilities = ["Blink", "DoubleJump", "Jetpack", "Dash", "Hook", "Transposition", "Pill", "Invisibility", "Armor", "C4",
                  "Stone", "RemoteDistraction", "SleepDart", "Charm", "Flashbang", "SmokeGrenade", "Lighter", "MultiKill", "Trap", "WindMine", "PoisonVial"]
+    zone_title(0, -250, "ABILITIES  E move / A manipulation")
     for i, name in enumerate(abilities):
-        x = -10000 + i * 1000
+        x = -1050 + (i % 7) * 350
+        y = 0 + (i // 7) * 330
         ability_pickup((x, y, 0), name, "Gym/Abilities")
-        text((x, y - 250, 200), name, 40)
+        label(x, y, 70, name.upper(), 22)
 
-    # ---- Row 4: fixtures ----
-    y = 2000
-    text((-9000, y - 900, 250), "FIXTURES", 160, color=(1, 0.8, 0.1))
-    x = -9500
-    wall((x - 300, y), (x + 300, y), 0, 300, 25, [(250, 110, 0, 230)], GRID_DARK, "Gym/Fixtures")
-    spawn(bp("World/Interactables/Door/BP_Door"), (x - 105, y, 0), folder="Gym/Fixtures")
-    text((x, y - 300, 380), "Door", 50)
-    x = -8300
-    wall((x - 300, y), (x + 300, y), 0, 300, 25, [(250, 110, 0, 230)], GRID_DARK, "Gym/Fixtures")
-    spawn(bp("World/Interactables/Door/BP_Door_Keycard1"), (x - 105, y, 0), folder="Gym/Fixtures")
-    spawn(bp("World/Interactables/Keycard/BP_KeycardPickup"), (x, y - 500, 0), folder="Gym/Fixtures").set_editor_property("keycard_id", 1)
-    text((x, y - 300, 380), "Keycard 1 door + keycard", 50)
-    spawn(bp("World/Interactables/Distraction/BP_Distraction_Radio"), (-7000, y, 80), folder="Gym/Fixtures")
-    box((-7000, y, 40), (100, 100, 80), mi("MI_Dark"), folder="Gym/Fixtures")
-    text((-7000, y - 300, 250), "Distraction (noise)", 50)
-    box((-6000, y + 60, 150), (300, 20, 300), GRID_DARK, folder="Gym/Fixtures")
-    spawn(bp("World/Interactables/Distraction/BP_HackableDistraction_TV"), (-6000, y, 0), folder="Gym/Fixtures")
-    text((-6000, y - 300, 350), "Hackable TV (silent)", 50)
-    # Camera network with control console and monitor.
-    box((-4600, y + 300, 250), (60, 60, 500), GRID_DARK, folder="Gym/Fixtures")
-    camera = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (-4600, y + 250, 450), (-30, -90, 0), folder="Gym/Fixtures")
-    monitor = spawn(bp("World/Interactables/Security/BP_SecurityMonitor"), (-3800, y + 400, 180), (0, -90, 0), folder="Gym/Fixtures")
-    console = spawn(bp("World/Interactables/Security/BP_ControlConsole"), (-3800, y + 200, 0), (0, -90, 0), folder="Gym/Fixtures")
-    if camera and monitor and console:
-        monitor.set_editor_property("linked_camera", camera)
+    # =========================== C. FIXTURES (east) ===========================
+    G = "Gym/Fixtures"
+    X = 2400
+    zone_title(X, -3000, "FIXTURES")
+    # Doors: plain and keycard (keycard on a pedestal next to it).
+    wall((X - 900, -2600), (X - 300, -2600), 0, 300, 25, [(300, 110, 0, 230)], GRID_DARK, G)
+    spawn(bp("World/Interactables/Door/BP_Door"), (X - 655, -2600, 0), folder=G)
+    label(X - 600, -2600, 300, "DOOR  F")
+    wall((X + 100, -2600), (X + 700, -2600), 0, 300, 25, [(300, 110, 0, 230)], GRID_DARK, G)
+    spawn(bp("World/Interactables/Door/BP_Door_Keycard1"), (X + 345, -2600, 0), folder=G)
+    block(X + 900, -2800, 100, 100, 90, mi("MI_Dark"), G)
+    card = spawn(bp("World/Interactables/Keycard/BP_KeycardPickup"), (X + 900, -2800, 90), folder=G)
+    if card:
+        card.set_editor_property("keycard_id", 1)
+    label(X + 400, -2600, 300, "KEYCARD 1 DOOR  (card on the pedestal)")
+    # Distractions.
+    block(X - 600, -1900, 100, 100, 80, mi("MI_Dark"), G)
+    spawn(bp("World/Interactables/Distraction/BP_Distraction_Radio"), (X - 600, -1900, 80), folder=G)
+    label(X - 600, -1900, 120, "RADIO  noise")
+    block(X + 300, -1840, 300, 20, 260, GRID_DARK, G)
+    spawn(bp("World/Interactables/Distraction/BP_HackableDistraction_TV"), (X + 300, -1900, 0), folder=G)
+    label(X + 300, -1900, 260, "TV  silent, hack with F")
+    # Security: camera on a pole watching the path, station with its feed.
+    block(X + 800, -1150, 50, 50, 420, GRID_DARK, G)
+    camera = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (X + 800, -1190, 400), (0, -150, 0), folder=G)
+    console = spawn(bp("World/Interactables/Security/BP_ControlConsole"), (X - 500, -1150, 0), (0, -90, 0), folder=G)
+    if camera and console:
         console.set_editor_property("linked_cameras", [camera])
-    text((-4200, y - 300, 300), "Camera + monitor + console", 50)
-    # Turret wired to a hack panel.
-    turret = spawn(bp("World/Interactables/Security/BP_Turret"), (-2400, y + 600, 0), (0, -90, 0), folder="Gym/Fixtures")
-    panel = spawn(bp("World/Interactables/Security/BP_HackPanel"), (-2000, y, 0), (0, -90, 0), folder="Gym/Fixtures")
+    label(X + 800, -1150, 420, "CAMERA  (cone on the floor)")
+    label(X - 500, -1150, 190, "SECURITY STATION  F: cameras off")
+    # Turret behind a low wall, aiming down the east lane; its hack panel at the side.
+    block(X, -300, 900, 40, 110, GRID_DARK, G)
+    turret = spawn(bp("World/Interactables/Security/BP_Turret"), (X + 700, -150, 0), (0, -90, 0), folder=G)
+    if turret:
+        turret.set_editor_property("range", 1300.0)
+    panel = spawn(bp("World/Interactables/Security/BP_HackPanel"), (X - 700, -150, 0), (0, -90, 0), folder=G)
     if turret and panel:
         panel.set_editor_property("linked_turret", turret)
-    text((-2200, y - 300, 300), "Turret + hack panel", 50)
-    # Blackout room: breaker cuts the lights inside.
-    rx, ry = -500, y + 500
-    wall((rx - 500, ry - 500), (rx + 500, ry - 500), 0, 350, 25, [(500, 110, 0, 230)], GRID_DARK, "Gym/Fixtures")
-    wall((rx - 500, ry + 500), (rx + 500, ry + 500), 0, 350, 25, (), GRID_DARK, "Gym/Fixtures")
-    wall((rx - 500, ry - 500), (rx - 500, ry + 500), 0, 350, 25, (), GRID_DARK, "Gym/Fixtures")
-    wall((rx + 500, ry - 500), (rx + 500, ry + 500), 0, 350, 25, (), GRID_DARK, "Gym/Fixtures")
-    box((rx, ry, 360), (1050, 1050, 20), GRID_DARK, folder="Gym/Fixtures")
-    lamp = spawn(bp("World/Interactables/Power/BP_LightFixture"), (rx, ry, 320), folder="Gym/Fixtures")
-    blackout = spawn(bp("World/Interactables/Power/BP_BlackoutVolume"), (rx, ry, 175), folder="Gym/Fixtures")
+    label(X + 700, -150, 160, "TURRET  laser, F to hack")
+    label(X - 700, -150, 180, "HACK PANEL")
+    # Breaker room: the breaker outside cuts the lamp inside (dark room, a guard inside).
+    rx, ry = X, 650
+    wall((rx - 400, ry - 400), (rx + 400, ry - 400), 0, 330, 25, [(400, 110, 0, 230)], GRID_DARK, G)
+    wall((rx - 400, ry + 400), (rx + 400, ry + 400), 0, 330, 25, (), GRID_DARK, G)
+    wall((rx - 400, ry - 400), (rx - 400, ry + 400), 0, 330, 25, (), GRID_DARK, G)
+    wall((rx + 400, ry - 400), (rx + 400, ry + 400), 0, 330, 25, (), GRID_DARK, G)
+    box((rx, ry, 340), (830, 830, 20), GRID_DARK, folder=G)
+    lamp = spawn(bp("World/Interactables/Power/BP_LightFixture"), (rx, ry, 300), folder=G)
+    blackout = spawn(bp("World/Interactables/Power/BP_BlackoutVolume"), (rx, ry, 165), folder=G)
     if blackout:
-        blackout.set_actor_scale3d(unreal.Vector(0.62, 0.62, 0.6))
-    breaker = spawn(bp("World/Interactables/Power/BP_CircuitBreaker"), (rx - 700, ry - 600, 0), (0, -90, 0), folder="Gym/Fixtures")
+        blackout.set_actor_scale3d(unreal.Vector(0.5, 0.5, 0.55))
+    breaker = spawn(bp("World/Interactables/Power/BP_CircuitBreaker"), (rx - 600, ry - 450, 0), (0, -90, 0), folder=G)
     if breaker and lamp and blackout:
         breaker.set_editor_property("linked_lights", [lamp])
         breaker.set_editor_property("linked_volumes", [blackout])
-    npc("guard", (rx, ry, 0), folder="Gym/Fixtures")
-    text((rx, ry - 800, 420), "Breaker + blackout room", 50)
-    # Sealed room with vent hatch and poisonable drink.
-    vx, vy = 1700, y + 500
-    room_door = spawn(bp("World/Interactables/Door/BP_Door"), (vx - 55, vy - 500, 0), folder="Gym/Fixtures")
-    wall((vx - 500, vy - 500), (vx + 500, vy - 500), 0, 350, 25, [(500, 110, 0, 230)], GRID_DARK, "Gym/Fixtures")
-    wall((vx - 500, vy + 500), (vx + 500, vy + 500), 0, 350, 25, [(500, 120, 100, 220)], GRID_DARK, "Gym/Fixtures")
-    room_window = spawn(bp("World/Interactables/Window/BP_Window"), (vx, vy + 500, 0), folder="Gym/Fixtures")
-    wall((vx - 500, vy - 500), (vx - 500, vy + 500), 0, 350, 25, [(500, 120, 0, 120)], GRID_DARK, "Gym/Fixtures")
-    hatch = spawn(bp("World/Interactables/Vent/BP_VentHatch"), (vx - 500, vy, 0), (0, 90, 0), folder="Gym/Fixtures")
-    wall((vx + 500, vy - 500), (vx + 500, vy + 500), 0, 350, 25, (), GRID_DARK, "Gym/Fixtures")
-    box((vx, vy, 360), (1050, 1050, 20), GRID_DARK, folder="Gym/Fixtures")
-    room = spawn(bp("World/Interactables/Vent/BP_RoomVolume"), (vx, vy, 175), folder="Gym/Fixtures")
+    npc("guard", (rx, ry + 150, 0), -90, folder=G, stationary=True)
+    label(rx - 600, ry - 450, 180, "BREAKER  F: lights off")
+    label(rx, ry, 350, "DARK ROOM")
+    # Mounted gun and tank on the east lane.
+    block(X - 300, 1600, 160, 160, 90, mi("MI_Dark"), G)
+    spawn(bp("World/Vehicles/BP_MountedGun"), (X - 300, 1600, 90), (0, 90, 0), folder=G)
+    label(X - 300, 1600, 200, "MOUNTED GUN  F")
+    spawn(bp("World/Vehicles/BP_Tank"), (X + 500, 2600, 100), (0, 90, 0), folder=G)
+    label(X + 500, 2600, 260, "TANK")
+    # Sealed room: vent hatch, window and a poisonable drink.
+    vx, vy = X - 700, 2500
+    room_door = spawn(bp("World/Interactables/Door/BP_Door"), (vx - 55, vy - 350, 0), folder=G)
+    wall((vx - 350, vy - 350), (vx + 350, vy - 350), 0, 330, 25, [(350, 110, 0, 230)], GRID_DARK, G)
+    wall((vx - 350, vy + 350), (vx + 350, vy + 350), 0, 330, 25, [(350, 120, 100, 220)], GRID_DARK, G)
+    room_window = spawn(bp("World/Interactables/Window/BP_Window"), (vx, vy + 350, 0), folder=G)
+    wall((vx - 350, vy - 350), (vx - 350, vy + 350), 0, 330, 25, [(350, 120, 0, 120)], GRID_DARK, G)
+    hatch = spawn(bp("World/Interactables/Vent/BP_VentHatch"), (vx - 350, vy, 0), (0, 90, 0), folder=G)
+    wall((vx + 350, vy - 350), (vx + 350, vy + 350), 0, 330, 25, (), GRID_DARK, G)
+    box((vx, vy, 340), (730, 730, 20), GRID_DARK, folder=G)
+    room = spawn(bp("World/Interactables/Vent/BP_RoomVolume"), (vx, vy, 165), folder=G)
     if room:
+        room.set_actor_scale3d(unreal.Vector(0.7, 0.7, 1.0))
         room.set_editor_property("openings", [a for a in (room_door, room_window, hatch) if a])
     if hatch and room:
         hatch.set_editor_property("linked_rooms", [room])
-    box((vx + 200, vy, 45), (200, 100, 90), mi("MI_Wood"), folder="Gym/Fixtures")
-    drink = spawn(bp("World/Interactables/Drink/BP_PoisonableDrink"), (vx + 200, vy, 90), folder="Gym/Fixtures")
-    drinker_route = patrol([(vx - 200, vy, 100), (vx + 100, vy, 100)], [2.0, 4.0], "Gym/Fixtures")
-    if drink and drinker_route:
-        points = list(drinker_route.get_editor_property("points"))
-        points[1].set_editor_property("use_actor", drink)
-        drinker_route.set_editor_property("points", points)
-    npc("civilian", (vx - 200, vy, 0), route=drinker_route, folder="Gym/Fixtures")
-    # Crawl duct to the hatch.
-    box((vx - 1100, vy + 90, 150), (1200, 20, 300), GRID_DARK, folder="Gym/Fixtures")
-    box((vx - 1100, vy - 90, 150), (1200, 20, 300), GRID_DARK, folder="Gym/Fixtures")
-    box((vx - 1100, vy, 135), (1200, 200, 20), GRID_DARK, folder="Gym/Fixtures")
-    text((vx, vy - 800, 420), "Sealed room: door, window, vent, drink", 50)
-    # Vehicles, retrieval and loot.
-    spawn(bp("World/Vehicles/BP_MountedGun"), (4000, y, 100), (0, 90, 0), folder="Gym/Fixtures")
-    box((4000, y, 50), (150, 150, 100), mi("MI_Dark"), folder="Gym/Fixtures")
-    text((4000, y - 300, 250), "Mounted gun (180)", 50)
-    spawn(bp("World/Vehicles/BP_Tank"), (6000, y + 400, 100), (0, 90, 0), folder="Gym/Fixtures")
-    text((6000, y - 300, 350), "Tank", 50)
-    spawn(bp("World/Spawning/BP_RetrievalPoint"), (8500, y + 400, 0), folder="Gym/Fixtures")
-    text((8500, y - 300, 250), "Retrieval point", 50)
-    spawn(bp("World/Spawning/BP_LootSpawn_Weapon"), (10000, y, 50), folder="Gym/Fixtures")
-    spawn(bp("World/Spawning/BP_LootSpawn_Item"), (10000, y + 500, 50), folder="Gym/Fixtures")
-    text((10000, y - 300, 250), "Loot spawn points", 50)
+    block(vx + 150, vy, 160, 90, 90, mi("MI_Wood"), G)
+    spawn(bp("World/Interactables/Drink/BP_PoisonableDrink"), (vx + 150, vy, 90), folder=G)
+    label(vx, vy, 340, "SEALED ROOM  vent, window, drink")
+    spawn(bp("World/Spawning/BP_RetrievalPoint"), (3250, 3250, 0), folder=G)
+    label(3250, 3250, 40, "RETRIEVAL POINT  deliver the VIP")
 
-    # ---- Row 5: AI pens ----
-    y = 6500
-    text((-9000, y - 900, 250), "AI", 160, color=(1, 0.8, 0.1))
-    pens = [("Patrolling guard", "guard", "patrol"), ("Guard with keycard 1", "guard", "patrol"),
-            ("Stationary guard", "guard", "stationary"), ("Sentry: sight only, holds position", "guard", "sentry"),
-            ("VIP candidate", "vip", ""), ("Civilian", "civilian", ""), ("Sniper (tower)", "sniper", "")]
-    for i, (label, kind, mode) in enumerate(pens):
-        x = -9000 + i * 3000
-        wall((x - 1200, y + 1200), (x + 1200, y + 1200), 0, 300, 25, (), GRID_DARK, "Gym/AI")
-        wall((x - 1200, y - 600), (x - 1200, y + 1200), 0, 300, 25, (), GRID_DARK, "Gym/AI")
-        wall((x + 1200, y - 600), (x + 1200, y + 1200), 0, 300, 25, (), GRID_DARK, "Gym/AI")
-        text((x, y - 700, 320), label, 60)
-        if kind == "sniper":
-            box((x, y + 800, 300), (400, 400, 600), GRID_DARK, folder="Gym/AI")
-            ladder((x, y + 575, 0), -90, 600)
-            npc("sniper", (x, y + 800, 600), -90, folder="Gym/AI")
-        else:
-            route = patrol([(x - 700, y, 100), (x + 700, y, 100), (x + 700, y + 900, 100), (x - 700, y + 900, 100)], folder="Gym/AI") if mode == "patrol" else None
-            npc(kind, (x, y + 300, 0), -90, route=route, keycard=1 if i == 1 else None, folder="Gym/AI",
-                stationary=mode == "stationary", sentry=mode == "sentry")
+    # =========================== D. AI (north centre, inside a pen) ===========================
+    G = "Gym/AI"
+    zone_title(0, 900, "AI")
+    py0, py1, px0, px1 = 1200, 3600, -1400, 1400
+    wall((px0, py0), (-150, py0), 0, 260, 25, (), GRID_DARK, G)          # entrance gap in the middle
+    wall((150, py0), (px1, py0), 0, 260, 25, (), GRID_DARK, G)
+    wall((px0, py0), (px0, py1), 0, 260, 25, (), GRID_DARK, G)
+    wall((px1, py0), (px1, py1), 0, 260, 25, (), GRID_DARK, G)
+    # Curved patrol (spline) around a pillar.
+    block(0, 2300, 300, 300, 260, GRID_DARK, G)
+    loop = patrol([(-500, 1800, 100), (500, 1800, 100), (500, 2800, 100), (-500, 2800, 100)], [2.0, 0.0, 2.0, 0.0], G, curved=True)
+    npc("guard", (-500, 1800, 0), 0, route=loop, folder=G)
+    label(0, 2300, 260, "SPLINE PATROL  around the pillar")
+    # Guard group: a leader on a route, two followers in formation.
+    group_route = patrol([(-1100, 1500, 100), (-1100, 3300, 100)], [3.0, 3.0], G, curved=False)
+    leader = npc("guard", (-1100, 1500, 0), 90, route=group_route, folder=G)
+    followers = [npc("guard", (-1250, 1400, 0), 90, folder=G), npc("guard", (-950, 1400, 0), 90, folder=G)]
+    group = spawn(bp("AI/BP_GuardGroup"), (-1100, 1500, 0), label="GuardGroup", folder=G)
+    if group and leader:
+        group.set_editor_property("members", [m for m in [leader] + followers if m])
+    label(-1100, 1450, 200, "GUARD GROUP  leader + 2")
+    # Keycard guard to pickpocket (stationary, back turned to the entrance).
+    npc("guard", (900, 1700, 0), 90, keycard=1, folder=G, stationary=True)
+    label(900, 1700, 200, "KEYCARD GUARD  F from behind: pickpocket")
+    # Sentry, sniper tower, VIP candidate.
+    npc("guard", (1100, 3200, 0), -90, folder=G, sentry=True)
+    label(1100, 3200, 200, "SENTRY  sight only")
+    block(-200, 3350, 300, 300, 450, GRID_DARK, G)
+    ladder((-200, 3175, 0), -90, 450)
+    npc("sniper", (-200, 3350, 450), -90, folder=G)
+    label(-200, 3350, 650, "SNIPER  red laser")
+    npc("vip", (400, 3300, 0), -90, folder=G, stationary=True)
+    label(400, 3300, 200, "VIP CANDIDATE")
+    # Hiding spots for the search state.
+    spawn(bp("World/Interactables/Locker/BP_Locker"), (1250, 2400, 0), (0, 180, 0), folder=G)
+    spawn(bp("World/Interactables/Grass/BP_TallGrass"), (-700, 3300, 55), folder=G).set_actor_scale3d(unreal.Vector(0.4, 0.4, 1.0))
+    label(1250, 2400, 215, "SEARCH  lockers / grass")
+    # Camera alarm: a camera over the pen entrance calls the guards inside.
+    block(-400, py0 - 60, 40, 40, 380, GRID_DARK, G)
+    pen_camera = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (-400, py0 - 20, 360), (0, -60, 0), folder=G)
+    label(-400, py0 - 60, 380, "CAMERA ALARM  calls the pen")
     save_map()
 
 
@@ -751,8 +892,6 @@ def build_ldtest():
     for i, (gx, gy, gz) in enumerate(((mx - 400, my - cd / 2 + 300, 0), (mx + 400, my - cd / 2 + 300, 0), (hx1 - 200, hy0 - 200, 0),
                                       (mx, my + cd / 2 - 300, 0), (-4300, -2600, 0), (-6500, 3200, 0))):
         npc("guard", (gx, gy, gz), 180, folder="AI/Guards", stationary=True, sentry=i < 2)
-    for gx, gy in ((-2200, 500), (-2700, -1200), (-1900, 3600), (mx - 2000, my + 1800)):
-        npc("civilian", (gx, gy, 0), 90, folder="AI/Civilians")
 
     for x, y in ((mx + 2800, my + 2800), (-7800, -7600), (cx, cy + 900), (-2400, 0), (2500, -7500), (-7500, 7500)):
         spawn(bp("World/Spawning/BP_RetrievalPoint"), (x, y, 0), folder="Gameplay/Retrieval")
@@ -771,6 +910,20 @@ def build_ldtest():
         box((sx + 450 * (1 if sx < 0 else -1), sy, 200), (40, 1000, 400), GRID_ALT, folder="Gameplay/Starts")
     team_starts([(corners[0][0], corners[0][1], 45), (corners[1][0], corners[1][1], 135), (corners[2][0], corners[2][1], -45), (corners[3][0], corners[3][1], -135)])
     save_map()
+
+
+def bake_map_textures():
+    """Top-down schematics (minimap, pause map, room preview) for every playable map + the gym."""
+    for name in ("LDTest", "Empty_01", "Empty_02", "Gym"):
+        data = load(path("Data", "Maps", "DA_Map_" + name))
+        if not data or not EAL.does_asset_exist(path("Maps", "L_" + name)):
+            continue
+        LES.load_level(path("Maps", "L_" + name))
+        texture = unreal.HitmenContentTools.bake_map_texture(data, path("UI", "Maps", "T_Map_" + name), 768, 260.0)
+        if texture:
+            save(texture)
+            save(data)
+            log("map texture", name)
 
 
 def link_map_definitions():
@@ -795,14 +948,23 @@ def should_build(name):
     return True
 
 
+OLD_FRONT_END_MAPS = ("L_TitleScreen", "L_Lobby")
+
+
 def run():
-    build_title()
-    build_lobby()
+    build_front_end()
     build_empty("L_Empty_01")
     build_empty("L_Empty_02")
     if should_build("L_Gym"):
         build_gym()
     if should_build("L_LDTest"):
         build_ldtest()
+    respread_ldtest_spawns()
     link_map_definitions()
-    LES.load_level(path("Maps", "L_TitleScreen"))
+    bake_map_textures()
+    LES.load_level(path("Maps", "L_FrontEnd"))
+    # The title screen and lobby maps were merged into L_FrontEnd.
+    for name in OLD_FRONT_END_MAPS:
+        if EAL.does_asset_exist(path("Maps", name)):
+            EAL.delete_asset(path("Maps", name))
+            log("deleted old map", name)

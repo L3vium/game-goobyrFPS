@@ -57,25 +57,39 @@ Shown under the map carousel. Every option has a default in the match rules data
 `bShowInLobbyUI` flag so designers can hide it and fix its value.
 
 - Proximity voice chat (on/off)
-- Number of retrieval points
-- Difficulty (drives loot counts, AI parameters, NPC damage multiplier). NPCs stroll on patrol (170 cm/s), walk briskly when investigating or searching (320) and run in combat (480).
-- Sonar timing: first interval, fastest interval, speed-up time (`FHitmenFloatOption`s)
+- Difficulty (drives the number of retrieval points — Easy 4, Normal 3, Hard 2 —, loot counts, AI
+  parameters and the NPC damage multiplier). NPCs stroll on patrol (170 cm/s), walk briskly when
+  investigating or searching (320) and run in combat (480).
 
-## 4. Flow & screens
-1. **Title screen** — huge bold **HITMEN** title top-left; square, left-aligned buttons:
-   **Join** (dashed outline, no fill) above **Create Room**, **Options**, **Quit**. A museum-like
-   backdrop built from basic shapes with ambient sound; the assassin (engine mannequin) on the
-   right with idle animations. A small **debug** button bottom-right opens the Gym.
-2. **Join** — the title screen darkened; joinable rooms, then Steam friends' rooms.
-3. **Create Room** — left: map carousel (arrows hide at the ends) and match options;
-   right: players list (rename, icon — coloured glyphs until the team adds icon textures to
-   `DA_Catalog.PlayerIcons`), a dashed **+ Create team** button, drag & drop players
-   into teams, Protect/Attack toggle per team, Watcher toggle for players without a team.
-   Bottom-left **Back**, bottom-right **Start**.
-4. **Customization** — left: the assassin's look in three slots (head: hat, cap, moustache,
-   glasses…; body; legs), randomize, name (defaults to the Steam name or a random name); right:
-   the loadout (one weapon, one move ability, one manipulation ability).
-5. **Match** — then results.
+Designer-only values (match rules asset, never in the lobby): sonar timing (first interval, fastest
+interval, speed-up time) and the per-difficulty presets.
+
+The whole front end is **one scene** (`L_FrontEnd`): title, room and agent screens never load a
+level. The camera blends between `CameraActor`s tagged `Shot_Title`, `Shot_Lobby` and
+`Shot_Customization` (the match phase picks the shot; `AHitmenHUD::ShotBlendTime`). Creating a room
+starts listening in place; joining players load `L_FrontEnd` once; a finished match travels back
+to it, in the room.
+
+1. **Title screen** — the **HITMEN** logo and the buttons vertically centred on the left: **Join**,
+   **Create Room**, **Options**, **Quit**, plus a small **debug** button (Gym). The museum hall
+   behind, the assassin (engine mannequin) idling on the right.
+2. **Join** — joinable rooms, then Steam friends' rooms.
+3. **Create Room** (briefing room) — left: a large top-down map tile (the baked schematic, map name,
+   prev / next arrow buttons on square backgrounds) and two options: proximity chat and difficulty.
+   Right: player rows (white name, colour swatch), a dashed **+ Create team** button, whole-row
+   drag & drop into team panels (the target panel lights up), Protect/Attack per team, a
+   **Watcher** checkbox for players without a team. Bottom: **Back** and **Next**.
+4. **Your agent** (stage) — the mannequin stands on the left; arrows on both sides of its head,
+   body and legs change the look live; the name is edited here. Below: the loadout as square cards
+   (weapon, move, manipulation); hovering a card opens a carousel above it (wheel or click).
+   **Ready** only: when every non-watcher is ready a 5 s countdown starts the match (un-ready
+   cancels it).
+5. **Match** — intro (parachute drop, "Dropping in", map name, 3-2-1), play, then results.
+
+Spawns: maps carry many `BP_TeamStart` points. Each team (or solo player) takes a random free point
+and teammates take the nearest free points around it. During the intro (`bParachuteIntro`,
+`IntroDropHeight`, `IntroDuration` on the match game mode) everyone falls from above their point
+under a canopy, steering a little; control returns on landing. The Gym skips the intro.
 
 Watchers get a spectator mode (`V` cycles): free fly, single-player view (LMB / RMB switch between
 players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players follow teammates.
@@ -102,9 +116,20 @@ Options: crouch toggle, sprint toggle, ladder direction relative to camera (off 
 mouse sensitivity, invert Y, audio volumes, full key rebinding.
 
 ## 6. Player
-- **Movement**: walk, sprint, crouch, slide, jump, ledge grab (tall walls), vault (low obstacles,
-  windows), ladders and ziplines (automatic, no `F`, no snap animation, permissive look angle;
-  forward = up, back = down), jump pads, lockers.
+- **Movement**: walk (480), sprint (820), crouch (240, the view lowers smoothly), slide (crouch while
+  sprinting), jump, ladders / gutters (automatic, forward = up, smooth pull-up at the top), ziplines (`F` at a
+  post: rides to the other end on its own), jump pads, lockers (you stand inside and look through the slit).
+- **Traversal metrics** (Space while moving into it; the action shows at the crosshair):
+
+  | Obstacle | Action |
+  |---|---|
+  | up to 50 cm | step |
+  | up to 120 cm, thin, floor behind | vault |
+  | up to 250 cm with room on top | ledge grab (climb and stand on it) |
+  | up to 250 cm, thin wall | climb over |
+  | above 250 cm | out of reach (ladder, gutter, ability) |
+- **First person**: no body or arms while moving (the body's shadow stays); the arms appear with a weapon in
+  hand or while punching. Recoil kicks the view up and it recovers smoothly. On death the view leaves the head.
 - **Inventory**: 2 weapon slots (mouse wheel). `F` with no interactable in focus throws the held
   item: if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
   stays. Firing with an empty magazine and no reserve throws the weapon where you look. No weapon
@@ -124,8 +149,10 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   materials and an anim notify.
 
 ## 7. Weapons
-All weapons share ammo, fire rate, spread, damage, headshot multiplier, noise radius, silenced
-flag, mesh/VFX/SFX/montage soft references — every value is in a `DA_Weapon_*` data asset.
+All weapons share ammo, fire rate, spread (fixed: firing never widens it), recoil, damage, headshot
+multiplier, noise radius, silenced flag, mesh / visual transform / VFX / SFX / montage / first-person pose
+references — every value is in a `DA_Weapon_*` data asset. Weapons lying in the world float and turn. The
+sniper shows a scope overlay; zoom keeps the mouse feel (sensitivity follows the field of view).
 
 | Weapon | Family | Notes |
 |---|---|---|
@@ -171,19 +198,20 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Ladder / gutter | Automatic climb |
 | Zipline | Automatic, up/down |
 | Jump pad | Launches high |
-| Locker | Hide inside |
-| Door | Open/close; optional keycard ID |
-| Window | Vaultable, open/close |
+| Locker | Hollow cabinet; hide inside, look through the door slit |
+| Door | Open/close; optional keycard ID (`[Locked - Keycard N]` in the prompt) |
+| Window | Thin frame, two shutters swinging sideways; vaultable when open |
+| Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
 | Distraction | Interact → noise that attracts NPCs |
 | Hackable distraction | Silent, interact or remote-activate |
-| Turret | Shoots players; wired to a hack panel, hacked = shoots NPCs |
-| Security camera | Visible cone (white → red when you are inside, also on the floor); spotting calls reinforcements |
-| Control room / monitors | Each monitor shows a linked camera ("no signal" while it is disabled); the console disables only its linked cameras |
+| Turret | Red laser while locking on, then shoots players; hack with `F` (or its panel): shoots NPCs |
+| Security camera | Short cone aimed at the floor (white → red when you are inside), round footprint; spotting calls reinforcements |
+| Security station | Desk + screen cycling through its cameras; `F` disables / enables them ("no signal") |
 | Circuit breaker | Turns off its linked lights: NPCs cannot see (only hear), players see less |
 | Vent | Crouch-size duct with small doors; poison spreads to linked rooms only if fully closed |
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
-| Mounted machine gun | Use from behind only, 180° arc; takes damage, part of it reaches the gunner |
+| Mounted machine gun | Usable from any side (option), 180° arc; takes damage, part of it reaches the gunner |
 | Tank | Enter, third-person view, cannon; server-driven from any client; damageable, driver ejected when destroyed |
 | Teleporter | Fixed pair: in → out |
 | Retrieval point candidate | See §2 |
@@ -193,8 +221,13 @@ drink, or in a vent to poison the sealed rooms it serves).
 ## 10. AI
 All NPCs are hostile. Sight takes priority over hearing.
 
+There are no civilians: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate.
+
 **Two NPC types** (`Behavior` on the NPC, "Hitmen|NPC|Behavior"):
-- **Patrol**: walks its `PatrolRoute` (stands at its post if it has none).
+- **Patrol**: walks its `PatrolRoute` (stands at its post if it has none). Routes can be **curved**
+  (spline through the points). A **guard group** (`BP_GuardGroup`) makes followers walk in formation behind
+  the first member and shares alerts inside the group.
+- **Keycards** hang on the carrier's hip; from behind an unaware carrier, `F` pickpockets it (before any kill).
 - **Stationary**: stands at its placement, facing the way it was placed; after an alert it walks
   back and turns to that direction again.
 
@@ -242,21 +275,31 @@ smoke, darkness, invisibility) drives perception, kill witnesses and body sighti
   `Tools/Editor/hitmen_build_ai.py` (headless, see CLAUDE.md).
 
 ## 11. HUD
+Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `HitmenHUDWidgets`).
 - **Compass** (top): N/S/E/W only (`bShowIntercardinals` off); optional VIP marker; retrieval
   directions while carrying.
-- **Inventory** (bottom centre) with keycards next to it. Abilities and health bottom right.
-- **Minimap** (bottom left, square): alert states in white/yellow/red, sonar pings.
-- **Crosshair** with a ring; hit marker; red cross on a headshot kill.
-- **Interaction prompt** at screen centre (Open, Swap, Hack, Climb…).
+- **Inventory bar** (bottom centre): two weapon cards (name, ammo in dimmed italics; they slide when you
+  switch), a divider, the A and E ability cards (cooldown / charges), keycard chips above, a health line when hurt.
+- **Minimap** (bottom left, square): the baked map rotating with the view, alerted NPCs, sonar pings; its frame
+  takes the colour of the worst alert aimed at you with a status line (Suspicious, Alerted, Searching,
+  Spotted, Under fire).
+- **Crosshair**: a thin "+"; hit ticks; an "x" on a kill (red on a headshot); arrows around it toward NPCs
+  that are onto you.
+- **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault`; remote-ability targets
+  glow with `[A] Charm` under them.
+- **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
+- **Scope** overlay for the sniper. **Sightroom** (Tab): a scan wave, a grid on the floor, a cool world.
 - **Alert indicators** above NPCs and at screen centre.
-- **Pause map**: your position, the VIP, retrieval points.
+- **Pause map**: the baked schematic, north up, about two thirds of the screen, wheel to zoom around
+  you; a legend on the left toggles each marker type (you, teammates, VIP, retrieval points,
+  alerted guards, cameras). Debug tools sit flush against the right edge.
+- **Intro**: "Dropping in", the map name and a 3-2-1 countdown during the parachute drop.
 
 ## 12. Maps
 | Map | Purpose |
 |---|---|
-| `L_TitleScreen` | Menus backdrop |
-| `L_Lobby` | Create room / customization after hosting |
-| `L_Gym` | Debug gym: checker grid, spaced labelled zones showcasing every move, weapon, ability, fixture, NPC type and AI state (alert states + search with lockers / grass, camera alarm with guards in reinforcement range, stealth kill / body discovery / lighter / VIP carry to a retrieval point) |
+| `L_FrontEnd` | The whole front end in one scene: museum hall (title), briefing room (create room), agent stage (`BP_AgentPreview`, "Your agent"); one tagged camera per screen |
+| `L_Gym` | Debug gym: a compact walled hall (74 x 74 m) laid out like a mini LD — movement course with the traversal metrics, armoury (weapons, containers, loot points), abilities, fixtures, and an AI pen (spline patrol, guard group, keycard guard to pickpocket, sentry, sniper, VIP, search spots, camera alarm); every station is labelled just above itself |
 | `L_LDTest` | Basic Hitman-like sandbox: town (gutters beside back windows, street lamps on a breaker in a hidden keycard utility room), walled manor (keycard gates, sealed dining room fed by a crouch vent duct, upstairs keycard control room, basement foundations via exterior side stairs with a keycard breaker room), cave with a ramp down to a tunnel into the basement, a garden-shed secret passage down to the tunnel, AIs, a basin of mountains and invisible walls; checker materials only |
 | `L_Empty_01`, `L_Empty_02` | Empty maps for the team |
 

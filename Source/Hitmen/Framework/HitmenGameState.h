@@ -79,6 +79,13 @@ public:
 
 	void SetMatchPhase(EHitmenMatchPhase NewPhase);
 
+	/** Server: starts (Seconds > 0) or clears a countdown shown by the UI (launch, intro). */
+	void SetPhaseCountdown(float Seconds);
+
+	/** Seconds left on the current countdown (0 = none). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Match")
+	float GetPhaseCountdownRemaining() const;
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Match")
 	AHitmenCharacterBase* GetVIP() const { return VIP; }
 
@@ -147,6 +154,10 @@ protected:
 
 	UPROPERTY(Replicated)
 	bool bDebugCommandsAllowed = false;
+
+	/** Server world time when the countdown ends (0 = none). */
+	UPROPERTY(Replicated)
+	float PhaseCountdownEnd = 0.f;
 
 	int32 NextTeamId = 0;
 

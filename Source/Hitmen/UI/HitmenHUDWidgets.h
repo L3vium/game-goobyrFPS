@@ -38,7 +38,10 @@ protected:
 	virtual FVector2D GetDesiredSizeForPaint() const { return FVector2D(600.f, 40.f); }
 };
 
-/** Crosshair with spread ring, NPC alert arcs and hit markers. */
+/**
+ * Crosshair: a thin "+" (no spread ring: firing never widens it), a diagonal cross on a kill (red
+ * on a headshot), and arrows around it toward NPCs that are onto you.
+ */
 UCLASS()
 class HITMEN_API UHitmenCrosshairWidget : public UHitmenUserWidget
 {
@@ -61,13 +64,21 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Hitmen|Crosshair")
 	float KillCrossDuration = 0.6f;
 
-	/** Pixels per degree of weapon spread. */
+	/** Half length of each arm of the cross and the gap at its centre (px). */
 	UPROPERTY(EditAnywhere, Category="Hitmen|Crosshair")
-	float SpreadScale = 8.f;
+	float ArmLength = 9.f;
+
+	UPROPERTY(EditAnywhere, Category="Hitmen|Crosshair")
+	float ArmGap = 4.f;
+
+	/** Radius of the threat arrows around the crosshair (px). */
+	UPROPERTY(EditAnywhere, Category="Hitmen|Crosshair")
+	float ThreatRadius = 74.f;
 
 	float HitMarkerTime = 0.f;
 	float KillCrossTime = 0.f;
 	bool bLastHitWasKill = false;
+	bool bLastKillHeadshot = false;
 };
 
 /** Square minimap: you, NPCs coloured by alert, sonar pings. */
@@ -88,6 +99,12 @@ public:
 protected:
 	virtual void BindEvents() override;
 	virtual void UnbindEvents() override;
+	virtual void NativeConstruct() override;
+
+	/** Baked map of the level (DA_Map MapTexture) and its world bounds. */
+	FSlateBrush MapBrush;
+	FBox2D MapBounds = FBox2D(ForceInit);
+	bool bHasMap = false;
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 
 	UFUNCTION() void HandleSonar(const FHitmenSonarPing& Ping);
@@ -117,6 +134,12 @@ protected:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> MoveAbilityText;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> ManipulationAbilityText;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> HealthText;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenActionPromptWidget> ActionPrompt;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenDamageVignetteWidget> DamageVignette;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenScopeWidget> Scope;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenInventoryBarWidget> InventoryBar;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenWorldHintWidget> WorldHint;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenIntroWidget> Intro;
 
 	UFUNCTION() void HandlePawnChanged(APawn* NewPawn);
 	UFUNCTION() void HandlePrompt(const FText& Prompt, bool bVisible);

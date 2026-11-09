@@ -9,6 +9,7 @@
 class UHitmenMatchRules;
 class UHitmenMapDefinition;
 class UHitmenCatalog;
+class UHitmenSoundSet;
 class UBehaviorTree;
 
 /**
@@ -33,6 +34,10 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Data")
 	TSoftObjectPtr<UHitmenCatalog> Catalog;
+
+	/** Every placeholder sound (UI, fixtures, explosions, heartbeat...). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Data")
+	TSoftObjectPtr<UHitmenSoundSet> SoundSet;
 
 	/** Maps in carousel order. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Data")

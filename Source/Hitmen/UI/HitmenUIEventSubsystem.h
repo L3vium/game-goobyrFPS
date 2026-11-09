@@ -72,6 +72,20 @@ struct FHitmenHUDAlertBlip
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bCallingReinforcements = false;
 };
 
+/** A hint anchored on a world actor (remote-ability target: glow + action under it). */
+USTRUCT(BlueprintType)
+struct FHitmenWorldHint
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") TWeakObjectPtr<AActor> Target;
+	/** Key label, e.g. "A" or "E". */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FText Key;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FText Action;
+
+	bool IsSet() const { return Target.IsValid(); }
+};
+
 /** One player's live view for the spectator grid. */
 USTRUCT(BlueprintType)
 struct FHitmenSpectatorView
@@ -96,6 +110,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenInventoryView, const FHitme
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenAbilityViews, const FHitmenHUDAbilityView&, Move, const FHitmenHUDAbilityView&, Manipulation);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenVitals, const FHitmenHUDVitalsView&, View);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenSpectatorViews, const TArray<FHitmenSpectatorView>&, Views);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenWorldHint, const FHitmenWorldHint&, Hint);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenTextChanged, const FText&, Text);
 
 /**
  * Local-player event hub. Gameplay code calls the Broadcast* helpers; widgets bind in
@@ -184,6 +200,40 @@ public:
 	void SetEmoteNames(const TArray<FText>& Names) { EmoteNames = Names; OnEmotesChanged.Broadcast(); }
 	void SetSpectatorViews(const TArray<FHitmenSpectatorView>& Views) { SpectatorViews = Views; OnSpectatorViewsChanged.Broadcast(SpectatorViews); }
 	void SetCrosshairSpread(float Degrees) { CrosshairSpread = Degrees; }
+
+	/** Remote-ability target under the crosshair (or none). */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenWorldHint OnAbilityHintChanged;
+
+	/** What Space does in front of the player ("Vault", "Climb"...), empty = nothing. */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenTextChanged OnTraversalHintChanged;
+
+	/** Scoped aiming (sniper overlay). */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenToggle OnScopeToggled;
+
+	void SetAbilityHint(const FHitmenWorldHint& Hint)
+	{
+		if (Hint.Target != AbilityHint.Target || !Hint.Action.EqualTo(AbilityHint.Action))
+		{
+			AbilityHint = Hint;
+			OnAbilityHintChanged.Broadcast(AbilityHint);
+		}
+	}
+	void SetTraversalHint(const FText& Hint)
+	{
+		if (!Hint.EqualTo(TraversalHint))
+		{
+			TraversalHint = Hint;
+			OnTraversalHintChanged.Broadcast(TraversalHint);
+		}
+	}
+	void SetScoped(bool bInScoped) { if (bScoped != bInScoped) { bScoped = bInScoped; OnScopeToggled.Broadcast(bScoped); } }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FHitmenWorldHint& GetAbilityHint() const { return AbilityHint; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FText& GetTraversalHint() const { return TraversalHint; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") bool IsScoped() const { return bScoped; }
 	void SetAlertBlips(TArray<FHitmenHUDAlertBlip>&& Blips) { AlertBlips = MoveTemp(Blips); }
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FHitmenHUDInventoryView& GetInventoryView() const { return InventoryView; }
@@ -242,4 +292,9 @@ private:
 	bool bOptionsOpen = false;
 	bool bEmoteWheelOpen = false;
 	bool bSightroomActive = false;
+
+	// ---- Hints (world-anchored ability target, traversal, scope) ----
+	FHitmenWorldHint AbilityHint;
+	FText TraversalHint;
+	bool bScoped = false;
 };

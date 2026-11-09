@@ -1,6 +1,7 @@
 // Hitmen — ability component
 
 #include "Abilities/HitmenAbilityComponent.h"
+#include "Characters/HitmenCharacterBase.h"
 #include "Abilities/HitmenAbility.h"
 #include "Data/HitmenAbilityData.h"
 #include "Weapons/HitmenCombatLibrary.h"
@@ -89,6 +90,74 @@ void UHitmenAbilityComponent::OnRep_Abilities()
 		KnownAbilities.Add(Ability);
 	}
 	OnAbilitiesChanged.Broadcast();
+}
+
+void UHitmenAbilityComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	// Local player only (checked each scan: a respawned pawn is possessed after BeginPlay).
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		GetWorld()->GetTimerManager().SetTimer(HintTimer, this, &UHitmenAbilityComponent::UpdateTargetHint, HintScanInterval, true);
+	}
+}
+
+void UHitmenAbilityComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	GetWorld()->GetTimerManager().ClearTimer(HintTimer);
+	ClearTargetHint();
+	Super::EndPlay(EndPlayReason);
+}
+
+void UHitmenAbilityComponent::ClearTargetHint()
+{
+	UHitmenInteractionComponent::SetActorHighlight(HintedActor.Get(), HintOverlayMaterial, false);
+	HintedActor.Reset();
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Cast<APawn>(GetOwner())))
+	{
+		UI->SetAbilityHint(FHitmenWorldHint());
+	}
+}
+
+void UHitmenAbilityComponent::UpdateTargetHint()
+{
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	const AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(Pawn);
+	if (!Pawn || !Pawn->IsLocallyControlled() || !Pawn->IsPlayerControlled() || (Character && Character->IsDead()))
+	{
+		if (HintedActor.IsValid())
+		{
+			ClearTargetHint();
+		}
+		return;
+	}
+	FVector Origin, Direction;
+	GetAim(Origin, Direction);
+	FHitmenWorldHint Hint;
+	// Manipulation (A) first, then move (E).
+	for (const EHitmenAbilitySlot Slot : { EHitmenAbilitySlot::Manipulation, EHitmenAbilitySlot::Move })
+	{
+		const UHitmenAbility* Ability = GetAbility(Slot);
+		FText Action;
+		AActor* Target = Ability && Ability->CanActivate() ? Ability->FindHintTarget(Origin, Direction, Action) : nullptr;
+		if (Target)
+		{
+			Hint.Target = Target;
+			Hint.Action = Action;
+			Hint.Key = Slot == EHitmenAbilitySlot::Manipulation ? NSLOCTEXT("Hitmen", "KeyManipulation", "A") : NSLOCTEXT("Hitmen", "KeyMove", "E");
+			break;
+		}
+	}
+	if (HintedActor.Get() != Hint.Target.Get())
+	{
+		UHitmenInteractionComponent::SetActorHighlight(HintedActor.Get(), HintOverlayMaterial, false);
+		UHitmenInteractionComponent::SetActorHighlight(Hint.Target.Get(), HintOverlayMaterial, true);
+		HintedActor = Hint.Target;
+	}
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Pawn))
+	{
+		UI->SetAbilityHint(Hint);
+	}
 }
 
 void UHitmenAbilityComponent::GetAim(FVector& OutOrigin, FVector& OutDirection) const

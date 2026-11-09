@@ -5,6 +5,82 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-09
+
+### Added
+- First-person arms (`ABP_FirstPersonArms`, `UHitmenFirstPersonAnimInstance`): shown only with a weapon in hand
+  or while punching / acting, holding the weapon's pose, with sway, walk bob and hip / aim offsets. The body is
+  hidden from its owner but still casts its shadow.
+- Recoil spring: the view kicks up and comes back down smoothly; explosion view shake.
+- Death camera: the view leaves the head and orbits the body.
+- Traversal metrics: vault up to 120 cm, ledge grab up to 250 cm, climb over thin walls; cubic eased paths with a
+  view dip; `[SPACE] Vault / Climb / Climb over` hint at the crosshair; windows (openings in walls) are vaultable.
+- Ladders / gutters end with a smooth pull-up over the top; climb enter / exit, zipline, locker, pickpocket and
+  parachute montage slots in the anim set.
+- Ziplines are used with `F` at a post and ride on their own to the other end (direction option: both ways,
+  start to end, end to start), letting go before the anchor.
+- Locker: a hollow cabinet with a slitted door; you stand inside and look out; the door opens and closes.
+- Window: a thin frame with two shutters that swing open sideways.
+- Container (`BP_Container`, `BP_Container_Random`): two-door cabinet with a shelf; fixed contents or a random
+  weighted pick (catalog loot when the pool is empty); items float in their slots.
+- Security station: the console has a screen cycling through its cameras ("no signal" when off).
+- Turret: red laser while locking on, lock-on delay before the first shot, barrel kick, muzzle / impact effects,
+  hackable with `F` on the turret itself.
+- Mounted gun usable from any side; tripod and shield plate.
+- Remote-ability targets glow (blue fresnel) with `[A] Charm` / `[A] Activate remotely` / `[E] Swap places` under them.
+- White fresnel highlight on whatever `F` would act on.
+- Dropped weapons settle, then float and turn (no physics) instead of lying on the floor.
+- VFX from the Vefects packs: muzzle flashes, impacts, explosions (rockets, grenades, tank shells, barrels),
+  smoke grenade cloud, flashbang, rocket smoke trail and launcher back-blast.
+- `DA_SoundSet` (`EHitmenSound`, Project Settings > Hitmen > Sound Set): placeholder sounds from HeartBeats,
+  SFX Essentials and Vefects for UI, doors, lockers, zipline, pickups, explosions, heartbeat, Sightroom, turret.
+- AI: spline (curved) patrol routes, guard groups (`BP_GuardGroup`: leader + followers in formation, shared
+  alerts), keycards visible on the hip and pickpocketed with `F` from behind, red aiming laser for snipers.
+- HUD: action prompt under the crosshair (`[F]` key cap, locked reason in red), damage vignette and heartbeat at
+  low health, sniper scope overlay, inventory bar (weapon cards with dimmed ammo, sliding on switch, A / E ability
+  cards, keycard chips, health line), threat arrows around the crosshair, minimap on the baked map with an outline
+  and status (Suspicious / Alerted / Searching / Spotted / Under fire).
+- Map baker (`UHitmenContentTools::BakeMapTexture`): top-down schematic textures `T_Map_*` for every map.
+- Sightroom: scan wave from the player, floor grid behind it, cool desaturated world, fade in / out.
+- Front end in one scene (`L_FrontEnd`, replaces `L_TitleScreen` and `L_Lobby`): title, room and agent screens
+  blend between tagged cameras (`Shot_<Phase>`) with no level load; creating a room listens in place.
+- Your agent: the mannequin on the stage with look arrows beside its head, body and legs (live), name editing,
+  loadout cards with a hover carousel.
+- Ready-only start: when every non-watcher is ready a 5 s countdown launches the match.
+- Match intro: parachute drop above your spawn (canopy, slight steering, control on landing) with a
+  "Dropping in" / 3-2-1 overlay; spawn clusters (random point per team, teammates next to each other); 16 spread
+  spawn points in LDTest.
+- Pause map: the baked schematic at two thirds of the screen, wheel zoom, a clickable legend to toggle each marker
+  type; debug tools flush right.
+- UI font: Barlow Condensed (OFL, `Tools/Fonts`) as `FNT_Barlow`; menu kit (`HitmenMenuKit`): menu buttons with an
+  accent bar, arrow buttons, toggles, cards, choice carousel, backdrop.
+
+### Changed
+- Gym rebuilt as a compact walled hall (74 x 74 m): movement course, armoury, abilities, fixtures and an AI pen,
+  labels just above each station.
+- Faster player (walk 480, sprint 820, crouch 240); crouch lowers the view smoothly; slides only start from a sprint.
+- Lower default mouse sensitivity (0.45, migrated once) and zoom-compensated aiming sensitivity; no mouse smoothing.
+- Firing never widens the spread (no bloom); crosshair is a thin "+" that turns into an "x" on a kill.
+- Weapons use the Weapons_Free gun pack (pistol, rifles, shotgun, sniper, knife), scaled and turned by
+  `VisualTransform`; one mesh per weapon.
+- NPCs hit softer (difficulty damage x0.3 / x0.45 / x0.7) and walk / run with path acceleration (locomotion plays).
+- Security cameras: shorter, narrower cone aimed at the floor with a round footprint that follows the sweep.
+- Civilians removed (`BP_NPC_Civilian` deleted).
+- Lobby: player rows without letter glyphs, white names, whole-row drag & drop, Watcher checkbox, large map tile
+  with square arrow buttons; options reduced to proximity chat and difficulty. The retrieval-point count moved
+  into the difficulty presets; sonar timings are designer-only (match rules).
+- Title screen: logo and buttons vertically centred on the left. All menus restyled (pause, options, results).
+
+### Fixed
+- `F` did nothing after a respawn (the focus trace only started when the pawn was already possessed).
+- Front-end screens lost the mouse cursor (Escape toggled an invisible pause; the input mode was set in two places).
+- Dead NPC capsules blocked the dropped gun and the body; dropped keycards were invisible and could not be taken.
+- The locker teleported you into its solid mesh; window lintels stopped the vault probe.
+- The chosen loadout and look were lost after a non-seamless travel (PIE, reconnects): the game instance keeps them
+  and re-sends them after every travel; a pawn spawned before they arrive is equipped during the intro.
+- Long guns (rifles, shotgun, sniper) were held sideways in first person; every gun now uses the two-hand hold.
+- Menu input mode tried to focus a non-focusable widget.
+
 ## [0.2.0] - 2026-11-08
 
 ### Added

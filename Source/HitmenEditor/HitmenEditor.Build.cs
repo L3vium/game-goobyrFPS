@@ -27,7 +27,9 @@ public class HitmenEditor : ModuleRules
 			"AnimGraph",
 			"AnimGraphRuntime",
 			"BlueprintGraph",
-			"Kismet"
+			"Kismet",
+			"SlateCore",
+			"Slate"
 		});
 	}
 }

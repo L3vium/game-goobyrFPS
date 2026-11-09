@@ -16,6 +16,8 @@ class UNiagaraSystem;
 class USoundBase;
 class UAnimMontage;
 class UCameraShakeBase;
+class UAnimSequenceBase;
+class UHitmenAnimSet;
 
 /**
  * Data of a weapon type. Two pickups with the same data are the same type (ammo merges).
@@ -127,16 +129,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="0", Units="deg"))
 	float AimSpread = 0.5f;
 
-	/** Added per shot while firing continuously, recovers over time. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="0", Units="deg"))
-	float SpreadPerShot = 0.3f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="0", Units="deg"))
-	float MaxBloom = 4.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="0"))
-	float BloomRecoveryPerSecond = 6.f;
-
 	/** Camera field of view while aiming. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="5", ClampMax="170"))
 	float AimFOV = 70.f;
@@ -147,6 +139,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="0"))
 	float RecoilYawRandom = 0.25f;
+
+	/** Aiming shows a full-screen scope (reticle + vignette) and hides the weapon. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy")
+	bool bScopeOverlay = false;
 
 	// ---- Stealth ----
 	/** Silenced weapons make no gunshot noise (bodies are still seen). */
@@ -178,6 +174,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
 	TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
 
+	/**
+	 * Applied to the mesh inside the weapon actor: turns / scales a mesh pack to the hand socket's
+	 * convention (forward = +Y for the mannequin's HandGrip_R) and real-world size.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
+	FTransform VisualTransform;
+
 	/** Socket on the character mesh the weapon attaches to. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
 	FName AttachSocket = TEXT("HandGrip_R");
@@ -188,6 +191,22 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
 	FName MuzzleSocket = TEXT("Muzzle");
 
+	/** Muzzle position in weapon space when the mesh has no muzzle socket. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
+	FVector MuzzleOffset = FVector(40.f, 0.f, 4.f);
+
+	/** Offset on the first-person arms (the local player's view); AttachOffset is used on bodies. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
+	FTransform FirstPersonAttachOffset;
+
+	/** Looping arms pose while this weapon is in hand (first person). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
+	TSoftObjectPtr<UAnimSequenceBase> FirstPersonPose;
+
+	/** Body animations while this weapon is in hand (armed locomotion, aim offset). Empty = character's set. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
+	TObjectPtr<UHitmenAnimSet> HeldAnimSet;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<UNiagaraSystem> MuzzleFX;
 
@@ -196,6 +215,14 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<UNiagaraSystem> ImpactFX;
+
+	/** Smoke behind the weapon when it fires (rocket launcher back-blast). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	TSoftObjectPtr<UNiagaraSystem> BackBlastFX;
+
+	/** Back-blast position in weapon space. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	FVector BackBlastOffset = FVector(-60.f, 0.f, 0.f);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<USoundBase> FireSound;

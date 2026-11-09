@@ -1,6 +1,9 @@
 // Hitmen — match HUD
 
 #include "UI/HitmenHUDWidgets.h"
+#include "Engine/Texture2D.h"
+#include "Data/HitmenMapDefinition.h"
+#include "UI/HitmenHUDElements.h"
 #include "UI/HitmenUIFactory.h"
 #include "UI/HitmenUIEventSubsystem.h"
 #include "Framework/HitmenGameState.h"
@@ -162,9 +165,10 @@ void UHitmenCrosshairWidget::ShowHitMarker(bool bKill, bool bHeadshot)
 {
 	HitMarkerTime = HitMarkerDuration;
 	bLastHitWasKill = bKill;
-	if (bKill && bHeadshot)
+	if (bKill)
 	{
 		KillCrossTime = KillCrossDuration;
+		bLastKillHeadshot = bHeadshot;
 	}
 }
 
@@ -180,21 +184,42 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 	const FVector2D Center = AllottedGeometry.GetLocalSize() * 0.5f;
 	const APlayerController* PC = GetOwningPlayer();
 	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
-	const FLinearColor White = HitmenUI::Text();
-
-	// Centre dot.
-	DrawBox(OutDrawElements, LayerId, AllottedGeometry, Center - FVector2D(1.5f), FVector2D(3.f), White);
-
-	// Ring sized by weapon spread.
 	const UHitmenUIEventSubsystem* UI = GetUIEvents();
-	const float Spread = UI ? UI->GetCrosshairSpread() : 1.f;
-	const float RingRadius = 10.f + Spread * SpreadScale;
-	DrawArc(OutDrawElements, LayerId, AllottedGeometry, Center, RingRadius, 0.f, 360.f, White * FLinearColor(1.f, 1.f, 1.f, 0.55f), 1.5f, 32);
+	if (UI && UI->IsScoped())
+	{
+		return LayerId; // The scope draws its own reticle.
+	}
+	const FLinearColor White = HitmenUI::Text() * FLinearColor(1.f, 1.f, 1.f, 0.9f);
+	const FLinearColor Shadow(0.f, 0.f, 0.f, 0.35f);
 
-	// Alert arcs: NPCs aware of you, placed toward them.
+	// A kill turns the "+" into an "x" (red on a headshot) for a moment.
+	const float KillAlpha = KillCrossDuration > 0.f ? KillCrossTime / KillCrossDuration : 0.f;
+	const float Angle = KillAlpha > 0.f ? 45.f : 0.f;
+	const FLinearColor Ink = KillAlpha > 0.f ? FMath::Lerp(White, bLastKillHeadshot ? HitmenUI::Accent() : White, 1.f) : White;
+	const float Length = ArmLength + KillAlpha * 5.f;
+	for (int32 Arm = 0; Arm < 4; ++Arm)
+	{
+		const float Rad = FMath::DegreesToRadians(Angle + Arm * 90.f);
+		const FVector2D Dir(FMath::Cos(Rad), FMath::Sin(Rad));
+		HitmenUI::PaintLine(OutDrawElements, LayerId, AllottedGeometry, Center + Dir * ArmGap + FVector2D(1.f, 1.f), Center + Dir * (ArmGap + Length) + FVector2D(1.f, 1.f), Shadow, 2.5f);
+		HitmenUI::PaintLine(OutDrawElements, LayerId + 1, AllottedGeometry, Center + Dir * ArmGap, Center + Dir * (ArmGap + Length), Ink, KillAlpha > 0.f ? 3.f : 2.f);
+	}
+
+	// Hit marker: four short ticks.
+	if (HitMarkerTime > 0.f && KillAlpha <= 0.f)
+	{
+		const float Alpha = HitMarkerTime / HitMarkerDuration;
+		for (const FVector2D& Dir : { FVector2D(1, 1), FVector2D(-1, 1), FVector2D(1, -1), FVector2D(-1, -1) })
+		{
+			HitmenUI::PaintLine(OutDrawElements, LayerId + 2, AllottedGeometry, Center + Dir * 9.f, Center + Dir * 15.f, White * FLinearColor(1.f, 1.f, 1.f, Alpha), 2.f);
+		}
+	}
+
+	// Threat arrows: NPCs aware of you, pointing toward them, coloured by alert.
 	if (Pawn && PC && UI)
 	{
 		const float ViewYaw = PC->GetControlRotation().Yaw;
+		const float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
 		{
 			if (Blip.Color == EHitmenAlertColor::None || !Blip.bTargetsViewer)
@@ -202,32 +227,22 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 				continue;
 			}
 			const float Yaw = RelativeYaw(Blip.Location - Pawn->GetActorLocation(), ViewYaw);
+			const float Rad = FMath::DegreesToRadians(Yaw);
+			const FVector2D Dir(FMath::Sin(Rad), -FMath::Cos(Rad));
+			const FVector2D Side(-Dir.Y, Dir.X);
 			FLinearColor Tint = HitmenAlert::ToLinearColor(Blip.Color);
 			if (Blip.Color == EHitmenAlertColor::White)
 			{
-				Tint.A = FMath::Lerp(0.3f, 1.f, Blip.Suspicion);
+				Tint.A = FMath::Lerp(0.35f, 1.f, Blip.Suspicion);
 			}
-			DrawArc(OutDrawElements, LayerId + 1, AllottedGeometry, Center, RingRadius + 26.f, Yaw - 14.f, Yaw + 14.f, Tint, 4.f);
+			if (Blip.Color == EHitmenAlertColor::Red)
+			{
+				Tint.A = 0.75f + 0.25f * FMath::Sin(Time * 12.f);
+			}
+			const FVector2D Tip = Center + Dir * (ThreatRadius + 12.f);
+			const FVector2D Base = Center + Dir * ThreatRadius;
+			HitmenUI::PaintLines(OutDrawElements, LayerId + 3, AllottedGeometry, { Base + Side * 11.f, Tip, Base - Side * 11.f }, Tint, 3.f);
 		}
-	}
-
-	// Hit marker.
-	if (HitMarkerTime > 0.f)
-	{
-		const float Alpha = HitMarkerTime / HitMarkerDuration;
-		const FLinearColor Color = (bLastHitWasKill ? HitmenUI::Accent() : White) * FLinearColor(1.f, 1.f, 1.f, Alpha);
-		for (const FVector2D& Dir : { FVector2D(1, 1), FVector2D(-1, 1), FVector2D(1, -1), FVector2D(-1, -1) })
-		{
-			DrawLine(OutDrawElements, LayerId + 2, AllottedGeometry, Center + Dir * 8.f, Center + Dir * 15.f, Color, 2.f);
-		}
-	}
-	// Big red cross on a headshot kill.
-	if (KillCrossTime > 0.f)
-	{
-		const float Alpha = KillCrossTime / KillCrossDuration;
-		const FLinearColor Red = HitmenUI::Accent() * FLinearColor(1.f, 1.f, 1.f, Alpha);
-		DrawLine(OutDrawElements, LayerId + 3, AllottedGeometry, Center + FVector2D(-24.f, -24.f), Center + FVector2D(24.f, 24.f), Red, 5.f);
-		DrawLine(OutDrawElements, LayerId + 3, AllottedGeometry, Center + FVector2D(24.f, -24.f), Center + FVector2D(-24.f, 24.f), Red, 5.f);
 	}
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
 }
@@ -252,6 +267,23 @@ void UHitmenMinimapWidget::UnbindEvents()
 	}
 }
 
+void UHitmenMinimapWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	bHasMap = false;
+	if (const UHitmenMapDefinition* Map = HitmenUI::FindCurrentMap(this))
+	{
+		MapBounds = Map->WorldBounds;
+		if (UTexture2D* Texture = Map->MapTexture.LoadSynchronous())
+		{
+			MapBrush.SetResourceObject(Texture);
+			MapBrush.ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+			MapBrush.DrawAs = ESlateBrushDrawType::Image;
+			bHasMap = true;
+		}
+	}
+}
+
 void UHitmenMinimapWidget::HandleSonar(const FHitmenSonarPing& Ping)
 {
 	LastPing = Ping;
@@ -262,18 +294,39 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 {
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
 	const FVector2D Center = Size * 0.5f;
-	DrawBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, HitmenUI::Background());
-	const FLinearColor Frame = HitmenUI::Text() * FLinearColor(1.f, 1.f, 1.f, 0.35f);
-	DrawLine(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(0, 0), FVector2D(Size.X, 0), Frame, 1.f);
-	DrawLine(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(Size.X, 0), Size, Frame, 1.f);
-	DrawLine(OutDrawElements, LayerId + 1, AllottedGeometry, Size, FVector2D(0, Size.Y), Frame, 1.f);
-	DrawLine(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(0, Size.Y), FVector2D(0, 0), Frame, 1.f);
+	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FLinearColor(0.035f, 0.038f, 0.045f, 0.82f));
 
 	const APlayerController* PC = GetOwningPlayer();
 	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	const UHitmenUIEventSubsystem* UIView = GetUIEvents();
+
+	// Highest alert aimed at you: outline colour and status line.
+	EHitmenAlertColor Worst = EHitmenAlertColor::None;
+	bool bTargeted = false;
+	bool bSearching = false;
+	if (UIView)
+	{
+		for (const FHitmenHUDAlertBlip& Blip : UIView->GetAlertBlips())
+		{
+			if (Blip.bTargetsViewer && static_cast<uint8>(Blip.Color) > static_cast<uint8>(Worst))
+			{
+				Worst = Blip.Color;
+			}
+			bTargeted |= Blip.bTargetsViewer && Blip.State == EHitmenAlertState::Combat;
+			bSearching |= Blip.State == EHitmenAlertState::Searching;
+		}
+	}
+	const float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	FLinearColor Outline = HitmenUI::Hairline();
+	if (Worst != EHitmenAlertColor::None)
+	{
+		Outline = HitmenAlert::ToLinearColor(Worst);
+		Outline.A = Worst == EHitmenAlertColor::Red ? 0.7f + 0.3f * FMath::Sin(Time * 10.f) : 0.9f;
+	}
 	if (!Pawn)
 	{
-		return LayerId + 2;
+		HitmenUI::PaintFrame(OutDrawElements, LayerId + 6, AllottedGeometry, FVector2D::ZeroVector, Size, Outline, 2.f);
+		return LayerId + 7;
 	}
 	const FVector Origin = Pawn->GetActorLocation();
 	const float ViewYaw = PC->GetControlRotation().Yaw;
@@ -288,6 +341,21 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		bInside = Point.X >= 0.f && Point.Y >= 0.f && Point.X <= Size.X && Point.Y <= Size.Y;
 		return Point;
 	};
+
+	// Baked map image: north (+X) up in the texture, rotated around you.
+	OutDrawElements.PushClip(FSlateClippingZone(AllottedGeometry));
+	if (bHasMap && MapBounds.bIsValid)
+	{
+		const FVector2D WorldSize = MapBounds.GetSize();
+		// Texture: u along +Y (east), v along -X (north at the top).
+		const FVector2D ImageSize(WorldSize.Y * Scale, WorldSize.X * Scale);
+		const FVector2D PlayerInImage((Origin.Y - MapBounds.Min.Y) * Scale, (MapBounds.Max.X - Origin.X) * Scale);
+		const FVector2D TopLeft = Center - PlayerInImage;
+		FSlateDrawElement::MakeRotatedBox(OutDrawElements, LayerId + 1,
+			AllottedGeometry.ToPaintGeometry(FVector2f(ImageSize), FSlateLayoutTransform(FVector2f(TopLeft))),
+			&MapBrush, ESlateDrawEffect::None, FMath::DegreesToRadians(-ViewYaw), FVector2f(PlayerInImage),
+			FSlateDrawElement::RelativeToElement, FLinearColor(1.f, 1.f, 1.f, 0.92f));
+	}
 
 	if (const UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
@@ -320,12 +388,44 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		}
 	}
 
-	// You: arrow pointing up.
+	// You: a view cone and an arrow pointing up.
+	HitmenUI::PaintLines(OutDrawElements, LayerId + 4, AllottedGeometry, { Center + FVector2D(-34.f, -48.f), Center, Center + FVector2D(34.f, -48.f) }, FLinearColor(1.f, 1.f, 1.f, 0.18f), 1.5f);
 	const FLinearColor Me = HitmenUI::Text();
-	DrawLine(OutDrawElements, LayerId + 4, AllottedGeometry, Center + FVector2D(0.f, -8.f), Center + FVector2D(-6.f, 6.f), Me, 2.f);
-	DrawLine(OutDrawElements, LayerId + 4, AllottedGeometry, Center + FVector2D(0.f, -8.f), Center + FVector2D(6.f, 6.f), Me, 2.f);
-	DrawLine(OutDrawElements, LayerId + 4, AllottedGeometry, Center + FVector2D(-6.f, 6.f), Center + FVector2D(6.f, 6.f), Me, 2.f);
-	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 5, InWidgetStyle, bParentEnabled);
+	HitmenUI::PaintLines(OutDrawElements, LayerId + 5, AllottedGeometry,
+		{ Center + FVector2D(0.f, -9.f), Center + FVector2D(-6.5f, 7.f), Center + FVector2D(0.f, 3.f), Center + FVector2D(6.5f, 7.f), Center + FVector2D(0.f, -9.f) }, Me, 2.f);
+	OutDrawElements.PopClip();
+
+	// Frame coloured by the worst alert aimed at you; a status line above when it matters.
+	HitmenUI::PaintFrame(OutDrawElements, LayerId + 6, AllottedGeometry, FVector2D::ZeroVector, Size, Outline, Worst == EHitmenAlertColor::None ? 1.f : 3.f);
+	FString Status;
+	FLinearColor StatusColor = HitmenUI::Text();
+	if (bTargeted)
+	{
+		Status = TEXT("UNDER FIRE");
+		StatusColor = HitmenAlert::ToLinearColor(EHitmenAlertColor::Red);
+	}
+	else if (Worst == EHitmenAlertColor::Red)
+	{
+		Status = TEXT("SPOTTED");
+		StatusColor = HitmenAlert::ToLinearColor(EHitmenAlertColor::Red);
+	}
+	else if (Worst == EHitmenAlertColor::Yellow || bSearching)
+	{
+		Status = bSearching ? TEXT("SEARCHING") : TEXT("ALERTED");
+		StatusColor = HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow);
+	}
+	else if (Worst == EHitmenAlertColor::White)
+	{
+		Status = TEXT("SUSPICIOUS");
+	}
+	if (!Status.IsEmpty())
+	{
+		const FSlateFontInfo StatusFont = HitmenUI::SpacedFont(15, TEXT("SemiBold"), 150);
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 6, AllottedGeometry, FVector2D(0.f, -26.f), FVector2D(Size.X, 22.f), FLinearColor(0.f, 0.f, 0.f, 0.6f));
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 7, AllottedGeometry, FVector2D(0.f, -26.f), FVector2D(4.f, 22.f), StatusColor);
+		HitmenUI::PaintText(OutDrawElements, LayerId + 7, AllottedGeometry, Status, FVector2D(12.f, -25.f), StatusFont, StatusColor);
+	}
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 8, InWidgetStyle, bParentEnabled);
 }
 
 // =============================================================================================
@@ -336,49 +436,42 @@ void UHitmenHUDWidget::BuildDefaultLayout()
 {
 	UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
 	WidgetTree->RootWidget = Canvas;
+	const FAnchors Full(0.f, 0.f, 1.f, 1.f);
+
+	// Back to front: damage edges, scope, world hints, then the HUD itself.
+	DamageVignette = WidgetTree->ConstructWidget<UHitmenDamageVignetteWidget>(UHitmenDamageVignetteWidget::StaticClass());
+	if (UCanvasPanelSlot* VignetteSlot = Canvas->AddChildToCanvas(DamageVignette)) { VignetteSlot->SetAnchors(Full); VignetteSlot->SetOffsets(FMargin(0.f)); }
+	Scope = WidgetTree->ConstructWidget<UHitmenScopeWidget>(UHitmenScopeWidget::StaticClass());
+	if (UCanvasPanelSlot* ScopeSlot = Canvas->AddChildToCanvas(Scope)) { ScopeSlot->SetAnchors(Full); ScopeSlot->SetOffsets(FMargin(0.f)); }
+	WorldHint = WidgetTree->ConstructWidget<UHitmenWorldHintWidget>(UHitmenWorldHintWidget::StaticClass());
+	if (UCanvasPanelSlot* HintSlot = Canvas->AddChildToCanvas(WorldHint)) { HintSlot->SetAnchors(Full); HintSlot->SetOffsets(FMargin(0.f)); }
 
 	Compass = WidgetTree->ConstructWidget<UHitmenCompassWidget>(UHitmenCompassWidget::StaticClass());
-	HitmenUI::AddToCanvas(Canvas, Compass, FAnchors(0.5f, 0.f), FVector2D(0.f, 20.f), FVector2D(0.5f, 0.f), FVector2D(640.f, 44.f));
+	Compass->SetVisibility(ESlateVisibility::HitTestInvisible);
+	HitmenUI::AddToCanvas(Canvas, Compass, FAnchors(0.5f, 0.f), FVector2D(0.f, 22.f), FVector2D(0.5f, 0.f), FVector2D(560.f, 40.f));
 
 	Crosshair = WidgetTree->ConstructWidget<UHitmenCrosshairWidget>(UHitmenCrosshairWidget::StaticClass());
 	Crosshair->SetVisibility(ESlateVisibility::HitTestInvisible);
 	HitmenUI::AddToCanvas(Canvas, Crosshair, FAnchors(0.5f, 0.5f), FVector2D::ZeroVector, FVector2D(0.5f, 0.5f), FVector2D(220.f, 220.f));
 
-	PromptText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 20);
-	PromptText->SetJustification(ETextJustify::Center);
-	HitmenUI::AddToCanvas(Canvas, PromptText, FAnchors(0.5f, 0.5f), FVector2D(0.f, 70.f), FVector2D(0.5f, 0.f));
+	// Action prompt just under the crosshair.
+	ActionPrompt = WidgetTree->ConstructWidget<UHitmenActionPromptWidget>(UHitmenActionPromptWidget::StaticClass());
+	HitmenUI::AddToCanvas(Canvas, ActionPrompt, FAnchors(0.5f, 0.5f), FVector2D(0.f, 36.f), FVector2D(0.5f, 0.f), FVector2D(900.f, 44.f));
 
-	// Inventory, bottom centre; keycards next to it.
-	UBorder* InventoryPanel = HitmenUI::MakePanel(WidgetTree, HitmenUI::Panel(), FMargin(14.f, 8.f));
-	UHorizontalBox* InventoryRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	SlotOneText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 16);
-	SlotTwoText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 16);
-	KeycardText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 14, TEXT("Regular"), HitmenUI::TextDim());
-	HitmenUI::AddToHBox(InventoryRow, SlotOneText, FMargin(0.f, 0.f, 22.f, 0.f));
-	HitmenUI::AddToHBox(InventoryRow, SlotTwoText, FMargin(0.f, 0.f, 22.f, 0.f));
-	HitmenUI::AddToHBox(InventoryRow, KeycardText);
-	InventoryPanel->SetContent(InventoryRow);
-	HitmenUI::AddToCanvas(Canvas, InventoryPanel, FAnchors(0.5f, 1.f), FVector2D(0.f, -24.f), FVector2D(0.5f, 1.f));
+	// Inventory bar, bottom centre (weapons | abilities, keycards above, health line).
+	const float Margin = 28.f;
+	InventoryBar = WidgetTree->ConstructWidget<UHitmenInventoryBarWidget>(UHitmenInventoryBarWidget::StaticClass());
+	HitmenUI::AddToCanvas(Canvas, InventoryBar, FAnchors(0.5f, 1.f), FVector2D(0.f, -Margin), FVector2D(0.5f, 1.f), FVector2D(1100.f, 110.f));
+
+	// Match intro (dropping in + countdown), over everything.
+	Intro = WidgetTree->ConstructWidget<UHitmenIntroWidget>(UHitmenIntroWidget::StaticClass());
+	if (UCanvasPanelSlot* IntroSlot = Canvas->AddChildToCanvas(Intro)) { IntroSlot->SetAnchors(Full); IntroSlot->SetOffsets(FMargin(0.f)); }
 
 	// Square minimap, bottom left.
-	const float MinimapSize = 220.f;
-	const float Margin = 24.f;
+	const float MinimapSize = 230.f;
 	Minimap = WidgetTree->ConstructWidget<UHitmenMinimapWidget>(UHitmenMinimapWidget::StaticClass());
 	Minimap->SetVisibility(ESlateVisibility::HitTestInvisible);
 	HitmenUI::AddToCanvas(Canvas, Minimap, FAnchors(0.f, 1.f), FVector2D(Margin, -Margin), FVector2D(0.f, 1.f), FVector2D(MinimapSize, MinimapSize));
-
-	// Abilities and health, bottom right (the minimap owns the bottom left).
-	UVerticalBox* Right = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	MoveAbilityText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 15);
-	ManipulationAbilityText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 15);
-	HealthText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 15, TEXT("Regular"), HitmenUI::TextDim());
-	MoveAbilityText->SetJustification(ETextJustify::Right);
-	ManipulationAbilityText->SetJustification(ETextJustify::Right);
-	HealthText->SetJustification(ETextJustify::Right);
-	HitmenUI::AddToVBox(Right, MoveAbilityText, FMargin(0.f), false, HAlign_Right);
-	HitmenUI::AddToVBox(Right, ManipulationAbilityText, FMargin(0.f), false, HAlign_Right);
-	HitmenUI::AddToVBox(Right, HealthText, FMargin(0.f), false, HAlign_Right);
-	HitmenUI::AddToCanvas(Canvas, Right, FAnchors(1.f, 1.f), FVector2D(-Margin - 4.f, -Margin), FVector2D(1.f, 1.f));
 }
 
 void UHitmenHUDWidget::BindEvents()
@@ -421,6 +514,7 @@ void UHitmenHUDWidget::HandlePrompt(const FText& Prompt, bool bVisible)
 	{
 		PromptText->SetText(bVisible ? FText::Format(LOCTEXT("Prompt", "[F]  {0}"), Prompt) : FText::GetEmpty());
 	}
+	// The default layout shows prompts through ActionPrompt (it binds the same event).
 }
 
 void UHitmenHUDWidget::HandleInventoryView(const FHitmenHUDInventoryView& View)

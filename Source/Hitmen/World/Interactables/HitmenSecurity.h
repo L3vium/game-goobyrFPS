@@ -19,6 +19,8 @@ class UBoxComponent;
 class ULightComponent;
 class UPointLightComponent;
 class UMaterialInterface;
+class UNiagaraSystem;
+class USoundBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenCameraDisabledChanged, bool, bDisabled);
 
@@ -74,10 +76,14 @@ protected:
 	TObjectPtr<USceneCaptureComponent2D> Capture;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0", Units="cm"))
-	float ViewDistance = 1800.f;
+	float ViewDistance = 1200.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="1", ClampMax="89", Units="deg"))
-	float ViewHalfAngle = 28.f;
+	float ViewHalfAngle = 17.f;
+
+	/** The head looks down at the floor by this much (the cone draws a round footprint there). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0", ClampMax="89", Units="deg"))
+	float LookDownAngle = 38.f;
 
 	/** Total sweep arc (0 = static). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0", ClampMax="350", Units="deg"))
@@ -121,6 +127,8 @@ protected:
 	void Juice_OnSeeingChanged(bool bSeeing);
 
 	APawn* FindIntruder() const;
+	/** Floor disc under the cone (follows the sweep). */
+	void UpdateFootprint();
 	void RaiseAlarm(APawn* Intruder);
 
 	float SweepTime = 0.f;
@@ -182,7 +190,10 @@ protected:
 	FTimerHandle RefreshTimer;
 };
 
-/** Control room console: disables / enables every linked camera. */
+/**
+ * Security station: a desk with a screen cycling through its cameras' feeds. F (or a remote
+ * hack) disables / enables every linked camera; the screen then shows "no signal".
+ */
 UCLASS(Blueprintable)
 class HITMEN_API AHitmenControlConsole : public AHitmenInteractableBase, public IHitmenRemoteActivatable
 {
@@ -190,6 +201,7 @@ class HITMEN_API AHitmenControlConsole : public AHitmenInteractableBase, public 
 
 public:
 	AHitmenControlConsole();
+	virtual void BeginPlay() override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
 	virtual bool CanRemoteActivate_Implementation() const override { return true; }
 	virtual void RemoteActivate_Implementation(AActor* Activator) override { OnInteracted(Activator); }
@@ -198,25 +210,68 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console")
 	TArray<TObjectPtr<AHitmenSecurityCamera>> LinkedCameras;
 
-	UPROPERTY(Replicated)
+	/** Screen above the desk, parallel to its front (material slot 0 shows the feed). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Screen;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console")
+	FName ScreenTextureParameter = TEXT("ScreenTexture");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console")
+	TSoftObjectPtr<UMaterialInterface> NoSignalMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/M_Monitor_NoSignal.M_Monitor_NoSignal")));
+
+	/** Seconds each camera stays on screen. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console", meta=(ClampMin="0.5", Units="s"))
+	float FeedCycleTime = 3.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console", meta=(ClampMin="0.02", Units="s"))
+	float RefreshInterval = 0.2f;
+
+	/** Only refresh when a local player is this close (performance). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console", meta=(ClampMin="0", Units="cm"))
+	float RefreshDistance = 1500.f;
+
+	UPROPERTY(ReplicatedUsing=OnRep_CamerasDisabled)
 	bool bCamerasDisabled = false;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextureRenderTarget2D> RenderTarget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> FeedMaterial;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void OnInteracted(AActor* Interactor) override;
+
+	UFUNCTION()
+	void OnRep_CamerasDisabled();
+
+	void RefreshScreen();
+	void ApplyScreenState();
+
+	FTimerHandle RefreshTimer;
+	int32 FeedIndex = 0;
+	float FeedTime = 0.f;
 };
 
 /** Auto turret. Shoots players; once hacked it shoots for the hacker's side. */
 UCLASS(Blueprintable)
-class HITMEN_API AHitmenTurret : public AActor, public IHitmenTeamMember
+class HITMEN_API AHitmenTurret : public AActor, public IHitmenTeamMember, public IHitmenInteractable, public IHitmenRemoteActivatable
 {
 	GENERATED_BODY()
 
 public:
 	AHitmenTurret();
-
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual int32 GetHitmenTeamId_Implementation() const override { return TeamId; }
+
+	// F on the turret itself hacks it (like its panel).
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override { return !bHacked; }
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	virtual void Interact_Implementation(AActor* Interactor) override { Hack(Interactor); }
+	virtual bool CanRemoteActivate_Implementation() const override { return !bHacked; }
+	virtual void RemoteActivate_Implementation(AActor* Activator) override { Hack(Activator); }
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Turret")
 	void Hack(AActor* Hacker);
@@ -234,14 +289,39 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> Head;
 
+	/** Barrel (kicks back on each shot). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Barrel;
+
+	/** Red aiming laser to the current target (thin cylinder scaled to the distance). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Laser;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0", Units="cm"))
 	float Range = 2500.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0"))
-	float Damage = 8.f;
+	float Damage = 6.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0.02"))
-	float FireInterval = 0.15f;
+	float FireInterval = 0.3f;
+
+	/** Seconds the laser is on a new target before the first shot (time to react). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0", Units="s"))
+	float LockOnTime = 0.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret|Juice")
+	TObjectPtr<UNiagaraSystem> MuzzleFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret|Juice")
+	TObjectPtr<UNiagaraSystem> ImpactFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret|Juice")
+	TObjectPtr<USoundBase> FireSound;
+
+	/** Barrel kick per shot (cm, recovers). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret|Juice", meta=(ClampMin="0", Units="cm"))
+	float BarrelKick = 9.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0"))
 	float TurnSpeed = 120.f;
@@ -271,8 +351,13 @@ protected:
 	void Juice_OnHacked();
 
 	AActor* FindTarget() const;
+	void UpdateLaser();
 	float LastFireTime = 0.f;
 	float RetargetAccumulator = 0.f;
+	float TargetAcquiredTime = 0.f;
+	float BarrelOffset = 0.f;
+	FVector BarrelRestLocation = FVector::ZeroVector;
+	TWeakObjectPtr<AActor> LastTarget;
 };
 
 /** Wired panel that hacks its turret. */

@@ -26,6 +26,10 @@ FHitmenLobbySettings UHitmenMatchRules::MakeDefaultLobbySettings() const
 	Settings.bProximityChat = ProximityChat.Value;
 	Settings.RetrievalPointCount = RetrievalPointCount.Value;
 	Settings.Difficulty = static_cast<EHitmenDifficulty>(FMath::Clamp(Difficulty.Value, 0, static_cast<int32>(EHitmenDifficulty::Hard)));
+	if (const FHitmenDifficultyPreset* Preset = DifficultyPresets.Find(Settings.Difficulty))
+	{
+		Settings.RetrievalPointCount = Preset->RetrievalPointCount;
+	}
 	Settings.SonarStartInterval = SonarStartInterval.Value;
 	Settings.SonarEndInterval = SonarEndInterval.Value;
 	Settings.SonarRampDuration = SonarRampDuration.Value;
@@ -44,8 +48,14 @@ FHitmenLobbySettings UHitmenMatchRules::SanitizeLobbySettings(const FHitmenLobby
 	if (!ProximityChat.bShowInLobbyUI)       { Out.bProximityChat = Defaults.bProximityChat; }
 	if (!RetrievalPointCount.bShowInLobbyUI) { Out.RetrievalPointCount = Defaults.RetrievalPointCount; }
 	if (!Difficulty.bShowInLobbyUI)          { Out.Difficulty = Defaults.Difficulty; }
-	if (!SonarStartInterval.bShowInLobbyUI)  { Out.SonarStartInterval = Defaults.SonarStartInterval; }
-	if (!SonarEndInterval.bShowInLobbyUI)    { Out.SonarEndInterval = Defaults.SonarEndInterval; }
-	if (!SonarRampDuration.bShowInLobbyUI)   { Out.SonarRampDuration = Defaults.SonarRampDuration; }
+	// Sonar timings are designer values (rules asset only); the lobby cannot change them.
+	Out.SonarStartInterval = Defaults.SonarStartInterval;
+	Out.SonarEndInterval = Defaults.SonarEndInterval;
+	Out.SonarRampDuration = Defaults.SonarRampDuration;
+	// The retrieval count follows the difficulty.
+	if (const FHitmenDifficultyPreset* Preset = DifficultyPresets.Find(Out.Difficulty))
+	{
+		Out.RetrievalPointCount = FMath::Max(1, Preset->RetrievalPointCount);
+	}
 	return Out;
 }

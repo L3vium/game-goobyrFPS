@@ -101,6 +101,21 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice")
 	TObjectPtr<USoundBase> ExplosionSound;
 
+	/** Attached for the whole flight (rocket smoke, arrow streak). Empty = none. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice")
+	TObjectPtr<UNiagaraSystem> TrailEffect;
+
+	/** Scale of the spawned explosion effect. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice", meta=(ClampMin="0"))
+	float ExplosionEffectScale = 1.f;
+
+	/** Local players within this radius get a view shake (strength falls off with distance). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice", meta=(ClampMin="0", Units="cm"))
+	float ExplosionShakeRadius = 2200.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice", meta=(ClampMin="0"))
+	float ExplosionShakeIntensity = 2.5f;
+
 	UFUNCTION()
 	void HandleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
 

@@ -14,6 +14,7 @@ void AHitmenGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AHitmenGameState, Teams);
 	DOREPLIFETIME(AHitmenGameState, LobbySettings);
 	DOREPLIFETIME(AHitmenGameState, MatchPhase);
+	DOREPLIFETIME(AHitmenGameState, PhaseCountdownEnd);
 	DOREPLIFETIME(AHitmenGameState, VIP);
 	DOREPLIFETIME(AHitmenGameState, bVIPDead);
 	DOREPLIFETIME(AHitmenGameState, VIPCarrier);
@@ -111,6 +112,16 @@ void AHitmenGameState::SetLobbySettings(const FHitmenLobbySettings& InSettings)
 {
 	LobbySettings = InSettings;
 	NotifyLobbyChanged();
+}
+
+void AHitmenGameState::SetPhaseCountdown(float Seconds)
+{
+	PhaseCountdownEnd = Seconds > 0.f ? GetServerWorldTimeSeconds() + Seconds : 0.f;
+}
+
+float AHitmenGameState::GetPhaseCountdownRemaining() const
+{
+	return PhaseCountdownEnd > 0.f ? FMath::Max(0.f, PhaseCountdownEnd - GetServerWorldTimeSeconds()) : 0.f;
 }
 
 void AHitmenGameState::SetMatchPhase(EHitmenMatchPhase NewPhase)

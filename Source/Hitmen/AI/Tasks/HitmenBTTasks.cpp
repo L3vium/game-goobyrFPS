@@ -5,6 +5,7 @@
 #include "AI/HitmenAlertComponent.h"
 #include "AI/HitmenAISubsystem.h"
 #include "AI/HitmenPatrolRoute.h"
+#include "AI/HitmenGuardGroup.h"
 #include "Characters/HitmenNPC.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Inventory/HitmenInventoryComponent.h"
@@ -99,6 +100,15 @@ EBTNodeResult::Type UBTTask_HitmenFindPatrolPoint::ExecuteTask(UBehaviorTreeComp
 	if (!BB || !NPC)
 	{
 		return EBTNodeResult::Failed;
+	}
+
+	// Group followers walk in formation behind their leader.
+	if (const AHitmenGuardGroup* Group = NPC->GetGuardGroup(); Group && Group->GetLeader() && Group->GetLeader() != NPC)
+	{
+		BB->SetValueAsVector(HitmenBBKeys::MoveLocation, Group->GetFormationLocation(NPC));
+		BB->SetValueAsFloat(HitmenBBKeys::WaitTime, 0.3f);
+		BB->SetValueAsObject(HitmenBBKeys::UseActor, nullptr);
+		return EBTNodeResult::Succeeded;
 	}
 
 	// Stationary NPCs ignore any route: their patrol is their post.

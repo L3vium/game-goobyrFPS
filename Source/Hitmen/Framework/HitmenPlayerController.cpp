@@ -5,6 +5,9 @@
 #include "Framework/HitmenGameState.h"
 #include "Framework/HitmenLobbyGameMode.h"
 #include "Framework/HitmenGameModeBase.h"
+#include "Framework/HitmenHUD.h"
+#include "Framework/HitmenGameInstance.h"
+#include "Blueprint/UserWidget.h"
 #include "Core/HitmenInterfaces.h"
 #include "Core/HitmenUserSettings.h"
 #include "Core/HitmenTeamLibrary.h"
@@ -50,6 +53,25 @@ void AHitmenPlayerController::BeginPlay()
 	{
 		RefreshMappingContexts();
 		SendPreferredProfile();
+		// After a travel the PlayerState may be fresh: re-send the agent chosen in the front end.
+		if (const UHitmenGameInstance* GI = GetGameInstance<UHitmenGameInstance>())
+		{
+			if (GI->bHasLocalLoadout) { Server_SetLoadout(GI->LocalLoadout); }
+			if (GI->bHasLocalCosmetics) { Server_SetCosmetics(GI->LocalCosmetics); }
+		}
+		// The HUD owns the input mode (menu screens keep the cursor); it may not exist yet.
+		RefreshInputMode();
+	}
+}
+
+void AHitmenPlayerController::RefreshInputMode()
+{
+	if (AHitmenHUD* HitmenHUD = Cast<AHitmenHUD>(GetHUD()))
+	{
+		HitmenHUD->RefreshInputMode();
+	}
+	else
+	{
 		SetMenuInputMode(false);
 	}
 }
@@ -614,9 +636,13 @@ void AHitmenPlayerController::HandlePause()
 		UI->SetOptionsOpen(false);
 		return;
 	}
-	const bool bOpen = !UI->IsPauseMenuOpen();
-	UI->SetPauseMenuOpen(bOpen);
-	SetMenuInputMode(bOpen);
+	// Front-end screens have no pause menu (Esc is handled by their own Back buttons).
+	if (const AHitmenHUD* HitmenHUD = Cast<AHitmenHUD>(GetHUD()); HitmenHUD && HitmenHUD->IsMenuHUD())
+	{
+		return;
+	}
+	// The HUD reacts to the toggle and sets the input mode.
+	UI->SetPauseMenuOpen(!UI->IsPauseMenuOpen());
 }
 
 void AHitmenPlayerController::HandleSpectatorMode()
@@ -632,10 +658,26 @@ void AHitmenPlayerController::SelectEmote(int32 EmoteIndex)
 	if (IHitmenInputReceiver* R = GetReceiver()) { R->Input_Emote(EmoteIndex); }
 }
 
-void AHitmenPlayerController::SetMenuInputMode(bool bMenu)
+void AHitmenPlayerController::SetMenuInputMode(bool bMenu, bool bUIOnly)
 {
-	if (bMenu)
+	if (bMenu && bUIOnly)
 	{
+		// Front end: the viewport never captures the mouse, so the cursor can't vanish on a click.
+		FInputModeUIOnly Mode;
+		if (const AHitmenHUD* HitmenHUD = Cast<AHitmenHUD>(GetHUD()); HitmenHUD && HitmenHUD->GetPrimaryWidget())
+		{
+			UUserWidget* Primary = HitmenHUD->GetPrimaryWidget();
+			Primary->SetIsFocusable(true);
+			Mode.SetWidgetToFocus(Primary->TakeWidget());
+		}
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(Mode);
+		SetShowMouseCursor(true);
+		bEnableClickEvents = false;
+	}
+	else if (bMenu)
+	{
+		// In-match overlays (pause, options, results): game input keeps running (Esc closes).
 		FInputModeGameAndUI Mode;
 		Mode.SetHideCursorDuringCapture(false);
 		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
@@ -679,11 +721,29 @@ void AHitmenPlayerController::Server_SetIcon_Implementation(int32 IconIndex)
 void AHitmenPlayerController::Server_SetCosmetics_Implementation(const FHitmenCosmeticLoadout& Cosmetics)
 {
 	if (AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>()) { PS->SetCosmetics(Cosmetics); }
+	if (AHitmenPlayerCharacter* Agent = Cast<AHitmenPlayerCharacter>(GetPawn()))
+	{
+		Agent->ApplyCosmetics(Cosmetics);
+	}
 }
 
 void AHitmenPlayerController::Server_SetLoadout_Implementation(const FHitmenLoadout& Loadout)
 {
-	if (AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>()) { PS->SetLoadout(Loadout); }
+	AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
+	if (!PS)
+	{
+		return;
+	}
+	const FHitmenLoadout Previous = PS->GetLoadout();
+	const bool bChanged = Previous.Weapon != Loadout.Weapon || Previous.MoveAbility != Loadout.MoveAbility || Previous.ManipulationAbility != Loadout.ManipulationAbility;
+	PS->SetLoadout(Loadout);
+	// The pawn may have spawned before this arrived (non-seamless travel): equip it during the intro.
+	const AHitmenGameState* GS = GetWorld()->GetGameState<AHitmenGameState>();
+	AHitmenPlayerCharacter* Agent = Cast<AHitmenPlayerCharacter>(GetPawn());
+	if (bChanged && Agent && GS && GS->GetMatchPhase() == EHitmenMatchPhase::Intro)
+	{
+		Agent->ApplyLoadout(Loadout);
+	}
 }
 
 void AHitmenPlayerController::Server_SetReady_Implementation(bool bReady)

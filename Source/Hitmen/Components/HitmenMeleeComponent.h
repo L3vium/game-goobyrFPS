@@ -61,6 +61,13 @@ protected:
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayPunch();
 
+	/** Punch montage (body + first-person arms) and juice on this machine. */
+	void PlayPunchLocal();
+
+	/** Punch montage speed (the mannequin attack clip is slow for a jab). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee", meta=(ClampMin="0.1"))
+	float PunchPlayRate = 1.6f;
+
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_PlayStealthKill(AHitmenCharacterBase* Victim);
 

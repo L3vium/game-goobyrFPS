@@ -17,6 +17,8 @@ class UCanvasPanelSlot;
 class UBorder;
 class UVerticalBox;
 class UHorizontalBox;
+class UHitmenMapDefinition;
+struct FSlateBrush;
 
 /** Visual style of a Hitmen button. */
 UENUM(BlueprintType)
@@ -41,7 +43,35 @@ namespace HitmenUI
 	HITMEN_API FLinearColor Text();
 	HITMEN_API FLinearColor TextDim();
 	HITMEN_API FLinearColor Accent();
+	HITMEN_API FLinearColor Hairline();
+	/** Alert yellow (retrieval points, warnings). */
+	HITMEN_API FLinearColor Warning();
+
+	/**
+	 * Barlow Condensed (FNT_Barlow) with the engine font as a fallback. Typefaces: Light, Regular,
+	 * Medium, SemiBold, Bold, Italic, SemiBoldItalic ("Black" maps to Bold).
+	 */
 	HITMEN_API FSlateFontInfo Font(int32 Size, FName Typeface = TEXT("Bold"));
+	/** Same, with letter spacing (1/1000 em) for uppercase labels. */
+	HITMEN_API FSlateFontInfo SpacedFont(int32 Size, FName Typeface, int32 LetterSpacing);
+	HITMEN_API FVector2D MeasureText(const FString& Text, const FSlateFontInfo& FontInfo);
+
+	// ---- Paint helpers (NativePaint of code-drawn widgets) ----
+	HITMEN_API void PaintLine(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D A, FVector2D B, const FLinearColor& Color, float Thickness = 2.f);
+	HITMEN_API void PaintLines(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const TArray<FVector2D>& Points, const FLinearColor& Color, float Thickness = 2.f);
+	HITMEN_API void PaintBox(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Position, FVector2D Size, const FLinearColor& Color);
+	HITMEN_API void PaintFrame(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Position, FVector2D Size, const FLinearColor& Color, float Thickness = 1.f);
+	HITMEN_API void PaintArc(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Radius, float StartDeg, float EndDeg, const FLinearColor& Color, float Thickness, int32 Segments = 24);
+	/** Draws text at Position (top-left); returns its size. */
+	HITMEN_API FVector2D PaintText(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FString& Text, FVector2D Position, const FSlateFontInfo& FontInfo, const FLinearColor& Color);
+	/** Horizontal (left -> right) or vertical (top -> bottom) gradient between two colours. */
+	HITMEN_API void PaintGradient(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Position, FVector2D Size, const FLinearColor& From, const FLinearColor& To, bool bHorizontal);
+	/** A key cap: the key letter in a small outlined square. Returns its size. */
+	HITMEN_API FVector2D PaintKey(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FString& Key, FVector2D Position, int32 FontSize, float Alpha = 1.f);
+	HITMEN_API void PaintImage(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FSlateBrush* Brush, FVector2D Position, FVector2D Size, const FLinearColor& Tint = FLinearColor::White);
+
+	/** The map definition of the level this widget lives in (minimap, pause map). */
+	HITMEN_API const UHitmenMapDefinition* FindCurrentMap(const UObject* WorldContext);
 
 	HITMEN_API UTextBlock* MakeText(UWidgetTree* Tree, const FText& InText, int32 Size, FName Typeface = TEXT("Bold"), FLinearColor Color = FLinearColor(0.96f, 0.96f, 0.96f, 1.f));
 	/** Square button with a left-aligned label. OutLabel receives the label text block. */

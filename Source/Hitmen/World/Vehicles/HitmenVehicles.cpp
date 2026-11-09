@@ -338,6 +338,13 @@ AHitmenMountedGun::AHitmenMountedGun()
 
 	Mesh->SetupAttachment(GunPivot);
 
+	Tripod = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Tripod"));
+	Tripod->SetupAttachment(Collision);
+	Tripod->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Block);
+	Shield = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Shield"));
+	Shield->SetupAttachment(GunPivot);
+	Shield->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Block);
+
 	// The gunner stands exposed behind the gun; the gun itself shrugs off most bullets.
 	DriverDamageShare = 0.6f;
 	PointDamageMultiplier = 0.15f;
@@ -364,12 +371,12 @@ bool AHitmenMountedGun::IsUserBehind(const AActor* User) const
 FText AHitmenMountedGun::GetInteractionText_Implementation(AActor* Interactor) const
 {
 	// The prompt stays visible from the front so the player knows where to stand.
-	return IsUserBehind(Interactor) ? Super::GetInteractionText_Implementation(Interactor) : UseFromBehindText;
+	return bUsableFromAnySide || IsUserBehind(Interactor) ? NSLOCTEXT("Hitmen", "UseMountedGun", "Use mounted gun") : UseFromBehindText;
 }
 
 void AHitmenMountedGun::Interact_Implementation(AActor* Interactor)
 {
-	if (IsUserBehind(Interactor))
+	if (bUsableFromAnySide || IsUserBehind(Interactor))
 	{
 		Super::Interact_Implementation(Interactor);
 	}

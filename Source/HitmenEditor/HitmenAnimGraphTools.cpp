@@ -11,8 +11,10 @@
 #include "AnimGraphNode_Base.h"
 #include "AnimGraphNode_Root.h"
 #include "AnimGraphNode_Slot.h"
+#include "AnimGraphNode_SequencePlayer.h"
 #include "Animation/Skeleton.h"
 #include "EdGraphSchema_K2.h"
+#include "AnimationGraphSchema.h"
 #include "K2Node_VariableGet.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
@@ -305,4 +307,110 @@ bool UHitmenAnimGraphTools::EnsureSlotBeforeOutput(UAnimBlueprint* AnimBlueprint
 	}
 	AnimBlueprint->MarkPackageDirty();
 	return true;
+}
+
+bool UHitmenAnimGraphTools::BuildPoseSlotGraph(UAnimBlueprint* AnimBlueprint, UAnimSequenceBase* PreviewPose, FName PoseVariable, bool bCompile)
+{
+	using namespace HitmenAnimGraph;
+
+	if (!AnimBlueprint || !PreviewPose || PoseVariable.IsNone())
+	{
+		return false;
+	}
+	UEdGraph* AnimGraph = nullptr;
+	for (UEdGraph* Graph : AnimBlueprint->FunctionGraphs)
+	{
+		if (Graph && Graph->GetFName() == UEdGraphSchema_K2::GN_AnimGraph)
+		{
+			AnimGraph = Graph;
+			break;
+		}
+	}
+	const UEdGraphSchema* Schema = AnimGraph ? AnimGraph->GetSchema() : nullptr;
+	if (!AnimGraph || !Schema)
+	{
+		UE_LOG(LogHitmenAnimGraph, Warning, TEXT("BuildPoseSlotGraph: %s has no AnimGraph."), *AnimBlueprint->GetName());
+		return false;
+	}
+
+	UAnimGraphNode_Root* Root = nullptr;
+	bool bHasPlayer = false;
+	for (UEdGraphNode* Node : AnimGraph->Nodes)
+	{
+		Root = Root ? Root : Cast<UAnimGraphNode_Root>(Node);
+		bHasPlayer |= Cast<UAnimGraphNode_SequencePlayer>(Node) != nullptr;
+	}
+	if (!Root)
+	{
+		return false;
+	}
+	if (bHasPlayer)
+	{
+		return true; // Already built (idempotent; hand edits survive).
+	}
+
+	// Start clean: everything but the output pose goes.
+	AnimGraph->Modify();
+	const TArray<UEdGraphNode*> Existing = AnimGraph->Nodes;
+	for (UEdGraphNode* Node : Existing)
+	{
+		if (Node && Node != Root)
+		{
+			AnimGraph->RemoveNode(Node);
+		}
+	}
+
+	auto FirstPin = [](UEdGraphNode* Node, EEdGraphPinDirection Direction) -> UEdGraphPin*
+	{
+		for (UEdGraphPin* Pin : Node->Pins)
+		{
+			if (Pin && Pin->Direction == Direction && !Pin->bHidden && Pin->PinType.PinCategory == UAnimationGraphSchema::PC_Struct)
+			{
+				return Pin;
+			}
+		}
+		for (UEdGraphPin* Pin : Node->Pins)
+		{
+			if (Pin && Pin->Direction == Direction && !Pin->bHidden)
+			{
+				return Pin;
+			}
+		}
+		return nullptr;
+	};
+
+	FGraphNodeCreator<UAnimGraphNode_SequencePlayer> PlayerCreator(*AnimGraph);
+	UAnimGraphNode_SequencePlayer* Player = PlayerCreator.CreateNode(false);
+	Player->Node.SetSequence(PreviewPose);
+	Player->Node.SetLoopAnimation(true);
+	Player->NodePosX = Root->NodePosX - GetNodeOffsetX * 2;
+	Player->NodePosY = Root->NodePosY;
+	PlayerCreator.Finalize();
+
+	FGraphNodeCreator<UAnimGraphNode_Slot> SlotCreator(*AnimGraph);
+	UAnimGraphNode_Slot* Slot = SlotCreator.CreateNode(false);
+	Slot->Node.SlotName = FAnimSlotGroup::DefaultSlotName;
+	Slot->NodePosX = Root->NodePosX - GetNodeOffsetX;
+	Slot->NodePosY = Root->NodePosY;
+	SlotCreator.Finalize();
+
+	UEdGraphPin* PlayerOut = FirstPin(Player, EGPD_Output);
+	UEdGraphPin* SlotIn = Slot->FindPin(TEXT("Source"), EGPD_Input);
+	UEdGraphPin* SlotOut = FirstPin(Slot, EGPD_Output);
+	UEdGraphPin* RootIn = FirstPin(Root, EGPD_Input);
+	const bool bLinked = PlayerOut && SlotIn && SlotOut && RootIn
+		&& Schema->TryCreateConnection(PlayerOut, SlotIn) && Schema->TryCreateConnection(SlotOut, RootIn);
+	if (!bLinked)
+	{
+		UE_LOG(LogHitmenAnimGraph, Warning, TEXT("BuildPoseSlotGraph: %s could not link the pose graph."), *AnimBlueprint->GetName());
+	}
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(AnimBlueprint);
+	FKismetEditorUtilities::CompileBlueprint(AnimBlueprint);
+
+	// Bind the player's asset pin to the anim instance variable (runtime pose swap).
+	TMap<FString, FName> Map;
+	Map.Add(PreviewPose->GetPathName(), PoseVariable);
+	BindAssetPinsToVariables(AnimBlueprint, Map, bCompile);
+	AnimBlueprint->MarkPackageDirty();
+	return bLinked;
 }

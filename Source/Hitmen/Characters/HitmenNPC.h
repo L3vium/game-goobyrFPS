@@ -65,6 +65,22 @@ public:
 
 	virtual int32 GetHitmenTeamId_Implementation() const override;
 	virtual bool IsUnawareOf(const AActor* Other) const override;
+	virtual void Tick(float DeltaSeconds) override;
+
+	// F: pickpocket the keycard from behind (alive, unaware); otherwise carry the body.
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	virtual void Interact_Implementation(AActor* Interactor) override;
+
+	/** Alive, unaware of the player, carrying a keycard, player behind it. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
+	bool CanBePickpocketedBy(const AActor* Thief) const;
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
+	int32 GetCarriedKeycard() const { return CarriedKeycard; }
+
+	void SetGuardGroup(class AHitmenGuardGroup* Group);
+	class AHitmenGuardGroup* GetGuardGroup() const;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
@@ -106,9 +122,33 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
 	bool bIsSniper = false;
 
-	/** Keycard dropped on death (-1 = none). */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
+	/** Keycard carried on the hip (-1 = none): pickpocketed from behind or dropped on death. */
+	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_CarriedKeycard, BlueprintReadOnly, Category="Hitmen|NPC")
 	int32 CarriedKeycard = INDEX_NONE;
+
+	/** The keycard visible on the hip while carried. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> KeycardMesh;
+
+	/** Bone / socket the keycard hangs from and its offset. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC")
+	FName KeycardBone = TEXT("pelvis");
+
+	/** Red aiming line from the weapon to the target while a sniper aims. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> AimLaser;
+
+	/** Pickpocket only works from behind (dot of the NPC forward and the direction to the thief). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC", meta=(ClampMin="-1", ClampMax="1"))
+	float PickpocketMaxDot = -0.2f;
+
+	UFUNCTION()
+	void OnRep_CarriedKeycard();
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnPickpocketed(AActor* Thief);
+
+	TWeakObjectPtr<class AHitmenGuardGroup> GuardGroup;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC")
 	TSubclassOf<AHitmenKeycardPickup> KeycardPickupClass;

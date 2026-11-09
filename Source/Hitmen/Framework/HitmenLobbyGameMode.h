@@ -40,10 +40,28 @@ public:
 	/** Called when a player toggles ready; launches automatically when everyone is ready. */
 	void NotifyReadyChanged();
 
+	/** Title -> Lobby once the room is hosted (the world listens in place, no level load). */
+	void OpenLobby();
+
+	/** Lobby -> Title on the host leaving the room (the world stops listening). */
+	void ReturnToTitlePhase();
+
 protected:
 	/** Launch automatically once every non-watcher is ready in the customization screen. */
+	/** The match starts by itself when every non-watcher is ready (after LaunchCountdown). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Lobby")
-	bool bAutoLaunchWhenAllReady = false;
+	bool bAutoLaunchWhenAllReady = true;
+
+	/** Seconds between "everyone ready" and the travel; un-readying cancels. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Lobby", meta=(ClampMin="0", Units="s"))
+	float LaunchCountdown = 5.f;
+
+	/** A standalone front end starts on the title screen (the lobby opens when hosting). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Lobby")
+	bool bStartOnTitle = true;
+
+	FTimerHandle LaunchTimer;
+	void HandleLaunchTimer();
 
 	int32 TeamColorCursor = 0;
 };

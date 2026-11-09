@@ -20,12 +20,26 @@ void UHitmenUserSettings::SetToDefaults()
 	bToggleCrouch = false;
 	bToggleSprint = false;
 	bClimbRelativeToCamera = false;
-	MouseSensitivity = 1.f;
-	AimSensitivityMultiplier = 0.7f;
+	MouseSensitivity = 0.45f;
+	AimSensitivityMultiplier = 1.f;
+	HitmenSettingsVersion = CurrentSettingsVersion;
 	bInvertY = false;
 	FieldOfView = 90.f;
 	MasterVolume = 1.f;
 	MusicVolume = 0.8f;
 	SFXVolume = 1.f;
 	VoiceVolume = 1.f;
+}
+
+void UHitmenUserSettings::LoadSettings(bool bForceReload)
+{
+	Super::LoadSettings(bForceReload);
+	if (HitmenSettingsVersion < CurrentSettingsVersion)
+	{
+		// Version 2: lower default sensitivity; aiming compensates the zoom by itself.
+		MouseSensitivity = 0.45f;
+		AimSensitivityMultiplier = 1.f;
+		HitmenSettingsVersion = CurrentSettingsVersion;
+		SaveSettings();
+	}
 }

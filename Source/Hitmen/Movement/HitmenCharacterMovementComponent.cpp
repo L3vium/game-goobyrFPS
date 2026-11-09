@@ -15,7 +15,7 @@ namespace
 UHitmenCharacterMovementComponent::UHitmenCharacterMovementComponent()
 {
 	MaxWalkSpeed = WalkSpeed;
-	MaxWalkSpeedCrouched = 200.f;
+	MaxWalkSpeedCrouched = 240.f;
 	NavAgentProps.bCanCrouch = true;
 	bCanWalkOffLedgesWhenCrouching = true;
 	JumpZVelocity = 450.f;
@@ -283,6 +283,7 @@ void UHitmenCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iterat
 bool UHitmenCharacterMovementComponent::CanStartSlide() const
 {
 	return Super::IsMovingOnGround()
+		&& (!bSlideRequiresSprint || bWantsToSprint)
 		&& Velocity.Size2D() >= SlideMinStartSpeed
 		&& GetTimeSeconds() - LastSlideEndTime > SlideCooldown;
 }
@@ -381,16 +382,39 @@ bool UHitmenCharacterMovementComponent::TryStartMantle()
 	{
 		return false;
 	}
-
 	// Needs forward intent: jumping in place next to a wall is a normal jump.
-	FVector Forward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
+	const FVector Facing = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
 	const FVector Input = Acceleration.GetSafeNormal2D();
-	if (Input.IsNearlyZero() || FVector::DotProduct(Input, Forward) < 0.3f)
+	if (Input.IsNearlyZero() || FVector::DotProduct(Input, Facing) < 0.3f)
 	{
 		return false;
 	}
-	Forward = Input;
+	FHitmenMantlePlan Plan;
+	if (!PlanMantle(Input, Plan))
+	{
+		return false;
+	}
+	StartMantlePlan(Plan);
+	return true;
+}
 
+EHitmenTraversalAction UHitmenCharacterMovementComponent::QueryTraversalAction() const
+{
+	if (!CharacterOwner || !UpdatedComponent || IsMantling() || IsClimbing() || !(IsMovingOnGround() || IsFalling()))
+	{
+		return EHitmenTraversalAction::None;
+	}
+	FHitmenMantlePlan Plan;
+	return PlanMantle(CharacterOwner->GetActorForwardVector().GetSafeNormal2D(), Plan) ? Plan.Action : EHitmenTraversalAction::None;
+}
+
+float UHitmenCharacterMovementComponent::GetMantleAlpha() const
+{
+	return IsMantling() ? FMath::Clamp(MantleElapsed / FMath::Max(MantleTotal, KINDA_SMALL_NUMBER), 0.f, 1.f) : 0.f;
+}
+
+bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitmenMantlePlan& OutPlan) const
+{
 	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
 	const float Radius = Capsule->GetScaledCapsuleRadius();
 	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
@@ -401,7 +425,7 @@ bool UHitmenCharacterMovementComponent::TryStartMantle()
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenMantle), false, CharacterOwner);
 	const ECollisionChannel Channel = UpdatedComponent->GetCollisionObjectType();
 
-	// 1. Find a wall in front, from knee to max ledge height.
+	// 1. A wall in front, from knee height to the highest grabbable ledge.
 	FHitResult WallHit;
 	bool bFoundWall = false;
 	const float ProbeDistance = Radius + MantleReach;
@@ -421,15 +445,25 @@ bool UHitmenCharacterMovementComponent::TryStartMantle()
 	}
 	const FVector Into = -WallHit.ImpactNormal.GetSafeNormal2D();
 
-	// 2. Find the top surface at several depths past the face (thin walls, window sills).
+	// 2. The top surface, at several depths past the face (thin walls, sills). The downward probe
+	//    starts under any ceiling (window lintel) so openings in a wall are found too.
 	FHitResult TopHit;
 	bool bFoundTop = false;
 	for (const float Depth : MantleProbeDepths)
 	{
-		FVector ProbeXY = WallHit.ImpactPoint + Into * Depth;
-		const FVector Start(ProbeXY.X, ProbeXY.Y, Feet.Z + MantleMaxHeight + 25.f);
+		const FVector ProbeXY = WallHit.ImpactPoint + Into * Depth;
+		float StartZ = Feet.Z + MantleMaxHeight + 25.f;
+		FHitResult Ceiling;
+		const FVector Below(ProbeXY.X, ProbeXY.Y, WallHit.ImpactPoint.Z);
+		if (World->LineTraceSingleByChannel(Ceiling, Below + FVector::UpVector * 2.f, FVector(ProbeXY.X, ProbeXY.Y, StartZ), ECC_Visibility, Params)
+			&& !Ceiling.bStartPenetrating)
+		{
+			StartZ = Ceiling.ImpactPoint.Z - 6.f;
+		}
+		const FVector Start(ProbeXY.X, ProbeXY.Y, StartZ);
 		const FVector End(ProbeXY.X, ProbeXY.Y, Feet.Z + MantleMinHeight * 0.5f);
-		if (World->SweepSingleByChannel(TopHit, Start, End, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(4.f), Params)
+		if (Start.Z > End.Z
+			&& World->SweepSingleByChannel(TopHit, Start, End, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(4.f), Params)
 			&& !TopHit.bStartPenetrating && IsWalkable(TopHit))
 		{
 			bFoundTop = true;
@@ -446,50 +480,115 @@ bool UHitmenCharacterMovementComponent::TryStartMantle()
 	{
 		return false;
 	}
-
 	const FCollisionShape StandShape = FCollisionShape::MakeCapsule(Radius * 0.95f, HalfHeight * 0.95f);
-	const FVector StandDest = TopHit.ImpactPoint + Into * (Radius + 5.f) + FVector::UpVector * (HalfHeight + 3.f);
-	const bool bCanStand = !World->OverlapBlockingTestByChannel(StandDest, FQuat::Identity, Channel, StandShape, Params);
+	const FVector OverTop = TopHit.ImpactPoint + FVector::UpVector * (HalfHeight + MantleClearance);
 
-	// 3. Vault over thin, low obstacles when there is floor on the other side.
-	bool bVault = false;
-	FVector VaultDest = FVector::ZeroVector;
-	if (LedgeHeight <= VaultMaxHeight)
+	// Is there floor right past the wall (thin obstacle) and room to land there?
+	auto FindFarSide = [&](FVector& OutDest) -> bool
 	{
-		const FVector OverTop = TopHit.ImpactPoint + FVector::UpVector * 15.f;
-		const FVector FarTop = FVector(WallHit.ImpactPoint.X, WallHit.ImpactPoint.Y, OverTop.Z) + Into * (VaultMaxDepth + Radius + 10.f);
+		const FVector FarProbe = FVector(WallHit.ImpactPoint.X, WallHit.ImpactPoint.Y, TopHit.ImpactPoint.Z + 15.f) + Into * (VaultMaxDepth + Radius + 10.f);
 		FHitResult Blocked;
-		if (!World->LineTraceSingleByChannel(Blocked, OverTop, FarTop, ECC_Visibility, Params))
+		if (World->LineTraceSingleByChannel(Blocked, TopHit.ImpactPoint + FVector::UpVector * 15.f, FarProbe, ECC_Visibility, Params))
 		{
-			FHitResult FloorHit;
-			if (World->LineTraceSingleByChannel(FloorHit, FarTop, FarTop - FVector::UpVector * (LedgeHeight + 200.f), ECC_Visibility, Params)
-				&& IsWalkable(FloorHit) && FloorHit.ImpactPoint.Z < TopHit.ImpactPoint.Z - 25.f)
-			{
-				VaultDest = FloorHit.ImpactPoint + FVector::UpVector * (HalfHeight + 3.f);
-				bVault = !World->OverlapBlockingTestByChannel(VaultDest, FQuat::Identity, Channel, StandShape, Params);
-			}
+			return false;
 		}
-	}
-
-	if (!bVault && !bCanStand)
-	{
+		FHitResult FloorHit;
+		if (World->LineTraceSingleByChannel(FloorHit, FarProbe, FarProbe - FVector::UpVector * (LedgeHeight + 300.f), ECC_Visibility, Params)
+			&& IsWalkable(FloorHit) && FloorHit.ImpactPoint.Z < TopHit.ImpactPoint.Z - 25.f)
+		{
+			OutDest = FloorHit.ImpactPoint + FVector::UpVector * (HalfHeight + 3.f);
+			return !World->OverlapBlockingTestByChannel(OutDest, FQuat::Identity, Channel, StandShape, Params);
+		}
 		return false;
-	}
+	};
 
-	bMantleIsVault = bVault;
-	MantleStart = Location;
-	MantleTarget = bVault ? VaultDest : StandDest;
-	MantlePeak = bVault
-		? TopHit.ImpactPoint + FVector::UpVector * (HalfHeight + 25.f)
-		: FVector(Location.X, Location.Y, StandDest.Z + 10.f);
+	// Room to stand on top (a sill, a crate, a roof edge)?
+	const FVector StandDest = TopHit.ImpactPoint + Into * (Radius + 8.f) + FVector::UpVector * (HalfHeight + 3.f);
+	FHitResult StandFloor;
+	const bool bTopUnderStand = World->LineTraceSingleByChannel(StandFloor, StandDest, StandDest - FVector::UpVector * (HalfHeight + 20.f), ECC_Visibility, Params)
+		&& FMath::Abs(StandFloor.ImpactPoint.Z - TopHit.ImpactPoint.Z) < 30.f;
+	const bool bCanStand = bTopUnderStand && !World->OverlapBlockingTestByChannel(StandDest, FQuat::Identity, Channel, StandShape, Params);
+
+	FVector FarDest;
+	const bool bFarSide = FindFarSide(FarDest);
+	const float HeightAlpha = FMath::GetMappedRangeValueClamped(FVector2D(MantleMinHeight, MantleMaxHeight), FVector2D(0.8f, 1.25f), LedgeHeight);
+
+	OutPlan = FHitmenMantlePlan();
+	OutPlan.Start = Location;
+	OutPlan.LedgeHeight = LedgeHeight;
+	if (LedgeHeight <= VaultMaxHeight && bFarSide)
+	{
+		// Vault: one fluid arc over the top.
+		OutPlan.Action = EHitmenTraversalAction::Vault;
+		OutPlan.ControlA = FVector(Location.X, Location.Y, OverTop.Z) + Into * 15.f;
+		OutPlan.ControlB = OverTop + Into * 40.f;
+		OutPlan.Target = FarDest;
+		OutPlan.Duration = VaultDuration;
+		return true;
+	}
+	if (bCanStand)
+	{
+		// Ledge grab: hands up the wall first, then over onto the top.
+		OutPlan.Action = EHitmenTraversalAction::Climb;
+		OutPlan.ControlA = FVector(Location.X, Location.Y, StandDest.Z + MantleClearance);
+		OutPlan.ControlB = FVector(TopHit.ImpactPoint.X, TopHit.ImpactPoint.Y, StandDest.Z + MantleClearance * 0.5f);
+		OutPlan.Target = StandDest;
+		OutPlan.Duration = MantleDuration * HeightAlpha;
+		return true;
+	}
+	if (bFarSide)
+	{
+		// Thin wall: up, over the top, down the other side.
+		OutPlan.Action = EHitmenTraversalAction::ClimbOver;
+		OutPlan.ControlA = FVector(Location.X, Location.Y, OverTop.Z + 10.f);
+		OutPlan.ControlB = OverTop + Into * 45.f + FVector::UpVector * 10.f;
+		OutPlan.Target = FarDest;
+		OutPlan.Duration = ClimbOverDuration * HeightAlpha;
+		return true;
+	}
+	return false;
+}
+
+void UHitmenCharacterMovementComponent::StartMantlePlan(const FHitmenMantlePlan& Plan)
+{
+	MantleAction = Plan.Action;
+	bMantleIsVault = Plan.Action == EHitmenTraversalAction::Vault;
+	bMantleFromClimb = false;
+	MantleStart = Plan.Start;
+	MantleControlA = Plan.ControlA;
+	MantleControlB = Plan.ControlB;
+	MantleTarget = Plan.Target;
 	MantleElapsed = 0.f;
-	const float HeightAlpha = FMath::GetMappedRangeValueClamped(FVector2D(MantleMinHeight, MantleMaxHeight), FVector2D(0.75f, 1.2f), LedgeHeight);
-	MantleTotal = bVault ? VaultDuration : MantleDuration * HeightAlpha;
+	MantleTotal = Plan.Duration;
 	LastMantleTime = GetTimeSeconds();
 	Velocity = FVector::ZeroVector;
 	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Mantle));
-	OnMantleStarted.Broadcast(bVault);
-	return true;
+	OnMantleStarted.Broadcast(bMantleIsVault);
+}
+
+void UHitmenCharacterMovementComponent::StartLadderExit(const IHitmenClimbable& Climbable)
+{
+	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	const FVector Normal = Climbable.GetClimbNormal().GetSafeNormal2D();
+	const FVector Location = UpdatedComponent->GetComponentLocation();
+	const FVector Top = Climbable.GetClimbEnd() - Normal * (Capsule->GetScaledCapsuleRadius() + 30.f) + FVector::UpVector * (HalfHeight + 5.f);
+
+	// Keep climbing a little past the top, then roll over onto the ledge.
+	MantleAction = EHitmenTraversalAction::Climb;
+	bMantleIsVault = false;
+	bMantleFromClimb = true;
+	MantleStart = Location;
+	MantleControlA = FVector(Location.X, Location.Y, Top.Z + MantleClearance + 20.f);
+	MantleControlB = Top + Normal * 10.f + FVector::UpVector * (MantleClearance + 10.f);
+	MantleTarget = Top;
+	MantleElapsed = 0.f;
+	MantleTotal = LadderExitDuration;
+	LastMantleTime = GetTimeSeconds();
+	LastClimbExitTime = GetTimeSeconds();
+	Velocity = FVector::ZeroVector;
+	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Mantle));
+	OnTraversalMontage.Broadcast(EHitmenAnimMontage::ClimbExitTop);
 }
 
 void UHitmenCharacterMovementComponent::PhysMantle(float DeltaTime, int32 Iterations)
@@ -499,13 +598,15 @@ void UHitmenCharacterMovementComponent::PhysMantle(float DeltaTime, int32 Iterat
 		return;
 	}
 	MantleElapsed += DeltaTime;
-	const float Alpha = FMath::Clamp(MantleElapsed / FMath::Max(MantleTotal, KINDA_SMALL_NUMBER), 0.f, 1.f);
-	const float Inv = 1.f - Alpha;
-	const FVector Point = Inv * Inv * MantleStart + 2.f * Inv * Alpha * MantlePeak + Alpha * Alpha * MantleTarget;
+	const float Raw = FMath::Clamp(MantleElapsed / FMath::Max(MantleTotal, KINDA_SMALL_NUMBER), 0.f, 1.f);
+	// Ease in and out: the pull-up starts and lands softly.
+	const float T = FMath::InterpEaseInOut(0.f, 1.f, Raw, 1.7f);
+	const float U = 1.f - T;
+	const FVector Point = U * U * U * MantleStart + 3.f * U * U * T * MantleControlA + 3.f * U * T * T * MantleControlB + T * T * T * MantleTarget;
 	const FVector OldLocation = UpdatedComponent->GetComponentLocation();
 	UpdatedComponent->SetWorldLocation(Point, false, nullptr, ETeleportType::None);
 	Velocity = (Point - OldLocation) / DeltaTime;
-	if (Alpha >= 1.f)
+	if (Raw >= 1.f)
 	{
 		FinishMantle();
 	}
@@ -514,8 +615,11 @@ void UHitmenCharacterMovementComponent::PhysMantle(float DeltaTime, int32 Iterat
 void UHitmenCharacterMovementComponent::FinishMantle()
 {
 	const FVector Forward = CharacterOwner ? CharacterOwner->GetActorForwardVector().GetSafeNormal2D() : FVector::ForwardVector;
-	Velocity = Forward * (bMantleIsVault ? WalkSpeed : WalkSpeed * 0.3f);
+	const bool bKeepMomentum = MantleAction == EHitmenTraversalAction::Vault || MantleAction == EHitmenTraversalAction::ClimbOver;
+	Velocity = Forward * (bKeepMomentum ? WalkSpeed * 0.8f : WalkSpeed * 0.25f);
 	LastMantleTime = GetTimeSeconds();
+	MantleAction = EHitmenTraversalAction::None;
+	bMantleFromClimb = false;
 	SetMovementMode(MOVE_Falling);
 }
 
@@ -573,8 +677,8 @@ bool UHitmenCharacterMovementComponent::ShouldGrabClimbable(const IHitmenClimbab
 
 	if (Climbable.GetClimbType() == EHitmenClimbType::Zipline)
 	{
-		// Jump or walk into the cable while pushing forward.
-		return !Input.IsNearlyZero() || IsFalling();
+		// Ziplines are used with F (StartZiplineRide), never grabbed by walking into them.
+		return false;
 	}
 
 	const FVector Normal = Climbable.GetClimbNormal().GetSafeNormal2D();
@@ -610,6 +714,33 @@ void UHitmenCharacterMovementComponent::StartClimb(AActor* ClimbableActor, bool 
 	ClimbAlpha = bFromTop ? 0.97f : ProjectOnClimbAxis(UpdatedComponent->GetComponentLocation(), *Climbable);
 	Velocity = FVector::ZeroVector;
 	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Climb));
+	OnTraversalMontage.Broadcast(EHitmenAnimMontage::ClimbEnter);
+}
+
+void UHitmenCharacterMovementComponent::StartZiplineRide(AActor* ZiplineActor, float Direction)
+{
+	const IHitmenClimbable* Climbable = Cast<IHitmenClimbable>(ZiplineActor);
+	if (!Climbable || Climbable->GetClimbType() != EHitmenClimbType::Zipline || IsClimbing() || IsMantling() || !UpdatedComponent)
+	{
+		return;
+	}
+	if (IsSliding())
+	{
+		LastSlideEndTime = GetTimeSeconds();
+	}
+	ClimbTarget = ZiplineActor;
+	ClimbAlpha = ProjectOnClimbAxis(UpdatedComponent->GetComponentLocation(), *Climbable);
+	ZiplineDirection = Direction >= 0.f ? 1.f : -1.f;
+	ZiplineRideTime = 0.f;
+	Velocity = FVector::ZeroVector;
+	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Climb));
+	OnTraversalMontage.Broadcast(EHitmenAnimMontage::ZiplineEnter);
+}
+
+bool UHitmenCharacterMovementComponent::IsZiplining() const
+{
+	const IHitmenClimbable* Climbable = IsClimbing() ? Cast<IHitmenClimbable>(ClimbTarget.Get()) : nullptr;
+	return Climbable && Climbable->GetClimbType() == EHitmenClimbType::Zipline;
 }
 
 void UHitmenCharacterMovementComponent::StopClimbing(bool bJumpOff)
@@ -655,6 +786,7 @@ void UHitmenCharacterMovementComponent::PhysClimb(float DeltaTime, int32 Iterati
 	const FVector ActorForward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
 
 	float Forward = FVector::DotProduct(Input, ActorForward);
+	float SpeedScale = 1.f;
 	if (Climbable->GetClimbType() == EHitmenClimbType::Ladder)
 	{
 		if (bClimbRelativeToCamera)
@@ -665,25 +797,23 @@ void UHitmenCharacterMovementComponent::PhysClimb(float DeltaTime, int32 Iterati
 	}
 	else
 	{
-		// Zipline: forward moves toward where you look along the cable.
-		Forward *= FVector::DotProduct(ActorForward, Axis.GetSafeNormal2D()) >= 0.f ? 1.f : -1.f;
+		// Zipline: rides on its own toward the chosen end, easing up to speed.
+		Forward = ZiplineDirection;
+		ZiplineRideTime += DeltaTime;
+		SpeedScale = ZiplineAccelerationTime > 0.f ? FMath::Clamp(ZiplineRideTime / ZiplineAccelerationTime, 0.2f, 1.f) : 1.f;
 	}
 	ClimbAxisInput = FMath::Clamp(Forward, -1.f, 1.f);
 
-	const float NewAlpha = ClimbAlpha + ClimbAxisInput * Climbable->GetClimbSpeed() * DeltaTime / Length;
+	const float NewAlpha = ClimbAlpha + ClimbAxisInput * SpeedScale * Climbable->GetClimbSpeed() * DeltaTime / Length;
 	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
 
 	if (Climbable->GetClimbType() == EHitmenClimbType::Ladder)
 	{
 		if (NewAlpha >= 1.f && ClimbAxisInput > 0.f)
 		{
-			// Step off the top onto the ledge behind the ladder.
-			const FVector Top = Climbable->GetClimbEnd() - Climbable->GetClimbNormal().GetSafeNormal2D() * (Capsule->GetScaledCapsuleRadius() + 30.f)
-				+ FVector::UpVector * (Capsule->GetScaledCapsuleHalfHeight() + 5.f);
-			UpdatedComponent->SetWorldLocation(Top, false, nullptr, ETeleportType::TeleportPhysics);
-			LastClimbExitTime = GetTimeSeconds();
-			Velocity = FVector::ZeroVector;
-			SetMovementMode(MOVE_Falling);
+			// Pull up over the top onto the ledge behind the ladder (smooth path, no snap).
+			ClimbTarget.Reset();
+			StartLadderExit(*Climbable);
 			return;
 		}
 		if (NewAlpha <= 0.f && ClimbAxisInput < 0.f)
@@ -693,11 +823,18 @@ void UHitmenCharacterMovementComponent::PhysClimb(float DeltaTime, int32 Iterati
 			return;
 		}
 	}
-	else if ((NewAlpha >= 1.f && ClimbAxisInput > 0.f) || (NewAlpha <= 0.f && ClimbAxisInput < 0.f))
+	else
 	{
-		StopClimbing(false);
-		StartNewPhysics(DeltaTime, Iterations);
-		return;
+		// Leave the cable before the anchor, keeping some momentum so the landing carries forward.
+		const float Clearance = Climbable->GetClimbOffset() / Length;
+		if ((NewAlpha >= 1.f - Clearance && ClimbAxisInput > 0.f) || (NewAlpha <= Clearance && ClimbAxisInput < 0.f))
+		{
+			const FVector RideDirection = (Axis * ClimbAxisInput).GetSafeNormal2D();
+			StopClimbing(false);
+			Velocity = RideDirection * Climbable->GetClimbSpeed() * 0.45f;
+			StartNewPhysics(DeltaTime, Iterations);
+			return;
+		}
 	}
 
 	ClimbAlpha = FMath::Clamp(NewAlpha, 0.f, 1.f);

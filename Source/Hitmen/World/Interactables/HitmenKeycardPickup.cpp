@@ -3,9 +3,19 @@
 #include "World/Interactables/HitmenKeycardPickup.h"
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Engine/StaticMesh.h"
+#include "UObject/ConstructorHelpers.h"
 
 AHitmenKeycardPickup::AHitmenKeycardPickup()
 {
+	// Visible and traceable even without a Blueprint (keycards dropped by NPCs).
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CardMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (CardMesh.Succeeded())
+	{
+		Mesh->SetStaticMesh(CardMesh.Object);
+		Mesh->SetRelativeScale3D(FVector(0.15f, 0.1f, 0.02f));
+		Mesh->SetRelativeLocation(FVector(0.f, 0.f, 10.f));
+	}
 	Mesh->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	Mesh->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Block);
 }

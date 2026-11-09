@@ -128,9 +128,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|UI")
 	void SelectEmote(int32 EmoteIndex);
 
-	/** Switches input between game and UI (cursor visible). */
+	/**
+	 * Switches input between game and UI (cursor visible). bUIOnly: front-end screens, where no
+	 * click ever reaches the game viewport (it would capture and hide the cursor).
+	 */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|UI")
-	void SetMenuInputMode(bool bMenu);
+	void SetMenuInputMode(bool bMenu, bool bUIOnly = false);
+
+	/** Asks the HUD to re-evaluate the input mode (menus, pause, wheel...). */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|UI")
+	void RefreshInputMode();
 
 	// ---- Spectator ----
 	UFUNCTION(BlueprintPure, Category="Hitmen|Spectator")

@@ -40,7 +40,7 @@ Content/Hitmen/
   AI/              BP_AIController, BP_PatrolRoute, BehaviorTrees/ (BT_* and BB_NPC, generated together)
   UI/              Menus/  Lobby/  HUD/   (WBP_* are value carriers over C++ default layouts)
   Input/           Actions/  Contexts/
-  Maps/            L_TitleScreen, L_Lobby, L_Gym, L_LDTest, L_Empty_01, L_Empty_02
+  Maps/            L_FrontEnd, L_Gym, L_LDTest, L_Empty_01, L_Empty_02
   Materials/       Master/  Instances/ (MI_<Colour> props, MI_Grid_<Colour> checker LD)  PostProcess/ (PP_*)
   VFX/             <Category>/                       (created by the team with the first asset)
   Audio/           Mixes/ (SCM_Volume)  SFX/<Category>/  Music/  Ambience/

@@ -5,6 +5,74 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-10
+
+### Fixed
+- Crash candidates from the playtest (no log was available): a voice talker stayed bound to a destroyed body after
+  a respawn (now released with the body); Steam searches ran in parallel on Steam's single search slot (public
+  rooms, then friends' rooms, now one query at a time through one queue, refresh spam ignored); session delegates
+  are cleared when the subsystem goes away; the UI folder is always cooked (font loaded by path).
+
+### Changed
+- Front end lit at one fixed exposure (unbound post process volume, min = max brightness): no more dark briefing
+  room that slowly brightens, no overexposed agent stage. Briefing fills added, stage key / rim softened.
+- Title: the HITMEN wordmark alone (no tagline, no red underline); square menu blocks top to bottom Join room
+  (dashed outline), Create room, Options, Quit. Space or Escape goes back on every menu page; menu buttons never
+  take keyboard focus (Space no longer re-presses the last button).
+- Create Room: the players panel runs from the map to the screen edge; three nested blocks (players panel, opaque
+  team blocks with a tinted header, a solid block per player); team role is a square ATTACK / PROTECT block,
+  remove is a cross; the watcher toggle is an eye (open / struck) shown when hovering a player; the map tile fills
+  its frame with the map image (cropped, never letterboxed) with the whole map small in the top-left corner.
+- Arrows are real arrows (shaft and head) on square blocks; fast clicks all count (double clicks are steps).
+- Your agent: framed further left, codename above the head, Randomize under the feet, no slot labels; the look
+  changes on the stage at once and is sent once clicks pause (no lobby rebuild per click, unchanged cosmetic
+  slots are skipped).
+- Loadout: three always-visible rows of square tiles (weapon, move, manipulation) with a None tile each; a click
+  picks, hover is instant, names stay inside their tile, no hint text. Default loadout: silenced pistol, no
+  abilities. The launch countdown is one big number in a square block.
+
+- Traversal: steps up to 55 cm are walked up; Space counts for 0.25 s after the press (late ledge / ladder
+  grabs); jumping at a ladder grabs it at once (only the ladder just left keeps its cooldown); vault / climb hints
+  only show on the ground; a block wall (top at least 40 cm deep) is climbed onto and walked along, a thinner wall
+  is climbed over.
+- Doors and vent hatches swing on a hinge (their edge), not around their centre.
+- Security cameras: the view is a shadowed spotlight (walls cut it, it spreads on the floor), no translucent cone
+  or halo; a player is seen only through open air (visibility and static geometry tested to the head and chest).
+- Guards see 35 % less far (sight 1950 / lose 2250, suspicion falloff 1600, instant detection 300).
+- Players have 300 health (guards unchanged). Default mouse sensitivity 0.25 (migrated once).
+- Minimap is north-up; your arrow turns.
+- Parachute: the move keys steer the canopy; guards and cameras cannot see a player under the canopy or for 2 s
+  after landing.
+- Stealth takedown: the attacker steps in behind the victim, both are held, the attack plays on the body and the
+  first-person arms (camera shake), the victim plays its reaction, and dies on the strike (0.55 s of 1 s).
+- Swapped / dropped weapons become a floating pickup at once (no physics tumble) at their real size; the focus
+  glow works on skeletal guns (rocket / grenade launchers, black hole gun).
+- Containers hide their contents while their doors are closed.
+- First person: the arms hold guns on the right (BP hip offset was left of centre) and every gun points along the
+  view (the old -90 yaw turned them sideways); rotations solved in PIE by `Tools/Editor/hitmen_fp_solve.py`.
+  Launchers are drawn smaller; the knife and the bow use the hold pose (the knife sat at the hip).
+- Punches are seen: without a weapon the arms move to chest height (`ArmsUnarmedOffset`) so the fists cross the view.
+- Windows lie in their wall (they were spawned across it): 100 windows turned in the Gym and LDTest
+  (`Tools/Editor/hitmen_patch_levels_040.py`), the level builder spawns them turned. A closed window can no
+  longer be vaulted (the shutters left a 1 cm gap on the centre line; the passage check is a sweep on the pawn
+  channel), and the vault probe finds the sill under a lintel.
+- LDTest: 8 of the 16 spawn points were removed, the ones within guard sight (two had a guard 3 to 5 m away).
+  Gym: the guard group keeps one follower.
+- Bullet impacts: a dust puff thrown back toward the shooter on surfaces, blood on characters.
+- The interaction prompt keeps its target 0.2 s when the trace grazes a frame (no flicker on windows).
+
+### Added
+- Placeholder icons for every weapon and ability (`Tools/Icons/make_icons.py` draws them, `hitmen_import_icons.py`
+  imports them into `/Game/Hitmen/UI/Icons` and sets each data asset's Icon); shown on the loadout tiles.
+- Map previews (`Tools/Editor/ue_map_shot.sh` + `hitmen_map_shots.py`): a spawn-view screenshot per map as its
+  Thumbnail, shown full-bleed on the Create Room tile.
+- NPC aim pose: guards in combat hold their weapon's aim montage (AM_Pistol_Aim / AM_Rifle_Aim, looped) while
+  standing or walking slowly; the fire montage plays over it on each shot.
+- Hidden vignette: dark soft edges and an eye-off mark while concealed (tall grass).
+- Room codes: every room gets a 6-character code (no 0/O/1/I/L), shown on Create Room; Join has a code field.
+- Join: the Steam friends list (playing Hitmen / online / offline, click a friend in a room to join), then the
+  rooms with a refresh button beside the header and the messages inside the list.
+
 ## [0.3.0] - 2026-11-09
 
 ### Added

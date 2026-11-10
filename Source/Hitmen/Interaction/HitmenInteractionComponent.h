@@ -68,5 +68,11 @@ protected:
 	TWeakObjectPtr<AActor> FocusedActor;
 	TWeakObjectPtr<AActor> HighlightedActor;
 	FText FocusedPrompt;
+
+	/** Time the trace first lost the focused interactable: it stays focused a moment (no flicker on thin frames). */
+	float FocusLostTime = -1.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Interaction", meta=(ClampMin="0", Units="s"))
+	float FocusGraceTime = 0.2f;
 	FTimerHandle TraceTimer;
 };

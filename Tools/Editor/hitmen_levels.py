@@ -245,6 +245,82 @@ def shot(name, loc, rot, fov=70.0):
     return camera
 
 
+# ---- Front end lighting: one fixed exposure for the whole scene (no eye adaptation while the
+# camera flies between the hall, the briefing room and the stage); every room is lit for it. ----
+FRONTEND_EV100 = 5.0
+FRONTEND_MUSEUM_SPOT = 3500.0
+FRONTEND_MUSEUM_FILL = 2600.0
+FRONTEND_KEY = 6000.0
+FRONTEND_BRIEFING_LAMP = 5000.0
+FRONTEND_BRIEFING_FILL = 2800.0
+FRONTEND_STAGE_KEY = 2200.0
+FRONTEND_STAGE_RIM = 2600.0
+FRONTEND_STAGE = (5000, -600)
+# Camera of "Your agent": the agent sits on the left of the frame (loadout on the right).
+FRONTEND_AGENT_SHOT = ((5000 - 480, -600 + 170, 125), (-3, 0, 0))
+
+
+def front_end_exposure(volume=None):
+    """Unbound post process volume with min = max exposure (EV100): nothing adapts."""
+    if volume is None:
+        volume = spawn(unreal.PostProcessVolume, (2500, 0, 300), label="FrontEndExposure", folder="Lighting")
+    volume.set_editor_property("unbound", True)
+    settings = volume.get_editor_property("settings")
+    settings.set_editor_property("override_auto_exposure_method", True)
+    settings.set_editor_property("auto_exposure_method", unreal.AutoExposureMethod.AEM_HISTOGRAM)
+    settings.set_editor_property("override_auto_exposure_min_brightness", True)
+    settings.set_editor_property("auto_exposure_min_brightness", FRONTEND_EV100)
+    settings.set_editor_property("override_auto_exposure_max_brightness", True)
+    settings.set_editor_property("auto_exposure_max_brightness", FRONTEND_EV100)
+    settings.set_editor_property("override_auto_exposure_bias", True)
+    settings.set_editor_property("auto_exposure_bias", 0.0)
+    settings.set_editor_property("override_local_exposure_highlight_contrast_scale", True)
+    settings.set_editor_property("local_exposure_highlight_contrast_scale", 1.0)
+    settings.set_editor_property("override_local_exposure_shadow_contrast_scale", True)
+    settings.set_editor_property("local_exposure_shadow_contrast_scale", 1.0)
+    volume.set_editor_property("settings", settings)
+    return volume
+
+
+def front_end_tune_lights(actors):
+    """Light levels for the fixed exposure; also adds the briefing fills and frames the agent."""
+    labels = {a.get_actor_label(): a for a in actors}
+    for actor in actors:
+        loc = actor.get_actor_location()
+        if isinstance(actor, unreal.SpotLight):
+            comp = actor.spot_light_component
+            label = actor.get_actor_label()
+            if label == "KeyLight":
+                comp.set_editor_property("intensity", FRONTEND_KEY)
+            elif label == "StageKey":
+                comp.set_editor_property("intensity", FRONTEND_STAGE_KEY)
+            elif label == "StageRim":
+                comp.set_editor_property("intensity", FRONTEND_STAGE_RIM)
+            elif loc.z > 800 and loc.x < 3000:
+                comp.set_editor_property("intensity", FRONTEND_MUSEUM_SPOT)
+            elif 3000 < loc.x < 5600 and loc.z > 550:
+                comp.set_editor_property("intensity", FRONTEND_BRIEFING_LAMP)
+                comp.set_editor_property("outer_cone_angle", 50.0)
+        elif isinstance(actor, unreal.PointLight) and loc.x < 3000 and not actor.get_actor_label().startswith("BriefingFill"):
+            actor.point_light_component.set_editor_property("intensity", FRONTEND_MUSEUM_FILL)
+    # Briefing room fills: the room reads at the same exposure as the hall.
+    # (kept off the agent stage at y -600 so the stage stays lit by its own key and rim)
+    for index, (x, y) in enumerate(((3400, -150), (4300, -150), (4300, 1100), (3400, 700), (4300, 700), (5200, 700))):
+        name = "BriefingFill_%d" % index
+        fill = labels.get(name) or spawn(unreal.PointLight, (x, y, 500), label=name, folder="Lighting")
+        fill.set_actor_location(unreal.Vector(x, y, 500), False, False)
+        fill.point_light_component.set_editor_property("intensity", FRONTEND_BRIEFING_FILL)
+        fill.point_light_component.set_editor_property("attenuation_radius", 1400.0)
+        fill.point_light_component.set_editor_property("light_color", unreal.Color(r=215, g=225, b=255, a=255))
+    camera = labels.get("Shot_Customization")
+    if camera:
+        loc, rot = FRONTEND_AGENT_SHOT
+        camera.set_actor_location(unreal.Vector(*loc), False, False)
+        camera.set_actor_rotation(unreal.Rotator(pitch=rot[0], yaw=rot[1], roll=rot[2]), False)
+
+
+# Windows: the opening spans the window's local Y, so in a wall running along X they are turned 90.
+
 def build_front_end():
     new_map("L_FrontEnd")
     game_mode("BP_GM_Lobby")
@@ -328,7 +404,9 @@ def build_front_end():
     stage_rim.spot_light_component.set_editor_property("intensity", 9000.0)
     stage_rim.spot_light_component.set_editor_property("outer_cone_angle", 30.0)
     stage_rim.spot_light_component.set_editor_property("light_color", unreal.Color(r=255, g=90, b=80, a=255))
-    shot("Shot_Customization", (sx - 480, sy + 130, 125), (-3, 0, 0))
+    shot("Shot_Customization", *FRONTEND_AGENT_SHOT)
+    front_end_exposure()
+    front_end_tune_lights(EAS.get_all_level_actors())
     save_map()
 
 
@@ -437,7 +515,7 @@ def build_gym():
     label(X, -1000, 250, "CLIMB OVER  thin 250 cm wall")
     # Window in a wall: F to open, Space to vault through.
     wall((X - 350, -500), (X + 350, -500), 0, 320, 25, [(350, 120, 100, 220)], GRID_DARK, G)
-    spawn(bp("World/Interactables/Window/BP_Window"), (X, -500, 0), folder=G)
+    spawn(bp("World/Interactables/Window/BP_Window"), (X, -500, 0), (0, 90, 0), folder=G)
     label(X, -500, 320, "WINDOW  F open  -  Space vault")
     # Ladder and gutter up to a platform; zipline down from it to the east.
     block(X, 300, 500, 500, 400, folder=G)
@@ -589,7 +667,7 @@ def build_gym():
     room_door = spawn(bp("World/Interactables/Door/BP_Door"), (vx - 55, vy - 350, 0), folder=G)
     wall((vx - 350, vy - 350), (vx + 350, vy - 350), 0, 330, 25, [(350, 110, 0, 230)], GRID_DARK, G)
     wall((vx - 350, vy + 350), (vx + 350, vy + 350), 0, 330, 25, [(350, 120, 100, 220)], GRID_DARK, G)
-    room_window = spawn(bp("World/Interactables/Window/BP_Window"), (vx, vy + 350, 0), folder=G)
+    room_window = spawn(bp("World/Interactables/Window/BP_Window"), (vx, vy + 350, 0), (0, 90, 0), folder=G)
     wall((vx - 350, vy - 350), (vx - 350, vy + 350), 0, 330, 25, [(350, 120, 0, 120)], GRID_DARK, G)
     hatch = spawn(bp("World/Interactables/Vent/BP_VentHatch"), (vx - 350, vy, 0), (0, 90, 0), folder=G)
     wall((vx + 350, vy - 350), (vx + 350, vy + 350), 0, 330, 25, (), GRID_DARK, G)
@@ -689,7 +767,7 @@ def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", 
     if windows:
         for f in range(floors):
             for t in (0.25, 0.75):
-                spawn(bp("World/Interactables/Window/BP_Window"), (x0 + w * t, y0, f * floor_h), folder=folder)
+                spawn(bp("World/Interactables/Window/BP_Window"), (x0 + w * t, y0, f * floor_h), (0, 90, 0), folder=folder)
     if gutter:
         ladder((x0 - 15, cy + d * 0.3, 0), 180, H + 20, gutter=True, folder=folder)
     return (x0, x1, y0, y1, H)
@@ -765,7 +843,7 @@ def build_ldtest():
     spawn(bp("World/Interactables/Door/BP_Door"), (mx - 80, hy0, 0), folder="Manor/House")
     for f in range(2):
         for t in (0.25, 0.75):
-            spawn(bp("World/Interactables/Window/BP_Window"), (hx0 + 3600 * t, hy1, f * FH), (0, 180, 0), folder="Manor/House")
+            spawn(bp("World/Interactables/Window/BP_Window"), (hx0 + 3600 * t, hy1, f * FH), (0, 270, 0), folder="Manor/House")
     stairs((hx1 - 200, hy0 + 150, 0), 90, FH, 1100, 300, folder="Manor/House")
     ladder((hx1 + 20, hy1 - 400, 0), 0, 2 * FH + 20, gutter=True, folder="Manor/House")
     # Interior: dining room (sealed: door + window + vent hatch) on ground floor west.

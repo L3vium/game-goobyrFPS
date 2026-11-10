@@ -47,6 +47,10 @@ void UHitmenMenuButton::EnsureLayout()
 		return;
 	}
 	Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	// Never keyboard-focusable: Space / Enter must not re-press the last clicked button (Space = Back).
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	Button->IsFocusable = false;
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 	Button->SetStyle(InvisibleButtonStyle());
 	Button->OnClicked.AddDynamic(this, &UHitmenMenuButton::HandleClicked);
 	Button->OnHovered.AddDynamic(this, &UHitmenMenuButton::HandleHovered);
@@ -116,7 +120,16 @@ void UHitmenMenuButton::ApplyStyle()
 	case EHitmenMenuButtonKind::Secondary: Size = 22; Spacing = 70; break;
 	case EHitmenMenuButtonKind::Accent:    Size = 24; Spacing = 90; break;
 	case EHitmenMenuButtonKind::Back:      Size = 19; Face = TEXT("Medium"); Spacing = 120; break;
+	case EHitmenMenuButtonKind::Block:     Size = 28; Spacing = 90; break;
+	case EHitmenMenuButtonKind::Dashed:    Size = 28; Spacing = 90; break;
+	case EHitmenMenuButtonKind::Chip:      Size = 15; Spacing = 140; break;
 	default: break;
+	}
+	if (UButtonSlot* ContentSlot = Button && Button->GetContent() ? Cast<UButtonSlot>(Button->GetContent()->Slot) : nullptr)
+	{
+		const bool bBlock = Kind == EHitmenMenuButtonKind::Block || Kind == EHitmenMenuButtonKind::Dashed;
+		ContentSlot->SetPadding(bBlock ? FMargin(26.f, 16.f, 26.f, 16.f)
+			: (Kind == EHitmenMenuButtonKind::Chip ? FMargin(14.f, 7.f, 14.f, 7.f) : FMargin(22.f, 10.f, 28.f, 10.f)));
 	}
 	LabelText->SetText(FText::FromString(Label.ToString().ToUpper()));
 	LabelText->SetFont(HitmenUI::SpacedFont(Size, Face, Spacing));
@@ -158,20 +171,58 @@ void UHitmenMenuButton::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	const bool bLit = (bHovered || bSelected) && bEnabledState;
-	HoverAlpha = FMath::FInterpTo(HoverAlpha, bLit ? 1.f : 0.f, InDeltaTime, 14.f);
+	HoverAlpha = FMath::FInterpTo(HoverAlpha, bLit ? 1.f : 0.f, InDeltaTime, 18.f);
+	const bool bSlides = Kind == EHitmenMenuButtonKind::Primary || Kind == EHitmenMenuButtonKind::Secondary || Kind == EHitmenMenuButtonKind::Back;
+	const float Slide = bSlides ? 12.f * HoverAlpha : 0.f;
 	if (LabelText)
 	{
-		LabelText->SetRenderTranslation(FVector2D(12.f * HoverAlpha, 0.f));
+		LabelText->SetRenderTranslation(FVector2D(Slide, 0.f));
 	}
 	if (SubtitleText)
 	{
-		SubtitleText->SetRenderTranslation(FVector2D(12.f * HoverAlpha, 0.f));
+		SubtitleText->SetRenderTranslation(FVector2D(Slide, 0.f));
 	}
 }
 
 int32 UHitmenMenuButton::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
+	if (Kind == EHitmenMenuButtonKind::Block || Kind == EHitmenMenuButtonKind::Dashed || Kind == EHitmenMenuButtonKind::Chip)
+	{
+		const float Dim = bEnabledState ? 1.f : 0.45f;
+		if (Kind == EHitmenMenuButtonKind::Dashed)
+		{
+			// Dashed outline over a faint fill.
+			HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FMath::Lerp(FLinearColor(0.f, 0.f, 0.f, 0.35f), FLinearColor(0.1f, 0.1f, 0.11f, 0.85f), HoverAlpha));
+			const FLinearColor DashColor = FMath::Lerp(FLinearColor(1.f, 1.f, 1.f, 0.55f * Dim), FLinearColor(1.f, 1.f, 1.f, 0.95f * Dim), HoverAlpha);
+			const float Dash = 10.f;
+			const float GapLength = 7.f;
+			auto DashedEdge = [&](FVector2D From, FVector2D To)
+			{
+				const float Length = FVector2D::Distance(From, To);
+				const FVector2D Dir = (To - From) / FMath::Max(1.f, Length);
+				for (float At = 0.f; At < Length; At += Dash + GapLength)
+				{
+					HitmenUI::PaintLine(OutDrawElements, LayerId + 1, AllottedGeometry, From + Dir * At, From + Dir * FMath::Min(Length, At + Dash), DashColor, 2.f);
+				}
+			};
+			DashedEdge(FVector2D(1.f, 1.f), FVector2D(Size.X - 1.f, 1.f));
+			DashedEdge(FVector2D(Size.X - 1.f, 1.f), Size - FVector2D(1.f, 1.f));
+			DashedEdge(Size - FVector2D(1.f, 1.f), FVector2D(1.f, Size.Y - 1.f));
+			DashedEdge(FVector2D(1.f, Size.Y - 1.f), FVector2D(1.f, 1.f));
+		}
+		else
+		{
+			const bool bChip = Kind == EHitmenMenuButtonKind::Chip;
+			const FLinearColor Base = bChip ? FLinearColor(0.16f, 0.17f, 0.19f, 0.95f) : FLinearColor(0.055f, 0.058f, 0.068f, 0.9f);
+			const FLinearColor Lit = bChip ? FLinearColor(0.32f, 0.33f, 0.36f, 1.f) : FLinearColor(0.16f, 0.165f, 0.18f, 0.95f);
+			HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FMath::Lerp(Base, Lit, HoverAlpha) * FLinearColor(1.f, 1.f, 1.f, Dim));
+			HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, Size, FLinearColor(1.f, 1.f, 1.f, (0.18f + 0.5f * HoverAlpha) * Dim), 1.f);
+		}
+		// Red edge on the left when lit.
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, FVector2D(Kind == EHitmenMenuButtonKind::Chip ? 3.f : 5.f, Size.Y * HoverAlpha), HitmenUI::Accent());
+		return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
+	}
 	if (Kind == EHitmenMenuButtonKind::Accent)
 	{
 		const FLinearColor Fill = bEnabledState ? FMath::Lerp(HitmenUI::Accent(), HitmenUI::Accent() * 1.3f, HoverAlpha) : FLinearColor(0.2f, 0.2f, 0.22f, 0.8f);
@@ -206,7 +257,8 @@ void UHitmenArrowButton::Setup(bool bInPointsRight, float InSize)
 void UHitmenArrowButton::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	HoverAlpha = FMath::FInterpTo(HoverAlpha, bHovered ? 1.f : 0.f, InDeltaTime, 14.f);
+	HoverAlpha = FMath::FInterpTo(HoverAlpha, bHovered ? 1.f : 0.f, InDeltaTime, 18.f);
+	PressAlpha = FMath::FInterpTo(PressAlpha, 0.f, InDeltaTime, 12.f);
 }
 
 FReply UHitmenArrowButton::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -214,10 +266,17 @@ FReply UHitmenArrowButton::NativeOnMouseButtonDown(const FGeometry& InGeometry, 
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 	{
 		UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::UIClick);
+		PressAlpha = 1.f;
 		OnClicked.Broadcast();
 		return FReply::Handled();
 	}
 	return FReply::Unhandled();
+}
+
+FReply UHitmenArrowButton::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	// Slate turns the second of two fast clicks into a double click: it is one more step.
+	return NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
 void UHitmenArrowButton::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -238,12 +297,19 @@ int32 UHitmenArrowButton::NativePaint(const FPaintArgs& Args, const FGeometry& A
 	const FVector2D Local = AllottedGeometry.GetLocalSize();
 	const float Side = FMath::Min(Local.X, Local.Y);
 	const FVector2D Origin = (Local - FVector2D(Side)) * 0.5f;
-	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, Origin, FVector2D(Side), FMath::Lerp(FLinearColor(0.f, 0.f, 0.f, 0.6f), HitmenUI::Accent(), HoverAlpha));
-	HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, Origin, FVector2D(Side), FLinearColor(1.f, 1.f, 1.f, 0.25f + 0.5f * HoverAlpha), 1.f);
-	const FVector2D C = Origin + FVector2D(Side) * 0.5f + FVector2D((bPointsRight ? 1.f : -1.f) * 2.f * HoverAlpha, 0.f);
-	const float A = Side * 0.17f;
+	// Square block: dark, lights up on hover, flashes on press.
+	const FLinearColor Fill = FMath::Lerp(FMath::Lerp(FLinearColor(0.04f, 0.042f, 0.05f, 0.85f), FLinearColor(0.16f, 0.165f, 0.18f, 0.95f), HoverAlpha), HitmenUI::Accent(), PressAlpha * 0.8f);
+	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, Origin, FVector2D(Side), Fill);
+	HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, Origin, FVector2D(Side), FLinearColor(1.f, 1.f, 1.f, 0.22f + 0.5f * HoverAlpha), 1.f);
+	// A real arrow: a shaft and a head.
 	const float Dir = bPointsRight ? 1.f : -1.f;
-	HitmenUI::PaintLines(OutDrawElements, LayerId + 2, AllottedGeometry, { C + FVector2D(-A * 0.6f * Dir, -A), C + FVector2D(A * 0.6f * Dir, 0.f), C + FVector2D(-A * 0.6f * Dir, A) }, HitmenUI::Text(), 3.f);
+	const FVector2D C = Origin + FVector2D(Side) * 0.5f + FVector2D(Dir * 2.f * HoverAlpha, 0.f);
+	const float HalfShaft = Side * 0.24f;
+	const float Head = Side * 0.17f;
+	const float Thickness = FMath::Max(2.f, Side * 0.065f);
+	const FVector2D Tip = C + FVector2D(Dir * HalfShaft, 0.f);
+	HitmenUI::PaintLine(OutDrawElements, LayerId + 2, AllottedGeometry, C - FVector2D(Dir * HalfShaft, 0.f), Tip - FVector2D(Dir * Thickness * 0.5f, 0.f), HitmenUI::Text(), Thickness);
+	HitmenUI::PaintLines(OutDrawElements, LayerId + 2, AllottedGeometry, { Tip + FVector2D(-Dir * Head, -Head), Tip, Tip + FVector2D(-Dir * Head, Head) }, HitmenUI::Text(), Thickness);
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 3, InWidgetStyle, bParentEnabled);
 }
 

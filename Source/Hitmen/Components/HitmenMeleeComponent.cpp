@@ -14,6 +14,10 @@
 #include "Animation/AnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Controller.h"
+#include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
 
 UHitmenMeleeComponent::UHitmenMeleeComponent()
 {
@@ -141,28 +145,98 @@ bool UHitmenMeleeComponent::TryStealthKill()
 	return false;
 }
 
+void UHitmenMeleeComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UHitmenMeleeComponent, bTakedownActive);
+}
+
 void UHitmenMeleeComponent::Server_StealthKill_Implementation(AHitmenCharacterBase* Victim)
 {
-	if (!IsValidStealthKillVictim(Victim))
+	if (bTakedownActive || !IsValidStealthKillVictim(Victim))
 	{
 		return;
 	}
+	ACharacter* Attacker = Cast<ACharacter>(GetOwner());
+	if (!Attacker)
+	{
+		return;
+	}
+	// A takedown, not an instant kill: both bodies freeze, the attacker steps in behind the
+	// victim facing it, the montages play, and the victim dies on the strike.
+	bTakedownActive = true;
+	const FVector Behind = Victim->GetActorLocation() - Victim->GetActorForwardVector().GetSafeNormal2D() * StealthKillHoldDistance;
+	Attacker->SetActorLocation(FVector(Behind.X, Behind.Y, Attacker->GetActorLocation().Z), true);
+	Attacker->SetActorRotation(FRotator(0.f, Victim->GetActorRotation().Yaw, 0.f));
+	if (AController* AttackerController = Attacker->GetController())
+	{
+		AttackerController->SetControlRotation(FRotator(AttackerController->GetControlRotation().Pitch, Victim->GetActorRotation().Yaw, 0.f));
+		AttackerController->SetIgnoreMoveInput(true);
+	}
+	Attacker->GetCharacterMovement()->StopMovementImmediately();
+	if (AController* VictimController = Victim->GetController())
+	{
+		VictimController->StopMovement();
+		VictimController->SetIgnoreMoveInput(true);
+	}
+	Victim->GetCharacterMovement()->StopMovementImmediately();
+	Victim->GetCharacterMovement()->DisableMovement();
 	Multicast_PlayStealthKill(Victim);
-	Victim->GetHealth()->Kill(GetOwner(), GetOwner(), false);
+
+	const TWeakObjectPtr<AHitmenCharacterBase> WeakVictim(Victim);
+	GetWorld()->GetTimerManager().SetTimer(TakedownStrikeTimer, FTimerDelegate::CreateUObject(this, &UHitmenMeleeComponent::FinishStealthKill, WeakVictim), FMath::Max(0.01f, StealthKillStrikeTime), false);
+	GetWorld()->GetTimerManager().SetTimer(TakedownEndTimer, FTimerDelegate::CreateUObject(this, &UHitmenMeleeComponent::EndTakedown, WeakVictim), FMath::Max(StealthKillStrikeTime + 0.05f, StealthKillDuration), false);
+}
+
+void UHitmenMeleeComponent::FinishStealthKill(TWeakObjectPtr<AHitmenCharacterBase> Victim)
+{
+	if (Victim.IsValid() && !Victim->IsDead())
+	{
+		Victim->GetHealth()->Kill(GetOwner(), GetOwner(), false);
+	}
+}
+
+void UHitmenMeleeComponent::EndTakedown(TWeakObjectPtr<AHitmenCharacterBase> Victim)
+{
+	bTakedownActive = false;
+	if (const APawn* Attacker = Cast<APawn>(GetOwner()))
+	{
+		if (AController* AttackerController = Attacker->GetController())
+		{
+			AttackerController->SetIgnoreMoveInput(false);
+		}
+	}
+	// A victim that somehow survived gets its legs back.
+	if (Victim.IsValid() && !Victim->IsDead())
+	{
+		Victim->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+		if (AController* VictimController = Victim->GetController())
+		{
+			VictimController->SetIgnoreMoveInput(false);
+		}
+	}
 }
 
 void UHitmenMeleeComponent::Multicast_PlayStealthKill_Implementation(AHitmenCharacterBase* Victim)
 {
-	const AHitmenCharacterBase* Attacker = Cast<AHitmenCharacterBase>(GetOwner());
+	AHitmenCharacterBase* Attacker = Cast<AHitmenCharacterBase>(GetOwner());
 	const UHitmenAnimSet* AnimSet = Attacker ? Attacker->GetAnimSet() : nullptr;
-	if (AnimSet && AnimSet->StealthKillAttackerMontage && Attacker->GetMesh()->GetAnimInstance())
+	if (Attacker && AnimSet)
 	{
-		Attacker->GetMesh()->GetAnimInstance()->Montage_Play(AnimSet->StealthKillAttackerMontage);
+		// Body and first-person arms (PlayCosmeticMontage covers both): the owner sees the strike.
+		UAnimMontage* AttackMontage = AnimSet->StealthKillAttackerMontage ? AnimSet->StealthKillAttackerMontage.Get() : AnimSet->PunchMontage.Get();
+		const float Length = Attacker->PlayCosmeticMontage(AttackMontage, 1.f);
+		if (AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Attacker); Player && Player->IsLocallyControlled())
+		{
+			Player->ShowFirstPersonArms(FMath::Max(Length, StealthKillDuration) + 0.2f);
+			Player->AddCameraShake(0.6f, 0.25f);
+		}
 	}
 	const UHitmenAnimSet* VictimSet = Victim ? Victim->GetAnimSet() : nullptr;
-	if (VictimSet && VictimSet->StealthKillVictimMontage && Victim->GetMesh()->GetAnimInstance())
+	if (Victim && VictimSet)
 	{
-		Victim->GetMesh()->GetAnimInstance()->Montage_Play(VictimSet->StealthKillVictimMontage);
+		UAnimMontage* VictimMontage = VictimSet->StealthKillVictimMontage ? VictimSet->StealthKillVictimMontage.Get() : VictimSet->HitReactMontage.Get();
+		Victim->PlayCosmeticMontage(VictimMontage, 1.f);
 	}
 	Juice_OnStealthKill(Victim);
 }

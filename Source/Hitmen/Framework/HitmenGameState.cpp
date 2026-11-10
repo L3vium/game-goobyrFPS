@@ -13,6 +13,7 @@ void AHitmenGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHitmenGameState, Teams);
 	DOREPLIFETIME(AHitmenGameState, LobbySettings);
+	DOREPLIFETIME(AHitmenGameState, RoomCode);
 	DOREPLIFETIME(AHitmenGameState, MatchPhase);
 	DOREPLIFETIME(AHitmenGameState, PhaseCountdownEnd);
 	DOREPLIFETIME(AHitmenGameState, VIP);

@@ -80,6 +80,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Intro")
 	bool IsParachuting() const { return bParachuting; }
 
+	/** Parachuting, or just landed: guards and cameras cannot see you yet. */
+	bool IsIntroProtected() const;
+
 	virtual void Landed(const FHitResult& Hit) override;
 
 	/** Local: shows the first-person arms for a moment (punch, throw, interact). */
@@ -161,6 +164,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0", Units="cm/s"))
 	float ParachuteDrift = 60.f;
 
+	/** Horizontal speed when steering the canopy with the move keys. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0", Units="cm/s"))
+	float ParachuteSteerSpeed = 420.f;
+
+	/** How fast the canopy answers the keys (higher = snappier). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0.1"))
+	float ParachuteSteerResponse = 2.5f;
+
+	/** Seconds after landing during which guards still cannot see you. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0", Units="s"))
+	float IntroSightGraceTime = 2.f;
+
+	float ParachuteLandTime = -100.f;
+
 	UPROPERTY(ReplicatedUsing=OnRep_Parachuting)
 	bool bParachuting = false;
 
@@ -205,11 +222,15 @@ protected:
 	// ---- First-person arms (shown only with a weapon in hand or while acting) ----
 	/** Arms mesh offset from the camera when firing from the hip. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
-	FVector ArmsHipOffset = FVector(-6.f, 9.f, -158.f);
+	FVector ArmsHipOffset = FVector(8.f, 16.f, -166.f);
 
 	/** Arms mesh offset from the camera while aiming (sights near the screen centre). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
 	FVector ArmsAimOffset = FVector(-4.f, 0.f, -153.f);
+
+	/** Arms mesh offset with no weapon (punch, takedown): higher, so the fists swing through the view. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
+	FVector ArmsUnarmedOffset = FVector(14.f, 6.f, -162.f);
 
 	/** Yaw of the arms mesh relative to the camera (mannequin forward is +Y). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
@@ -290,6 +311,7 @@ protected:
 	void BeginCharm(AActor* Charmer);
 	void EndCharm();
 	void SetupProximityVoice();
+	void ReleaseProximityVoice();
 	void ApplyInvisibilityVisuals(bool bInvisible);
 	bool CanAct() const;
 

@@ -82,6 +82,27 @@ void AHitmenContainer::ApplyOpenAlpha(float Alpha)
 	const float Angle = DoorOpenAngle * Alpha;
 	LeftHinge->SetRelativeRotation(FRotator(0.f, -Angle, 0.f));
 	RightHinge->SetRelativeRotation(FRotator(0.f, Angle, 0.f));
+	// Nothing inside shows through closed doors (hidden state replicates to clients).
+	if (HasAuthority())
+	{
+		const bool bReveal = Alpha > 0.15f;
+		const float Reach = FMath::Max(Width, Height) + 50.f;
+		for (int32 Index = SpawnedContents.Num() - 1; Index >= 0; --Index)
+		{
+			AActor* Content = SpawnedContents[Index];
+			// Taken out (or destroyed): no longer the container's business.
+			if (!IsValid(Content) || Content->GetAttachParentActor() || FVector::Dist(Content->GetActorLocation(), GetActorLocation()) > Reach)
+			{
+				if (IsValid(Content))
+				{
+					Content->SetActorHiddenInGame(false);
+				}
+				SpawnedContents.RemoveAt(Index);
+				continue;
+			}
+			Content->SetActorHiddenInGame(!bReveal);
+		}
+	}
 }
 
 FTransform AHitmenContainer::GetSlotTransform(int32 SlotIndex) const
@@ -164,6 +185,8 @@ void AHitmenContainer::SpawnContents()
 	{
 		SpawnEntry(Chosen[Index], Index);
 	}
+	// Closed doors hide what was just put inside.
+	ApplyOpenAlpha(bOpen ? 1.f : 0.f);
 }
 
 void AHitmenContainer::SpawnEntry(const FHitmenContainerEntry& Entry, int32 SlotIndex)

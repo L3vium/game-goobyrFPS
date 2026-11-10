@@ -130,11 +130,11 @@ protected:
 
 	/** Seeing a hostile closer than this goes straight to combat. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="cm"))
-	float InstantDetectionDistance = 350.f;
+	float InstantDetectionDistance = 300.f;
 
 	/** Distance at which the rise rate reaches its minimum. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="cm"))
-	float SuspicionFalloffDistance = 2500.f;
+	float SuspicionFalloffDistance = 1600.f;
 
 	/** Multiplier when the hostile is doing something alarming (armed, sprinting, in a restricted act). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="1"))

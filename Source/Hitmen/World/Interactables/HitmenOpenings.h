@@ -58,6 +58,16 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnOpenChanged(bool bIsOpen);
+
+	/** Remembers the closed pose of Mesh and its hinge: the edge at -X (doors) or +Z (hatches). */
+	void CacheHinge(const FVector& EdgeDirection);
+	/** Turns Mesh by Delta around the hinge (not around its own centre). */
+	void RotateAroundHinge(const FRotator& Delta);
+
+	FRotator HingeClosedRotation;
+	FVector HingeClosedLocation = FVector::ZeroVector;
+	/** Hinge -> mesh origin, in the mesh's closed local frame. */
+	FVector HingeToCenter = FVector::ZeroVector;
 };
 
 UCLASS(Blueprintable)

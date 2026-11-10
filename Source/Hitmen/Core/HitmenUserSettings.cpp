@@ -20,7 +20,7 @@ void UHitmenUserSettings::SetToDefaults()
 	bToggleCrouch = false;
 	bToggleSprint = false;
 	bClimbRelativeToCamera = false;
-	MouseSensitivity = 0.45f;
+	MouseSensitivity = 0.25f;
 	AimSensitivityMultiplier = 1.f;
 	HitmenSettingsVersion = CurrentSettingsVersion;
 	bInvertY = false;
@@ -36,8 +36,8 @@ void UHitmenUserSettings::LoadSettings(bool bForceReload)
 	Super::LoadSettings(bForceReload);
 	if (HitmenSettingsVersion < CurrentSettingsVersion)
 	{
-		// Version 2: lower default sensitivity; aiming compensates the zoom by itself.
-		MouseSensitivity = 0.45f;
+		// Version 3: lower default sensitivity again (playtest); aiming compensates the zoom by itself.
+		MouseSensitivity = 0.25f;
 		AimSensitivityMultiplier = 1.f;
 		HitmenSettingsVersion = CurrentSettingsVersion;
 		SaveSettings();

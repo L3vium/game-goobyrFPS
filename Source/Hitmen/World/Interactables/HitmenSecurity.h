@@ -72,6 +72,17 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UDecalComponent> FloorDecal;
 
+	/** What the camera watches, shown as real light: walls cut it, it spreads on the floor. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class USpotLightComponent> ViewLight;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice", meta=(ClampMin="0", Units="cd"))
+	float ViewLightIntensity = 1500.f;
+
+	/** The old translucent cone (and its hard floor disc); off by default, the light shows the view. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
+	bool bShowViewCone = false;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<USceneCaptureComponent2D> Capture;
 

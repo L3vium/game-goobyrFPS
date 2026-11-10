@@ -123,9 +123,25 @@ void UHitmenInteractionComponent::UpdateFocus()
 	if (Candidate && Candidate->GetClass()->ImplementsInterface(UHitmenInteractable::StaticClass())
 		&& IHitmenInteractable::Execute_CanInteract(Candidate, Pawn))
 	{
+		FocusLostTime = -1.f;
 		SetFocus(Candidate, IHitmenInteractable::Execute_GetInteractionText(Candidate, Pawn));
 		return;
 	}
+	// The sweep grazing a frame / the wall around it for a frame must not make the prompt blink.
+	if (AActor* Current = FocusedActor.Get(); Current && Current->GetClass()->ImplementsInterface(UHitmenInteractable::StaticClass())
+		&& IHitmenInteractable::Execute_CanInteract(Current, Pawn) && FVector::Dist(Current->GetActorLocation(), Origin) < TraceDistance + 150.f)
+	{
+		const float Now = GetWorld()->GetTimeSeconds();
+		if (FocusLostTime < 0.f)
+		{
+			FocusLostTime = Now;
+		}
+		if (Now - FocusLostTime < FocusGraceTime)
+		{
+			return;
+		}
+	}
+	FocusLostTime = -1.f;
 
 	// Carrying a body with nothing focused: F drops it.
 	if (const UHitmenBodyCarryComponent* Carry = Pawn->FindComponentByClass<UHitmenBodyCarryComponent>(); Carry && Carry->IsCarrying())

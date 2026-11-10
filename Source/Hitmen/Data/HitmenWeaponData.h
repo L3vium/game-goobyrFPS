@@ -216,6 +216,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<UNiagaraSystem> ImpactFX;
 
+	/** Puff thrown back toward the shooter where a bullet hits a surface (with ImpactFX). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	TSoftObjectPtr<UNiagaraSystem> SurfaceImpactFX;
+
+	/** Played instead of the surface effects when a bullet hits a character. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	TSoftObjectPtr<UNiagaraSystem> FleshImpactFX;
+
 	/** Smoke behind the weapon when it fires (rocket launcher back-blast). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<UNiagaraSystem> BackBlastFX;
@@ -237,6 +245,10 @@ public:
 	/** Played on the owning character for each shot (predicted locally, multicast to others). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<UAnimMontage> FireMontage;
+
+	/** Aim pose an NPC holds (looped) while it fights with this weapon and stands still. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	TSoftObjectPtr<UAnimMontage> AimMontage;
 
 	/** Played on the owning character when the weapon comes into hand (every machine). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")

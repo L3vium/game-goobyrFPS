@@ -260,6 +260,8 @@ void AHitmenWeaponBase::ApplyWeaponState()
 		{
 			DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		}
+		// First-person arms are scaled: a dropped weapon is always back to its real size.
+		SetActorScale3D(FVector::OneVector);
 		Root->SetRelativeLocationAndRotation(-DropCenter, FRotator::ZeroRotator);
 		SetActorHiddenInGame(false);
 		AutoPickupSphere->SetCollisionEnabled(HasAuthority() ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
@@ -351,6 +353,14 @@ void AHitmenWeaponBase::Drop(int32 InAmmo, const FVector& Location, const FRotat
 	ApplyWeaponState();
 
 	SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	if (!Thrower)
+	{
+		// Swapped or dropped (not thrown): it becomes a floating pickup at once, no tumbling.
+		StartHovering();
+		GetWorldTimerManager().ClearTimer(PickupActivationTimer);
+		GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, FMath::Max(0.05f, ThrownPickupDelay), false);
+		return;
+	}
 	// A thrown weapon hits pawns until its first impact; then pawns walk through it.
 	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, Thrower ? ECR_Block : ECR_Ignore);
 	DropCollision->SetPhysicsLinearVelocity(Velocity);
@@ -1016,9 +1026,33 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	}
 	UNiagaraSystem* Tracer = WeaponData->TracerFX.LoadSynchronous();
 	UNiagaraSystem* ImpactFX = WeaponData->ImpactFX.LoadSynchronous();
+	UNiagaraSystem* SurfaceFX = WeaponData->SurfaceImpactFX.LoadSynchronous();
+	UNiagaraSystem* FleshFX = WeaponData->FleshImpactFX.LoadSynchronous();
 	USoundBase* ImpactSound = WeaponData->ImpactSound.LoadSynchronous();
+	FCollisionQueryParams FleshParams(SCENE_QUERY_STAT(HitmenImpactFlesh), false, this);
+	FleshParams.AddIgnoredActor(OwnerPawn);
 	for (const FVector& Impact : Impacts)
 	{
+		// Cosmetic: a character right at the impact point bleeds, anything else throws dust and sparks.
+		const bool bFlesh = FleshFX && GetWorld()->OverlapAnyTestByChannel(Impact, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeSphere(12.f), FleshParams);
+		const FRotator BackToShooter = (Origin - Impact).GetSafeNormal().Rotation();
+		if (bFlesh)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, FleshFX, Impact, BackToShooter);
+			if (Tracer)
+			{
+				if (UNiagaraComponent* TracerComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Tracer, Origin, (Impact - Origin).Rotation()))
+				{
+					TracerComp->SetVectorParameter(TEXT("TracerEnd"), Impact);
+				}
+			}
+			Juice_OnImpact(Impact);
+			continue;
+		}
+		if (SurfaceFX)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SurfaceFX, Impact, BackToShooter);
+		}
 		if (Tracer)
 		{
 			if (UNiagaraComponent* TracerComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Tracer, Origin, (Impact - Origin).Rotation()))

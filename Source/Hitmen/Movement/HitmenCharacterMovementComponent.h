@@ -130,9 +130,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
 	float VaultMaxDepth = 90.f;
 
-	/** Ignore steps lower than this (normal step-up handles them). */
+	/** Ignore steps lower than this (normal step-up handles them: MaxStepHeight is 55 cm). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
-	float MantleMinHeight = 50.f;
+	float MantleMinHeight = 56.f;
+
+	/** A wall top at least this deep is a block you climb onto (and walk along); thinner walls are climbed over. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
+	float MinStandDepth = 40.f;
+
+	/** Space counts this long after the press (grab a ledge or a ladder slightly late). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="s"))
+	float JumpInputBuffer = 0.25f;
 
 	/** How far in front of the capsule a wall is searched. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
@@ -340,6 +348,9 @@ protected:
 	float ClimbAlpha = 0.f;
 	float ClimbAxisInput = 0.f;
 	float LastClimbExitTime = -100.f;
+	/** The ladder just left: only it waits for the reattach cooldown. */
+	TWeakObjectPtr<AActor> LastClimbExitActor;
+	float LastJumpPressTime = -100.f;
 	bool bPrevPressedJump = false;
 
 	// Zipline ride state (auto ride toward ZiplineDirection)

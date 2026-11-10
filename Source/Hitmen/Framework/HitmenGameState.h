@@ -73,6 +73,12 @@ public:
 
 	void SetLobbySettings(const FHitmenLobbySettings& InSettings);
 
+	/** Join code of the room (shown on Create Room so the host can share it). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Lobby")
+	const FString& GetRoomCode() const { return RoomCode; }
+
+	void SetRoomCode(const FString& InCode) { RoomCode = InCode; NotifyLobbyChanged(); }
+
 	// ---- Match ----
 	UFUNCTION(BlueprintPure, Category="Hitmen|Match")
 	EHitmenMatchPhase GetMatchPhase() const { return MatchPhase; }
@@ -126,6 +132,9 @@ protected:
 
 	UPROPERTY(ReplicatedUsing=OnRep_Lobby)
 	FHitmenLobbySettings LobbySettings;
+
+	UPROPERTY(ReplicatedUsing=OnRep_Lobby)
+	FString RoomCode;
 
 	UPROPERTY(ReplicatedUsing=OnRep_MatchPhase)
 	EHitmenMatchPhase MatchPhase = EHitmenMatchPhase::Lobby;

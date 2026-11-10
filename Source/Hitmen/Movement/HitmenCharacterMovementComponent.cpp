@@ -22,6 +22,8 @@ UHitmenCharacterMovementComponent::UHitmenCharacterMovementComponent()
 	AirControl = 0.35f;
 	BrakingDecelerationFalling = 1200.f;
 	GravityScale = 1.4f;
+	// Steps and ledges up to 55 cm are walked up without pressing anything.
+	MaxStepHeight = 55.f;
 	SetCrouchedHalfHeight(55.f);
 }
 
@@ -149,32 +151,50 @@ void UHitmenCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float
 	const bool bJumpHeld = CharacterOwner->bPressedJump;
 	const bool bJumpPressedNow = bJumpHeld && !bPrevPressedJump;
 	const float Now = GetTimeSeconds();
+	if (bJumpPressedNow)
+	{
+		LastJumpPressTime = Now;
+	}
+	// Space keeps counting for a short moment (a jump started just before the ledge / ladder).
+	const bool bJumpBuffered = bJumpHeld || Now - LastJumpPressTime <= JumpInputBuffer;
 
 	if (IsClimbing())
 	{
 		if (bJumpPressedNow)
 		{
 			StopClimbing(true);
+			LastJumpPressTime = -100.f;
 		}
 	}
 	else if (!IsMantling())
 	{
-		// Ledge grab / vault: space in front of a wall, on the ground or in the air (held).
+		// Ledge grab / vault: space in front of a wall, on the ground or in the air.
 		const bool bCanTryMantle = IsMovingOnGround() || (bAllowAirMantle && IsFalling());
-		if (bJumpHeld && bCanTryMantle && Now - LastMantleTime > MantleCooldown)
+		if (bJumpBuffered && bCanTryMantle && Now - LastMantleTime > MantleCooldown)
 		{
-			TryStartMantle();
+			if (TryStartMantle())
+			{
+				LastJumpPressTime = -100.f;
+			}
 		}
 
-		// Ladders / ziplines are automatic: walk or jump into them.
-		if (!IsMantling() && (IsFalling() || (Super::IsMovingOnGround() && !IsSliding())) && Now - LastClimbExitTime > ClimbReattachCooldown)
+		// Ladders / ziplines are automatic: walk or jump into them. Only the ladder just left waits.
+		if (!IsMantling() && (IsFalling() || (Super::IsMovingOnGround() && !IsSliding())))
 		{
 			if (AActor* ClimbableActor = FindClimbableActor())
 			{
+				const bool bCoolingDown = ClimbableActor == LastClimbExitActor.Get() && Now - LastClimbExitTime <= ClimbReattachCooldown;
+				const IHitmenClimbable* Climbable = Cast<IHitmenClimbable>(ClimbableActor);
 				bool bFromTop = false;
-				if (ShouldGrabClimbable(*Cast<IHitmenClimbable>(ClimbableActor), bFromTop))
+				if (!bCoolingDown && Climbable && ShouldGrabClimbable(*Climbable, bFromTop))
 				{
 					StartClimb(ClimbableActor, bFromTop);
+				}
+				else if (!bCoolingDown && Climbable && IsFalling() && bJumpBuffered && Climbable->GetClimbType() != EHitmenClimbType::Zipline)
+				{
+					// Jumped at it: grab at once, whatever the exact facing.
+					StartClimb(ClimbableActor, false);
+					LastJumpPressTime = -100.f;
 				}
 			}
 		}
@@ -400,7 +420,8 @@ bool UHitmenCharacterMovementComponent::TryStartMantle()
 
 EHitmenTraversalAction UHitmenCharacterMovementComponent::QueryTraversalAction() const
 {
-	if (!CharacterOwner || !UpdatedComponent || IsMantling() || IsClimbing() || !(IsMovingOnGround() || IsFalling()))
+	// The hint only shows on the ground: a jump must not reveal climbs out of reach.
+	if (!CharacterOwner || !UpdatedComponent || IsMantling() || IsClimbing() || !IsMovingOnGround())
 	{
 		return EHitmenTraversalAction::None;
 	}
@@ -452,16 +473,17 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 	for (const float Depth : MantleProbeDepths)
 	{
 		const FVector ProbeXY = WallHit.ImpactPoint + Into * Depth;
+		const float EndZ = Feet.Z + MantleMinHeight * 0.5f;
 		float StartZ = Feet.Z + MantleMaxHeight + 25.f;
-		FHitResult Ceiling;
-		const FVector Below(ProbeXY.X, ProbeXY.Y, WallHit.ImpactPoint.Z);
-		if (World->LineTraceSingleByChannel(Ceiling, Below + FVector::UpVector * 2.f, FVector(ProbeXY.X, ProbeXY.Y, StartZ), ECC_Visibility, Params)
-			&& !Ceiling.bStartPenetrating)
+		// Start in open air: a probe column through a wall with an opening (window) starts inside the
+		// lintel; step down until out of solid geometry, then sweep down onto the sill.
+		const FCollisionShape ProbeShape = FCollisionShape::MakeSphere(5.f);
+		while (StartZ > EndZ && World->OverlapBlockingTestByChannel(FVector(ProbeXY.X, ProbeXY.Y, StartZ), FQuat::Identity, ECC_Visibility, ProbeShape, Params))
 		{
-			StartZ = Ceiling.ImpactPoint.Z - 6.f;
+			StartZ -= 12.f;
 		}
 		const FVector Start(ProbeXY.X, ProbeXY.Y, StartZ);
-		const FVector End(ProbeXY.X, ProbeXY.Y, Feet.Z + MantleMinHeight * 0.5f);
+		const FVector End(ProbeXY.X, ProbeXY.Y, EndZ);
 		if (Start.Z > End.Z
 			&& World->SweepSingleByChannel(TopHit, Start, End, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(4.f), Params)
 			&& !TopHit.bStartPenetrating && IsWalkable(TopHit))
@@ -488,7 +510,10 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 	{
 		const FVector FarProbe = FVector(WallHit.ImpactPoint.X, WallHit.ImpactPoint.Y, TopHit.ImpactPoint.Z + 15.f) + Into * (VaultMaxDepth + Radius + 10.f);
 		FHitResult Blocked;
-		if (World->LineTraceSingleByChannel(Blocked, TopHit.ImpactPoint + FVector::UpVector * 15.f, FarProbe, ECC_Visibility, Params))
+		// Pawn channel too: closed shutters block bodies without blocking sight.
+		const FCollisionShape PassShape = FCollisionShape::MakeSphere(10.f);
+		if (World->SweepSingleByChannel(Blocked, TopHit.ImpactPoint + FVector::UpVector * 15.f, FarProbe, FQuat::Identity, ECC_Visibility, PassShape, Params)
+			|| World->SweepTestByChannel(TopHit.ImpactPoint + FVector::UpVector * 15.f, FarProbe, FQuat::Identity, Channel, PassShape, Params))
 		{
 			return false;
 		}
@@ -502,12 +527,28 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 		return false;
 	};
 
-	// Room to stand on top (a sill, a crate, a roof edge)?
-	const FVector StandDest = TopHit.ImpactPoint + Into * (Radius + 8.f) + FVector::UpVector * (HalfHeight + 3.f);
+	// How deep is the top? A block (deep enough) is climbed onto; a thin wall is climbed over.
+	float TopDepth = 0.f;
+	for (float Depth = 6.f; Depth <= 2.f * (Radius + 8.f) + 6.f; Depth += 6.f)
+	{
+		const FVector Probe = FVector(WallHit.ImpactPoint.X, WallHit.ImpactPoint.Y, TopHit.ImpactPoint.Z) + Into * Depth;
+		FHitResult TopProbe;
+		if (!World->LineTraceSingleByChannel(TopProbe, Probe + FVector::UpVector * 20.f, Probe - FVector::UpVector * 20.f, ECC_Visibility, Params)
+			|| FMath::Abs(TopProbe.ImpactPoint.Z - TopHit.ImpactPoint.Z) > 15.f)
+		{
+			break;
+		}
+		TopDepth = Depth;
+	}
+	const bool bDeepTop = TopDepth >= 2.f * (Radius + 8.f);
+	const float StandDepth = bDeepTop ? Radius + 8.f : TopDepth * 0.5f;
+
+	// Room to stand on top (a sill, a crate, a roof edge, the top of a block wall)?
+	const FVector StandDest = FVector(WallHit.ImpactPoint.X, WallHit.ImpactPoint.Y, TopHit.ImpactPoint.Z) + Into * StandDepth + FVector::UpVector * (HalfHeight + 3.f);
 	FHitResult StandFloor;
 	const bool bTopUnderStand = World->LineTraceSingleByChannel(StandFloor, StandDest, StandDest - FVector::UpVector * (HalfHeight + 20.f), ECC_Visibility, Params)
 		&& FMath::Abs(StandFloor.ImpactPoint.Z - TopHit.ImpactPoint.Z) < 30.f;
-	const bool bCanStand = bTopUnderStand && !World->OverlapBlockingTestByChannel(StandDest, FQuat::Identity, Channel, StandShape, Params);
+	const bool bCanStand = TopDepth >= MinStandDepth && bTopUnderStand && !World->OverlapBlockingTestByChannel(StandDest, FQuat::Identity, Channel, StandShape, Params);
 
 	FVector FarDest;
 	const bool bFarSide = FindFarSide(FarDest);
@@ -586,6 +627,7 @@ void UHitmenCharacterMovementComponent::StartLadderExit(const IHitmenClimbable& 
 	MantleTotal = LadderExitDuration;
 	LastMantleTime = GetTimeSeconds();
 	LastClimbExitTime = GetTimeSeconds();
+	LastClimbExitActor = ClimbTarget;
 	Velocity = FVector::ZeroVector;
 	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Mantle));
 	OnTraversalMontage.Broadcast(EHitmenAnimMontage::ClimbExitTop);
@@ -751,6 +793,7 @@ void UHitmenCharacterMovementComponent::StopClimbing(bool bJumpOff)
 	}
 	const IHitmenClimbable* Climbable = Cast<IHitmenClimbable>(ClimbTarget.Get());
 	LastClimbExitTime = GetTimeSeconds();
+	LastClimbExitActor = ClimbTarget;
 	if (bJumpOff && Climbable)
 	{
 		if (Climbable->GetClimbType() == EHitmenClimbType::Ladder)

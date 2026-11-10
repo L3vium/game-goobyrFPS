@@ -24,6 +24,9 @@ class UHitmenArrowButton;
 class UHitmenToggle;
 class UHitmenCardTile;
 class UHitmenChoiceCarousel;
+class UHitmenChoiceStrip;
+class UHitmenIconButton;
+class UHitmenMapDefinition;
 
 UCLASS()
 class HITMEN_API UHitmenPlayerDragOperation : public UDragDropOperation
@@ -36,8 +39,9 @@ public:
 };
 
 /**
- * One player: a full-width row (colour bar, name, YOU / HOST tags, Watcher check box or Ready
- * state). The host drags the whole row onto a team.
+ * One player: a solid block (colour swatch, name, YOU / HOST tags, Ready state). Hovering the
+ * name of a player without team shows the watcher eye (open / struck) on the right; a click on it
+ * toggles Watcher. The host drags the whole block onto a team.
  */
 UCLASS()
 class HITMEN_API UHitmenPlayerEntryWidget : public UHitmenUserWidget
@@ -75,6 +79,8 @@ protected:
 	bool IsLocalPlayer() const;
 	bool CanToggleWatcher() const;
 	FBox2D GetWatcherBox(const FGeometry& Geometry) const;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	bool bEyeHovered = false;
 
 	FLinearColor Accent = FLinearColor::White;
 	bool bDragVisual = false;
@@ -105,8 +111,11 @@ protected:
 
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> TitleText;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UHitmenMenuButton> RoleButton;
-	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UHitmenMenuButton> RemoveButton;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UHitmenIconButton> RemoveButton;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UVerticalBox> MemberList;
+	/** Fills are Borders (drawn under the rows); NativePaint would draw over them. */
+	UPROPERTY(Transient) TObjectPtr<class UBorder> PanelFill;
+	UPROPERTY(Transient) TObjectPtr<class UBorder> HeaderFill;
 
 	UFUNCTION() void HandleRoleClicked();
 	UFUNCTION() void HandleRemoveClicked();
@@ -116,7 +125,8 @@ protected:
 	bool bDropHover = false;
 };
 
-/** Map preview of the room: the baked schematic (or thumbnail), name and description. */
+/** Map preview of the room: a full-bleed screenshot, the minimap small in the top-left corner,
+ * the name at the bottom. */
 UCLASS()
 class HITMEN_API UHitmenMapTileWidget : public UHitmenUserWidget
 {
@@ -128,8 +138,11 @@ public:
 protected:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 
-	FSlateBrush MapBrush;
-	bool bHasImage = false;
+	FSlateBrush ShotBrush;
+	FSlateBrush MinimapBrush;
+	bool bHasShot = false;
+	bool bHasMinimap = false;
+	TWeakObjectPtr<const UHitmenMapDefinition> ShownMap;
 	FText MapName;
 	FText Description;
 	int32 MapPosition = 0;
@@ -158,14 +171,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Lobby") void RandomizeCosmetics();
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Lobby") void ToggleReady();
 
+	/** True while the local player types in a name box: lobby refreshes wait so the draft is kept. */
+	bool IsEditingText() const;
+
 protected:
 	virtual void BuildDefaultLayout() override;
 	virtual void BindEvents() override;
 	virtual void UnbindEvents() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
-	/** True while the local player types in a name box: lobby refreshes wait so the draft is kept. */
-	bool IsEditingText() const;
 	bool bLobbyRefreshPending = false;
 
 	UPROPERTY(Transient) TObjectPtr<UWidgetSwitcher> ScreenSwitcher;
@@ -183,24 +197,26 @@ protected:
 	UPROPERTY(Transient) TObjectPtr<UHitmenMenuButton> StartButton;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> HostHintText;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> PlayerCountText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> RoomCodeText;
 
 	// Your Agent
 	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> AgentCanvas;
+	UPROPERTY(Transient) TObjectPtr<UWidget> AgentNameBox;
 	UPROPERTY(Transient) TObjectPtr<UEditableTextBox> AgentNameEdit;
+	UPROPERTY(Transient) TObjectPtr<UHitmenIconButton> RandomizeButton;
 	UPROPERTY(Transient) TArray<TObjectPtr<UHitmenArrowButton>> LookArrows;
-	UPROPERTY(Transient) TArray<TObjectPtr<UTextBlock>> LookLabels;
-	UPROPERTY(Transient) TArray<TObjectPtr<UHitmenCardTile>> LoadoutCards;
-	UPROPERTY(Transient) TObjectPtr<UHitmenChoiceCarousel> Carousel;
+	UPROPERTY(Transient) TArray<TObjectPtr<UHitmenChoiceStrip>> LoadoutStrips;
 	UPROPERTY(Transient) TObjectPtr<UHitmenMenuButton> ReadyButton;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> ReadyStatusText;
+	UPROPERTY(Transient) TObjectPtr<UWidget> CountdownBlock;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> CountdownText;
 
 	UFUNCTION() void HandleLobbyChanged();
 	UFUNCTION() void HandlePhaseChanged(EHitmenMatchPhase Phase);
 	UFUNCTION() void HandleAgentNameCommitted(const FText& Text, ETextCommit::Type CommitType);
-	UFUNCTION() void HandleCardHovered(bool bHovered);
-	UFUNCTION() void HandleCardClicked();
-	UFUNCTION() void HandleCardWheel(int32 Direction);
-	UFUNCTION() void HandleCarouselChosen(int32 Index);
+	UFUNCTION() void HandleWeaponChosen(int32 Index);
+	UFUNCTION() void HandleMoveChosen(int32 Index);
+	UFUNCTION() void HandleManipulationChosen(int32 Index);
 	UFUNCTION() void HandleLookArrow0();
 	UFUNCTION() void HandleLookArrow1();
 	UFUNCTION() void HandleLookArrow2();
@@ -216,10 +232,12 @@ protected:
 	void RebuildTeams();
 	void SendSettings(const FHitmenLobbySettings& Settings);
 	void LookArrow(int32 ArrowIndex);
-	void OpenCarousel(int32 CardIndex);
 	void ApplyLoadoutChoice(int32 CardIndex, int32 ChoiceIndex);
+	void RefreshLoadoutStrips();
 	void UpdateAgentAnchors();
-	TArray<FText> GetLoadoutChoices(int32 CardIndex, int32& OutSelected) const;
+	/** Shows the local look on the stage at once; the server gets it once clicks pause. */
+	void PreviewLocalCosmetics();
+	TArray<struct FHitmenChoiceItem> GetLoadoutChoices(int32 CardIndex, int32& OutSelected) const;
 	AHitmenAgentPreview* FindAgentPreview() const;
 	TArray<int32> GetCarouselMaps() const;
 	bool IsHost() const;
@@ -233,7 +251,10 @@ protected:
 	FHitmenCosmeticLoadout LocalCosmetics;
 	FHitmenLoadout LocalLoadout;
 	bool bLocalInitialized = false;
-	int32 CarouselCard = INDEX_NONE;
-	float CarouselCloseTimer = 0.f;
-	bool bPointerOnCards = false;
+	/** Seconds left before the edited look is sent (coalesces fast arrow clicks). */
+	float CosmeticSendDelay = -1.f;
+	/** Carousel maps, resolved once. */
+	mutable TArray<int32> CachedCarouselMaps;
+	mutable bool bCarouselMapsCached = false;
+	int32 ShownMapIndex = INDEX_NONE;
 };

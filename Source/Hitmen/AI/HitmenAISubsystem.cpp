@@ -6,6 +6,7 @@
 #include "Abilities/HitmenAbilityActors.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Characters/HitmenNPC.h"
+#include "Characters/HitmenPlayerCharacter.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Framework/HitmenGameModeBase.h"
 #include "Framework/HitmenPlayerController.h"
@@ -359,6 +360,11 @@ bool UHitmenAISubsystem::IsLocationDark(const FVector& Location) const
 bool UHitmenAISubsystem::CanObserverSee(const APawn* Observer, const AActor* Target, float MaxRange, float HalfAngleDegrees, bool bTraceOcclusion) const
 {
 	if (!Observer || !Target)
+	{
+		return false;
+	}
+	// Players dropping in (and a moment after landing) are never spotted.
+	if (const AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Target); Player && Player->IsIntroProtected())
 	{
 		return false;
 	}

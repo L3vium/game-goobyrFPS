@@ -20,6 +20,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Components/Border.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/WidgetSwitcher.h"
@@ -32,7 +33,6 @@
 #include "Components/TextBlock.h"
 #include "Components/EditableTextBox.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Framework/Application/SlateApplication.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -92,15 +92,35 @@ namespace
 		}
 	}
 
-	UTextBlock* MakeSectionLabel(UWidgetTree* Tree, const FText& Text)
+	UTextBlock* MakeSectionLabel(UWidgetTree* Tree, const FText& Text, int32 Size = 15)
 	{
-		UTextBlock* Label = HitmenUI::MakeText(Tree, Text, 15, TEXT("Medium"), HitmenUI::TextDim());
-		Label->SetFont(HitmenUI::SpacedFont(15, TEXT("Medium"), 260));
+		UTextBlock* Label = HitmenUI::MakeText(Tree, Text, Size, TEXT("Medium"), HitmenUI::TextDim());
+		Label->SetFont(HitmenUI::SpacedFont(Size, TEXT("Medium"), 260));
 		return Label;
+	}
+
+	USizeBox* Sized(UWidgetTree* Tree, UWidget* Content, float Width, float Height)
+	{
+		USizeBox* Box = Tree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+		if (Width > 0.f) { Box->SetWidthOverride(Width); }
+		if (Height > 0.f) { Box->SetHeightOverride(Height); }
+		Box->SetContent(Content);
+		return Box;
 	}
 
 	const EHitmenCosmeticSlot LookSlots[3] = { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Legs };
 	const TCHAR* LookBones[3] = { TEXT("head"), TEXT("spine_03"), TEXT("calf_l") };
+
+	/** Half the distance between the two look arrows of a slot (they hug the body). */
+	constexpr float LookArrowSpread = 118.f;
+	/** Seconds without a click before an edited look is sent to the server. */
+	constexpr float CosmeticSendPause = 0.15f;
+	constexpr float LoadoutTileSize = 84.f;
+	constexpr int32 LoadoutColumns = 7;
+
+	const FLinearColor PanelOuter(0.018f, 0.02f, 0.026f, 0.9f);
+	const FLinearColor PanelTeam(0.07f, 0.074f, 0.086f, 0.97f);
+	const FLinearColor PanelPlayer(0.135f, 0.14f, 0.155f, 0.98f);
 }
 
 // =============================================================================================
@@ -110,8 +130,8 @@ namespace
 void UHitmenPlayerEntryWidget::BuildDefaultLayout()
 {
 	USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	Size->SetHeightOverride(52.f);
-	Size->SetMinDesiredWidth(420.f);
+	Size->SetHeightOverride(54.f);
+	Size->SetMinDesiredWidth(300.f);
 	WidgetTree->RootWidget = Size;
 	SetVisibility(ESlateVisibility::Visible);
 }
@@ -135,13 +155,13 @@ bool UHitmenPlayerEntryWidget::CanToggleWatcher() const
 FBox2D UHitmenPlayerEntryWidget::GetWatcherBox(const FGeometry& Geometry) const
 {
 	const FVector2D Size = Geometry.GetLocalSize();
-	return FBox2D(FVector2D(Size.X - 150.f, 0.f), Size);
+	return FBox2D(FVector2D(Size.X - 54.f, 0.f), Size);
 }
 
 void UHitmenPlayerEntryWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	HoverAlpha = FMath::FInterpTo(HoverAlpha, bHovered ? 1.f : 0.f, InDeltaTime, 14.f);
+	HoverAlpha = FMath::FInterpTo(HoverAlpha, bHovered ? 1.f : 0.f, InDeltaTime, 18.f);
 }
 
 void UHitmenPlayerEntryWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -154,6 +174,13 @@ void UHitmenPlayerEntryWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEv
 {
 	Super::NativeOnMouseLeave(InMouseEvent);
 	bHovered = false;
+	bEyeHovered = false;
+}
+
+FReply UHitmenPlayerEntryWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	bEyeHovered = CanToggleWatcher() && GetWatcherBox(InGeometry).IsInside(InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition()));
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
 }
 
 FReply UHitmenPlayerEntryWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -172,7 +199,7 @@ FReply UHitmenPlayerEntryWidget::NativeOnMouseButtonDown(const FGeometry& InGeom
 		}
 		return FReply::Handled();
 	}
-	// The host drags the whole row onto a team.
+	// The host drags the whole block onto a team.
 	if (const AHitmenPlayerController* PC = GetHitmenPC(); PC && PC->IsHost() && !bShowReady)
 	{
 		return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, EKeys::LeftMouseButton).NativeReply;
@@ -198,24 +225,23 @@ void UHitmenPlayerEntryWidget::NativeOnDragDetected(const FGeometry& InGeometry,
 
 int32 UHitmenPlayerEntryWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-	if (!PlayerState)
+	if (!IsValid(PlayerState))
 	{
 		return LayerId;
 	}
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
-	const FLinearColor Back = bDragVisual ? FLinearColor(0.06f, 0.06f, 0.07f, 0.95f) : FLinearColor(0.f, 0.f, 0.f, 0.45f + 0.15f * HoverAlpha);
+	// A solid block per player, lighter on hover.
+	const FLinearColor Back = bDragVisual ? FLinearColor(0.2f, 0.205f, 0.22f, 0.98f) : FMath::Lerp(PanelPlayer, FLinearColor(0.2f, 0.205f, 0.225f, 1.f), HoverAlpha);
 	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, Back);
-	HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, FVector2D(5.f, Size.Y), Accent);
-	if (bDragVisual)
-	{
-		HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, Size, HitmenUI::Accent(), 2.f);
-	}
+	HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, FVector2D(6.f, Size.Y), Accent);
+	HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, Size, bDragVisual ? HitmenUI::Accent() : FLinearColor(1.f, 1.f, 1.f, 0.08f + 0.2f * HoverAlpha), bDragVisual ? 2.f : 1.f);
+	const bool bWatcher = PlayerState->IsWatcher();
 	const FSlateFontInfo NameFont = HitmenUI::SpacedFont(22, TEXT("SemiBold"), 30);
-	// Long names are shortened so the tags and the right-hand box never overlap them.
+	// Long names are shortened so the tags and the right-hand state never overlap them.
 	FString Name = PlayerState->GetPlayerName();
 	const AHitmenGameState* NameGS = GetHitmenGameState();
 	const bool bHostRow = NameGS && NameGS->PlayerArray.Num() > 0 && NameGS->PlayerArray[0] == PlayerState;
-	const float NameRoom = Size.X - 20.f - 150.f - (IsLocalPlayer() ? 52.f : 0.f) - (bHostRow ? 64.f : 0.f);
+	const float NameRoom = Size.X - 24.f - 120.f - (IsLocalPlayer() ? 52.f : 0.f) - (bHostRow ? 64.f : 0.f);
 	if (HitmenUI::MeasureText(Name, NameFont).X > NameRoom)
 	{
 		while (Name.Len() > 3 && HitmenUI::MeasureText(Name + TEXT("..."), NameFont).X > NameRoom)
@@ -224,9 +250,10 @@ int32 UHitmenPlayerEntryWidget::NativePaint(const FPaintArgs& Args, const FGeome
 		}
 		Name += TEXT("...");
 	}
-	const FVector2D NameSize = HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Name, FVector2D(20.f, (Size.Y - 28.f) * 0.5f), NameFont, HitmenUI::Text());
+	const FVector2D NameSize = HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Name, FVector2D(22.f, (Size.Y - 28.f) * 0.5f), NameFont,
+		bWatcher && !bShowReady ? HitmenUI::TextDim() : HitmenUI::Text());
 	// Tags: YOU / HOST.
-	float TagX = 20.f + NameSize.X + 12.f;
+	float TagX = 22.f + NameSize.X + 12.f;
 	const FSlateFontInfo TagFont = HitmenUI::SpacedFont(12, TEXT("Medium"), 160);
 	auto Tag = [&](const FString& Text, const FLinearColor& Color)
 	{
@@ -239,33 +266,38 @@ int32 UHitmenPlayerEntryWidget::NativePaint(const FPaintArgs& Args, const FGeome
 	{
 		Tag(TEXT("YOU"), HitmenUI::Text());
 	}
-	if (const AHitmenGameState* GS = GetHitmenGameState(); GS && GS->PlayerArray.Num() > 0 && GS->PlayerArray[0] == PlayerState)
+	if (bHostRow)
 	{
 		Tag(TEXT("HOST"), HitmenUI::TextDim());
 	}
-	// Right side: watcher box (no team) or ready state (agent screen).
-	const FSlateFontInfo SideFont = HitmenUI::SpacedFont(15, TEXT("SemiBold"), 140);
 	if (bShowReady)
 	{
 		const bool bReady = PlayerState->IsReady();
-		const FString Text = PlayerState->IsWatcher() ? FString(TEXT("WATCHER")) : (bReady ? FString(TEXT("READY")) : FString(TEXT("CHOOSING")));
-		const FVector2D TextSize = HitmenUI::MeasureText(Text, SideFont);
-		HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Text, FVector2D(Size.X - TextSize.X - 18.f, (Size.Y - TextSize.Y) * 0.5f), SideFont,
-			bReady ? FLinearColor(0.35f, 0.9f, 0.45f, 1.f) : HitmenUI::TextDim());
-	}
-	else if (PlayerState->GetLobbyTeamId() == INDEX_NONE)
-	{
-		const bool bEditable = CanToggleWatcher();
-		const float Box = 18.f;
-		const FVector2D BoxPos(Size.X - 140.f, (Size.Y - Box) * 0.5f);
-		HitmenUI::PaintFrame(OutDrawElements, LayerId + 2, AllottedGeometry, BoxPos, FVector2D(Box), FLinearColor(1.f, 1.f, 1.f, bEditable ? 0.7f : 0.3f), 1.5f);
-		if (PlayerState->IsWatcher())
+		if (bWatcher)
 		{
-			HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, BoxPos + FVector2D(4.f), FVector2D(Box - 8.f), HitmenUI::Accent());
+			UHitmenIconButton::PaintGlyph(OutDrawElements, LayerId + 2, AllottedGeometry, EHitmenIconGlyph::Eye, FVector2D(Size.X - 30.f, Size.Y * 0.5f), 11.f, HitmenUI::TextDim(), 2.f);
 		}
-		const FVector2D TextSize = HitmenUI::MeasureText(TEXT("WATCHER"), SideFont);
-		HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, TEXT("WATCHER"), BoxPos + FVector2D(Box + 10.f, (Box - TextSize.Y) * 0.5f), SideFont,
-			bEditable ? HitmenUI::Text() : HitmenUI::TextDim());
+		else
+		{
+			const FSlateFontInfo SideFont = HitmenUI::SpacedFont(15, TEXT("SemiBold"), 140);
+			const FString Text = bReady ? FString(TEXT("READY")) : FString(TEXT("CHOOSING"));
+			const FVector2D TextSize = HitmenUI::MeasureText(Text, SideFont);
+			HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Text, FVector2D(Size.X - TextSize.X - 18.f, (Size.Y - TextSize.Y) * 0.5f), SideFont,
+				bReady ? FLinearColor(0.35f, 0.9f, 0.45f, 1.f) : HitmenUI::TextDim());
+		}
+	}
+	else if (PlayerState->GetLobbyTeamId() == INDEX_NONE && (bHovered || bWatcher))
+	{
+		// Watcher eye: only on hover (faint while watching); open = watching, struck = playing.
+		const bool bEditable = CanToggleWatcher();
+		const float Alpha = bHovered ? (bEyeHovered && bEditable ? 1.f : 0.7f) : 0.45f;
+		const FBox2D Box = GetWatcherBox(AllottedGeometry);
+		if (bEyeHovered && bEditable)
+		{
+			HitmenUI::PaintBox(OutDrawElements, LayerId + 2, AllottedGeometry, Box.Min + FVector2D(6.f, 8.f), Box.GetSize() - FVector2D(12.f, 16.f), FLinearColor(1.f, 1.f, 1.f, 0.1f));
+		}
+		UHitmenIconButton::PaintGlyph(OutDrawElements, LayerId + 3, AllottedGeometry, bWatcher ? EHitmenIconGlyph::Eye : EHitmenIconGlyph::EyeOff,
+			Box.GetCenter(), 11.f, FLinearColor(1.f, 1.f, 1.f, Alpha), 2.f);
 	}
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
 }
@@ -276,28 +308,33 @@ int32 UHitmenPlayerEntryWidget::NativePaint(const FPaintArgs& Args, const FGeome
 
 void UHitmenTeamPanelWidget::BuildDefaultLayout()
 {
+	// Opaque block (Border, drawn under the rows), a tinted header strip, then the player blocks.
+	PanelFill = HitmenUI::MakePanel(WidgetTree, PanelTeam, FMargin(0.f));
+	WidgetTree->RootWidget = PanelFill;
 	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	WidgetTree->RootWidget = Column;
+	PanelFill->SetContent(Column);
+	HeaderFill = HitmenUI::MakePanel(WidgetTree, FLinearColor(0.12f, 0.125f, 0.14f, 1.f), FMargin(0.f));
 	UHorizontalBox* Header = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	HeaderFill->SetContent(Sized(WidgetTree, Header, 0.f, 50.f));
 	TitleText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 20, TEXT("SemiBold"));
 	TitleText->SetFont(HitmenUI::SpacedFont(20, TEXT("SemiBold"), 160));
 	if (UHorizontalBoxSlot* TitleSlot = Header->AddChildToHorizontalBox(TitleText))
 	{
 		TitleSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 		TitleSlot->SetVerticalAlignment(VAlign_Center);
-		TitleSlot->SetPadding(FMargin(14.f, 0.f, 0.f, 0.f));
+		TitleSlot->SetPadding(FMargin(18.f, 0.f, 0.f, 0.f));
 	}
 	RoleButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
-	RoleButton->Setup(FText::GetEmpty(), EHitmenMenuButtonKind::Back);
+	RoleButton->Setup(FText::GetEmpty(), EHitmenMenuButtonKind::Chip);
 	RoleButton->OnClicked.AddDynamic(this, &UHitmenTeamPanelWidget::HandleRoleClicked);
-	HitmenUI::AddToHBox(Header, RoleButton);
-	RemoveButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
-	RemoveButton->Setup(LOCTEXT("RemoveTeam", "Remove"), EHitmenMenuButtonKind::Back);
+	HitmenUI::AddToHBox(Header, Sized(WidgetTree, RoleButton, 132.f, 0.f), FMargin(0.f, 0.f, 8.f, 0.f));
+	RemoveButton = WidgetTree->ConstructWidget<UHitmenIconButton>(UHitmenIconButton::StaticClass());
+	RemoveButton->Setup(EHitmenIconGlyph::Close, 34.f, true);
 	RemoveButton->OnClicked.AddDynamic(this, &UHitmenTeamPanelWidget::HandleRemoveClicked);
-	HitmenUI::AddToHBox(Header, RemoveButton);
-	HitmenUI::AddToVBox(Column, Header, FMargin(0.f, 6.f, 0.f, 4.f));
+	HitmenUI::AddToHBox(Header, RemoveButton, FMargin(0.f, 0.f, 10.f, 0.f));
+	HitmenUI::AddToVBox(Column, HeaderFill, FMargin(0.f, 0.f, 0.f, 8.f));
 	MemberList = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	HitmenUI::AddToVBox(Column, MemberList, FMargin(10.f, 0.f, 10.f, 10.f));
+	HitmenUI::AddToVBox(Column, MemberList, FMargin(14.f, 0.f, 12.f, 12.f));
 	SetVisibility(ESlateVisibility::Visible);
 }
 
@@ -315,10 +352,11 @@ void UHitmenTeamPanelWidget::Refresh(bool bShowReady)
 	{
 		return;
 	}
-	TeamColor = FLinearColor::White;
+	TeamColor = FLinearColor(0.75f, 0.76f, 0.8f, 1.f);
 	if (TeamId == INDEX_NONE)
 	{
 		TitleText->SetText(LOCTEXT("Unassigned", "NO TEAM"));
+		TitleText->SetColorAndOpacity(FSlateColor(HitmenUI::TextDim()));
 		RoleButton->SetVisibility(ESlateVisibility::Collapsed);
 		RemoveButton->SetVisibility(ESlateVisibility::Collapsed);
 	}
@@ -326,37 +364,39 @@ void UHitmenTeamPanelWidget::Refresh(bool bShowReady)
 	{
 		TeamColor = Team->Color;
 		TitleText->SetText(FText::FromString(Team->DisplayName.ToString().ToUpper()));
-		TitleText->SetColorAndOpacity(FSlateColor(TeamColor));
+		TitleText->SetColorAndOpacity(FSlateColor(FMath::Lerp(TeamColor, FLinearColor::White, 0.35f)));
 		RoleButton->SetLabel(Team->Role == EHitmenTeamRole::Protect ? LOCTEXT("Protect", "Protect") : LOCTEXT("Attack", "Attack"));
 		RoleButton->SetButtonEnabled(bHost && !bShowReady);
 		RoleButton->SetVisibility(ESlateVisibility::Visible);
 		RemoveButton->SetVisibility(bHost && !bShowReady ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+	if (HeaderFill)
+	{
+		const FLinearColor Tint = TeamId == INDEX_NONE ? FLinearColor(0.11f, 0.115f, 0.13f, 1.f) : TeamColor * FLinearColor(0.3f, 0.3f, 0.3f, 1.f);
+		HeaderFill->SetBrushColor(FLinearColor(Tint.R, Tint.G, Tint.B, 1.f));
 	}
 	MemberList->ClearChildren();
 	for (AHitmenPlayerState* PS : GS->GetPlayersInTeam(TeamId))
 	{
 		UHitmenPlayerEntryWidget* Entry = CreateWidget<UHitmenPlayerEntryWidget>(GetOwningPlayer(), UHitmenPlayerEntryWidget::StaticClass());
 		Entry->SetPlayer(PS);
-		Entry->SetAccent(TeamColor);
+		Entry->SetAccent(TeamId == INDEX_NONE ? FLinearColor(1.f, 1.f, 1.f, 0.85f) : TeamColor);
 		Entry->SetShowReady(bShowReady);
-		HitmenUI::AddToVBox(MemberList, Entry, FMargin(0.f, 2.f));
+		HitmenUI::AddToVBox(MemberList, Entry, FMargin(0.f, 3.f));
 	}
 	if (MemberList->GetChildrenCount() == 0)
 	{
 		UTextBlock* Hint = HitmenUI::MakeText(WidgetTree, bHost ? LOCTEXT("DropHere", "Drag players here") : LOCTEXT("Empty", "Empty"), 17, TEXT("Italic"), HitmenUI::TextDim());
-		HitmenUI::AddToVBox(MemberList, Hint, FMargin(10.f, 8.f));
+		HitmenUI::AddToVBox(MemberList, Hint, FMargin(8.f, 10.f));
 	}
 }
 
 int32 UHitmenTeamPanelWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
+	// Drawn over the children (Slate paints a user widget after them): only the colour bar and frame.
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
-	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FLinearColor(1.f, 1.f, 1.f, bDropHover ? 0.08f : 0.03f));
-	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, FVector2D(Size.X, 2.f), TeamColor * FLinearColor(1, 1, 1, 0.8f));
-	if (bDropHover)
-	{
-		HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, Size, HitmenUI::Accent(), 2.f);
-	}
+	HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, FVector2D(5.f, Size.Y), TeamColor);
+	HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, Size, bDropHover ? HitmenUI::Accent() : FLinearColor(1.f, 1.f, 1.f, 0.1f), bDropHover ? 2.f : 1.f);
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
 }
 
@@ -364,12 +404,20 @@ void UHitmenTeamPanelWidget::NativeOnDragEnter(const FGeometry& InGeometry, cons
 {
 	Super::NativeOnDragEnter(InGeometry, InDragDropEvent, InOperation);
 	bDropHover = Cast<UHitmenPlayerDragOperation>(InOperation) != nullptr;
+	if (PanelFill)
+	{
+		PanelFill->SetBrushColor(bDropHover ? FLinearColor(0.11f, 0.115f, 0.13f, 0.98f) : PanelTeam);
+	}
 }
 
 void UHitmenTeamPanelWidget::NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
 	Super::NativeOnDragLeave(InDragDropEvent, InOperation);
 	bDropHover = false;
+	if (PanelFill)
+	{
+		PanelFill->SetBrushColor(PanelTeam);
+	}
 }
 
 bool UHitmenTeamPanelWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
@@ -377,7 +425,7 @@ bool UHitmenTeamPanelWidget::NativeOnDrop(const FGeometry& InGeometry, const FDr
 	bDropHover = false;
 	const UHitmenPlayerDragOperation* Operation = Cast<UHitmenPlayerDragOperation>(InOperation);
 	AHitmenPlayerController* PC = GetHitmenPC();
-	if (!Operation || !Operation->PlayerState || !PC)
+	if (!Operation || !IsValid(Operation->PlayerState) || !PC)
 	{
 		return false;
 	}
@@ -412,46 +460,78 @@ void UHitmenMapTileWidget::SetMap(const UHitmenMapDefinition* Map, int32 Positio
 {
 	MapPosition = Position;
 	MapCount = Count;
-	bHasImage = false;
+	if (ShownMap.Get() == Map && Map)
+	{
+		return;
+	}
+	ShownMap = Map;
+	bHasShot = false;
+	bHasMinimap = false;
 	MapName = Map ? Map->DisplayName : FText::GetEmpty();
 	Description = Map ? Map->Description : FText::GetEmpty();
-	UTexture2D* Texture = Map ? Map->MapTexture.LoadSynchronous() : nullptr;
-	if (!Texture && Map)
+	auto SetBrush = [](FSlateBrush& Brush, UTexture2D* Texture)
 	{
-		Texture = Map->Thumbnail.LoadSynchronous();
-	}
-	if (Texture)
-	{
-		MapBrush.SetResourceObject(Texture);
-		MapBrush.ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
-		bHasImage = true;
-	}
+		Brush = FSlateBrush();
+		if (!Texture)
+		{
+			return false;
+		}
+		Brush.SetResourceObject(Texture);
+		Brush.ImageSize = FVector2D(Texture->GetSizeX(), Texture->GetSizeY());
+		return true;
+	};
+	bHasShot = Map && SetBrush(ShotBrush, Map->Thumbnail.LoadSynchronous());
+	bHasMinimap = Map && SetBrush(MinimapBrush, Map->MapTexture.LoadSynchronous());
 }
 
 int32 UHitmenMapTileWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
-	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FLinearColor(0.07f, 0.075f, 0.09f, 0.95f));
-	if (bHasImage)
+	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FLinearColor(0.05f, 0.052f, 0.06f, 0.98f));
+	// The screenshot fills the whole tile: cropped (never letterboxed) to the tile's shape.
+	const FSlateBrush* Fill = bHasShot ? &ShotBrush : (bHasMinimap ? &MinimapBrush : nullptr);
+	if (Fill && Fill->ImageSize.X > 0.f && Fill->ImageSize.Y > 0.f && Size.Y > 0.f)
 	{
-		// Square map, centred and filling the height; the tile's sides stay dark.
-		const float Side = Size.Y;
-		HitmenUI::PaintImage(OutDrawElements, LayerId + 1, AllottedGeometry, &MapBrush, FVector2D((Size.X - Side) * 0.5f, 0.f), FVector2D(Side));
+		FSlateBrush Cropped = *Fill;
+		const float TileAspect = Size.X / Size.Y;
+		const float ImageAspect = Fill->ImageSize.X / Fill->ImageSize.Y;
+		FBox2f UV(FVector2f(0.f, 0.f), FVector2f(1.f, 1.f));
+		if (ImageAspect > TileAspect)
+		{
+			const float Width = TileAspect / ImageAspect;
+			UV = FBox2f(FVector2f((1.f - Width) * 0.5f, 0.f), FVector2f((1.f + Width) * 0.5f, 1.f));
+		}
+		else
+		{
+			const float Height = ImageAspect / TileAspect;
+			UV = FBox2f(FVector2f(0.f, (1.f - Height) * 0.5f), FVector2f(1.f, (1.f + Height) * 0.5f));
+		}
+		Cropped.SetUVRegion(UV);
+		HitmenUI::PaintImage(OutDrawElements, LayerId + 1, AllottedGeometry, &Cropped, FVector2D::ZeroVector, Size);
+	}
+	// The whole map, small, top-left.
+	if (bHasShot && bHasMinimap)
+	{
+		const float Mini = FMath::Min(170.f, Size.Y * 0.36f);
+		const FVector2D MiniPos(18.f, 18.f);
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 2, AllottedGeometry, MiniPos - FVector2D(4.f), FVector2D(Mini + 8.f), FLinearColor(0.f, 0.f, 0.f, 0.75f));
+		HitmenUI::PaintImage(OutDrawElements, LayerId + 3, AllottedGeometry, &MinimapBrush, MiniPos, FVector2D(Mini));
+		HitmenUI::PaintFrame(OutDrawElements, LayerId + 3, AllottedGeometry, MiniPos - FVector2D(4.f), FVector2D(Mini + 8.f), FLinearColor(1.f, 1.f, 1.f, 0.3f), 1.f);
 	}
 	// Caption over a bottom gradient.
-	HitmenUI::PaintGradient(OutDrawElements, LayerId + 2, AllottedGeometry, FVector2D(0.f, Size.Y * 0.55f), FVector2D(Size.X, Size.Y * 0.45f), FLinearColor(0, 0, 0, 0), FLinearColor(0, 0, 0, 0.9f), false);
-	const FSlateFontInfo NameFont = HitmenUI::SpacedFont(40, TEXT("Bold"), 20);
-	HitmenUI::PaintText(OutDrawElements, LayerId + 3, AllottedGeometry, MapName.ToString().ToUpper(), FVector2D(24.f, Size.Y - 92.f), NameFont, HitmenUI::Text());
-	HitmenUI::PaintText(OutDrawElements, LayerId + 3, AllottedGeometry, Description.ToString(), FVector2D(26.f, Size.Y - 42.f), HitmenUI::Font(18, TEXT("Italic")), HitmenUI::TextDim());
+	HitmenUI::PaintGradient(OutDrawElements, LayerId + 2, AllottedGeometry, FVector2D(0.f, Size.Y * 0.5f), FVector2D(Size.X, Size.Y * 0.5f), FLinearColor(0, 0, 0, 0), FLinearColor(0, 0, 0, 0.92f), false);
+	const FSlateFontInfo NameFont = HitmenUI::SpacedFont(44, TEXT("Bold"), 20);
+	HitmenUI::PaintText(OutDrawElements, LayerId + 3, AllottedGeometry, MapName.ToString().ToUpper(), FVector2D(26.f, Size.Y - 96.f), NameFont, HitmenUI::Text());
+	HitmenUI::PaintText(OutDrawElements, LayerId + 3, AllottedGeometry, Description.ToString(), FVector2D(28.f, Size.Y - 42.f), HitmenUI::Font(18, TEXT("Italic")), FLinearColor(0.78f, 0.79f, 0.82f, 1.f));
 	if (MapCount > 1)
 	{
 		const FString Counter = FString::Printf(TEXT("%02d / %02d"), MapPosition + 1, MapCount);
 		const FSlateFontInfo CounterFont = HitmenUI::SpacedFont(15, TEXT("Medium"), 200);
 		const FVector2D CounterSize = HitmenUI::MeasureText(Counter, CounterFont);
-		HitmenUI::PaintText(OutDrawElements, LayerId + 3, AllottedGeometry, Counter, FVector2D(Size.X - CounterSize.X - 22.f, 18.f), CounterFont, HitmenUI::Text());
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 2, AllottedGeometry, FVector2D(Size.X - CounterSize.X - 34.f, 14.f), FVector2D(CounterSize.X + 20.f, CounterSize.Y + 10.f), FLinearColor(0.f, 0.f, 0.f, 0.7f));
+		HitmenUI::PaintText(OutDrawElements, LayerId + 3, AllottedGeometry, Counter, FVector2D(Size.X - CounterSize.X - 24.f, 19.f), CounterFont, HitmenUI::Text());
 	}
 	HitmenUI::PaintFrame(OutDrawElements, LayerId + 3, AllottedGeometry, FVector2D::ZeroVector, Size, HitmenUI::Hairline(), 1.f);
-	HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, FVector2D(0.f, Size.Y - 4.f), FVector2D(Size.X * 0.25f, 4.f), HitmenUI::Accent());
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
 }
 
@@ -468,30 +548,24 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	UCanvasPanel* Room = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
 	ScreenSwitcher->AddChild(Room);
 	UVerticalBox* Left = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	UCanvasPanelSlot* LeftSlot = HitmenUI::AddToCanvas(Room, Left, FAnchors(0.f, 0.f, 0.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
-	LeftSlot->SetOffsets(FMargin(110.f, 80.f, 860.f, 130.f));
-	HitmenUI::AddToVBox(Left, MakeSectionLabel(WidgetTree, LOCTEXT("RoomOverline", "MULTIPLAYER ROOM")));
-	UTextBlock* RoomTitle = HitmenUI::MakeText(WidgetTree, LOCTEXT("CreateRoom", "CREATE ROOM"), 76, TEXT("Bold"));
-	HitmenUI::AddToVBox(Left, RoomTitle, FMargin(0.f, -10.f, 0.f, 16.f));
+	HitmenUI::AddToCanvas(Room, Left, FAnchors(0.f, 0.f), FVector2D(110.f, 70.f), FVector2D::ZeroVector);
+	HitmenUI::AddToVBox(Left, HitmenUI::MakeText(WidgetTree, LOCTEXT("CreateRoom", "CREATE ROOM"), 72, TEXT("Bold")), FMargin(0.f, 0.f, 0.f, 14.f));
 
 	// Map tile with arrows on its sides.
 	UCanvasPanel* MapArea = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
-	USizeBox* MapSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	MapSize->SetWidthOverride(840.f);
-	MapSize->SetHeightOverride(470.f);
-	MapSize->SetContent(MapArea);
-	HitmenUI::AddToVBox(Left, MapSize, FMargin(0.f, 0.f, 0.f, 22.f), false, HAlign_Left);
+	HitmenUI::AddToVBox(Left, Sized(WidgetTree, MapArea, 840.f, 470.f), FMargin(0.f, 0.f, 0.f, 22.f), false, HAlign_Left);
 	MapTile = WidgetTree->ConstructWidget<UHitmenMapTileWidget>(UHitmenMapTileWidget::StaticClass());
 	UCanvasPanelSlot* TileSlot = HitmenUI::AddToCanvas(MapArea, MapTile, FAnchors(0.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
+	TileSlot->SetAutoSize(false);
 	TileSlot->SetOffsets(FMargin(0.f));
 	PrevMapButton = WidgetTree->ConstructWidget<UHitmenArrowButton>(UHitmenArrowButton::StaticClass());
-	PrevMapButton->Setup(false, 56.f);
+	PrevMapButton->Setup(false, 60.f);
 	PrevMapButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::PreviousMap);
-	HitmenUI::AddToCanvas(MapArea, PrevMapButton, FAnchors(0.f, 0.5f), FVector2D(16.f, 0.f), FVector2D(0.f, 0.5f), FVector2D(56.f, 56.f));
+	HitmenUI::AddToCanvas(MapArea, PrevMapButton, FAnchors(0.f, 0.5f), FVector2D(16.f, 0.f), FVector2D(0.f, 0.5f), FVector2D(60.f, 60.f));
 	NextMapButton = WidgetTree->ConstructWidget<UHitmenArrowButton>(UHitmenArrowButton::StaticClass());
-	NextMapButton->Setup(true, 56.f);
+	NextMapButton->Setup(true, 60.f);
 	NextMapButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::NextMap);
-	HitmenUI::AddToCanvas(MapArea, NextMapButton, FAnchors(1.f, 0.5f), FVector2D(-16.f, 0.f), FVector2D(1.f, 0.5f), FVector2D(56.f, 56.f));
+	HitmenUI::AddToCanvas(MapArea, NextMapButton, FAnchors(1.f, 0.5f), FVector2D(-16.f, 0.f), FVector2D(1.f, 0.5f), FVector2D(60.f, 60.f));
 
 	// Options: proximity chat and difficulty only (the rest is set by designers).
 	HitmenUI::AddToVBox(Left, MakeSectionLabel(WidgetTree, LOCTEXT("OptionsHeader", "OPTIONS")), FMargin(0.f, 0.f, 0.f, 10.f));
@@ -504,34 +578,39 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	DifficultyLabel->SetFont(HitmenUI::SpacedFont(20, TEXT("SemiBold"), 60));
 	HitmenUI::AddToHBox(OptionsRow, DifficultyLabel, FMargin(0.f, 0.f, 16.f, 0.f));
 	PrevDifficultyButton = WidgetTree->ConstructWidget<UHitmenArrowButton>(UHitmenArrowButton::StaticClass());
-	PrevDifficultyButton->Setup(false, 38.f);
+	PrevDifficultyButton->Setup(false, 40.f);
 	PrevDifficultyButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::PreviousDifficulty);
-	USizeBox* PrevSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	PrevSize->SetWidthOverride(38.f); PrevSize->SetHeightOverride(38.f); PrevSize->SetContent(PrevDifficultyButton);
-	HitmenUI::AddToHBox(OptionsRow, PrevSize);
+	HitmenUI::AddToHBox(OptionsRow, Sized(WidgetTree, PrevDifficultyButton, 40.f, 40.f));
 	DifficultyText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 22, TEXT("Bold"));
-	USizeBox* DiffSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	DiffSize->SetWidthOverride(120.f);
 	DifficultyText->SetJustification(ETextJustify::Center);
-	DiffSize->SetContent(DifficultyText);
-	HitmenUI::AddToHBox(OptionsRow, DiffSize);
+	HitmenUI::AddToHBox(OptionsRow, Sized(WidgetTree, DifficultyText, 120.f, 0.f));
 	NextDifficultyButton = WidgetTree->ConstructWidget<UHitmenArrowButton>(UHitmenArrowButton::StaticClass());
-	NextDifficultyButton->Setup(true, 38.f);
+	NextDifficultyButton->Setup(true, 40.f);
 	NextDifficultyButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::NextDifficulty);
-	USizeBox* NextSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	NextSize->SetWidthOverride(38.f); NextSize->SetHeightOverride(38.f); NextSize->SetContent(NextDifficultyButton);
-	HitmenUI::AddToHBox(OptionsRow, NextSize);
+	HitmenUI::AddToHBox(OptionsRow, Sized(WidgetTree, NextDifficultyButton, 40.f, 40.f));
 	HitmenUI::AddToVBox(Left, OptionsRow);
 
-	// Players and teams, right column.
+	// Players: one big block holding the team blocks, which hold the player blocks. It runs from
+	// the map's right edge to the screen margin.
+	UBorder* PlayersPanel = HitmenUI::MakePanel(WidgetTree, PanelOuter, FMargin(16.f));
+	UCanvasPanelSlot* PlayersSlot = HitmenUI::AddToCanvas(Room, PlayersPanel, FAnchors(0.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
+	PlayersSlot->SetAutoSize(false);
+	PlayersSlot->SetOffsets(FMargin(980.f, 160.f, 90.f, 130.f));
 	UVerticalBox* Right = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	UCanvasPanelSlot* RightSlot = HitmenUI::AddToCanvas(Room, Right, FAnchors(1.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
-	RightSlot->SetOffsets(FMargin(-640.f, 150.f, 90.f, 140.f));
+	PlayersPanel->SetContent(Right);
 	UHorizontalBox* PlayersHeader = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	HitmenUI::AddToHBox(PlayersHeader, MakeSectionLabel(WidgetTree, LOCTEXT("Players", "PLAYERS")), FMargin(0.f, 0.f, 12.f, 0.f));
+	HitmenUI::AddToHBox(PlayersHeader, MakeSectionLabel(WidgetTree, LOCTEXT("Players", "PLAYERS")), FMargin(4.f, 0.f, 12.f, 0.f));
 	PlayerCountText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 15, TEXT("Medium"), HitmenUI::Text());
-	HitmenUI::AddToHBox(PlayersHeader, PlayerCountText);
-	HitmenUI::AddToVBox(Right, PlayersHeader, FMargin(0.f, 0.f, 0.f, 10.f));
+	if (UHorizontalBoxSlot* CountSlot = PlayersHeader->AddChildToHorizontalBox(PlayerCountText))
+	{
+		CountSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		CountSlot->SetVerticalAlignment(VAlign_Center);
+	}
+	HitmenUI::AddToHBox(PlayersHeader, MakeSectionLabel(WidgetTree, LOCTEXT("CodeLabel", "ROOM CODE")), FMargin(0.f, 0.f, 12.f, 0.f));
+	RoomCodeText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 26, TEXT("Bold"));
+	RoomCodeText->SetFont(HitmenUI::SpacedFont(26, TEXT("Bold"), 220));
+	HitmenUI::AddToHBox(PlayersHeader, RoomCodeText, FMargin(0.f, 0.f, 4.f, 0.f));
+	HitmenUI::AddToVBox(Right, Sized(WidgetTree, PlayersHeader, 0.f, 40.f), FMargin(0.f, 0.f, 0.f, 12.f));
 	UScrollBox* TeamsScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
 	if (UVerticalBoxSlot* ScrollSlot = Right->AddChildToVerticalBox(TeamsScroll))
 	{
@@ -540,9 +619,9 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	TeamsBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	TeamsScroll->AddChild(TeamsBox);
 	CreateTeamButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
-	CreateTeamButton->Setup(LOCTEXT("CreateTeam", "+  Create team"), EHitmenMenuButtonKind::Secondary);
+	CreateTeamButton->Setup(LOCTEXT("CreateTeam", "+  Create team"), EHitmenMenuButtonKind::Dashed);
 	CreateTeamButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::CreateTeam);
-	HitmenUI::AddToVBox(Right, CreateTeamButton, FMargin(0.f, 8.f, 0.f, 0.f), false, HAlign_Left);
+	HitmenUI::AddToVBox(Right, CreateTeamButton, FMargin(0.f, 10.f, 0.f, 0.f), false, HAlign_Fill);
 
 	// Bottom bar.
 	UHitmenMenuButton* BackButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
@@ -559,14 +638,9 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	// ================= Your agent =================
 	AgentCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
 	ScreenSwitcher->AddChild(AgentCanvas);
-	UVerticalBox* AgentHeader = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	HitmenUI::AddToCanvas(AgentCanvas, AgentHeader, FAnchors(0.f, 0.f), FVector2D(110.f, 80.f), FVector2D::ZeroVector);
-	HitmenUI::AddToVBox(AgentHeader, MakeSectionLabel(WidgetTree, LOCTEXT("AgentOverline", "AGENT")));
-	HitmenUI::AddToVBox(AgentHeader, HitmenUI::MakeText(WidgetTree, LOCTEXT("YourAgent", "YOUR AGENT"), 76, TEXT("Bold")), FMargin(0.f, -10.f, 0.f, 8.f));
-	// Identity (name, randomize) sits in the right column so the left stays clear for the model.
-	UVerticalBox* Identity = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	HitmenUI::AddToCanvas(AgentCanvas, Identity, FAnchors(1.f, 0.f), FVector2D(-90.f, 150.f), FVector2D(1.f, 0.f));
-	HitmenUI::AddToVBox(Identity, MakeSectionLabel(WidgetTree, LOCTEXT("Codename", "CODENAME")), FMargin(0.f, 0.f, 0.f, 8.f));
+	HitmenUI::AddToCanvas(AgentCanvas, MakeSectionLabel(WidgetTree, LOCTEXT("YourAgent", "YOUR AGENT"), 18), FAnchors(0.f, 0.f), FVector2D(110.f, 70.f), FVector2D::ZeroVector);
+
+	// Codename above the agent's head (placed every frame).
 	AgentNameEdit = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
 	{
 		FEditableTextBoxStyle Style = AgentNameEdit->WidgetStyle;
@@ -574,26 +648,21 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 		Field.TintColor = FSlateColor(FLinearColor(0.f, 0.f, 0.f, 0.55f));
 		Style.SetBackgroundImageNormal(Field);
 		Style.SetBackgroundImageHovered(Field);
-		Field.TintColor = FSlateColor(FLinearColor(0.f, 0.f, 0.f, 0.75f));
+		Field.TintColor = FSlateColor(FLinearColor(0.f, 0.f, 0.f, 0.8f));
 		Style.SetBackgroundImageFocused(Field);
 		Style.SetPadding(FMargin(14.f, 8.f));
-		Style.TextStyle.SetFont(HitmenUI::SpacedFont(26, TEXT("SemiBold"), 40));
+		Style.TextStyle.SetFont(HitmenUI::SpacedFont(26, TEXT("SemiBold"), 60));
 		Style.TextStyle.SetColorAndOpacity(FSlateColor(HitmenUI::Text()));
 		Style.SetForegroundColor(FSlateColor(HitmenUI::Text()));
 		AgentNameEdit->WidgetStyle = Style;
 	}
-	AgentNameEdit->SetHintText(LOCTEXT("NameHint", "Agent name"));
+	AgentNameEdit->SetHintText(LOCTEXT("NameHint", "Codename"));
+	AgentNameEdit->SetJustification(ETextJustify::Center);
 	AgentNameEdit->OnTextCommitted.AddDynamic(this, &UHitmenLobbyWidget::HandleAgentNameCommitted);
-	USizeBox* NameSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	NameSize->SetWidthOverride(420.f);
-	NameSize->SetContent(AgentNameEdit);
-	HitmenUI::AddToVBox(Identity, NameSize, FMargin(0.f, 0.f, 0.f, 8.f), false, HAlign_Left);
-	UHitmenMenuButton* RandomButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
-	RandomButton->Setup(LOCTEXT("Randomize", "Randomize look"), EHitmenMenuButtonKind::Back);
-	RandomButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::RandomizeCosmetics);
-	HitmenUI::AddToVBox(Identity, RandomButton, FMargin(-20.f, 0.f, 0.f, 0.f), false, HAlign_Left);
+	AgentNameBox = Sized(WidgetTree, AgentNameEdit, 340.f, 0.f);
+	HitmenUI::AddToCanvas(AgentCanvas, AgentNameBox, FAnchors(0.f, 0.f), FVector2D(-1000.f, -1000.f), FVector2D(0.5f, 1.f));
 
-	// Look arrows: two per slot (head, body, legs), placed beside the 3D model every frame.
+	// Look arrows: two per slot (head, body, legs), hugging the 3D model, placed every frame.
 	const FName ArrowHandlers[6] = {
 		GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleLookArrow0), GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleLookArrow1),
 		GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleLookArrow2), GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleLookArrow3),
@@ -601,47 +670,50 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	for (int32 Arrow = 0; Arrow < 6; ++Arrow)
 	{
 		UHitmenArrowButton* Button = WidgetTree->ConstructWidget<UHitmenArrowButton>(UHitmenArrowButton::StaticClass());
-		Button->Setup(Arrow % 2 == 1, 46.f);
+		Button->Setup(Arrow % 2 == 1, 50.f);
 		FScriptDelegate Delegate;
 		Delegate.BindUFunction(this, ArrowHandlers[Arrow]);
 		Button->OnClicked.Add(Delegate);
-		HitmenUI::AddToCanvas(AgentCanvas, Button, FAnchors(0.f, 0.f), FVector2D(-200.f, -200.f), FVector2D(0.5f, 0.5f), FVector2D(46.f, 46.f));
+		HitmenUI::AddToCanvas(AgentCanvas, Button, FAnchors(0.f, 0.f), FVector2D(-1000.f, -1000.f), FVector2D(0.5f, 0.5f), FVector2D(50.f, 50.f));
 		LookArrows.Add(Button);
 	}
-	for (int32 Label = 0; Label < 3; ++Label)
+	// Randomize look, under the agent's feet.
+	RandomizeButton = WidgetTree->ConstructWidget<UHitmenIconButton>(UHitmenIconButton::StaticClass());
+	RandomizeButton->Setup(EHitmenIconGlyph::Dice, 40.f, true);
+	RandomizeButton->SetLabel(LOCTEXT("Randomize", "Randomize"));
+	RandomizeButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::RandomizeCosmetics);
+	HitmenUI::AddToCanvas(AgentCanvas, RandomizeButton, FAnchors(0.f, 0.f), FVector2D(-1000.f, -1000.f), FVector2D(0.5f, 0.f));
+
+	// Loadout: three rows of icon tiles, always visible on the right. A click picks.
+	UBorder* LoadoutPanel = HitmenUI::MakePanel(WidgetTree, PanelOuter, FMargin(20.f, 16.f));
+	HitmenUI::AddToCanvas(AgentCanvas, LoadoutPanel, FAnchors(1.f, 0.f), FVector2D(-90.f, 120.f), FVector2D(1.f, 0.f));
+	UVerticalBox* Loadout = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	LoadoutPanel->SetContent(Loadout);
+	const FText RowNames[3] = { LOCTEXT("WeaponRow", "WEAPON"), LOCTEXT("MoveRow", "MOVE ABILITY   [E]"), LOCTEXT("ManipulationRow", "MANIPULATION   [A]") };
+	const FName StripHandlers[3] = { GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleWeaponChosen),
+		GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleMoveChosen), GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleManipulationChosen) };
+	for (int32 Row = 0; Row < 3; ++Row)
 	{
-		UTextBlock* Text = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 18, TEXT("SemiBold"));
-		Text->SetVisibility(ESlateVisibility::HitTestInvisible);
-		HitmenUI::AddToCanvas(AgentCanvas, Text, FAnchors(0.f, 0.f), FVector2D(-400.f, -400.f), FVector2D(0.f, 0.5f));
-		LookLabels.Add(Text);
+		HitmenUI::AddToVBox(Loadout, MakeSectionLabel(WidgetTree, RowNames[Row]), FMargin(0.f, Row == 0 ? 0.f : 16.f, 0.f, 8.f));
+		UHitmenChoiceStrip* Strip = WidgetTree->ConstructWidget<UHitmenChoiceStrip>(UHitmenChoiceStrip::StaticClass());
+		Strip->StripIndex = Row;
+		FScriptDelegate Delegate;
+		Delegate.BindUFunction(this, StripHandlers[Row]);
+		Strip->OnChosen.Add(Delegate);
+		HitmenUI::AddToVBox(Loadout, Strip, FMargin(0.f), false, HAlign_Left);
+		LoadoutStrips.Add(Strip);
 	}
 
-	// Loadout cards, bottom right, with the carousel above.
-	UHorizontalBox* Cards = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	const FText Categories[3] = { LOCTEXT("Weapon", "Weapon"), LOCTEXT("Move", "Move ability"), LOCTEXT("Manipulation", "Manipulation") };
-	const FText Keys[3] = { FText::GetEmpty(), FText::FromString(TEXT("E")), FText::FromString(TEXT("A")) };
-	for (int32 Card = 0; Card < 3; ++Card)
-	{
-		UHitmenCardTile* Tile = WidgetTree->ConstructWidget<UHitmenCardTile>(UHitmenCardTile::StaticClass());
-		Tile->Setup(Categories[Card], FText::GetEmpty(), Keys[Card], 190.f);
-		Tile->Index = Card;
-		Tile->OnHovered.AddDynamic(this, &UHitmenLobbyWidget::HandleCardHovered);
-		Tile->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::HandleCardClicked);
-		Tile->OnWheel.AddDynamic(this, &UHitmenLobbyWidget::HandleCardWheel);
-		USizeBox* TileSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-		TileSize->SetWidthOverride(190.f);
-		TileSize->SetHeightOverride(190.f);
-		TileSize->SetContent(Tile);
-		HitmenUI::AddToHBox(Cards, TileSize, FMargin(0.f, 0.f, 10.f, 0.f));
-		LoadoutCards.Add(Tile);
-	}
-	HitmenUI::AddToCanvas(AgentCanvas, Cards, FAnchors(1.f, 1.f), FVector2D(-80.f, -150.f), FVector2D(1.f, 1.f));
-	UTextBlock* LoadoutLabel = MakeSectionLabel(WidgetTree, LOCTEXT("Loadout", "LOADOUT  -  HOVER OR CLICK A CARD, WHEEL TO BROWSE"));
-	HitmenUI::AddToCanvas(AgentCanvas, LoadoutLabel, FAnchors(1.f, 1.f), FVector2D(-90.f, -360.f), FVector2D(1.f, 1.f));
-	Carousel = WidgetTree->ConstructWidget<UHitmenChoiceCarousel>(UHitmenChoiceCarousel::StaticClass());
-	Carousel->OnChosen.AddDynamic(this, &UHitmenLobbyWidget::HandleCarouselChosen);
-	Carousel->SetVisibility(ESlateVisibility::Collapsed);
-	HitmenUI::AddToCanvas(AgentCanvas, Carousel, FAnchors(1.f, 1.f), FVector2D(-80.f, -360.f), FVector2D(1.f, 1.f), FVector2D(600.f, 90.f));
+	// Launch countdown: one big number in a square block, centred at the top.
+	UBorder* Countdown = HitmenUI::MakePanel(WidgetTree, FLinearColor(0.f, 0.f, 0.f, 0.82f), FMargin(0.f));
+	CountdownText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 96, TEXT("Bold"));
+	CountdownText->SetJustification(ETextJustify::Center);
+	Countdown->SetContent(CountdownText);
+	Countdown->SetHorizontalAlignment(HAlign_Center);
+	Countdown->SetVerticalAlignment(VAlign_Center);
+	CountdownBlock = Sized(WidgetTree, Countdown, 150.f, 150.f);
+	CountdownBlock->SetVisibility(ESlateVisibility::Collapsed);
+	HitmenUI::AddToCanvas(AgentCanvas, CountdownBlock, FAnchors(0.5f, 0.f), FVector2D(0.f, 60.f), FVector2D(0.5f, 0.f));
 
 	// Ready (no launch button: the match starts when everyone is ready).
 	ReadyButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
@@ -697,10 +769,6 @@ void UHitmenLobbyWidget::HandleLobbyChanged()
 	{
 		ScreenSwitcher->SetActiveWidgetIndex(bCustomization ? 1 : 0);
 		Juice_OnScreenChanged(bCustomization);
-		if (Carousel)
-		{
-			Carousel->SetVisibility(ESlateVisibility::Collapsed);
-		}
 	}
 	RefreshLobby();
 	if (bCustomization)
@@ -722,38 +790,51 @@ void UHitmenLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 		bLobbyRefreshPending = false;
 		HandleLobbyChanged();
 	}
+	// Edited look: sent once the clicks pause (the stage already shows it).
+	if (CosmeticSendDelay >= 0.f)
+	{
+		CosmeticSendDelay -= InDeltaTime;
+		if (CosmeticSendDelay < 0.f)
+		{
+			if (AHitmenPlayerController* PC = GetHitmenPC())
+			{
+				HitmenLobby::SendCosmetics(PC, LocalCosmetics);
+			}
+		}
+	}
 	if (ScreenSwitcher && ScreenSwitcher->GetActiveWidgetIndex() == 1)
 	{
 		UpdateAgentAnchors();
-		// The carousel closes once the pointer has left the cards and the strip for a moment.
-		if (Carousel && Carousel->IsVisible() && !bPointerOnCards && !Carousel->IsHovered())
-		{
-			CarouselCloseTimer += InDeltaTime;
-			if (CarouselCloseTimer > 0.6f)
-			{
-				Carousel->SetVisibility(ESlateVisibility::Collapsed);
-				CarouselCard = INDEX_NONE;
-				for (UHitmenCardTile* Card : LoadoutCards)
-				{
-					Card->SetSelected(false);
-				}
-			}
-		}
-		else
-		{
-			CarouselCloseTimer = 0.f;
-		}
 	}
-	// Launch countdown text (everyone ready).
-	if (const AHitmenGameState* GS = GetHitmenGameState(); GS && ReadyStatusText)
+	// Launch countdown (everyone ready): a big number, nothing else.
+	if (const AHitmenGameState* GS = GetHitmenGameState(); GS && CountdownBlock && CountdownText)
 	{
 		const float Remaining = GS->GetPhaseCountdownRemaining();
-		if (Remaining > 0.f)
+		const bool bCounting = Remaining > 0.f && GS->GetMatchPhase() == EHitmenMatchPhase::Customization;
+		CountdownBlock->SetVisibility(bCounting ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (bCounting)
 		{
-			ReadyStatusText->SetText(FText::Format(LOCTEXT("Launching", "Everyone is ready - starting in {0}"), FText::AsNumber(FMath::CeilToInt(Remaining))));
-			ReadyStatusText->SetColorAndOpacity(FSlateColor(HitmenUI::Text()));
+			CountdownText->SetText(FText::AsNumber(FMath::CeilToInt(Remaining)));
 		}
 	}
+}
+
+TArray<int32> UHitmenLobbyWidget::GetCarouselMaps() const
+{
+	if (!bCarouselMapsCached)
+	{
+		bCarouselMapsCached = true;
+		CachedCarouselMaps.Reset();
+		const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+		for (int32 Index = 0; Index < Settings->GetMapCount(); ++Index)
+		{
+			if (const UHitmenMapDefinition* Map = Settings->LoadMap(Index); Map && Map->bShowInCarousel)
+			{
+				CachedCarouselMaps.Add(Index);
+			}
+		}
+	}
+	return CachedCarouselMaps;
 }
 
 void UHitmenLobbyWidget::RefreshLobby()
@@ -767,8 +848,9 @@ void UHitmenLobbyWidget::RefreshLobby()
 	const FHitmenLobbySettings& Settings = GS->GetLobbySettings();
 	const TArray<int32> Maps = GetCarouselMaps();
 	const int32 Position = FMath::Max(0, Maps.IndexOfByKey(Settings.MapIndex));
-	if (MapTile)
+	if (MapTile && ShownMapIndex != Settings.MapIndex)
 	{
+		ShownMapIndex = Settings.MapIndex;
 		MapTile->SetMap(UHitmenGameSettings::Get()->LoadMap(Settings.MapIndex), Position, Maps.Num());
 	}
 	if (PrevMapButton) { PrevMapButton->SetVisibility(bHost && Position > 0 ? ESlateVisibility::Visible : ESlateVisibility::Hidden); }
@@ -787,6 +869,11 @@ void UHitmenLobbyWidget::RefreshLobby()
 	if (PlayerCountText)
 	{
 		PlayerCountText->SetText(FText::Format(LOCTEXT("PlayerCount", "{0} / {1}"), FText::AsNumber(GS->GetHitmenPlayers().Num()), FText::AsNumber(UHitmenGameSettings::Get()->MaxPlayers)));
+	}
+	if (RoomCodeText)
+	{
+		const FString& Code = GS->GetRoomCode();
+		RoomCodeText->SetText(Code.IsEmpty() ? FText::FromString(TEXT("-")) : FText::FromString(Code));
 	}
 	RebuildTeams();
 }
@@ -812,7 +899,7 @@ void UHitmenLobbyWidget::RebuildTeams()
 		for (int32 Index = 0; Index < TeamIds.Num(); ++Index)
 		{
 			UHitmenTeamPanelWidget* Panel = CreateWidget<UHitmenTeamPanelWidget>(GetOwningPlayer(), UHitmenTeamPanelWidget::StaticClass());
-			HitmenUI::AddToVBox(TeamsBox, Panel, FMargin(0.f, 0.f, 0.f, 10.f));
+			HitmenUI::AddToVBox(TeamsBox, Panel, FMargin(0.f, 0.f, 0.f, 12.f));
 			TeamPanels.Add(Panel);
 		}
 	}
@@ -834,6 +921,14 @@ AHitmenAgentPreview* UHitmenLobbyWidget::FindAgentPreview() const
 	return nullptr;
 }
 
+void UHitmenLobbyWidget::PreviewLocalCosmetics()
+{
+	if (AHitmenAgentPreview* Preview = FindAgentPreview())
+	{
+		Preview->ShowCosmetics(LocalCosmetics);
+	}
+}
+
 void UHitmenLobbyWidget::RefreshCustomization()
 {
 	const AHitmenPlayerState* PS = GetLocalPlayerState();
@@ -847,11 +942,10 @@ void UHitmenLobbyWidget::RefreshCustomization()
 		bLocalInitialized = true;
 		LocalCosmetics = PS->GetCosmetics();
 		LocalLoadout = PS->GetLoadout();
-		if (Catalog)
+		// Default loadout: the first weapon (silenced pistol), no abilities.
+		if (Catalog && !LocalLoadout.Weapon && !LocalLoadout.MoveAbility && !LocalLoadout.ManipulationAbility && Catalog->Weapons.Num() > 0)
 		{
-			if (!LocalLoadout.Weapon && Catalog->Weapons.Num() > 0) { LocalLoadout.Weapon = Catalog->Weapons[0]; }
-			if (!LocalLoadout.MoveAbility && Catalog->MoveAbilities.Num() > 0) { LocalLoadout.MoveAbility = Catalog->MoveAbilities[0]; }
-			if (!LocalLoadout.ManipulationAbility && Catalog->ManipulationAbilities.Num() > 0) { LocalLoadout.ManipulationAbility = Catalog->ManipulationAbilities[0]; }
+			LocalLoadout.Weapon = Catalog->Weapons[0];
 		}
 		if (AHitmenPlayerController* PC = GetHitmenPC())
 		{
@@ -862,28 +956,9 @@ void UHitmenLobbyWidget::RefreshCustomization()
 	{
 		AgentNameEdit->SetText(FText::FromString(PS->GetPlayerName()));
 	}
-	if (AHitmenAgentPreview* Preview = FindAgentPreview())
-	{
-		Preview->ShowCosmetics(LocalCosmetics);
-	}
-	for (int32 LookIndex = 0; LookIndex < 3 && LookLabels.IsValidIndex(LookIndex); ++LookIndex)
-	{
-		const UHitmenCosmeticItem* Item = LocalCosmetics.GetSlot(LookSlots[LookIndex]);
-		static const TCHAR* SlotNames[3] = { TEXT("HEAD"), TEXT("BODY"), TEXT("LEGS") };
-		LookLabels[LookIndex]->SetText(FText::FromString(FString::Printf(TEXT("%s  -  %s"), SlotNames[LookIndex], Item ? *Item->DisplayName.ToString().ToUpper() : TEXT("NONE"))));
-	}
-	auto NameOf = [](const UObject* Asset, const FText& Fallback) -> FText
-	{
-		if (const UHitmenWeaponData* Weapon = Cast<UHitmenWeaponData>(Asset)) { return Weapon->DisplayName; }
-		if (const UHitmenAbilityData* Ability = Cast<UHitmenAbilityData>(Asset)) { return Ability->DisplayName; }
-		return Fallback;
-	};
-	if (LoadoutCards.Num() == 3)
-	{
-		LoadoutCards[0]->SetTitle(NameOf(LocalLoadout.Weapon, LOCTEXT("Fists", "Fists")));
-		LoadoutCards[1]->SetTitle(NameOf(LocalLoadout.MoveAbility, LOCTEXT("None", "None")));
-		LoadoutCards[2]->SetTitle(NameOf(LocalLoadout.ManipulationAbility, LOCTEXT("None", "None")));
-	}
+	// While the local look is being edited the stage keeps the local copy.
+	PreviewLocalCosmetics();
+	RefreshLoadoutStrips();
 	const AHitmenGameState* GS = GetHitmenGameState();
 	int32 ReadyCount = 0;
 	int32 Needed = 0;
@@ -900,10 +975,9 @@ void UHitmenLobbyWidget::RefreshCustomization()
 		ReadyButton->SetLabel(PS->IsReady() ? LOCTEXT("NotReady", "Not ready") : LOCTEXT("Ready", "Ready"));
 		ReadyButton->SetSelected(PS->IsReady());
 	}
-	if (ReadyStatusText && (!GS || GS->GetPhaseCountdownRemaining() <= 0.f))
+	if (ReadyStatusText)
 	{
 		ReadyStatusText->SetText(FText::Format(LOCTEXT("ReadyCount", "{0} / {1} ready"), FText::AsNumber(ReadyCount), FText::AsNumber(Needed)));
-		ReadyStatusText->SetColorAndOpacity(FSlateColor(HitmenUI::TextDim()));
 	}
 }
 
@@ -916,14 +990,12 @@ void UHitmenLobbyWidget::UpdateAgentAnchors()
 	{
 		return;
 	}
-	// Arrows sit on each side of the head, the torso and the legs, in two aligned columns at a
-	// fixed distance from the body's centre line.
+	// Arrows sit right beside the head, the torso and the legs, in two columns hugging the body.
 	FVector2D Center;
 	if (!UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, Body->GetBoneLocation(TEXT("pelvis")), Center, true))
 	{
 		return;
 	}
-	const float Spread = 175.f;
 	for (int32 LookIndex = 0; LookIndex < 3; ++LookIndex)
 	{
 		FVector2D Anchor;
@@ -931,17 +1003,29 @@ void UHitmenLobbyWidget::UpdateAgentAnchors()
 		{
 			continue;
 		}
-		const float Y = Anchor.Y;
 		for (int32 Side = 0; Side < 2; ++Side)
 		{
 			if (UCanvasPanelSlot* ArrowSlot = Cast<UCanvasPanelSlot>(LookArrows[LookIndex * 2 + Side]->Slot))
 			{
-				ArrowSlot->SetPosition(FVector2D(Center.X + (Side == 0 ? -Spread : Spread), Y));
+				ArrowSlot->SetPosition(FVector2D(Center.X + (Side == 0 ? -LookArrowSpread : LookArrowSpread), Anchor.Y));
 			}
 		}
-		if (UCanvasPanelSlot* LabelSlot = Cast<UCanvasPanelSlot>(LookLabels[LookIndex]->Slot))
+	}
+	// Codename above the head, Randomize under the feet.
+	FVector2D Head;
+	if (AgentNameBox && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, Body->GetBoneLocation(TEXT("head")) + FVector(0.f, 0.f, 32.f), Head, true))
+	{
+		if (UCanvasPanelSlot* NameSlot = Cast<UCanvasPanelSlot>(AgentNameBox->Slot))
 		{
-			LabelSlot->SetPosition(FVector2D(Center.X + Spread + 40.f, Y));
+			NameSlot->SetPosition(FVector2D(Center.X, Head.Y - 36.f));
+		}
+	}
+	FVector2D Feet;
+	if (RandomizeButton && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, Body->GetComponentLocation(), Feet, true))
+	{
+		if (UCanvasPanelSlot* RandomSlot = Cast<UCanvasPanelSlot>(RandomizeButton->Slot))
+		{
+			RandomSlot->SetPosition(FVector2D(Center.X, Feet.Y + 18.f));
 		}
 	}
 }
@@ -958,103 +1042,59 @@ void UHitmenLobbyWidget::HandleLookArrow3() { LookArrow(3); }
 void UHitmenLobbyWidget::HandleLookArrow4() { LookArrow(4); }
 void UHitmenLobbyWidget::HandleLookArrow5() { LookArrow(5); }
 
-TArray<FText> UHitmenLobbyWidget::GetLoadoutChoices(int32 CardIndex, int32& OutSelected) const
+TArray<FHitmenChoiceItem> UHitmenLobbyWidget::GetLoadoutChoices(int32 CardIndex, int32& OutSelected) const
 {
-	TArray<FText> Choices;
+	TArray<FHitmenChoiceItem> Choices;
+	auto Item = [](const FText& Name, UTexture2D* Icon)
+	{
+		FHitmenChoiceItem Choice;
+		Choice.Name = Name;
+		Choice.Icon = Icon;
+		return Choice;
+	};
 	OutSelected = 0;
 	const UHitmenCatalog* Catalog = GetCatalog();
 	if (!Catalog)
 	{
 		return Choices;
 	}
+	// Every row starts with None (fists for the weapon).
+	Choices.Add(Item(CardIndex == 0 ? LOCTEXT("FistsChoice", "None") : LOCTEXT("NoneChoice", "None"), nullptr));
 	if (CardIndex == 0)
 	{
-		Choices.Add(LOCTEXT("FistsChoice", "Fists"));
 		for (int32 Index = 0; Index < Catalog->Weapons.Num(); ++Index)
 		{
-			Choices.Add(Catalog->Weapons[Index] ? Catalog->Weapons[Index]->DisplayName : FText::GetEmpty());
-			OutSelected = Catalog->Weapons[Index] == LocalLoadout.Weapon ? Index + 1 : OutSelected;
+			const UHitmenWeaponData* Weapon = Catalog->Weapons[Index];
+			Choices.Add(Item(Weapon ? Weapon->DisplayName : FText::GetEmpty(), Weapon ? Weapon->Icon.LoadSynchronous() : nullptr));
+			OutSelected = Weapon && Weapon == LocalLoadout.Weapon ? Index + 1 : OutSelected;
 		}
 		return Choices;
 	}
 	const EHitmenAbilitySlot AbilitySlot = CardIndex == 1 ? EHitmenAbilitySlot::Move : EHitmenAbilitySlot::Manipulation;
 	const UHitmenAbilityData* Current = CardIndex == 1 ? LocalLoadout.MoveAbility.Get() : LocalLoadout.ManipulationAbility.Get();
-	Choices.Add(LOCTEXT("NoneChoice", "None"));
 	const TArray<UHitmenAbilityData*> Abilities = Catalog->GetAbilities(AbilitySlot);
 	for (int32 Index = 0; Index < Abilities.Num(); ++Index)
 	{
-		Choices.Add(Abilities[Index] ? Abilities[Index]->DisplayName : FText::GetEmpty());
-		OutSelected = Abilities[Index] == Current ? Index + 1 : OutSelected;
+		const UHitmenAbilityData* Ability = Abilities[Index];
+		Choices.Add(Item(Ability ? Ability->DisplayName : FText::GetEmpty(), Ability ? Ability->Icon.LoadSynchronous() : nullptr));
+		OutSelected = Ability && Ability == Current ? Index + 1 : OutSelected;
 	}
 	return Choices;
 }
 
-void UHitmenLobbyWidget::OpenCarousel(int32 CardIndex)
+void UHitmenLobbyWidget::RefreshLoadoutStrips()
 {
-	if (!Carousel || !LoadoutCards.IsValidIndex(CardIndex))
+	for (int32 Row = 0; Row < LoadoutStrips.Num(); ++Row)
 	{
-		return;
-	}
-	CarouselCard = CardIndex;
-	int32 Selected = 0;
-	const TArray<FText> Choices = GetLoadoutChoices(CardIndex, Selected);
-	Carousel->SetChoices(Choices, Selected);
-	if (UCanvasPanelSlot* CarouselSlot = Cast<UCanvasPanelSlot>(Carousel->Slot))
-	{
-		CarouselSlot->SetSize(Carousel->GetStripSize());
-	}
-	for (int32 Card = 0; Card < LoadoutCards.Num(); ++Card)
-	{
-		LoadoutCards[Card]->SetSelected(Card == CardIndex);
+		int32 Selected = 0;
+		const TArray<FHitmenChoiceItem> Choices = GetLoadoutChoices(Row, Selected);
+		LoadoutStrips[Row]->SetChoices(Choices, Selected, LoadoutTileSize, LoadoutColumns);
 	}
 }
 
-void UHitmenLobbyWidget::HandleCardHovered(bool bHovered)
-{
-	bPointerOnCards = false;
-	for (int32 Card = 0; Card < LoadoutCards.Num(); ++Card)
-	{
-		if (LoadoutCards[Card]->IsHovered())
-		{
-			bPointerOnCards = true;
-			if (Card != CarouselCard)
-			{
-				OpenCarousel(Card);
-			}
-		}
-	}
-}
-
-void UHitmenLobbyWidget::HandleCardClicked()
-{
-	for (int32 Card = 0; Card < LoadoutCards.Num(); ++Card)
-	{
-		if (LoadoutCards[Card]->IsHovered())
-		{
-			OpenCarousel(Card);
-		}
-	}
-}
-
-void UHitmenLobbyWidget::HandleCardWheel(int32 Direction)
-{
-	if (CarouselCard == INDEX_NONE)
-	{
-		return;
-	}
-	int32 Selected = 0;
-	const TArray<FText> Choices = GetLoadoutChoices(CarouselCard, Selected);
-	if (Choices.Num() > 0)
-	{
-		ApplyLoadoutChoice(CarouselCard, (Selected + Direction + Choices.Num()) % Choices.Num());
-		OpenCarousel(CarouselCard);
-	}
-}
-
-void UHitmenLobbyWidget::HandleCarouselChosen(int32 Index)
-{
-	ApplyLoadoutChoice(CarouselCard, Index);
-}
+void UHitmenLobbyWidget::HandleWeaponChosen(int32 Index) { ApplyLoadoutChoice(0, Index); }
+void UHitmenLobbyWidget::HandleMoveChosen(int32 Index) { ApplyLoadoutChoice(1, Index); }
+void UHitmenLobbyWidget::HandleManipulationChosen(int32 Index) { ApplyLoadoutChoice(2, Index); }
 
 void UHitmenLobbyWidget::ApplyLoadoutChoice(int32 CardIndex, int32 ChoiceIndex)
 {
@@ -1077,26 +1117,15 @@ void UHitmenLobbyWidget::ApplyLoadoutChoice(int32 CardIndex, int32 ChoiceIndex)
 	{
 		HitmenLobby::SendLoadout(PC, LocalLoadout);
 	}
-	RefreshCustomization();
+	if (LoadoutStrips.IsValidIndex(CardIndex))
+	{
+		LoadoutStrips[CardIndex]->SetSelected(ChoiceIndex);
+	}
 }
 
 // =============================================================================================
 // Actions
 // =============================================================================================
-
-TArray<int32> UHitmenLobbyWidget::GetCarouselMaps() const
-{
-	TArray<int32> Result;
-	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
-	for (int32 Index = 0; Index < Settings->GetMapCount(); ++Index)
-	{
-		if (const UHitmenMapDefinition* Map = Settings->LoadMap(Index); Map && Map->bShowInCarousel)
-		{
-			Result.Add(Index);
-		}
-	}
-	return Result;
-}
 
 bool UHitmenLobbyWidget::IsHost() const
 {
@@ -1220,9 +1249,10 @@ void UHitmenLobbyWidget::CycleCosmetic(EHitmenCosmeticSlot CosmeticSlot, int32 D
 	{
 		return;
 	}
+	// Instant on the stage; the server gets the result once the clicks pause.
 	LocalCosmetics.SetSlot(CosmeticSlot, CycleIn(Catalog->GetCosmeticsForSlot(CosmeticSlot), LocalCosmetics.GetSlot(CosmeticSlot), Direction, true));
-	if (AHitmenPlayerController* PC = GetHitmenPC()) { HitmenLobby::SendCosmetics(PC, LocalCosmetics); }
-	RefreshCustomization();
+	PreviewLocalCosmetics();
+	CosmeticSendDelay = CosmeticSendPause;
 }
 
 void UHitmenLobbyWidget::RandomizeCosmetics()
@@ -1230,8 +1260,8 @@ void UHitmenLobbyWidget::RandomizeCosmetics()
 	if (const UHitmenCatalog* Catalog = GetCatalog())
 	{
 		LocalCosmetics = Catalog->MakeRandomCosmetics();
-		if (AHitmenPlayerController* PC = GetHitmenPC()) { HitmenLobby::SendCosmetics(PC, LocalCosmetics); }
-		RefreshCustomization();
+		PreviewLocalCosmetics();
+		CosmeticSendDelay = CosmeticSendPause;
 	}
 }
 

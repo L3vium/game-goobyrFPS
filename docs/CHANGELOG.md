@@ -11,6 +11,24 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   rooms, then friends' rooms, now one query at a time through one queue, refresh spam ignored); session delegates
   are cleared when the subsystem goes away; the UI folder is always cooked (font loaded by path).
 
+### Changed
+- Front end lit at one fixed exposure (unbound post process volume, min = max brightness): no more dark briefing
+  room that slowly brightens, no overexposed agent stage. Briefing fills added, stage key / rim softened.
+- Title: the HITMEN wordmark alone (no tagline, no red underline); square menu blocks top to bottom Join room
+  (dashed outline), Create room, Options, Quit. Space or Escape goes back on every menu page; menu buttons never
+  take keyboard focus (Space no longer re-presses the last button).
+- Create Room: the players panel runs from the map to the screen edge; three nested blocks (players panel, opaque
+  team blocks with a tinted header, a solid block per player); team role is a square ATTACK / PROTECT block,
+  remove is a cross; the watcher toggle is an eye (open / struck) shown when hovering a player; the map tile fills
+  its frame with the map image (cropped, never letterboxed) with the whole map small in the top-left corner.
+- Arrows are real arrows (shaft and head) on square blocks; fast clicks all count (double clicks are steps).
+- Your agent: framed further left, codename above the head, Randomize under the feet, no slot labels; the look
+  changes on the stage at once and is sent once clicks pause (no lobby rebuild per click, unchanged cosmetic
+  slots are skipped).
+- Loadout: three always-visible rows of square tiles (weapon, move, manipulation) with a None tile each; a click
+  picks, hover is instant, names stay inside their tile, no hint text. Default loadout: silenced pistol, no
+  abilities. The launch countdown is one big number in a square block.
+
 ### Added
 - Room codes: every room gets a 6-character code (no 0/O/1/I/L), shown on Create Room; Join has a code field.
 - Join: the Steam friends list (playing Hitmen / online / offline, click a friend in a room to join), then the

@@ -16,6 +16,8 @@ class UWidgetSwitcher;
 class UHitmenMenuButton;
 class UHitmenBackdrop;
 class UHitmenLobbyWidget;
+class UEditableTextBox;
+class UHitmenIconButton;
 
 UCLASS()
 class HITMEN_API UHitmenTitleScreenWidget : public UHitmenUserWidget
@@ -30,11 +32,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Title") void OpenOptions();
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Title") void QuitGame();
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Title") void OpenDebugGym();
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Title") void JoinWithCode();
+
+	/** Back from the current page (Space / Escape): join -> title, agent -> room, room -> leave. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Title") void GoBack();
 
 protected:
 	virtual void BuildDefaultLayout() override;
 	virtual void BindEvents() override;
 	virtual void UnbindEvents() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	/** Search LAN instead of Steam (local testing). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Title")
@@ -48,12 +56,18 @@ protected:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UVerticalBox> FriendRoomList;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> JoinStatusText;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> TitleStatusText;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UVerticalBox> FriendList;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UEditableTextBox> CodeEdit;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UTextBlock> CodeStatusText;
+	UPROPERTY(Transient) TObjectPtr<UHitmenIconButton> RefreshButton;
 
 	UFUNCTION() void HandleSessionsFound(const TArray<FHitmenSessionInfo>& Sessions, bool bSuccess);
 	UFUNCTION() void HandleJoinClicked(int32 ResultIndex);
 	UFUNCTION() void HandleCreateComplete(bool bSuccess);
 	UFUNCTION() void HandleJoinComplete(bool bSuccess);
 	UFUNCTION() void HandlePhaseChanged(EHitmenMatchPhase Phase);
+	UFUNCTION() void HandleFriendsUpdated(const TArray<FHitmenFriendInfo>& Friends);
+	UFUNCTION() void HandleCodeCommitted(const FText& Text, ETextCommit::Type CommitType);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnJoinPanelToggled(bool bOpen);
@@ -65,4 +79,7 @@ protected:
 	void RefreshPageFromPhase();
 	UHitmenSessionSubsystem* GetSessions() const;
 	UHitmenMenuButton* AddMenuButton(UVerticalBox* Box, const FText& Label, int32 Kind, FName Handler);
+	UTextBlock* MakeListMessage(const FText& Text) const;
+	bool IsTyping() const;
+	bool bJoiningByCode = false;
 };

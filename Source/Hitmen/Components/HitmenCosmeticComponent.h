@@ -59,6 +59,11 @@ protected:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> StaticSlots;
 
+	/** Item shown in each slot: unchanged slots are skipped (fast look cycling). */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<const UHitmenCosmeticItem>> AppliedItems;
+	bool bAppliedOnce = false;
+
 	UFUNCTION() void OnRep_Cosmetics();
 
 	void ApplyCosmetics();

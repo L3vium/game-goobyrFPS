@@ -95,9 +95,15 @@ void UHitmenCosmeticComponent::ApplyCosmetics()
 	{
 		return;
 	}
+	AppliedItems.SetNum(UE_ARRAY_COUNT(AllSlots));
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(AllSlots); ++Index)
 	{
 		const UHitmenCosmeticItem* Item = Cosmetics.GetSlot(AllSlots[Index]);
+		if (bAppliedOnce && AppliedItems[Index] == Item)
+		{
+			continue;
+		}
+		AppliedItems[Index] = Item;
 		USkeletalMeshComponent* Skeletal = SkeletalSlots[Index];
 		UStaticMeshComponent* Static = StaticSlots[Index];
 
@@ -123,6 +129,7 @@ void UHitmenCosmeticComponent::ApplyCosmetics()
 			}
 		}
 	}
+	bAppliedOnce = true;
 	OnCosmeticsApplied.Broadcast();
 }
 

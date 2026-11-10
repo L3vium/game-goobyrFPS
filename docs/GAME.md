@@ -68,22 +68,30 @@ The whole front end is **one scene** (`L_FrontEnd`): title, room and agent scree
 level. The camera blends between `CameraActor`s tagged `Shot_Title`, `Shot_Lobby` and
 `Shot_Customization` (the match phase picks the shot; `AHitmenHUD::ShotBlendTime`). Creating a room
 starts listening in place; joining players load `L_FrontEnd` once; a finished match travels back
-to it, in the room.
+to it, in the room. The front end has one fixed exposure (an unbound post process volume, no eye
+adaptation): every room is lit for it. Space or Escape goes back on every menu page.
 
-1. **Title screen** — the **HITMEN** logo and the buttons vertically centred on the left: **Join**,
-   **Create Room**, **Options**, **Quit**, plus a small **debug** button (Gym). The museum hall
-   behind, the assassin (engine mannequin) idling on the right.
-2. **Join** — joinable rooms, then Steam friends' rooms.
-3. **Create Room** (briefing room) — left: a large top-down map tile (the baked schematic, map name,
-   prev / next arrow buttons on square backgrounds) and two options: proximity chat and difficulty.
-   Right: player rows (white name, colour swatch), a dashed **+ Create team** button, whole-row
-   drag & drop into team panels (the target panel lights up), Protect/Attack per team, a
-   **Watcher** checkbox for players without a team. Bottom: **Back** and **Next**.
-4. **Your agent** (stage) — the mannequin stands on the left; arrows on both sides of its head,
-   body and legs change the look live; the name is edited here. Below: the loadout as square cards
-   (weapon, move, manipulation); hovering a card opens a carousel above it (wheel or click).
-   **Ready** only: when every non-watcher is ready a 5 s countdown starts the match (un-ready
-   cancels it).
+1. **Title screen** — the **HITMEN** wordmark alone, then square menu blocks vertically centred on
+   the left, top to bottom: **Join room** (dashed outline), **Create room**, **Options**, **Quit**,
+   plus a small **debug** button (Gym). The museum hall behind, the assassin idling on the right.
+2. **Join** — left: **Steam friends** (playing Hitmen / online / offline; a friend in a room is a
+   click to join), then **Rooms** with a refresh button beside the header (messages such as "No room
+   found" sit inside the list). Right: the **room code** field and **Join**. Every room has a
+   6-character code (no 0/O/1/I/L) shown on Create Room. Steam allows one search at a time, so public
+   rooms, the friends list and friends' rooms are queried one after the other.
+3. **Create Room** (briefing room) — left: the map tile (a screenshot of the map filling the tile, the
+   whole map small in its top-left corner, the name at the bottom, arrows on square blocks) and two
+   options: proximity chat and difficulty. Right, from the map to the screen edge: one players panel
+   (count and room code on top) holding opaque team blocks (tinted header, square **ATTACK / PROTECT**
+   toggle, a cross to remove) which hold one solid block per player; the host drags players between
+   blocks. Hovering a player without team shows the watcher eye (open = watching, struck = playing).
+   A dashed **+ Create team** block below. Bottom: **Leave room** and **Choose your agent**.
+4. **Your agent** (stage) — the agent stands on the left; the codename above its head, arrows (real
+   arrows, every click counts) right beside its head, torso and legs, **Randomize** under its feet;
+   the look changes on the stage at once and is sent once the clicks pause. Right: the loadout, three
+   always-visible rows of square icon tiles (weapon, move `E`, manipulation `A`), each starting with
+   **None**; a click picks. Default: silenced pistol, no abilities. **Ready** only: when every
+   non-watcher is ready a 5 s countdown (one big number) starts the match (un-ready cancels it).
 5. **Match** — intro (parachute drop, "Dropping in", map name, 3-2-1), play, then results.
 
 Spawns: maps carry many `BP_TeamStart` points. Each team (or solo player) takes a random free point
@@ -123,13 +131,16 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
 
   | Obstacle | Action |
   |---|---|
-  | up to 50 cm | step |
-  | up to 120 cm, thin, floor behind | vault |
-  | up to 250 cm with room on top | ledge grab (climb and stand on it) |
-  | up to 250 cm, thin wall | climb over |
+  | up to 55 cm | step (walked up, no key) |
+  | up to 120 cm, thin, floor behind | vault (also through an open window) |
+  | up to 250 cm, top at least 40 cm deep | climb onto it (a block wall: walk along its top) |
+  | up to 250 cm, thinner wall | climb over |
   | above 250 cm | out of reach (ladder, gutter, ability) |
+- The hint only shows on the ground. Space counts for 0.25 s after the press (late ledge grabs); jumping at a
+  ladder grabs it at once.
 - **First person**: no body or arms while moving (the body's shadow stays); the arms appear with a weapon in
-  hand or while punching. Recoil kicks the view up and it recovers smoothly. On death the view leaves the head.
+  hand (held on the right, barrel along the view) or while punching (arms at chest height, the fists cross the
+  view). Recoil kicks the view up and it recovers smoothly. On death the view leaves the head.
 - **Inventory**: 2 weapon slots (mouse wheel). `F` with no interactable in focus throws the held
   item: if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
   stays. Firing with an empty magazine and no reserve throws the weapon where you look. No weapon
@@ -139,7 +150,11 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   pistol is silenced.
 - **Keycards**: acquired items shown next to the inventory, cannot be dropped. Doors may require
   a keycard ID (0, 1, 2…). NPCs can carry keycards and drop them on death.
-- **Stealth kill**: `F` behind an unaware target plays a kill montage.
+- **Stealth kill**: `F` behind an unaware target: both are held, the attacker steps in behind, the
+  attack plays (body and first-person arms), the victim reacts and dies on the strike (1 s).
+- **Health**: players 300, guards 100 (guards also hit softer, difficulty damage multiplier).
+- **Intro**: the move keys steer the parachute; nobody can see a player under the canopy or for 2 s
+  after landing.
 - **Sightroom (`Tab`)**: a scan sweeps the surroundings; enemies within a radius are shown in
   white through walls, interactables in white only when in line of sight, the target in red at
   any distance. No waypoint in normal view. Radii live on the player controller
@@ -193,7 +208,7 @@ drink, or in a vent to poison the sealed rooms it serves).
 ## 9. World fixtures
 | Fixture | Behaviour |
 |---|---|
-| Tall grass | Crouched inside = hidden |
+| Tall grass | Crouched inside = hidden (dark soft vignette and an eye-off mark on screen) |
 | Explosive barrel (red) | Explodes when shot |
 | Ladder / gutter | Automatic climb |
 | Zipline | Automatic, up/down |
@@ -205,7 +220,7 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Distraction | Interact → noise that attracts NPCs |
 | Hackable distraction | Silent, interact or remote-activate |
 | Turret | Red laser while locking on, then shoots players; hack with `F` (or its panel): shoots NPCs |
-| Security camera | Short cone aimed at the floor (white → red when you are inside), round footprint; spotting calls reinforcements |
+| Security camera | A shadowed spotlight aimed at the floor (white → red when it sees you; walls cut it); sees you only through open air; spotting calls reinforcements |
 | Security station | Desk + screen cycling through its cameras; `F` disables / enables them ("no signal") |
 | Circuit breaker | Turns off its linked lights: NPCs cannot see (only hear), players see less |
 | Vent | Crouch-size duct with small doors; poison spreads to linked rooms only if fully closed |
@@ -219,7 +234,9 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Keycard pickup | Grants keycard ID |
 
 ## 10. AI
-All NPCs are hostile. Sight takes priority over hearing.
+All NPCs are hostile. Sight takes priority over hearing. Sight range 1950 cm (lose at 2250), times the
+difficulty multiplier; suspicion fills slower with distance (falloff 1600 cm). Guards in combat hold their
+weapon's aim pose and play its fire montage on each shot.
 
 There are no civilians: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate.
 
@@ -280,7 +297,7 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   directions while carrying.
 - **Inventory bar** (bottom centre): two weapon cards (name, ammo in dimmed italics; they slide when you
   switch), a divider, the A and E ability cards (cooldown / charges), keycard chips above, a health line when hurt.
-- **Minimap** (bottom left, square): the baked map rotating with the view, alerted NPCs, sonar pings; its frame
+- **Minimap** (bottom left, square): the baked map, north up (your arrow turns), alerted NPCs, sonar pings; its frame
   takes the colour of the worst alert aimed at you with a status line (Suspicious, Alerted, Searching,
   Spotted, Under fire).
 - **Crosshair**: a thin "+"; hit ticks; an "x" on a kill (red on a headshot); arrows around it toward NPCs

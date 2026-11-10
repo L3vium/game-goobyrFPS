@@ -443,7 +443,9 @@ void AHitmenPlayerCharacter::UpdateFirstPersonArms(float DeltaSeconds)
 	}
 
 	// Hip / aim offset.
-	CurrentArmsOffset = FMath::VInterpTo(CurrentArmsOffset, bIsAiming ? ArmsAimOffset : ArmsHipOffset, DeltaSeconds, ArmsOffsetInterpSpeed);
+	const FVector TargetArmsOffset = !InventoryComponent->GetActiveWeapon() ? ArmsUnarmedOffset : (bIsAiming ? ArmsAimOffset : ArmsHipOffset);
+	// Fists appear at once (a punch is short); weapons blend between hip and aim.
+	CurrentArmsOffset = InventoryComponent->GetActiveWeapon() ? FMath::VInterpTo(CurrentArmsOffset, TargetArmsOffset, DeltaSeconds, ArmsOffsetInterpSpeed) : TargetArmsOffset;
 
 	// Sway: the arms lag behind fast view turns, then catch up.
 	const FRotator Control = GetControlRotation();

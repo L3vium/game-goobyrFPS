@@ -46,6 +46,17 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Swapped / dropped weapons become a floating pickup at once (no physics tumble) at their real size; the focus
   glow works on skeletal guns (rocket / grenade launchers, black hole gun).
 - Containers hide their contents while their doors are closed.
+- First person: the arms hold guns on the right (BP hip offset was left of centre) and every gun points along the
+  view (the old -90 yaw turned them sideways); rotations solved in PIE by `Tools/Editor/hitmen_fp_solve.py`.
+  Launchers are drawn smaller; the knife and the bow use the hold pose (the knife sat at the hip).
+- Punches are seen: without a weapon the arms move to chest height (`ArmsUnarmedOffset`) so the fists cross the view.
+- Windows lie in their wall (they were spawned across it): 100 windows turned in the Gym and LDTest
+  (`Tools/Editor/hitmen_patch_levels_040.py`), the level builder spawns them turned. A closed window can no
+  longer be vaulted (the shutters left a 1 cm gap on the centre line; the passage check is a sweep on the pawn
+  channel), and the vault probe finds the sill under a lintel.
+- LDTest: 8 of the 16 spawn points were removed, the ones within guard sight (two had a guard 3 to 5 m away).
+  Gym: the guard group keeps one follower.
+- Bullet impacts: a dust puff thrown back toward the shooter on surfaces, blood on characters.
 - The interaction prompt keeps its target 0.2 s when the trace grazes a frame (no flicker on windows).
 
 ### Added

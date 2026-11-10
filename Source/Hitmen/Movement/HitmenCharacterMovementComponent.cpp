@@ -473,16 +473,17 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 	for (const float Depth : MantleProbeDepths)
 	{
 		const FVector ProbeXY = WallHit.ImpactPoint + Into * Depth;
+		const float EndZ = Feet.Z + MantleMinHeight * 0.5f;
 		float StartZ = Feet.Z + MantleMaxHeight + 25.f;
-		FHitResult Ceiling;
-		const FVector Below(ProbeXY.X, ProbeXY.Y, WallHit.ImpactPoint.Z);
-		if (World->LineTraceSingleByChannel(Ceiling, Below + FVector::UpVector * 2.f, FVector(ProbeXY.X, ProbeXY.Y, StartZ), ECC_Visibility, Params)
-			&& !Ceiling.bStartPenetrating)
+		// Start in open air: a probe column through a wall with an opening (window) starts inside the
+		// lintel; step down until out of solid geometry, then sweep down onto the sill.
+		const FCollisionShape ProbeShape = FCollisionShape::MakeSphere(5.f);
+		while (StartZ > EndZ && World->OverlapBlockingTestByChannel(FVector(ProbeXY.X, ProbeXY.Y, StartZ), FQuat::Identity, ECC_Visibility, ProbeShape, Params))
 		{
-			StartZ = Ceiling.ImpactPoint.Z - 6.f;
+			StartZ -= 12.f;
 		}
 		const FVector Start(ProbeXY.X, ProbeXY.Y, StartZ);
-		const FVector End(ProbeXY.X, ProbeXY.Y, Feet.Z + MantleMinHeight * 0.5f);
+		const FVector End(ProbeXY.X, ProbeXY.Y, EndZ);
 		if (Start.Z > End.Z
 			&& World->SweepSingleByChannel(TopHit, Start, End, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(4.f), Params)
 			&& !TopHit.bStartPenetrating && IsWalkable(TopHit))
@@ -509,7 +510,10 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 	{
 		const FVector FarProbe = FVector(WallHit.ImpactPoint.X, WallHit.ImpactPoint.Y, TopHit.ImpactPoint.Z + 15.f) + Into * (VaultMaxDepth + Radius + 10.f);
 		FHitResult Blocked;
-		if (World->LineTraceSingleByChannel(Blocked, TopHit.ImpactPoint + FVector::UpVector * 15.f, FarProbe, ECC_Visibility, Params))
+		// Pawn channel too: closed shutters block bodies without blocking sight.
+		const FCollisionShape PassShape = FCollisionShape::MakeSphere(10.f);
+		if (World->SweepSingleByChannel(Blocked, TopHit.ImpactPoint + FVector::UpVector * 15.f, FarProbe, FQuat::Identity, ECC_Visibility, PassShape, Params)
+			|| World->SweepTestByChannel(TopHit.ImpactPoint + FVector::UpVector * 15.f, FarProbe, FQuat::Identity, Channel, PassShape, Params))
 		{
 			return false;
 		}

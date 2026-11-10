@@ -582,11 +582,13 @@ def build_weapons(mats):
     pistol_aim = montage("AM_Pistol_Aim", ANIMS + "/Pistol/MF_Pistol_Idle_ADS")
     rifle_aim = montage("AM_Rifle_Aim", ANIMS + "/Rifle/MF_Rifle_Idle_ADS")
     gun_fx = dict(muzzle_fx=fx("MuzzleFlash/OneShot/NS_Muzzle_Combined_Aligned_X_OS"), impact_fx=fx("Impact/OneShot/NS_Impact_01_OS"),
+                  surface_impact_fx=fx("Dust/OneShot/NS_Dust_Directional_Small_01_OS"), flesh_impact_fx=fx("Blood/OneShot/NS_Blood_Impact_01_OS"),
                   fire_sound=load(SFX + "SFX_GunShot_Cue"), impact_sound=load(SFX + "SFX_Impact_01"),
                   dry_fire_sound=load(ESS + "SFX_Essentials_02_CLOCKS/Cues/CLOCKTick_InsJ_Clock-01_Ticking_Single-01_Cue"))
-    # On the first-person arms (camera-aligned ADS pose) the hand socket faces sideways: turn the gun forward.
+    # On the first-person arms the gun is turned so its barrel runs along the view and its top is up. Solved in
+    # PIE by Tools/Editor/hitmen_fp_solve.py (the same for every gun, their VisualTransforms share one convention).
     fp_offset = unreal.Transform()
-    fp_offset.rotation = unreal.Rotator(roll=0.0, pitch=0.0, yaw=-90.0).quaternion()
+    fp_offset.rotation = unreal.Rotator(roll=8.7, pitch=-0.3, yaw=-2.9).quaternion()
     gun_fx["first_person_attach_offset"] = fp_offset
     pistol_vis = dict(first_person_pose=pistol_pose, fire_montage=pistol_fire, equip_montage=pistol_equip, aim_montage=pistol_aim, **gun_fx)
     pistol_vis["muzzle_fx"] = fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_Aligned_X_OS")
@@ -594,14 +596,20 @@ def build_weapons(mats):
     # First person, every gun uses the two-hand pistol hold (the arms offsets are tuned for it); the body keeps the
     # rifle montages. Swap first_person_pose per weapon once dedicated first-person rifle poses exist.
     rifle_vis = dict(first_person_pose=pistol_pose, fire_montage=rifle_fire, equip_montage=rifle_equip, aim_montage=rifle_aim, **gun_fx)
-    # The pack's long guns face another axis than its pistol: tilted and turned so the barrel meets the crosshair
-    # from the hip hold, and a little smaller so the stock does not fill the view (tuned live in PIE).
+    # Long guns: same hold, a little smaller so the stock does not fill the view.
     long_offset = unreal.Transform()
-    long_offset.rotation = unreal.Rotator(roll=0.0, pitch=45.0, yaw=-25.0).quaternion()
+    long_offset.rotation = fp_offset.rotation
     long_offset.scale3d = unreal.Vector(0.75, 0.75, 0.75)
     rifle_vis["first_person_attach_offset"] = long_offset
     launcher_vis = dict(rifle_vis)
-    launcher_vis["first_person_attach_offset"] = fp_offset
+    launcher_offset = unreal.Transform()
+    launcher_offset.rotation = fp_offset.rotation
+    launcher_offset.scale3d = unreal.Vector(0.55, 0.55, 0.55)
+    launcher_vis["first_person_attach_offset"] = launcher_offset
+    knife_offset = unreal.Transform()
+    knife_offset.rotation = unreal.Rotator(roll=-179.3, pitch=-79.6, yaw=-94.7).quaternion()
+    bow_offset = unreal.Transform()
+    bow_offset.rotation = unreal.Rotator(roll=-90.3, pitch=-8.7, yaw=87.2).quaternion()
     launcher_vis["fire_sound"] = load("/Game/Weapons/GrenadeLauncher/Audio/FirstPersonTemplateWeaponFire02")
 
     A = unreal.HitmenFireMode
@@ -631,7 +639,7 @@ def build_weapons(mats):
                    static_mesh=sniper_mesh, skeletal_mesh=None, visual_transform=pack(0.55), **rifle_vis)),
         "Bow": ("Bow", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=60.0, damage=90.0, charge_to_fire=True, full_charge_time=1.0,
                 projectile_class=gen_class(arrow), projectile_speed=5000.0, silenced=True, noise_radius=0.0, start_ammo=12, max_ammo=30,
-                ammo_per_pickup=6, recoil_pitch=0.8, first_person_pose=pistol_pose)),
+                ammo_per_pickup=6, recoil_pitch=0.8, first_person_pose=pistol_pose, first_person_attach_offset=bow_offset)),
         "RocketLauncher": ("Rocket launcher", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=40.0, projectile_class=gen_class(rocket),
                            projectile_speed=3000.0, start_ammo=4, max_ammo=8, ammo_per_pickup=2, noise_radius=5000.0, recoil_pitch=4.0,
                            back_blast_fx=fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_OS"),
@@ -643,7 +651,8 @@ def build_weapons(mats):
                       projectile_speed=1800.0, start_ammo=2, max_ammo=4, ammo_per_pickup=1, noise_radius=1500.0, recoil_pitch=2.0,
                       static_mesh=gl_mesh, skeletal_mesh=gl_skel, **launcher_vis)),
         "Sword": ("Knife", melee, dict(fire_mode=A.SINGLE, rounds_per_minute=90.0, damage=75.0, uses_ammo=False, melee_range=190.0,
-                  melee_radius=45.0, silenced=True, noise_radius=0.0, static_mesh=knife_mesh, skeletal_mesh=None, visual_transform=pack(0.5, 0.0))),
+                  melee_radius=45.0, silenced=True, noise_radius=0.0, static_mesh=knife_mesh, skeletal_mesh=None, visual_transform=pack(0.5, 0.0),
+                  first_person_pose=pistol_pose, first_person_attach_offset=knife_offset)),
     }
     datas = {}
     for name, (display, bp, props) in weapons.items():

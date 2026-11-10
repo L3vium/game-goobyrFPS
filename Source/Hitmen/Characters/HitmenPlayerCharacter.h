@@ -222,11 +222,15 @@ protected:
 	// ---- First-person arms (shown only with a weapon in hand or while acting) ----
 	/** Arms mesh offset from the camera when firing from the hip. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
-	FVector ArmsHipOffset = FVector(-6.f, 9.f, -158.f);
+	FVector ArmsHipOffset = FVector(8.f, 16.f, -166.f);
 
 	/** Arms mesh offset from the camera while aiming (sights near the screen centre). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
 	FVector ArmsAimOffset = FVector(-4.f, 0.f, -153.f);
+
+	/** Arms mesh offset with no weapon (punch, takedown): higher, so the fists swing through the view. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
+	FVector ArmsUnarmedOffset = FVector(14.f, 6.f, -162.f);
 
 	/** Yaw of the arms mesh relative to the camera (mannequin forward is +Y). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")

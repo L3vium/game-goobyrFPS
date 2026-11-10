@@ -319,6 +319,8 @@ def front_end_tune_lights(actors):
         camera.set_actor_rotation(unreal.Rotator(pitch=rot[0], yaw=rot[1], roll=rot[2]), False)
 
 
+# Windows: the opening spans the window's local Y, so in a wall running along X they are turned 90.
+
 def build_front_end():
     new_map("L_FrontEnd")
     game_mode("BP_GM_Lobby")
@@ -513,7 +515,7 @@ def build_gym():
     label(X, -1000, 250, "CLIMB OVER  thin 250 cm wall")
     # Window in a wall: F to open, Space to vault through.
     wall((X - 350, -500), (X + 350, -500), 0, 320, 25, [(350, 120, 100, 220)], GRID_DARK, G)
-    spawn(bp("World/Interactables/Window/BP_Window"), (X, -500, 0), folder=G)
+    spawn(bp("World/Interactables/Window/BP_Window"), (X, -500, 0), (0, 90, 0), folder=G)
     label(X, -500, 320, "WINDOW  F open  -  Space vault")
     # Ladder and gutter up to a platform; zipline down from it to the east.
     block(X, 300, 500, 500, 400, folder=G)
@@ -665,7 +667,7 @@ def build_gym():
     room_door = spawn(bp("World/Interactables/Door/BP_Door"), (vx - 55, vy - 350, 0), folder=G)
     wall((vx - 350, vy - 350), (vx + 350, vy - 350), 0, 330, 25, [(350, 110, 0, 230)], GRID_DARK, G)
     wall((vx - 350, vy + 350), (vx + 350, vy + 350), 0, 330, 25, [(350, 120, 100, 220)], GRID_DARK, G)
-    room_window = spawn(bp("World/Interactables/Window/BP_Window"), (vx, vy + 350, 0), folder=G)
+    room_window = spawn(bp("World/Interactables/Window/BP_Window"), (vx, vy + 350, 0), (0, 90, 0), folder=G)
     wall((vx - 350, vy - 350), (vx - 350, vy + 350), 0, 330, 25, [(350, 120, 0, 120)], GRID_DARK, G)
     hatch = spawn(bp("World/Interactables/Vent/BP_VentHatch"), (vx - 350, vy, 0), (0, 90, 0), folder=G)
     wall((vx + 350, vy - 350), (vx + 350, vy + 350), 0, 330, 25, (), GRID_DARK, G)
@@ -765,7 +767,7 @@ def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", 
     if windows:
         for f in range(floors):
             for t in (0.25, 0.75):
-                spawn(bp("World/Interactables/Window/BP_Window"), (x0 + w * t, y0, f * floor_h), folder=folder)
+                spawn(bp("World/Interactables/Window/BP_Window"), (x0 + w * t, y0, f * floor_h), (0, 90, 0), folder=folder)
     if gutter:
         ladder((x0 - 15, cy + d * 0.3, 0), 180, H + 20, gutter=True, folder=folder)
     return (x0, x1, y0, y1, H)
@@ -841,7 +843,7 @@ def build_ldtest():
     spawn(bp("World/Interactables/Door/BP_Door"), (mx - 80, hy0, 0), folder="Manor/House")
     for f in range(2):
         for t in (0.25, 0.75):
-            spawn(bp("World/Interactables/Window/BP_Window"), (hx0 + 3600 * t, hy1, f * FH), (0, 180, 0), folder="Manor/House")
+            spawn(bp("World/Interactables/Window/BP_Window"), (hx0 + 3600 * t, hy1, f * FH), (0, 270, 0), folder="Manor/House")
     stairs((hx1 - 200, hy0 + 150, 0), 90, FH, 1100, 300, folder="Manor/House")
     ladder((hx1 + 20, hy1 - 400, 0), 0, 2 * FH + 20, gutter=True, folder="Manor/House")
     # Interior: dining room (sealed: door + window + vent hatch) on ground floor west.

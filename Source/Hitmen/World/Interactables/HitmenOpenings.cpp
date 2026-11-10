@@ -232,8 +232,9 @@ void AHitmenWindow::OnConstruction(const FTransform& Transform)
 	// Hinges on the outer edges; each shutter covers half the opening.
 	LeftHinge->SetRelativeLocation(FVector(0.f, -Width * 0.5f, (Z0 + Z1) * 0.5f));
 	RightHinge->SetRelativeLocation(FVector(0.f, Width * 0.5f, (Z0 + Z1) * 0.5f));
-	HitmenGeometry::SetBox(LeftShutter, FVector(0.f, Width * 0.25f, 0.f), FVector(ShutterThickness, Width * 0.5f - 1.f, Height - 1.f));
-	HitmenGeometry::SetBox(RightShutter, FVector(0.f, -Width * 0.25f, 0.f), FVector(ShutterThickness, Width * 0.5f - 1.f, Height - 1.f));
+	// The two shutters overlap a little in the middle: no gap a body or a probe could pass through.
+	HitmenGeometry::SetBox(LeftShutter, FVector(0.f, Width * 0.25f, 0.f), FVector(ShutterThickness, Width * 0.5f + 1.f, Height - 1.f));
+	HitmenGeometry::SetBox(RightShutter, FVector(0.f, -Width * 0.25f, 0.f), FVector(ShutterThickness, Width * 0.5f + 1.f, Height - 1.f));
 	ApplyOpenAlpha(bOpen ? 1.f : 0.f);
 }
 

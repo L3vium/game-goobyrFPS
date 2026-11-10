@@ -5,6 +5,17 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+### Fixed
+- Crash candidates from the playtest (no log was available): a voice talker stayed bound to a destroyed body after
+  a respawn (now released with the body); Steam searches ran in parallel on Steam's single search slot (public
+  rooms, then friends' rooms, now one query at a time through one queue, refresh spam ignored); session delegates
+  are cleared when the subsystem goes away; the UI folder is always cooked (font loaded by path).
+
+### Added
+- Room codes: every room gets a 6-character code (no 0/O/1/I/L), shown on Create Room; Join has a code field.
+- Join: the Steam friends list (playing Hitmen / online / offline, click a friend in a room to join), then the
+  rooms with a refresh button beside the header and the messages inside the list.
+
 ## [0.3.0] - 2026-11-09
 
 ### Added

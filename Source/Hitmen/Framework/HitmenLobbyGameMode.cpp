@@ -10,6 +10,7 @@
 #include "Data/HitmenMapDefinition.h"
 #include "Data/HitmenCatalog.h"
 #include "Hitmen.h"
+#include "Online/HitmenSessionSubsystem.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 
@@ -29,6 +30,10 @@ void AHitmenLobbyGameMode::InitGameState()
 	}
 	UHitmenGameInstance* GI = GetGameInstance<UHitmenGameInstance>();
 	const bool bReturningFromMatch = GI && GI->bHasPendingMatch;
+	if (const UHitmenSessionSubsystem* Sessions = GI ? GI->GetSubsystem<UHitmenSessionSubsystem>() : nullptr)
+	{
+		GS->SetRoomCode(Sessions->GetRoomCode());
+	}
 	// The front end opens on the title unless it is already hosting (back from a match, joined).
 	GS->SetMatchPhase(bStartOnTitle && !bReturningFromMatch && GetNetMode() == NM_Standalone ? EHitmenMatchPhase::Title : EHitmenMatchPhase::Lobby);
 
@@ -211,6 +216,10 @@ void AHitmenLobbyGameMode::OpenLobby()
 		return;
 	}
 	GS->SetLobbySettings(GetRules()->MakeDefaultLobbySettings());
+	if (const UHitmenSessionSubsystem* Sessions = GetGameInstance() ? GetGameInstance()->GetSubsystem<UHitmenSessionSubsystem>() : nullptr)
+	{
+		GS->SetRoomCode(Sessions->GetRoomCode());
+	}
 	for (AHitmenPlayerState* PS : GS->GetHitmenPlayers())
 	{
 		PS->SetReady(false);

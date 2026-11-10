@@ -80,6 +80,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Intro")
 	bool IsParachuting() const { return bParachuting; }
 
+	/** Parachuting, or just landed: guards and cameras cannot see you yet. */
+	bool IsIntroProtected() const;
+
 	virtual void Landed(const FHitResult& Hit) override;
 
 	/** Local: shows the first-person arms for a moment (punch, throw, interact). */
@@ -160,6 +163,20 @@ protected:
 	/** Gentle drift of the canopy while falling (cm/s). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0", Units="cm/s"))
 	float ParachuteDrift = 60.f;
+
+	/** Horizontal speed when steering the canopy with the move keys. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0", Units="cm/s"))
+	float ParachuteSteerSpeed = 420.f;
+
+	/** How fast the canopy answers the keys (higher = snappier). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0.1"))
+	float ParachuteSteerResponse = 2.5f;
+
+	/** Seconds after landing during which guards still cannot see you. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0", Units="s"))
+	float IntroSightGraceTime = 2.f;
+
+	float ParachuteLandTime = -100.f;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Parachuting)
 	bool bParachuting = false;
@@ -290,6 +307,7 @@ protected:
 	void BeginCharm(AActor* Charmer);
 	void EndCharm();
 	void SetupProximityVoice();
+	void ReleaseProximityVoice();
 	void ApplyInvisibilityVisuals(bool bInvisible);
 	bool CanAct() const;
 

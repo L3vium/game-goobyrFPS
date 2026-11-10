@@ -41,6 +41,13 @@ AHitmenPlayerCharacter::AHitmenPlayerCharacter(const FObjectInitializer& ObjectI
 {
 	PrimaryActorTick.bCanEverTick = true;
 	bUseControllerRotationYaw = true;
+	// Players last much longer than guards (default of the Health component's MaxHealth on the
+	// player; BP_PlayerCharacter can still change it).
+	static constexpr float DefaultPlayerMaxHealth = 300.f;
+	if (UHitmenHealthComponent* PlayerHealth = GetHealth())
+	{
+		PlayerHealth->SetDefaultMaxHealth(DefaultPlayerMaxHealth);
+	}
 
 	// The eye follows the capsule (smoothed stance height), never an animated bone: crouch and
 	// slide lower the view even without crouch animations, and nothing shakes it.
@@ -147,6 +154,7 @@ void AHitmenPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		Settings->OnHitmenSettingsChanged.RemoveAll(this);
 	}
+	ReleaseProximityVoice();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -202,6 +210,7 @@ void AHitmenPlayerCharacter::OnRep_Parachuting()
 	ParachuteCanopy->SetVisibility(bParachuting);
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
+		// Steering is done in Tick (ParachuteSteerSpeed); plain air control would fight it.
 		Movement->AirControl = bParachuting ? 0.f : 0.35f;
 		if (bParachuting)
 		{
@@ -215,11 +224,17 @@ void AHitmenPlayerCharacter::OnRep_Parachuting()
 	Juice_OnParachute(bParachuting);
 }
 
+bool AHitmenPlayerCharacter::IsIntroProtected() const
+{
+	return bParachuting || (GetWorld() && GetWorld()->GetTimeSeconds() - ParachuteLandTime < IntroSightGraceTime);
+}
+
 void AHitmenPlayerCharacter::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
 	if (bParachuting)
 	{
+		ParachuteLandTime = GetWorld()->GetTimeSeconds();
 		if (HasAuthority())
 		{
 			bParachuting = false;
@@ -239,13 +254,17 @@ void AHitmenPlayerCharacter::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (bParachuting)
 	{
-		// Slow, steady descent with a little drift; the canopy sways.
+		// Slow, steady descent steered with the move keys (a little drift when no key is held).
 		if (UCharacterMovementComponent* Movement = GetCharacterMovement(); Movement && (HasAuthority() || IsLocallyControlled()))
 		{
 			const float Time = GetWorld()->GetTimeSeconds();
 			Movement->Velocity.Z = FMath::Max(Movement->Velocity.Z, -ParachuteFallSpeed);
-			Movement->Velocity.X = FMath::Sin(Time * 0.7f) * ParachuteDrift;
-			Movement->Velocity.Y = FMath::Cos(Time * 0.5f) * ParachuteDrift;
+			const FVector Steer = Movement->GetCurrentAcceleration().GetSafeNormal2D();
+			const FVector Drift(FMath::Sin(Time * 0.7f) * ParachuteDrift, FMath::Cos(Time * 0.5f) * ParachuteDrift, 0.f);
+			const FVector Target = Steer.IsNearlyZero() ? Drift : Steer * ParachuteSteerSpeed;
+			const FVector Horizontal = FMath::VInterpTo(FVector(Movement->Velocity.X, Movement->Velocity.Y, 0.f), Target, DeltaSeconds, ParachuteSteerResponse);
+			Movement->Velocity.X = Horizontal.X;
+			Movement->Velocity.Y = Horizontal.Y;
 		}
 		ParachuteCanopy->SetRelativeRotation(FRotator(FMath::Sin(GetWorld()->GetTimeSeconds() * 1.3f) * 6.f, 0.f, FMath::Cos(GetWorld()->GetTimeSeconds()) * 5.f));
 	}
@@ -527,7 +546,8 @@ USceneComponent* AHitmenPlayerCharacter::GetWeaponAttachComponent() const
 
 bool AHitmenPlayerCharacter::CanAct() const
 {
-	return !IsDead() && !StatusEffectComponent->IsIncapacitated();
+	// A takedown holds the attacker in place until the strike is over.
+	return !IsDead() && !StatusEffectComponent->IsIncapacitated() && !(MeleeComponent && MeleeComponent->IsPerformingTakedown());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -536,7 +556,8 @@ bool AHitmenPlayerCharacter::CanAct() const
 
 void AHitmenPlayerCharacter::Input_Move(const FVector2D& Axis)
 {
-	if (!CanAct() || !StatusEffectComponent->CanMove() || bParachuting)
+	// Under the canopy the same keys steer the drop.
+	if (!CanAct() || !StatusEffectComponent->CanMove())
 	{
 		return;
 	}
@@ -840,10 +861,24 @@ void AHitmenPlayerCharacter::SetupProximityVoice()
 	{
 		return;
 	}
+	// One talker per player state: a respawned body replaces the old one (a talker left attached
+	// to a destroyed body crashed when that player spoke).
+	ReleaseProximityVoice();
+	UVOIPStatics::ResetPlayerVoiceTalker(PS);
 	VoiceTalker = UVOIPTalker::CreateTalkerForPlayer(PS);
 	if (VoiceTalker)
 	{
 		VoiceTalker->Settings.ComponentToAttachTo = GetRootComponent();
 		VoiceTalker->Settings.AttenuationSettings = VoiceAttenuation;
+	}
+}
+
+void AHitmenPlayerCharacter::ReleaseProximityVoice()
+{
+	if (VoiceTalker)
+	{
+		VoiceTalker->Settings.ComponentToAttachTo = nullptr;
+		VoiceTalker->DestroyComponent();
+		VoiceTalker = nullptr;
 	}
 }

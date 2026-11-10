@@ -10,6 +10,9 @@
 #include "GameFramework/Pawn.h"
 #include "Rendering/DrawElements.h"
 #include "Engine/World.h"
+#include "UI/HitmenMenuKit.h"
+#include "Characters/HitmenCharacterBase.h"
+#include "StatusEffects/HitmenStatusEffectComponent.h"
 
 namespace
 {
@@ -164,6 +167,9 @@ void UHitmenDamageVignetteWidget::NativeTick(const FGeometry& MyGeometry, float 
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	Pulse = FMath::Max(0.f, Pulse - InDeltaTime * PulseDecay);
+	const AHitmenCharacterBase* Character = GetOwningPlayer() ? Cast<AHitmenCharacterBase>(GetOwningPlayer()->GetPawn()) : nullptr;
+	const bool bConcealed = Character && Character->GetStatusEffects() && Character->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Concealed);
+	HiddenAlpha = FMath::FInterpTo(HiddenAlpha, bConcealed ? 1.f : 0.f, InDeltaTime, 6.f);
 	const float TargetLow = HealthRatio < LowHealthThreshold && HealthRatio > 0.f ? 1.f - HealthRatio / LowHealthThreshold : 0.f;
 	LowHealth = FMath::FInterpTo(LowHealth, TargetLow, InDeltaTime, 3.f);
 	if (TargetLow > 0.f)
@@ -186,11 +192,24 @@ int32 UHitmenDamageVignetteWidget::NativePaint(const FPaintArgs& Args, const FGe
 	// Low health breathes; hits flash on top.
 	const float Breath = LowHealth > 0.f ? 0.75f + 0.25f * FMath::Sin(GetWorld() ? GetWorld()->GetTimeSeconds() * 5.f : 0.f) : 0.f;
 	const float Strength = FMath::Clamp(Pulse * 0.8f + LowHealth * 0.65f * Breath, 0.f, 1.f);
+	const FVector2D Size = AllottedGeometry.GetLocalSize();
+	if (HiddenAlpha > 0.01f)
+	{
+		const FLinearColor Dark = HiddenVignetteColor * FLinearColor(1.f, 1.f, 1.f, HiddenAlpha);
+		const FLinearColor DarkClear(HiddenVignetteColor.R, HiddenVignetteColor.G, HiddenVignetteColor.B, 0.f);
+		const float HideX = Size.X * 0.26f;
+		const float HideY = Size.Y * 0.3f;
+		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, FVector2D(HideX, Size.Y), Dark, DarkClear, true);
+		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D(Size.X - HideX, 0.f), FVector2D(HideX, Size.Y), DarkClear, Dark, true);
+		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, FVector2D(Size.X, HideY), Dark, DarkClear, false);
+		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D(0.f, Size.Y - HideY), FVector2D(Size.X, HideY), DarkClear, Dark, false);
+		UHitmenIconButton::PaintGlyph(OutDrawElements, LayerId + 1, AllottedGeometry, EHitmenIconGlyph::EyeOff, FVector2D(Size.X * 0.5f, Size.Y * 0.5f + 70.f), 12.f,
+			FLinearColor(1.f, 1.f, 1.f, 0.7f * HiddenAlpha), 2.f);
+	}
 	if (Strength <= 0.01f)
 	{
-		return LayerId;
+		return HiddenAlpha > 0.01f ? Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled) : LayerId;
 	}
-	const FVector2D Size = AllottedGeometry.GetLocalSize();
 	const FLinearColor Red(0.55f, 0.f, 0.f, 0.85f * Strength);
 	const FLinearColor Clear(0.55f, 0.f, 0.f, 0.f);
 	const float EdgeX = Size.X * (0.18f + 0.1f * Strength);

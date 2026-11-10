@@ -67,6 +67,10 @@ public:
 	virtual bool IsUnawareOf(const AActor* Other) const override;
 	virtual void Tick(float DeltaSeconds) override;
 
+	/** NPCs in combat raise their gun (weapon AimMontage) while standing or walking slowly. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Combat", meta=(ClampMin="0", Units="cm/s"))
+	float AimPoseMaxSpeed = 140.f;
+
 	// F: pickpocket the keycard from behind (alive, unaware); otherwise carry the body.
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
@@ -190,4 +194,11 @@ protected:
 	virtual void HandleStatusRemoved(EHitmenStatusEffect Status, AActor* StatusInstigator) override;
 
 	void RefreshBrainPause();
+
+private:
+	/** Cosmetic: keeps the weapon's aim montage looping while fighting. */
+	void UpdateAimPose();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveAimMontage;
 };

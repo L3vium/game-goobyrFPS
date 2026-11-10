@@ -339,7 +339,8 @@ def build_materials(physical):
 
     # Focus highlight: additive white fresnel drawn over whatever the player looks at (overlay material).
     focus = new_material("M_FocusFresnel", folder)
-    set_props(focus, blend_mode=unreal.BlendMode.BLEND_ADDITIVE, shading_model=unreal.MaterialShadingModel.MSM_UNLIT)
+    # Used on skeletal guns too (launchers): without the usage flag the overlay draws nothing there.
+    set_props(focus, blend_mode=unreal.BlendMode.BLEND_ADDITIVE, shading_model=unreal.MaterialShadingModel.MSM_UNLIT, used_with_skeletal_mesh=True)
     fresnel = MEL.create_material_expression(focus, unreal.MaterialExpressionFresnel, -700, 0)
     set_props(fresnel, exponent=2.6, base_reflect_fraction=0.06)
     focus_color = MEL.create_material_expression(focus, unreal.MaterialExpressionVectorParameter, -700, 200)
@@ -577,6 +578,9 @@ def build_weapons(mats):
     rifle_fire = montage("AM_Rifle_Fire", ANIMS + "/Rifle/MM_Rifle_Fire")
     pistol_equip = montage("AM_Pistol_Equip", ANIMS + "/Pistol/MM_Pistol_Equip")
     rifle_equip = montage("AM_Rifle_Equip", ANIMS + "/Rifle/MM_Rifle_Equip")
+    # NPCs in combat hold these aim poses (looped in code) between shots.
+    pistol_aim = montage("AM_Pistol_Aim", ANIMS + "/Pistol/MF_Pistol_Idle_ADS")
+    rifle_aim = montage("AM_Rifle_Aim", ANIMS + "/Rifle/MF_Rifle_Idle_ADS")
     gun_fx = dict(muzzle_fx=fx("MuzzleFlash/OneShot/NS_Muzzle_Combined_Aligned_X_OS"), impact_fx=fx("Impact/OneShot/NS_Impact_01_OS"),
                   fire_sound=load(SFX + "SFX_GunShot_Cue"), impact_sound=load(SFX + "SFX_Impact_01"),
                   dry_fire_sound=load(ESS + "SFX_Essentials_02_CLOCKS/Cues/CLOCKTick_InsJ_Clock-01_Ticking_Single-01_Cue"))
@@ -584,12 +588,12 @@ def build_weapons(mats):
     fp_offset = unreal.Transform()
     fp_offset.rotation = unreal.Rotator(roll=0.0, pitch=0.0, yaw=-90.0).quaternion()
     gun_fx["first_person_attach_offset"] = fp_offset
-    pistol_vis = dict(first_person_pose=pistol_pose, fire_montage=pistol_fire, equip_montage=pistol_equip, **gun_fx)
+    pistol_vis = dict(first_person_pose=pistol_pose, fire_montage=pistol_fire, equip_montage=pistol_equip, aim_montage=pistol_aim, **gun_fx)
     pistol_vis["muzzle_fx"] = fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_Aligned_X_OS")
     pistol_vis["fire_sound"] = load(SFX + "SFX_DustPuff_Cue")
     # First person, every gun uses the two-hand pistol hold (the arms offsets are tuned for it); the body keeps the
     # rifle montages. Swap first_person_pose per weapon once dedicated first-person rifle poses exist.
-    rifle_vis = dict(first_person_pose=pistol_pose, fire_montage=rifle_fire, equip_montage=rifle_equip, **gun_fx)
+    rifle_vis = dict(first_person_pose=pistol_pose, fire_montage=rifle_fire, equip_montage=rifle_equip, aim_montage=rifle_aim, **gun_fx)
     # The pack's long guns face another axis than its pistol: tilted and turned so the barrel meets the crosshair
     # from the hip hold, and a little smaller so the stock does not fill the view (tuned live in PIE).
     long_offset = unreal.Transform()

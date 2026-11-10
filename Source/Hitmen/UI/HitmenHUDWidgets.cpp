@@ -332,12 +332,11 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 	const float ViewYaw = PC->GetControlRotation().Yaw;
 	const float Scale = (Size.X * 0.5f) / WorldRadius;
 
-	// Rotating map: up = where you look.
+	// North-up map centred on you: the map never turns, your arrow does.
 	auto ToMap = [&](const FVector& World, bool& bInside)
 	{
 		const FVector Delta = World - Origin;
-		const FVector Rotated = Delta.RotateAngleAxis(-ViewYaw, FVector::UpVector);
-		const FVector2D Point = Center + FVector2D(Rotated.Y, -Rotated.X) * Scale;
+		const FVector2D Point = Center + FVector2D(Delta.Y, -Delta.X) * Scale;
 		bInside = Point.X >= 0.f && Point.Y >= 0.f && Point.X <= Size.X && Point.Y <= Size.Y;
 		return Point;
 	};
@@ -351,10 +350,9 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		const FVector2D ImageSize(WorldSize.Y * Scale, WorldSize.X * Scale);
 		const FVector2D PlayerInImage((Origin.Y - MapBounds.Min.Y) * Scale, (MapBounds.Max.X - Origin.X) * Scale);
 		const FVector2D TopLeft = Center - PlayerInImage;
-		FSlateDrawElement::MakeRotatedBox(OutDrawElements, LayerId + 1,
+		FSlateDrawElement::MakeBox(OutDrawElements, LayerId + 1,
 			AllottedGeometry.ToPaintGeometry(FVector2f(ImageSize), FSlateLayoutTransform(FVector2f(TopLeft))),
-			&MapBrush, ESlateDrawEffect::None, FMath::DegreesToRadians(-ViewYaw), FVector2f(PlayerInImage),
-			FSlateDrawElement::RelativeToElement, FLinearColor(1.f, 1.f, 1.f, 0.92f));
+			&MapBrush, ESlateDrawEffect::None, FLinearColor(1.f, 1.f, 1.f, 0.92f));
 	}
 
 	if (const UHitmenUIEventSubsystem* UI = GetUIEvents())
@@ -388,11 +386,15 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		}
 	}
 
-	// You: a view cone and an arrow pointing up.
-	HitmenUI::PaintLines(OutDrawElements, LayerId + 4, AllottedGeometry, { Center + FVector2D(-34.f, -48.f), Center, Center + FVector2D(34.f, -48.f) }, FLinearColor(1.f, 1.f, 1.f, 0.18f), 1.5f);
+	// You: a view cone and an arrow turned to where you look.
+	const float YawRad = FMath::DegreesToRadians(ViewYaw);
+	const float CosYaw = FMath::Cos(YawRad);
+	const float SinYaw = FMath::Sin(YawRad);
+	auto Turn = [&](const FVector2D& Local) { return Center + FVector2D(Local.X * CosYaw - Local.Y * SinYaw, Local.X * SinYaw + Local.Y * CosYaw); };
+	HitmenUI::PaintLines(OutDrawElements, LayerId + 4, AllottedGeometry, { Turn(FVector2D(-34.f, -48.f)), Center, Turn(FVector2D(34.f, -48.f)) }, FLinearColor(1.f, 1.f, 1.f, 0.18f), 1.5f);
 	const FLinearColor Me = HitmenUI::Text();
 	HitmenUI::PaintLines(OutDrawElements, LayerId + 5, AllottedGeometry,
-		{ Center + FVector2D(0.f, -9.f), Center + FVector2D(-6.5f, 7.f), Center + FVector2D(0.f, 3.f), Center + FVector2D(6.5f, 7.f), Center + FVector2D(0.f, -9.f) }, Me, 2.f);
+		{ Turn(FVector2D(0.f, -9.f)), Turn(FVector2D(-6.5f, 7.f)), Turn(FVector2D(0.f, 3.f)), Turn(FVector2D(6.5f, 7.f)), Turn(FVector2D(0.f, -9.f)) }, Me, 2.f);
 	OutDrawElements.PopClip();
 
 	// Frame coloured by the worst alert aimed at you; a status line above when it matters.

@@ -1,6 +1,8 @@
 // Hitmen — security fixtures
 
 #include "World/Interactables/HitmenSecurity.h"
+#include "Components/SpotLightComponent.h"
+#include "Characters/HitmenPlayerCharacter.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
 #include "NiagaraFunctionLibrary.h"
@@ -50,6 +52,13 @@ AHitmenSecurityCamera::AHitmenSecurityCamera()
 	FloorDecal->SetupAttachment(Head);
 	FloorDecal->DecalSize = FVector(200.f, 300.f, 300.f);
 
+	ViewLight = CreateDefaultSubobject<USpotLightComponent>(TEXT("ViewLight"));
+	ViewLight->SetupAttachment(Head);
+	ViewLight->SetMobility(EComponentMobility::Movable);
+	ViewLight->SetIntensityUnits(ELightUnits::Candelas);
+	ViewLight->SetCastShadows(true);
+	ViewLight->bAffectsWorld = true;
+
 	Capture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("Capture"));
 	Capture->SetupAttachment(Head);
 	Capture->bCaptureEveryFrame = false;
@@ -80,6 +89,14 @@ void AHitmenSecurityCamera::BeginPlay()
 	FloorDecal->SetUsingAbsoluteRotation(true);
 	UpdateFootprint();
 
+	// The view is a light: shadowed (walls stop it), soft edge, reaching a bit past the view distance.
+	ViewLight->SetIntensity(ViewLightIntensity);
+	ViewLight->SetOuterConeAngle(ViewHalfAngle);
+	ViewLight->SetInnerConeAngle(ViewHalfAngle * 0.7f);
+	ViewLight->SetAttenuationRadius(ViewDistance * 1.35f);
+	ViewLight->SetSourceRadius(4.f);
+	ViewCone->SetHiddenInGame(!bShowViewCone);
+
 	for (UMeshComponent* MeshComp : { static_cast<UMeshComponent*>(ViewCone.Get()) })
 	{
 		if (UMaterialInterface* Material = MeshComp->GetMaterial(0))
@@ -105,7 +122,7 @@ void AHitmenSecurityCamera::UpdateFootprint()
 	const bool bHit = GetWorld()->LineTraceSingleByChannel(Ground, Eye, Along, ECC_Visibility, Params);
 	const FVector FloorPoint = bHit ? Ground.ImpactPoint : Along;
 	const float FootRadius = FMath::Tan(FMath::DegreesToRadians(ViewHalfAngle)) * FVector::Dist(Eye, FloorPoint);
-	FloorDecal->SetVisibility(bHit && !bDisabled);
+	FloorDecal->SetVisibility(bHit && !bDisabled && bShowViewCone);
 	FloorDecal->SetWorldLocation(FloorPoint);
 	FloorDecal->SetWorldRotation(FRotator(-90.f, Head->GetComponentRotation().Yaw, 0.f));
 	FloorDecal->DecalSize = FVector(120.f, FootRadius, FootRadius);
@@ -162,6 +179,10 @@ APawn* AHitmenSecurityCamera::FindIntruder() const
 		{
 			continue;
 		}
+		if (const AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Character); Player && Player->IsIntroProtected())
+		{
+			continue;
+		}
 		if (!UHitmenTeamLibrary::AreTeamIdsHostile(HitmenTeams::NPC, UHitmenTeamLibrary::GetTeamId(Character)))
 		{
 			continue;
@@ -176,10 +197,19 @@ APawn* AHitmenSecurityCamera::FindIntruder() const
 		{
 			continue;
 		}
-		FHitResult Hit;
-		if (!GetWorld()->LineTraceSingleByChannel(Hit, Eye, Target, ECC_Visibility, Params) || Hit.GetActor() == Character)
+		// Seen only through open air: any wall (visibility or static geometry) between the lens and
+		// the head or the chest hides the player.
+		FCollisionQueryParams SightParams = Params;
+		SightParams.AddIgnoredActor(Character);
+		const FCollisionObjectQueryParams Static(FCollisionObjectQueryParams::InitType::AllStaticObjects);
+		const float HalfHeight = Character->GetSimpleCollisionHalfHeight();
+		for (const FVector& Point : { Target + FVector(0.f, 0.f, HalfHeight * 0.75f), Target })
 		{
-			return Character;
+			if (!GetWorld()->LineTraceTestByChannel(Eye, Point, ECC_Visibility, SightParams)
+				&& !GetWorld()->LineTraceTestByObjectType(Eye, Point, Static, SightParams))
+			{
+				return Character;
+			}
 		}
 	}
 	return nullptr;
@@ -207,8 +237,14 @@ void AHitmenSecurityCamera::SetCameraDisabled(bool bInDisabled)
 
 void AHitmenSecurityCamera::OnRep_Visuals()
 {
-	ViewCone->SetVisibility(!bDisabled);
-	FloorDecal->SetVisibility(!bDisabled);
+	ViewCone->SetVisibility(!bDisabled && bShowViewCone);
+	FloorDecal->SetVisibility(!bDisabled && bShowViewCone);
+	ViewLight->SetVisibility(!bDisabled);
+	{
+		const FLinearColor LightColor = bSeeingIntruder ? AlertColor : IdleColor;
+		ViewLight->SetLightColor(FLinearColor(LightColor.R, LightColor.G, LightColor.B, 1.f));
+		ViewLight->SetIntensity(ViewLightIntensity * (bSeeingIntruder ? 1.6f : 1.f));
+	}
 	if (bLastBroadcastDisabled != bDisabled)
 	{
 		bLastBroadcastDisabled = bDisabled;

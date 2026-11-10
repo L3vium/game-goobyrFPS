@@ -38,7 +38,8 @@ protected:
 	bool bPromptVisible = false;
 };
 
-/** Red edges when hurt: a pulse on every hit, a steady glow (and heartbeat) when health is low. */
+/** Red edges when hurt: a pulse on every hit, a steady glow (and heartbeat) when health is low.
+ * Dark edges and an eye-off mark while concealed (tall grass). */
 UCLASS()
 class HITMEN_API UHitmenDamageVignetteWidget : public UHitmenUserWidget
 {
@@ -64,8 +65,13 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Hitmen|Damage")
 	float HeartbeatInterval = 1.1f;
 
+	/** Hidden in tall grass (or any concealment): a dark soft vignette and an eye-off mark. */
+	UPROPERTY(EditAnywhere, Category="Hitmen|Damage")
+	FLinearColor HiddenVignetteColor = FLinearColor(0.01f, 0.03f, 0.015f, 0.8f);
+
 	float Pulse = 0.f;
 	float LowHealth = 0.f;
+	float HiddenAlpha = 0.f;
 	float HealthRatio = 1.f;
 	float HeartbeatTimer = 0.f;
 	float LastDamageYaw = 0.f;

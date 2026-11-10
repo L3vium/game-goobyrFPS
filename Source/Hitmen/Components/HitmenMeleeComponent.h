@@ -79,5 +79,33 @@ protected:
 
 	bool IsValidStealthKillVictim(const AHitmenCharacterBase* Victim) const;
 
+	/** The takedown plays before the victim dies: both are held in place this long. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|StealthKill", meta=(ClampMin="0", Units="s"))
+	float StealthKillDuration = 1.f;
+
+	/** Moment of the strike in the takedown (the victim dies here). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|StealthKill", meta=(ClampMin="0", Units="s"))
+	float StealthKillStrikeTime = 0.55f;
+
+	/** The attacker is pulled to this distance behind the victim. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|StealthKill", meta=(ClampMin="0", Units="cm"))
+	float StealthKillHoldDistance = 75.f;
+
+	void FinishStealthKill(TWeakObjectPtr<AHitmenCharacterBase> Victim);
+	void EndTakedown(TWeakObjectPtr<AHitmenCharacterBase> Victim);
+
+	UPROPERTY(Replicated)
+	bool bTakedownActive = false;
+
+	FTimerHandle TakedownStrikeTimer;
+	FTimerHandle TakedownEndTimer;
+
 	float LastPunchTime = -100.f;
+
+public:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	/** True during a takedown (input ignored by the owner). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Melee")
+	bool IsPerformingTakedown() const { return bTakedownActive; }
 };

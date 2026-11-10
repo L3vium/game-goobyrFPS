@@ -30,7 +30,7 @@ public:
 	bool bClimbRelativeToCamera = false;
 
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
-	float MouseSensitivity = 0.45f;
+	float MouseSensitivity = 0.25f;
 
 	/** Extra multiplier while aiming; the zoom itself is already compensated (FOV ratio). */
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
@@ -73,7 +73,7 @@ public:
 	virtual void LoadSettings(bool bForceReload = false) override;
 
 	/** Saved settings older than this get the new control defaults (sensitivity rebalance). */
-	static constexpr int32 CurrentSettingsVersion = 2;
+	static constexpr int32 CurrentSettingsVersion = 3;
 
 	UPROPERTY(Config)
 	int32 HitmenSettingsVersion = 0;

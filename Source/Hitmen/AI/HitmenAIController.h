@@ -71,10 +71,10 @@ protected:
 	TObjectPtr<UBehaviorTree> BehaviorTree;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", Units="cm"))
-	float SightRadius = 3000.f;
+	float SightRadius = 1950.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", Units="cm"))
-	float LoseSightRadius = 3400.f;
+	float LoseSightRadius = 2250.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", ClampMax="180", Units="deg"))
 	float PeripheralVisionHalfAngle = 65.f;

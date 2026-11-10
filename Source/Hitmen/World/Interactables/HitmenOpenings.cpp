@@ -1,6 +1,7 @@
 // Hitmen — openings
 
 #include "World/Interactables/HitmenOpenings.h"
+#include "Engine/StaticMesh.h"
 #include "Hitmen.h"
 #include "UObject/ConstructorHelpers.h"
 #include "World/HitmenGeometry.h"
@@ -89,10 +90,36 @@ AHitmenDoor::AHitmenDoor()
 	Mesh->SetCanEverAffectNavigation(false);
 }
 
+void AHitmenOpeningBase::CacheHinge(const FVector& EdgeDirection)
+{
+	HingeClosedRotation = Mesh->GetRelativeRotation();
+	HingeClosedLocation = Mesh->GetRelativeLocation();
+	FVector HalfSize = FVector::ZeroVector;
+	if (const UStaticMesh* StaticMesh = Mesh->GetStaticMesh())
+	{
+		const FBoxSphereBounds Bounds = StaticMesh->GetBounds();
+		HalfSize = Bounds.BoxExtent * Mesh->GetRelativeScale3D();
+		// Mesh pivot may not be at its centre: the hinge is on the bounds' edge.
+		HalfSize += Bounds.Origin * Mesh->GetRelativeScale3D() * EdgeDirection.GetAbs();
+	}
+	// The mesh origin sits HalfSize away from its edge along -EdgeDirection.
+	HingeToCenter = -EdgeDirection * HalfSize;
+}
+
+void AHitmenOpeningBase::RotateAroundHinge(const FRotator& Delta)
+{
+	const FQuat Closed = HingeClosedRotation.Quaternion();
+	const FVector Hinge = HingeClosedLocation - Closed.RotateVector(HingeToCenter);
+	const FQuat Open = Closed * Delta.Quaternion();
+	Mesh->SetRelativeLocationAndRotation(Hinge + Open.RotateVector(HingeToCenter), Open.Rotator());
+}
+
 void AHitmenDoor::BeginPlay()
 {
 	Super::BeginPlay();
 	ClosedRotation = Mesh->GetRelativeRotation();
+	// Doors swing on their left edge (local -X), like a real door.
+	CacheHinge(FVector(-1.f, 0.f, 0.f));
 	if (HasAuthority())
 	{
 		NPCTrigger->OnComponentBeginOverlap.AddDynamic(this, &AHitmenDoor::HandleNPCOverlap);
@@ -136,7 +163,7 @@ void AHitmenDoor::OnInteracted(AActor* Interactor)
 
 void AHitmenDoor::ApplyOpenAlpha(float Alpha)
 {
-	Mesh->SetRelativeRotation(ClosedRotation + FRotator(0.f, OpenAngle * OpenDirection * Alpha, 0.f));
+	RotateAroundHinge(FRotator(0.f, OpenAngle * OpenDirection * Alpha, 0.f));
 }
 
 void AHitmenDoor::HandleNPCOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -232,11 +259,13 @@ void AHitmenVentHatch::BeginPlay()
 {
 	Super::BeginPlay();
 	ClosedRotation = Mesh->GetRelativeRotation();
+	// Hatches swing up on their top edge.
+	CacheHinge(FVector(0.f, 0.f, 1.f));
 }
 
 void AHitmenVentHatch::ApplyOpenAlpha(float Alpha)
 {
-	Mesh->SetRelativeRotation(ClosedRotation + FRotator(OpenAngle * Alpha, 0.f, 0.f));
+	RotateAroundHinge(FRotator(OpenAngle * Alpha, 0.f, 0.f));
 }
 
 void AHitmenVentHatch::ApplyPoison_Implementation(AActor* Poisoner)

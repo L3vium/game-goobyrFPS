@@ -46,6 +46,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Health")
 	void SetGodMode(bool bEnabled) { bGodMode = bEnabled; }
 
+	/** Constructor-time default (players and NPCs share the component with different pools). */
+	void SetDefaultMaxHealth(float InMaxHealth) { MaxHealth = InMaxHealth; Health = InMaxHealth; }
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Health")
 	float GetHealth() const { return Health; }
 

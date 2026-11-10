@@ -238,6 +238,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<UAnimMontage> FireMontage;
 
+	/** Aim pose an NPC holds (looped) while it fights with this weapon and stands still. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	TSoftObjectPtr<UAnimMontage> AimMontage;
+
 	/** Played on the owning character when the weapon comes into hand (every machine). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<UAnimMontage> EquipMontage;

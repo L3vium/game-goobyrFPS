@@ -29,7 +29,29 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   picks, hover is instant, names stay inside their tile, no hint text. Default loadout: silenced pistol, no
   abilities. The launch countdown is one big number in a square block.
 
+- Traversal: steps up to 55 cm are walked up; Space counts for 0.25 s after the press (late ledge / ladder
+  grabs); jumping at a ladder grabs it at once (only the ladder just left keeps its cooldown); vault / climb hints
+  only show on the ground; a block wall (top at least 40 cm deep) is climbed onto and walked along, a thinner wall
+  is climbed over.
+- Doors and vent hatches swing on a hinge (their edge), not around their centre.
+- Security cameras: the view is a shadowed spotlight (walls cut it, it spreads on the floor), no translucent cone
+  or halo; a player is seen only through open air (visibility and static geometry tested to the head and chest).
+- Guards see 35 % less far (sight 1950 / lose 2250, suspicion falloff 1600, instant detection 300).
+- Players have 300 health (guards unchanged). Default mouse sensitivity 0.25 (migrated once).
+- Minimap is north-up; your arrow turns.
+- Parachute: the move keys steer the canopy; guards and cameras cannot see a player under the canopy or for 2 s
+  after landing.
+- Stealth takedown: the attacker steps in behind the victim, both are held, the attack plays on the body and the
+  first-person arms (camera shake), the victim plays its reaction, and dies on the strike (0.55 s of 1 s).
+- Swapped / dropped weapons become a floating pickup at once (no physics tumble) at their real size; the focus
+  glow works on skeletal guns (rocket / grenade launchers, black hole gun).
+- Containers hide their contents while their doors are closed.
+- The interaction prompt keeps its target 0.2 s when the trace grazes a frame (no flicker on windows).
+
 ### Added
+- NPC aim pose: guards in combat hold their weapon's aim montage (AM_Pistol_Aim / AM_Rifle_Aim, looped) while
+  standing or walking slowly; the fire montage plays over it on each shot.
+- Hidden vignette: dark soft edges and an eye-off mark while concealed (tall grass).
 - Room codes: every room gets a 6-character code (no 0/O/1/I/L), shown on Create Room; Join has a code field.
 - Join: the Steam friends list (playing Hitmen / online / offline, click a friend in a room to join), then the
   rooms with a refresh button beside the header and the messages inside the list.

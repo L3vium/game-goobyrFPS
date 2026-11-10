@@ -260,6 +260,8 @@ void AHitmenWeaponBase::ApplyWeaponState()
 		{
 			DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		}
+		// First-person arms are scaled: a dropped weapon is always back to its real size.
+		SetActorScale3D(FVector::OneVector);
 		Root->SetRelativeLocationAndRotation(-DropCenter, FRotator::ZeroRotator);
 		SetActorHiddenInGame(false);
 		AutoPickupSphere->SetCollisionEnabled(HasAuthority() ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
@@ -351,6 +353,14 @@ void AHitmenWeaponBase::Drop(int32 InAmmo, const FVector& Location, const FRotat
 	ApplyWeaponState();
 
 	SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	if (!Thrower)
+	{
+		// Swapped or dropped (not thrown): it becomes a floating pickup at once, no tumbling.
+		StartHovering();
+		GetWorldTimerManager().ClearTimer(PickupActivationTimer);
+		GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, FMath::Max(0.05f, ThrownPickupDelay), false);
+		return;
+	}
 	// A thrown weapon hits pawns until its first impact; then pawns walk through it.
 	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, Thrower ? ECR_Block : ECR_Ignore);
 	DropCollision->SetPhysicsLinearVelocity(Velocity);

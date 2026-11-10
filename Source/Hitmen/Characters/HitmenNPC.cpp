@@ -1,6 +1,9 @@
 // Hitmen — NPC
 
 #include "Characters/HitmenNPC.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Data/HitmenWeaponData.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
@@ -88,9 +91,40 @@ void AHitmenNPC::OnRep_CarriedKeycard()
 	KeycardMesh->SetVisibility(CarriedKeycard >= 0 && !IsDead());
 }
 
+void AHitmenNPC::UpdateAimPose()
+{
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance)
+	{
+		return;
+	}
+	const AActor* Target = AlertComponent ? AlertComponent->GetTarget() : nullptr;
+	const bool bFighting = Target && !IsDead() && Weapon && Weapon->GetWeaponData() && AlertComponent->GetAlertState() == EHitmenAlertState::Combat;
+	UAnimMontage* Wanted = bFighting && GetVelocity().Size2D() <= AimPoseMaxSpeed ? Weapon->GetWeaponData()->AimMontage.LoadSynchronous() : nullptr;
+	if (ActiveAimMontage && ActiveAimMontage != Wanted)
+	{
+		AnimInstance->Montage_Stop(0.25f, ActiveAimMontage);
+		ActiveAimMontage = nullptr;
+	}
+	// Re-raise after a shot (the fire montage replaces it in the slot) or when it was stopped.
+	if (Wanted && !AnimInstance->IsAnyMontagePlaying())
+	{
+		if (AnimInstance->Montage_Play(Wanted, 1.f) > 0.f)
+		{
+			const FName Section = Wanted->GetSectionName(0);
+			AnimInstance->Montage_SetNextSection(Section, Section, Wanted);
+			ActiveAimMontage = Wanted;
+		}
+	}
+}
+
 void AHitmenNPC::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		UpdateAimPose();
+	}
 	// Snipers: a thin red line from the weapon to the target while aiming (every machine).
 	if (!bIsSniper || GetNetMode() == NM_DedicatedServer)
 	{

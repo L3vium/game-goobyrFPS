@@ -5,6 +5,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-10
+
 ### Fixed
 - Crash candidates from the playtest (no log was available): a voice talker stayed bound to a destroyed body after
   a respawn (now released with the body); Steam searches ran in parallel on Steam's single search slot (public

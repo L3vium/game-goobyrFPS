@@ -49,6 +49,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - The interaction prompt keeps its target 0.2 s when the trace grazes a frame (no flicker on windows).
 
 ### Added
+- Placeholder icons for every weapon and ability (`Tools/Icons/make_icons.py` draws them, `hitmen_import_icons.py`
+  imports them into `/Game/Hitmen/UI/Icons` and sets each data asset's Icon); shown on the loadout tiles.
+- Map previews (`Tools/Editor/ue_map_shot.sh` + `hitmen_map_shots.py`): a spawn-view screenshot per map as its
+  Thumbnail, shown full-bleed on the Create Room tile.
 - NPC aim pose: guards in combat hold their weapon's aim montage (AM_Pistol_Aim / AM_Rifle_Aim, looped) while
   standing or walking slowly; the fire montage plays over it on each shot.
 - Hidden vignette: dark soft edges and an eye-off mark while concealed (tall grass).

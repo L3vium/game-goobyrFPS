@@ -1,4 +1,4 @@
-// Hitmen — stealth fixtures: lockers, tall grass, noisy distractions, silent hackable distractions
+// Hitmen — stealth fixtures: lockers, tall grass, noisy distractions (radio)
 
 #pragma once
 
@@ -55,6 +55,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0.1", Units="s"))
 	float DoorCycleTime = 0.8f;
 
+	/** The occupant steps in (or out) over this time while the door is open, turning to face out. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0.05", Units="s"))
+	float StepTime = 0.5f;
+
+	/** Delay after the door starts opening before the occupant moves. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0", Units="s"))
+	float StepDelay = 0.12f;
+
 	/** Inside point (capsule centre), relative to the locker. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(MakeEditWidget=true))
 	FVector InsideOffset = FVector(-4.f, 0.f, 96.f);
@@ -101,6 +109,15 @@ protected:
 
 	TWeakObjectPtr<AHitmenCharacterBase> AppliedOccupant;
 	float DoorCycleStart = -100.f;
+
+	/** The character stepping in or out (every machine moves it the same way). */
+	TWeakObjectPtr<AHitmenCharacterBase> SteppingCharacter;
+	bool bSteppingIn = false;
+	FVector StepFrom = FVector::ZeroVector;
+	FVector StepTo = FVector::ZeroVector;
+	FRotator StepFromRotation = FRotator::ZeroRotator;
+	FRotator StepToRotation = FRotator::ZeroRotator;
+	void UpdateStep();
 };
 
 /** Crouching inside hides you from NPC sight. */
@@ -148,27 +165,37 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0"))
 	float Cooldown = 15.f;
 
+	/** It plays this long once turned on: a pulsing light, a sound every PulseInterval and a noise each time. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0", Units="s"))
+	float PlayTime = 8.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0.2", Units="s"))
+	float PulseInterval = 1.f;
+
+	/** Glows while it plays (Juice: colour and intensity). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UPointLightComponent> PlayingLight;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction|Juice", meta=(ClampMin="0"))
+	float PlayingLightIntensity = 3000.f;
+
+	/** The radio loop (sound set RadioLoop) while it plays. */
+	UPROPERTY(Transient)
+	TObjectPtr<class UAudioComponent> PlayingAudio;
+
+	float PlayingUntil = -1.f;
+	FTimerHandle PulseTimer;
+	void Pulse();
+	virtual void Tick(float DeltaSeconds) override;
+
 	virtual void OnInteracted(AActor* Interactor) override;
 	virtual void Trigger(AActor* Activator);
 
-	UFUNCTION(NetMulticast, Unreliable)
+	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_Triggered();
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnTriggered();
 
 	float LastTriggerTime = -1000.f;
-};
-
-/** Silent: draws NPCs that can see it (screens, lights). Hack it with F or remotely. */
-UCLASS(Blueprintable)
-class HITMEN_API AHitmenHackableDistraction : public AHitmenDistraction
-{
-	GENERATED_BODY()
-
-public:
-	AHitmenHackableDistraction();
-
-protected:
-	virtual void Trigger(AActor* Activator) override;
 };

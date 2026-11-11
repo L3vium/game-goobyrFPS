@@ -45,6 +45,10 @@ float UHitmenHealthComponent::ApplyDamage(float Amount, AActor* Instigator, AAct
 	{
 		Die(Instigator, DamageCauser, bHeadshot);
 	}
+	else
+	{
+		StartRegenCountdown();
+	}
 	return Amount;
 }
 
@@ -99,4 +103,28 @@ void UHitmenHealthComponent::OnRep_Dead()
 	{
 		OnDeath.Broadcast(nullptr, nullptr, bHeadshotDeath);
 	}
+}
+
+void UHitmenHealthComponent::StartRegenCountdown()
+{
+	UWorld* World = GetWorld();
+	if (!bRegenerates || !World || !GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	// Each hit restarts the delay; then health climbs back in small steps.
+	World->GetTimerManager().SetTimer(RegenTimer, FTimerDelegate::CreateUObject(this, &UHitmenHealthComponent::RegenTick), 0.1f, true, RegenDelay);
+}
+
+void UHitmenHealthComponent::RegenTick()
+{
+	if (bIsDead || Health >= MaxHealth)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(RegenTimer);
+		}
+		return;
+	}
+	Heal(RegenRate * 0.1f);
 }

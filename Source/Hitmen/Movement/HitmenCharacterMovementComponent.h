@@ -87,13 +87,13 @@ public:
 	float SprintMinForwardDot = 0.5f;
 
 	// ---- Slide ----
-	/** Crouching while moving at least this fast starts a slide (keep above WalkSpeed). */
+	/** Crouching while moving at least this fast starts a slide: a short one from a walk, a long one from a sprint. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
-	float SlideMinStartSpeed = 560.f;
+	float SlideMinStartSpeed = 380.f;
 
-	/** Crouch-walking never slides: only a sprint (or a fall) does. */
+	/** When set, only a sprint slides (crouch-walking just crouches). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide")
-	bool bSlideRequiresSprint = true;
+	bool bSlideRequiresSprint = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
 	float SlideImpulse = 250.f;
@@ -141,6 +141,11 @@ public:
 	/** Space counts this long after the press (grab a ledge or a ladder slightly late). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="s"))
 	float JumpInputBuffer = 0.25f;
+
+	/** Right after grabbing a ladder, Space is ignored this long (a press just before or after the grab must not
+	 *  jump straight off it). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0", Units="s"))
+	float LadderJumpGraceTime = 0.35f;
 
 	/** How far in front of the capsule a wall is searched. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
@@ -348,6 +353,7 @@ protected:
 	float ClimbAlpha = 0.f;
 	float ClimbAxisInput = 0.f;
 	float LastClimbExitTime = -100.f;
+	float ClimbStartTime = -100.f;
 	/** The ladder just left: only it waits for the reattach cooldown. */
 	TWeakObjectPtr<AActor> LastClimbExitActor;
 	float LastJumpPressTime = -100.f;

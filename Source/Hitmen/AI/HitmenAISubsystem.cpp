@@ -132,6 +132,41 @@ TArray<UHitmenAlertComponent*> UHitmenAISubsystem::GetAlertComponents() const
 	return Result;
 }
 
+int32 UHitmenAISubsystem::CountOccludingWalls(const FVector& From, const FVector& To, const AActor* IgnoreA, const AActor* IgnoreB, int32 MaxWalls) const
+{
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenAIWalls), false);
+	Params.AddIgnoredActor(IgnoreA);
+	Params.AddIgnoredActor(IgnoreB);
+	const FVector Dir = (To - From).GetSafeNormal();
+	FVector Start = From;
+	int32 Walls = 0;
+	while (Walls < MaxWalls)
+	{
+		FHitResult Hit;
+		if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, To, ECC_Visibility, Params))
+		{
+			break;
+		}
+		++Walls;
+		// Step through the wall: trace back from the far side to find where it ends.
+		FHitResult Exit;
+		const FVector Probe = Hit.ImpactPoint + Dir * 200.f;
+		if (GetWorld()->LineTraceSingleByChannel(Exit, Probe, Hit.ImpactPoint, ECC_Visibility, Params) && Exit.bBlockingHit)
+		{
+			Start = Exit.ImpactPoint + Dir * 2.f;
+		}
+		else
+		{
+			Start = Probe;
+		}
+		if (FVector::DotProduct(To - Start, Dir) <= 0.f)
+		{
+			break;
+		}
+	}
+	return Walls;
+}
+
 bool UHitmenAISubsystem::HasLineOfSight(const FVector& From, const FVector& To, const AActor* IgnoreA, const AActor* IgnoreB) const
 {
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenAILOS), false);
@@ -233,8 +268,9 @@ void UHitmenAISubsystem::ReportNoise(const UObject* WorldContext, const FVector&
 		{
 			continue;
 		}
-		const bool bOccluded = !AI->HasLineOfSight(Location + FVector::UpVector * HearingSourceHeight, Ear, Instigator, NPC);
-		if (bOccluded && Distance > Radius * Occlusion)
+		// Every wall in between cuts the radius again (one wall x0.45, two x0.2...); too many walls = silence.
+		const int32 Walls = AI->CountOccludingWalls(Location + FVector::UpVector * HearingSourceHeight, Ear, Instigator, NPC, Rules.MaxOccludingWalls + 1);
+		if (Walls > Rules.MaxOccludingWalls || Distance > Radius * FMath::Pow(Occlusion, static_cast<float>(Walls)))
 		{
 			continue;
 		}

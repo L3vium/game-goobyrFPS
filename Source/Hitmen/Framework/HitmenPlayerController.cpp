@@ -20,6 +20,10 @@
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenAnimSet.h"
 #include "Abilities/HitmenAbility.h"
+#include "Interaction/HitmenInteractionComponent.h"
+#include "EngineUtils.h"
+#include "World/Interactables/HitmenSecurity.h"
+#include "Abilities/Move/HitmenMoveAbilities.h"
 #include "Weapons/HitmenWeaponBase.h"
 #include "Components/HitmenBodyCarryComponent.h"
 #include "Components/HitmenSightroomComponent.h"
@@ -160,6 +164,7 @@ void AHitmenPlayerController::SetupInputComponent()
 	BindIfSet(AimAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleAimPressed);
 	BindIfSet(AimAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleAimReleased);
 	BindIfSet(InteractAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleInteract);
+	BindIfSet(InteractAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleInteractReleased);
 	BindIfSet(MoveAbilityAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleMoveAbilityPressed);
 	BindIfSet(MoveAbilityAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleMoveAbilityReleased);
 	BindIfSet(ManipulationAbilityAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleManipulationPressed);
@@ -309,6 +314,8 @@ void AHitmenPlayerController::HandleHUDInventoryChanged()
 		{
 			SlotView.Name = Slots[Index].Weapon->DisplayName;
 			SlotView.Ammo = Slots[Index].Weapon->bUsesAmmo ? Slots[Index].Ammo : -1;
+			SlotView.MaxAmmo = Slots[Index].Weapon->bUsesAmmo ? Slots[Index].Weapon->MaxAmmo : -1;
+			SlotView.Icon = Slots[Index].Weapon->Icon.LoadSynchronous();
 		}
 	}
 	View.Keycards = Inventory->GetKeycards();
@@ -378,6 +385,12 @@ void AHitmenPlayerController::RefreshHUDViews()
 			View.Charges = Ability->GetCharges();
 			View.MaxCharges = Ability->GetMaxCharges();
 			View.CooldownRemaining = Ability->GetCooldownRemaining();
+			View.CooldownAlpha = 1.f - Ability->GetCooldownNormalized();
+			View.Icon = Ability->GetData()->Icon.LoadSynchronous();
+			if (const UHitmenAbility_Jetpack* Jetpack = Cast<UHitmenAbility_Jetpack>(Ability))
+			{
+				View.Meter = Jetpack->GetFuelNormalized();
+			}
 		}
 		return View;
 	};
@@ -408,6 +421,32 @@ void AHitmenPlayerController::RefreshHUDViews()
 			Blip.Suspicion = Alert->GetSuspicion();
 			Blip.bTargetsViewer = Alert->GetTarget() == ViewPawn;
 			Blip.bCallingReinforcements = Alert->IsCallingReinforcements();
+		}
+	}
+	// Security cameras that are watching an intruder and have you in clear view (awareness arcs, camera mark).
+	if (UWorld* World = GetWorld())
+	{
+		const FVector Eye = ViewPawn->GetPawnViewLocation();
+		for (TActorIterator<AHitmenSecurityCamera> It(World); It; ++It)
+		{
+			if (It->IsCameraDisabled() || !It->IsSeeingIntruder())
+			{
+				continue;
+			}
+			FHitResult Hit;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenCameraBlip), false, *It);
+			Params.AddIgnoredActor(ViewPawn);
+			if (World->LineTraceSingleByChannel(Hit, It->GetActorLocation(), Eye, ECC_Visibility, Params))
+			{
+				continue;
+			}
+			FHitmenHUDAlertBlip& Blip = Blips.AddDefaulted_GetRef();
+			Blip.Location = It->GetActorLocation();
+			Blip.Color = EHitmenAlertColor::Red;
+			Blip.State = EHitmenAlertState::Combat;
+			Blip.Suspicion = 1.f;
+			Blip.bTargetsViewer = true;
+			Blip.bIsCamera = true;
 		}
 	}
 	UI->SetAlertBlips(MoveTemp(Blips));
@@ -548,6 +587,17 @@ void AHitmenPlayerController::HandleAimPressed()
 void AHitmenPlayerController::HandleAimReleased()
 {
 	if (IHitmenInputReceiver* R = GetReceiver()) { R->Input_AimChanged(false); }
+}
+
+void AHitmenPlayerController::HandleInteractReleased()
+{
+	if (const APawn* ControlledPawn = GetPawn())
+	{
+		if (UHitmenInteractionComponent* Interaction = ControlledPawn->FindComponentByClass<UHitmenInteractionComponent>())
+		{
+			Interaction->ReleaseInteract();
+		}
+	}
 }
 
 void AHitmenPlayerController::HandleInteract()

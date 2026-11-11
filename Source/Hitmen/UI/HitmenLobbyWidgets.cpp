@@ -33,6 +33,7 @@
 #include "Components/TextBlock.h"
 #include "Components/EditableTextBox.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkinnedAsset.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -111,11 +112,9 @@ namespace
 	const EHitmenCosmeticSlot LookSlots[3] = { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Legs };
 	const TCHAR* LookBones[3] = { TEXT("head"), TEXT("spine_03"), TEXT("calf_l") };
 
-	/** Half the distance between the two look arrows of a slot (they hug the body). */
-	constexpr float LookArrowSpread = 118.f;
 	/** Seconds without a click before an edited look is sent to the server. */
 	constexpr float CosmeticSendPause = 0.15f;
-	constexpr float LoadoutTileSize = 84.f;
+	constexpr float LoadoutTileSize = 112.f;
 	constexpr int32 LoadoutColumns = 7;
 
 	const FLinearColor PanelOuter(0.018f, 0.02f, 0.026f, 0.9f);
@@ -659,7 +658,7 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	AgentNameEdit->SetHintText(LOCTEXT("NameHint", "Codename"));
 	AgentNameEdit->SetJustification(ETextJustify::Center);
 	AgentNameEdit->OnTextCommitted.AddDynamic(this, &UHitmenLobbyWidget::HandleAgentNameCommitted);
-	AgentNameBox = Sized(WidgetTree, AgentNameEdit, 340.f, 0.f);
+	AgentNameBox = Sized(WidgetTree, AgentNameEdit, 520.f, 0.f);
 	HitmenUI::AddToCanvas(AgentCanvas, AgentNameBox, FAnchors(0.f, 0.f), FVector2D(-1000.f, -1000.f), FVector2D(0.5f, 1.f));
 
 	// Look arrows: two per slot (head, body, legs), hugging the 3D model, placed every frame.
@@ -806,16 +805,10 @@ void UHitmenLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	{
 		UpdateAgentAnchors();
 	}
-	// Launch countdown (everyone ready): a big number, nothing else.
-	if (const AHitmenGameState* GS = GetHitmenGameState(); GS && CountdownBlock && CountdownText)
+	// Everyone ready: the match starts after a short beat, no number on screen.
+	if (CountdownBlock)
 	{
-		const float Remaining = GS->GetPhaseCountdownRemaining();
-		const bool bCounting = Remaining > 0.f && GS->GetMatchPhase() == EHitmenMatchPhase::Customization;
-		CountdownBlock->SetVisibility(bCounting ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-		if (bCounting)
-		{
-			CountdownText->SetText(FText::AsNumber(FMath::CeilToInt(Remaining)));
-		}
+		CountdownBlock->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
@@ -981,6 +974,32 @@ void UHitmenLobbyWidget::RefreshCustomization()
 	}
 }
 
+namespace
+{
+	/** World location of a bone in the mesh's reference pose: stable while the preview plays its idle. */
+	FVector RefPoseBoneLocation(const USkeletalMeshComponent* Body, FName Bone)
+	{
+		const USkinnedAsset* Asset = Body ? Body->GetSkinnedAsset() : nullptr;
+		if (!Asset)
+		{
+			return Body ? Body->GetComponentLocation() : FVector::ZeroVector;
+		}
+		const FReferenceSkeleton& Ref = Asset->GetRefSkeleton();
+		int32 Index = Ref.FindBoneIndex(Bone);
+		if (Index == INDEX_NONE)
+		{
+			return Body->GetComponentLocation();
+		}
+		FTransform ComponentSpace = FTransform::Identity;
+		while (Index != INDEX_NONE)
+		{
+			ComponentSpace = ComponentSpace * Ref.GetRefBonePose()[Index];
+			Index = Ref.GetParentIndex(Index);
+		}
+		return Body->GetComponentTransform().TransformPosition(ComponentSpace.GetLocation());
+	}
+}
+
 void UHitmenLobbyWidget::UpdateAgentAnchors()
 {
 	APlayerController* PC = GetOwningPlayer();
@@ -990,16 +1009,18 @@ void UHitmenLobbyWidget::UpdateAgentAnchors()
 	{
 		return;
 	}
-	// Arrows sit right beside the head, the torso and the legs, in two columns hugging the body.
+	// Everything hangs off the reference pose and the agent's vertical axis, so nothing sways with the idle:
+	// arrows level with the head, torso and legs, in two columns AgentArrowSpacing away from the axis.
 	FVector2D Center;
-	if (!UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, Body->GetBoneLocation(TEXT("pelvis")), Center, true))
+	const FVector Axis = Body->GetComponentLocation() + FVector(0.f, 0.f, RefPoseBoneLocation(Body, TEXT("pelvis")).Z - Body->GetComponentLocation().Z);
+	if (!UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, Axis, Center, true))
 	{
 		return;
 	}
 	for (int32 LookIndex = 0; LookIndex < 3; ++LookIndex)
 	{
 		FVector2D Anchor;
-		if (!UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, Body->GetBoneLocation(LookBones[LookIndex]), Anchor, true))
+		if (!UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, RefPoseBoneLocation(Body, LookBones[LookIndex]), Anchor, true))
 		{
 			continue;
 		}
@@ -1007,13 +1028,13 @@ void UHitmenLobbyWidget::UpdateAgentAnchors()
 		{
 			if (UCanvasPanelSlot* ArrowSlot = Cast<UCanvasPanelSlot>(LookArrows[LookIndex * 2 + Side]->Slot))
 			{
-				ArrowSlot->SetPosition(FVector2D(Center.X + (Side == 0 ? -LookArrowSpread : LookArrowSpread), Anchor.Y));
+				ArrowSlot->SetPosition(FVector2D(Center.X + (Side == 0 ? -AgentArrowSpacing : AgentArrowSpacing), Anchor.Y));
 			}
 		}
 	}
 	// Codename above the head, Randomize under the feet.
 	FVector2D Head;
-	if (AgentNameBox && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, Body->GetBoneLocation(TEXT("head")) + FVector(0.f, 0.f, 32.f), Head, true))
+	if (AgentNameBox && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(PC, FVector(Axis.X, Axis.Y, RefPoseBoneLocation(Body, TEXT("head")).Z + 32.f), Head, true))
 	{
 		if (UCanvasPanelSlot* NameSlot = Cast<UCanvasPanelSlot>(AgentNameBox->Slot))
 		{

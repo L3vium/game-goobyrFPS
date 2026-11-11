@@ -1,7 +1,8 @@
 """First-person weapon hold solver (PIE running, player alive with first-person arms).
-For every weapon: equips it, finds the visible mesh's long axis (barrel / blade) and its height axis,
-signed away from the hand (the longer side of a gun is the barrel, the grip hangs below), and computes
-the FirstPersonAttachOffset rotation that points the barrel along the camera with the top up.
+For every weapon: equips it, reads the visible mesh's barrel (longest bounds axis, toward the side the mesh
+extends to from its grip pivot) and top (second longest), and computes the FirstPersonAttachOffset rotation
+that points the barrel along the camera with the top up. (0.4.0 used the world-space bounds centre and
+saved a roll that laid the guns on their side; this one works in the mesh's own frame.)
 solve() applies it live and returns {weapon: (pitch, yaw, roll)}; save(results) writes the data assets
 (PIE stopped). Run:
     python Tools/Editor/ue_remote.py "exec(open(r'<project>/Tools/Editor/hitmen_fp_solve.py').read()); print(solve())"
@@ -38,15 +39,28 @@ def _equip(inv, data):
     return inv.get_active_weapon()
 
 
-def solve(names=WEAPONS):
+def _mesh_frame(comp):
+    """Barrel (+X') and top (+Z') of the mesh in its own local space: the longest bounds axis points to the
+    side the mesh extends to from its pivot (the grip), the second longest is the height, signed the same way."""
+    bounds = _mesh_of(comp).get_bounds()
+    ext = [bounds.box_extent.x, bounds.box_extent.y, bounds.box_extent.z]
+    org = [bounds.origin.x, bounds.origin.y, bounds.origin.z]
+    order = sorted(range(3), key=lambda i: -ext[i])
+    unit = [unreal.Vector(1, 0, 0), unreal.Vector(0, 1, 0), unreal.Vector(0, 0, 1)]
+    barrel = unit[order[0]] * (1.0 if org[order[0]] >= 0.0 else -1.0)
+    top = unit[order[1]] * (1.0 if org[order[1]] >= 0.0 else -1.0)
+    return unreal.MathLibrary.make_rot_from_xz(barrel, top).quaternion()
+
+
+def solve(names=WEAPONS, apply=True):
+    """Computes, for each weapon, the FirstPersonAttachOffset rotation (relative to the hand socket) that puts the
+    mesh barrel along the camera and its top up. Pure math from the current pose: no bounds-centre guess."""
     world = _world()
     pc = unreal.GameplayStatics.get_player_controller(world, 0)
+    pc.set_control_rotation(unreal.Rotator(pitch=0.0, yaw=pc.get_control_rotation().yaw, roll=0.0))
     pawn = pc.get_controlled_pawn()
     inv = pawn.get_component_by_class(unreal.HitmenInventoryComponent)
     arms = pawn.get_first_person_mesh()
-    cam_rot = pc.player_camera_manager.get_camera_rotation()
-    cam_fwd = unreal.MathLibrary.get_forward_vector(cam_rot)
-    cam_up = unreal.MathLibrary.get_up_vector(cam_rot)
     results = {}
     for name in names:
         data = unreal.load_asset("/Game/Hitmen/Data/Weapons/DA_Weapon_" + name)
@@ -59,23 +73,17 @@ def solve(names=WEAPONS):
             print("no visible mesh", name)
             continue
         comp = comps[0]
-        bounds = _mesh_of(comp).get_bounds()
-        ext = [bounds.box_extent.x, bounds.box_extent.y, bounds.box_extent.z]
-        order = sorted(range(3), key=lambda i: -ext[i])
-        long_axis, up_axis = order[0], order[1]
-        axes = _axes(comp)
-        hand = arms.get_socket_location(SOCKET)
-        center = comp.get_world_transform().transform_location(bounds.origin)
-        to_center = center - hand
-        barrel = axes[long_axis] * (1.0 if to_center.dot(axes[long_axis]) >= 0.0 else -1.0)
-        top = axes[up_axis] * (1.0 if to_center.dot(axes[up_axis]) >= 0.0 else -1.0)
-        now = unreal.MathLibrary.make_rot_from_xz(barrel, top).quaternion()
-        want = unreal.MathLibrary.make_rot_from_xz(cam_fwd, cam_up).quaternion()
-        delta = want.multiply(now.inversed())
-        new_world = delta.multiply(weapon.get_actor_rotation().quaternion())
-        socket_rot = arms.get_socket_rotation(SOCKET).quaternion()
-        relative = socket_rot.inversed().multiply(new_world).rotator()
-        weapon.root_component.set_relative_rotation(relative, False, False)
+        cam = pc.player_camera_manager.get_camera_rotation()
+        q_cam = unreal.Rotator(pitch=0.0, yaw=cam.yaw, roll=0.0).quaternion()
+        q_mesh_want = q_cam.multiply(_mesh_frame(comp).inversed())
+        root = weapon.root_component
+        q_root = root.get_world_rotation().quaternion()
+        q_mesh_in_root = q_root.inversed().multiply(comp.get_world_rotation().quaternion())
+        q_root_want = q_mesh_want.multiply(q_mesh_in_root.inversed())
+        q_socket = arms.get_socket_rotation(SOCKET).quaternion()
+        relative = q_socket.inversed().multiply(q_root_want).rotator()
+        if apply:
+            root.set_relative_rotation(relative, False, False)
         results[name] = (round(relative.pitch, 1), round(relative.yaw, 1), round(relative.roll, 1))
     return results
 

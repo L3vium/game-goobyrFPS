@@ -60,11 +60,13 @@ public:
 	/** Next patrol index (owned by the NPC so routes can be shared). */
 	int32 AdvancePatrolIndex(int32 PointCount);
 
-	/** Server: shoot toward a point (aim error from difficulty). */
+	/** Server: shoot toward a point (aim error from difficulty), paced by the match rules: a raise delay,
+	 *  short bursts at NPCFireIntervalMultiplier x the weapon interval, pauses between bursts. */
 	void FireAt(const FVector& Location);
 
 	virtual int32 GetHitmenTeamId_Implementation() const override;
 	virtual bool IsUnawareOf(const AActor* Other) const override;
+	virtual bool CanBeTakenDownBy(const AActor* Attacker) const override;
 	virtual void Tick(float DeltaSeconds) override;
 
 	/** NPCs in combat raise their gun (weapon AimMontage) while standing or walking slowly. */
@@ -201,4 +203,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveAimMontage;
+
+	// Fire pacing (FireAt).
+	float NextShotTime = 0.f;
+	float LastShotRequestTime = -100.f;
+	int32 ShotsLeftInBurst = 0;
 };

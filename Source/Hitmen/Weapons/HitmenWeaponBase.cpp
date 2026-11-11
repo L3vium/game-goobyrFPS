@@ -1,6 +1,7 @@
 // Hitmen — weapon base
 
 #include "Weapons/HitmenWeaponBase.h"
+#include "Characters/HitmenNPC.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Data/HitmenWeaponData.h"
 #include "Inventory/HitmenInventoryComponent.h"
@@ -352,33 +353,32 @@ void AHitmenWeaponBase::Drop(int32 InAmmo, const FVector& Location, const FRotat
 	SetReplicatingMovement(true);
 	ApplyWeaponState();
 
-	SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
-	if (!Thrower)
+	FVector PlaceAt = Location;
+	if (Thrower)
 	{
-		// Swapped or dropped (not thrown): it becomes a floating pickup at once, no tumbling.
-		StartHovering();
-		GetWorldTimerManager().ClearTimer(PickupActivationTimer);
-		GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, FMath::Max(0.05f, ThrownPickupDelay), false);
-		return;
+		// Thrown: no physics phase either. It lands as a floating pickup a little ahead of the thrower (in front of
+		// any wall), on the ground below.
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenThrowPlace), false, this);
+		Params.AddIgnoredActor(Thrower);
+		const FVector Dir = Velocity.GetSafeNormal2D().IsNearlyZero() ? Thrower->GetActorForwardVector() : Velocity.GetSafeNormal2D();
+		FVector Ahead = Location + Dir * ThrowPlaceDistance;
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Location, Ahead, ECC_Visibility, Params))
+		{
+			Ahead = Hit.ImpactPoint - Dir * 40.f;
+		}
+		FHitResult Ground;
+		if (GetWorld()->LineTraceSingleByChannel(Ground, Ahead, Ahead - FVector(0.f, 0.f, 2000.f), ECC_Visibility, Params))
+		{
+			Ahead = Ground.ImpactPoint;
+		}
+		PlaceAt = Ahead;
 	}
-	// A thrown weapon hits pawns until its first impact; then pawns walk through it.
-	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, Thrower ? ECR_Block : ECR_Ignore);
-	DropCollision->SetPhysicsLinearVelocity(Velocity);
-	const FVector Spin = Thrower
-		? FVector(ThrowAngularVelocity.X * (FMath::RandBool() ? 1.f : -1.f), ThrowAngularVelocity.Y, ThrowAngularVelocity.Z)
-		: FVector::ZeroVector;
-	DropCollision->SetPhysicsAngularVelocityInDegrees(Spin);
-	ForceNetUpdate();
-
+	SetActorLocationAndRotation(PlaceAt, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	// Swapped, dropped or thrown: it becomes a floating pickup at once, no tumbling.
+	StartHovering();
 	GetWorldTimerManager().ClearTimer(PickupActivationTimer);
-	if (ThrownPickupDelay > 0.f)
-	{
-		GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, ThrownPickupDelay, false);
-	}
-	else
-	{
-		ActivatePickup();
-	}
+	GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, FMath::Max(0.05f, ThrownPickupDelay), false);
 }
 
 void AHitmenWeaponBase::PickUp(APawn* NewOwner)
@@ -937,7 +937,7 @@ void AHitmenWeaponBase::Server_Fire_Implementation(FVector_NetQuantize Origin, F
 
 	TArray<FVector> Impacts;
 	FireServer(Origin, Direction, Seed, FMath::Clamp(Charge, 0.f, 1.f), Impacts);
-	ReportShotNoise(Origin);
+	ReportShotNoise(Origin, Impacts);
 
 	TArray<FVector_NetQuantize> NetImpacts;
 	for (const FVector& Impact : Impacts)
@@ -968,7 +968,7 @@ void AHitmenWeaponBase::FireAt(const FVector& TargetLocation, float AimErrorDegr
 
 	TArray<FVector> Impacts;
 	FireServer(Origin, Spread, Seed, 1.f, Impacts);
-	ReportShotNoise(Origin);
+	ReportShotNoise(Origin, Impacts);
 
 	TArray<FVector_NetQuantize> NetImpacts;
 	for (const FVector& Impact : Impacts)
@@ -978,11 +978,21 @@ void AHitmenWeaponBase::FireAt(const FVector& TargetLocation, float AimErrorDegr
 	Multicast_FireEffects(GetMuzzleLocation(), NetImpacts);
 }
 
-void AHitmenWeaponBase::ReportShotNoise(const FVector& Origin) const
+void AHitmenWeaponBase::ReportShotNoise(const FVector& Origin, const TArray<FVector>& Impacts) const
 {
-	if (WeaponData && !WeaponData->bSilenced && WeaponData->NoiseRadius > 0.f)
+	if (!WeaponData)
+	{
+		return;
+	}
+	// The report itself is heard close to the shooter only (silenced: not at all).
+	if (!WeaponData->bSilenced && WeaponData->NoiseRadius > 0.f)
 	{
 		UHitmenAISubsystem::ReportNoise(this, Origin, WeaponData->NoiseRadius, OwnerPawn, EHitmenNoiseType::Gunshot);
+	}
+	// Where the bullet lands is what draws NPCs (they investigate the impact, not the shooter).
+	if (WeaponData->ImpactNoiseRadius > 0.f && Impacts.Num() > 0)
+	{
+		UHitmenAISubsystem::ReportNoise(this, Impacts[0], WeaponData->ImpactNoiseRadius, OwnerPawn, EHitmenNoiseType::Gunshot);
 	}
 }
 
@@ -1020,7 +1030,9 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 		UGameplayStatics::PlaySoundAtLocation(this, Sound, Origin);
 	}
 	// Same cosmetic path as the FX: predicted on the shooter, multicast to everyone else.
-	if (AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerPawn))
+	// NPCs hold their weapon's aim pose between shots: the fire montages are additive and, in the same slot, they
+	// would replace that pose (arms dropping on every shot), so NPCs keep the raised weapon instead.
+	if (AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerPawn); Character && !Character->IsA<AHitmenNPC>())
 	{
 		Character->PlayCosmeticMontage(WeaponData->FireMontage.LoadSynchronous());
 	}

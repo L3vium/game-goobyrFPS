@@ -182,6 +182,20 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> Shield;
 
+	/** Flashes at the muzzle on each shot (a light, not a particle). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UPointLightComponent> MuzzleLight;
+
+	/** Look speed multiplier (the player's look goes through the controller's x2.5 input scale; this matches it). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="0.1"))
+	float LookSensitivity = 2.5f;
+
+	/** View shake per shot for the gunner. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun|Juice", meta=(ClampMin="0"))
+	float FireShake = 0.35f;
+
+	float MuzzleFlashUntil = 0.f;
+
 	/** Off: the gun can only be used by someone standing behind it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun")
 	bool bUsableFromAnySide = true;
@@ -259,6 +273,22 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> Turret;
 
+	/** The cannon: follows the aim pitch, kicks back on each shot. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Barrel;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UPointLightComponent> MuzzleLight;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank|Juice", meta=(ClampMin="0"))
+	float FireShake = 2.5f;
+
+	float MuzzleFlashUntil = 0.f;
+	float BarrelKick = 0.f;
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_TankFired();
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<USpringArmComponent> SpringArm;
 
@@ -276,7 +306,7 @@ protected:
 	TSubclassOf<AHitmenProjectile> ShellClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank", meta=(ClampMin="0"))
-	float ShellSpeed = 6000.f;
+	float ShellSpeed = 20000.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank", meta=(ClampMin="0"))
 	float ReloadTime = 2.5f;

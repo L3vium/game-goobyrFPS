@@ -177,6 +177,10 @@ public:
 	/** True while the local player types in a name box: lobby refreshes wait so the draft is kept. */
 	bool IsEditingText() const;
 
+	/** Your agent: horizontal distance (px) between the agent's axis and each look arrow. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Lobby")
+	float AgentArrowSpacing = 210.f;
+
 protected:
 	virtual void BuildDefaultLayout() override;
 	virtual void BindEvents() override;

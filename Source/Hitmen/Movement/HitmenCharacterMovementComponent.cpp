@@ -160,7 +160,9 @@ void UHitmenCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float
 
 	if (IsClimbing())
 	{
-		if (bJumpPressedNow)
+		// A press right before or after the grab is part of getting on, not a jump off.
+		const bool bInGrace = Now - ClimbStartTime < LadderJumpGraceTime;
+		if (bJumpPressedNow && !bInGrace)
 		{
 			StopClimbing(true);
 			LastJumpPressTime = -100.f;
@@ -753,6 +755,7 @@ void UHitmenCharacterMovementComponent::StartClimb(AActor* ClimbableActor, bool 
 		LastSlideEndTime = GetTimeSeconds();
 	}
 	ClimbTarget = ClimbableActor;
+	ClimbStartTime = GetTimeSeconds();
 	ClimbAlpha = bFromTop ? 0.97f : ProjectOnClimbAxis(UpdatedComponent->GetComponentLocation(), *Climbable);
 	Velocity = FVector::ZeroVector;
 	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Climb));

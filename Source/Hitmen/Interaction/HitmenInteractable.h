@@ -28,4 +28,9 @@ public:
 	/** Server only. */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Hitmen|Interaction")
 	void Interact(AActor* Interactor);
+
+	/** Seconds F must be held (hacking a panel...): 0 = instant. A bar fills under the crosshair. */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Hitmen|Interaction")
+	float GetInteractHoldTime(AActor* Interactor) const;
+	virtual float GetInteractHoldTime_Implementation(AActor* Interactor) const { return 0.f; }
 };

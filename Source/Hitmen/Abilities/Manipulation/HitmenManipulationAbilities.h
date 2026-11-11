@@ -35,7 +35,7 @@ UCLASS(Blueprintable) class HITMEN_API UHitmenAbility_SleepDart : public UHitmen
 UCLASS(Blueprintable) class HITMEN_API UHitmenAbility_Flashbang : public UHitmenAbility_Throwable { GENERATED_BODY() public: UHitmenAbility_Flashbang(); };
 UCLASS(Blueprintable) class HITMEN_API UHitmenAbility_SmokeGrenade : public UHitmenAbility_Throwable { GENERATED_BODY() public: UHitmenAbility_SmokeGrenade(); };
 
-/** Triggers a distraction / hackable at range. */
+/** Triggers a distraction, a panel or a console at range. */
 UCLASS(Blueprintable)
 class HITMEN_API UHitmenAbility_RemoteDistraction : public UHitmenManipulationAbility
 {

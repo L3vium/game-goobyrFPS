@@ -1,6 +1,9 @@
 // Hitmen — vehicles
 
 #include "World/Vehicles/HitmenVehicles.h"
+#include "Data/HitmenSoundSet.h"
+#include "Characters/HitmenPlayerCharacter.h"
+#include "Components/PointLightComponent.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Components/HitmenHealthComponent.h"
 #include "Framework/HitmenGameModeBase.h"
@@ -343,6 +346,13 @@ AHitmenMountedGun::AHitmenMountedGun()
 	Tripod->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Block);
 	Shield = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Shield"));
 	Shield->SetupAttachment(GunPivot);
+	MuzzleLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("MuzzleLight"));
+	MuzzleLight->SetupAttachment(GunPivot);
+	MuzzleLight->SetRelativeLocation(FVector(150.f, 0.f, 0.f));
+	MuzzleLight->SetIntensity(0.f);
+	MuzzleLight->SetAttenuationRadius(500.f);
+	MuzzleLight->SetLightColor(FLinearColor(1.f, 0.7f, 0.35f));
+	MuzzleLight->SetCastShadows(false);
 	Shield->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Block);
 
 	// The gunner stands exposed behind the gun; the gun itself shrugs off most bullets.
@@ -384,8 +394,8 @@ void AHitmenMountedGun::Interact_Implementation(AActor* Interactor)
 
 void AHitmenMountedGun::Input_Look(const FVector2D& Axis)
 {
-	AimRotation.Yaw = FMath::Clamp(AimRotation.Yaw + Axis.X, -MaxYaw, MaxYaw);
-	AimRotation.Pitch = FMath::Clamp(AimRotation.Pitch + Axis.Y, MinPitch, MaxPitch);
+	AimRotation.Yaw = FMath::Clamp(AimRotation.Yaw + Axis.X * LookSensitivity, -MaxYaw, MaxYaw);
+	AimRotation.Pitch = FMath::Clamp(AimRotation.Pitch + Axis.Y * LookSensitivity, MinPitch, MaxPitch);
 	Server_SetAim(AimRotation);
 }
 
@@ -398,6 +408,7 @@ void AHitmenMountedGun::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	GunPivot->SetRelativeRotation(AimRotation);
+	MuzzleLight->SetIntensity(GetWorld()->GetTimeSeconds() < MuzzleFlashUntil ? 30000.f : 0.f);
 	if (HasAuthority() && bFiring && !bVehicleDestroyed && GetWorld()->GetTimeSeconds() - LastFireTime >= FireInterval)
 	{
 		FireServer();
@@ -425,12 +436,22 @@ void AHitmenMountedGun::FireServer()
 		Impact = Hit.ImpactPoint;
 		UGameplayStatics::ApplyPointDamage(Hit.GetActor(), Damage, Direction, Hit, GetController(), this, UDamageType::StaticClass());
 	}
-	UHitmenAISubsystem::ReportNoise(this, Start, 4000.f, Driver ? static_cast<AActor*>(Driver) : this, EHitmenNoiseType::Gunshot);
+	UHitmenAISubsystem::ReportNoise(this, Start, 900.f, Driver ? static_cast<AActor*>(Driver) : this, EHitmenNoiseType::Gunshot);
 	Multicast_Fire(Impact);
 }
 
 void AHitmenMountedGun::Multicast_Fire_Implementation(FVector_NetQuantize Impact)
 {
+	// Every shot is felt: sound, a muzzle light flash, a view shake for the gunner.
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::MountedGunFire, GunPivot->GetComponentLocation());
+		MuzzleFlashUntil = GetWorld()->GetTimeSeconds() + 0.04f;
+		if (AHitmenPlayerCharacter* Gunner = Cast<AHitmenPlayerCharacter>(Driver); Gunner && IsLocallyControlled())
+		{
+			Gunner->AddCameraShake(FireShake, 0.12f);
+		}
+	}
 	Juice_OnFire(Impact);
 }
 
@@ -444,6 +465,15 @@ AHitmenTank::AHitmenTank()
 
 	Turret = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Turret"));
 	Turret->SetupAttachment(Collision);
+	Barrel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Barrel"));
+	Barrel->SetupAttachment(Turret);
+	Barrel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MuzzleLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("MuzzleLight"));
+	MuzzleLight->SetupAttachment(Turret);
+	MuzzleLight->SetIntensity(0.f);
+	MuzzleLight->SetAttenuationRadius(1500.f);
+	MuzzleLight->SetLightColor(FLinearColor(1.f, 0.6f, 0.25f));
+	MuzzleLight->SetCastShadows(false);
 	Turret->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
 
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
@@ -579,6 +609,13 @@ void AHitmenTank::Tick(float DeltaSeconds)
 	// Turret follows the view: the driver's own camera, the replicated aim for everyone else.
 	const float ViewYaw = IsLocallyControlled() ? GetControlRotation().Yaw : AimRotation.Yaw;
 	Turret->SetWorldRotation(FRotator(0.f, ViewYaw, 0.f));
+	// The cannon follows the aim pitch and kicks back on a shot; the muzzle light flashes.
+	const float ViewPitch = FMath::Clamp(IsLocallyControlled() ? FRotator::NormalizeAxis(GetControlRotation().Pitch) : AimRotation.Pitch, MinAimPitch, MaxAimPitch);
+	BarrelKick = FMath::FInterpTo(BarrelKick, 0.f, DeltaSeconds, 6.f);
+	const FRotator BarrelRotation(ViewPitch, 0.f, 0.f);
+	Barrel->SetRelativeLocationAndRotation(BarrelRotation.RotateVector(FVector(MuzzleOffset * 0.5f - 60.f * BarrelKick, 0.f, 0.f)) + FVector(0.f, 0.f, 10.f), BarrelRotation + FRotator(-90.f, 0.f, 0.f));
+	MuzzleLight->SetRelativeLocation(BarrelRotation.RotateVector(FVector(MuzzleOffset + 20.f, 0.f, 0.f)) + FVector(0.f, 0.f, 10.f));
+	MuzzleLight->SetIntensity(GetWorld()->GetTimeSeconds() < MuzzleFlashUntil ? 200000.f : 0.f);
 }
 
 void AHitmenTank::SimulateDrive(float DeltaSeconds)
@@ -655,5 +692,21 @@ void AHitmenTank::FireServer()
 	{
 		Shell->Launch(Aim.Vector() * ShellSpeed, 0.f);
 	}
+	Multicast_TankFired();
 	UHitmenAISubsystem::ReportNoise(this, Start, CannonNoiseRadius, Driver ? static_cast<AActor*>(Driver) : this, EHitmenNoiseType::Explosion);
+}
+
+void AHitmenTank::Multicast_TankFired_Implementation()
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::TankFire, Turret->GetComponentLocation());
+	MuzzleFlashUntil = GetWorld()->GetTimeSeconds() + 0.08f;
+	BarrelKick = 1.f;
+	if (AHitmenPlayerCharacter* Gunner = Cast<AHitmenPlayerCharacter>(Driver); Gunner && IsLocallyControlled())
+	{
+		Gunner->AddCameraShake(FireShake, 0.35f);
+	}
 }

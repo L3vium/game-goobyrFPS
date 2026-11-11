@@ -1,6 +1,7 @@
 // Hitmen — HUD elements
 
 #include "UI/HitmenHUDElements.h"
+#include "Engine/Texture2D.h"
 #include "Data/HitmenMapDefinition.h"
 #include "Framework/HitmenGameState.h"
 #include "UI/HitmenUIFactory.h"
@@ -329,20 +330,12 @@ void UHitmenInventoryBarWidget::UnbindEvents()
 
 void UHitmenInventoryBarWidget::HandleInventory(const FHitmenHUDInventoryView& View)
 {
-	int32 NewActive = ActiveSlot;
 	for (int32 Index = 0; Index < View.Slots.Num(); ++Index)
 	{
 		if (View.Slots[Index].bActive)
 		{
-			NewActive = Index;
+			ActiveSlot = Index;
 		}
-	}
-	if (NewActive != ActiveSlot)
-	{
-		// Cards slide toward the newly drawn weapon.
-		SwitchDirection = NewActive > ActiveSlot ? 1.f : -1.f;
-		SwitchSlide = 1.f;
-		ActiveSlot = NewActive;
 	}
 	Inventory = View;
 }
@@ -355,116 +348,154 @@ void UHitmenInventoryBarWidget::HandleAbilities(const FHitmenHUDAbilityView& Mov
 
 void UHitmenInventoryBarWidget::HandleVitals(const FHitmenHUDVitalsView& View)
 {
-	HealthRatio = View.HealthNormalized;
+	// Health has no bar: the red screen edges and the heartbeat say it (HitmenHUDWidgets damage overlay).
 }
 
 void UHitmenInventoryBarWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	SwitchSlide = FMath::FInterpTo(SwitchSlide, 0.f, InDeltaTime, 10.f);
+}
+
+namespace
+{
+	/** The biggest font (MaxSize down to MinSize) that keeps Text inside Room; shortened with "." below that. */
+	FSlateFontInfo FitCardFont(FString& Text, float Room, int32 MaxSize, int32 MinSize)
+	{
+		FSlateFontInfo Font;
+		for (int32 FontSize = MaxSize; FontSize >= MinSize; --FontSize)
+		{
+			Font = HitmenUI::SpacedFont(FontSize, TEXT("SemiBold"), 40);
+			if (HitmenUI::MeasureText(Text, Font).X <= Room)
+			{
+				return Font;
+			}
+		}
+		while (Text.Len() > 1 && HitmenUI::MeasureText(Text + TEXT("."), Font).X > Room)
+		{
+			Text.LeftChopInline(1);
+		}
+		Text += TEXT(".");
+		return Font;
+	}
 }
 
 int32 UHitmenInventoryBarWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
+	// Four cards of one size: two weapon slots (fixed places, the drawn one lit; switching snaps), a divider,
+	// then the manipulation (A) and move (E) abilities. Icon + name on each, no key letters.
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
-	const FVector2D WeaponCard(230.f, 66.f);
-	const FVector2D AbilityCard(196.f, 66.f);
+	const FVector2D Card(212.f, 70.f);
 	const float Gap = 8.f;
-	const float DividerGap = 26.f;
-	const float Total = WeaponCard.X * 2.f + Gap + DividerGap * 2.f + AbilityCard.X * 2.f + Gap;
-	float X = (Size.X - Total) * 0.5f;
-	const float Y = Size.Y - WeaponCard.Y;
-	const FSlateFontInfo NameFont = HitmenUI::SpacedFont(20, TEXT("SemiBold"), 50);
+	const float DividerGap = 24.f;
+	const float Total = Card.X * 4.f + Gap * 2.f + DividerGap * 2.f;
+	const float StartX = (Size.X - Total) * 0.5f;
+	const float Y = Size.Y - Card.Y;
 	const FSlateFontInfo SubFont = HitmenUI::Font(16, TEXT("Italic"));
 	const FSlateFontInfo SmallFont = HitmenUI::SpacedFont(13, TEXT("Medium"), 120);
+	const float IconSize = 46.f;
 
-	auto PaintCardBase = [&](FVector2D Position, FVector2D CardSize, bool bActive, float Alpha)
+	auto PaintCard = [&](float X, bool bLit, float Alpha, UTexture2D* Icon, FString Name, const FString& Sub, const FLinearColor& SubColor)
 	{
-		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, Position, CardSize,
-			FLinearColor(0.f, 0.f, 0.f, (bActive ? 0.72f : 0.5f) * Alpha), FLinearColor(0.f, 0.f, 0.f, (bActive ? 0.45f : 0.28f) * Alpha), true);
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, Position, FVector2D(CardSize.X, bActive ? 3.f : 1.f),
-			bActive ? HitmenUI::Text() * FLinearColor(1, 1, 1, Alpha) : HitmenUI::Hairline() * FLinearColor(1, 1, 1, Alpha));
+		const FVector2D Position(X, Y);
+		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, Position, Card,
+			FLinearColor(0.f, 0.f, 0.f, (bLit ? 0.74f : 0.5f) * Alpha), FLinearColor(0.f, 0.f, 0.f, (bLit ? 0.5f : 0.3f) * Alpha), true);
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, Position, FVector2D(Card.X, bLit ? 3.f : 1.f),
+			bLit ? HitmenUI::Text() * FLinearColor(1, 1, 1, Alpha) : HitmenUI::Hairline() * FLinearColor(1, 1, 1, Alpha));
+		float TextX = X + 14.f;
+		if (Icon)
+		{
+			FSlateBrush Brush;
+			Brush.SetResourceObject(Icon);
+			Brush.ImageSize = FVector2D(IconSize);
+			HitmenUI::PaintImage(OutDrawElements, LayerId + 2, AllottedGeometry, &Brush, Position + FVector2D(10.f, (Card.Y - IconSize) * 0.5f), FVector2D(IconSize),
+				FLinearColor(1.f, 1.f, 1.f, (bLit ? 1.f : 0.65f) * Alpha));
+			TextX = X + 18.f + IconSize;
+		}
+		const float Room = X + Card.X - 10.f - TextX;
+		const FSlateFontInfo NameFont = FitCardFont(Name, Room, 20, 13);
+		HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Name, FVector2D(TextX, Y + 10.f), NameFont, HitmenUI::Text() * FLinearColor(1, 1, 1, (bLit ? 1.f : 0.7f) * Alpha));
+		if (!Sub.IsEmpty())
+		{
+			HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Sub, FVector2D(TextX, Y + 38.f), SubFont, SubColor * FLinearColor(1, 1, 1, Alpha));
+		}
 	};
 
-	// ---- Weapon cards: the drawn weapon first, sliding in after a switch ----
-	const float Slide = SwitchSlide * SwitchDirection * (WeaponCard.X + Gap) * 0.5f;
-	for (int32 Order = 0; Order < 2; ++Order)
+	// ---- Weapon slots ----
+	for (int32 SlotIndex = 0; SlotIndex < 2; ++SlotIndex)
 	{
-		const int32 SlotIndex = Order == 0 ? ActiveSlot : 1 - ActiveSlot;
-		const bool bActive = Order == 0;
-		const FVector2D Position(X + Order * (WeaponCard.X + Gap) + (bActive ? Slide : -Slide), Y + (bActive ? 0.f : 8.f));
-		const FVector2D CardSize = bActive ? WeaponCard : FVector2D(WeaponCard.X, WeaponCard.Y - 8.f);
-		const float Alpha = bActive ? 1.f : 0.7f;
-		PaintCardBase(Position, CardSize, bActive, Alpha);
+		const bool bActive = SlotIndex == ActiveSlot;
 		const bool bValid = Inventory.Slots.IsValidIndex(SlotIndex) && !Inventory.Slots[SlotIndex].bEmpty;
 		const FHitmenHUDSlotView* View = bValid ? &Inventory.Slots[SlotIndex] : nullptr;
-		const FString Name = View ? View->Name.ToString().ToUpper() : (SlotIndex == 0 && !bValid ? FString(TEXT("FISTS")) : FString(TEXT("EMPTY")));
-		HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Name, Position + FVector2D(14.f, 9.f), NameFont,
-			(View || SlotIndex == 0 ? HitmenUI::Text() : HitmenUI::TextDim()) * FLinearColor(1, 1, 1, Alpha));
+		FString Name = View ? View->Name.ToString().ToUpper() : (SlotIndex == 0 ? FString(TEXT("FISTS")) : FString(TEXT("EMPTY")));
 		FString Sub;
-		if (View)
+		FLinearColor SubColor = HitmenUI::TextDim();
+		if (View && View->Ammo >= 0)
 		{
-			Sub = View->Ammo >= 0 ? FString::Printf(TEXT("%d rounds"), View->Ammo) : FString(TEXT("melee"));
+			Sub = View->MaxAmmo > 0 ? FString::Printf(TEXT("%d / %d"), View->Ammo, View->MaxAmmo) : FString::FromInt(View->Ammo);
+			SubColor = View->Ammo == 0 ? HitmenUI::Accent() : HitmenUI::TextDim();
 		}
-		else if (SlotIndex == 0)
-		{
-			Sub = TEXT("punch");
-		}
-		HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Sub, Position + FVector2D(14.f, 36.f), SubFont,
-			(View && View->Ammo == 0 ? HitmenUI::Accent() : HitmenUI::TextDim()) * FLinearColor(1, 1, 1, Alpha));
+		PaintCard(StartX + SlotIndex * (Card.X + Gap), bActive, bActive ? 1.f : 0.62f, View ? View->Icon.Get() : nullptr, Name, Sub, SubColor);
 	}
-	X += WeaponCard.X * 2.f + Gap + DividerGap;
+	float X = StartX + Card.X * 2.f + Gap + DividerGap;
 
 	// ---- Divider ----
-	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D(X - DividerGap * 0.5f, Y + 10.f), FVector2D(1.f, WeaponCard.Y - 20.f), HitmenUI::Hairline());
+	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D(X - DividerGap * 0.5f, Y + 10.f), FVector2D(1.f, Card.Y - 20.f), HitmenUI::Hairline());
 
-	// ---- Ability cards: [A] manipulation, [E] move ----
-	auto PaintAbility = [&](const FHitmenHUDAbilityView& View, const FString& Key, float CardX)
+	// ---- Abilities: manipulation (A), then move (E) ----
+	auto PaintAbility = [&](const FHitmenHUDAbilityView& View, float CardX)
 	{
-		const FVector2D Position(CardX, Y);
-		PaintCardBase(Position, AbilityCard, false, View.bValid ? 1.f : 0.6f);
-		const FVector2D KeySize = HitmenUI::PaintKey(OutDrawElements, LayerId + 2, AllottedGeometry, Key, Position + FVector2D(12.f, 14.f), 15, View.bValid ? 1.f : 0.4f);
-		const FString Name = View.bValid ? View.Name.ToString().ToUpper() : FString(TEXT("NONE"));
-		HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Name, Position + FVector2D(22.f + KeySize.X, 9.f), NameFont,
-			View.bValid ? HitmenUI::Text() : HitmenUI::TextDim());
+		const bool bReady = View.bValid && View.CooldownAlpha >= 1.f && (View.MaxCharges <= 0 || View.Charges > 0);
 		FString Sub;
-		if (View.bValid)
-		{
-			Sub = View.CooldownRemaining > 0.f ? FString::Printf(TEXT("%.1fs"), View.CooldownRemaining)
-				: (View.MaxCharges > 0 ? FString::Printf(TEXT("%d / %d"), View.Charges, View.MaxCharges) : FString(TEXT("ready")));
-		}
-		HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Sub, Position + FVector2D(22.f + KeySize.X, 36.f), SubFont, HitmenUI::TextDim());
-		// Cooldown bar along the bottom edge.
 		if (View.bValid && View.CooldownRemaining > 0.f)
 		{
-			HitmenUI::PaintBox(OutDrawElements, LayerId + 2, AllottedGeometry, Position + FVector2D(0.f, AbilityCard.Y - 3.f), FVector2D(AbilityCard.X, 3.f), FLinearColor(1, 1, 1, 0.12f));
+			Sub = FString::Printf(TEXT("%.0fs"), FMath::CeilToFloat(View.CooldownRemaining));
+		}
+		PaintCard(CardX, bReady, View.bValid ? 1.f : 0.5f, View.Icon.Get(), View.bValid ? View.Name.ToString().ToUpper() : FString(TEXT("NONE")), Sub, HitmenUI::TextDim());
+		if (!View.bValid)
+		{
+			return;
+		}
+		// Cooldown: a shade that shrinks to the right as the ability comes back.
+		if (View.CooldownAlpha < 1.f)
+		{
+			const float Shade = Card.X * (1.f - FMath::Clamp(View.CooldownAlpha, 0.f, 1.f));
+			HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, FVector2D(CardX + Card.X - Shade, Y), FVector2D(Shade, Card.Y), FLinearColor(0.f, 0.f, 0.f, 0.55f));
+		}
+		// Charges: small squares in the bottom-right corner.
+		if (View.MaxCharges > 1)
+		{
+			for (int32 Pip = 0; Pip < View.MaxCharges; ++Pip)
+			{
+				const FVector2D PipPos(CardX + Card.X - 14.f - Pip * 11.f, Y + Card.Y - 14.f);
+				HitmenUI::PaintBox(OutDrawElements, LayerId + 4, AllottedGeometry, PipPos, FVector2D(7.f), FLinearColor(1.f, 1.f, 1.f, Pip < View.Charges ? 0.95f : 0.18f));
+			}
+		}
+		// Gauge (jetpack fuel): a vertical bar along the right edge.
+		if (View.Meter >= 0.f)
+		{
+			const float Fill = FMath::Clamp(View.Meter, 0.f, 1.f);
+			const FVector2D BarPos(CardX + Card.X - 7.f, Y + 6.f);
+			const float BarHeight = Card.Y - 12.f;
+			HitmenUI::PaintBox(OutDrawElements, LayerId + 4, AllottedGeometry, BarPos, FVector2D(4.f, BarHeight), FLinearColor(1.f, 1.f, 1.f, 0.15f));
+			HitmenUI::PaintBox(OutDrawElements, LayerId + 5, AllottedGeometry, BarPos + FVector2D(0.f, BarHeight * (1.f - Fill)), FVector2D(4.f, BarHeight * Fill),
+				Fill < 0.2f ? HitmenUI::Accent() : HitmenUI::Text());
 		}
 	};
-	PaintAbility(ManipulationAbility, TEXT("A"), X);
-	PaintAbility(MoveAbility, TEXT("E"), X + AbilityCard.X + Gap);
+	PaintAbility(ManipulationAbility, X);
+	PaintAbility(MoveAbility, X + Card.X + Gap);
 
 	// ---- Keycards: chips above the weapon cards ----
-	float ChipX = (Size.X - Total) * 0.5f;
-	for (const int32 Card : Inventory.Keycards)
+	float ChipX = StartX;
+	for (const int32 KeyCard : Inventory.Keycards)
 	{
-		const FString Label = FString::Printf(TEXT("KEYCARD %d"), Card);
+		const FString Label = FString::Printf(TEXT("KEYCARD %d"), KeyCard);
 		const FVector2D LabelSize = HitmenUI::MeasureText(Label, SmallFont);
 		const FVector2D ChipSize(LabelSize.X + 22.f, 22.f);
 		HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D(ChipX, Y - 30.f), ChipSize, FLinearColor(0.08f, 0.32f, 0.85f, 0.85f));
 		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Label, FVector2D(ChipX + 11.f, Y - 30.f + (22.f - LabelSize.Y) * 0.5f), SmallFont, HitmenUI::Text());
 		ChipX += ChipSize.X + 6.f;
 	}
-
-	// ---- Health: a thin line above the ability cards, only when hurt ----
-	if (HealthRatio < 0.999f)
-	{
-		const FVector2D BarPos(X, Y - 12.f);
-		const float Width = AbilityCard.X * 2.f + Gap;
-		HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, BarPos, FVector2D(Width, 4.f), FLinearColor(1, 1, 1, 0.12f));
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, BarPos, FVector2D(Width * FMath::Clamp(HealthRatio, 0.f, 1.f), 4.f),
-			HealthRatio < 0.35f ? HitmenUI::Accent() : HitmenUI::Text());
-	}
-	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 3, InWidgetStyle, bParentEnabled);
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 6, InWidgetStyle, bParentEnabled);
 }
 
 // =============================================================================================
@@ -540,16 +571,7 @@ void UHitmenIntroWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
 	const bool bIntro = GS && GS->GetMatchPhase() == EHitmenMatchPhase::Intro;
 	Alpha = FMath::FInterpConstantTo(Alpha, bIntro ? 1.f : 0.f, InDeltaTime, 2.5f);
-	const int32 Second = GS ? FMath::CeilToInt(GS->GetPhaseCountdownRemaining()) : 0;
-	if (bIntro && Second != LastSecond && Second > 0 && Second <= 3)
-	{
-		UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::Countdown);
-	}
-	if (LastSecond > 0 && Second == 0 && bIntro)
-	{
-		UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::MatchStart);
-	}
-	LastSecond = Second;
+	// No countdown and no sting: the drop just shows the map name.
 }
 
 int32 UHitmenIntroWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
@@ -559,22 +581,16 @@ int32 UHitmenIntroWidget::NativePaint(const FPaintArgs& Args, const FGeometry& A
 		return LayerId;
 	}
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
-	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
-	const int32 Seconds = GS ? FMath::CeilToInt(GS->GetPhaseCountdownRemaining()) : 0;
 	HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, FVector2D(Size.X, Size.Y * 0.4f), FLinearColor(0, 0, 0, 0.75f * Alpha), FLinearColor(0, 0, 0, 0), false);
 	const FSlateFontInfo Overline = HitmenUI::SpacedFont(18, TEXT("Medium"), 300);
 	const FSlateFontInfo Title = HitmenUI::SpacedFont(64, TEXT("Bold"), 40);
-	const FSlateFontInfo Count = HitmenUI::Font(96, TEXT("Bold"));
 	const FString Over = TEXT("DROPPING IN");
 	const FString Name = MapName.ToString().ToUpper();
-	const FString Number = Seconds > 0 ? FString::FromInt(Seconds) : FString(TEXT("GO"));
 	const FVector2D OverSize = HitmenUI::MeasureText(Over, Overline);
 	const FVector2D NameSize = HitmenUI::MeasureText(Name, Title);
-	const FVector2D CountSize = HitmenUI::MeasureText(Number, Count);
 	const float Y = Size.Y * 0.08f;
 	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Over, FVector2D((Size.X - OverSize.X) * 0.5f, Y), Overline, HitmenUI::TextDim() * FLinearColor(1, 1, 1, Alpha));
 	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Name, FVector2D((Size.X - NameSize.X) * 0.5f, Y + 26.f), Title, HitmenUI::Text() * FLinearColor(1, 1, 1, Alpha));
 	HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(Size.X * 0.5f - 50.f, Y + 26.f + NameSize.Y + 6.f), FVector2D(100.f, 4.f), HitmenUI::Accent() * FLinearColor(1, 1, 1, Alpha));
-	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Number, FVector2D((Size.X - CountSize.X) * 0.5f, Y + 40.f + NameSize.Y), Count, HitmenUI::Text() * FLinearColor(1, 1, 1, Alpha));
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
 }

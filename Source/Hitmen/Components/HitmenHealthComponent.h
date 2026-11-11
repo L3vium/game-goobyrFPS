@@ -49,6 +49,9 @@ public:
 	/** Constructor-time default (players and NPCs share the component with different pools). */
 	void SetDefaultMaxHealth(float InMaxHealth) { MaxHealth = InMaxHealth; Health = InMaxHealth; }
 
+	/** Enables regeneration (the player character turns it on). */
+	void SetRegenerates(bool bEnabled) { bRegenerates = bEnabled; }
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Health")
 	float GetHealth() const { return Health; }
 
@@ -74,6 +77,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Health", meta=(ClampMin="0"))
 	float MaxArmor = 100.f;
 
+	/** Health comes back after RegenDelay seconds without taking damage (players). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Health|Regen")
+	bool bRegenerates = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Health|Regen", meta=(ClampMin="0", Units="s", EditCondition="bRegenerates"))
+	float RegenDelay = 6.f;
+
+	/** Health per second while regenerating. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Health|Regen", meta=(ClampMin="0", EditCondition="bRegenerates"))
+	float RegenRate = 30.f;
+
 	UPROPERTY(ReplicatedUsing=OnRep_Health)
 	float Health = 100.f;
 
@@ -88,6 +102,9 @@ protected:
 
 	bool bGodMode = false;
 	float LastReplicatedHealth = 100.f;
+	FTimerHandle RegenTimer;
+	void StartRegenCountdown();
+	void RegenTick();
 
 	UFUNCTION() void OnRep_Health();
 	UFUNCTION() void OnRep_Dead();

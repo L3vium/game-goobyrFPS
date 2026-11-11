@@ -5,6 +5,131 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-11
+
+### Added
+- Health regeneration: players heal back 30 per second after 6 s without being hit (UHitmenHealthComponent
+  RegenDelay / RegenRate).
+- Hold to interact: interactables can ask for F to be held (IHitmenInteractable GetInteractHoldTime). Hacking the
+  turret panel takes 3 s and the security console 2 s; a bar fills under the crosshair with a hacking sound;
+  releasing F or looking away cancels; the server times the hold too.
+- Landing sounds on every landing by fall speed (soft / hard), a view dip on hard landings.
+
+
+
+
+
+
+
+
+
+
+
+### Changed
+- UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
+- Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
+  that grew on the left of the title buttons is gone.
+- Arrows (map carousel, difficulty, agent look) are plain solid white triangles, red while hovered or pressed: no
+  square block, no shaft.
+- Pause menu: just PAUSE with big square Resume / Options / Leave match blocks (no 'contract in progress' or 'the
+  match keeps running' lines); the legend moved to the right and shows the real marker colours (guards white /
+  yellow / red as on the map and the minimap, no more orange); the map is dimmed so white markers read; debug tools
+  are closed behind a 'Debug tools' button and open over the legend.
+- Changing team (and other confirms) plays a soft tick instead of a machine start-up; no thunder sting when the
+  match starts.
+- Your agent: the arrows sit twice as far from the body (AgentArrowSpacing) and, with the codename and Randomize,
+  are placed from the agent's axis and reference pose: they no longer sway with the idle animation; the codename box
+  is wider.
+- Loadout: Hitman-like tiles, 112 px squares with a big icon and the full name on one or two lines (no more cut
+  names such as 'SILENCED PI.'); hover snaps with a white frame, the pick gets a red name band.
+- Icons are sorted into /Game/Hitmen/UI/Icons/Weapons, Abilities/Move and Abilities/Manipulation (references kept);
+  docs/Pipelines.md explains how to swap one; the importer and hitmen_organize_icons.py keep the folders.
+- HUD inventory: the four cards (two weapons, two abilities) have one size and fixed places; switching weapon snaps
+  (no sliding); every card shows the item's icon and its full name (font shrinks to fit, no overflow); ammo reads
+  'current / max' (e.g. 2 / 15) instead of 'N rounds'; abilities show no key letter and no 'ready', a cooldown
+  shade, charge pips, and the jetpack a fuel gauge.
+- Crosshair: Hitman-like awareness arcs replace the chevrons: one arc per guard or camera noticing you, toward it,
+  filling with its suspicion (white) then yellow / red; cameras that see you get an arc with a camera mark. Headshot
+  hits get red, longer hit ticks (not only headshot kills).
+- Minimap: your own view cone is gone; the status (Suspicious ... Under fire) is a solid banner inside the top of
+  the map that opens with a white flash; Under fire is taller, red and pulses.
+- AI hearing is far smaller and never reveals you: footsteps 1.5 m walking / 4.5 m running; a gunshot report is
+  heard 6-9 m around the shooter (was 26-60 m), the bullet impact is what draws guards (they investigate where it
+  landed); each wall cuts the radius again (more than 3 walls: silence); explosions 15 m.
+- Guards fire much less: a 0.6 s raise, bursts of 3 shots at 2.5x the weapon's interval, a 1.2 s pause (match rules,
+  NPC fire); difficulty damage multipliers 0.25 / 0.4 / 0.6. A fight in the open now lasts about half a minute
+  instead of a few seconds.
+- The turret tower itself is no longer interactable: only its hack panel hacks it.
+- Lockers: no more instant teleport: the door opens and you step in over 0.5 s turning to face out, then it closes;
+  stepping out is the reverse (every machine animates it).
+- Radio distraction: once turned on it plays a radio loop for 8 s with a pulsing light (visible and audible
+  indicator), and makes its noise (10 m) on every beat.
+- Explosive barrels: explosion sound and view shake (effect slot for the toon explosion), chain reactions; the
+  default explosion noise is 15 m (was 40 m).
+- Silent takedown from any side, standing or crouched, as long as the guard is not looking at you (it used to need
+  you behind it); the attacker blends in and the view turns over 0.25 s instead of snapping (also for clients).
+- Crouching while walking does a short slide (a sprint gives the long one).
+- Thrown weapons no longer tumble as physics bodies: they land at once as a floating pickup a little ahead (before
+  any wall).
+- First-person arms sit further right; aiming keeps the gun low on the right (it re-centred and filled the screen);
+  sprinting with a weapon lowers and tilts it instead of losing it; unarmed arms are higher so punches cross the
+  view.
+- Mounted gun shots are felt: sound, muzzle light flash, view shake. Tank: a real cannon barrel that follows the aim
+  pitch and kicks back; the shell glows, flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m
+  wide (was 6.5 m); fire sound, muzzle flash, view shake.
+- Explosions (rocket, tank shell, C4, grenade, barrels, flashbang) use 3D toon fire and smoke from
+  Anime_Stylized_VFX instead of the 2D flipbook sheets that read as comic book; every slot stays swappable in the
+  data.
+- Last-known-position ghost: a faint white silhouette (15 % opacity, was 35 %), Hitman-like.
+
+
+
+
+
+### Fixed
+- First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
+  and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
+  rotation in each mesh's own frame (its 0.4.0 guess laid guns on their side); launchers are drawn at 0.55 and long
+  guns at 0.75 as intended, the placeholder bow at 0.5.
+- Guards knew where you were: a gunshot within 9 m or any hit made them lock onto your real position and shoot
+  through walls (the target stayed 'visible' forever). Now noise only sends them to the sound or impact, a hit from
+  an unseen shooter puts them on alert toward the shot, and only sight reveals you; in the dark a hostile heard
+  within 2.5 m is attacked.
+- Doors swung toward or away from you depending on which end you stood at (the side test used the axis along the
+  door): they now always open away from you, and fill their 110 x 230 openings (a 10 cm gap at the side and 20 cm on
+  top before). The NPC door trigger is centred.
+- Vent hatches spun inside their own plane like a pendulum: they now swing open on their top edge like a small door,
+  away from the opener.
+- Window flicker: the frame faces were coplanar with the wall's opening and the closed shutters overlapped in one
+  plane; the frame now sits inside the opening, the shutters at two depths, and they open 80 degrees (105 cut into
+  the wall).
+- Ladders: Space pressed just before or right after grabbing a ladder no longer jumps you straight off it (0.35 s
+  grace).
+- Mounted gun: its barrel pointed straight up (unrotated cylinder) and it turned 2.5x slower than the player's view
+  (raw look input); it now points forward and matches the player's sensitivity.
+- Arriving on a map, the image slowly brightened or darkened (default eye adaptation): every match map now has one
+  fixed exposure (MatchExposure post process volume, also made by the level builder).
+- Guards in combat now raise their weapon (aim pose): only snipers ticked, so the others never played it; and the
+  additive fire montage no longer replaces the aim pose on each shot (arms dropping).
+- Security camera footage showed a white floor: the feed looked down at the camera's own light pool through a
+  34-degree view, untonemapped, at 512 x 288. It now looks ahead with a 90-degree view (FeedFOV), tonemapped at the
+  match exposure, at 1024 x 576. The 'no signal' screen works on consoles too (wrong material path, unset on the
+  console).
+- Footsteps were silent (the per-surface sound slots were empty): players and NPCs now play a footstep per surface
+  (grass, stone, dirt, wood, metal, concrete by default).
+- Gym: the armor and C4 pickups sat inside blocks (they could not be picked up): they now rest on top.
+
+
+### Removed
+- Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):
+  the comic-book flipbooks are gone; the data slots stay for the team's own effects.
+- The launch countdown (5-4-3-2-1) and the intro 3-2-1: when everyone is ready the match starts a second later; the
+  drop only shows 'Dropping in' and the map name.
+- The health line and the health text: health shows only through the red screen edges and the heartbeat.
+- The 'TV / silent hack with F' hackable distraction, everywhere: class, Blueprint, its Gym placement and label,
+  builders and docs.
+- The Gym slide lane (blue strip and label): sliding is a move of the character, not a fixture.
+
 ## [0.4.1] - 2026-11-11
 
 ### Fixed

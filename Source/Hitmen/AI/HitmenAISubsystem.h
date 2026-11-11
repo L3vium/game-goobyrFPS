@@ -179,6 +179,8 @@ private:
 	TMap<TWeakObjectPtr<UHitmenAlertComponent>, TWeakObjectPtr<AActor>> SearcherTargets;
 
 	bool HasLineOfSight(const FVector& From, const FVector& To, const AActor* IgnoreA, const AActor* IgnoreB) const;
+	/** Walls between two points (up to MaxWalls), for hearing occlusion. */
+	int32 CountOccludingWalls(const FVector& From, const FVector& To, const AActor* IgnoreA, const AActor* IgnoreB, int32 MaxWalls) const;
 	void RefreshMarker(const TWeakObjectPtr<AActor>& Key);
 	void PruneClaims() const;
 };

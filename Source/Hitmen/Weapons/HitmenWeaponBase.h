@@ -197,6 +197,10 @@ protected:
 	FVector PlaceholderScale = FVector(0.5f, 0.12f, 0.15f);
 
 	// ---- Lying in the world: once it lands it floats and turns (no physics) ----
+	/** A thrown weapon lands as a floating pickup at once, this far ahead of the thrower (or before a wall). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Drop", meta=(ClampMin="0", Units="cm"))
+	float ThrowPlaceDistance = 180.f;
+
 	/** Height of the weapon centre above the ground while floating. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Pickup", meta=(ClampMin="0", Units="cm"))
 	float HoverHeight = 45.f;
@@ -266,7 +270,7 @@ protected:
 	int32 GetOwnerAmmo() const;
 	bool IsLocallyOwned() const;
 	USceneComponent* GetAttachParent() const;
-	void ReportShotNoise(const FVector& Origin) const;
+	void ReportShotNoise(const FVector& Origin, const TArray<FVector>& Impacts) const;
 
 	// ---- Dropped pickup (server) ----
 	void ActivatePickup();

@@ -1,6 +1,10 @@
 // Hitmen — stealth fixtures
 
 #include "World/Interactables/HitmenStealth.h"
+#include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
+#include "Data/HitmenSoundSet.h"
+#include "Components/PointLightComponent.h"
 #include "Data/HitmenAnimSet.h"
 #include "GameFramework/PlayerController.h"
 #include "Hitmen.h"
@@ -132,30 +136,20 @@ void AHitmenLocker::OnRep_Occupant()
 void AHitmenLocker::ApplyOccupant(AHitmenCharacterBase* Character, bool bInside)
 {
 	UCharacterMovementComponent* Movement = Character->GetCharacterMovement();
-	if (bInside)
-	{
-		// Inside the hollow cabinet, facing out through the slit, unable to walk.
-		Character->MoveIgnoreActorAdd(this);
-		Movement->StopMovementImmediately();
-		Movement->DisableMovement();
-		const FRotator Facing(0.f, GetActorRotation().Yaw, 0.f);
-		Character->SetActorLocationAndRotation(GetActorTransform().TransformPosition(InsideOffset), Facing, false, nullptr, ETeleportType::TeleportPhysics);
-		if (APlayerController* PC = Cast<APlayerController>(Character->GetController()); PC && PC->IsLocalController())
-		{
-			PC->SetControlRotation(Facing);
-		}
-		Character->PlayCosmeticMontage(Character->GetAnimSet() ? Character->GetAnimSet()->GetMontage(EHitmenAnimMontage::LockerEnter) : nullptr);
-	}
-	else
-	{
-		Character->SetActorLocation(GetActorTransform().TransformPosition(ExitOffset), false, nullptr, ETeleportType::TeleportPhysics);
-		Character->MoveIgnoreActorRemove(this);
-		if (!Character->IsDead())
-		{
-			Movement->SetMovementMode(MOVE_Falling);
-		}
-		Character->PlayCosmeticMontage(Character->GetAnimSet() ? Character->GetAnimSet()->GetMontage(EHitmenAnimMontage::LockerExit) : nullptr);
-	}
+	// The door opens, the character steps in (or out) turning to face out, the door closes: UpdateStep moves it
+	// on every machine while the door cycles.
+	const FRotator Facing(0.f, GetActorRotation().Yaw, 0.f);
+	Character->MoveIgnoreActorAdd(this);
+	Movement->StopMovementImmediately();
+	Movement->DisableMovement();
+	SteppingCharacter = Character;
+	bSteppingIn = bInside;
+	StepFrom = Character->GetActorLocation();
+	StepTo = GetActorTransform().TransformPosition(bInside ? InsideOffset : ExitOffset);
+	StepFromRotation = Character->GetControlRotation();
+	StepToRotation = bInside ? Facing : FRotator(0.f, Facing.Yaw, 0.f);
+	Character->PlayCosmeticMontage(Character->GetAnimSet() ? Character->GetAnimSet()->GetMontage(bInside ? EHitmenAnimMontage::LockerEnter : EHitmenAnimMontage::LockerExit) : nullptr);
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, bInside ? EHitmenSound::LockerEnter : EHitmenSound::LockerExit, GetActorLocation());
 }
 
 void AHitmenLocker::StartDoorCycle()
@@ -171,10 +165,40 @@ void AHitmenLocker::Tick(float DeltaSeconds)
 	// Opens, lets the occupant through, closes again (smooth).
 	const float Open = FMath::Sin(Alpha * PI);
 	DoorHinge->SetRelativeRotation(FRotator(0.f, -DoorOpenAngle * FMath::SmoothStep(0.f, 1.f, Open), 0.f));
-	if (Alpha >= 1.f)
+	UpdateStep();
+	if (Alpha >= 1.f && !SteppingCharacter.IsValid())
 	{
 		DoorHinge->SetRelativeRotation(FRotator::ZeroRotator);
 		SetActorTickEnabled(false);
+	}
+}
+
+void AHitmenLocker::UpdateStep()
+{
+	AHitmenCharacterBase* Character = SteppingCharacter.Get();
+	if (!Character)
+	{
+		return;
+	}
+	const float T = FMath::Clamp((GetWorld()->GetTimeSeconds() - DoorCycleStart - StepDelay) / StepTime, 0.f, 1.f);
+	const float Ease = FMath::InterpEaseInOut(0.f, 1.f, T, 2.f);
+	Character->SetActorLocation(FMath::Lerp(StepFrom, StepTo, Ease), false, nullptr, ETeleportType::TeleportPhysics);
+	if (APlayerController* PC = Cast<APlayerController>(Character->GetController()); PC && PC->IsLocalController())
+	{
+		PC->SetControlRotation(FMath::Lerp(StepFromRotation, StepToRotation, Ease));
+	}
+	if (T >= 1.f)
+	{
+		SteppingCharacter.Reset();
+		if (!bSteppingIn)
+		{
+			// Out: walk again.
+			Character->MoveIgnoreActorRemove(this);
+			if (!Character->IsDead())
+			{
+				Character->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+			}
+		}
 	}
 }
 
@@ -225,6 +249,50 @@ void AHitmenTallGrass::UpdateOccupants()
 AHitmenDistraction::AHitmenDistraction()
 {
 	InteractionText = NSLOCTEXT("Hitmen", "Distract", "Turn on");
+	NoiseRadius = 1000.f;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
+	PlayingLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("PlayingLight"));
+	PlayingLight->SetupAttachment(Root);
+	PlayingLight->SetRelativeLocation(FVector(0.f, 0.f, 60.f));
+	PlayingLight->SetIntensity(0.f);
+	PlayingLight->SetAttenuationRadius(350.f);
+	PlayingLight->SetLightColor(FLinearColor(1.f, 0.55f, 0.15f));
+	PlayingLight->SetCastShadows(false);
+}
+
+void AHitmenDistraction::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now >= PlayingUntil)
+	{
+		PlayingLight->SetIntensity(0.f);
+		if (PlayingAudio)
+		{
+			PlayingAudio->FadeOut(0.4f, 0.f);
+			PlayingAudio = nullptr;
+		}
+		SetActorTickEnabled(false);
+		return;
+	}
+	// Pulses with the beat while it plays.
+	const float Beat = 0.5f + 0.5f * FMath::Sin(Now * PI * 4.f);
+	PlayingLight->SetIntensity(PlayingLightIntensity * (0.35f + 0.65f * Beat));
+}
+
+void AHitmenDistraction::Pulse()
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now >= PlayingUntil)
+	{
+		GetWorldTimerManager().ClearTimer(PulseTimer);
+		return;
+	}
+	if (HasAuthority())
+	{
+		UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), NoiseRadius, this, EHitmenNoiseType::Distraction);
+	}
 }
 
 bool AHitmenDistraction::CanRemoteActivate_Implementation() const
@@ -251,48 +319,23 @@ void AHitmenDistraction::OnInteracted(AActor* Interactor)
 void AHitmenDistraction::Trigger(AActor* Activator)
 {
 	LastTriggerTime = GetWorld()->GetTimeSeconds();
-	// The noise comes from the device, not from the player.
-	UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), NoiseRadius, this, EHitmenNoiseType::Distraction);
+	// The noise comes from the device, not from the player, again on every pulse while it plays.
 	Multicast_Triggered();
 }
 
 void AHitmenDistraction::Multicast_Triggered_Implementation()
 {
-	Juice_OnTriggered();
-}
-
-AHitmenHackableDistraction::AHitmenHackableDistraction()
-{
-	InteractionText = NSLOCTEXT("Hitmen", "Hack", "Hack");
-	NoiseRadius = 1200.f;
-}
-
-void AHitmenHackableDistraction::Trigger(AActor* Activator)
-{
-	LastTriggerTime = GetWorld()->GetTimeSeconds();
-	// Silent: only NPCs that can see the device react.
-	const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
-	if (AI)
+	// Every machine: plays for PlayTime with a pulsing light and a sound each PulseInterval.
+	PlayingUntil = GetWorld()->GetTimeSeconds() + PlayTime;
+	SetActorTickEnabled(true);
+	if (!PlayingAudio && GetNetMode() != NM_DedicatedServer)
 	{
-		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenHackable), false, this);
-		for (UHitmenAlertComponent* Alert : AI->GetAlertComponents())
+		if (USoundBase* Loop = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::RadioLoop))
 		{
-			const APawn* NPC = Cast<APawn>(Alert->GetOwner());
-			if (!NPC)
-			{
-				continue;
-			}
-			const FVector Eye = NPC->GetPawnViewLocation();
-			const float Distance = FVector::Dist(Eye, GetActorLocation());
-			FHitResult Hit;
-			Params.ClearIgnoredSourceObjects();
-			Params.AddIgnoredActor(this);
-			Params.AddIgnoredActor(NPC);
-			if (Distance <= NoiseRadius && !GetWorld()->LineTraceSingleByChannel(Hit, Eye, GetActorLocation(), ECC_Visibility, Params))
-			{
-				Alert->HearNoise(GetActorLocation(), EHitmenNoiseType::Distraction, this, Distance);
-			}
+			PlayingAudio = UGameplayStatics::SpawnSoundAttached(Loop, Root);
 		}
 	}
-	Multicast_Triggered();
+	Pulse();
+	GetWorldTimerManager().SetTimer(PulseTimer, this, &AHitmenDistraction::Pulse, PulseInterval, true);
+	Juice_OnTriggered();
 }

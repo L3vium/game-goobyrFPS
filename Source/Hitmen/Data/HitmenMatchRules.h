@@ -103,26 +103,47 @@ public:
 
 	// ---- Noise ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", Units="cm"))
-	float SprintFootstepRadius = 1200.f;
+	float SprintFootstepRadius = 450.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", Units="cm"))
-	float WalkFootstepRadius = 350.f;
+	float WalkFootstepRadius = 150.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", Units="cm"))
 	float CrouchFootstepRadius = 0.f;
 
-	/** Radius multiplier when a wall blocks the line between noise and listener. */
+	/** Radius multiplier for each wall between the noise and the listener (two walls: squared...). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", ClampMax="1"))
 	float OcclusionMultiplier = 0.45f;
+
+	/** Walls counted by the occlusion test; more walls than this = not heard. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="1", ClampMax="6"))
+	int32 MaxOccludingWalls = 3;
 
 	/** Only the N nearest NPCs that can hear react to one noise, for every noise type (gunshots and
 	 *  explosions included). Keep it at 1-2; per-type exceptions in NoiseResponderOverrides. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="1"))
 	int32 MaxNoiseResponders = 2;
 
-	/** Gunshot closer than this sends a hearing NPC straight to combat. */
+	/** Hearing a hostile this close in the dark (cannot see) is enough to attack. Elsewhere hearing only
+	 *  sends NPCs to the sound (or the bullet impact); only sight reveals where a shooter is. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", Units="cm"))
-	float GunshotCombatRadius = 900.f;
+	float DarkCloseEngageDistance = 250.f;
+
+	// ---- NPC fire (Hitman-like: few, slow shots) ----
+	/** NPC shots are this many times slower than the weapon's own rate. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Fire", meta=(ClampMin="1"))
+	float NPCFireIntervalMultiplier = 2.5f;
+
+	/** Shots per burst before a pause. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Fire", meta=(ClampMin="1"))
+	int32 NPCBurstShots = 3;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Fire", meta=(ClampMin="0", Units="s"))
+	float NPCBurstPause = 1.2f;
+
+	/** Time to raise the weapon before the first shot of an engagement. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Fire", meta=(ClampMin="0", Units="s"))
+	float NPCFirstShotDelay = 0.6f;
 
 	// ---- AI ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI", meta=(ClampMin="0"))

@@ -71,13 +71,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Hitmen|Crosshair")
 	float ArmGap = 4.f;
 
-	/** Radius of the threat arrows around the crosshair (px). */
+	/** Radius of the awareness arcs around the crosshair (px). */
 	UPROPERTY(EditAnywhere, Category="Hitmen|Crosshair")
 	float ThreatRadius = 74.f;
+
+	/** Angular width of one awareness arc (degrees). */
+	UPROPERTY(EditAnywhere, Category="Hitmen|Crosshair", meta=(ClampMin="5", ClampMax="90"))
+	float AwarenessArcWidth = 34.f;
 
 	float HitMarkerTime = 0.f;
 	float KillCrossTime = 0.f;
 	bool bLastHitWasKill = false;
+	bool bLastHitHeadshot = false;
 	bool bLastKillHeadshot = false;
 };
 
@@ -112,6 +117,9 @@ protected:
 
 	FHitmenSonarPing LastPing;
 	float LastPingLocalTime = -100.f;
+	/** Status banner ("UNDER FIRE"...): the current one and when it appeared (scale-in and flash). */
+	mutable FString ShownStatus;
+	mutable float StatusShownAt = -100.f;
 };
 
 /** Root HUD: composes the parts above and the text elements. */

@@ -51,9 +51,9 @@ void AHitmenOpeningBase::SetOpen(bool bNewOpen, const AActor* Opener)
 	}
 	if (bNewOpen && Opener)
 	{
-		// Swing away from whoever opens it.
+		// Swing away from whoever opens it: the side is measured across the opening (its swing normal).
 		const FVector ToOpener = (Opener->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-		OpenDirection = FVector::DotProduct(ToOpener, GetActorForwardVector()) > 0.f ? -1.f : 1.f;
+		OpenDirection = FVector::DotProduct(ToOpener, GetSwingNormal()) > 0.f ? -1.f : 1.f;
 	}
 	bOpen = bNewOpen;
 	OnRep_Open();
@@ -84,8 +84,8 @@ AHitmenDoor::AHitmenDoor()
 {
 	NPCTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("NPCTrigger"));
 	NPCTrigger->SetupAttachment(Root);
-	NPCTrigger->SetBoxExtent(FVector(120.f, 80.f, 100.f));
-	NPCTrigger->SetRelativeLocation(FVector(0.f, 50.f, 100.f));
+	NPCTrigger->SetBoxExtent(FVector(110.f, 110.f, 100.f));
+	NPCTrigger->SetRelativeLocation(FVector(55.f, 0.f, 100.f));
 	NPCTrigger->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	Mesh->SetCanEverAffectNavigation(false);
 }
@@ -218,23 +218,28 @@ void AHitmenWindow::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	// Origin = floor; the opening spans [SillHeight, SillHeight + Height] and [-Width/2, Width/2].
+	// The frame sits just inside the wall's opening (Inset) so none of its faces is coplanar with the wall's
+	// opening faces (that flickered); the clear opening is the inner frame.
+	constexpr float Inset = 0.3f;
 	const float T = FrameThickness;
 	const float Z0 = SillHeight;
 	const float Z1 = SillHeight + Height;
-	HitmenGeometry::SetBox(Mesh, FVector(0.f, 0.f, Z0 - T * 0.5f), FVector(FrameDepth, Width + 2.f * T, T));
-	HitmenGeometry::SetBox(FrameTop, FVector(0.f, 0.f, Z1 + T * 0.5f), FVector(FrameDepth, Width + 2.f * T, T));
-	HitmenGeometry::SetBox(FrameLeft, FVector(0.f, -(Width + T) * 0.5f, (Z0 + Z1) * 0.5f), FVector(FrameDepth, T, Height));
-	HitmenGeometry::SetBox(FrameRight, FVector(0.f, (Width + T) * 0.5f, (Z0 + Z1) * 0.5f), FVector(FrameDepth, T, Height));
+	const float InnerHalf = Width * 0.5f - T - Inset;
+	HitmenGeometry::SetBox(Mesh, FVector(0.f, 0.f, Z0 + Inset + T * 0.5f), FVector(FrameDepth, Width - 2.f * Inset, T));
+	HitmenGeometry::SetBox(FrameTop, FVector(0.f, 0.f, Z1 - Inset - T * 0.5f), FVector(FrameDepth, Width - 2.f * Inset, T));
+	HitmenGeometry::SetBox(FrameLeft, FVector(0.f, -(InnerHalf + T * 0.5f), (Z0 + Z1) * 0.5f), FVector(FrameDepth, T, Height - 2.f * (T + Inset)));
+	HitmenGeometry::SetBox(FrameRight, FVector(0.f, InnerHalf + T * 0.5f, (Z0 + Z1) * 0.5f), FVector(FrameDepth, T, Height - 2.f * (T + Inset)));
 	for (UStaticMeshComponent* Piece : { FrameTop.Get(), FrameLeft.Get(), FrameRight.Get() })
 	{
 		HitmenGeometry::InheritLook(Piece, Mesh);
 	}
-	// Hinges on the outer edges; each shutter covers half the opening.
-	LeftHinge->SetRelativeLocation(FVector(0.f, -Width * 0.5f, (Z0 + Z1) * 0.5f));
-	RightHinge->SetRelativeLocation(FVector(0.f, Width * 0.5f, (Z0 + Z1) * 0.5f));
-	// The two shutters overlap a little in the middle: no gap a body or a probe could pass through.
-	HitmenGeometry::SetBox(LeftShutter, FVector(0.f, Width * 0.25f, 0.f), FVector(ShutterThickness, Width * 0.5f + 1.f, Height - 1.f));
-	HitmenGeometry::SetBox(RightShutter, FVector(0.f, -Width * 0.25f, 0.f), FVector(ShutterThickness, Width * 0.5f + 1.f, Height - 1.f));
+	// Hinges on the inner frame edges; each shutter covers half the clear opening. They overlap a little in the
+	// middle (no gap a body or a probe could pass) at two different depths, so they never share a plane.
+	const float ShutterHeight = Height - 2.f * (T + Inset) - 1.f;
+	LeftHinge->SetRelativeLocation(FVector(-ShutterThickness * 0.5f - 0.1f, -InnerHalf, (Z0 + Z1) * 0.5f));
+	RightHinge->SetRelativeLocation(FVector(ShutterThickness * 0.5f + 0.1f, InnerHalf, (Z0 + Z1) * 0.5f));
+	HitmenGeometry::SetBox(LeftShutter, FVector(0.f, InnerHalf * 0.5f + 0.5f, 0.f), FVector(ShutterThickness, InnerHalf + 1.f, ShutterHeight));
+	HitmenGeometry::SetBox(RightShutter, FVector(0.f, -InnerHalf * 0.5f - 0.5f, 0.f), FVector(ShutterThickness, InnerHalf + 1.f, ShutterHeight));
 	ApplyOpenAlpha(bOpen ? 1.f : 0.f);
 }
 
@@ -266,7 +271,8 @@ void AHitmenVentHatch::BeginPlay()
 
 void AHitmenVentHatch::ApplyOpenAlpha(float Alpha)
 {
-	RotateAroundHinge(FRotator(OpenAngle * Alpha, 0.f, 0.f));
+	// The panel lies in X-Z (thin along Y): it swings out of its plane around the top edge, like a small door.
+	RotateAroundHinge(FRotator(0.f, 0.f, -OpenAngle * OpenDirection * Alpha));
 }
 
 void AHitmenVentHatch::ApplyPoison_Implementation(AActor* Poisoner)

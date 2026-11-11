@@ -340,18 +340,26 @@ void UHitmenAlertComponent::HearNoise(const FVector& Location, EHitmenNoiseType 
 	{
 		return;
 	}
-	const float CombatRadius = UHitmenAISubsystem::GetRules(this).GunshotCombatRadius;
 	const bool bHostileSource = UHitmenTeamLibrary::AreHostile(GetOwner(), NoiseInstigator);
 	const bool bLoud = Type == EHitmenNoiseType::Gunshot || Type == EHitmenNoiseType::Explosion;
 
-	if (bLoud && bHostileSource && Distance <= CombatRadius)
+	// Hearing never reveals where a shooter is: the NPC goes to the sound (for gunfire, where the bullet
+	// landed). Exception: in the dark, a hostile heard right next to it is attacked (nothing else to go on).
+	if (bHostileSource && NoiseInstigator && Distance <= UHitmenAISubsystem::GetRules(this).DarkCloseEngageDistance)
 	{
-		EngageTarget(NoiseInstigator);
-		return;
+		const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
+		if (AI && AI->IsLocationDark(GetOwner()->GetActorLocation()))
+		{
+			EngageTarget(NoiseInstigator);
+			return;
+		}
 	}
 	if (AlertState == EHitmenAlertState::Combat)
 	{
-		LastKnownLocation = Location;
+		if (!bTargetVisible)
+		{
+			LastKnownLocation = Location;
+		}
 		return;
 	}
 	if (AlertState == EHitmenAlertState::Searching)
@@ -396,7 +404,25 @@ void UHitmenAlertComponent::OnDamagedBy(AActor* DamageInstigator)
 	}
 	if (DamageInstigator && UHitmenTeamLibrary::AreHostile(GetOwner(), DamageInstigator))
 	{
-		EngageTarget(DamageInstigator);
+		const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+		const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
+		const bool bSeen = AI && OwnerPawn && AI->CanObserverSee(OwnerPawn, DamageInstigator, TNumericLimits<float>::Max(), 180.f, true);
+		if (bSeen)
+		{
+			EngageTarget(DamageInstigator);
+		}
+		else if (!(AlertState == EHitmenAlertState::Combat && bTargetVisible))
+		{
+			// Hit by someone it cannot see: alarmed, it turns toward where the shot came from and searches.
+			const FVector Here = GetOwner()->GetActorLocation();
+			const FVector Toward = (DamageInstigator->GetActorLocation() - Here).GetSafeNormal2D();
+			Target = DamageInstigator;
+			bTargetVisible = false;
+			bAlertedByCall = false;
+			LastKnownLocation = Here + Toward * UnseenAttackerSearchDistance;
+			LastSeenTime = GetWorld()->GetTimeSeconds();
+			SetAlertState(EHitmenAlertState::Combat);
+		}
 	}
 	else if (AlertState != EHitmenAlertState::Combat)
 	{

@@ -78,7 +78,7 @@ FText UHitmenPauseMapWidget::GetCategoryName(int32 Category)
 	case 1: return LOCTEXT("LegendTeam", "Teammates");
 	case 2: return LOCTEXT("LegendVIP", "Target (VIP)");
 	case 3: return LOCTEXT("LegendRetrieval", "Retrieval points");
-	case 4: return LOCTEXT("LegendAlerted", "Alerted guards");
+	case 4: return LOCTEXT("LegendAlerted", "Guards on alert");
 	default: return LOCTEXT("LegendCameras", "Cameras");
 	}
 }
@@ -91,7 +91,7 @@ FLinearColor UHitmenPauseMapWidget::GetCategoryColor(int32 Category)
 	case 1: return FLinearColor(0.3f, 0.7f, 1.f);
 	case 2: return HitmenUI::Accent();
 	case 3: return HitmenUI::Warning();
-	case 4: return FLinearColor(1.f, 0.45f, 0.1f);
+	case 4: return HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow);
 	default: return FLinearColor(0.75f, 0.75f, 0.8f);
 	}
 }
@@ -147,7 +147,8 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	{
 		const FVector2D TopLeft = ToMap(FVector(Bounds.Max.X, Bounds.Min.Y, 0.f));
 		const FVector2D BottomRight = ToMap(FVector(Bounds.Min.X, Bounds.Max.Y, 0.f));
-		HitmenUI::PaintImage(OutDrawElements, LayerId + 1, AllottedGeometry, &MapBrush, TopLeft, BottomRight - TopLeft);
+		// Dimmed so white markers (you, cameras, suspicious guards) read on the light schematic.
+		HitmenUI::PaintImage(OutDrawElements, LayerId + 1, AllottedGeometry, &MapBrush, TopLeft, BottomRight - TopLeft, FLinearColor(0.42f, 0.44f, 0.47f, 1.f));
 	}
 	auto Marker = [&](int32 Category, const FVector& World, const FString& Label, float Size)
 	{
@@ -192,9 +193,12 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	{
 		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
 		{
-			if (Blip.Color != EHitmenAlertColor::None)
+			if (Blip.Color != EHitmenAlertColor::None && bCategoryVisible[4])
 			{
-				Marker(4, Blip.Location, TEXT(""), 9.f);
+				// Same colours as the minimap: white (suspicious), yellow (alerted / searching), red (combat).
+				const FVector2D P = ToMap(Blip.Location);
+				HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, P - FVector2D(6.5f), FVector2D(13.f), FLinearColor(0.f, 0.f, 0.f, 0.7f));
+				HitmenUI::PaintBox(OutDrawElements, LayerId + 4, AllottedGeometry, P - FVector2D(4.5f), FVector2D(9.f), HitmenAlert::ToLinearColor(Blip.Color));
 			}
 		}
 	}
@@ -341,57 +345,82 @@ void UHitmenPauseMenuWidget::BuildDefaultLayout()
 	UCanvasPanelSlot* BackSlot = HitmenUI::AddToCanvas(Canvas, Backdrop, FAnchors(0.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
 	BackSlot->SetOffsets(FMargin(0.f));
 
-	// Left: title, actions, then the map legend.
+	// Left: PAUSE and three big square blocks.
 	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	HitmenUI::AddToCanvas(Canvas, Column, FAnchors(0.f, 0.f), FVector2D(96.f, 84.f), FVector2D::ZeroVector);
-	UTextBlock* Overline = HitmenUI::MakeText(WidgetTree, LOCTEXT("InProgress", "CONTRACT IN PROGRESS"), 15, TEXT("Medium"), HitmenUI::TextDim());
-	Overline->SetFont(HitmenUI::SpacedFont(15, TEXT("Medium"), 260));
-	HitmenUI::AddToVBox(Column, Overline);
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Paused", "PAUSED"), 76, TEXT("Bold")), FMargin(0.f, -10.f, 0.f, 0.f));
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("StillRunning", "The match keeps running."), 18, TEXT("Italic"), HitmenUI::TextDim()), FMargin(2.f, 0.f, 0.f, 26.f));
-	struct FEntry { FText Label; EHitmenMenuButtonKind Kind; FName Handler; };
+	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Paused", "PAUSE"), 84, TEXT("Bold")), FMargin(0.f, 0.f, 0.f, 28.f));
+	struct FEntry { FText Label; FName Handler; };
 	const FEntry Entries[] = {
-		{ LOCTEXT("Resume", "Resume"), EHitmenMenuButtonKind::Secondary, GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, Resume) },
-		{ LOCTEXT("Options", "Options"), EHitmenMenuButtonKind::Secondary, GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, OpenOptions) },
-		{ LOCTEXT("Leave", "Leave match"), EHitmenMenuButtonKind::Back, GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, LeaveMatch) } };
+		{ LOCTEXT("Resume", "Resume"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, Resume) },
+		{ LOCTEXT("Options", "Options"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, OpenOptions) },
+		{ LOCTEXT("Leave", "Leave match"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, LeaveMatch) } };
 	for (const FEntry& Entry : Entries)
 	{
 		UHitmenMenuButton* Button = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
-		Button->Setup(Entry.Label, Entry.Kind);
+		Button->Setup(Entry.Label, EHitmenMenuButtonKind::Block);
 		FScriptDelegate Delegate;
 		Delegate.BindUFunction(this, Entry.Handler);
 		Button->OnClicked.Add(Delegate);
-		HitmenUI::AddToVBox(Column, Button, FMargin(-22.f, 2.f, 0.f, 2.f), false, HAlign_Left);
+		USizeBox* ButtonSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+		ButtonSize->SetWidthOverride(360.f);
+		ButtonSize->SetHeightOverride(92.f);
+		ButtonSize->SetContent(Button);
+		HitmenUI::AddToVBox(Column, ButtonSize, FMargin(0.f, 0.f, 0.f, 12.f), false, HAlign_Left);
 	}
+
+	// The map in the middle.
+	Map = WidgetTree->ConstructWidget<UHitmenPauseMapWidget>(UHitmenPauseMapWidget::StaticClass());
+	UCanvasPanelSlot* MapSlot = HitmenUI::AddToCanvas(Canvas, Map, FAnchors(0.26f, 0.05f, 0.76f, 0.95f), FVector2D::ZeroVector, FVector2D::ZeroVector);
+	MapSlot->SetOffsets(FMargin(0.f));
+
+	// Right: the legend, each row with the marker colours as they are drawn on the map.
+	UVerticalBox* Legend = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	UCanvasPanelSlot* LegendSlot = HitmenUI::AddToCanvas(Canvas, Legend, FAnchors(1.f, 0.f), FVector2D(-64.f, 96.f), FVector2D(1.f, 0.f));
+	LegendSlot->SetAutoSize(true);
 	UTextBlock* LegendTitle = HitmenUI::MakeText(WidgetTree, LOCTEXT("Legend", "MAP LEGEND"), 15, TEXT("Medium"), HitmenUI::TextDim());
 	LegendTitle->SetFont(HitmenUI::SpacedFont(15, TEXT("Medium"), 260));
-	HitmenUI::AddToVBox(Column, LegendTitle, FMargin(0.f, 40.f, 0.f, 10.f));
+	HitmenUI::AddToVBox(Legend, LegendTitle, FMargin(0.f, 0.f, 0.f, 12.f));
 	for (int32 Category = 0; Category < UHitmenPauseMapWidget::CategoryCount; ++Category)
 	{
 		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-		UBorder* Swatch = HitmenUI::MakePanel(WidgetTree, UHitmenPauseMapWidget::GetCategoryColor(Category), FMargin(0.f));
-		USizeBox* SwatchSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-		SwatchSize->SetWidthOverride(10.f);
-		SwatchSize->SetHeightOverride(10.f);
-		SwatchSize->SetContent(Swatch);
-		HitmenUI::AddToHBox(Row, SwatchSize, FMargin(0.f, 0.f, 12.f, 0.f));
+		UHorizontalBox* Swatches = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+		TArray<FLinearColor> Colors = { UHitmenPauseMapWidget::GetCategoryColor(Category) };
+		if (Category == 4)
+		{
+			Colors = { HitmenAlert::ToLinearColor(EHitmenAlertColor::White), HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow), HitmenAlert::ToLinearColor(EHitmenAlertColor::Red) };
+		}
+		for (const FLinearColor& Color : Colors)
+		{
+			UBorder* Swatch = HitmenUI::MakePanel(WidgetTree, Color, FMargin(0.f));
+			USizeBox* SwatchSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+			SwatchSize->SetWidthOverride(12.f);
+			SwatchSize->SetHeightOverride(12.f);
+			SwatchSize->SetContent(Swatch);
+			HitmenUI::AddToHBox(Swatches, SwatchSize, FMargin(0.f, 0.f, 4.f, 0.f));
+		}
+		USizeBox* SwatchColumn = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+		SwatchColumn->SetWidthOverride(52.f);
+		SwatchColumn->SetContent(Swatches);
+		HitmenUI::AddToHBox(Row, SwatchColumn, FMargin(0.f));
 		UHitmenToggle* Toggle = WidgetTree->ConstructWidget<UHitmenToggle>(UHitmenToggle::StaticClass());
 		Toggle->Setup(UHitmenPauseMapWidget::GetCategoryName(Category), true, 18);
 		Toggle->OnToggled.AddDynamic(this, &UHitmenPauseMenuWidget::HandleLegendToggled);
 		HitmenUI::AddToHBox(Row, Toggle);
-		HitmenUI::AddToVBox(Column, Row, FMargin(0.f, 3.f));
+		HitmenUI::AddToVBox(Legend, Row, FMargin(0.f, 4.f));
 		LegendToggles.Add(Toggle);
 	}
 
-	// The map takes most of the screen.
-	Map = WidgetTree->ConstructWidget<UHitmenPauseMapWidget>(UHitmenPauseMapWidget::StaticClass());
-	UCanvasPanelSlot* MapSlot = HitmenUI::AddToCanvas(Canvas, Map, FAnchors(0.24f, 0.05f, 0.82f, 0.95f), FVector2D::ZeroVector, FVector2D::ZeroVector);
-	MapSlot->SetOffsets(FMargin(0.f));
-
-	// Debug tools flush against the right edge.
+	// Debug tools: hidden behind a small button; they open over the legend.
 	DebugPanel = WidgetTree->ConstructWidget<UHitmenDebugPanelWidget>(UHitmenDebugPanelWidget::StaticClass());
 	UCanvasPanelSlot* DebugSlot = HitmenUI::AddToCanvas(Canvas, DebugPanel, FAnchors(1.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
-	DebugSlot->SetOffsets(FMargin(-280.f, 0.f, 280.f, 0.f));
+	DebugSlot->SetOffsets(FMargin(-360.f, 64.f, 360.f, 120.f));
+	DebugSlot->SetZOrder(10);
+	DebugToggleButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
+	DebugToggleButton->Setup(LOCTEXT("DebugTools", "Debug tools"), EHitmenMenuButtonKind::Chip);
+	DebugToggleButton->OnClicked.AddDynamic(this, &UHitmenPauseMenuWidget::ToggleDebugPanel);
+	UCanvasPanelSlot* ToggleSlot = HitmenUI::AddToCanvas(Canvas, DebugToggleButton, FAnchors(1.f, 1.f), FVector2D(-64.f, -48.f), FVector2D(1.f, 1.f));
+	ToggleSlot->SetAutoSize(true);
+	ToggleSlot->SetZOrder(11);
 }
 
 void UHitmenPauseMenuWidget::HandleLegendToggled(bool bChecked)
@@ -406,12 +435,25 @@ void UHitmenPauseMenuWidget::HandleLegendToggled(bool bChecked)
 	}
 }
 
+void UHitmenPauseMenuWidget::ToggleDebugPanel()
+{
+	if (DebugPanel)
+	{
+		DebugPanel->SetVisibility(DebugPanel->IsVisible() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+	}
+}
+
 void UHitmenPauseMenuWidget::BindEvents()
 {
 	if (DebugPanel)
 	{
+		// Closed by default; the toggle only exists where debug commands are allowed.
 		const AHitmenGameState* GS = GetHitmenGameState();
-		DebugPanel->SetVisibility(GS && GS->AreDebugCommandsAllowed() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		DebugPanel->SetVisibility(ESlateVisibility::Collapsed);
+		if (DebugToggleButton)
+		{
+			DebugToggleButton->SetVisibility(GS && GS->AreDebugCommandsAllowed() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		}
 	}
 }
 

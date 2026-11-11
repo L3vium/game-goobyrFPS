@@ -1,6 +1,7 @@
 // Hitmen — interaction component
 
 #include "Interaction/HitmenInteractionComponent.h"
+#include "Data/HitmenSoundSet.h"
 #include "Characters/HitmenNPC.h"
 #include "Interaction/HitmenInteractable.h"
 #include "Components/HitmenMeleeComponent.h"
@@ -195,7 +196,16 @@ bool UHitmenInteractionComponent::TryInteract()
 	}
 	if (AActor* Target = FocusedActor.Get())
 	{
-		Server_Interact(Target);
+		const float Hold = Target->GetClass()->ImplementsInterface(UHitmenInteractable::StaticClass())
+			? IHitmenInteractable::Execute_GetInteractHoldTime(Target, Pawn) : 0.f;
+		if (Hold > 0.f)
+		{
+			BeginHold(Target, Hold);
+		}
+		else
+		{
+			Server_Interact(Target);
+		}
 		return true;
 	}
 	if (UHitmenBodyCarryComponent* Carry = Pawn->FindComponentByClass<UHitmenBodyCarryComponent>(); Carry && Carry->IsCarrying())
@@ -217,6 +227,17 @@ void UHitmenInteractionComponent::Server_Interact_Implementation(AActor* Target)
 	{
 		return;
 	}
+	// Held interactions (hacking) only go through after the hold time, timed on the server too.
+	const float Hold = IHitmenInteractable::Execute_GetInteractHoldTime(Target, Pawn);
+	if (Hold > 0.f)
+	{
+		const bool bHeldLongEnough = ServerHoldTarget.Get() == Target && GetWorld()->GetTimeSeconds() - ServerHoldStartTime >= Hold * 0.85f;
+		ServerHoldTarget.Reset();
+		if (!bHeldLongEnough)
+		{
+			return;
+		}
+	}
 	if (IHitmenInteractable::Execute_CanInteract(Target, Pawn))
 	{
 		IHitmenInteractable::Execute_Interact(Target, Pawn);
@@ -226,4 +247,65 @@ void UHitmenInteractionComponent::Server_Interact_Implementation(AActor* Target)
 			Character->PlayAnimSetMontage(EHitmenAnimMontage::Interact);
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------------------------
+// Hold to interact
+// ---------------------------------------------------------------------------------------------
+
+void UHitmenInteractionComponent::BeginHold(AActor* Target, float Duration)
+{
+	HoldTarget = Target;
+	HoldStartTime = GetWorld()->GetTimeSeconds();
+	HoldDuration = Duration;
+	Server_BeginHold(Target);
+	UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::HackLoop);
+	GetWorld()->GetTimerManager().SetTimer(HoldTimer, this, &UHitmenInteractionComponent::UpdateHold, 0.03f, true);
+	UpdateHold();
+}
+
+void UHitmenInteractionComponent::UpdateHold()
+{
+	AActor* Target = HoldTarget.Get();
+	// Looking away (or the target going away) cancels the hold.
+	if (!Target || FocusedActor.Get() != Target)
+	{
+		EndHold(false);
+		return;
+	}
+	const float Progress = FMath::Clamp((GetWorld()->GetTimeSeconds() - HoldStartTime) / FMath::Max(0.01f, HoldDuration), 0.f, 1.f);
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Cast<APawn>(GetOwner())))
+	{
+		UI->SetInteractProgress(Progress);
+	}
+	if (Progress >= 1.f)
+	{
+		Server_Interact(Target);
+		UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::HackComplete);
+		EndHold(true);
+	}
+}
+
+void UHitmenInteractionComponent::EndHold(bool bCompleted)
+{
+	HoldTarget.Reset();
+	GetWorld()->GetTimerManager().ClearTimer(HoldTimer);
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Cast<APawn>(GetOwner())))
+	{
+		UI->SetInteractProgress(-1.f);
+	}
+}
+
+void UHitmenInteractionComponent::ReleaseInteract()
+{
+	if (HoldTarget.IsValid())
+	{
+		EndHold(false);
+	}
+}
+
+void UHitmenInteractionComponent::Server_BeginHold_Implementation(AActor* Target)
+{
+	ServerHoldTarget = Target;
+	ServerHoldStartTime = GetWorld()->GetTimeSeconds();
 }

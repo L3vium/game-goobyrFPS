@@ -402,6 +402,30 @@ def montage(name, source):
     return m
 
 
+
+def set_footstep_sounds(character_cdo):
+    """Footstep sounds per physical surface (PM_Grass / Stone / Sand / Wood / Metal) and a default."""
+    steps1 = ESS + "SFX_Essentials_11_FOOTSTEPS_01/Cues/FEETHmn_InsJ_Footsteps_"
+    steps2 = ESS + "SFX_Essentials_20_FOOTSTEPS_02/Cues/FEETHmn_InsJ_Footsteps_"
+    P = unreal.PhysicalSurface
+    table = {P.SURFACE_TYPE1: (steps1 + "Grass_Running_Trainers_01-01_Single-01_Cue", 0.8),
+             P.SURFACE_TYPE2: (steps2 + "Stones_Running_Trainers_01-01_Single-01_Cue", 1.0),
+             P.SURFACE_TYPE3: (steps2 + "Dirt_Running_Trainers_01-01_Single-01_Cue", 0.6),
+             P.SURFACE_TYPE4: (steps2 + "Wood_Jogging_Trainers_02-01_Single_01_Cue", 1.1),
+             P.SURFACE_TYPE5: (steps2 + "Glass_Running_Trainers_03-01_Single-01_Cue", 1.4)}
+    comp = component(character_cdo, "footstep_component")
+    if not comp:
+        return
+    feedback = {}
+    for surface, (sound_path, noise) in table.items():
+        f = unreal.HitmenSurfaceFeedback()
+        f.set_editor_property("sound", load(sound_path))
+        f.set_editor_property("noise_multiplier", noise)
+        feedback[surface] = f
+    default = unreal.HitmenSurfaceFeedback()
+    default.set_editor_property("sound", load(steps1 + "Concrete_Jogging_Trainers_01-01_Single-01_Cue"))
+    set_props(comp, surface_feedback=feedback, default_feedback=default)
+
 def build_animation():
     folder = path("Characters", "Shared", "Anims")
     ensure_folder(folder)
@@ -522,20 +546,23 @@ def build_weapons(mats):
     for bp in (hitscan, projectile, melee, shotgun, pickup):
         save(bp)
 
-    explosion_fx = fx("Explosions/OneShot/NS_Explosion_Fire_01_OS")
+    # Explosions: 3D toon fire and smoke (Anime_Stylized_VFX), never the 2D flipbook sheets (they read as comic book).
+    toon = "/Game/Vefects/Anime_Stylized_VFX/VFX/Particles/"
+    explosion_fx = load(toon + "NS_Bomb_Explosion")
+    ground_fx = load(toon + "NS_Explosion_Fire_Ground")
     explosion_sfx = load(SFX + "SFX_ExplosionFire")
     impact_fx = fx("Impact/OneShot/NS_Impact_01_OS")
     impact_sfx = load(SFX + "SFX_Impact_01")
     smoke_trail = load("/Game/Vefects/Essential_Trails_VFX/Shared/Particles/NS_Trail_Simple_02")
     arrow = projectile_bp("BP_Projectile_Arrow", unreal.HitmenProjectile, "cylinder", (0.025, 0.025, 0.7), mi["MI_Wood"],
-                          stick_on_impact=True, impact_noise_radius=300.0, impact_effect=impact_fx, impact_sound=impact_sfx,
+                          stick_on_impact=True, impact_noise_radius=300.0, impact_effect=None, impact_sound=impact_sfx,
                           movement={"projectile_gravity_scale": 0.6, "rotation_follows_velocity": True})
     rocket = projectile_bp("BP_Projectile_Rocket", unreal.HitmenProjectile, "cylinder", (0.12, 0.12, 0.6), mi["MI_Dark"],
-                           explode_on_impact=True, explosion_radius=500.0, explosion_damage=140.0, explosion_effect=explosion_fx,
+                           explode_on_impact=True, explosion_noise_radius=1500.0, explosion_radius=500.0, explosion_damage=140.0, explosion_effect=explosion_fx,
                            explosion_sound=explosion_sfx, explosion_effect_scale=1.6, trail_effect=smoke_trail,
                            movement={"projectile_gravity_scale": 0.0, "rotation_follows_velocity": True})
     grenade = projectile_bp("BP_Projectile_Grenade", unreal.HitmenProjectile, "sphere", (0.15, 0.15, 0.15), mi["MI_Green"],
-                            fuse_time=2.0, explosion_radius=450.0, explosion_damage=120.0, explosion_effect=explosion_fx,
+                            fuse_time=2.0, explosion_noise_radius=1500.0, explosion_radius=450.0, explosion_damage=120.0, explosion_effect=ground_fx,
                             explosion_sound=explosion_sfx, explosion_effect_scale=1.3,
                             movement={"should_bounce": True, "bounciness": 0.4})
     blackhole = projectile_bp("BP_Projectile_BlackHole", unreal.HitmenProjectile_BlackHole, "sphere", (0.3, 0.3, 0.3), mi["MI_Dark"],
@@ -545,15 +572,16 @@ def build_weapons(mats):
     dart = projectile_bp("BP_Projectile_SleepDart", unreal.HitmenProjectile, "cylinder", (0.02, 0.02, 0.2), mi["MI_Blue"],
                          status_on_hit=unreal.HitmenStatusEffect.ASLEEP, status_duration=25.0, movement={"projectile_gravity_scale": 0.0})
     flash = projectile_bp("BP_Projectile_Flashbang", unreal.HitmenProjectile_Flashbang, "cylinder", (0.08, 0.08, 0.15), mi["MI_White"],
-                          explosion_effect=fx("Explosions/OneShot/NS_Explosion_Magic_01_OS"), explosion_sound=load(SFX + "SFX_ExplosionClassic"),
+                          explosion_effect=load(toon + "NS_Explosion_Ice_Omni"), explosion_sound=load(SFX + "SFX_ExplosionClassic"),
                           explosion_effect_scale=0.8, explosion_shake_intensity=1.2)
     smoke = projectile_bp("BP_Projectile_Smoke", unreal.HitmenProjectile_Smoke, "cylinder", (0.08, 0.08, 0.15), mi["MI_Metal"],
                           explosion_sound=load(SFX + "SFX_DustPuff_Cue"), explosion_shake_intensity=0.0)
-    c4 = projectile_bp("BP_Projectile_C4", unreal.HitmenC4Charge, "cube", (0.15, 0.1, 0.05), mi["MI_Red"])
-    shell = projectile_bp("BP_Projectile_TankShell", unreal.HitmenProjectile, "sphere", (0.2, 0.2, 0.2), mi["MI_Dark"],
-                          explode_on_impact=True, explosion_radius=650.0, explosion_damage=200.0, explosion_effect=explosion_fx,
-                          explosion_sound=explosion_sfx, explosion_effect_scale=2.0, explosion_shake_intensity=4.0,
-                          movement={"projectile_gravity_scale": 0.2})
+    c4 = projectile_bp("BP_Projectile_C4", unreal.HitmenC4Charge, "cube", (0.15, 0.1, 0.05), mi["MI_Red"], explosion_effect=explosion_fx, explosion_effect_scale=1.6)
+    # Tank shell: a glowing slug that flies straight (no gravity, near-instant), then a big blast.
+    shell = projectile_bp("BP_Projectile_TankShell", unreal.HitmenProjectile, "sphere", (0.35, 0.35, 0.35), mats["laser"],
+                          explode_on_impact=True, explosion_noise_radius=1500.0, explosion_radius=1200.0, explosion_damage=260.0, explosion_effect=explosion_fx,
+                          explosion_sound=explosion_sfx, explosion_effect_scale=3.5, explosion_shake_intensity=6.0, trail_effect=smoke_trail,
+                          movement={"projectile_gravity_scale": 0.0, "rotation_follows_velocity": True})
 
     # Gun pack (Weapons_Free) for firearms and melee; the launchers keep the template launcher.
     free = "/Game/Weapons_Free/Meshes/"
@@ -581,17 +609,16 @@ def build_weapons(mats):
     # NPCs in combat hold these aim poses (looped in code) between shots.
     pistol_aim = montage("AM_Pistol_Aim", ANIMS + "/Pistol/MF_Pistol_Idle_ADS")
     rifle_aim = montage("AM_Rifle_Aim", ANIMS + "/Rifle/MF_Rifle_Idle_ADS")
-    gun_fx = dict(muzzle_fx=fx("MuzzleFlash/OneShot/NS_Muzzle_Combined_Aligned_X_OS"), impact_fx=fx("Impact/OneShot/NS_Impact_01_OS"),
-                  surface_impact_fx=fx("Dust/OneShot/NS_Dust_Directional_Small_01_OS"), flesh_impact_fx=fx("Blood/OneShot/NS_Blood_Impact_01_OS"),
+    # Guns carry no VFX (no muzzle flash, impact, dust or blood): the slots stay for the team's own effects.
+    gun_fx = dict(muzzle_fx=None, impact_fx=None, surface_impact_fx=None, flesh_impact_fx=None,
                   fire_sound=load(SFX + "SFX_GunShot_Cue"), impact_sound=load(SFX + "SFX_Impact_01"),
                   dry_fire_sound=load(ESS + "SFX_Essentials_02_CLOCKS/Cues/CLOCKTick_InsJ_Clock-01_Ticking_Single-01_Cue"))
     # On the first-person arms the gun is turned so its barrel runs along the view and its top is up. Solved in
     # PIE by Tools/Editor/hitmen_fp_solve.py (the same for every gun, their VisualTransforms share one convention).
     fp_offset = unreal.Transform()
-    fp_offset.rotation = unreal.Rotator(roll=8.7, pitch=-0.3, yaw=-2.9).quaternion()
+    fp_offset.rotation = unreal.Rotator(roll=9.5, pitch=0.9, yaw=-3.3).quaternion()
     gun_fx["first_person_attach_offset"] = fp_offset
     pistol_vis = dict(first_person_pose=pistol_pose, fire_montage=pistol_fire, equip_montage=pistol_equip, aim_montage=pistol_aim, **gun_fx)
-    pistol_vis["muzzle_fx"] = fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_Aligned_X_OS")
     pistol_vis["fire_sound"] = load(SFX + "SFX_DustPuff_Cue")
     # First person, every gun uses the two-hand pistol hold (the arms offsets are tuned for it); the body keeps the
     # rifle montages. Swap first_person_pose per weapon once dedicated first-person rifle poses exist.
@@ -607,48 +634,49 @@ def build_weapons(mats):
     launcher_offset.scale3d = unreal.Vector(0.55, 0.55, 0.55)
     launcher_vis["first_person_attach_offset"] = launcher_offset
     knife_offset = unreal.Transform()
-    knife_offset.rotation = unreal.Rotator(roll=-179.3, pitch=-79.6, yaw=-94.7).quaternion()
+    knife_offset.rotation = unreal.Rotator(roll=174.8, pitch=-80.4, yaw=-88.1).quaternion()
     bow_offset = unreal.Transform()
-    bow_offset.rotation = unreal.Rotator(roll=-90.3, pitch=-8.7, yaw=87.2).quaternion()
+    bow_offset.rotation = unreal.Rotator(roll=-89.1, pitch=-9.5, yaw=86.6).quaternion()
+    bow_offset.scale3d = unreal.Vector(0.5, 0.5, 0.5)
     launcher_vis["fire_sound"] = load("/Game/Weapons/GrenadeLauncher/Audio/FirstPersonTemplateWeaponFire02")
 
     A = unreal.HitmenFireMode
     weapons = {
         # name: (display, class bp, props). Recoil is in degrees (kick up, then recovers).
         "Pistol": ("Silenced pistol", hitscan, dict(fire_mode=A.SINGLE, rounds_per_minute=260.0, damage=34.0, headshot_multiplier=3.0,
-                   silenced=True, noise_radius=0.0, start_ammo=24, max_ammo=72, ammo_per_pickup=12, hip_spread=1.2, aim_spread=0.25,
+                   silenced=True, noise_radius=0.0, impact_noise_radius=300.0, start_ammo=24, max_ammo=72, ammo_per_pickup=12, hip_spread=1.2, aim_spread=0.25,
                    recoil_pitch=1.6, recoil_yaw_random=0.35, static_mesh=pistol_mesh, skeletal_mesh=None, visual_transform=pack(0.45), **pistol_vis)),
         "SMG": ("SMG", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=900.0, damage=13.0, start_ammo=90, max_ammo=240,
-                ammo_per_pickup=45, hip_spread=3.0, aim_spread=1.2, noise_radius=2600.0, recoil_pitch=0.55, recoil_yaw_random=0.35,
+                ammo_per_pickup=45, hip_spread=3.0, aim_spread=1.2, noise_radius=600.0, impact_noise_radius=500.0, recoil_pitch=0.55, recoil_yaw_random=0.35,
                 static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "AssaultRifle": ("Assault rifle", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=620.0, damage=22.0, start_ammo=90,
-                         max_ammo=210, ammo_per_pickup=30, hip_spread=2.0, aim_spread=0.5, noise_radius=3200.0, recoil_pitch=0.8,
+                         max_ammo=210, ammo_per_pickup=30, hip_spread=2.0, aim_spread=0.5, noise_radius=700.0, impact_noise_radius=600.0, recoil_pitch=0.8,
                          recoil_yaw_random=0.3, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "BurstRifle": ("Burst rifle", hitscan, dict(fire_mode=A.BURST, burst_count=3, rounds_per_minute=780.0, damage=24.0, start_ammo=72,
-                       max_ammo=180, ammo_per_pickup=24, hip_spread=1.8, aim_spread=0.4, noise_radius=3200.0, recoil_pitch=0.7,
+                       max_ammo=180, ammo_per_pickup=24, hip_spread=1.8, aim_spread=0.4, noise_radius=700.0, impact_noise_radius=600.0, recoil_pitch=0.7,
                        recoil_yaw_random=0.25, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "Shotgun": ("Shotgun", shotgun, dict(fire_mode=A.SINGLE, rounds_per_minute=70.0, damage=12.0, pellet_count=9, range=2500.0,
-                    start_ammo=16, max_ammo=40, ammo_per_pickup=6, hip_spread=1.0, aim_spread=0.6, noise_radius=3500.0,
+                    start_ammo=16, max_ammo=40, ammo_per_pickup=6, hip_spread=1.0, aim_spread=0.6, noise_radius=800.0, impact_noise_radius=600.0,
                     recoil_pitch=3.5, recoil_yaw_random=0.6, static_mesh=shotgun_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "Minigun": ("Minigun", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=1500.0, damage=9.0, spin_up_time=0.8, start_ammo=300,
-                    max_ammo=600, ammo_per_pickup=150, hip_spread=3.0, aim_spread=2.0, noise_radius=4500.0, recoil_pitch=0.3,
+                    max_ammo=600, ammo_per_pickup=150, hip_spread=3.0, aim_spread=2.0, noise_radius=900.0, impact_noise_radius=700.0, recoil_pitch=0.3,
                     recoil_yaw_random=0.4, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "Sniper": ("Sniper rifle", hitscan, dict(fire_mode=A.SINGLE, rounds_per_minute=40.0, damage=120.0, headshot_multiplier=3.0,
                    range=30000.0, start_ammo=10, max_ammo=30, ammo_per_pickup=5, hip_spread=4.0, aim_spread=0.0, aim_fov=20.0,
-                   recoil_pitch=5.0, recoil_yaw_random=0.5, noise_radius=6000.0, scope_overlay=True,
+                   recoil_pitch=5.0, recoil_yaw_random=0.5, noise_radius=800.0, impact_noise_radius=700.0, scope_overlay=True,
                    static_mesh=sniper_mesh, skeletal_mesh=None, visual_transform=pack(0.55), **rifle_vis)),
         "Bow": ("Bow", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=60.0, damage=90.0, charge_to_fire=True, full_charge_time=1.0,
                 projectile_class=gen_class(arrow), projectile_speed=5000.0, silenced=True, noise_radius=0.0, start_ammo=12, max_ammo=30,
                 ammo_per_pickup=6, recoil_pitch=0.8, first_person_pose=pistol_pose, first_person_attach_offset=bow_offset)),
         "RocketLauncher": ("Rocket launcher", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=40.0, projectile_class=gen_class(rocket),
-                           projectile_speed=3000.0, start_ammo=4, max_ammo=8, ammo_per_pickup=2, noise_radius=5000.0, recoil_pitch=4.0,
-                           back_blast_fx=fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_OS"),
+                           projectile_speed=3000.0, start_ammo=4, max_ammo=8, ammo_per_pickup=2, noise_radius=1200.0, impact_noise_radius=0.0, recoil_pitch=4.0,
+                           back_blast_fx=None,
                            static_mesh=gl_mesh, skeletal_mesh=gl_skel, **launcher_vis)),
         "GrenadeLauncher": ("Grenade launcher", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=70.0, projectile_class=gen_class(grenade),
-                            projectile_speed=2200.0, start_ammo=6, max_ammo=12, ammo_per_pickup=3, noise_radius=3000.0, recoil_pitch=2.5,
+                            projectile_speed=2200.0, start_ammo=6, max_ammo=12, ammo_per_pickup=3, noise_radius=1000.0, impact_noise_radius=0.0, recoil_pitch=2.5,
                             static_mesh=gl_mesh, skeletal_mesh=gl_skel, **launcher_vis)),
         "BlackHole": ("Black hole gun", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=20.0, projectile_class=gen_class(blackhole),
-                      projectile_speed=1800.0, start_ammo=2, max_ammo=4, ammo_per_pickup=1, noise_radius=1500.0, recoil_pitch=2.0,
+                      projectile_speed=1800.0, start_ammo=2, max_ammo=4, ammo_per_pickup=1, noise_radius=500.0, impact_noise_radius=0.0, recoil_pitch=2.0,
                       static_mesh=gl_mesh, skeletal_mesh=gl_skel, **launcher_vis)),
         "Sword": ("Knife", melee, dict(fire_mode=A.SINGLE, rounds_per_minute=90.0, damage=75.0, uses_ammo=False, melee_range=190.0,
                   melee_radius=45.0, silenced=True, noise_radius=0.0, static_mesh=knife_mesh, skeletal_mesh=None, visual_transform=pack(0.5, 0.0),
@@ -769,9 +797,10 @@ def build_rules():
                   npc_suspicion_rate_multiplier=suspicion, npc_damage_multiplier=damage, npc_aim_error_degrees=aim)
         return p
 
-    set_props(rules, difficulty_presets={D.EASY: preset(4, 10, 10, 0.8, 0.7, 0.3, 7.0),
-                                         D.NORMAL: preset(3, 6, 6, 1.0, 1.0, 0.45, 4.0),
-                                         D.HARD: preset(2, 4, 4, 1.2, 1.4, 0.7, 2.5)})
+    # Damage stays low (with the slow paced fire of the match rules, a fight lasts): Hitman-like.
+    set_props(rules, difficulty_presets={D.EASY: preset(4, 10, 10, 0.8, 0.7, 0.25, 7.0),
+                                         D.NORMAL: preset(3, 6, 6, 1.0, 1.0, 0.4, 4.0),
+                                         D.HARD: preset(2, 4, 4, 1.2, 1.4, 0.6, 2.5)})
     save(rules)
     return rules
 
@@ -813,8 +842,8 @@ def build_sound_set():
     steps = ESS + "SFX_Essentials_20_FOOTSTEPS_02/Cues/FEETHmn_InsJ_Footsteps_"
     entries = {
         S.UI_HOVER: (clock + "2_Cue", 0.35), S.UI_CLICK: (clock + "1_Cue", 0.6), S.UI_BACK: (whoosh, 0.35),
-        S.UI_CONFIRM: (machine, 0.5), S.COUNTDOWN: (clock + "1_Cue", 0.9),
-        S.MATCH_START: (ESS + "SFX_Essentials_01_THUNDER/Cues/THUN_InsJ_Thunder_Close_03-01-Instant_Cue", 0.6),
+        # Confirm (team change, ready): the same short tick as a click, a little softer. No match-start sting.
+        S.UI_CONFIRM: (clock + "1_Cue", 0.45), S.COUNTDOWN: (clock + "1_Cue", 0.9),
         S.HEARTBEAT: (hb + "Action/Cue/LowHealth_Cue", 0.8), S.PUNCH_WHOOSH: (whoosh, 0.7),
         S.DOOR_OPEN: (chains + "Lifting_Close_02-01_Cue", 0.35), S.DOOR_CLOSE: (chains + "Dropping_Close_01-01_Cue", 0.35),
         S.WINDOW_OPEN: (chains + "Lifting_Close_02-01_Cue", 0.3), S.CONTAINER_OPEN: (chains + "Dropping_Close_01-01_Cue", 0.4),
@@ -828,6 +857,11 @@ def build_sound_set():
         S.SIGHTROOM_ON: (hb + "Ambient/Cue/ReversedEcho1_Cue", 0.6), S.SIGHTROOM_OFF: (hb + "Ambient/Cue/ReversedEcho2_Cue", 0.4),
         S.LANDING: (steps + "Stones_Running_Trainers_01-01_Single-01_Cue", 0.8), S.PARACHUTE: (whoosh, 0.6),
         S.DEATH: (hb + "Action/Cue/Slowdown1_Cue", 0.8), S.TURRET_LOCK_ON: (hb + "Futuristic/Cue/NeonPulse1_Cue", 0.6),
+        S.HEADSHOT_HIT: (chains + "Dropping_Close_01-01_Cue", 0.5), S.HACK_LOOP: (hb + "Futuristic/Cue/Cybernetic1_Cue", 0.45),
+        S.HACK_COMPLETE: ("/Game/Vefects/Item_Pickup_VFX/Audio/SND_Item_Rare_L_Cue", 0.55),
+        S.RADIO_LOOP: (ESS + "SFX_Essentials_05_GLITCH/Cues/COMRadio_InsJ_Radio_Noise_Long-Wave_01-01_LOOP_Cue", 0.7),
+        S.MOUNTED_GUN_FIRE: (SFX + "SFX_GunShot_Cue", 0.8), S.TANK_FIRE: (SFX + "SFX_ExplosionClassic", 1.0),
+        S.LANDING_HARD: (steps + "Stones_Running_Trainers_01-01_Single-01_Cue", 1.0),
     }
     data = make_data("DA_SoundSet", path("Data"), unreal.HitmenSoundSet)
     sounds, volumes = {}, {}
@@ -897,7 +931,8 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     ghost_mi = create("MI_LastKnownGhost", path("Materials", "Instances"), unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
     if ghost_mi:
         MEL.set_material_instance_parent(ghost_mi, mats["cone"])
-        MEL.set_material_instance_vector_parameter_value(ghost_mi, "Color", unreal.LinearColor(0.85, 0.9, 1.0, 0.35))
+        # Hitman-like: a faint white silhouette.
+        MEL.set_material_instance_vector_parameter_value(ghost_mi, "Color", unreal.LinearColor(0.95, 0.97, 1.0, 0.15))
         save(ghost_mi)
     marker = make_blueprint("BP_LastKnownGhost", path("Characters", "Player"), unreal.SkeletalMeshActor)
     skel = component(cdo(marker), "skeletal_mesh_component")
@@ -945,6 +980,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     if fp:
         set_props(fp, skeletal_mesh_asset=manny, anim_class=gen_class(fp_abp) if fp_abp else gen_class(abp))
     set_props(pcdo, anim_set=anim_set)
+    set_footstep_sounds(pcdo)
     interaction = component(pcdo, "interaction_component")
     if interaction:
         set_props(interaction, focus_overlay_material=mats["focus"])
@@ -1089,8 +1125,9 @@ def build_world(mats, weapons):
         bps[name] = bp
         return bp
 
-    fixture("BP_Door", unreal.HitmenDoor, W + "/Door", {"mesh": ("cube", (1.0, 0.1, 2.1), mi["MI_Wood"], (50, 0, 105))})
-    fixture("BP_Door_Keycard1", unreal.HitmenDoor, W + "/Door", {"mesh": ("cube", (1.0, 0.1, 2.1), mi["MI_Blue"], (50, 0, 105))}, {"required_keycard": 1})
+    # Doors fill the 110 x 230 openings the level builder cuts.
+    fixture("BP_Door", unreal.HitmenDoor, W + "/Door", {"mesh": ("cube", (1.1, 0.1, 2.3), mi["MI_Wood"], (55, 0, 115))})
+    fixture("BP_Door_Keycard1", unreal.HitmenDoor, W + "/Door", {"mesh": ("cube", (1.1, 0.1, 2.3), mi["MI_Blue"], (55, 0, 115))}, {"required_keycard": 1})
     window = fixture("BP_Window", unreal.HitmenWindow, W + "/Window", {"mesh": ("cube", (1, 1, 1), mi["MI_White"], None)})
     for leaf in ("left_shutter", "right_shutter"):
         set_mesh(component(cdo(window), leaf), SHAPES["cube"], None, mi["MI_Glass"])
@@ -1109,7 +1146,6 @@ def build_world(mats, weapons):
             {"contents_mode": unreal.HitmenContainerContents.RANDOM})
     fixture("BP_TallGrass", unreal.HitmenTallGrass, W + "/Grass", {"mesh": ("cube", (6.0, 6.0, 1.1), mi["MI_Grass"], (0, 0, -5))})
     fixture("BP_Distraction_Radio", unreal.HitmenDistraction, W + "/Distraction", {"mesh": ("cube", (0.4, 0.2, 0.25), mi["MI_Red"], (0, 0, 12))})
-    fixture("BP_HackableDistraction_TV", unreal.HitmenHackableDistraction, W + "/Distraction", {"mesh": ("cube", (1.2, 0.1, 0.7), mi["MI_Dark"], (0, 0, 120))})
     fixture("BP_SecurityCamera", unreal.HitmenSecurityCamera, W + "/Security",
             {"body": ("cube", (0.4, 0.2, 0.2), mi["MI_White"], None), "view_cone": ("cone", (1, 1, 1), mats["cone"], None)})
     decal_comp = component(cdo(bps["BP_SecurityCamera"]), "floor_decal")
@@ -1118,12 +1154,13 @@ def build_world(mats, weapons):
     save(bps["BP_SecurityCamera"])
     fixture("BP_SecurityMonitor", unreal.HitmenSecurityMonitor, W + "/Security", {"screen": ("cube", (0.8, 0.05, 0.5), mats["screen"], None)},
             {"no_signal_material": mats["no_signal"]})
-    console = fixture("BP_ControlConsole", unreal.HitmenControlConsole, W + "/Security", {"mesh": ("cube", (0.7, 1.4, 0.9), mi["MI_Dark"], (0, 0, 45))})
+    console = fixture("BP_ControlConsole", unreal.HitmenControlConsole, W + "/Security", {"mesh": ("cube", (0.7, 1.4, 0.9), mi["MI_Dark"], (0, 0, 45))},
+                      {"no_signal_material": mats["no_signal"]})
     set_mesh(component(cdo(console), "screen"), SHAPES["cube"], None, mats["screen"])
     save(console)
     turret = fixture("BP_Turret", unreal.HitmenTurret, W + "/Security",
                      {"base": ("cylinder", (0.5, 0.5, 1.0), mi["MI_Metal"], (0, 0, 50)), "head": ("cube", (0.6, 0.45, 0.35), mi["MI_Dark"], (0, 0, 110))},
-                     {"muzzle_fx": fx("MuzzleFlash/OneShot/NS_Muzzle_Combined_Aligned_X_OS"), "impact_fx": fx("Impact/OneShot/NS_Impact_01_OS"),
+                     {"muzzle_fx": None, "impact_fx": None,
                       "fire_sound": load(SFX + "SFX_GunShot_Cue")})
     tcdo = cdo(turret)
     set_mesh(component(tcdo, "barrel"), SHAPES["cylinder"], None, mi["MI_Metal"])
@@ -1135,13 +1172,20 @@ def build_world(mats, weapons):
     fixture("BP_BlackoutVolume", unreal.HitmenBlackoutVolume, W + "/Power")
     fixture("BP_RoomVolume", unreal.HitmenRoomVolume, W + "/Vent")
     fixture("BP_PoisonableDrink", unreal.HitmenPoisonableDrink, W + "/Drink", {"mesh": ("cylinder", (0.08, 0.08, 0.15), mi["MI_Glass"], (0, 0, 8))})
-    fixture("BP_ExplosiveBarrel", unreal.HitmenExplosiveBarrel, W + "/Barrel", {"mesh": ("cylinder", (0.6, 0.6, 1.0), mi["MI_Red"], (0, 0, 50))})
+    fixture("BP_ExplosiveBarrel", unreal.HitmenExplosiveBarrel, W + "/Barrel", {"mesh": ("cylinder", (0.6, 0.6, 1.0), mi["MI_Red"], (0, 0, 50))},
+            {"explosion_effect": load("/Game/Vefects/Anime_Stylized_VFX/VFX/Particles/NS_Explosion_Fire_Ground"), "explosion_effect_scale": 1.6})
     fixture("BP_BreakableWall", unreal.HitmenBreakableWall, W + "/Breakable", {"mesh": ("cube", (3.0, 0.3, 3.0), mi["MI_Stone"], (0, 0, 150))})
-    fixture("BP_MountedGun", unreal.HitmenMountedGun, V, {"mesh": ("cylinder", (0.12, 0.12, 1.4), mi["MI_Dark"], (40, 0, 0)),
+    mounted = fixture("BP_MountedGun", unreal.HitmenMountedGun, V, {"mesh": ("cylinder", (0.12, 0.12, 1.4), mi["MI_Dark"], (70, 0, 0)),
                                                           "tripod": ("cone", (0.9, 0.9, 0.85), mi["MI_Metal"], (0, 0, -35)),
                                                           "shield": ("cube", (0.06, 1.1, 0.7), mi["MI_Metal"], (25, 0, 15))})
-    fixture("BP_Tank", unreal.HitmenTank, V, {"mesh": ("cube", (6.0, 3.6, 1.6), mi["MI_Green"], None), "turret": ("cube", (2.6, 2.0, 0.8), mi["MI_Green"], None)},
-            {"shell_class": gen_class(load(path("Weapons", "Projectiles", "BP_Projectile_TankShell")))})
+    # The barrel cylinder is modelled along Z: pitch it onto the gun's forward axis.
+    mounted_mesh = component(cdo(mounted), "mesh")
+    if mounted_mesh:
+        mounted_mesh.set_editor_property("relative_rotation", unreal.Rotator(pitch=-90.0, yaw=0.0, roll=0.0))
+    save(mounted)
+    tank = fixture("BP_Tank", unreal.HitmenTank, V, {"mesh": ("cube", (6.0, 3.6, 1.6), mi["MI_Green"], None), "turret": ("cube", (2.6, 2.0, 0.8), mi["MI_Green"], None),
+                                                    "barrel": ("cylinder", (0.32, 0.32, 3.4), mi["MI_Dark"], None)},
+                   {"shell_class": gen_class(load(path("Weapons", "Projectiles", "BP_Projectile_TankShell"))), "shell_speed": 20000.0})
     fixture("BP_RetrievalPoint", unreal.HitmenRetrievalPoint, S, {"mesh": ("cylinder", (4.0, 4.0, 0.1), mi["MI_Yellow"], (0, 0, 5))})
     fixture("BP_LootSpawn_Weapon", unreal.HitmenLootSpawnPoint, S, None, {"category": unreal.HitmenLootCategory.WEAPON})
     fixture("BP_LootSpawn_Item", unreal.HitmenLootSpawnPoint, S, None, {"category": unreal.HitmenLootCategory.ANY_ITEM})

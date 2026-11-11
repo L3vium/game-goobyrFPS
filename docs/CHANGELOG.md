@@ -5,6 +5,11 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+### Added
+- Tools/Editor/hitmen_check_reach.py: LD check for the map open in the editor. Every door must be walkable and every
+  loot spawn, NPC and retrieval point reachable on foot from a team start (snipers and roof points are listed as
+  ladder-only).
+
 ### Changed
 - Navmesh: 10 cm cells (from 19) so every 110 cm doorway is walkable by the AI, and 16384 A* search nodes (from
   2048) so long patrol legs on a big map are not cut short. L_Empty_01 and L_Empty_02 are re-baked.

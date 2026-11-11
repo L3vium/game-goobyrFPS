@@ -10,6 +10,7 @@
 class APawn;
 class APlayerController;
 class UTextureRenderTarget2D;
+class UTexture2D;
 
 /** One inventory slot as the HUD shows it. */
 USTRUCT(BlueprintType)
@@ -20,6 +21,10 @@ struct FHitmenHUDSlotView
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FText Name;
 	/** Remaining ammo, -1 for weapons without ammo. */
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") int32 Ammo = -1;
+	/** Ammo the weapon can hold (shown as "Ammo / MaxAmmo"). */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") int32 MaxAmmo = -1;
+	/** The weapon's icon (DA_Weapon_* Icon), null = name only. */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") TObjectPtr<UTexture2D> Icon = nullptr;
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bEmpty = true;
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bActive = false;
 };
@@ -45,6 +50,12 @@ struct FHitmenHUDAbilityView
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") int32 Charges = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") int32 MaxCharges = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float CooldownRemaining = 0.f;
+	/** Cooldown progress 0..1 (1 = ready). */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float CooldownAlpha = 1.f;
+	/** A resource gauge 0..1 (jetpack fuel), -1 = none. */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Meter = -1.f;
+	/** The ability's icon (DA_Ability_* Icon). */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") TObjectPtr<UTexture2D> Icon = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -70,6 +81,8 @@ struct FHitmenHUDAlertBlip
 	/** The NPC is aware of the viewing player (crosshair arcs only show these). */
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bTargetsViewer = false;
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bCallingReinforcements = false;
+	/** A security camera rather than an NPC (awareness arcs show a camera mark). */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bIsCamera = false;
 };
 
 /** A hint anchored on a world actor (remote-ability target: glow + action under it). */
@@ -230,6 +243,9 @@ public:
 		}
 	}
 	void SetScoped(bool bInScoped) { if (bScoped != bInScoped) { bScoped = bInScoped; OnScopeToggled.Broadcast(bScoped); } }
+	/** Hold-to-interact progress 0..1 (hacking a panel...), negative = no hold in progress. */
+	void SetInteractProgress(float Progress) { InteractProgress = Progress; }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") float GetInteractProgress() const { return InteractProgress; }
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FHitmenWorldHint& GetAbilityHint() const { return AbilityHint; }
 	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FText& GetTraversalHint() const { return TraversalHint; }
@@ -297,4 +313,5 @@ private:
 	FHitmenWorldHint AbilityHint;
 	FText TraversalHint;
 	bool bScoped = false;
+	float InteractProgress = -1.f;
 };

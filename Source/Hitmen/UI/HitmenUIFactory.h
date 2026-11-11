@@ -43,6 +43,8 @@ namespace HitmenUI
 	HITMEN_API FLinearColor Text();
 	HITMEN_API FLinearColor TextDim();
 	HITMEN_API FLinearColor Accent();
+	/** Near-black text on light blocks (lit buttons). */
+	HITMEN_API FLinearColor Ink();
 	HITMEN_API FLinearColor Hairline();
 	/** Alert yellow (retrieval points, warnings). */
 	HITMEN_API FLinearColor Warning();
@@ -69,6 +71,10 @@ namespace HitmenUI
 	/** A key cap: the key letter in a small outlined square. Returns its size. */
 	HITMEN_API FVector2D PaintKey(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FString& Key, FVector2D Position, int32 FontSize, float Alpha = 1.f);
 	HITMEN_API void PaintImage(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FSlateBrush* Brush, FVector2D Position, FVector2D Size, const FLinearColor& Tint = FLinearColor::White);
+	/** A filled triangle (local coordinates). */
+	HITMEN_API void PaintTriangle(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D A, FVector2D B, FVector2D C, const FLinearColor& Color);
+	/** A filled ring sector (awareness arcs, meters), clockwise from 12 o'clock in degrees. */
+	HITMEN_API void PaintArcFill(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float InnerRadius, float OuterRadius, float StartDeg, float EndDeg, const FLinearColor& Color, int32 Segments = 24);
 
 	/** The map definition of the level this widget lives in (minimap, pause map). */
 	HITMEN_API const UHitmenMapDefinition* FindCurrentMap(const UObject* WorldContext);

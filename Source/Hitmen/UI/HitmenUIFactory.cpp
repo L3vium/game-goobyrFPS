@@ -145,6 +145,47 @@ namespace HitmenUI
 		}
 	}
 
+	static void PaintVerts(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const TArray<FVector2D>& Points, const TArray<SlateIndex>& Indices, const FLinearColor& Color)
+	{
+		const FSlateBrush* White = FCoreStyle::Get().GetBrush("WhiteBrush");
+		const FSlateResourceHandle Handle = FSlateApplication::Get().GetRenderer()->GetResourceHandle(*White);
+		const FSlateRenderTransform& Transform = Geo.GetAccumulatedRenderTransform();
+		const FColor Vertex = Color.ToFColorSRGB();
+		TArray<FSlateVertex> Verts;
+		Verts.Reserve(Points.Num());
+		for (const FVector2D& Point : Points)
+		{
+			Verts.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(Transform, FVector2f(Point), FVector2f(0.5f, 0.5f), Vertex));
+		}
+		FSlateDrawElement::MakeCustomVerts(Out, Layer, Handle, Verts, Indices, nullptr, 0, 0);
+	}
+
+	void PaintTriangle(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D A, FVector2D B, FVector2D C, const FLinearColor& Color)
+	{
+		PaintVerts(Out, Layer, Geo, { A, B, C }, { 0, 1, 2 }, Color);
+	}
+
+	void PaintArcFill(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float InnerRadius, float OuterRadius, float StartDeg, float EndDeg, const FLinearColor& Color, int32 Segments)
+	{
+		Segments = FMath::Max(1, Segments);
+		TArray<FVector2D> Points;
+		TArray<SlateIndex> Indices;
+		Points.Reserve((Segments + 1) * 2);
+		for (int32 Index = 0; Index <= Segments; ++Index)
+		{
+			const float Angle = FMath::DegreesToRadians(FMath::Lerp(StartDeg, EndDeg, static_cast<float>(Index) / Segments));
+			const FVector2D Dir(FMath::Sin(Angle), -FMath::Cos(Angle));
+			Points.Add(Center + Dir * InnerRadius);
+			Points.Add(Center + Dir * OuterRadius);
+			if (Index > 0)
+			{
+				const SlateIndex Base = static_cast<SlateIndex>((Index - 1) * 2);
+				Indices.Append({ Base, static_cast<SlateIndex>(Base + 1), static_cast<SlateIndex>(Base + 2), static_cast<SlateIndex>(Base + 1), static_cast<SlateIndex>(Base + 3), static_cast<SlateIndex>(Base + 2) });
+			}
+		}
+		PaintVerts(Out, Layer, Geo, Points, Indices, Color);
+	}
+
 	const UHitmenMapDefinition* FindCurrentMap(const UObject* WorldContext)
 	{
 		const UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;

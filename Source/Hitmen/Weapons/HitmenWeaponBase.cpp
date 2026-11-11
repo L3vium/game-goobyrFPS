@@ -1,6 +1,7 @@
 // Hitmen — weapon base
 
 #include "Weapons/HitmenWeaponBase.h"
+#include "Characters/HitmenNPC.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Data/HitmenWeaponData.h"
 #include "Inventory/HitmenInventoryComponent.h"
@@ -1029,7 +1030,9 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 		UGameplayStatics::PlaySoundAtLocation(this, Sound, Origin);
 	}
 	// Same cosmetic path as the FX: predicted on the shooter, multicast to everyone else.
-	if (AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerPawn))
+	// NPCs hold their weapon's aim pose between shots: the fire montages are additive and, in the same slot, they
+	// would replace that pose (arms dropping on every shot), so NPCs keep the raised weapon instead.
+	if (AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerPawn); Character && !Character->IsA<AHitmenNPC>())
 	{
 		Character->PlayCosmeticMontage(WeaponData->FireMontage.LoadSynchronous());
 	}

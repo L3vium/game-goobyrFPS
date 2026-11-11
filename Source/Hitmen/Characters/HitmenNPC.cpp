@@ -223,7 +223,9 @@ void AHitmenNPC::BeginPlay()
 	Super::BeginPlay();
 	KeycardMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, KeycardBone);
 	OnRep_CarriedKeycard();
-	SetActorTickEnabled(bIsSniper);
+	// Every guard ticks for its combat aim pose (raised weapon); only snipers need every frame (aim laser).
+	SetActorTickEnabled(GetNetMode() != NM_DedicatedServer || bIsSniper);
+	SetActorTickInterval(bIsSniper ? 0.f : 0.1f);
 	AlertComponent->SetReactsToNoises(bReactsToNoises);
 	// Bodies are a visual cue: only sentries (Hold Position + deaf) ignore them, because a sentry's
 	// job is to never be lured off its gate. A deaf patrol / stationary NPC still investigates bodies.

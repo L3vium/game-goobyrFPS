@@ -813,8 +813,8 @@ def build_sound_set():
     steps = ESS + "SFX_Essentials_20_FOOTSTEPS_02/Cues/FEETHmn_InsJ_Footsteps_"
     entries = {
         S.UI_HOVER: (clock + "2_Cue", 0.35), S.UI_CLICK: (clock + "1_Cue", 0.6), S.UI_BACK: (whoosh, 0.35),
-        S.UI_CONFIRM: (machine, 0.5), S.COUNTDOWN: (clock + "1_Cue", 0.9),
-        S.MATCH_START: (ESS + "SFX_Essentials_01_THUNDER/Cues/THUN_InsJ_Thunder_Close_03-01-Instant_Cue", 0.6),
+        # Confirm (team change, ready): the same short tick as a click, a little softer. No match-start sting.
+        S.UI_CONFIRM: (clock + "1_Cue", 0.45), S.COUNTDOWN: (clock + "1_Cue", 0.9),
         S.HEARTBEAT: (hb + "Action/Cue/LowHealth_Cue", 0.8), S.PUNCH_WHOOSH: (whoosh, 0.7),
         S.DOOR_OPEN: (chains + "Lifting_Close_02-01_Cue", 0.35), S.DOOR_CLOSE: (chains + "Dropping_Close_01-01_Cue", 0.35),
         S.WINDOW_OPEN: (chains + "Lifting_Close_02-01_Cue", 0.3), S.CONTAINER_OPEN: (chains + "Dropping_Close_01-01_Cue", 0.4),

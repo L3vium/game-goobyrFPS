@@ -96,6 +96,18 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0", ClampMax="89", Units="deg"))
 	float LookDownAngle = 38.f;
 
+	/** Security footage: field of view of the feed (wider than the detection cone, to see the room). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Feed", meta=(ClampMin="20", ClampMax="150", Units="deg"))
+	float FeedFOV = 90.f;
+
+	/** The feed looks down only this much (the head looks at its own light pool on the floor). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Feed", meta=(ClampMin="0", ClampMax="89", Units="deg"))
+	float FeedLookDownAngle = 15.f;
+
+	/** Fixed exposure of the feed (EV100, the match maps' MatchExposure). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Feed")
+	float FeedExposureEV100 = -0.3f;
+
 	/** Total sweep arc (0 = static). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0", ClampMax="350", Units="deg"))
 	float SweepAngle = 90.f;
@@ -181,7 +193,7 @@ protected:
 
 	/** Shown on the screen slot while the linked camera is disabled (no capture runs meanwhile). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Monitor")
-	TSoftObjectPtr<UMaterialInterface> NoSignalMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/M_Monitor_NoSignal.M_Monitor_NoSignal")));
+	TSoftObjectPtr<UMaterialInterface> NoSignalMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/Master/M_Monitor_NoSignal.M_Monitor_NoSignal")));
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextureRenderTarget2D> RenderTarget;
@@ -234,7 +246,7 @@ protected:
 	FName ScreenTextureParameter = TEXT("ScreenTexture");
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console")
-	TSoftObjectPtr<UMaterialInterface> NoSignalMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/M_Monitor_NoSignal.M_Monitor_NoSignal")));
+	TSoftObjectPtr<UMaterialInterface> NoSignalMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/Master/M_Monitor_NoSignal.M_Monitor_NoSignal")));
 
 	/** Seconds each camera stays on screen. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console", meta=(ClampMin="0.5", Units="s"))

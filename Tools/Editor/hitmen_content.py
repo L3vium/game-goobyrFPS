@@ -1129,7 +1129,8 @@ def build_world(mats, weapons):
     save(bps["BP_SecurityCamera"])
     fixture("BP_SecurityMonitor", unreal.HitmenSecurityMonitor, W + "/Security", {"screen": ("cube", (0.8, 0.05, 0.5), mats["screen"], None)},
             {"no_signal_material": mats["no_signal"]})
-    console = fixture("BP_ControlConsole", unreal.HitmenControlConsole, W + "/Security", {"mesh": ("cube", (0.7, 1.4, 0.9), mi["MI_Dark"], (0, 0, 45))})
+    console = fixture("BP_ControlConsole", unreal.HitmenControlConsole, W + "/Security", {"mesh": ("cube", (0.7, 1.4, 0.9), mi["MI_Dark"], (0, 0, 45))},
+                      {"no_signal_material": mats["no_signal"]})
     set_mesh(component(cdo(console), "screen"), SHAPES["cube"], None, mats["screen"])
     save(console)
     turret = fixture("BP_Turret", unreal.HitmenTurret, W + "/Security",

@@ -78,7 +78,18 @@ void AHitmenSecurityCamera::BeginPlay()
 	// Cameras watch the floor: the cone ends in a round footprint where it meets the ground.
 	BaseHeadRotation = Head->GetRelativeRotation() + FRotator(-LookDownAngle, 0.f, 0.f);
 	Head->SetRelativeRotation(BaseHeadRotation);
-	Capture->FOVAngle = ViewHalfAngle * 2.f;
+	// The feed: wide, looking more ahead than the head, tonemapped at the match exposure (it was a white floor).
+	Capture->FOVAngle = FeedFOV;
+	Capture->SetRelativeRotation(FRotator(LookDownAngle - FeedLookDownAngle, 0.f, 0.f));
+	Capture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+	Capture->PostProcessBlendWeight = 1.f;
+	Capture->PostProcessSettings.bOverride_AutoExposureMethod = true;
+	Capture->PostProcessSettings.AutoExposureMethod = EAutoExposureMethod::AEM_Histogram;
+	Capture->PostProcessSettings.bOverride_AutoExposureMinBrightness = true;
+	Capture->PostProcessSettings.bOverride_AutoExposureMaxBrightness = true;
+	Capture->PostProcessSettings.AutoExposureMinBrightness = FeedExposureEV100;
+	Capture->PostProcessSettings.AutoExposureMaxBrightness = FeedExposureEV100;
+	Capture->ShowFlags.SetEyeAdaptation(false);
 
 	// Cone length / width follow the view settings (default mesh: engine cone pointing up).
 	const float Radius = FMath::Tan(FMath::DegreesToRadians(ViewHalfAngle)) * ViewDistance;
@@ -289,7 +300,7 @@ void AHitmenSecurityMonitor::BeginPlay()
 	{
 		return;
 	}
-	RenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(this, 512, 288);
+	RenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(this, 1024, 576, RTF_RGBA8_SRGB);
 	FeedMaterial = Screen->CreateDynamicMaterialInstance(ScreenMaterialIndex);
 	if (FeedMaterial)
 	{
@@ -359,7 +370,7 @@ void AHitmenControlConsole::BeginPlay()
 	{
 		return;
 	}
-	RenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(this, 512, 288);
+	RenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(this, 1024, 576, RTF_RGBA8_SRGB);
 	FeedMaterial = Screen->CreateDynamicMaterialInstance(0);
 	if (FeedMaterial)
 	{

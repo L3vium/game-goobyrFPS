@@ -421,6 +421,32 @@ void AHitmenPlayerController::RefreshHUDViews()
 			Blip.bCallingReinforcements = Alert->IsCallingReinforcements();
 		}
 	}
+	// Security cameras that are watching an intruder and have you in clear view (awareness arcs, camera mark).
+	if (UWorld* World = GetWorld())
+	{
+		const FVector Eye = ViewPawn->GetPawnViewLocation();
+		for (TActorIterator<AHitmenSecurityCamera> It(World); It; ++It)
+		{
+			if (It->IsCameraDisabled() || !It->IsSeeingIntruder())
+			{
+				continue;
+			}
+			FHitResult Hit;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenCameraBlip), false, *It);
+			Params.AddIgnoredActor(ViewPawn);
+			if (World->LineTraceSingleByChannel(Hit, It->GetActorLocation(), Eye, ECC_Visibility, Params))
+			{
+				continue;
+			}
+			FHitmenHUDAlertBlip& Blip = Blips.AddDefaulted_GetRef();
+			Blip.Location = It->GetActorLocation();
+			Blip.Color = EHitmenAlertColor::Red;
+			Blip.State = EHitmenAlertState::Combat;
+			Blip.Suspicion = 1.f;
+			Blip.bTargetsViewer = true;
+			Blip.bIsCamera = true;
+		}
+	}
 	UI->SetAlertBlips(MoveTemp(Blips));
 }
 

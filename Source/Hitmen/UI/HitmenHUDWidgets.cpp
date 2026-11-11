@@ -167,8 +167,9 @@ void UHitmenCrosshairWidget::HandleHitMarker(bool bKill, bool bHeadshot)
 
 void UHitmenCrosshairWidget::ShowHitMarker(bool bKill, bool bHeadshot)
 {
-	HitMarkerTime = HitMarkerDuration;
+	HitMarkerTime = HitMarkerDuration * (bHeadshot ? 1.6f : 1.f);
 	bLastHitWasKill = bKill;
+	bLastHitHeadshot = bHeadshot;
 	if (bKill)
 	{
 		KillCrossTime = KillCrossDuration;
@@ -209,46 +210,54 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 		HitmenUI::PaintLine(OutDrawElements, LayerId + 1, AllottedGeometry, Center + Dir * ArmGap, Center + Dir * (ArmGap + Length), Ink, KillAlpha > 0.f ? 3.f : 2.f);
 	}
 
-	// Hit marker: four short ticks.
+	// Hit marker: four short ticks; a headshot makes them red, longer and thicker.
 	if (HitMarkerTime > 0.f && KillAlpha <= 0.f)
 	{
-		const float Alpha = HitMarkerTime / HitMarkerDuration;
+		const float Alpha = FMath::Clamp(HitMarkerTime / HitMarkerDuration, 0.f, 1.f);
+		const FLinearColor TickColor = (bLastHitHeadshot ? HitmenUI::Accent() : White) * FLinearColor(1.f, 1.f, 1.f, Alpha);
+		const float Outer = bLastHitHeadshot ? 21.f : 15.f;
 		for (const FVector2D& Dir : { FVector2D(1, 1), FVector2D(-1, 1), FVector2D(1, -1), FVector2D(-1, -1) })
 		{
-			HitmenUI::PaintLine(OutDrawElements, LayerId + 2, AllottedGeometry, Center + Dir * 9.f, Center + Dir * 15.f, White * FLinearColor(1.f, 1.f, 1.f, Alpha), 2.f);
+			HitmenUI::PaintLine(OutDrawElements, LayerId + 2, AllottedGeometry, Center + Dir * 9.f, Center + Dir * Outer, TickColor, bLastHitHeadshot ? 3.f : 2.f);
 		}
 	}
 
-	// Threat arrows: NPCs aware of you, pointing toward them, coloured by alert.
+	// Awareness arcs (Hitman-like): one arc around the crosshair per guard or camera that is noticing you,
+	// placed toward it. It fills from its middle as suspicion grows (white), then turns yellow / red.
 	if (Pawn && PC && UI)
 	{
 		const float ViewYaw = PC->GetControlRotation().Yaw;
 		const float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+		const float Inner = ThreatRadius;
+		const float Outer = ThreatRadius + 7.f;
 		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
 		{
-			if (Blip.Color == EHitmenAlertColor::None || !Blip.bTargetsViewer)
+			if (!Blip.bTargetsViewer || (Blip.Color == EHitmenAlertColor::None && Blip.Suspicion <= 0.01f))
 			{
 				continue;
 			}
 			const float Yaw = RelativeYaw(Blip.Location - Pawn->GetActorLocation(), ViewYaw);
-			const float Rad = FMath::DegreesToRadians(Yaw);
-			const FVector2D Dir(FMath::Sin(Rad), -FMath::Cos(Rad));
-			const FVector2D Side(-Dir.Y, Dir.X);
-			FLinearColor Tint = HitmenAlert::ToLinearColor(Blip.Color);
-			if (Blip.Color == EHitmenAlertColor::White)
-			{
-				Tint.A = FMath::Lerp(0.35f, 1.f, Blip.Suspicion);
-			}
-			if (Blip.Color == EHitmenAlertColor::Red)
+			const EHitmenAlertColor ArcColor = Blip.Color == EHitmenAlertColor::None ? EHitmenAlertColor::White : Blip.Color;
+			FLinearColor Tint = HitmenAlert::ToLinearColor(ArcColor);
+			if (ArcColor == EHitmenAlertColor::Red)
 			{
 				Tint.A = 0.75f + 0.25f * FMath::Sin(Time * 12.f);
 			}
-			const FVector2D Tip = Center + Dir * (ThreatRadius + 12.f);
-			const FVector2D Base = Center + Dir * ThreatRadius;
-			HitmenUI::PaintLines(OutDrawElements, LayerId + 3, AllottedGeometry, { Base + Side * 11.f, Tip, Base - Side * 11.f }, Tint, 3.f);
+			const float Fill = ArcColor == EHitmenAlertColor::White ? FMath::Clamp(Blip.Suspicion, 0.08f, 1.f) : 1.f;
+			const float Half = AwarenessArcWidth * 0.5f;
+			HitmenUI::PaintArcFill(OutDrawElements, LayerId + 3, AllottedGeometry, Center, Inner - 1.f, Outer + 1.f, Yaw - Half, Yaw + Half, FLinearColor(0.f, 0.f, 0.f, 0.35f), 16);
+			HitmenUI::PaintArcFill(OutDrawElements, LayerId + 4, AllottedGeometry, Center, Inner, Outer, Yaw - Half * Fill, Yaw + Half * Fill, Tint, 16);
+			if (Blip.bIsCamera)
+			{
+				// A small camera mark outside the arc: body and lens.
+				const float Rad = FMath::DegreesToRadians(Yaw);
+				const FVector2D Mark = Center + FVector2D(FMath::Sin(Rad), -FMath::Cos(Rad)) * (Outer + 14.f);
+				HitmenUI::PaintBox(OutDrawElements, LayerId + 4, AllottedGeometry, Mark - FVector2D(7.f, 5.f), FVector2D(11.f, 10.f), Tint);
+				HitmenUI::PaintTriangle(OutDrawElements, LayerId + 4, AllottedGeometry, Mark + FVector2D(4.f, 0.f), Mark + FVector2D(9.f, -5.f), Mark + FVector2D(9.f, 5.f), Tint);
+			}
 		}
 	}
-	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 5, InWidgetStyle, bParentEnabled);
 }
 
 // =============================================================================================

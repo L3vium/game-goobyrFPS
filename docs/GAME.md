@@ -304,8 +304,9 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 - **Minimap** (bottom left, square): the baked map, north up (your arrow turns), alerted NPCs, sonar pings; its frame
   takes the colour of the worst alert aimed at you with a status line (Suspicious, Alerted, Searching,
   Spotted, Under fire).
-- **Crosshair**: a thin "+"; hit ticks; an "x" on a kill (red on a headshot); arrows around it toward NPCs
-  that are onto you.
+- **Crosshair**: a thin "+"; hit ticks (red, longer and thicker on a headshot); an "x" on a kill (red on a headshot);
+  Hitman-like awareness arcs around it, one per guard or camera noticing you, placed toward it: the arc fills from its
+  middle as suspicion grows (white), then turns yellow or red; cameras add a small camera mark.
 - **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault`; remote-ability targets
   glow with `[A] Charm` under them.
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.

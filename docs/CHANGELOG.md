@@ -20,6 +20,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -64,6 +65,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Silent takedown from any side, standing or crouched, as long as the guard is not looking at you (it used to need
   you behind it); the attacker blends in and the view turns over 0.25 s instead of snapping (also for clients).
 
+
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -81,10 +83,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Window flicker: the frame faces were coplanar with the wall's opening and the closed shutters overlapped in one
   plane; the frame now sits inside the opening, the shutters at two depths, and they open 80 degrees (105 cut into
   the wall).
-
-
-
-
+- Ladders: Space pressed just before or right after grabbing a ladder no longer jumps you straight off it (0.35 s
+  grace).
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):

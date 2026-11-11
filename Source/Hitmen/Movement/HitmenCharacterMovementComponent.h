@@ -142,6 +142,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="s"))
 	float JumpInputBuffer = 0.25f;
 
+	/** Right after grabbing a ladder, Space is ignored this long (a press just before or after the grab must not
+	 *  jump straight off it). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0", Units="s"))
+	float LadderJumpGraceTime = 0.35f;
+
 	/** How far in front of the capsule a wall is searched. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
 	float MantleReach = 60.f;
@@ -348,6 +353,7 @@ protected:
 	float ClimbAlpha = 0.f;
 	float ClimbAxisInput = 0.f;
 	float LastClimbExitTime = -100.f;
+	float ClimbStartTime = -100.f;
 	/** The ladder just left: only it waits for the reattach cooldown. */
 	TWeakObjectPtr<AActor> LastClimbExitActor;
 	float LastJumpPressTime = -100.f;

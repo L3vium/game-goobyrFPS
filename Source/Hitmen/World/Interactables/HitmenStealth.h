@@ -55,6 +55,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0.1", Units="s"))
 	float DoorCycleTime = 0.8f;
 
+	/** The occupant steps in (or out) over this time while the door is open, turning to face out. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0.05", Units="s"))
+	float StepTime = 0.5f;
+
+	/** Delay after the door starts opening before the occupant moves. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0", Units="s"))
+	float StepDelay = 0.12f;
+
 	/** Inside point (capsule centre), relative to the locker. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(MakeEditWidget=true))
 	FVector InsideOffset = FVector(-4.f, 0.f, 96.f);
@@ -101,6 +109,15 @@ protected:
 
 	TWeakObjectPtr<AHitmenCharacterBase> AppliedOccupant;
 	float DoorCycleStart = -100.f;
+
+	/** The character stepping in or out (every machine moves it the same way). */
+	TWeakObjectPtr<AHitmenCharacterBase> SteppingCharacter;
+	bool bSteppingIn = false;
+	FVector StepFrom = FVector::ZeroVector;
+	FVector StepTo = FVector::ZeroVector;
+	FRotator StepFromRotation = FRotator::ZeroRotator;
+	FRotator StepToRotation = FRotator::ZeroRotator;
+	void UpdateStep();
 };
 
 /** Crouching inside hides you from NPC sight. */

@@ -132,30 +132,20 @@ void AHitmenLocker::OnRep_Occupant()
 void AHitmenLocker::ApplyOccupant(AHitmenCharacterBase* Character, bool bInside)
 {
 	UCharacterMovementComponent* Movement = Character->GetCharacterMovement();
-	if (bInside)
-	{
-		// Inside the hollow cabinet, facing out through the slit, unable to walk.
-		Character->MoveIgnoreActorAdd(this);
-		Movement->StopMovementImmediately();
-		Movement->DisableMovement();
-		const FRotator Facing(0.f, GetActorRotation().Yaw, 0.f);
-		Character->SetActorLocationAndRotation(GetActorTransform().TransformPosition(InsideOffset), Facing, false, nullptr, ETeleportType::TeleportPhysics);
-		if (APlayerController* PC = Cast<APlayerController>(Character->GetController()); PC && PC->IsLocalController())
-		{
-			PC->SetControlRotation(Facing);
-		}
-		Character->PlayCosmeticMontage(Character->GetAnimSet() ? Character->GetAnimSet()->GetMontage(EHitmenAnimMontage::LockerEnter) : nullptr);
-	}
-	else
-	{
-		Character->SetActorLocation(GetActorTransform().TransformPosition(ExitOffset), false, nullptr, ETeleportType::TeleportPhysics);
-		Character->MoveIgnoreActorRemove(this);
-		if (!Character->IsDead())
-		{
-			Movement->SetMovementMode(MOVE_Falling);
-		}
-		Character->PlayCosmeticMontage(Character->GetAnimSet() ? Character->GetAnimSet()->GetMontage(EHitmenAnimMontage::LockerExit) : nullptr);
-	}
+	// The door opens, the character steps in (or out) turning to face out, the door closes: UpdateStep moves it
+	// on every machine while the door cycles.
+	const FRotator Facing(0.f, GetActorRotation().Yaw, 0.f);
+	Character->MoveIgnoreActorAdd(this);
+	Movement->StopMovementImmediately();
+	Movement->DisableMovement();
+	SteppingCharacter = Character;
+	bSteppingIn = bInside;
+	StepFrom = Character->GetActorLocation();
+	StepTo = GetActorTransform().TransformPosition(bInside ? InsideOffset : ExitOffset);
+	StepFromRotation = Character->GetControlRotation();
+	StepToRotation = bInside ? Facing : FRotator(0.f, Facing.Yaw, 0.f);
+	Character->PlayCosmeticMontage(Character->GetAnimSet() ? Character->GetAnimSet()->GetMontage(bInside ? EHitmenAnimMontage::LockerEnter : EHitmenAnimMontage::LockerExit) : nullptr);
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, bInside ? EHitmenSound::LockerEnter : EHitmenSound::LockerExit, GetActorLocation());
 }
 
 void AHitmenLocker::StartDoorCycle()
@@ -171,10 +161,40 @@ void AHitmenLocker::Tick(float DeltaSeconds)
 	// Opens, lets the occupant through, closes again (smooth).
 	const float Open = FMath::Sin(Alpha * PI);
 	DoorHinge->SetRelativeRotation(FRotator(0.f, -DoorOpenAngle * FMath::SmoothStep(0.f, 1.f, Open), 0.f));
-	if (Alpha >= 1.f)
+	UpdateStep();
+	if (Alpha >= 1.f && !SteppingCharacter.IsValid())
 	{
 		DoorHinge->SetRelativeRotation(FRotator::ZeroRotator);
 		SetActorTickEnabled(false);
+	}
+}
+
+void AHitmenLocker::UpdateStep()
+{
+	AHitmenCharacterBase* Character = SteppingCharacter.Get();
+	if (!Character)
+	{
+		return;
+	}
+	const float T = FMath::Clamp((GetWorld()->GetTimeSeconds() - DoorCycleStart - StepDelay) / StepTime, 0.f, 1.f);
+	const float Ease = FMath::InterpEaseInOut(0.f, 1.f, T, 2.f);
+	Character->SetActorLocation(FMath::Lerp(StepFrom, StepTo, Ease), false, nullptr, ETeleportType::TeleportPhysics);
+	if (APlayerController* PC = Cast<APlayerController>(Character->GetController()); PC && PC->IsLocalController())
+	{
+		PC->SetControlRotation(FMath::Lerp(StepFromRotation, StepToRotation, Ease));
+	}
+	if (T >= 1.f)
+	{
+		SteppingCharacter.Reset();
+		if (!bSteppingIn)
+		{
+			// Out: walk again.
+			Character->MoveIgnoreActorRemove(this);
+			if (!Character->IsDead())
+			{
+				Character->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+			}
+		}
 	}
 }
 

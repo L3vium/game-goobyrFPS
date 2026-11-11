@@ -769,9 +769,10 @@ def build_rules():
                   npc_suspicion_rate_multiplier=suspicion, npc_damage_multiplier=damage, npc_aim_error_degrees=aim)
         return p
 
-    set_props(rules, difficulty_presets={D.EASY: preset(4, 10, 10, 0.8, 0.7, 0.3, 7.0),
-                                         D.NORMAL: preset(3, 6, 6, 1.0, 1.0, 0.45, 4.0),
-                                         D.HARD: preset(2, 4, 4, 1.2, 1.4, 0.7, 2.5)})
+    # Damage stays low (with the slow paced fire of the match rules, a fight lasts): Hitman-like.
+    set_props(rules, difficulty_presets={D.EASY: preset(4, 10, 10, 0.8, 0.7, 0.25, 7.0),
+                                         D.NORMAL: preset(3, 6, 6, 1.0, 1.0, 0.4, 4.0),
+                                         D.HARD: preset(2, 4, 4, 1.2, 1.4, 0.6, 2.5)})
     save(rules)
     return rules
 

@@ -153,7 +153,8 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   a keycard ID (0, 1, 2…). NPCs can carry keycards and drop them on death.
 - **Stealth kill**: `F` behind an unaware target: both are held, the attacker steps in behind, the
   attack plays (body and first-person arms), the victim reacts and dies on the strike (1 s).
-- **Health**: players 300, guards 100 (guards also hit softer, difficulty damage multiplier).
+- **Health**: players 300, guards 100 (guards also hit softer, difficulty damage multiplier). Players heal back
+  (30 per second) after 6 s without being hit; there is no health bar (red screen edges and heartbeat).
 - **Intro**: the move keys steer the parachute; nobody can see a player under the canopy or for 2 s
   after landing.
 - **Sightroom (`Tab`)**: a scan sweeps the surroundings; enemies within a radius are shown in
@@ -237,7 +238,9 @@ drink, or in a vent to poison the sealed rooms it serves).
 ## 10. AI
 All NPCs are hostile. Sight takes priority over hearing. Sight range 1950 cm (lose at 2250), times the
 difficulty multiplier; suspicion fills slower with distance (falloff 1600 cm). Guards in combat hold their
-weapon's aim pose and play its fire montage on each shot.
+weapon's aim pose and play its fire montage on each shot. They fire like Hitman guards: a short raise
+(`NPCFirstShotDelay` 0.6 s), bursts of `NPCBurstShots` (3) at 2.5x the weapon's interval, a 1.2 s pause; low
+damage (difficulty multiplier Easy 0.25 / Normal 0.4 / Hard 0.6), so a fight in the open lasts.
 
 There are no civilians: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate.
 

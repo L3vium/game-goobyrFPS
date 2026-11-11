@@ -1,6 +1,7 @@
 // Hitmen — NPC
 
 #include "Characters/HitmenNPC.h"
+#include "AI/HitmenAISubsystem.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Data/HitmenWeaponData.h"
@@ -315,7 +316,27 @@ void AHitmenNPC::FireAt(const FVector& Location)
 	{
 		AimError = GM->GetRules()->GetPreset(GS->GetLobbySettings().Difficulty).NPCAimErrorDegrees;
 	}
+	// Pacing (Hitman-like): raise the weapon, a short burst at a slow rate, a pause, again.
+	const UHitmenMatchRules& Rules = UHitmenAISubsystem::GetRules(this);
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now - LastShotRequestTime > Rules.NPCBurstPause + 1.f)
+	{
+		NextShotTime = Now + Rules.NPCFirstShotDelay;
+		ShotsLeftInBurst = Rules.NPCBurstShots;
+	}
+	LastShotRequestTime = Now;
+	if (Now < NextShotTime)
+	{
+		return;
+	}
 	Weapon->FireAt(Location, AimError);
+	const float Interval = Weapon->GetWeaponData() ? Weapon->GetWeaponData()->GetFireInterval() : 0.3f;
+	NextShotTime = Now + Interval * Rules.NPCFireIntervalMultiplier;
+	if (--ShotsLeftInBurst <= 0)
+	{
+		ShotsLeftInBurst = Rules.NPCBurstShots;
+		NextShotTime = Now + Rules.NPCBurstPause;
+	}
 }
 
 int32 AHitmenNPC::GetHitmenTeamId_Implementation() const

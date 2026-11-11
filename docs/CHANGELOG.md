@@ -36,7 +36,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - AI hearing is far smaller and never reveals you: footsteps 1.5 m walking / 4.5 m running; a gunshot report is
   heard 6-9 m around the shooter (was 26-60 m), the bullet impact is what draws guards (they investigate where it
   landed); each wall cuts the radius again (more than 3 walls: silence); explosions 15 m.
-
+- Guards fire much less: a 0.6 s raise, bursts of 3 shots at 2.5x the weapon's interval, a 1.2 s pause (match rules,
+  NPC fire); difficulty damage multipliers 0.25 / 0.4 / 0.6. A fight in the open now lasts about half a minute
+  instead of a few seconds.
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -47,6 +49,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   through walls (the target stayed 'visible' forever). Now noise only sends them to the sound or impact, a hit from
   an unseen shooter puts them on alert toward the shot, and only sight reveals you; in the dark a hostile heard
   within 2.5 m is attacked.
+
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):

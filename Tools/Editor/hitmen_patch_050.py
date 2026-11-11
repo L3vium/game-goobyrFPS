@@ -174,6 +174,21 @@ if wanted("explosions"):
         EAL.save_loaded_asset(barrel, only_if_is_dirty=False)
     log("explosion effects patched")
 
+if wanted("exposure"):
+    # One fixed exposure on every match map: no eye adaptation when arriving or moving between light and shade.
+    import hitmen_levels
+    les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    current = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_path_name().split(".")[0]
+    for map_name in ("L_Gym", "L_LDTest", "L_Empty_01", "L_Empty_02"):
+        map_path = "/Game/Hitmen/Maps/" + map_name
+        if not EAL.does_asset_exist(map_path):
+            continue
+        les.load_level(map_path)
+        hitmen_levels.match_exposure()
+        les.save_current_level()
+        log("fixed exposure:", map_name)
+    les.load_level(current)
+
 if wanted("difficulty"):
     hitmen_content.build_rules()
     log("match rules (difficulty presets) rebuilt")

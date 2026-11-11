@@ -123,7 +123,36 @@ def stairs(start, direction_yaw, rise, run, width=200, steps=None, material=GRID
         box((cx, cy, start[2] + h / 2.0), (step_run, width, h), material, direction_yaw, folder=folder)
 
 
-def environment(sun_pitch=-40.0, sun_yaw=30.0, fog=0.01, intensity=8.0):
+# Match maps: one fixed exposure (no eye adaptation: arriving on the map, entering a room or leaving a cave never
+# makes the image drift). Rooms are lit by light fixtures for it. EV100, ExtendDefaultLuminanceRange on.
+MATCH_EV100 = -0.3
+
+
+def match_exposure(ev100=MATCH_EV100):
+    """Unbound post process volume with min = max exposure on a match map."""
+    volume = None
+    for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors():
+        if isinstance(actor, unreal.PostProcessVolume) and actor.get_actor_label() == "MatchExposure":
+            volume = actor
+    if volume is None:
+        volume = spawn(unreal.PostProcessVolume, (0, 0, 500), label="MatchExposure", folder="Lighting")
+    volume.set_editor_property("unbound", True)
+    settings = volume.get_editor_property("settings")
+    settings.set_editor_property("override_auto_exposure_method", True)
+    settings.set_editor_property("auto_exposure_method", unreal.AutoExposureMethod.AEM_HISTOGRAM)
+    settings.set_editor_property("override_auto_exposure_min_brightness", True)
+    settings.set_editor_property("auto_exposure_min_brightness", ev100)
+    settings.set_editor_property("override_auto_exposure_max_brightness", True)
+    settings.set_editor_property("auto_exposure_max_brightness", ev100)
+    settings.set_editor_property("override_auto_exposure_bias", True)
+    settings.set_editor_property("auto_exposure_bias", 0.0)
+    volume.set_editor_property("settings", settings)
+    return volume
+
+
+def environment(sun_pitch=-40.0, sun_yaw=30.0, fog=0.01, intensity=8.0, fixed_exposure=True):
+    if fixed_exposure:
+        match_exposure()
     sun = spawn(unreal.DirectionalLight, (0, 0, 2000), (sun_pitch, sun_yaw, 0), "Sun", "Lighting")
     light = sun.light_component
     light.set_editor_property("intensity", intensity)
@@ -324,7 +353,7 @@ def front_end_tune_lights(actors):
 def build_front_end():
     new_map("L_FrontEnd")
     game_mode("BP_GM_Lobby")
-    environment(sun_pitch=-60, intensity=0.0, fog=0.02)
+    environment(sun_pitch=-60, intensity=0.0, fog=0.02, fixed_exposure=False)
 
     # ---- Museum hall (title) ----
     floor((1200, 0, 0), (3600, 2400, 0), mi("MI_White"))

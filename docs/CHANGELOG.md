@@ -16,6 +16,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -72,6 +73,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   Anime_Stylized_VFX instead of the 2D flipbook sheets that read as comic book; every slot stays swappable in the
   data.
 
+
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -93,8 +95,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   grace).
 - Mounted gun: its barrel pointed straight up (unrotated cylinder) and it turned 2.5x slower than the player's view
   (raw look input); it now points forward and matches the player's sensitivity.
-
-
+- Arriving on a map, the image slowly brightened or darkened (default eye adaptation): every match map now has one
+  fixed exposure (MatchExposure post process volume, also made by the level builder).
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):

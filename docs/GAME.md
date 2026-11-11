@@ -337,6 +337,9 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 | `L_LDTest` | Basic Hitman-like sandbox: town (gutters beside back windows, street lamps on a breaker in a hidden keycard utility room), walled manor (keycard gates, sealed dining room fed by a crouch vent duct, upstairs keycard control room, basement foundations via exterior side stairs with a keycard breaker room), cave with a ramp down to a tunnel into the basement, a garden-shed secret passage down to the tunnel, AIs, a basin of mountains and invisible walls; checker materials only |
 | `L_Empty_01`, `L_Empty_02` | Empty maps for the team |
 
+Every match map has one fixed exposure (`MatchExposure`, an unbound post process volume, EV100 -0.3): no eye
+adaptation, so the image never drifts when you land, enter a room or leave a cave. Rooms are lit by light fixtures.
+
 ## 13. Architecture invariants
 - **C++ for systems, Blueprints for values and juice.** Every gameplay class is C++; its `BP_`
   child sets values, meshes, VFX, sounds and implements `Juice_On…` events.

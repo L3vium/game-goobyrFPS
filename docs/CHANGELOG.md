@@ -20,12 +20,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Your agent: the arrows sit twice as far from the body (AgentArrowSpacing) and, with the codename and Randomize,
   are placed from the agent's axis and reference pose: they no longer sway with the idle animation; the codename box
   is wider.
+- Loadout: Hitman-like tiles, 112 px squares with a big icon and the full name on one or two lines (no more cut
+  names such as 'SILENCED PI.'); hover snaps with a white frame, the pick gets a red name band.
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
   rotation in each mesh's own frame (its 0.4.0 guess laid guns on their side); launchers are drawn at 0.55 and long
   guns at 0.75 as intended, the placeholder bow at 0.5.
+
 
 
 

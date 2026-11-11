@@ -112,10 +112,9 @@ namespace
 	const EHitmenCosmeticSlot LookSlots[3] = { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Legs };
 	const TCHAR* LookBones[3] = { TEXT("head"), TEXT("spine_03"), TEXT("calf_l") };
 
-	/** Half the distance between the two look arrows of a slot (they hug the body). */
 	/** Seconds without a click before an edited look is sent to the server. */
 	constexpr float CosmeticSendPause = 0.15f;
-	constexpr float LoadoutTileSize = 84.f;
+	constexpr float LoadoutTileSize = 112.f;
 	constexpr int32 LoadoutColumns = 7;
 
 	const FLinearColor PanelOuter(0.018f, 0.02f, 0.026f, 0.9f);

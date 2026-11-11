@@ -276,10 +276,50 @@ void UHitmenChoiceStrip::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 	Hovered = INDEX_NONE;
 }
 
+namespace
+{
+	/** Splits a tile name on one or two lines and picks the biggest font (down to 10 pt) that fits Room. */
+	void FitTileName(const FString& Name, float Room, int32 MaxSize, TArray<FString>& OutLines, FSlateFontInfo& OutFont)
+	{
+		TArray<FString> Words;
+		Name.ParseIntoArray(Words, TEXT(" "));
+		for (int32 Size = MaxSize; Size >= 10; --Size)
+		{
+			OutFont = HitmenUI::SpacedFont(Size, TEXT("SemiBold"), 20);
+			if (HitmenUI::MeasureText(Name, OutFont).X <= Room)
+			{
+				OutLines = { Name };
+				return;
+			}
+			// Two lines, split at the space that balances them best.
+			float BestWidth = TNumericLimits<float>::Max();
+			TArray<FString> Best;
+			for (int32 Split = 1; Split < Words.Num(); ++Split)
+			{
+				const FString First = FString::Join(TArrayView<const FString>(Words.GetData(), Split), TEXT(" "));
+				const FString Second = FString::Join(TArrayView<const FString>(Words.GetData() + Split, Words.Num() - Split), TEXT(" "));
+				const float Width = FMath::Max(HitmenUI::MeasureText(First, OutFont).X, HitmenUI::MeasureText(Second, OutFont).X);
+				if (Width < BestWidth)
+				{
+					BestWidth = Width;
+					Best = { First, Second };
+				}
+			}
+			if (Best.Num() == 2 && BestWidth <= Room)
+			{
+				OutLines = Best;
+				return;
+			}
+		}
+		OutLines = { Name };
+	}
+}
+
 int32 UHitmenChoiceStrip::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-	const FSlateFontInfo NameFont = HitmenUI::SpacedFont(FMath::Max(11, FMath::RoundToInt(TileSize * 0.125f)), TEXT("SemiBold"), 30);
-	const float NameBand = TileSize * 0.26f;
+	// Hitman-like tiles: a big icon, the full name in a band at the bottom (two lines when needed).
+	const float NameBand = TileSize * 0.3f;
+	const int32 MaxFont = FMath::Max(11, FMath::RoundToInt(TileSize * 0.13f));
 	for (int32 Choice = 0; Choice < Choices.Num(); ++Choice)
 	{
 		const FVector2D Position = GetTilePosition(Choice);
@@ -288,44 +328,44 @@ int32 UHitmenChoiceStrip::NativePaint(const FPaintArgs& Args, const FGeometry& A
 		const bool bIsHovered = Choice == Hovered;
 		const bool bLit = bIsSelected || bIsHovered;
 		HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, Position, Tile,
-			bIsSelected ? FLinearColor(0.2f, 0.205f, 0.22f, 0.96f) : (bIsHovered ? FLinearColor(0.13f, 0.135f, 0.15f, 0.95f) : FLinearColor(0.045f, 0.047f, 0.055f, 0.9f)));
+			bIsHovered ? FLinearColor(0.2f, 0.205f, 0.22f, 0.97f) : (bIsSelected ? FLinearColor(0.14f, 0.145f, 0.16f, 0.96f) : FLinearColor(0.05f, 0.052f, 0.06f, 0.92f)));
 		// Icon in the upper part of the tile.
-		const FVector2D IconArea(TileSize - 16.f, TileSize - NameBand - 12.f);
+		const FVector2D IconArea(TileSize - 20.f, TileSize - NameBand - 14.f);
 		const float Fit = FMath::Min(IconArea.X, IconArea.Y);
 		if (Brushes.IsValidIndex(Choice) && Brushes[Choice].GetResourceObject())
 		{
-			HitmenUI::PaintImage(OutDrawElements, LayerId + 1, AllottedGeometry, &Brushes[Choice], Position + FVector2D((TileSize - Fit) * 0.5f, 8.f + (IconArea.Y - Fit) * 0.5f), FVector2D(Fit),
-				FLinearColor(1.f, 1.f, 1.f, bLit ? 1.f : 0.7f));
+			HitmenUI::PaintImage(OutDrawElements, LayerId + 1, AllottedGeometry, &Brushes[Choice], Position + FVector2D((TileSize - Fit) * 0.5f, 10.f + (IconArea.Y - Fit) * 0.5f), FVector2D(Fit),
+				FLinearColor(1.f, 1.f, 1.f, bLit ? 1.f : 0.72f));
 		}
 		else
 		{
 			// "None": a struck-through ring.
-			const FVector2D Center = Position + FVector2D(TileSize * 0.5f, 8.f + IconArea.Y * 0.5f);
+			const FVector2D Center = Position + FVector2D(TileSize * 0.5f, 10.f + IconArea.Y * 0.5f);
 			const float Radius = Fit * 0.3f;
-			const FLinearColor Ring(1.f, 1.f, 1.f, bLit ? 0.8f : 0.4f);
+			const FLinearColor Ring(1.f, 1.f, 1.f, bLit ? 0.85f : 0.4f);
 			HitmenUI::PaintArc(OutDrawElements, LayerId + 1, AllottedGeometry, Center, Radius, 0.f, 360.f, Ring, 2.f, 24);
 			HitmenUI::PaintLine(OutDrawElements, LayerId + 1, AllottedGeometry, Center + FVector2D(-Radius, Radius) * 0.7f, Center + FVector2D(Radius, -Radius) * 0.7f, Ring, 2.f);
 		}
-		// Name, shortened so it always stays inside the tile.
-		FString Name = Choices[Choice].Name.ToString().ToUpper();
-		const float Room = TileSize - 10.f;
-		if (HitmenUI::MeasureText(Name, NameFont).X > Room)
-		{
-			while (Name.Len() > 1 && HitmenUI::MeasureText(Name + TEXT("."), NameFont).X > Room)
-			{
-				Name.LeftChopInline(1);
-			}
-			Name += TEXT(".");
-		}
-		const FVector2D NameSize = HitmenUI::MeasureText(Name, NameFont);
-		HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Name, Position + FVector2D((TileSize - NameSize.X) * 0.5f, TileSize - NameBand + (NameBand - NameSize.Y) * 0.5f - 2.f),
-			NameFont, bLit ? HitmenUI::Text() : HitmenUI::TextDim());
-		HitmenUI::PaintFrame(OutDrawElements, LayerId + 3, AllottedGeometry, Position, Tile,
-			bIsSelected ? FLinearColor(1.f, 1.f, 1.f, 0.85f) : FLinearColor(1.f, 1.f, 1.f, bIsHovered ? 0.45f : 0.14f), bIsSelected ? 2.f : 1.f);
+		// Name band: red under the selected item.
+		const FVector2D BandPos = Position + FVector2D(0.f, TileSize - NameBand);
 		if (bIsSelected)
 		{
-			HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, Position + FVector2D(0.f, TileSize - 4.f), FVector2D(TileSize, 4.f), HitmenUI::Accent());
+			HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, BandPos, FVector2D(TileSize, NameBand), HitmenUI::Accent());
 		}
+		TArray<FString> Lines;
+		FSlateFontInfo NameFont;
+		FitTileName(Choices[Choice].Name.ToString().ToUpper(), TileSize - 10.f, MaxFont, Lines, NameFont);
+		const float LineHeight = HitmenUI::MeasureText(TEXT("A"), NameFont).Y * 0.92f;
+		float Y = BandPos.Y + (NameBand - LineHeight * Lines.Num()) * 0.5f - 1.f;
+		for (const FString& Line : Lines)
+		{
+			const FVector2D LineSize = HitmenUI::MeasureText(Line, NameFont);
+			HitmenUI::PaintText(OutDrawElements, LayerId + 2, AllottedGeometry, Line, FVector2D(Position.X + (TileSize - LineSize.X) * 0.5f, Y), NameFont,
+				bLit ? HitmenUI::Text() : HitmenUI::TextDim());
+			Y += LineHeight;
+		}
+		HitmenUI::PaintFrame(OutDrawElements, LayerId + 3, AllottedGeometry, Position, Tile,
+			bIsHovered || bIsSelected ? FLinearColor(1.f, 1.f, 1.f, bIsHovered ? 1.f : 0.6f) : FLinearColor(1.f, 1.f, 1.f, 0.12f), bIsHovered ? 2.f : 1.f);
 	}
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
 }

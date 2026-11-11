@@ -46,6 +46,10 @@ Engine: `C:\Program Files\Epic Games\UE_5.7`.
   space: archive to `Builds/_DevTmp`, flatten the nested `Windows/` folder, then move it.
   Pass `-NoCompileEditor` to package with the editor open (UBT refuses to build the editor
   target while Live Coding is active).
+- Crash reports: `python Tools/Debug/hitmen_crash_report.py "Builds/Windows Dev"` groups and
+  symbolizes them. PIE hides GC bugs (the editor keeps assets loaded): stress the Dev build with
+  `-ExecCmds="gc.CollectGarbageEveryFrame 1"`. Any UObject reached from a widget or struct member
+  (including `FSlateBrush`) must be a `UPROPERTY`.
 
 ## Editor access
 The Unreal MCP server (`mcp__unreal-engine__*`, McpAutomationBridge plugin) drives the open

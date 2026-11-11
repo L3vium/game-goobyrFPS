@@ -17,6 +17,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ### Removed
 - The version line in the bottom-left corner of the title screen.
 
+### Added
+- `Tools/Debug/hitmen_crash_report.py`: groups the crash reports of a build and symbolizes their stacks with the
+  build's PDB (checks that the crashed exe matches it).
+
 ## [0.4.0] - 2026-11-10
 
 ### Fixed

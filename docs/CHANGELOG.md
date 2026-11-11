@@ -31,12 +31,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Crosshair: Hitman-like awareness arcs replace the chevrons: one arc per guard or camera noticing you, toward it,
   filling with its suspicion (white) then yellow / red; cameras that see you get an arc with a camera mark. Headshot
   hits get red, longer hit ticks (not only headshot kills).
+- Minimap: your own view cone is gone; the status (Suspicious ... Under fire) is a solid banner inside the top of
+  the map that opens with a white flash; Under fire is taller, red and pulses.
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
   rotation in each mesh's own frame (its 0.4.0 guess laid guns on their side); launchers are drawn at 0.55 and long
   guns at 0.75 as intended, the placeholder bow at 0.5.
+
 
 
 

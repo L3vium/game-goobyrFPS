@@ -117,6 +117,9 @@ protected:
 
 	FHitmenSonarPing LastPing;
 	float LastPingLocalTime = -100.f;
+	/** Status banner ("UNDER FIRE"...): the current one and when it appeared (scale-in and flash). */
+	mutable FString ShownStatus;
+	mutable float StatusShownAt = -100.f;
 };
 
 /** Root HUD: composes the parts above and the text elements. */

@@ -399,12 +399,11 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		}
 	}
 
-	// You: a view cone and an arrow turned to where you look.
+	// You: an arrow turned to where you look (no view cone).
 	const float YawRad = FMath::DegreesToRadians(ViewYaw);
 	const float CosYaw = FMath::Cos(YawRad);
 	const float SinYaw = FMath::Sin(YawRad);
 	auto Turn = [&](const FVector2D& Local) { return Center + FVector2D(Local.X * CosYaw - Local.Y * SinYaw, Local.X * SinYaw + Local.Y * CosYaw); };
-	HitmenUI::PaintLines(OutDrawElements, LayerId + 4, AllottedGeometry, { Turn(FVector2D(-34.f, -48.f)), Center, Turn(FVector2D(34.f, -48.f)) }, FLinearColor(1.f, 1.f, 1.f, 0.18f), 1.5f);
 	const FLinearColor Me = HitmenUI::Text();
 	HitmenUI::PaintLines(OutDrawElements, LayerId + 5, AllottedGeometry,
 		{ Turn(FVector2D(0.f, -9.f)), Turn(FVector2D(-6.5f, 7.f)), Turn(FVector2D(0.f, 3.f)), Turn(FVector2D(6.5f, 7.f)), Turn(FVector2D(0.f, -9.f)) }, Me, 2.f);
@@ -433,14 +432,42 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 	{
 		Status = TEXT("SUSPICIOUS");
 	}
+	if (Status != ShownStatus)
+	{
+		ShownStatus = Status;
+		StatusShownAt = Time;
+	}
 	if (!Status.IsEmpty())
 	{
-		const FSlateFontInfo StatusFont = HitmenUI::SpacedFont(15, TEXT("SemiBold"), 150);
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 6, AllottedGeometry, FVector2D(0.f, -26.f), FVector2D(Size.X, 22.f), FLinearColor(0.f, 0.f, 0.f, 0.6f));
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 7, AllottedGeometry, FVector2D(0.f, -26.f), FVector2D(4.f, 22.f), StatusColor);
-		HitmenUI::PaintText(OutDrawElements, LayerId + 7, AllottedGeometry, Status, FVector2D(12.f, -25.f), StatusFont, StatusColor);
+		// A solid banner across the top of the map: it opens from the centre, flashes white, then holds.
+		// UNDER FIRE is taller and pulses.
+		const bool bUnderFire = bTargeted;
+		const float Age = Time - StatusShownAt;
+		const float Open = 1.f - FMath::Pow(1.f - FMath::Clamp(Age / 0.16f, 0.f, 1.f), 3.f);
+		const float Flash = FMath::Clamp(1.f - Age / 0.45f, 0.f, 1.f);
+		const float BannerHeight = bUnderFire ? 34.f : 26.f;
+		const float Width = Size.X * Open;
+		const FVector2D BannerPos((Size.X - Width) * 0.5f, 0.f);
+		const bool bColoured = StatusColor != HitmenUI::Text();
+		FLinearColor Fill = bColoured ? StatusColor : FLinearColor(0.f, 0.f, 0.f, 0.72f);
+		if (bUnderFire)
+		{
+			Fill.A = 0.82f + 0.18f * FMath::Sin(Time * 14.f);
+		}
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 7, AllottedGeometry, BannerPos, FVector2D(Width, BannerHeight), Fill);
+		if (Flash > 0.f)
+		{
+			HitmenUI::PaintBox(OutDrawElements, LayerId + 8, AllottedGeometry, BannerPos, FVector2D(Width, BannerHeight), FLinearColor(1.f, 1.f, 1.f, 0.85f * Flash));
+		}
+		if (Open > 0.6f)
+		{
+			const FSlateFontInfo StatusFont = HitmenUI::SpacedFont(bUnderFire ? 20 : 15, TEXT("Bold"), 160);
+			const FVector2D TextSize = HitmenUI::MeasureText(Status, StatusFont);
+			const FLinearColor TextColor = StatusColor == HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow) ? HitmenUI::Ink() : HitmenUI::Text();
+			HitmenUI::PaintText(OutDrawElements, LayerId + 9, AllottedGeometry, Status, FVector2D((Size.X - TextSize.X) * 0.5f, (BannerHeight - TextSize.Y) * 0.5f), StatusFont, TextColor);
+		}
 	}
-	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 8, InWidgetStyle, bParentEnabled);
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 10, InWidgetStyle, bParentEnabled);
 }
 
 // =============================================================================================

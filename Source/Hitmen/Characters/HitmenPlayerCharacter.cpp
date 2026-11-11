@@ -47,6 +47,8 @@ AHitmenPlayerCharacter::AHitmenPlayerCharacter(const FObjectInitializer& ObjectI
 	if (UHitmenHealthComponent* PlayerHealth = GetHealth())
 	{
 		PlayerHealth->SetDefaultMaxHealth(DefaultPlayerMaxHealth);
+		// Out of a fight for a while, players heal back (Hitman-like).
+		PlayerHealth->SetRegenerates(true);
 	}
 
 	// The eye follows the capsule (smoothed stance height), never an animated bone: crouch and

@@ -5,6 +5,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+### Added
+- Health regeneration: players heal back 30 per second after 6 s without being hit (UHitmenHealthComponent
+  RegenDelay / RegenRate).
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -40,6 +44,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   NPC fire); difficulty damage multipliers 0.25 / 0.4 / 0.6. A fight in the open now lasts about half a minute
   instead of a few seconds.
 
+
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -49,6 +54,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   through walls (the target stayed 'visible' forever). Now noise only sends them to the sound or impact, a hit from
   an unseen shooter puts them on alert toward the shot, and only sight reveals you; in the dark a hostile heard
   within 2.5 m is attacked.
+
 
 
 ### Removed

@@ -139,11 +139,13 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   | above 250 cm | out of reach (ladder, gutter, ability) |
 - The hint only shows on the ground. Space counts for 0.25 s after the press (late ledge grabs); jumping at a
   ladder grabs it at once.
-- **First person**: no body or arms while moving (the body's shadow stays); the arms appear with a weapon in
-  hand (held on the right, barrel along the view) or while punching (arms at chest height, the fists cross the
-  view). Recoil kicks the view up and it recovers smoothly. On death the view leaves the head.
+- **First person**: no body or arms while moving without a weapon (the body's shadow stays); the arms appear with a
+  weapon in hand (held low on the right, barrel along the view; aiming only re-centres it a little, it stays low right;
+  sprinting lowers and tilts it, still in view) or while punching (arms at chest height, the fists cross the view).
+  Recoil kicks the view up and it recovers smoothly. On death the view leaves the head. Landings are heard (soft or
+  hard, by fall speed); a hard landing dips the view.
 - **Inventory**: 2 weapon slots (mouse wheel). `F` with no interactable in focus throws the held
-  item: if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
+  item (it lands at once as a floating pickup a little ahead, no physics): if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
   stays. Firing with an empty magazine and no reserve throws the weapon where you look. No weapon
   in hand = fists (melee).
 - **Ammo**: one ammo pool per weapon (no magazine / reload). Walking over a weapon of the same

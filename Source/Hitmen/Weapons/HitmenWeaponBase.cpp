@@ -352,33 +352,32 @@ void AHitmenWeaponBase::Drop(int32 InAmmo, const FVector& Location, const FRotat
 	SetReplicatingMovement(true);
 	ApplyWeaponState();
 
-	SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
-	if (!Thrower)
+	FVector PlaceAt = Location;
+	if (Thrower)
 	{
-		// Swapped or dropped (not thrown): it becomes a floating pickup at once, no tumbling.
-		StartHovering();
-		GetWorldTimerManager().ClearTimer(PickupActivationTimer);
-		GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, FMath::Max(0.05f, ThrownPickupDelay), false);
-		return;
+		// Thrown: no physics phase either. It lands as a floating pickup a little ahead of the thrower (in front of
+		// any wall), on the ground below.
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenThrowPlace), false, this);
+		Params.AddIgnoredActor(Thrower);
+		const FVector Dir = Velocity.GetSafeNormal2D().IsNearlyZero() ? Thrower->GetActorForwardVector() : Velocity.GetSafeNormal2D();
+		FVector Ahead = Location + Dir * ThrowPlaceDistance;
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Location, Ahead, ECC_Visibility, Params))
+		{
+			Ahead = Hit.ImpactPoint - Dir * 40.f;
+		}
+		FHitResult Ground;
+		if (GetWorld()->LineTraceSingleByChannel(Ground, Ahead, Ahead - FVector(0.f, 0.f, 2000.f), ECC_Visibility, Params))
+		{
+			Ahead = Ground.ImpactPoint;
+		}
+		PlaceAt = Ahead;
 	}
-	// A thrown weapon hits pawns until its first impact; then pawns walk through it.
-	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, Thrower ? ECR_Block : ECR_Ignore);
-	DropCollision->SetPhysicsLinearVelocity(Velocity);
-	const FVector Spin = Thrower
-		? FVector(ThrowAngularVelocity.X * (FMath::RandBool() ? 1.f : -1.f), ThrowAngularVelocity.Y, ThrowAngularVelocity.Z)
-		: FVector::ZeroVector;
-	DropCollision->SetPhysicsAngularVelocityInDegrees(Spin);
-	ForceNetUpdate();
-
+	SetActorLocationAndRotation(PlaceAt, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	// Swapped, dropped or thrown: it becomes a floating pickup at once, no tumbling.
+	StartHovering();
 	GetWorldTimerManager().ClearTimer(PickupActivationTimer);
-	if (ThrownPickupDelay > 0.f)
-	{
-		GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, ThrownPickupDelay, false);
-	}
-	else
-	{
-		ActivatePickup();
-	}
+	GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, FMath::Max(0.05f, ThrownPickupDelay), false);
 }
 
 void AHitmenWeaponBase::PickUp(APawn* NewOwner)

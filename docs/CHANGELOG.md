@@ -22,6 +22,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -66,6 +67,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Silent takedown from any side, standing or crouched, as long as the guard is not looking at you (it used to need
   you behind it); the attacker blends in and the view turns over 0.25 s instead of snapping (also for clients).
 - Crouching while walking does a short slide (a sprint gives the long one).
+- Thrown weapons no longer tumble as physics bodies: they land at once as a floating pickup a little ahead (before
+  any wall).
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -86,6 +89,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   the wall).
 - Ladders: Space pressed just before or right after grabbing a ladder no longer jumps you straight off it (0.35 s
   grace).
+
 
 
 ### Removed

@@ -86,13 +86,14 @@ adaptation): every room is lit for it. Space or Escape goes back on every menu p
    toggle, a cross to remove) which hold one solid block per player; the host drags players between
    blocks. Hovering a player without team shows the watcher eye (open = watching, struck = playing).
    A dashed **+ Create team** block below. Bottom: **Leave room** and **Choose your agent**.
-4. **Your agent** (stage) — the agent stands on the left; the codename above its head, arrows (real
-   arrows, every click counts) right beside its head, torso and legs, **Randomize** under its feet;
+4. **Your agent** (stage) — the agent stands on the left; the codename above its head, white triangle arrows (every
+   click counts) level with its head, torso and legs in two columns `AgentArrowSpacing` away from its axis, and
+   **Randomize** under its feet — all placed from the reference pose, so they never move with the idle animation;
    the look changes on the stage at once and is sent once the clicks pause. Right: the loadout, three
    always-visible rows of square icon tiles (weapon, move `E`, manipulation `A`), each starting with
    **None**; a click picks. Default: silenced pistol, no abilities. **Ready** only: when every
-   non-watcher is ready a 5 s countdown (one big number) starts the match (un-ready cancels it).
-5. **Match** — intro (parachute drop, "Dropping in", map name, 3-2-1), play, then results.
+   non-watcher is ready the match starts a second later (no countdown on screen; un-ready cancels it).
+5. **Match** — intro (parachute drop, "Dropping in" and the map name, no countdown), play, then results.
 
 Spawns: maps carry many `BP_TeamStart` points. Each team (or solo player) takes a random free point
 and teammates take the nearest free points around it. During the intro (`bParachuteIntro`,
@@ -312,7 +313,7 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   toggles each marker type and shows its exact colours (you, teammates, VIP, retrieval points, guards on alert in
   white / yellow / red like the minimap, cameras). Debug tools (dev builds) open over the legend from a small
   "Debug tools" button.
-- **Intro**: "Dropping in", the map name and a 3-2-1 countdown during the parachute drop.
+- **Intro**: "Dropping in" and the map name during the parachute drop (no countdown, no sting).
 
 ## 12. Maps
 | Map | Purpose |

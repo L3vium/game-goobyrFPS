@@ -225,7 +225,7 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
 | Distraction (radio) | Turn on with `F` (or remotely): it plays a radio loop for 8 s with a pulsing light, and its noise (10 m) draws NPCs on every beat |
 | Turret | Red laser while locking on, then shoots players; hacked only from its panel by **holding** `F` 3 s (a bar fills under the crosshair; releasing or looking away cancels): then shoots NPCs |
-| Security camera | A shadowed spotlight aimed at the floor (white → red when it sees you; walls cut it); sees you only through open air; spotting calls reinforcements |
+| Security camera | A shadowed spotlight aimed at the floor; an electronic ring marks exactly where the light ends (a crisp edge, a turning dashed ring, faint scanlines) and fills from the edge inward as the detection meter builds; light and ring go white → yellow → red; walls cut it; sees you only through open air; spotting calls reinforcements; a marker on the maps |
 | Security station | Desk + screen cycling through its cameras (a 90° feed, tonemapped at the match exposure); holding `F` 2 s disables / enables them ("no signal") |
 | Circuit breaker | Turns off its linked lights: NPCs cannot see (only hear), players see less |
 | Vent | Crouch-size duct; its hatches are small doors (vertical hinge on the side) that swing away from the opener; poison spreads to linked rooms only if fully closed |

@@ -16,6 +16,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   named by its kind (DA_MapMarker_* data asset: legend name, colour, shape or icon, size, maps, legend order). The
   pause legend builds its rows from the kinds on the map. Retrieval points and cameras use it (retrieval points now
   show on the minimap, pinned to the frame when out of range). Recipe in docs/Pipelines.md.
+- Security cameras draw a Hitman-like electronic ring on the floor exactly where their light ends (the decal
+  material tests the camera's own cone per pixel): a crisp edge, a turning dashed inner ring and faint scanlines; it
+  fills from the edge inward with the detection meter (replicated), and the light and the ring go white, then yellow
+  to red as the meter fills (M_Hitmen_CameraRing).
 
 ### Changed
 - Navmesh: 10 cm cells (from 19) so every 110 cm doorway is walkable by the AI, and 16384 A* search nodes (from
@@ -32,6 +36,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   flapped up on their top edge).
 - hitmen_check_reach.py also checks pickups: each needs a reachable standing spot within grabbing range (a pedestal
   top is a navmesh island of its own).
+
 
 
 ### Fixed

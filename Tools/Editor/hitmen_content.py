@@ -113,6 +113,99 @@ def new_material(name, folder):
     return mat
 
 
+CAMERA_RING_HLSL = """float3 eye = Eye.xyz;
+float3 fwd = normalize(Fwd.xyz);
+float3 d = P.xyz - eye;
+float dist = max(length(d), 1.0);
+float3 dir = d / dist;
+float ang = acos(clamp(dot(dir, fwd), -1.0, 1.0));
+float halfAngle = acos(clamp(CosHalf, -1.0, 1.0));
+// Distance in cm, across the surface, from the edge of the camera cone (negative inside).
+float edge = (ang - halfAngle) * dist;
+float inside = step(ang, halfAngle);
+// The edge: a crisp line where the light stops.
+float ring = saturate(1.0 - abs(edge + 3.0) / 2.5);
+// Electronic look: a dashed second ring that slowly turns, and faint moving scanlines.
+float3 upRef = abs(fwd.z) < 0.99 ? float3(0, 0, 1) : float3(1, 0, 0);
+float3 right = normalize(cross(upRef, fwd));
+float3 up = cross(fwd, right);
+float az = atan2(dot(dir, up), dot(dir, right));
+float dashes = step(0.4, frac(az * 32.0 / 6.2831853 + T * 0.12));
+float inner = saturate(1.0 - abs(edge + 16.0) / 1.5) * dashes;
+float scan = inside * step(0.9, frac((P.x + P.y) / 22.0 - T * 0.6)) * 0.07;
+// Detection meter: fills from the edge toward the centre as the camera builds up.
+float fill = inside * step(1.0 - Progress, ang / max(halfAngle, 0.001)) * step(0.004, Progress) * 0.28;
+return saturate(ring * 0.95 + inner * 0.55 + scan + fill) * saturate(A * 2.5);"""
+
+
+def build_camera_ring():
+    """Security camera floor ring (deferred decal): the material tests the camera's own cone per pixel (parameters Eye,
+    Forward, CosHalfAngle set by AHitmenSecurityCamera), so the ring sits exactly where the light ends. A dashed
+    inner ring, faint scanlines and a fill growing with Progress (the detection meter); Color follows the light."""
+    ring = new_material("M_Hitmen_CameraRing", path("Materials", "Master"))
+    set_props(ring, blend_mode=unreal.BlendMode.BLEND_TRANSLUCENT, material_domain=unreal.MaterialDomain.MD_DEFERRED_DECAL)  # blend first: a decal must be translucent
+
+    def param(cls, name, default, x, y):
+        node = MEL.create_material_expression(ring, cls, x, y)
+        set_props(node, parameter_name=name, default_value=default)
+        return node
+
+    color = param(unreal.MaterialExpressionVectorParameter, "Color", unreal.LinearColor(1, 1, 1, 0.35), -700, -200)
+    eye = param(unreal.MaterialExpressionVectorParameter, "Eye", unreal.LinearColor(0, 0, 0, 0), -700, 0)
+    forward = param(unreal.MaterialExpressionVectorParameter, "Forward", unreal.LinearColor(1, 0, 0, 0), -700, 150)
+    cos_half = param(unreal.MaterialExpressionScalarParameter, "CosHalfAngle", 0.956, -700, 300)
+    progress = param(unreal.MaterialExpressionScalarParameter, "Progress", 0.0, -700, 400)
+    world = MEL.create_material_expression(ring, unreal.MaterialExpressionWorldPosition, -700, 500)
+    time = MEL.create_material_expression(ring, unreal.MaterialExpressionTime, -700, 600)
+    mask = MEL.create_material_expression(ring, unreal.MaterialExpressionCustom, -300, 200)
+    inputs = []
+    for input_name in ("P", "Eye", "Fwd", "CosHalf", "Progress", "T", "A"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", input_name)
+        inputs.append(ci)
+    set_props(mask, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, description="CameraRing", inputs=inputs, code=CAMERA_RING_HLSL)
+    for node, pin, input_name in ((world, "", "P"), (eye, "", "Eye"), (forward, "", "Fwd"), (cos_half, "", "CosHalf"),
+                                  (progress, "", "Progress"), (time, "", "T"), (color, "A", "A")):
+        MEL.connect_material_expressions(node, pin, mask, input_name)
+    glow = MEL.create_material_expression(ring, unreal.MaterialExpressionMultiply, -300, -200)
+    set_props(glow, const_b=2.0)
+    MEL.connect_material_expressions(color, "", glow, "A")
+    MEL.connect_material_property(color, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    MEL.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.connect_material_property(mask, "", unreal.MaterialProperty.MP_OPACITY)
+    MEL.recompile_material(ring)
+    save(ring)
+    return ring
+
+
+def build_map_markers():
+    """Map marker kinds (minimap, pause map, legend) and the fixtures that carry them. A new kind: duplicate a
+    DA_MapMarker_*, set its name, colour and shape; give an actor a HitmenMapMarker component and pick the kind."""
+    folder = path("Data", "MapMarkers")
+    kinds = {
+        "RetrievalPoint": dict(display_name=unreal.Text("Retrieval points"), color=unreal.LinearColor(1.0, 0.78, 0.1, 1.0),
+                               shape=unreal.HitmenMapMarkerShape.SQUARE, size=14.0, minimap_scale=0.8, show_on_minimap=True,
+                               clamp_to_minimap_edge=True, show_on_pause_map=True, show_in_legend=True, legend_order=10),
+        "Camera": dict(display_name=unreal.Text("Cameras"), color=unreal.LinearColor(0.75, 0.75, 0.8, 1.0),
+                       shape=unreal.HitmenMapMarkerShape.DIAMOND, size=11.0, minimap_scale=0.8, show_on_minimap=True,
+                       clamp_to_minimap_edge=False, show_on_pause_map=True, show_in_legend=True, legend_order=20),
+    }
+    assets = {}
+    for name, props in kinds.items():
+        data = make_data("DA_MapMarker_" + name, folder, unreal.HitmenMapMarkerType)
+        set_props(data, **props)
+        save(data)
+        assets[name] = data
+    for bp_path, kind in ((path("World", "Spawning", "BP_RetrievalPoint"), "RetrievalPoint"),
+                          (path("World", "Interactables", "Security", "BP_SecurityCamera"), "Camera")):
+        bp = load(bp_path)
+        marker = component(cdo(bp), "map_marker") if bp else None
+        if marker:
+            marker.set_editor_property("type", assets[kind])
+            save(bp)
+    return assets
+
+
 def build_materials(physical):
     folder = path("Materials", "Master")
     inst_folder = path("Materials", "Instances")
@@ -190,6 +283,7 @@ def build_materials(physical):
     MEL.connect_material_property(d_disc, "", unreal.MaterialProperty.MP_OPACITY)
     MEL.recompile_material(decal)
     save(decal)
+    camera_ring = build_camera_ring()
 
     # Monitor screen showing a render target.
     screen = new_material("M_Hitmen_Screen", folder)
@@ -378,7 +472,7 @@ def build_materials(physical):
     save(laser)
 
     log("materials:", len(instances), "instances")
-    return {"remote": remote, "laser": laser, "color": color, "cone": cone, "decal": decal, "screen": screen, "pp": pp, "mi": instances,
+    return {"remote": remote, "laser": laser, "color": color, "cone": cone, "decal": decal, "camera_ring": camera_ring, "screen": screen, "pp": pp, "mi": instances,
             "pp_pill": pill, "pp_blind": blind, "smoke": smoke, "no_signal": no_signal, "focus": focus}
 
 
@@ -1150,7 +1244,7 @@ def build_world(mats, weapons):
             {"body": ("cube", (0.4, 0.2, 0.2), mi["MI_White"], None), "view_cone": ("cone", (1, 1, 1), mats["cone"], None)})
     decal_comp = component(cdo(bps["BP_SecurityCamera"]), "floor_decal")
     if decal_comp:
-        decal_comp.set_decal_material(mats["decal"])
+        decal_comp.set_decal_material(mats["camera_ring"])
     save(bps["BP_SecurityCamera"])
     fixture("BP_SecurityMonitor", unreal.HitmenSecurityMonitor, W + "/Security", {"screen": ("cube", (0.8, 0.05, 0.5), mats["screen"], None)},
             {"no_signal_material": mats["no_signal"]})
@@ -1215,5 +1309,6 @@ def run():
     widgets = build_widgets()
     modes, characters = build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, weapons)
     world = build_world(mats, weapons)
+    build_map_markers()
     return {"weapons": weapons, "move": move, "manip": manip, "modes": modes, "characters": characters, "world": world,
             "rules": rules, "catalog": catalog, "maps": maps, "mats": mats}

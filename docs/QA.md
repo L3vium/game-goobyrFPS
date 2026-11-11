@@ -50,6 +50,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Window frame inside the opening (screenshot, 0.5.0); [ ] no flicker in motion
 - [x] Turret panel: hold F 3 s, bar fills, turret hacked only at the end (PIE script, 0.5.0); [ ] the tower itself has no prompt
 - [x] Security feed shows the room, wide (screenshot, 0.5.0); [ ] "no signal" after disabling
+- [x] Camera floor ring on the light's edge, fills and turns red when it sees you (PIE screenshots, 0.6.0);
+  [ ] yellow while the meter fills, seen from a client
 - [ ] Locker: you step in and out (no teleport)
 - [ ] Radio: plays 8 s with a pulsing light; guards come
 - [ ] Barrels: toon explosion, sound, shake, chain reaction

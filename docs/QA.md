@@ -55,7 +55,9 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Barrels: toon explosion, sound, shake, chain reaction
 - [x] Mounted gun barrel points forward (PIE script, 0.5.0); [ ] turns at the player's speed, shots felt
 - [ ] Tank: glowing straight shell, big blast, barrel follows the aim
-- [ ] Gym: armor and C4 can be picked up; no slide lane
+- [x] Gym: every pickup clear of geometry and reachable (builder check + `hitmen_check_reach.py`, 0.6.0); no slide lane
+- [x] Gym vent: from the AI pen, F opens the hatch, crouch through the duct into the sealed room (PIE script, 0.6.0)
+- [ ] Gym parkour run 1 to 10 in one go by hand (zipline from the gutter tower, plank to the overlook)
 - [x] San Lazaro: every door walkable, every loot / NPC / retrieval point reachable on foot (`hitmen_check_reach.py`,
   0.6.0); [ ] walk the village, the estate, the maze, the caves and the tunnel by hand
 

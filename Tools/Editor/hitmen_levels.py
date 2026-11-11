@@ -555,14 +555,6 @@ def build_gym():
     ladder((X - 600, 125, 0), -90, 600, gutter=True)
     label(X - 600, 140, 600, "GUTTER")
     block(X - 375, 300, 150, 120, 400, folder=G, z0=0)  # bridge from the gutter top down to the platform
-    zip_start = (X + 200, 300, 400 + 260)
-    zip_end_platform = (X + 1700, 300)
-    block(zip_end_platform[0], zip_end_platform[1], 500, 500, 120, folder=G)
-    stairs((zip_end_platform[0] + 250, 300, 0), 0, 120, 300, width=200, folder=G)
-    zip_line = spawn(bp("World/Interactables/Zipline/BP_Zipline"), zip_start, folder=G)
-    if zip_line:
-        zip_line.set_editor_property("end_point", unreal.Vector(zip_end_platform[0] - zip_start[0], 0, 120 + 260 - zip_start[2]))
-    label(X + 900, 300, 560, "ZIPLINE  F at a post")
     # Jump pad onto a high ledge; teleporter back to the start.
     spawn(bp("World/Interactables/JumpPad/BP_JumpPad"), (X, 1100, 0), folder=G)
     label(X, 1100, 20, "JUMP PAD")
@@ -574,10 +566,48 @@ def build_gym():
         tp_b.set_editor_property("destination", tp_a)
     label(X, 1600, 520, "TELEPORTER  (back to start)")
     # Tall grass and a locker to break line of sight.
-    spawn(bp("World/Interactables/Grass/BP_TallGrass"), (X, 2600, 55), folder=G)
-    label(X, 2600, 110, "TALL GRASS  crouch inside")
+    spawn(bp("World/Interactables/Grass/BP_TallGrass"), (-3400, 1500, 55), folder=G)
+    label(-3400, 1500, 110, "TALL GRASS  crouch inside")
     spawn(bp("World/Interactables/Locker/BP_Locker"), (X - 700, 2200, 0), (0, 0, 0), folder=G)
     label(X - 700, 2200, 215, "LOCKER  F hide")
+
+    # ======================= PARKOUR RUN (west wall, then north to the AI pen) =======================
+    # Rooftops from the spawn to the gutter tower, a zipline north, then over to an overlook above the AI pen.
+    # Gaps and heights follow the metrics: jump apex ~1 m, vault / mantle 120 cm, ledge grab 250 cm.
+    G = "Gym/Parkour"
+    RX = -3400
+    zone_title(RX, -3500, "PARKOUR RUN")
+    run = [
+        # (x, y, width, depth, height, label)
+        (RX, -3200, 400, 300, 120, "1 VAULT"),
+        (RX, -2650, 400, 500, 250, "2 JUMP + MANTLE"),
+        (RX, -1900, 400, 600, 250, "3 GAP  2 m"),
+        (RX, -1200, 400, 500, 370, "4 JUMP + GRAB"),
+        (RX, 100, 400, 400, 370, "6 LEDGE GRAB  onto the tower"),
+    ]
+    for (bx, by, bw, bd, bh, text_) in run:
+        block(bx, by, bw, bd, bh, GRID_ALT, G)
+        label(bx, by, bh, text_, 30)
+    block(RX, -525, 60, 850, 370, GRID_ALT, G)  # beam from the 4th roof to the 6th
+    label(RX, -525, 370, "5 BEAM", 30)
+    # Zipline from the gutter tower (600) north to a roof by the west wall, then steps over to the north roofs.
+    zip_start = (X - 600, 420, 600 + 260)
+    nw = (RX, 2650, 400, 500, 300)
+    zip_line = spawn(bp("World/Interactables/Zipline/BP_Zipline"), zip_start, folder=G)
+    if zip_line:
+        zip_line.set_editor_property("end_point", unreal.Vector(nw[0] - zip_start[0], nw[1] - nw[3] / 2 + 80 - zip_start[1], nw[4] + 260 - zip_start[2]))
+    label(X - 600, 420, 860, "7 ZIPLINE  F at the post", 30)
+    block(nw[0], nw[1], nw[2], nw[3], nw[4], GRID_ALT, G)
+    block(-2900, 2650, 300, 300, 400, GRID_ALT, G)
+    label(-2900, 2650, 400, "8 STEP UP", 30)
+    # North roofs: one comes from the jump pad ledge, the other leads to the overlook; a ladder on its back.
+    block(X, 2250, 400, 500, 500, GRID_ALT, G)
+    block(X, 3000, 400, 600, 500, GRID_ALT, G)
+    ladder((X, 3315, 0), 90, 500)
+    block(-2000, 3000, 400, 80, 500, GRID_ALT, G)
+    label(-2000, 3000, 500, "9 PLANK", 30)
+    block(-1650, 3000, 300, 400, 500, GRID_ALT, G)
+    label(-1650, 3000, 500, "10 OVERLOOK  drop into the AI pen", 30)
 
     # =========================== B. ARMOURY (centre-south) ===========================
     G = "Gym/Armoury"
@@ -644,6 +674,7 @@ def build_gym():
     block(X - 600, -1900, 100, 100, 80, mi("MI_Dark"), G)
     spawn(bp("World/Interactables/Distraction/BP_Distraction_Radio"), (X - 600, -1900, 80), folder=G)
     label(X - 600, -1900, 120, "RADIO  noise")
+    block(X + 300, -1840, 300, 20, 260, GRID_DARK, G)  # cover from the camera
     # Security: camera on a pole watching the path, station with its feed.
     block(X + 800, -1150, 50, 50, 420, GRID_DARK, G)
     camera = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (X + 800, -1190, 400), (0, -150, 0), folder=G)
@@ -687,13 +718,20 @@ def build_gym():
     spawn(bp("World/Vehicles/BP_Tank"), (X + 500, 2600, 100), (0, 90, 0), folder=G)
     label(X + 500, 2600, 260, "TANK")
     # Sealed room: vent hatch, window and a poisonable drink.
-    vx, vy = X - 700, 2500
+    vx, vy = X - 450, 2500
     room_door = spawn(bp("World/Interactables/Door/BP_Door"), (vx - 55, vy - 350, 0), folder=G)
     wall((vx - 350, vy - 350), (vx + 350, vy - 350), 0, 330, 25, [(350, 110, 0, 230)], GRID_DARK, G)
     wall((vx - 350, vy + 350), (vx + 350, vy + 350), 0, 330, 25, [(350, 120, 100, 220)], GRID_DARK, G)
     room_window = spawn(bp("World/Interactables/Window/BP_Window"), (vx, vy + 350, 0), (0, 90, 0), folder=G)
     wall((vx - 350, vy - 350), (vx - 350, vy + 350), 0, 330, 25, [(350, 120, 0, 120)], GRID_DARK, G)
-    hatch = spawn(bp("World/Interactables/Vent/BP_VentHatch"), (vx - 350, vy, 0), (0, 90, 0), folder=G)
+    # Vent: the hatch in the AI pen's east wall (x 1400), a 1.2 m crouch duct to the room's west wall.
+    duct_x0, duct_x1 = 1400, vx - 350
+    for side in (-1, 1):
+        box(((duct_x0 + duct_x1) / 2, vy + side * 70, 65), (duct_x1 - duct_x0, 20, 130), GRID_DARK, folder=G)
+    box(((duct_x0 + duct_x1) / 2, vy, 130), (duct_x1 - duct_x0 + 25, 160, 20), GRID_DARK, folder=G)
+    hatch = spawn(bp("World/Interactables/Vent/BP_VentHatch"), (duct_x0, vy, 0), (0, 90, 0), folder=G)
+    if hatch:
+        hatch.set_editor_property("open_angle", 88.0)  # the duct is as wide as the hatch: it opens flat on its side
     wall((vx + 350, vy - 350), (vx + 350, vy + 350), 0, 330, 25, (), GRID_DARK, G)
     box((vx, vy, 340), (730, 730, 20), GRID_DARK, folder=G)
     room = spawn(bp("World/Interactables/Vent/BP_RoomVolume"), (vx, vy, 165), folder=G)
@@ -705,6 +743,7 @@ def build_gym():
     block(vx + 150, vy, 160, 90, 90, mi("MI_Wood"), G)
     spawn(bp("World/Interactables/Drink/BP_PoisonableDrink"), (vx + 150, vy, 90), folder=G)
     label(vx, vy, 340, "SEALED ROOM  vent, window, drink")
+    label(duct_x0 - 30, vy, 120, "VENT  F, crouch through", 26, yaw=180.0)  # read from the AI pen
     spawn(bp("World/Spawning/BP_RetrievalPoint"), (3250, 3250, 0), folder=G)
     label(3250, 3250, 40, "RETRIEVAL POINT  deliver the VIP")
 
@@ -715,7 +754,7 @@ def build_gym():
     wall((px0, py0), (-150, py0), 0, 260, 25, (), GRID_DARK, G)          # entrance gap in the middle
     wall((150, py0), (px1, py0), 0, 260, 25, (), GRID_DARK, G)
     wall((px0, py0), (px0, py1), 0, 260, 25, (), GRID_DARK, G)
-    wall((px1, py0), (px1, py1), 0, 260, 25, (), GRID_DARK, G)
+    wall((px1, py0), (px1, py1), 0, 260, 25, [(2500 - py0, 120, 0, 120)], GRID_DARK, G)  # vent hole (sealed room)
     # Curved patrol (spline) around a pillar.
     block(0, 2300, 300, 300, 260, GRID_DARK, G)
     loop = patrol([(-500, 1800, 100), (500, 1800, 100), (500, 2800, 100), (-500, 2800, 100)], [2.0, 0.0, 2.0, 0.0], G, curved=True)
@@ -742,14 +781,32 @@ def build_gym():
     npc("vip", (400, 3300, 0), -90, folder=G, stationary=True)
     label(400, 3300, 200, "VIP CANDIDATE")
     # Hiding spots for the search state.
-    spawn(bp("World/Interactables/Locker/BP_Locker"), (1250, 2400, 0), (0, 180, 0), folder=G)
+    spawn(bp("World/Interactables/Locker/BP_Locker"), (1250, 1900, 0), (0, 180, 0), folder=G)
     spawn(bp("World/Interactables/Grass/BP_TallGrass"), (-700, 3300, 55), folder=G).set_actor_scale3d(unreal.Vector(0.4, 0.4, 1.0))
-    label(1250, 2400, 215, "SEARCH  lockers / grass")
+    label(1250, 1900, 215, "SEARCH  lockers / grass")
     # Camera alarm: a camera over the pen entrance calls the guards inside.
     block(-400, py0 - 60, 40, 40, 380, GRID_DARK, G)
     pen_camera = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (-400, py0 - 20, 360), (0, -60, 0), folder=G)
     label(-400, py0 - 60, 380, "CAMERA ALARM  calls the pen")
+    check_pickups_clear()
     save_map()
+
+
+def check_pickups_clear(radius=25.0):
+    """Logs every pickup whose spot (a small box at its hover height) overlaps level geometry."""
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    blocked = 0
+    for actor in EAS.get_all_level_actors():
+        name = actor.get_class().get_name()
+        if not any(key in name for key in ("Pickup", "LootSpawn")):
+            continue
+        center = actor.get_actor_location() + unreal.Vector(0, 0, 40)
+        hits = unreal.SystemLibrary.box_overlap_actors(world, center, unreal.Vector(radius, radius, radius),
+                                                       [unreal.ObjectTypeQuery.OBJECT_TYPE_QUERY1], unreal.StaticMeshActor, [])
+        if hits:
+            blocked += 1
+            log("WARN pickup inside geometry:", actor.get_actor_label(), name, actor.get_actor_location(), [h.get_actor_label() for h in hits])
+    log("pickups clear" if blocked == 0 else "pickups blocked: %d" % blocked)
 
 
 # ---------------------------------------------------------------------------------------------

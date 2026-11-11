@@ -9,8 +9,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Tools/Editor/hitmen_check_reach.py: LD check for the map open in the editor. Every door must be walkable and every
   loot spawn, NPC and retrieval point reachable on foot from a team start (snipers and roof points are listed as
   ladder-only).
-
-
+- Gym parkour run: ten numbered rooftops along the west and north walls (vault, jump and mantle, gap, jump and grab,
+  beam, ledge grab onto the gutter tower, a zipline north, step-ups, a plank and an overlook above the AI pen); a
+  ladder on the back of the north roofs.
 
 
 
@@ -28,9 +29,17 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Vent hatches open like small doors: a vertical hinge on their side edge, swinging away from the opener (they
   flapped up on their top edge).
 
+
+
+
 ### Fixed
 - Generated buildings: door openings match the door (110 x 230), stairs leave room to step on and switch back on
   three-floor houses (upper floors were unreachable); the ground has holes for stair wells instead of covering them.
+- Gym vent: the sealed room overlapped the AI pen wall, so the hatch opened onto a 50 cm gap. The room moved east;
+  the hatch sits in a hole in the pen wall and a crouch duct leads into the room.
+- Gym: the zipline landing and its stairs covered the armor and C4 pickups; the zipline now runs north from the
+  gutter tower. The builder logs any pickup that overlaps geometry. The camera cover wall added by hand is
+  generated.
 
 ## [0.5.0] - 2026-11-11
 

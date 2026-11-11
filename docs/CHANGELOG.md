@@ -10,9 +10,20 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   loot spawn, NPC and retrieval point reachable on foot from a team start (snipers and roof points are listed as
   ladder-only).
 
+
+
 ### Changed
 - Navmesh: 10 cm cells (from 19) so every 110 cm doorway is walkable by the AI, and 16384 A* search nodes (from
   2048) so long patrol legs on a big map are not cut short. L_Empty_01 and L_Empty_02 are re-baked.
+- L_LDTest is rebuilt as San Lazaro, about 3x the area: a village (market street, 20 houses with rooftop planks,
+  plaza, church bell tower), a river with two bridges, a walled mansion estate (three-floor house, sealed dining
+  room, control room, basement down an outside stair well, a seeded hedge maze, greenhouse, garage with the tank,
+  graveyard and chapel) and a cliff zone with three caves, a tunnel to the basement and a cove. Every room is lit;
+  the minimap texture is 1536 px.
+
+### Fixed
+- Generated buildings: door openings match the door (110 x 230), stairs leave room to step on and switch back on
+  three-floor houses (upper floors were unreachable); the ground has holes for stair wells instead of covering them.
 
 ## [0.5.0] - 2026-11-11
 

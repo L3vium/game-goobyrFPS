@@ -888,7 +888,7 @@ def build_catalog(weapons, move, manip, cosmetics):
 
 def build_maps():
     maps = []
-    for name, display, carousel, half in (("LDTest", "San Lazaro (LD test)", True, 9000.0), ("Empty_01", "Empty 01", True, 10000.0),
+    for name, display, carousel, half in (("LDTest", "San Lazaro", True, 16500.0), ("Empty_01", "Empty 01", True, 10000.0),
                                           ("Empty_02", "Empty 02", True, 10000.0), ("Gym", "Debug gym", False, 3800.0)):
         data = make_data("DA_Map_" + name, path("Data", "Maps"), unreal.HitmenMapDefinition)
         level = unreal.SoftObjectPath(path("Maps", "L_" + name) + ".L_" + name)

@@ -56,9 +56,12 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Mounted gun barrel points forward (PIE script, 0.5.0); [ ] turns at the player's speed, shots felt
 - [ ] Tank: glowing straight shell, big blast, barrel follows the aim
 - [ ] Gym: armor and C4 can be picked up; no slide lane
+- [x] San Lazaro: every door walkable, every loot / NPC / retrieval point reachable on foot (`hitmen_check_reach.py`,
+  0.6.0); [ ] walk the village, the estate, the maze, the caves and the tunnel by hand
 
 ## AI
 - [x] Attack chain: an armed player in view gets shot, damage arrives slowly (~9 HP/s), guard holds the aim pose (PIE script, 0.5.0)
+- [x] Attack chain on San Lazaro: shot after 6-9 s in a guard's view, ~9 HP/s (PIE script, 0.6.0)
 - [ ] A gunshot 15 m away behind a wall is not heard; a bullet impact draws the nearest guard to the impact
 - [ ] A guard shot from out of its sight turns toward the shot and searches, it does not know where you are
 - [ ] In the dark, a guard that hears you within 2.5 m attacks

@@ -18,6 +18,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Changing team (and other confirms) plays a soft tick instead of a machine start-up; no thunder sting when the
   match starts.
 
+
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -25,9 +26,12 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   guns at 0.75 as intended, the placeholder bow at 0.5.
 
 
+
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):
   the comic-book flipbooks are gone; the data slots stay for the team's own effects.
+- The launch countdown (5-4-3-2-1) and the intro 3-2-1: when everyone is ready the match starts a second later; the
+  drop only shows 'Dropping in' and the map name.
 
 ## [0.4.1] - 2026-11-11
 

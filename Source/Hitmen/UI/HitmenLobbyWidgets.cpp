@@ -806,16 +806,10 @@ void UHitmenLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	{
 		UpdateAgentAnchors();
 	}
-	// Launch countdown (everyone ready): a big number, nothing else.
-	if (const AHitmenGameState* GS = GetHitmenGameState(); GS && CountdownBlock && CountdownText)
+	// Everyone ready: the match starts after a short beat, no number on screen.
+	if (CountdownBlock)
 	{
-		const float Remaining = GS->GetPhaseCountdownRemaining();
-		const bool bCounting = Remaining > 0.f && GS->GetMatchPhase() == EHitmenMatchPhase::Customization;
-		CountdownBlock->SetVisibility(bCounting ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-		if (bCounting)
-		{
-			CountdownText->SetText(FText::AsNumber(FMath::CeilToInt(Remaining)));
-		}
+		CountdownBlock->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 

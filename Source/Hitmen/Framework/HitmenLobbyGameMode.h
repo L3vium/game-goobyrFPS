@@ -54,7 +54,7 @@ protected:
 
 	/** Seconds between "everyone ready" and the travel; un-readying cancels. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Lobby", meta=(ClampMin="0", Units="s"))
-	float LaunchCountdown = 5.f;
+	float LaunchCountdown = 1.f;
 
 	/** A standalone front end starts on the title screen (the lobby opens when hosting). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Lobby")

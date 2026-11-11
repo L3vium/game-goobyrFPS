@@ -133,8 +133,11 @@ void UHitmenMenuButton::ApplyStyle()
 	}
 	LabelText->SetText(FText::FromString(Label.ToString().ToUpper()));
 	LabelText->SetFont(HitmenUI::SpacedFont(Size, Face, Spacing));
+	// Lit blocks invert: a white block with a dark label.
+	const bool bInverted = HoverAlpha > 0.5f && (Kind == EHitmenMenuButtonKind::Block || Kind == EHitmenMenuButtonKind::Dashed || Kind == EHitmenMenuButtonKind::Chip);
 	const FLinearColor Color = !bEnabledState ? HitmenUI::TextDim() * FLinearColor(1, 1, 1, 0.6f)
-		: (Kind == EHitmenMenuButtonKind::Back ? HitmenUI::TextDim() : HitmenUI::Text());
+		: bInverted ? HitmenUI::Ink()
+		: (Kind == EHitmenMenuButtonKind::Back && HoverAlpha < 0.5f ? HitmenUI::TextDim() : HitmenUI::Text());
 	LabelText->SetColorAndOpacity(FSlateColor(Color));
 	SubtitleText->SetText(Subtitle);
 	SubtitleText->SetFont(HitmenUI::Font(FMath::Max(14, Size / 2), TEXT("Italic")));
@@ -170,17 +173,13 @@ void UHitmenMenuButton::HandleUnhovered()
 void UHitmenMenuButton::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	// Hover is a state, not an animation: it snaps.
 	const bool bLit = (bHovered || bSelected) && bEnabledState;
-	HoverAlpha = FMath::FInterpTo(HoverAlpha, bLit ? 1.f : 0.f, InDeltaTime, 18.f);
-	const bool bSlides = Kind == EHitmenMenuButtonKind::Primary || Kind == EHitmenMenuButtonKind::Secondary || Kind == EHitmenMenuButtonKind::Back;
-	const float Slide = bSlides ? 12.f * HoverAlpha : 0.f;
-	if (LabelText)
+	const float NewAlpha = bLit ? 1.f : 0.f;
+	if (NewAlpha != HoverAlpha)
 	{
-		LabelText->SetRenderTranslation(FVector2D(Slide, 0.f));
-	}
-	if (SubtitleText)
-	{
-		SubtitleText->SetRenderTranslation(FVector2D(Slide, 0.f));
+		HoverAlpha = NewAlpha;
+		ApplyStyle();
 	}
 }
 
@@ -190,10 +189,16 @@ int32 UHitmenMenuButton::NativePaint(const FPaintArgs& Args, const FGeometry& Al
 	if (Kind == EHitmenMenuButtonKind::Block || Kind == EHitmenMenuButtonKind::Dashed || Kind == EHitmenMenuButtonKind::Chip)
 	{
 		const float Dim = bEnabledState ? 1.f : 0.45f;
+		if (HoverAlpha > 0.5f && bEnabledState)
+		{
+			// Lit: a solid white block (the label turns dark in ApplyStyle).
+			HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, HitmenUI::Text());
+			return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
+		}
 		if (Kind == EHitmenMenuButtonKind::Dashed)
 		{
 			// Dashed outline over a faint fill.
-			HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FMath::Lerp(FLinearColor(0.f, 0.f, 0.f, 0.35f), FLinearColor(0.1f, 0.1f, 0.11f, 0.85f), HoverAlpha));
+			HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FLinearColor(0.f, 0.f, 0.f, 0.35f));
 			const FLinearColor DashColor = FMath::Lerp(FLinearColor(1.f, 1.f, 1.f, 0.55f * Dim), FLinearColor(1.f, 1.f, 1.f, 0.95f * Dim), HoverAlpha);
 			const float Dash = 10.f;
 			const float GapLength = 7.f;
@@ -219,8 +224,6 @@ int32 UHitmenMenuButton::NativePaint(const FPaintArgs& Args, const FGeometry& Al
 			HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FMath::Lerp(Base, Lit, HoverAlpha) * FLinearColor(1.f, 1.f, 1.f, Dim));
 			HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, Size, FLinearColor(1.f, 1.f, 1.f, (0.18f + 0.5f * HoverAlpha) * Dim), 1.f);
 		}
-		// Red edge on the left when lit.
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D::ZeroVector, FVector2D(Kind == EHitmenMenuButtonKind::Chip ? 3.f : 5.f, Size.Y * HoverAlpha), HitmenUI::Accent());
 		return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
 	}
 	if (Kind == EHitmenMenuButtonKind::Accent)
@@ -228,12 +231,10 @@ int32 UHitmenMenuButton::NativePaint(const FPaintArgs& Args, const FGeometry& Al
 		const FLinearColor Fill = bEnabledState ? FMath::Lerp(HitmenUI::Accent(), HitmenUI::Accent() * 1.3f, HoverAlpha) : FLinearColor(0.2f, 0.2f, 0.22f, 0.8f);
 		HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, Fill);
 	}
-	if (HoverAlpha > 0.01f)
+	if (HoverAlpha > 0.5f && Kind != EHitmenMenuButtonKind::Accent)
 	{
-		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size,
-			FLinearColor(1.f, 1.f, 1.f, 0.14f * HoverAlpha), FLinearColor(1.f, 1.f, 1.f, 0.f), true);
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(0.f, 0.f), FVector2D(4.f, Size.Y * HoverAlpha),
-			Kind == EHitmenMenuButtonKind::Accent ? HitmenUI::Text() : HitmenUI::Accent());
+		// Text entries: a flat light band behind the label, no bar, no slide.
+		HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, Size, FLinearColor(1.f, 1.f, 1.f, 0.1f));
 	}
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
 }

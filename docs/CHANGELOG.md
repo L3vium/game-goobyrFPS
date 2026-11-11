@@ -5,6 +5,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-11
+
 ### Added
 - Health regeneration: players heal back 30 per second after 6 s without being hit (UHitmenHealthComponent
   RegenDelay / RegenRate).

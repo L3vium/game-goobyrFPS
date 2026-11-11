@@ -14,6 +14,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   the engine font after a GC), the barrel chain-explosion timer holds its instigator weakly, the lobby's local loadout
   copies are `UPROPERTY`, retrieval-point markers skip destroyed points.
 
+### Removed
+- The version line in the bottom-left corner of the title screen.
+
 ## [0.4.0] - 2026-11-10
 
 ### Fixed

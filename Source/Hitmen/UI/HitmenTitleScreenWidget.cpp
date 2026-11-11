@@ -113,9 +113,6 @@ void UHitmenTitleScreenWidget::BuildDefaultLayout()
 		AddMenuButton(DebugBox, LOCTEXT("DebugGym", "Debug gym"), static_cast<int32>(EHitmenMenuButtonKind::Back), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, OpenDebugGym));
 		HitmenUI::AddToCanvas(TitlePage, DebugBox, FAnchors(1.f, 1.f), FVector2D(-40.f, -32.f), FVector2D(1.f, 1.f));
 	}
-	UTextBlock* Version = HitmenUI::MakeText(WidgetTree, LOCTEXT("Version", "HITMEN  0.4.0  -  UNREAL ENGINE 5.7"), 14, TEXT("Medium"), HitmenUI::TextDim());
-	Version->SetFont(HitmenUI::SpacedFont(14, TEXT("Medium"), 200));
-	HitmenUI::AddToCanvas(TitlePage, Version, FAnchors(0.f, 1.f), FVector2D(124.f, -40.f), FVector2D(0.f, 1.f));
 
 	// ---------------- Join page: friends and rooms on the left, the code on the right ----------------
 	UCanvasPanel* JoinPage = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());

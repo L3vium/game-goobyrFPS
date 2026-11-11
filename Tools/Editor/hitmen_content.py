@@ -528,7 +528,7 @@ def build_weapons(mats):
     impact_sfx = load(SFX + "SFX_Impact_01")
     smoke_trail = load("/Game/Vefects/Essential_Trails_VFX/Shared/Particles/NS_Trail_Simple_02")
     arrow = projectile_bp("BP_Projectile_Arrow", unreal.HitmenProjectile, "cylinder", (0.025, 0.025, 0.7), mi["MI_Wood"],
-                          stick_on_impact=True, impact_noise_radius=300.0, impact_effect=impact_fx, impact_sound=impact_sfx,
+                          stick_on_impact=True, impact_noise_radius=300.0, impact_effect=None, impact_sound=impact_sfx,
                           movement={"projectile_gravity_scale": 0.6, "rotation_follows_velocity": True})
     rocket = projectile_bp("BP_Projectile_Rocket", unreal.HitmenProjectile, "cylinder", (0.12, 0.12, 0.6), mi["MI_Dark"],
                            explode_on_impact=True, explosion_radius=500.0, explosion_damage=140.0, explosion_effect=explosion_fx,
@@ -581,8 +581,8 @@ def build_weapons(mats):
     # NPCs in combat hold these aim poses (looped in code) between shots.
     pistol_aim = montage("AM_Pistol_Aim", ANIMS + "/Pistol/MF_Pistol_Idle_ADS")
     rifle_aim = montage("AM_Rifle_Aim", ANIMS + "/Rifle/MF_Rifle_Idle_ADS")
-    gun_fx = dict(muzzle_fx=fx("MuzzleFlash/OneShot/NS_Muzzle_Combined_Aligned_X_OS"), impact_fx=fx("Impact/OneShot/NS_Impact_01_OS"),
-                  surface_impact_fx=fx("Dust/OneShot/NS_Dust_Directional_Small_01_OS"), flesh_impact_fx=fx("Blood/OneShot/NS_Blood_Impact_01_OS"),
+    # Guns carry no VFX (no muzzle flash, impact, dust or blood): the slots stay for the team's own effects.
+    gun_fx = dict(muzzle_fx=None, impact_fx=None, surface_impact_fx=None, flesh_impact_fx=None,
                   fire_sound=load(SFX + "SFX_GunShot_Cue"), impact_sound=load(SFX + "SFX_Impact_01"),
                   dry_fire_sound=load(ESS + "SFX_Essentials_02_CLOCKS/Cues/CLOCKTick_InsJ_Clock-01_Ticking_Single-01_Cue"))
     # On the first-person arms the gun is turned so its barrel runs along the view and its top is up. Solved in
@@ -591,7 +591,6 @@ def build_weapons(mats):
     fp_offset.rotation = unreal.Rotator(roll=9.5, pitch=0.9, yaw=-3.3).quaternion()
     gun_fx["first_person_attach_offset"] = fp_offset
     pistol_vis = dict(first_person_pose=pistol_pose, fire_montage=pistol_fire, equip_montage=pistol_equip, aim_montage=pistol_aim, **gun_fx)
-    pistol_vis["muzzle_fx"] = fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_Aligned_X_OS")
     pistol_vis["fire_sound"] = load(SFX + "SFX_DustPuff_Cue")
     # First person, every gun uses the two-hand pistol hold (the arms offsets are tuned for it); the body keeps the
     # rifle montages. Swap first_person_pose per weapon once dedicated first-person rifle poses exist.
@@ -643,7 +642,7 @@ def build_weapons(mats):
                 ammo_per_pickup=6, recoil_pitch=0.8, first_person_pose=pistol_pose, first_person_attach_offset=bow_offset)),
         "RocketLauncher": ("Rocket launcher", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=40.0, projectile_class=gen_class(rocket),
                            projectile_speed=3000.0, start_ammo=4, max_ammo=8, ammo_per_pickup=2, noise_radius=5000.0, recoil_pitch=4.0,
-                           back_blast_fx=fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_OS"),
+                           back_blast_fx=None,
                            static_mesh=gl_mesh, skeletal_mesh=gl_skel, **launcher_vis)),
         "GrenadeLauncher": ("Grenade launcher", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=70.0, projectile_class=gen_class(grenade),
                             projectile_speed=2200.0, start_ammo=6, max_ammo=12, ammo_per_pickup=3, noise_radius=3000.0, recoil_pitch=2.5,
@@ -1124,7 +1123,7 @@ def build_world(mats, weapons):
     save(console)
     turret = fixture("BP_Turret", unreal.HitmenTurret, W + "/Security",
                      {"base": ("cylinder", (0.5, 0.5, 1.0), mi["MI_Metal"], (0, 0, 50)), "head": ("cube", (0.6, 0.45, 0.35), mi["MI_Dark"], (0, 0, 110))},
-                     {"muzzle_fx": fx("MuzzleFlash/OneShot/NS_Muzzle_Combined_Aligned_X_OS"), "impact_fx": fx("Impact/OneShot/NS_Impact_01_OS"),
+                     {"muzzle_fx": None, "impact_fx": None,
                       "fire_sound": load(SFX + "SFX_GunShot_Cue")})
     tcdo = cdo(turret)
     set_mesh(component(tcdo, "barrel"), SHAPES["cylinder"], None, mi["MI_Metal"])

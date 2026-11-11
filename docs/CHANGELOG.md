@@ -5,6 +5,26 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-11
+
+### Fixed
+- **Crash about one minute after launch** (all 20 reports of the 0.4.0 playtest). The minimap, the Create Room map
+  tile and the pause map drew textures through `FSlateBrush` members that were not `UPROPERTY`: the first garbage
+  collection (about 61 s in) freed the textures and the next paint read freed memory. PIE never showed it because the
+  editor keeps the assets loaded. Every brush is now a `UPROPERTY(Transient)`.
+- Related hardening from a GC audit of the whole module: the UI font is kept loaded once found (it silently fell back to
+  the engine font after a GC), the barrel chain-explosion timer holds its instigator weakly, the lobby's local loadout
+  copies are `UPROPERTY`, retrieval-point markers skip destroyed points.
+
+### Removed
+- The version line in the bottom-left corner of the title screen.
+
+### Added
+- `Tools/Debug/hitmen_crash_report.py`: groups the crash reports of a build and symbolizes their stacks with the
+  build's PDB (checks that the crashed exe matches it).
+- `Tools/Packaging/package_builds.ps1`: packages the Dev and Shipping player builds, keeps each build's `Saved` folder
+  (crash reports) and archives the PDB per version in `Builds/_Symbols/<version>/`.
+
 ## [0.4.0] - 2026-11-10
 
 ### Fixed

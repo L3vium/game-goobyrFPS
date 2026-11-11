@@ -37,12 +37,16 @@ namespace HitmenUI
 
 	static const UObject* GetUIFont()
 	{
-		static TWeakObjectPtr<const UObject> Cached;
-		static bool bTried = false;
-		if (!Cached.IsValid() && !bTried)
+		// Rooted once loaded: painted text only holds the font through FSlateFontInfo, which GC does not see.
+		static TWeakObjectPtr<UObject> Cached;
+		if (!Cached.IsValid())
 		{
-			bTried = true;
-			Cached = LoadObject<UObject>(nullptr, TEXT("/Game/Hitmen/UI/Fonts/FNT_Barlow.FNT_Barlow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+			UObject* Loaded = LoadObject<UObject>(nullptr, TEXT("/Game/Hitmen/UI/Fonts/FNT_Barlow.FNT_Barlow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+			if (Loaded && !GIsEditor)
+			{
+				Loaded->AddToRoot();
+			}
+			Cached = Loaded;
 		}
 		return Cached.Get();
 	}

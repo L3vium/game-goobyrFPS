@@ -5,6 +5,9 @@ are gone). Run it in PIE and in the Dev build (`Builds/Windows Dev/Hitmen.exe -l
 `[x]` = checked for 0.4.0 (how: PIE script, screenshot, or by hand); `[ ]` = still to check by hand.
 
 ## Stability
+- [ ] GC stress: the Dev build with `-ExecCmds="gc.CollectGarbageEveryFrame 1"` walked through title, Create Room (every
+  map tile), agent, Ready, a Gym match (minimap, pause map) and back — no folder in `Saved/Crashes`
+- [ ] Crash reports, if any: `python Tools/Debug/hitmen_crash_report.py "Builds/Windows Dev"`
 - [ ] No crash: 10 min of menu stress with Steam running (create / leave / join / refresh spam / map cycling)
 - [ ] No crash: 10 min in the Gym and LDTest, dying and respawning with proximity chat on
 - [x] Steam searches never overlap (one queue: public rooms, friends list, friends' rooms) — code review

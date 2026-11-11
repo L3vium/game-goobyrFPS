@@ -38,6 +38,8 @@ protected:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
+	/** UPROPERTY so GC keeps the map texture. */
+	UPROPERTY(Transient)
 	FSlateBrush MapBrush;
 	bool bHasMap = false;
 	FBox2D Bounds = FBox2D(FVector2D(-20000.f), FVector2D(20000.f));

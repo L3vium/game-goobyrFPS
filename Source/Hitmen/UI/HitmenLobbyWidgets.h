@@ -138,7 +138,10 @@ public:
 protected:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 
+	/** UPROPERTY so GC keeps the textures (they are loaded from soft pointers). */
+	UPROPERTY(Transient)
 	FSlateBrush ShotBrush;
+	UPROPERTY(Transient)
 	FSlateBrush MinimapBrush;
 	bool bHasShot = false;
 	bool bHasMinimap = false;
@@ -248,7 +251,9 @@ protected:
 	TArray<TObjectPtr<UHitmenTeamPanelWidget>> TeamPanels;
 
 	/** Local edit copies pushed to the server on every change. */
+	UPROPERTY(Transient)
 	FHitmenCosmeticLoadout LocalCosmetics;
+	UPROPERTY(Transient)
 	FHitmenLoadout LocalLoadout;
 	bool bLocalInitialized = false;
 	/** Seconds left before the edited look is sent (coalesces fast arrow clicks). */

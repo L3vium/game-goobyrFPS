@@ -101,7 +101,8 @@ protected:
 	virtual void UnbindEvents() override;
 	virtual void NativeConstruct() override;
 
-	/** Baked map of the level (DA_Map MapTexture) and its world bounds. */
+	/** Baked map of the level (DA_Map MapTexture) and its world bounds. UPROPERTY so GC keeps the texture. */
+	UPROPERTY(Transient)
 	FSlateBrush MapBrush;
 	FBox2D MapBounds = FBox2D(ForceInit);
 	bool bHasMap = false;

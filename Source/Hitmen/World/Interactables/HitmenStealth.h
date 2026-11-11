@@ -165,10 +165,33 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0"))
 	float Cooldown = 15.f;
 
+	/** It plays this long once turned on: a pulsing light, a sound every PulseInterval and a noise each time. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0", Units="s"))
+	float PlayTime = 8.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0.2", Units="s"))
+	float PulseInterval = 1.f;
+
+	/** Glows while it plays (Juice: colour and intensity). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UPointLightComponent> PlayingLight;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction|Juice", meta=(ClampMin="0"))
+	float PlayingLightIntensity = 3000.f;
+
+	/** The radio loop (sound set RadioLoop) while it plays. */
+	UPROPERTY(Transient)
+	TObjectPtr<class UAudioComponent> PlayingAudio;
+
+	float PlayingUntil = -1.f;
+	FTimerHandle PulseTimer;
+	void Pulse();
+	virtual void Tick(float DeltaSeconds) override;
+
 	virtual void OnInteracted(AActor* Interactor) override;
 	virtual void Trigger(AActor* Activator);
 
-	UFUNCTION(NetMulticast, Unreliable)
+	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_Triggered();
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")

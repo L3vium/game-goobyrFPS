@@ -17,6 +17,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -54,6 +56,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - The turret tower itself is no longer interactable: only its hack panel hacks it.
 - Lockers: no more instant teleport: the door opens and you step in over 0.5 s turning to face out, then it closes;
   stepping out is the reverse (every machine animates it).
+- Radio distraction: once turned on it plays a radio loop for 8 s with a pulsing light (visible and audible
+  indicator), and makes its noise (10 m) on every beat.
+- Explosive barrels: explosion sound and view shake (effect slot for the toon explosion), chain reactions; the
+  default explosion noise is 15 m (was 40 m).
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -72,6 +78,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Window flicker: the frame faces were coplanar with the wall's opening and the closed shutters overlapped in one
   plane; the frame now sits inside the opening, the shutters at two depths, and they open 80 degrees (105 cut into
   the wall).
+
+
 
 
 ### Removed

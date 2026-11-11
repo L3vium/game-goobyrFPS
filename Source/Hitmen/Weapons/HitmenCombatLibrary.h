@@ -18,7 +18,7 @@ public:
 	 * actors (breakable walls, barrels, mines) and makes an explosion noise for the AI.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Combat", meta=(WorldContext="WorldContextObject"))
-	static void Explode(const UObject* WorldContextObject, FVector Origin, float Radius, float Damage, AActor* DamageCauser, AController* InstigatorController, float NoiseRadius = 4000.f, float Impulse = 150000.f);
+	static void Explode(const UObject* WorldContextObject, FVector Origin, float Radius, float Damage, AActor* DamageCauser, AController* InstigatorController, float NoiseRadius = 1500.f, float Impulse = 150000.f);
 
 	/** Eye location and view direction of a pawn (camera for players, eyes for NPCs). */
 	/** Make a noise NPCs can hear: graded, occluded, only the nearest responders react. */

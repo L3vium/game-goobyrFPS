@@ -1,6 +1,10 @@
 // Hitmen — hazards
 
 #include "World/Interactables/HitmenHazards.h"
+#include "GameFramework/PlayerController.h"
+#include "Data/HitmenSoundSet.h"
+#include "Characters/HitmenPlayerCharacter.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Weapons/HitmenCombatLibrary.h"
@@ -145,6 +149,26 @@ void AHitmenExplosiveBarrel::Explode(AController* InstigatorController)
 
 void AHitmenExplosiveBarrel::Multicast_Exploded_Implementation()
 {
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		const FVector Location = GetActorLocation() + FVector(0.f, 0.f, 50.f);
+		if (ExplosionEffect)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ExplosionEffect, Location, FRotator::ZeroRotator, FVector(ExplosionEffectScale));
+		}
+		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::Explosion, Location);
+		const float ShakeRadius = ExplosionRadius * 3.f;
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			const APlayerController* PC = It->Get();
+			AHitmenPlayerCharacter* Player = PC && PC->IsLocalController() ? Cast<AHitmenPlayerCharacter>(PC->GetPawn()) : nullptr;
+			const float Distance = Player ? FVector::Dist(Player->GetActorLocation(), Location) : BIG_NUMBER;
+			if (Player && Distance < ShakeRadius)
+			{
+				Player->AddCameraShake(ShakeIntensity * (1.f - Distance / ShakeRadius), 0.6f);
+			}
+		}
+	}
 	Juice_OnExploded();
 	SetActorHiddenInGame(true);
 	SetActorEnableCollision(false);

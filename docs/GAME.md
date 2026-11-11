@@ -211,15 +211,15 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Fixture | Behaviour |
 |---|---|
 | Tall grass | Crouched inside = hidden (dark soft vignette and an eye-off mark on screen) |
-| Explosive barrel (red) | Explodes when shot |
+| Explosive barrel (red) | Explodes when shot (effect, sound, view shake); blasts set off nearby barrels in a chain |
 | Ladder / gutter | Automatic climb |
 | Zipline | Automatic, up/down |
 | Jump pad | Launches high |
-| Locker | Hollow cabinet; hide inside, look through the door slit |
+| Locker | Hollow cabinet; the door opens and you step in (0.5 s, turning to face out), the door closes; look through the door slit; stepping out is the reverse |
 | Door | Open/close, swings away from whoever opens it; fills its 110 x 230 opening; optional keycard ID (`[Locked - Keycard N]` in the prompt) |
 | Window | Frame inside the wall opening, two shutters opening 80 degrees away from the opener; vaultable when open |
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
-| Distraction | Interact → noise that attracts NPCs |
+| Distraction (radio) | Turn on with `F` (or remotely): it plays a radio loop for 8 s with a pulsing light, and its noise (10 m) draws NPCs on every beat |
 | Turret | Red laser while locking on, then shoots players; hacked only from its panel by **holding** `F` 3 s (a bar fills under the crosshair; releasing or looking away cancels): then shoots NPCs |
 | Security camera | A shadowed spotlight aimed at the floor (white → red when it sees you; walls cut it); sees you only through open air; spotting calls reinforcements |
 | Security station | Desk + screen cycling through its cameras; holding `F` 2 s disables / enables them ("no signal") |

@@ -1,6 +1,10 @@
 // Hitmen — stealth fixtures
 
 #include "World/Interactables/HitmenStealth.h"
+#include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
+#include "Data/HitmenSoundSet.h"
+#include "Components/PointLightComponent.h"
 #include "Data/HitmenAnimSet.h"
 #include "GameFramework/PlayerController.h"
 #include "Hitmen.h"
@@ -245,6 +249,50 @@ void AHitmenTallGrass::UpdateOccupants()
 AHitmenDistraction::AHitmenDistraction()
 {
 	InteractionText = NSLOCTEXT("Hitmen", "Distract", "Turn on");
+	NoiseRadius = 1000.f;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
+	PlayingLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("PlayingLight"));
+	PlayingLight->SetupAttachment(Root);
+	PlayingLight->SetRelativeLocation(FVector(0.f, 0.f, 60.f));
+	PlayingLight->SetIntensity(0.f);
+	PlayingLight->SetAttenuationRadius(350.f);
+	PlayingLight->SetLightColor(FLinearColor(1.f, 0.55f, 0.15f));
+	PlayingLight->SetCastShadows(false);
+}
+
+void AHitmenDistraction::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now >= PlayingUntil)
+	{
+		PlayingLight->SetIntensity(0.f);
+		if (PlayingAudio)
+		{
+			PlayingAudio->FadeOut(0.4f, 0.f);
+			PlayingAudio = nullptr;
+		}
+		SetActorTickEnabled(false);
+		return;
+	}
+	// Pulses with the beat while it plays.
+	const float Beat = 0.5f + 0.5f * FMath::Sin(Now * PI * 4.f);
+	PlayingLight->SetIntensity(PlayingLightIntensity * (0.35f + 0.65f * Beat));
+}
+
+void AHitmenDistraction::Pulse()
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now >= PlayingUntil)
+	{
+		GetWorldTimerManager().ClearTimer(PulseTimer);
+		return;
+	}
+	if (HasAuthority())
+	{
+		UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), NoiseRadius, this, EHitmenNoiseType::Distraction);
+	}
 }
 
 bool AHitmenDistraction::CanRemoteActivate_Implementation() const

@@ -110,6 +110,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barrel", meta=(ClampMin="0"))
 	float ChainDelay = 0.25f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barrel|Juice")
+	TObjectPtr<class UNiagaraSystem> ExplosionEffect;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barrel|Juice", meta=(ClampMin="0"))
+	float ExplosionEffectScale = 1.5f;
+
+	/** Camera shake strength for players near the blast. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barrel|Juice", meta=(ClampMin="0"))
+	float ShakeIntensity = 2.5f;
+
 	void Explode(AController* InstigatorController);
 
 	UFUNCTION(NetMulticast, Reliable)

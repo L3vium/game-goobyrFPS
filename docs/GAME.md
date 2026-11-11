@@ -307,9 +307,11 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
 - **Scope** overlay for the sniper. **Sightroom** (Tab): a scan wave, a grid on the floor, a cool world.
 - **Alert indicators** above NPCs and at screen centre.
-- **Pause map**: the baked schematic, north up, about two thirds of the screen, wheel to zoom around
-  you; a legend on the left toggles each marker type (you, teammates, VIP, retrieval points,
-  alerted guards, cameras). Debug tools sit flush against the right edge.
+- **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match); the baked
+  schematic in the middle (north up, dimmed under the markers, wheel to zoom around you); the legend on the right
+  toggles each marker type and shows its exact colours (you, teammates, VIP, retrieval points, guards on alert in
+  white / yellow / red like the minimap, cameras). Debug tools (dev builds) open over the legend from a small
+  "Debug tools" button.
 - **Intro**: "Dropping in", the map name and a 3-2-1 countdown during the parachute drop.
 
 ## 12. Maps

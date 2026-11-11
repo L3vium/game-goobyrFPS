@@ -11,6 +11,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   that grew on the left of the title buttons is gone.
 - Arrows (map carousel, difficulty, agent look) are plain solid white triangles, red while hovered or pressed: no
   square block, no shaft.
+- Pause menu: just PAUSE with big square Resume / Options / Leave match blocks (no 'contract in progress' or 'the
+  match keeps running' lines); the legend moved to the right and shows the real marker colours (guards white /
+  yellow / red as on the map and the minimap, no more orange); the map is dimmed so white markers read; debug tools
+  are closed behind a 'Debug tools' button and open over the legend.
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol

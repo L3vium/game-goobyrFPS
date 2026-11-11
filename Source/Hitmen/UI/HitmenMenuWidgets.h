@@ -85,6 +85,9 @@ protected:
 	UPROPERTY(Transient) TArray<TObjectPtr<class UHitmenToggle>> LegendToggles;
 
 	UFUNCTION() void HandleLegendToggled(bool bChecked);
+	/** Shows / hides the debug tools (they open over the legend). */
+	UFUNCTION() void ToggleDebugPanel();
+	UPROPERTY(Transient) TObjectPtr<class UHitmenMenuButton> DebugToggleButton;
 };
 
 /** One rebindable action: name + key button; click then press a key. */

@@ -378,10 +378,10 @@ int32 UHitmenToggle::NativePaint(const FPaintArgs& Args, const FGeometry& Allott
 	const FVector2D BoxPos(0.f, (Local.Y - Box) * 0.5f);
 	const float Alpha = bInteractable ? 1.f : 0.45f;
 	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, BoxPos, FVector2D(Box), FLinearColor(0.f, 0.f, 0.f, 0.5f));
-	HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, BoxPos, FVector2D(Box), FMath::Lerp(FLinearColor(1, 1, 1, 0.5f * Alpha), HitmenUI::Accent(), HoverAlpha), 1.5f);
+	HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, BoxPos, FVector2D(Box), FLinearColor(1, 1, 1, (bHovered ? 1.f : 0.5f) * Alpha), 1.5f);
 	if (bChecked)
 	{
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, BoxPos + FVector2D(Box * 0.22f), FVector2D(Box * 0.56f), HitmenUI::Accent() * FLinearColor(1, 1, 1, Alpha));
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, BoxPos + FVector2D(Box * 0.22f), FVector2D(Box * 0.56f), HitmenUI::Text() * FLinearColor(1, 1, 1, Alpha));
 	}
 	const FSlateFontInfo LabelFont = HitmenUI::SpacedFont(FontSize, TEXT("SemiBold"), 60);
 	const FString Text = Label.ToString().ToUpper();

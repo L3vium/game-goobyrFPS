@@ -150,6 +150,30 @@ if wanted("vehicles"):
         EAL.save_loaded_asset(shell, only_if_is_dirty=False)
     log("vehicles patched")
 
+if wanted("explosions"):
+    # 3D toon explosions (Anime_Stylized_VFX) instead of the 2D flipbook sheets.
+    toon = "/Game/Vefects/Anime_Stylized_VFX/VFX/Particles/"
+    bomb = EAL.load_asset(toon + "NS_Bomb_Explosion")
+    ground = EAL.load_asset(toon + "NS_Explosion_Fire_Ground")
+    ice = EAL.load_asset(toon + "NS_Explosion_Ice_Omni")
+    for name, effect in (("BP_Projectile_Rocket", bomb), ("BP_Projectile_TankShell", bomb), ("BP_Projectile_C4", bomb),
+                         ("BP_Projectile_Grenade", ground), ("BP_Projectile_Flashbang", ice)):
+        bp = EAL.load_asset("/Game/Hitmen/Weapons/Projectiles/" + name)
+        if not bp:
+            log("WARN missing", name)
+            continue
+        unreal.get_default_object(bp.generated_class()).set_editor_property("explosion_effect", effect)
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        EAL.save_loaded_asset(bp, only_if_is_dirty=False)
+    barrel = EAL.load_asset("/Game/Hitmen/World/Interactables/Barrel/BP_ExplosiveBarrel")
+    if barrel:
+        barrel_cdo = unreal.get_default_object(barrel.generated_class())
+        barrel_cdo.set_editor_property("explosion_effect", ground)
+        barrel_cdo.set_editor_property("explosion_effect_scale", 1.6)
+        unreal.BlueprintEditorLibrary.compile_blueprint(barrel)
+        EAL.save_loaded_asset(barrel, only_if_is_dirty=False)
+    log("explosion effects patched")
+
 if wanted("difficulty"):
     hitmen_content.build_rules()
     log("match rules (difficulty presets) rebuilt")

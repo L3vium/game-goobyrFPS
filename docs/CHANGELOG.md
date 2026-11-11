@@ -15,6 +15,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -67,6 +68,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Mounted gun shots are felt: sound, muzzle light flash, view shake. Tank: a real cannon barrel that follows the aim
   pitch and kicks back; the shell glows, flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m
   wide (was 6.5 m); fire sound, muzzle flash, view shake.
+- Explosions (rocket, tank shell, C4, grenade, barrels, flashbang) use 3D toon fire and smoke from
+  Anime_Stylized_VFX instead of the 2D flipbook sheets that read as comic book; every slot stays swappable in the
+  data.
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -89,6 +93,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   grace).
 - Mounted gun: its barrel pointed straight up (unrotated cylinder) and it turned 2.5x slower than the player's view
   (raw look input); it now points forward and matches the player's sensitivity.
+
 
 
 ### Removed

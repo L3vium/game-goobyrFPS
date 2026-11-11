@@ -522,7 +522,10 @@ def build_weapons(mats):
     for bp in (hitscan, projectile, melee, shotgun, pickup):
         save(bp)
 
-    explosion_fx = fx("Explosions/OneShot/NS_Explosion_Fire_01_OS")
+    # Explosions: 3D toon fire and smoke (Anime_Stylized_VFX), never the 2D flipbook sheets (they read as comic book).
+    toon = "/Game/Vefects/Anime_Stylized_VFX/VFX/Particles/"
+    explosion_fx = load(toon + "NS_Bomb_Explosion")
+    ground_fx = load(toon + "NS_Explosion_Fire_Ground")
     explosion_sfx = load(SFX + "SFX_ExplosionFire")
     impact_fx = fx("Impact/OneShot/NS_Impact_01_OS")
     impact_sfx = load(SFX + "SFX_Impact_01")
@@ -535,7 +538,7 @@ def build_weapons(mats):
                            explosion_sound=explosion_sfx, explosion_effect_scale=1.6, trail_effect=smoke_trail,
                            movement={"projectile_gravity_scale": 0.0, "rotation_follows_velocity": True})
     grenade = projectile_bp("BP_Projectile_Grenade", unreal.HitmenProjectile, "sphere", (0.15, 0.15, 0.15), mi["MI_Green"],
-                            fuse_time=2.0, explosion_noise_radius=1500.0, explosion_radius=450.0, explosion_damage=120.0, explosion_effect=explosion_fx,
+                            fuse_time=2.0, explosion_noise_radius=1500.0, explosion_radius=450.0, explosion_damage=120.0, explosion_effect=ground_fx,
                             explosion_sound=explosion_sfx, explosion_effect_scale=1.3,
                             movement={"should_bounce": True, "bounciness": 0.4})
     blackhole = projectile_bp("BP_Projectile_BlackHole", unreal.HitmenProjectile_BlackHole, "sphere", (0.3, 0.3, 0.3), mi["MI_Dark"],
@@ -545,11 +548,11 @@ def build_weapons(mats):
     dart = projectile_bp("BP_Projectile_SleepDart", unreal.HitmenProjectile, "cylinder", (0.02, 0.02, 0.2), mi["MI_Blue"],
                          status_on_hit=unreal.HitmenStatusEffect.ASLEEP, status_duration=25.0, movement={"projectile_gravity_scale": 0.0})
     flash = projectile_bp("BP_Projectile_Flashbang", unreal.HitmenProjectile_Flashbang, "cylinder", (0.08, 0.08, 0.15), mi["MI_White"],
-                          explosion_effect=fx("Explosions/OneShot/NS_Explosion_Magic_01_OS"), explosion_sound=load(SFX + "SFX_ExplosionClassic"),
+                          explosion_effect=load(toon + "NS_Explosion_Ice_Omni"), explosion_sound=load(SFX + "SFX_ExplosionClassic"),
                           explosion_effect_scale=0.8, explosion_shake_intensity=1.2)
     smoke = projectile_bp("BP_Projectile_Smoke", unreal.HitmenProjectile_Smoke, "cylinder", (0.08, 0.08, 0.15), mi["MI_Metal"],
                           explosion_sound=load(SFX + "SFX_DustPuff_Cue"), explosion_shake_intensity=0.0)
-    c4 = projectile_bp("BP_Projectile_C4", unreal.HitmenC4Charge, "cube", (0.15, 0.1, 0.05), mi["MI_Red"])
+    c4 = projectile_bp("BP_Projectile_C4", unreal.HitmenC4Charge, "cube", (0.15, 0.1, 0.05), mi["MI_Red"], explosion_effect=explosion_fx, explosion_effect_scale=1.6)
     # Tank shell: a glowing slug that flies straight (no gravity, near-instant), then a big blast.
     shell = projectile_bp("BP_Projectile_TankShell", unreal.HitmenProjectile, "sphere", (0.35, 0.35, 0.35), mats["laser"],
                           explode_on_impact=True, explosion_noise_radius=1500.0, explosion_radius=1200.0, explosion_damage=260.0, explosion_effect=explosion_fx,
@@ -1142,7 +1145,8 @@ def build_world(mats, weapons):
     fixture("BP_BlackoutVolume", unreal.HitmenBlackoutVolume, W + "/Power")
     fixture("BP_RoomVolume", unreal.HitmenRoomVolume, W + "/Vent")
     fixture("BP_PoisonableDrink", unreal.HitmenPoisonableDrink, W + "/Drink", {"mesh": ("cylinder", (0.08, 0.08, 0.15), mi["MI_Glass"], (0, 0, 8))})
-    fixture("BP_ExplosiveBarrel", unreal.HitmenExplosiveBarrel, W + "/Barrel", {"mesh": ("cylinder", (0.6, 0.6, 1.0), mi["MI_Red"], (0, 0, 50))})
+    fixture("BP_ExplosiveBarrel", unreal.HitmenExplosiveBarrel, W + "/Barrel", {"mesh": ("cylinder", (0.6, 0.6, 1.0), mi["MI_Red"], (0, 0, 50))},
+            {"explosion_effect": load("/Game/Vefects/Anime_Stylized_VFX/VFX/Particles/NS_Explosion_Fire_Ground"), "explosion_effect_scale": 1.6})
     fixture("BP_BreakableWall", unreal.HitmenBreakableWall, W + "/Breakable", {"mesh": ("cube", (3.0, 0.3, 3.0), mi["MI_Stone"], (0, 0, 150))})
     mounted = fixture("BP_MountedGun", unreal.HitmenMountedGun, V, {"mesh": ("cylinder", (0.12, 0.12, 1.4), mi["MI_Dark"], (70, 0, 0)),
                                                           "tripod": ("cone", (0.9, 0.9, 0.85), mi["MI_Metal"], (0, 0, -35)),

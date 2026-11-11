@@ -296,8 +296,11 @@ smoke, darkness, invisibility) drives perception, kill witnesses and body sighti
 Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `HitmenHUDWidgets`).
 - **Compass** (top): N/S/E/W only (`bShowIntercardinals` off); optional VIP marker; retrieval
   directions while carrying.
-- **Inventory bar** (bottom centre): two weapon cards (name, ammo in dimmed italics; they slide when you
-  switch), a divider, the A and E ability cards (cooldown / charges), keycard chips above, a health line when hurt.
+- **Inventory bar** (bottom centre): four cards of one size, in fixed places — the two weapon slots (the drawn one lit;
+  switching snaps, nothing slides), a divider, the manipulation (A) and move (E) abilities. Each card shows the item's
+  icon and full name (the font shrinks to fit), weapons their ammo as `current / max`, abilities a cooldown shade that
+  shrinks as they come back, charge pips and a fuel gauge for the jetpack. No key letters, no "ready", no health bar:
+  keycard chips sit above.
 - **Minimap** (bottom left, square): the baked map, north up (your arrow turns), alerted NPCs, sonar pings; its frame
   takes the colour of the worst alert aimed at you with a status line (Suspicious, Alerted, Searching,
   Spotted, Under fire).

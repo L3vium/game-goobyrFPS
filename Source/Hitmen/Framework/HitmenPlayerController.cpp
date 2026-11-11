@@ -20,6 +20,9 @@
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenAnimSet.h"
 #include "Abilities/HitmenAbility.h"
+#include "EngineUtils.h"
+#include "World/Interactables/HitmenSecurity.h"
+#include "Abilities/Move/HitmenMoveAbilities.h"
 #include "Weapons/HitmenWeaponBase.h"
 #include "Components/HitmenBodyCarryComponent.h"
 #include "Components/HitmenSightroomComponent.h"
@@ -309,6 +312,8 @@ void AHitmenPlayerController::HandleHUDInventoryChanged()
 		{
 			SlotView.Name = Slots[Index].Weapon->DisplayName;
 			SlotView.Ammo = Slots[Index].Weapon->bUsesAmmo ? Slots[Index].Ammo : -1;
+			SlotView.MaxAmmo = Slots[Index].Weapon->bUsesAmmo ? Slots[Index].Weapon->MaxAmmo : -1;
+			SlotView.Icon = Slots[Index].Weapon->Icon.LoadSynchronous();
 		}
 	}
 	View.Keycards = Inventory->GetKeycards();
@@ -378,6 +383,12 @@ void AHitmenPlayerController::RefreshHUDViews()
 			View.Charges = Ability->GetCharges();
 			View.MaxCharges = Ability->GetMaxCharges();
 			View.CooldownRemaining = Ability->GetCooldownRemaining();
+			View.CooldownAlpha = 1.f - Ability->GetCooldownNormalized();
+			View.Icon = Ability->GetData()->Icon.LoadSynchronous();
+			if (const UHitmenAbility_Jetpack* Jetpack = Cast<UHitmenAbility_Jetpack>(Ability))
+			{
+				View.Meter = Jetpack->GetFuelNormalized();
+			}
 		}
 		return View;
 	};

@@ -24,6 +24,11 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   names such as 'SILENCED PI.'); hover snaps with a white frame, the pick gets a red name band.
 - Icons are sorted into /Game/Hitmen/UI/Icons/Weapons, Abilities/Move and Abilities/Manipulation (references kept);
   docs/Pipelines.md explains how to swap one; the importer and hitmen_organize_icons.py keep the folders.
+- HUD inventory: the four cards (two weapons, two abilities) have one size and fixed places; switching weapon snaps
+  (no sliding); every card shows the item's icon and its full name (font shrinks to fit, no overflow); ammo reads
+  'current / max' (e.g. 2 / 15) instead of 'N rounds'; abilities show no key letter and no 'ready', a cooldown
+  shade, charge pips, and the jetpack a fuel gauge.
+
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -36,11 +41,14 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
+
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):
   the comic-book flipbooks are gone; the data slots stay for the team's own effects.
 - The launch countdown (5-4-3-2-1) and the intro 3-2-1: when everyone is ready the match starts a second later; the
   drop only shows 'Dropping in' and the map name.
+- The health line and the health text: health shows only through the red screen edges and the heartbeat.
 
 ## [0.4.1] - 2026-11-11
 

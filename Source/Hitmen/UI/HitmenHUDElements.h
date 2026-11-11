@@ -115,17 +115,14 @@ protected:
 	UFUNCTION() void HandleAbilities(const FHitmenHUDAbilityView& Move, const FHitmenHUDAbilityView& Manipulation);
 	UFUNCTION() void HandleVitals(const FHitmenHUDVitalsView& View);
 
-	FHitmenHUDInventoryView Inventory;
-	FHitmenHUDAbilityView MoveAbility;
-	FHitmenHUDAbilityView ManipulationAbility;
-	float HealthRatio = 1.f;
+	/** UPROPERTY: the views carry icon textures. */
+	UPROPERTY(Transient) FHitmenHUDInventoryView Inventory;
+	UPROPERTY(Transient) FHitmenHUDAbilityView MoveAbility;
+	UPROPERTY(Transient) FHitmenHUDAbilityView ManipulationAbility;
 	int32 ActiveSlot = 0;
-	/** 1 right after a switch, eases to 0 (cards slide into place). */
-	float SwitchSlide = 0.f;
-	float SwitchDirection = 1.f;
 };
 
-/** Match intro: map name, "dropping in" and the countdown while players parachute in. */
+/** Match intro: "dropping in" and the map name while players parachute in. */
 UCLASS()
 class HITMEN_API UHitmenIntroWidget : public UHitmenUserWidget
 {

@@ -578,15 +578,8 @@ void UHitmenHUDWidget::HandleVitals(const FHitmenHUDVitalsView& View)
 	{
 		return;
 	}
-	// Health only shows when hurt (minimal HUD).
-	if (View.HealthNormalized < 0.999f)
-	{
-		HealthText->SetText(FText::Format(LOCTEXT("Health", "HEALTH {0}  ARMOR {1}"), FText::AsNumber(FMath::RoundToInt(View.Health)), FText::AsNumber(FMath::RoundToInt(View.Armor))));
-	}
-	else
-	{
-		HealthText->SetText(FText::GetEmpty());
-	}
+	// No health readout: the red edges and the heartbeat show it.
+	HealthText->SetText(FText::GetEmpty());
 }
 
 // =============================================================================================

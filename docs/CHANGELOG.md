@@ -21,6 +21,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -80,6 +82,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
+
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -111,6 +115,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   console).
 - Footsteps were silent (the per-surface sound slots were empty): players and NPCs now play a footstep per surface
   (grass, stone, dirt, wood, metal, concrete by default).
+- Gym: the armor and C4 pickups sat inside blocks (they could not be picked up): they now rest on top.
+
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):
@@ -120,6 +126,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - The health line and the health text: health shows only through the red screen edges and the heartbeat.
 - The 'TV / silent hack with F' hackable distraction, everywhere: class, Blueprint, its Gym placement and label,
   builders and docs.
+- The Gym slide lane (blue strip and label): sliding is a move of the character, not a fixture.
 
 ## [0.4.1] - 2026-11-11
 

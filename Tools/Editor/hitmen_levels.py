@@ -572,9 +572,6 @@ def build_gym():
         tp_a.set_editor_property("destination", tp_b)
         tp_b.set_editor_property("destination", tp_a)
     label(X, 1600, 520, "TELEPORTER  (back to start)")
-    # Slide lane along the west wall.
-    box((-3300, -500, -4), (260, 5000, 8), mi("MI_Blue"), folder=G)
-    label(-3300, -2900, 0, "SLIDE  sprint + crouch", 30)
     # Tall grass and a locker to break line of sight.
     spawn(bp("World/Interactables/Grass/BP_TallGrass"), (X, 2600, 55), folder=G)
     label(X, 2600, 110, "TALL GRASS  crouch inside")

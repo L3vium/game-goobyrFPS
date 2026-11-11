@@ -127,6 +127,7 @@ void AHitmenLobbyGameMode::RequestSetLobbySettings(AHitmenPlayerController* Requ
 
 void AHitmenLobbyGameMode::RequestStart(AHitmenPlayerController* Requester)
 {
+	UE_LOG(LogHitmen, Log, TEXT("Lobby: start requested (host: %s)"), IsHost(Requester) ? TEXT("yes") : TEXT("no"));
 	if (AHitmenGameState* GS = GetGameState<AHitmenGameState>(); GS && IsHost(Requester))
 	{
 		for (AHitmenPlayerState* PS : GS->GetHitmenPlayers())
@@ -186,6 +187,13 @@ void AHitmenLobbyGameMode::NotifyReadyChanged()
 		}
 	}
 	bAllReady &= Players > 0;
+	int32 ReadyCount = 0;
+	for (const AHitmenPlayerState* PS : GS->GetHitmenPlayers())
+	{
+		ReadyCount += !PS->IsWatcher() && PS->IsReady() ? 1 : 0;
+	}
+	UE_LOG(LogHitmen, Log, TEXT("Lobby: %d / %d ready (phase %s)%s"), ReadyCount, Players,
+		*UEnum::GetValueAsString(GS->GetMatchPhase()), bAllReady ? TEXT(", launching") : TEXT(""));
 	if (bAllReady && !GetWorldTimerManager().IsTimerActive(LaunchTimer))
 	{
 		// Everyone is ready: a short countdown, then the match.

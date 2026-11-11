@@ -9,7 +9,7 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 
 ## Stability
 - [x] GC stress: the Dev build with `-ExecCmds="gc.CollectGarbageEveryFrame 1"` — 100 s in the Gym (minimap) and
-  400 s on the title screen, no crash (0.4.1); 100 s in the Gym and 90 s on San Lazaro, no crash (0.6.0);
+  400 s on the title screen, no crash (0.4.1); 100 s in the Gym and 90 s on San Lazaro, no crash (0.6.0, 0.6.1);
   [ ] Create Room map tiles and the pause map by hand
 - [ ] Crash reports, if any: `python Tools/Debug/hitmen_crash_report.py "Builds/Windows Dev"`
 - [ ] No crash: 10 min of menu stress with Steam running (create / leave / join / refresh spam / map cycling)
@@ -24,10 +24,12 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Your agent: arrows further out, fixed while the agent idles, codename and Randomize centred (screenshot, 0.5.0)
 - [x] Loadout: big tiles, full names on up to two lines, red band on the pick (screenshot, 0.5.0)
 - [ ] Icons: swapping a texture in `/Game/Hitmen/UI/Icons/...` changes the tile and the HUD card
-- [ ] Ready: the match starts a second after everyone is ready, no 5-4-3-2-1; the drop shows no 3-2-1
+- [x] Ready with two players (PIE listen server + client joining by room code): nobody leaves while one is not
+  ready, both travel ~1 s after the last Ready, no 5-4-3-2-1 (PIE script, 0.6.1); [ ] two machines over Steam
 - [x] Pause: PAUSE, three big blocks, legend on the right with the real colours, debug tools behind a button (screenshot, 0.5.0)
 - [ ] Space and Escape go back on every page; Space never re-presses the last clicked button
 - [ ] Create Room: watcher eye shows only when hovering a player without team; a click toggles it
+- [x] Create Room on one grid: map tile and players panel aligned, full player name, join hint (screenshot, 0.6.1)
 
 ## Match start
 - [x] Spawn points are out of guard sight (LDTest: the 8 closest removed; Gym start 4.5 km+ away) — script
@@ -69,6 +71,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 ## AI
 - [x] Attack chain: an armed player in view gets shot, damage arrives slowly (~9 HP/s), guard holds the aim pose (PIE script, 0.5.0)
 - [x] Attack chain on San Lazaro: shot after 6-9 s in a guard's view, ~9 HP/s (PIE script, 0.6.0)
+- [x] A searching guard draws its pistol, then holds it ready each time it stops to look around (PIE log and
+  screenshot, 0.6.1); [ ] the hit reaction on a shot guard; [ ] both seen from a client
 - [ ] A gunshot 15 m away behind a wall is not heard; a bullet impact draws the nearest guard to the impact
 - [ ] A guard shot from out of its sight turns toward the shot and searches, it does not know where you are
 - [ ] In the dark, a guard that hears you within 2.5 m attacks
@@ -76,7 +80,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 ## HUD
 - [x] Inventory: four equal cards with icons, ammo x / max, no key letters, jetpack gauge (screenshot, 0.5.0)
 - [x] Awareness arcs toward guards noticing you; minimap Under fire banner (screenshot, 0.5.0)
-- [ ] Headshot hit ticks are red
+- [ ] Headshot hit ticks are red and a metallic hit sound plays (shooter only)
 - [ ] Minimap: no own view cone, north-up, your arrow turns
+- [x] Overhead alert marker: yellow / red triangle with "!" and backup arcs (screenshots, 0.6.1); [ ] white, filling with suspicion
 - [x] Map markers: cameras (diamonds) and the retrieval point (yellow, pinned to the edge) on the minimap and the pause map;
   legend rows come from the marker kinds on the map (screenshots, 0.6.0); [ ] a new DA_MapMarker kind shows up by hand

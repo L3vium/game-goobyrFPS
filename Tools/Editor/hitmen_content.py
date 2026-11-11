@@ -539,6 +539,7 @@ def build_animation():
     wave = montage("AM_Emote_Wave", ANIMS + "/Unarmed/Attack/MM_Attack_02")
     charged = montage("AM_Emote_Taunt", ANIMS + "/Unarmed/Attack/MM_ChargedAttack")
     dash = montage("AM_Emote_Hop", ANIMS + "/Unarmed/Jump/MM_Dash")
+    hit_react = montage("AM_HitReact", ANIMS + "/Rifle/HitReact/MM_HitReact_Front_Lgt_01")
 
     anim_set = make_data("DA_AnimSet_Mannequin", path("Data", "AnimSets"), unreal.HitmenAnimSet)
     emotes = []
@@ -553,7 +554,7 @@ def build_animation():
               jump_start=load(ANIMS + "/Unarmed/Jump/MM_Jump"),
               fall_loop=load(ANIMS + "/Unarmed/Jump/MM_Fall_Loop"),
               land=load(ANIMS + "/Unarmed/Jump/MM_Land"),
-              punch_montage=punch, stealth_kill_attacker_montage=kill,
+              punch_montage=punch, stealth_kill_attacker_montage=kill, hit_react_montage=hit_react,
               first_person_unarmed_pose=load(ANIMS + "/Unarmed/MM_Idle"),
               death_montages=[d for d in deaths if d], emotes=emotes,
               menu_idles=[load(ANIMS + "/Unarmed/MM_Idle")])
@@ -951,7 +952,7 @@ def build_sound_set():
         S.SIGHTROOM_ON: (hb + "Ambient/Cue/ReversedEcho1_Cue", 0.6), S.SIGHTROOM_OFF: (hb + "Ambient/Cue/ReversedEcho2_Cue", 0.4),
         S.LANDING: (steps + "Stones_Running_Trainers_01-01_Single-01_Cue", 0.8), S.PARACHUTE: (whoosh, 0.6),
         S.DEATH: (hb + "Action/Cue/Slowdown1_Cue", 0.8), S.TURRET_LOCK_ON: (hb + "Futuristic/Cue/NeonPulse1_Cue", 0.6),
-        S.HEADSHOT_HIT: (chains + "Dropping_Close_01-01_Cue", 0.5), S.HACK_LOOP: (hb + "Futuristic/Cue/Cybernetic1_Cue", 0.45),
+        S.HEADSHOT_HIT: (hb + "FX_Heartbeats/Cue/MetalHeartbeat1_Cue", 0.6), S.HACK_LOOP: (hb + "Futuristic/Cue/Cybernetic1_Cue", 0.45),
         S.HACK_COMPLETE: ("/Game/Vefects/Item_Pickup_VFX/Audio/SND_Item_Rare_L_Cue", 0.55),
         S.RADIO_LOOP: (ESS + "SFX_Essentials_05_GLITCH/Cues/COMRadio_InsJ_Radio_Noise_Long-Wave_01-01_LOOP_Cue", 0.7),
         S.MOUNTED_GUN_FIRE: (SFX + "SFX_GunShot_Cue", 0.8), S.TANK_FIRE: (SFX + "SFX_ExplosionClassic", 1.0),

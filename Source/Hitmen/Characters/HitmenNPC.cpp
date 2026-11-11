@@ -100,8 +100,21 @@ void AHitmenNPC::UpdateAimPose()
 		return;
 	}
 	const AActor* Target = AlertComponent ? AlertComponent->GetTarget() : nullptr;
-	const bool bFighting = Target && !IsDead() && Weapon && Weapon->GetWeaponData() && AlertComponent->GetAlertState() == EHitmenAlertState::Combat;
-	UAnimMontage* Wanted = bFighting && GetVelocity().Size2D() <= AimPoseMaxSpeed ? Weapon->GetWeaponData()->AimMontage.LoadSynchronous() : nullptr;
+	const EHitmenAlertState State = AlertComponent ? AlertComponent->GetAlertState() : EHitmenAlertState::Unaware;
+	const bool bArmed = !IsDead() && Weapon && Weapon->GetWeaponData();
+	const bool bFighting = bArmed && Target && State == EHitmenAlertState::Combat;
+	// Searching: the gun stays ready while the guard stops to look around (alert state replicates: every machine).
+	const bool bReady = bFighting || (bArmed && bReadyGunWhileSearching && State == EHitmenAlertState::Searching);
+	if (bReady && !bGunReady && !AnimInstance->IsAnyMontagePlaying())
+	{
+		// Draw first: the weapon's equip animation, then the aim pose takes over.
+		if (UAnimMontage* Equip = Weapon->GetWeaponData()->EquipMontage.LoadSynchronous())
+		{
+			AnimInstance->Montage_Play(Equip, 1.f);
+		}
+	}
+	bGunReady = bReady;
+	UAnimMontage* Wanted = bReady && GetVelocity().Size2D() <= AimPoseMaxSpeed ? Weapon->GetWeaponData()->AimMontage.LoadSynchronous() : nullptr;
 	if (ActiveAimMontage && ActiveAimMontage != Wanted)
 	{
 		AnimInstance->Montage_Stop(0.25f, ActiveAimMontage);

@@ -1,6 +1,7 @@
 // Hitmen — player controller
 
 #include "Framework/HitmenPlayerController.h"
+#include "Data/HitmenSoundSet.h"
 #include "Framework/HitmenPlayerState.h"
 #include "Framework/HitmenGameState.h"
 #include "Framework/HitmenLobbyGameMode.h"
@@ -854,6 +855,11 @@ void AHitmenPlayerController::Server_BackToLobby_Implementation()
 void AHitmenPlayerController::Client_HitConfirmed_Implementation(bool bKill, bool bHeadshot)
 {
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this)) { UI->BroadcastHitMarker(bKill, bHeadshot); }
+	if (bHeadshot)
+	{
+		// Only the shooter hears it: a crisp confirmation on top of the red hit ticks.
+		UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::HeadshotHit);
+	}
 	Juice_OnHitConfirmed(bKill, bHeadshot);
 }
 

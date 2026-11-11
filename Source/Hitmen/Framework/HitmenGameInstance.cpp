@@ -122,12 +122,22 @@ void UHitmenGameInstance::OpenGym()
 
 void UHitmenGameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
 {
+	// GEngine broadcasts every world's failures: with several game instances in one process (PIE players) another
+	// player's dropped connection must not close this player's room.
+	if (World && World->GetGameInstance() != this)
+	{
+		return;
+	}
 	UE_LOG(LogHitmen, Warning, TEXT("Network failure (%s): %s"), ENetworkFailure::ToString(FailureType), *ErrorString);
 	ReturnToTitle();
 }
 
 void UHitmenGameInstance::HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString)
 {
+	if (World && World->GetGameInstance() != this)
+	{
+		return;
+	}
 	UE_LOG(LogHitmen, Warning, TEXT("Travel failure (%s): %s"), ETravelFailure::ToString(FailureType), *ErrorString);
 	ReturnToTitle();
 }

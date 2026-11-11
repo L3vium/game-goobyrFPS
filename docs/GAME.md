@@ -85,7 +85,9 @@ adaptation): every room is lit for it. Space or Escape goes back on every menu p
    (count and room code on top) holding opaque team blocks (tinted header, square **ATTACK / PROTECT**
    toggle, a cross to remove) which hold one solid block per player; the host drags players between
    blocks. Hovering a player without team shows the watcher eye (open = watching, struck = playing).
-   A dashed **+ Create team** block below. Bottom: **Leave room** and **Choose your agent**.
+   A line on how friends join and a dashed **+ Create team** block below. Bottom: **Leave room** and **Choose your
+   agent**. One 8 px grid: 112 px side margins, the map tile and the players panel start on the same line under
+   the title, the panel ends on the same edge as **Choose your agent**.
 4. **Your agent** (stage) — the agent stands on the left; the codename above its head, white triangle arrows (every
    click counts) level with its head, torso and legs in two columns `AgentArrowSpacing` away from its axis, and
    **Randomize** under its feet — all placed from the reference pose, so they never move with the idle animation;
@@ -242,7 +244,10 @@ drink, or in a vent to poison the sealed rooms it serves).
 ## 10. AI
 All NPCs are hostile. Sight takes priority over hearing. Sight range 1950 cm (lose at 2250), times the
 difficulty multiplier; suspicion fills slower with distance (falloff 1600 cm). Guards in combat hold their
-weapon's aim pose and play its fire montage on each shot. They fire like Hitman guards: a short raise
+weapon's aim pose and play its fire montage on each shot. Searching guards draw their gun (the weapon's equip
+animation) and hold it ready (its aim pose) each time they stop to look around; a hit plays a hit reaction. All of
+these are the Mannequin pack animations (pistol / rifle equip and ADS idle, `MM_HitReact_Front_Lgt_01`), seen on
+every machine. They fire like Hitman guards: a short raise
 (`NPCFirstShotDelay` 0.6 s), bursts of `NPCBurstShots` (3) at 2.5x the weapon's interval, a 1.2 s pause; low
 damage (difficulty multiplier Easy 0.25 / Normal 0.4 / Hard 0.6), so a fight in the open lasts.
 
@@ -316,14 +321,17 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   map markers (cameras, retrieval points pinned to the frame when out of range);
   its frame takes the colour of the worst alert aimed at you and a banner opens across its top with a white flash
   (Suspicious, Alerted, Searching, Spotted; **Under fire** is taller, red and pulses).
-- **Crosshair**: a thin "+"; hit ticks (red, longer and thicker on a headshot); an "x" on a kill (red on a headshot);
+- **Crosshair**: a thin "+"; hit ticks (red, longer and thicker on a headshot, with a metallic hit sound only the shooter
+  hears); an "x" on a kill (red on a headshot);
   Hitman-like awareness arcs around it, one per guard or camera noticing you, placed toward it: the arc fills from its
   middle as suspicion grows (white), then turns yellow or red; cameras add a small camera mark.
 - **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault`; remote-ability targets
   glow with `[A] Charm` under them.
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
 - **Scope** overlay for the sniper. **Sightroom** (Tab): a scan wave, a grid on the floor, a cool world.
-- **Alert indicators** above NPCs and at screen centre.
+- **Alert indicators** above NPCs (a small triangle pointing at the head: white and filling from the tip while
+  suspicion builds, solid yellow or red with a dark "!" once alerted, two pulsing arcs while calling for backup) and
+  around the crosshair.
 - **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match); the baked
   schematic in the middle (north up, dimmed under the markers, wheel to zoom around you); the legend on the right
   toggles each marker type and shows its exact colours (you, teammates, VIP, guards on alert in white / yellow / red

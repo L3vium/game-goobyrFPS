@@ -546,13 +546,23 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	// ================= Create room =================
 	UCanvasPanel* Room = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
 	ScreenSwitcher->AddChild(Room);
+	// One 8 px grid (1920 x 1080 reference): 112 px side margins, a 112 px title band from y 72, the map tile and the
+	// players panel both start at y 184, the bottom bar sits 48 px above the bottom edge.
+	constexpr float Margin = 112.f;
+	constexpr float Top = 72.f;
+	constexpr float TitleBand = 112.f;
+	constexpr float MapWidth = 816.f;
+	constexpr float MapHeight = 464.f;
+	constexpr float Gutter = 32.f;
+	constexpr float BottomBar = 48.f;
 	UVerticalBox* Left = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	HitmenUI::AddToCanvas(Room, Left, FAnchors(0.f, 0.f), FVector2D(110.f, 70.f), FVector2D::ZeroVector);
-	HitmenUI::AddToVBox(Left, HitmenUI::MakeText(WidgetTree, LOCTEXT("CreateRoom", "CREATE ROOM"), 72, TEXT("Bold")), FMargin(0.f, 0.f, 0.f, 14.f));
+	HitmenUI::AddToCanvas(Room, Left, FAnchors(0.f, 0.f), FVector2D(Margin, Top), FVector2D::ZeroVector);
+	UTextBlock* RoomTitle = HitmenUI::MakeText(WidgetTree, LOCTEXT("CreateRoom", "CREATE ROOM"), 72, TEXT("Bold"));
+	HitmenUI::AddToVBox(Left, Sized(WidgetTree, RoomTitle, 0.f, TitleBand), FMargin(0.f), false, HAlign_Left);
 
 	// Map tile with arrows on its sides.
 	UCanvasPanel* MapArea = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
-	HitmenUI::AddToVBox(Left, Sized(WidgetTree, MapArea, 840.f, 470.f), FMargin(0.f, 0.f, 0.f, 22.f), false, HAlign_Left);
+	HitmenUI::AddToVBox(Left, Sized(WidgetTree, MapArea, MapWidth, MapHeight), FMargin(0.f, 0.f, 0.f, 24.f), false, HAlign_Left);
 	MapTile = WidgetTree->ConstructWidget<UHitmenMapTileWidget>(UHitmenMapTileWidget::StaticClass());
 	UCanvasPanelSlot* TileSlot = HitmenUI::AddToCanvas(MapArea, MapTile, FAnchors(0.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
 	TileSlot->SetAutoSize(false);
@@ -567,11 +577,11 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	HitmenUI::AddToCanvas(MapArea, NextMapButton, FAnchors(1.f, 0.5f), FVector2D(-16.f, 0.f), FVector2D(1.f, 0.5f), FVector2D(60.f, 60.f));
 
 	// Options: proximity chat and difficulty only (the rest is set by designers).
-	HitmenUI::AddToVBox(Left, MakeSectionLabel(WidgetTree, LOCTEXT("OptionsHeader", "OPTIONS")), FMargin(0.f, 0.f, 0.f, 10.f));
+	HitmenUI::AddToVBox(Left, MakeSectionLabel(WidgetTree, LOCTEXT("OptionsHeader", "OPTIONS")), FMargin(0.f, 0.f, 0.f, 8.f));
 	ProximityToggle = WidgetTree->ConstructWidget<UHitmenToggle>(UHitmenToggle::StaticClass());
 	ProximityToggle->Setup(LOCTEXT("ProximityChat", "Proximity voice chat"), true, 20);
 	ProximityToggle->OnToggled.AddDynamic(this, &UHitmenLobbyWidget::SetProximityChat);
-	HitmenUI::AddToVBox(Left, ProximityToggle, FMargin(0.f, 0.f, 0.f, 10.f), false, HAlign_Left);
+	HitmenUI::AddToVBox(Left, ProximityToggle, FMargin(0.f, 0.f, 0.f, 8.f), false, HAlign_Left);
 	UHorizontalBox* OptionsRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	UTextBlock* DifficultyLabel = HitmenUI::MakeText(WidgetTree, LOCTEXT("Difficulty", "DIFFICULTY"), 20, TEXT("SemiBold"));
 	DifficultyLabel->SetFont(HitmenUI::SpacedFont(20, TEXT("SemiBold"), 60));
@@ -594,7 +604,7 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	UBorder* PlayersPanel = HitmenUI::MakePanel(WidgetTree, PanelOuter, FMargin(16.f));
 	UCanvasPanelSlot* PlayersSlot = HitmenUI::AddToCanvas(Room, PlayersPanel, FAnchors(0.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
 	PlayersSlot->SetAutoSize(false);
-	PlayersSlot->SetOffsets(FMargin(980.f, 160.f, 90.f, 130.f));
+	PlayersSlot->SetOffsets(FMargin(Margin + MapWidth + Gutter, Top + TitleBand, Margin, 136.f));
 	UVerticalBox* Right = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	PlayersPanel->SetContent(Right);
 	UHorizontalBox* PlayersHeader = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
@@ -609,7 +619,7 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	RoomCodeText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 26, TEXT("Bold"));
 	RoomCodeText->SetFont(HitmenUI::SpacedFont(26, TEXT("Bold"), 220));
 	HitmenUI::AddToHBox(PlayersHeader, RoomCodeText, FMargin(0.f, 0.f, 4.f, 0.f));
-	HitmenUI::AddToVBox(Right, Sized(WidgetTree, PlayersHeader, 0.f, 40.f), FMargin(0.f, 0.f, 0.f, 12.f));
+	HitmenUI::AddToVBox(Right, Sized(WidgetTree, PlayersHeader, 0.f, 40.f), FMargin(0.f, 0.f, 0.f, 16.f));
 	UScrollBox* TeamsScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
 	if (UVerticalBoxSlot* ScrollSlot = Right->AddChildToVerticalBox(TeamsScroll))
 	{
@@ -617,22 +627,26 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 	}
 	TeamsBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	TeamsScroll->AddChild(TeamsBox);
+	// How the room fills up, under the list (the panel is mostly empty until friends arrive).
+	UTextBlock* JoinHint = HitmenUI::MakeText(WidgetTree, LOCTEXT("JoinHint", "Friends join with the room code: Join room on the title screen."), 16, TEXT("Medium"), HitmenUI::TextDim());
+	JoinHint->SetAutoWrapText(true);
+	HitmenUI::AddToVBox(Right, JoinHint, FMargin(4.f, 16.f, 4.f, 0.f), false, HAlign_Fill);
 	CreateTeamButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
 	CreateTeamButton->Setup(LOCTEXT("CreateTeam", "+  Create team"), EHitmenMenuButtonKind::Dashed);
 	CreateTeamButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::CreateTeam);
-	HitmenUI::AddToVBox(Right, CreateTeamButton, FMargin(0.f, 10.f, 0.f, 0.f), false, HAlign_Fill);
+	HitmenUI::AddToVBox(Right, CreateTeamButton, FMargin(0.f, 16.f, 0.f, 0.f), false, HAlign_Fill);
 
 	// Bottom bar.
 	UHitmenMenuButton* BackButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
 	BackButton->Setup(LOCTEXT("LeaveRoom", "Leave room"), EHitmenMenuButtonKind::Back);
 	BackButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::Back);
-	HitmenUI::AddToCanvas(Room, BackButton, FAnchors(0.f, 1.f), FVector2D(96.f, -42.f), FVector2D(0.f, 1.f));
+	HitmenUI::AddToCanvas(Room, BackButton, FAnchors(0.f, 1.f), FVector2D(Margin - 16.f, -BottomBar), FVector2D(0.f, 1.f));  // label on the margin
 	StartButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
 	StartButton->Setup(LOCTEXT("ChooseAgent", "Choose your agent"), EHitmenMenuButtonKind::Accent);
 	StartButton->OnClicked.AddDynamic(this, &UHitmenLobbyWidget::Start);
-	HitmenUI::AddToCanvas(Room, StartButton, FAnchors(1.f, 1.f), FVector2D(-90.f, -40.f), FVector2D(1.f, 1.f));
+	HitmenUI::AddToCanvas(Room, StartButton, FAnchors(1.f, 1.f), FVector2D(-Margin, -BottomBar), FVector2D(1.f, 1.f));
 	HostHintText = HitmenUI::MakeText(WidgetTree, LOCTEXT("WaitingHost", "Waiting for the host..."), 18, TEXT("Italic"), HitmenUI::TextDim());
-	HitmenUI::AddToCanvas(Room, HostHintText, FAnchors(1.f, 1.f), FVector2D(-96.f, -52.f), FVector2D(1.f, 1.f));
+	HitmenUI::AddToCanvas(Room, HostHintText, FAnchors(1.f, 1.f), FVector2D(-Margin, -BottomBar - 8.f), FVector2D(1.f, 1.f));
 
 	// ================= Your agent =================
 	AgentCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());

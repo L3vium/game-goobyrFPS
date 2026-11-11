@@ -73,6 +73,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Combat", meta=(ClampMin="0", Units="cm/s"))
 	float AimPoseMaxSpeed = 140.f;
 
+	/** Searching guards also hold their gun ready while they stand and look around (Hitman-like). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Combat")
+	bool bReadyGunWhileSearching = true;
+
+	/** Every machine: the gun is drawn (weapon EquipMontage played when it became ready). */
+	bool bGunReady = false;
+
 	// F: pickpocket the keycard from behind (alive, unaware); otherwise carry the body.
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;

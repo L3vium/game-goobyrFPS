@@ -258,8 +258,8 @@ void UHitmenArrowButton::Setup(bool bInPointsRight, float InSize)
 void UHitmenArrowButton::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	HoverAlpha = FMath::FInterpTo(HoverAlpha, bHovered ? 1.f : 0.f, InDeltaTime, 18.f);
-	PressAlpha = FMath::FInterpTo(PressAlpha, 0.f, InDeltaTime, 12.f);
+	HoverAlpha = bHovered ? 1.f : 0.f;
+	PressAlpha = FMath::Max(0.f, PressAlpha - InDeltaTime * 8.f);
 }
 
 FReply UHitmenArrowButton::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -298,19 +298,15 @@ int32 UHitmenArrowButton::NativePaint(const FPaintArgs& Args, const FGeometry& A
 	const FVector2D Local = AllottedGeometry.GetLocalSize();
 	const float Side = FMath::Min(Local.X, Local.Y);
 	const FVector2D Origin = (Local - FVector2D(Side)) * 0.5f;
-	// Square block: dark, lights up on hover, flashes on press.
-	const FLinearColor Fill = FMath::Lerp(FMath::Lerp(FLinearColor(0.04f, 0.042f, 0.05f, 0.85f), FLinearColor(0.16f, 0.165f, 0.18f, 0.95f), HoverAlpha), HitmenUI::Accent(), PressAlpha * 0.8f);
-	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, Origin, FVector2D(Side), Fill);
-	HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, Origin, FVector2D(Side), FLinearColor(1.f, 1.f, 1.f, 0.22f + 0.5f * HoverAlpha), 1.f);
-	// A real arrow: a shaft and a head.
+	// A plain solid triangle: white, red while hovered or pressed.
 	const float Dir = bPointsRight ? 1.f : -1.f;
-	const FVector2D C = Origin + FVector2D(Side) * 0.5f + FVector2D(Dir * 2.f * HoverAlpha, 0.f);
-	const float HalfShaft = Side * 0.24f;
-	const float Head = Side * 0.17f;
-	const float Thickness = FMath::Max(2.f, Side * 0.065f);
-	const FVector2D Tip = C + FVector2D(Dir * HalfShaft, 0.f);
-	HitmenUI::PaintLine(OutDrawElements, LayerId + 2, AllottedGeometry, C - FVector2D(Dir * HalfShaft, 0.f), Tip - FVector2D(Dir * Thickness * 0.5f, 0.f), HitmenUI::Text(), Thickness);
-	HitmenUI::PaintLines(OutDrawElements, LayerId + 2, AllottedGeometry, { Tip + FVector2D(-Dir * Head, -Head), Tip, Tip + FVector2D(-Dir * Head, Head) }, HitmenUI::Text(), Thickness);
+	const FVector2D C = Origin + FVector2D(Side) * 0.5f;
+	const float HalfHeight = Side * 0.4f;
+	const float HalfDepth = Side * 0.3f;
+	const FLinearColor Ink = (HoverAlpha > 0.5f || PressAlpha > 0.f) ? HitmenUI::Accent() : HitmenUI::Text();
+	const FVector2D Tip = C + FVector2D(Dir * HalfDepth, 0.f);
+	HitmenUI::PaintTriangle(OutDrawElements, LayerId, AllottedGeometry, C + FVector2D(-Dir * HalfDepth, -HalfHeight), Tip, C + FVector2D(-Dir * HalfDepth, HalfHeight), FLinearColor(0.f, 0.f, 0.f, 0.35f) );
+	HitmenUI::PaintTriangle(OutDrawElements, LayerId + 1, AllottedGeometry, C + FVector2D(-Dir * HalfDepth, -HalfHeight) - FVector2D(0.f, 1.5f), Tip - FVector2D(0.f, 1.5f), C + FVector2D(-Dir * HalfDepth, HalfHeight) - FVector2D(0.f, 1.5f), Ink);
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 3, InWidgetStyle, bParentEnabled);
 }
 

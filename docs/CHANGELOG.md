@@ -9,6 +9,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
   that grew on the left of the title buttons is gone.
+- Arrows (map carousel, difficulty, agent look) are plain solid white triangles, red while hovered or pressed: no
+  square block, no shaft.
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol

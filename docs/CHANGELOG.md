@@ -20,6 +20,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ### Added
 - `Tools/Debug/hitmen_crash_report.py`: groups the crash reports of a build and symbolizes their stacks with the
   build's PDB (checks that the crashed exe matches it).
+- `Tools/Packaging/package_builds.ps1`: packages the Dev and Shipping player builds, keeps each build's `Saved` folder
+  (crash reports) and archives the PDB per version in `Builds/_Symbols/<version>/`.
 
 ## [0.4.0] - 2026-11-10
 

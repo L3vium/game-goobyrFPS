@@ -27,6 +27,8 @@ Build/
 Builds/**/Saved/
 Builds/**/Manifest_*.txt
 Builds/**/*.pdb
+# Packaging temp folders and the per-version symbol archive (Tools/Packaging/package_builds.ps1)
+Builds/_*/
 !Builds/Windows/
 !Builds/Windows Dev/
 

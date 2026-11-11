@@ -216,15 +216,15 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Zipline | Automatic, up/down |
 | Jump pad | Launches high |
 | Locker | Hollow cabinet; hide inside, look through the door slit |
-| Door | Open/close; optional keycard ID (`[Locked - Keycard N]` in the prompt) |
-| Window | Thin frame, two shutters swinging sideways; vaultable when open |
+| Door | Open/close, swings away from whoever opens it; fills its 110 x 230 opening; optional keycard ID (`[Locked - Keycard N]` in the prompt) |
+| Window | Frame inside the wall opening, two shutters opening 80 degrees away from the opener; vaultable when open |
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
 | Distraction | Interact → noise that attracts NPCs |
 | Turret | Red laser while locking on, then shoots players; hacked only from its panel by **holding** `F` 3 s (a bar fills under the crosshair; releasing or looking away cancels): then shoots NPCs |
 | Security camera | A shadowed spotlight aimed at the floor (white → red when it sees you; walls cut it); sees you only through open air; spotting calls reinforcements |
 | Security station | Desk + screen cycling through its cameras; holding `F` 2 s disables / enables them ("no signal") |
 | Circuit breaker | Turns off its linked lights: NPCs cannot see (only hear), players see less |
-| Vent | Crouch-size duct with small doors; poison spreads to linked rooms only if fully closed |
+| Vent | Crouch-size duct; its hatches swing open like small doors on their top edge, away from the opener; poison spreads to linked rooms only if fully closed |
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
 | Mounted machine gun | Usable from any side (option), 180° arc; takes damage, part of it reaches the gunner |

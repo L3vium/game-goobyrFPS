@@ -71,6 +71,25 @@ if wanted("noise"):
         EAL.save_loaded_asset(bp, only_if_is_dirty=False)
     log("noise radii patched")
 
+if wanted("openings"):
+    # Doors fill the 110 x 230 openings; windows open 80 degrees (105 cut into the wall).
+    for bp_path in ("/Game/Hitmen/World/Interactables/Door/BP_Door", "/Game/Hitmen/World/Interactables/Door/BP_Door_Keycard1"):
+        bp = EAL.load_asset(bp_path) if EAL.does_asset_exist(bp_path) else None
+        if not bp:
+            log("WARN missing", bp_path)
+            continue
+        mesh = unreal.get_default_object(bp.generated_class()).get_editor_property("mesh")
+        mesh.set_editor_property("relative_scale3d", unreal.Vector(1.1, 0.1, 2.3))
+        mesh.set_editor_property("relative_location", unreal.Vector(55.0, 0.0, 115.0))
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        EAL.save_loaded_asset(bp, only_if_is_dirty=False)
+    window = EAL.load_asset("/Game/Hitmen/World/Interactables/Window/BP_Window")
+    if window:
+        unreal.get_default_object(window.generated_class()).set_editor_property("shutter_open_angle", 80.0)
+        unreal.BlueprintEditorLibrary.compile_blueprint(window)
+        EAL.save_loaded_asset(window, only_if_is_dirty=False)
+    log("doors and windows patched")
+
 if wanted("difficulty"):
     hitmen_content.build_rules()
     log("match rules (difficulty presets) rebuilt")

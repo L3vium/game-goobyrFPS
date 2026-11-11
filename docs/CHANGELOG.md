@@ -13,6 +13,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   releasing F or looking away cancels; the server times the hold too.
 
 
+
+
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -49,6 +52,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   instead of a few seconds.
 - The turret tower itself is no longer interactable: only its hack panel hacks it.
 
+
+
+
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -58,11 +64,14 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   through walls (the target stayed 'visible' forever). Now noise only sends them to the sound or impact, a hit from
   an unseen shooter puts them on alert toward the shot, and only sight reveals you; in the dark a hostile heard
   within 2.5 m is attacked.
-
-
-
-
-
+- Doors swung toward or away from you depending on which end you stood at (the side test used the axis along the
+  door): they now always open away from you, and fill their 110 x 230 openings (a 10 cm gap at the side and 20 cm on
+  top before). The NPC door trigger is centred.
+- Vent hatches spun inside their own plane like a pendulum: they now swing open on their top edge like a small door,
+  away from the opener.
+- Window flicker: the frame faces were coplanar with the wall's opening and the closed shutters overlapped in one
+  plane; the frame now sits inside the opening, the shutters at two depths, and they open 80 degrees (105 cut into
+  the wall).
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):

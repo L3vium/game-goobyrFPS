@@ -53,6 +53,8 @@ protected:
 
 	virtual void OnInteracted(AActor* Interactor) override;
 	virtual void ApplyOpenAlpha(float Alpha) {}
+	/** Axis across the opening (doors and hatches: their thin Y axis; windows: X). It swings away from the opener's side. */
+	virtual FVector GetSwingNormal() const { return GetActorRightVector(); }
 
 	UFUNCTION() void OnRep_Open();
 
@@ -143,7 +145,7 @@ protected:
 	float ShutterThickness = 3.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Window", meta=(Units="deg"))
-	float ShutterOpenAngle = 105.f;
+	float ShutterOpenAngle = 80.f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> FrameTop;
@@ -166,6 +168,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> RightShutter;
 
+	virtual FVector GetSwingNormal() const override { return GetActorForwardVector(); }
 	virtual void ApplyOpenAlpha(float Alpha) override;
 };
 

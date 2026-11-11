@@ -1095,8 +1095,9 @@ def build_world(mats, weapons):
         bps[name] = bp
         return bp
 
-    fixture("BP_Door", unreal.HitmenDoor, W + "/Door", {"mesh": ("cube", (1.0, 0.1, 2.1), mi["MI_Wood"], (50, 0, 105))})
-    fixture("BP_Door_Keycard1", unreal.HitmenDoor, W + "/Door", {"mesh": ("cube", (1.0, 0.1, 2.1), mi["MI_Blue"], (50, 0, 105))}, {"required_keycard": 1})
+    # Doors fill the 110 x 230 openings the level builder cuts.
+    fixture("BP_Door", unreal.HitmenDoor, W + "/Door", {"mesh": ("cube", (1.1, 0.1, 2.3), mi["MI_Wood"], (55, 0, 115))})
+    fixture("BP_Door_Keycard1", unreal.HitmenDoor, W + "/Door", {"mesh": ("cube", (1.1, 0.1, 2.3), mi["MI_Blue"], (55, 0, 115))}, {"required_keycard": 1})
     window = fixture("BP_Window", unreal.HitmenWindow, W + "/Window", {"mesh": ("cube", (1, 1, 1), mi["MI_White"], None)})
     for leaf in ("left_shutter", "right_shutter"):
         set_mesh(component(cdo(window), leaf), SHAPES["cube"], None, mi["MI_Glass"])

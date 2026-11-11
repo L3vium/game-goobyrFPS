@@ -216,6 +216,11 @@ public:
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
 	virtual bool CanRemoteActivate_Implementation() const override { return true; }
 	virtual void RemoteActivate_Implementation(AActor* Activator) override { OnInteracted(Activator); }
+	virtual float GetInteractHoldTime_Implementation(AActor* Interactor) const override { return HoldTime; }
+
+	/** Seconds F must be held to toggle the cameras. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Security", meta=(ClampMin="0", Units="s"))
+	float HoldTime = 2.f;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Console")
@@ -278,7 +283,8 @@ public:
 	virtual int32 GetHitmenTeamId_Implementation() const override { return TeamId; }
 
 	// F on the turret itself hacks it (like its panel).
-	virtual bool CanInteract_Implementation(AActor* Interactor) const override { return !bHacked; }
+	/** Only its hack panel hacks it (with a hold): the tower itself is not interactable. */
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override { return false; }
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
 	virtual void Interact_Implementation(AActor* Interactor) override { Hack(Interactor); }
 	virtual bool CanRemoteActivate_Implementation() const override { return !bHacked; }
@@ -382,6 +388,11 @@ public:
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual bool CanRemoteActivate_Implementation() const override;
 	virtual void RemoteActivate_Implementation(AActor* Activator) override { OnInteracted(Activator); }
+	virtual float GetInteractHoldTime_Implementation(AActor* Interactor) const override { return HoldTime; }
+
+	/** Hacking takes time: F held this long (a bar fills under the crosshair). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Security", meta=(ClampMin="0", Units="s"))
+	float HoldTime = 3.f;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|HackPanel")

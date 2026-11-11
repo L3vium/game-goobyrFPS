@@ -43,7 +43,14 @@ enum class EHitmenSound : uint8
 	Landing,
 	Parachute,
 	Death,
-	TurretLockOn
+	TurretLockOn,
+	HeadshotHit,
+	HackLoop,
+	HackComplete,
+	RadioLoop,
+	MountedGunFire,
+	TankFire,
+	LandingHard
 };
 
 UCLASS(BlueprintType)

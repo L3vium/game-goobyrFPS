@@ -222,6 +222,15 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 		}
 	}
 
+	// Hold-to-interact (hacking): a bar under the crosshair.
+	if (UI && UI->GetInteractProgress() >= 0.f)
+	{
+		const FVector2D BarSize(140.f, 6.f);
+		const FVector2D BarPos = Center + FVector2D(-BarSize.X * 0.5f, 34.f);
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 2, AllottedGeometry, BarPos - FVector2D(2.f), BarSize + FVector2D(4.f), FLinearColor(0.f, 0.f, 0.f, 0.6f));
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, BarPos, FVector2D(BarSize.X * UI->GetInteractProgress(), BarSize.Y), HitmenUI::Text());
+	}
+
 	// Awareness arcs (Hitman-like): one arc around the crosshair per guard or camera that is noticing you,
 	// placed toward it. It fills from its middle as suspicion grows (white), then turns yellow / red.
 	if (Pawn && PC && UI)

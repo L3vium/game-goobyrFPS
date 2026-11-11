@@ -255,6 +255,7 @@ protected:
 	void HandleAimPressed();
 	void HandleAimReleased();
 	void HandleInteract();
+	void HandleInteractReleased();
 	void HandleMoveAbilityPressed();
 	void HandleMoveAbilityReleased();
 	void HandleManipulationPressed();

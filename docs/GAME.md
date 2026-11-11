@@ -220,9 +220,9 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Window | Thin frame, two shutters swinging sideways; vaultable when open |
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
 | Distraction | Interact → noise that attracts NPCs |
-| Turret | Red laser while locking on, then shoots players; hack with `F` (or its panel): shoots NPCs |
+| Turret | Red laser while locking on, then shoots players; hacked only from its panel by **holding** `F` 3 s (a bar fills under the crosshair; releasing or looking away cancels): then shoots NPCs |
 | Security camera | A shadowed spotlight aimed at the floor (white → red when it sees you; walls cut it); sees you only through open air; spotting calls reinforcements |
-| Security station | Desk + screen cycling through its cameras; `F` disables / enables them ("no signal") |
+| Security station | Desk + screen cycling through its cameras; holding `F` 2 s disables / enables them ("no signal") |
 | Circuit breaker | Turns off its linked lights: NPCs cannot see (only hear), players see less |
 | Vent | Crouch-size duct with small doors; poison spreads to linked rooms only if fully closed |
 | Poisonable drink | Poison vial target |

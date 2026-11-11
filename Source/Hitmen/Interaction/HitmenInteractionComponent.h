@@ -28,6 +28,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Interaction")
 	bool TryInteract();
 
+	/** F released: a hold in progress (hacking) is cancelled. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Interaction")
+	void ReleaseInteract();
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Interaction")
+	bool IsHolding() const { return HoldTarget.IsValid(); }
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Interaction")
 	AActor* GetFocusedActor() const { return FocusedActor.Get(); }
 
@@ -58,6 +65,22 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void Server_Interact(AActor* Target);
+
+	/** The server times holds too: Interact only goes through after the hold time. */
+	UFUNCTION(Server, Reliable)
+	void Server_BeginHold(AActor* Target);
+
+	void BeginHold(AActor* Target, float Duration);
+	void UpdateHold();
+	void EndHold(bool bCompleted);
+
+	TWeakObjectPtr<AActor> HoldTarget;
+	float HoldStartTime = 0.f;
+	float HoldDuration = 0.f;
+	FTimerHandle HoldTimer;
+	/** Server side: the target being held and since when. */
+	TWeakObjectPtr<AActor> ServerHoldTarget;
+	float ServerHoldStartTime = 0.f;
 
 	void UpdateFocus();
 	void SetFocus(AActor* NewFocus, const FText& Prompt);

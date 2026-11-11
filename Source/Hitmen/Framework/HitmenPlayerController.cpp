@@ -20,6 +20,7 @@
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenAnimSet.h"
 #include "Abilities/HitmenAbility.h"
+#include "Interaction/HitmenInteractionComponent.h"
 #include "EngineUtils.h"
 #include "World/Interactables/HitmenSecurity.h"
 #include "Abilities/Move/HitmenMoveAbilities.h"
@@ -163,6 +164,7 @@ void AHitmenPlayerController::SetupInputComponent()
 	BindIfSet(AimAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleAimPressed);
 	BindIfSet(AimAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleAimReleased);
 	BindIfSet(InteractAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleInteract);
+	BindIfSet(InteractAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleInteractReleased);
 	BindIfSet(MoveAbilityAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleMoveAbilityPressed);
 	BindIfSet(MoveAbilityAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleMoveAbilityReleased);
 	BindIfSet(ManipulationAbilityAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleManipulationPressed);
@@ -585,6 +587,17 @@ void AHitmenPlayerController::HandleAimPressed()
 void AHitmenPlayerController::HandleAimReleased()
 {
 	if (IHitmenInputReceiver* R = GetReceiver()) { R->Input_AimChanged(false); }
+}
+
+void AHitmenPlayerController::HandleInteractReleased()
+{
+	if (const APawn* ControlledPawn = GetPawn())
+	{
+		if (UHitmenInteractionComponent* Interaction = ControlledPawn->FindComponentByClass<UHitmenInteractionComponent>())
+		{
+			Interaction->ReleaseInteract();
+		}
+	}
 }
 
 void AHitmenPlayerController::HandleInteract()

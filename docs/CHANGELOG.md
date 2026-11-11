@@ -8,6 +8,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ### Added
 - Health regeneration: players heal back 30 per second after 6 s without being hit (UHitmenHealthComponent
   RegenDelay / RegenRate).
+- Hold to interact: interactables can ask for F to be held (IHitmenInteractable GetInteractHoldTime). Hacking the
+  turret panel takes 3 s and the security console 2 s; a bar fills under the crosshair with a hacking sound;
+  releasing F or looking away cancels; the server times the hold too.
 
 
 ### Changed
@@ -44,8 +47,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Guards fire much less: a 0.6 s raise, bursts of 3 shots at 2.5x the weapon's interval, a 1.2 s pause (match rules,
   NPC fire); difficulty damage multipliers 0.25 / 0.4 / 0.6. A fight in the open now lasts about half a minute
   instead of a few seconds.
-
-
+- The turret tower itself is no longer interactable: only its hack panel hacks it.
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -56,6 +58,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   through walls (the target stayed 'visible' forever). Now noise only sends them to the sound or impact, a hit from
   an unseen shooter puts them on alert toward the shot, and only sight reveals you; in the dark a hostile heard
   within 2.5 m is attacked.
+
+
 
 
 

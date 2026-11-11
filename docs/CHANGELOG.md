@@ -5,6 +5,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-11
+
 ### Added
 - Headshots play a metallic hit sound for the shooter (HeartBeats MetalHeartbeat1, the HeadshotHit sound of
   DA_SoundSet) with the red hit ticks.

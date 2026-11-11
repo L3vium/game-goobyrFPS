@@ -38,6 +38,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Sprinting with a pistol: lowered and tilted, still in view (screenshot, 0.5.0); [ ] aiming stays low right
 - [x] Takedown from the side of an unaware guard (PIE script, 0.5.0); [ ] from the front in the dark; [ ] smooth blend
 - [x] Thrown weapon is a floating pickup at once, no physics (PIE script, 0.5.0)
+- [x] Hook ready: a small marker where it will grab, only in range (PIE screenshot, 0.6.0); [ ] E: a thin cable from
+  the hand to the anchor while pulling, seen by others too (not triggered by script: check by hand)
 - [ ] Short slide when crouching while walking; long slide from a sprint
 - [ ] Space right after grabbing a ladder does not jump off
 - [ ] Landing sounds (soft / hard) and footsteps per surface

@@ -201,7 +201,8 @@ user and does not spend a charge.
 **Move**: Blink (Dishonored-like teleport), Double jump, Jetpack, Dash, Hook (grapple),
 Transposition (swap positions with an aimed NPC/player), Pill (boost damage/speed/resistance with
 a distorted view, `PP_Pill`), Invisibility, Armor, C4 (place, then detonate). The jetpack is
-client-predicted like sprint.
+client-predicted like sprint. The hook shows a small marker where it will grab while it is ready and in range, and a thin cable from the hand
+to the anchor while it pulls (seen by everyone; `UHitmenAbilityComponent` draws both for any ability that asks).
 
 **Manipulation**: Stone (throw, noise), Remote distraction (activate a distraction at range),
 Sleep dart (one target), Charm (target becomes an ally and attacks others; a charmed player is

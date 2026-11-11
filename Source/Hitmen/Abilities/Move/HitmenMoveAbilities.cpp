@@ -299,6 +299,18 @@ bool UHitmenAbility_Hook::Activate(const FVector& AimOrigin, const FVector& AimD
 	return true;
 }
 
+bool UHitmenAbility_Hook::GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const
+{
+	// The same trace as Activate: the marker shows exactly where the hook would grab, only within range.
+	FHitResult Hit;
+	if (bHooked || !AimTrace(Origin, Direction, Hit))
+	{
+		return false;
+	}
+	OutPoint = Hit.ImpactPoint;
+	return true;
+}
+
 void UHitmenAbility_Hook::OnRep_Hooked()
 {
 	if (bHooked)

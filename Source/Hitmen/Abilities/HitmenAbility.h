@@ -56,6 +56,12 @@ public:
 	/** Abilities that need TickAbility / LocalTick while active. */
 	virtual bool WantsTick() const { return false; }
 
+	/** Local player, ability ready: a point to mark in the world from this aim (where a hook will land). */
+	virtual bool GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const { return false; }
+
+	/** Every machine: a cable is drawn from the owner's hand to OutAnchor while this returns true (hook pull). */
+	virtual bool GetCableAnchor(FVector& OutAnchor) const { return false; }
+
 	// ---- Queries ----
 	UFUNCTION(BlueprintPure, Category="Hitmen|Ability")
 	virtual bool CanActivate() const;

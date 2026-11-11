@@ -13,6 +13,14 @@
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/ConstructorHelpers.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
 
 UHitmenAbilityComponent::UHitmenAbilityComponent()
 {
@@ -20,6 +28,15 @@ UHitmenAbilityComponent::UHitmenAbilityComponent()
 	PrimaryComponentTick.bStartWithTickEnabled = true;
 	SetIsReplicatedByDefault(true);
 	bReplicateUsingRegisteredSubObjectList = true;
+
+	// Hook cable and aim marker: engine shapes and the tintable basic material (override in the Blueprint).
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	CableMesh = CylinderMesh.Object;
+	AimMarkerMesh = SphereMesh.Object;
+	CableMaterial = BasicMaterial.Object;
+	AimMarkerMaterial = BasicMaterial.Object;
 }
 
 void UHitmenAbilityComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -243,6 +260,114 @@ void UHitmenAbilityComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		if (bLocal && !bAuthority)
 		{
 			Ability->LocalTick(DeltaTime);
+		}
+	}
+	UpdateAbilityVisuals();
+}
+
+UStaticMeshComponent* UHitmenAbilityComponent::MakeVisual(UStaticMesh* Mesh, UMaterialInterface* Material, const FLinearColor& Color)
+{
+	AActor* Owner = GetOwner();
+	if (!Owner || !Mesh)
+	{
+		return nullptr;
+	}
+	UStaticMeshComponent* Visual = NewObject<UStaticMeshComponent>(Owner, NAME_None, RF_Transient);
+	Visual->SetStaticMesh(Mesh);
+	Visual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Visual->SetCastShadow(false);
+	Visual->SetCanEverAffectNavigation(false);
+	Visual->SetUsingAbsoluteLocation(true);
+	Visual->SetUsingAbsoluteRotation(true);
+	Visual->SetUsingAbsoluteScale(true);
+	Visual->SetupAttachment(Owner->GetRootComponent());
+	Visual->RegisterComponent();
+	if (Material)
+	{
+		if (UMaterialInstanceDynamic* Dynamic = Visual->CreateDynamicMaterialInstance(0, Material))
+		{
+			Dynamic->SetVectorParameterValue(TEXT("Color"), Color);
+		}
+	}
+	Visual->SetVisibility(false);
+	return Visual;
+}
+
+void UHitmenAbilityComponent::UpdateAbilityVisuals()
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	if (!Pawn)
+	{
+		return;
+	}
+
+	// Cable: an equipped ability pulling the owner (hook), from the hand to the anchor, thin, on every machine.
+	FVector Anchor = FVector::ZeroVector;
+	bool bCable = false;
+	for (const UHitmenAbility* Ability : { MoveAbility.Get(), ManipulationAbility.Get() })
+	{
+		if (Ability && Ability->GetCableAnchor(Anchor))
+		{
+			bCable = true;
+			break;
+		}
+	}
+	if (bCable && !CableComponent)
+	{
+		CableComponent = MakeVisual(CableMesh, CableMaterial, CableColor);
+	}
+	if (CableComponent)
+	{
+		CableComponent->SetVisibility(bCable);
+		if (bCable)
+		{
+			FVector Start = Pawn->GetActorLocation();
+			const APlayerController* PC = Cast<APlayerController>(Pawn->GetController());
+			const ACharacter* Character = Cast<ACharacter>(Pawn);
+			if (Pawn->IsLocallyControlled() && PC && PC->PlayerCameraManager)
+			{
+				// First person: low right in view, like a launcher held in the right hand.
+				Start = PC->PlayerCameraManager->GetCameraLocation() + PC->PlayerCameraManager->GetCameraRotation().RotateVector(FirstPersonCableOffset);
+			}
+			else if (Character && Character->GetMesh() && Character->GetMesh()->DoesSocketExist(CableSocket))
+			{
+				Start = Character->GetMesh()->GetSocketLocation(CableSocket);
+			}
+			const FVector Span = Anchor - Start;
+			// Engine cylinder: 100 cm tall along Z and 100 cm wide, pivot in the middle.
+			CableComponent->SetWorldLocationAndRotation(Start + Span * 0.5f, FRotationMatrix::MakeFromZ(Span.GetSafeNormal()).Rotator());
+			CableComponent->SetWorldScale3D(FVector(CableThickness / 100.f, CableThickness / 100.f, Span.Size() / 100.f));
+		}
+	}
+
+	// Aim marker: the local player's move ability is ready and would land here (hook in range).
+	FVector MarkerPoint = FVector::ZeroVector;
+	bool bMarker = false;
+	if (!bCable && Pawn->IsLocallyControlled() && Pawn->IsPlayerControlled())
+	{
+		const UHitmenAbility* Move = MoveAbility.Get();
+		if (Move && Move->CanActivate())
+		{
+			FVector Origin, Direction;
+			GetAim(Origin, Direction);
+			bMarker = Move->GetAimMarker(Origin, Direction, MarkerPoint);
+		}
+	}
+	if (bMarker && !AimMarkerComponent)
+	{
+		AimMarkerComponent = MakeVisual(AimMarkerMesh, AimMarkerMaterial, AimMarkerColor);
+	}
+	if (AimMarkerComponent)
+	{
+		AimMarkerComponent->SetVisibility(bMarker);
+		if (bMarker)
+		{
+			AimMarkerComponent->SetWorldLocation(MarkerPoint);
+			AimMarkerComponent->SetWorldScale3D(FVector(AimMarkerSize / 100.f));
 		}
 	}
 }

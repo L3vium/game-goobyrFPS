@@ -1,6 +1,8 @@
 // Hitmen — match HUD
 
 #include "UI/HitmenHUDWidgets.h"
+#include "Components/HitmenMapMarkerComponent.h"
+#include "Data/HitmenMapMarkerType.h"
 #include "Engine/Texture2D.h"
 #include "Data/HitmenMapDefinition.h"
 #include "UI/HitmenHUDElements.h"
@@ -392,6 +394,35 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 				const FLinearColor Tint = Blip.Color == EHitmenAlertColor::None ? HitmenUI::TextDim() : HitmenAlert::ToLinearColor(Blip.Color);
 				DrawBox(OutDrawElements, LayerId + 2, AllottedGeometry, Point - FVector2D(3.f), FVector2D(6.f), Tint);
 			}
+		}
+	}
+
+	// Map markers (retrieval points, cameras, anything with a UHitmenMapMarkerComponent) at their kind's minimap size;
+	// kinds marked as objectives stick to the frame when out of range.
+	if (const UHitmenMapMarkerSubsystem* Markers = UHitmenMapMarkerSubsystem::Get(this))
+	{
+		for (const TWeakObjectPtr<UHitmenMapMarkerComponent>& MapMarker : Markers->GetMarkers())
+		{
+			const UHitmenMapMarkerType* Type = MapMarker.IsValid() ? MapMarker->GetType() : nullptr;
+			if (!Type || !Type->bShowOnMinimap || !MapMarker->IsMarkerVisible())
+			{
+				continue;
+			}
+			bool bInside = false;
+			FVector2D Point = ToMap(MapMarker->GetMarkerLocation(), bInside);
+			const float MarkerSize = Type->Size * Type->MinimapScale;
+			if (!bInside)
+			{
+				if (!Type->bClampToMinimapEdge)
+				{
+					continue;
+				}
+				const FVector2D Delta = Point - Center;
+				const float Margin = MarkerSize * 0.5f + 3.f;
+				const float Fit = FMath::Min((Center.X - Margin) / FMath::Max(FMath::Abs(Delta.X), 1.f), (Center.Y - Margin) / FMath::Max(FMath::Abs(Delta.Y), 1.f));
+				Point = Center + Delta * FMath::Min(Fit, 1.f);
+			}
+			HitmenUI::PaintMapMarker(OutDrawElements, LayerId + 2, AllottedGeometry, Point, MarkerSize, Type, Markers->GetIconBrush(Type));
 		}
 	}
 

@@ -201,7 +201,8 @@ user and does not spend a charge.
 **Move**: Blink (Dishonored-like teleport), Double jump, Jetpack, Dash, Hook (grapple),
 Transposition (swap positions with an aimed NPC/player), Pill (boost damage/speed/resistance with
 a distorted view, `PP_Pill`), Invisibility, Armor, C4 (place, then detonate). The jetpack is
-client-predicted like sprint.
+client-predicted like sprint. The hook shows a small marker where it will grab while it is ready and in range, and a thin cable from the hand
+to the anchor while it pulls (seen by everyone; `UHitmenAbilityComponent` draws both for any ability that asks).
 
 **Manipulation**: Stone (throw, noise), Remote distraction (activate a distraction at range),
 Sleep dart (one target), Charm (target becomes an ally and attacks others; a charmed player is
@@ -225,10 +226,10 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
 | Distraction (radio) | Turn on with `F` (or remotely): it plays a radio loop for 8 s with a pulsing light, and its noise (10 m) draws NPCs on every beat |
 | Turret | Red laser while locking on, then shoots players; hacked only from its panel by **holding** `F` 3 s (a bar fills under the crosshair; releasing or looking away cancels): then shoots NPCs |
-| Security camera | A shadowed spotlight aimed at the floor (white → red when it sees you; walls cut it); sees you only through open air; spotting calls reinforcements |
+| Security camera | A shadowed spotlight aimed at the floor; an electronic ring marks exactly where the light ends (a crisp edge, a turning dashed ring, faint scanlines) and fills from the edge inward as the detection meter builds; light and ring go white → yellow → red; walls cut it; sees you only through open air; spotting calls reinforcements; a marker on the maps |
 | Security station | Desk + screen cycling through its cameras (a 90° feed, tonemapped at the match exposure); holding `F` 2 s disables / enables them ("no signal") |
 | Circuit breaker | Turns off its linked lights: NPCs cannot see (only hear), players see less |
-| Vent | Crouch-size duct; its hatches swing open like small doors on their top edge, away from the opener; poison spreads to linked rooms only if fully closed |
+| Vent | Crouch-size duct; its hatches are small doors (vertical hinge on the side) that swing away from the opener; poison spreads to linked rooms only if fully closed |
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
 | Mounted machine gun | Usable from any side (option), 180° arc, look speed matches the player's; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
@@ -311,7 +312,8 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   icon and full name (the font shrinks to fit), weapons their ammo as `current / max`, abilities a cooldown shade that
   shrinks as they come back, charge pips and a fuel gauge for the jetpack. No key letters, no "ready", no health bar:
   keycard chips sit above.
-- **Minimap** (bottom left, square): the baked map, north up (your arrow turns, no view cone), alerted NPCs, sonar pings;
+- **Minimap** (bottom left, square): the baked map, north up (your arrow turns, no view cone), alerted NPCs, sonar pings,
+  map markers (cameras, retrieval points pinned to the frame when out of range);
   its frame takes the colour of the worst alert aimed at you and a banner opens across its top with a white flash
   (Suspicious, Alerted, Searching, Spotted; **Under fire** is taller, red and pulses).
 - **Crosshair**: a thin "+"; hit ticks (red, longer and thicker on a headshot); an "x" on a kill (red on a headshot);
@@ -324,17 +326,20 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 - **Alert indicators** above NPCs and at screen centre.
 - **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match); the baked
   schematic in the middle (north up, dimmed under the markers, wheel to zoom around you); the legend on the right
-  toggles each marker type and shows its exact colours (you, teammates, VIP, retrieval points, guards on alert in
-  white / yellow / red like the minimap, cameras). Debug tools (dev builds) open over the legend from a small
-  "Debug tools" button.
+  toggles each marker type and shows its exact colours (you, teammates, VIP, guards on alert in white / yellow / red
+  like the minimap, then one row per map marker kind on the map: retrieval points, cameras...). Debug tools (dev builds)
+  open over the legend from a small "Debug tools" button.
+- **Map markers**: anything with a `HitmenMapMarker` component shows on the minimap and the pause map, drawn and named
+  by its kind (a `DA_MapMarker_*` data asset: legend name, colour, shape or icon, size, which maps, legend order).
+  Recipe in `docs/Pipelines.md`.
 - **Intro**: "Dropping in" and the map name during the parachute drop (no countdown, no sting).
 
 ## 12. Maps
 | Map | Purpose |
 |---|---|
 | `L_FrontEnd` | The whole front end in one scene: museum hall (title), briefing room (create room), agent stage (`BP_AgentPreview`, "Your agent"); one tagged camera per screen |
-| `L_Gym` | Debug gym: a compact walled hall (74 x 74 m) laid out like a mini LD — movement course with the traversal metrics, armoury (weapons, containers, loot points), abilities, fixtures, and an AI pen (spline patrol, guard group, keycard guard to pickpocket, sentry, sniper, VIP, search spots, camera alarm); every station is labelled just above itself |
-| `L_LDTest` | Basic Hitman-like sandbox: town (gutters beside back windows, street lamps on a breaker in a hidden keycard utility room), walled manor (keycard gates, sealed dining room fed by a crouch vent duct, upstairs keycard control room, basement foundations via exterior side stairs with a keycard breaker room), cave with a ramp down to a tunnel into the basement, a garden-shed secret passage down to the tunnel, AIs, a basin of mountains and invisible walls; checker materials only |
+| `L_Gym` | Debug gym: a compact walled hall (74 x 74 m) laid out like a mini LD — movement course with the traversal metrics, a numbered **parkour run** over rooftops (vault, gaps, mantle, jump and grab, beam, ledge grab onto the gutter tower, zipline north, step-ups, plank, an overlook above the AI pen), armoury (weapons on pedestals, containers, loot points), abilities, fixtures (a sealed room reached from the AI pen by a vent hatch and a crouch duct), and an AI pen (spline patrol, guard group, keycard guard to pickpocket, sentry, sniper, VIP, search spots, camera alarm); every station is labelled just above itself |
+| `L_LDTest` | **San Lazaro**, about 320 x 320 m playable (3x the 0.4 area), generated by `build_ldtest()`. **Village** (west): a market street with stalls and lamps on a breaker (keycard utility shed), 20 houses in blocks with alleys, back windows and gutters, rooftop planks, a plaza with the fountain, a cafe and the radio, a church with a sniper bell tower. **River** with two bridges (gate road, north road). **Mansion estate** (east): a walled estate (main gate with gatehouse, console, camera and mounted gun; a keycard side gate; a staff gate north), a three-floor house with rooms on both wings, a hall with a switchback stair, a sealed dining room (one door and a vent hatch), a keycard control room, a basement with the breaker and the turret panel reached by an outside stair well; a hedge maze (seeded, always solvable) with a gazebo, a greenhouse, a garage with the tank, a graveyard and its chapel, a helipad on the roof. **Cliffs and caves** (north): a cliff ridge with a pass, three cave chambers linked by tunnels, a stair well down to an underground tunnel that ends on the mansion basement stairs, a cove with a dock. Houses have switchback stairs; the mountains ring the square border. Every room is lit; 16 patrols, 10 posts, 3 snipers, 15 VIP spots, 6 retrieval points, 6 sheltered start groups |
 | `L_Empty_01`, `L_Empty_02` | Empty maps for the team |
 
 Every match map has one fixed exposure (`MatchExposure`, an unbound post process volume, EV100 -0.3): no eye

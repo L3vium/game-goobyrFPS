@@ -1,6 +1,8 @@
 // Hitmen — overlays
 
 #include "UI/HitmenMenuWidgets.h"
+#include "Data/HitmenMapMarkerType.h"
+#include "Components/HitmenMapMarkerComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/Texture2D.h"
 #include "EngineUtils.h"
@@ -77,9 +79,7 @@ FText UHitmenPauseMapWidget::GetCategoryName(int32 Category)
 	case 0: return LOCTEXT("LegendYou", "You");
 	case 1: return LOCTEXT("LegendTeam", "Teammates");
 	case 2: return LOCTEXT("LegendVIP", "Target (VIP)");
-	case 3: return LOCTEXT("LegendRetrieval", "Retrieval points");
-	case 4: return LOCTEXT("LegendAlerted", "Guards on alert");
-	default: return LOCTEXT("LegendCameras", "Cameras");
+	default: return LOCTEXT("LegendAlerted", "Guards on alert");
 	}
 }
 
@@ -90,9 +90,19 @@ FLinearColor UHitmenPauseMapWidget::GetCategoryColor(int32 Category)
 	case 0: return HitmenUI::Text();
 	case 1: return FLinearColor(0.3f, 0.7f, 1.f);
 	case 2: return HitmenUI::Accent();
-	case 3: return HitmenUI::Warning();
-	case 4: return HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow);
-	default: return FLinearColor(0.75f, 0.75f, 0.8f);
+	default: return HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow);
+	}
+}
+
+void UHitmenPauseMapWidget::SetMarkerTypeVisible(UHitmenMapMarkerType* Type, bool bVisible)
+{
+	if (bVisible)
+	{
+		HiddenMarkerTypes.Remove(Type);
+	}
+	else if (Type)
+	{
+		HiddenMarkerTypes.Add(Type);
 	}
 }
 
@@ -168,13 +178,6 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
 	if (GS)
 	{
-		for (const AActor* Point : GS->GetActiveRetrievalPoints())
-		{
-			if (Point)
-			{
-				Marker(3, Point->GetActorLocation(), TEXT(""), 14.f);
-			}
-		}
 		if (const AActor* VIP = GS->GetVIP())
 		{
 			Marker(2, VIP->GetActorLocation(), TEXT("TARGET"), 14.f);
@@ -193,7 +196,7 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	{
 		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
 		{
-			if (Blip.Color != EHitmenAlertColor::None && bCategoryVisible[4])
+			if (Blip.Color != EHitmenAlertColor::None && bCategoryVisible[AlertedCategory])
 			{
 				// Same colours as the minimap: white (suspicious), yellow (alerted / searching), red (combat).
 				const FVector2D P = ToMap(Blip.Location);
@@ -202,11 +205,22 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 			}
 		}
 	}
-	for (TActorIterator<AHitmenSecurityCamera> It(GetWorld()); It; ++It)
+	// Map markers (retrieval points, cameras, anything with a UHitmenMapMarkerComponent), drawn by their kind.
+	if (const UHitmenMapMarkerSubsystem* Markers = UHitmenMapMarkerSubsystem::Get(this))
 	{
-		if (!It->IsCameraDisabled())
+		for (const TWeakObjectPtr<UHitmenMapMarkerComponent>& MapMarker : Markers->GetMarkers())
 		{
-			Marker(5, It->GetActorLocation(), TEXT(""), 8.f);
+			const UHitmenMapMarkerType* Type = MapMarker.IsValid() ? MapMarker->GetType() : nullptr;
+			if (!Type || !MapMarker->IsMarkerVisible() || !Type->bShowOnPauseMap || HiddenMarkerTypes.Contains(const_cast<UHitmenMapMarkerType*>(Type)))
+			{
+				continue;
+			}
+			const FVector2D P = ToMap(MapMarker->GetMarkerLocation());
+			HitmenUI::PaintMapMarker(OutDrawElements, LayerId + 3, AllottedGeometry, P, Type->Size, Type, Markers->GetIconBrush(Type));
+			if (!MapMarker->GetLabel().IsEmpty())
+			{
+				HitmenUI::PaintText(OutDrawElements, LayerId + 4, AllottedGeometry, MapMarker->GetLabel().ToString().ToUpper(), P + FVector2D(Type->Size, -Type->Size - 4.f), HitmenUI::SpacedFont(14, TEXT("SemiBold"), 100), Type->Color);
+			}
 		}
 	}
 	if (Pawn && bCategoryVisible[0])
@@ -374,18 +388,72 @@ void UHitmenPauseMenuWidget::BuildDefaultLayout()
 	MapSlot->SetOffsets(FMargin(0.f));
 
 	// Right: the legend, each row with the marker colours as they are drawn on the map.
-	UVerticalBox* Legend = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	UCanvasPanelSlot* LegendSlot = HitmenUI::AddToCanvas(Canvas, Legend, FAnchors(1.f, 0.f), FVector2D(-64.f, 96.f), FVector2D(1.f, 0.f));
+	LegendBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	UCanvasPanelSlot* LegendSlot = HitmenUI::AddToCanvas(Canvas, LegendBox, FAnchors(1.f, 0.f), FVector2D(-64.f, 96.f), FVector2D(1.f, 0.f));
 	LegendSlot->SetAutoSize(true);
+	RefreshLegend();
+
+	// Debug tools: hidden behind a small button; they open over the legend.
+	DebugPanel = WidgetTree->ConstructWidget<UHitmenDebugPanelWidget>(UHitmenDebugPanelWidget::StaticClass());
+	UCanvasPanelSlot* DebugSlot = HitmenUI::AddToCanvas(Canvas, DebugPanel, FAnchors(1.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
+	DebugSlot->SetOffsets(FMargin(-360.f, 64.f, 360.f, 120.f));
+	DebugSlot->SetZOrder(10);
+	DebugToggleButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
+	DebugToggleButton->Setup(LOCTEXT("DebugTools", "Debug tools"), EHitmenMenuButtonKind::Chip);
+	DebugToggleButton->OnClicked.AddDynamic(this, &UHitmenPauseMenuWidget::ToggleDebugPanel);
+	UCanvasPanelSlot* ToggleSlot = HitmenUI::AddToCanvas(Canvas, DebugToggleButton, FAnchors(1.f, 1.f), FVector2D(-64.f, -48.f), FVector2D(1.f, 1.f));
+	ToggleSlot->SetAutoSize(true);
+	ToggleSlot->SetZOrder(11);
+}
+
+void UHitmenPauseMenuWidget::RefreshLegend()
+{
+	if (!LegendBox)
+	{
+		return;
+	}
+	TArray<UHitmenMapMarkerType*> Types;
+	if (const UHitmenMapMarkerSubsystem* Markers = UHitmenMapMarkerSubsystem::Get(this))
+	{
+		Types = Markers->GetLegendTypes();
+	}
+	TArray<UHitmenMapMarkerType*> Current;
+	for (const TObjectPtr<UHitmenMapMarkerType>& Type : LegendMarkerTypes)
+	{
+		Current.Add(Type.Get());
+	}
+	if (LegendToggles.Num() > 0 && Types == Current)
+	{
+		return;
+	}
+	// Markers register as the map starts, possibly after this menu was built: rebuild, everything shown again.
+	LegendBox->ClearChildren();
+	LegendToggles.Reset();
+	LegendMarkerTypes.Reset();
+	LegendMarkerTypes.Append(Types);
+	if (Map)
+	{
+		for (int32 Category = 0; Category < UHitmenPauseMapWidget::CategoryCount; ++Category)
+		{
+			Map->SetCategoryVisible(Category, true);
+		}
+		for (UHitmenMapMarkerType* Type : Types)
+		{
+			Map->SetMarkerTypeVisible(Type, true);
+		}
+	}
+	UVerticalBox* Legend = LegendBox;
 	UTextBlock* LegendTitle = HitmenUI::MakeText(WidgetTree, LOCTEXT("Legend", "MAP LEGEND"), 15, TEXT("Medium"), HitmenUI::TextDim());
 	LegendTitle->SetFont(HitmenUI::SpacedFont(15, TEXT("Medium"), 260));
 	HitmenUI::AddToVBox(Legend, LegendTitle, FMargin(0.f, 0.f, 0.f, 12.f));
-	for (int32 Category = 0; Category < UHitmenPauseMapWidget::CategoryCount; ++Category)
+	const int32 RowCount = UHitmenPauseMapWidget::CategoryCount + LegendMarkerTypes.Num();
+	for (int32 Category = 0; Category < RowCount; ++Category)
 	{
+		const UHitmenMapMarkerType* MarkerType = Category >= UHitmenPauseMapWidget::CategoryCount ? LegendMarkerTypes[Category - UHitmenPauseMapWidget::CategoryCount].Get() : nullptr;
 		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 		UHorizontalBox* Swatches = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-		TArray<FLinearColor> Colors = { UHitmenPauseMapWidget::GetCategoryColor(Category) };
-		if (Category == 4)
+		TArray<FLinearColor> Colors = { MarkerType ? MarkerType->Color : UHitmenPauseMapWidget::GetCategoryColor(Category) };
+		if (Category == UHitmenPauseMapWidget::AlertedCategory)
 		{
 			Colors = { HitmenAlert::ToLinearColor(EHitmenAlertColor::White), HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow), HitmenAlert::ToLinearColor(EHitmenAlertColor::Red) };
 		}
@@ -403,24 +471,12 @@ void UHitmenPauseMenuWidget::BuildDefaultLayout()
 		SwatchColumn->SetContent(Swatches);
 		HitmenUI::AddToHBox(Row, SwatchColumn, FMargin(0.f));
 		UHitmenToggle* Toggle = WidgetTree->ConstructWidget<UHitmenToggle>(UHitmenToggle::StaticClass());
-		Toggle->Setup(UHitmenPauseMapWidget::GetCategoryName(Category), true, 18);
+		Toggle->Setup(MarkerType ? MarkerType->DisplayName : UHitmenPauseMapWidget::GetCategoryName(Category), true, 18);
 		Toggle->OnToggled.AddDynamic(this, &UHitmenPauseMenuWidget::HandleLegendToggled);
 		HitmenUI::AddToHBox(Row, Toggle);
 		HitmenUI::AddToVBox(Legend, Row, FMargin(0.f, 4.f));
 		LegendToggles.Add(Toggle);
 	}
-
-	// Debug tools: hidden behind a small button; they open over the legend.
-	DebugPanel = WidgetTree->ConstructWidget<UHitmenDebugPanelWidget>(UHitmenDebugPanelWidget::StaticClass());
-	UCanvasPanelSlot* DebugSlot = HitmenUI::AddToCanvas(Canvas, DebugPanel, FAnchors(1.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
-	DebugSlot->SetOffsets(FMargin(-360.f, 64.f, 360.f, 120.f));
-	DebugSlot->SetZOrder(10);
-	DebugToggleButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
-	DebugToggleButton->Setup(LOCTEXT("DebugTools", "Debug tools"), EHitmenMenuButtonKind::Chip);
-	DebugToggleButton->OnClicked.AddDynamic(this, &UHitmenPauseMenuWidget::ToggleDebugPanel);
-	UCanvasPanelSlot* ToggleSlot = HitmenUI::AddToCanvas(Canvas, DebugToggleButton, FAnchors(1.f, 1.f), FVector2D(-64.f, -48.f), FVector2D(1.f, 1.f));
-	ToggleSlot->SetAutoSize(true);
-	ToggleSlot->SetZOrder(11);
 }
 
 void UHitmenPauseMenuWidget::HandleLegendToggled(bool bChecked)
@@ -431,7 +487,15 @@ void UHitmenPauseMenuWidget::HandleLegendToggled(bool bChecked)
 	}
 	for (int32 Category = 0; Category < LegendToggles.Num(); ++Category)
 	{
-		Map->SetCategoryVisible(Category, LegendToggles[Category]->IsChecked());
+		const int32 MarkerIndex = Category - UHitmenPauseMapWidget::CategoryCount;
+		if (MarkerIndex < 0)
+		{
+			Map->SetCategoryVisible(Category, LegendToggles[Category]->IsChecked());
+		}
+		else if (LegendMarkerTypes.IsValidIndex(MarkerIndex))
+		{
+			Map->SetMarkerTypeVisible(LegendMarkerTypes[MarkerIndex], LegendToggles[Category]->IsChecked());
+		}
 	}
 }
 

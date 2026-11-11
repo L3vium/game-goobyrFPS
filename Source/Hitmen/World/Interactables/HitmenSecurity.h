@@ -68,9 +68,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> ViewCone;
 
-	/** Footprint of the cone on the floor (decal, color parameter "Color"). */
+	/** The electronic ring where the light meets the floor and walls (decal; material parameters Color, Progress,
+	 *  Eye, Forward, CosHalfAngle: the material tests the camera's own cone per pixel, so it matches the light). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UDecalComponent> FloorDecal;
+
+	/** Shows the camera on the minimap and the pause map (hidden while disabled). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UHitmenMapMarkerComponent> MapMarker;
 
 	/** What the camera watches, shown as real light: walls cut it, it spreads on the floor. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
@@ -129,6 +134,18 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
 	FLinearColor AlertColor = FLinearColor(1.f, 0.05f, 0.05f, 0.4f);
 
+	/** While the detection meter fills (someone in view, no alarm yet): light and ring go from this to AlertColor. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
+	FLinearColor SuspiciousColor = FLinearColor(1.f, 0.78f, 0.1f, 0.4f);
+
+	/** The electronic floor ring (Hitman-like): on by default; the decal material draws it. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
+	bool bShowFloorRing = true;
+
+	/** Detection meter, 0..255 for 0..DetectionTime of continuous sight (replicated: ring fill and colour). */
+	UPROPERTY(ReplicatedUsing=OnRep_Visuals)
+	uint8 DetectionProgress = 0;
+
 	UPROPERTY(ReplicatedUsing=OnRep_Visuals)
 	bool bDisabled = false;
 
@@ -150,8 +167,10 @@ protected:
 	void Juice_OnSeeingChanged(bool bSeeing);
 
 	APawn* FindIntruder() const;
-	/** Floor disc under the cone (follows the sweep). */
+	/** Places the ring decal over the cone's footprint and feeds the material the cone (follows the sweep). */
 	void UpdateFootprint();
+	/** Idle white, then SuspiciousColor to AlertColor as the meter fills; the light and the ring share it. */
+	FLinearColor GetStateColor() const;
 	void RaiseAlarm(APawn* Intruder);
 
 	float SweepTime = 0.f;

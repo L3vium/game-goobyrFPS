@@ -1,6 +1,7 @@
 // Hitmen — security fixtures
 
 #include "World/Interactables/HitmenSecurity.h"
+#include "Components/HitmenMapMarkerComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Characters/HitmenPlayerCharacter.h"
 #include "Engine/StaticMesh.h"
@@ -52,6 +53,8 @@ AHitmenSecurityCamera::AHitmenSecurityCamera()
 	FloorDecal->SetupAttachment(Head);
 	FloorDecal->DecalSize = FVector(200.f, 300.f, 300.f);
 
+	MapMarker = CreateDefaultSubobject<UHitmenMapMarkerComponent>(TEXT("MapMarker"));
+
 	ViewLight = CreateDefaultSubobject<USpotLightComponent>(TEXT("ViewLight"));
 	ViewLight->SetupAttachment(Head);
 	ViewLight->SetMobility(EComponentMobility::Movable);
@@ -70,6 +73,7 @@ void AHitmenSecurityCamera::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHitmenSecurityCamera, bDisabled);
 	DOREPLIFETIME(AHitmenSecurityCamera, bSeeingIntruder);
+	DOREPLIFETIME(AHitmenSecurityCamera, DetectionProgress);
 }
 
 void AHitmenSecurityCamera::BeginPlay()
@@ -119,25 +123,59 @@ void AHitmenSecurityCamera::BeginPlay()
 	{
 		ColorMaterials.Add(FloorDecal->CreateDynamicMaterialInstance());
 	}
+	UpdateFootprint();  // again, now that the ring material can take the cone (static cameras never sweep)
 	OnRep_Visuals();
 	SetActorTickEnabled(HasAuthority() || SweepAngle > 0.f);
 }
 
 void AHitmenSecurityCamera::UpdateFootprint()
 {
-	// Where the cone axis meets the ground: a disc whose radius matches the cone there.
-	FHitResult Ground;
+	// The light's footprint: where the cone axis and eight cone edges meet the level. The decal box covers them all
+	// (projected straight down) and its material keeps only the pixels on the cone's edge, so the ring is exactly
+	// where the light ends, on the floor and on walls.
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenCameraFloor), false, this);
 	const FVector Eye = Head->GetComponentLocation();
-	const FVector Along = Eye + Head->GetForwardVector() * ViewDistance;
+	const FVector Forward = Head->GetForwardVector();
+	FHitResult Ground;
+	const FVector Along = Eye + Forward * ViewDistance;
 	const bool bHit = GetWorld()->LineTraceSingleByChannel(Ground, Eye, Along, ECC_Visibility, Params);
-	const FVector FloorPoint = bHit ? Ground.ImpactPoint : Along;
-	const float FootRadius = FMath::Tan(FMath::DegreesToRadians(ViewHalfAngle)) * FVector::Dist(Eye, FloorPoint);
-	FloorDecal->SetVisibility(bHit && !bDisabled && bShowViewCone);
-	FloorDecal->SetWorldLocation(FloorPoint);
-	FloorDecal->SetWorldRotation(FRotator(-90.f, Head->GetComponentRotation().Yaw, 0.f));
-	FloorDecal->DecalSize = FVector(120.f, FootRadius, FootRadius);
+	const FVector Center = bHit ? Ground.ImpactPoint : Along;
+	FBox Footprint(Center, Center);
+	const FQuat HeadRotation = Head->GetComponentQuat();
+	for (int32 Index = 0; Index < 8; ++Index)
+	{
+		const FRotator Edge(ViewHalfAngle * FMath::Cos(Index * PI / 4.f), ViewHalfAngle * FMath::Sin(Index * PI / 4.f), 0.f);
+		const FVector Direction = HeadRotation.RotateVector(Edge.Vector());
+		FHitResult Hit;
+		const FVector End = Eye + Direction * ViewDistance * 1.35f;
+		Footprint += GetWorld()->LineTraceSingleByChannel(Hit, Eye, End, ECC_Visibility, Params) ? Hit.ImpactPoint : End;
+	}
+	const FVector Extent = Footprint.GetExtent();
+	FloorDecal->SetVisibility(bHit && !bDisabled && bShowFloorRing);
+	FloorDecal->SetWorldLocation(Footprint.GetCenter());
+	FloorDecal->SetWorldRotation(FRotator(-90.f, 0.f, 0.f));
+	// Decal box: X projects (down here), Y and Z span the footprint (Y along world Y, Z along world X once pitched).
+	FloorDecal->DecalSize = FVector(FMath::Max(Extent.Z + 150.f, 150.f), Extent.Y + 60.f, Extent.X + 60.f);
 	FloorDecal->MarkRenderStateDirty();
+	for (UMaterialInstanceDynamic* Material : ColorMaterials)
+	{
+		if (Material)
+		{
+			Material->SetVectorParameterValue(TEXT("Eye"), FLinearColor(Eye));
+			Material->SetVectorParameterValue(TEXT("Forward"), FLinearColor(Forward));
+			Material->SetScalarParameterValue(TEXT("CosHalfAngle"), FMath::Cos(FMath::DegreesToRadians(ViewHalfAngle)));
+		}
+	}
+}
+
+FLinearColor AHitmenSecurityCamera::GetStateColor() const
+{
+	if (!bSeeingIntruder && DetectionProgress == 0)
+	{
+		return IdleColor;
+	}
+	const float Meter = DetectionProgress / 255.f;
+	return FLinearColor::LerpUsingHSV(SuspiciousColor, AlertColor, Meter * Meter);
 }
 
 void AHitmenSecurityCamera::Tick(float DeltaSeconds)
@@ -168,6 +206,13 @@ void AHitmenSecurityCamera::Tick(float DeltaSeconds)
 		OnRep_Visuals();
 	}
 	SeenTime = bSeeing ? SeenTime + DeltaSeconds : 0.f;
+	const float Meter = DetectionTime > 0.f ? SeenTime / DetectionTime : (bSeeing ? 1.f : 0.f);
+	const uint8 Progress = static_cast<uint8>(FMath::Clamp(Meter, 0.f, 1.f) * 255.f);
+	if (Progress != DetectionProgress)
+	{
+		DetectionProgress = Progress;
+		OnRep_Visuals();
+	}
 	if (bSeeing && SeenTime >= DetectionTime && GetWorld()->GetTimeSeconds() - LastAlarmTime > AlarmCooldown)
 	{
 		RaiseAlarm(Intruder);
@@ -242,6 +287,8 @@ void AHitmenSecurityCamera::SetCameraDisabled(bool bInDisabled)
 	{
 		bDisabled = bInDisabled;
 		bSeeingIntruder = false;
+		DetectionProgress = 0;
+		SeenTime = 0.f;
 		OnRep_Visuals();
 	}
 }
@@ -249,25 +296,24 @@ void AHitmenSecurityCamera::SetCameraDisabled(bool bInDisabled)
 void AHitmenSecurityCamera::OnRep_Visuals()
 {
 	ViewCone->SetVisibility(!bDisabled && bShowViewCone);
-	FloorDecal->SetVisibility(!bDisabled && bShowViewCone);
+	FloorDecal->SetVisibility(!bDisabled && bShowFloorRing);
 	ViewLight->SetVisibility(!bDisabled);
-	{
-		const FLinearColor LightColor = bSeeingIntruder ? AlertColor : IdleColor;
-		ViewLight->SetLightColor(FLinearColor(LightColor.R, LightColor.G, LightColor.B, 1.f));
-		ViewLight->SetIntensity(ViewLightIntensity * (bSeeingIntruder ? 1.6f : 1.f));
-	}
+	MapMarker->SetMarkerVisible(!bDisabled);
+	const FLinearColor StateColor = GetStateColor();
+	ViewLight->SetLightColor(FLinearColor(StateColor.R, StateColor.G, StateColor.B, 1.f));
+	ViewLight->SetIntensity(ViewLightIntensity * (bSeeingIntruder ? 1.6f : 1.f));
 	if (bLastBroadcastDisabled != bDisabled)
 	{
 		bLastBroadcastDisabled = bDisabled;
 		// Monitors swap to "no signal" and stop requesting captures; CaptureTo refuses meanwhile.
 		OnDisabledChanged.Broadcast(bDisabled);
 	}
-	const FLinearColor Color = bSeeingIntruder ? AlertColor : IdleColor;
 	for (UMaterialInstanceDynamic* Material : ColorMaterials)
 	{
 		if (Material)
 		{
-			Material->SetVectorParameterValue(TEXT("Color"), Color);
+			Material->SetVectorParameterValue(TEXT("Color"), StateColor);
+			Material->SetScalarParameterValue(TEXT("Progress"), DetectionProgress / 255.f);
 		}
 	}
 	Juice_OnSeeingChanged(bSeeingIntruder);

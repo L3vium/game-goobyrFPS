@@ -8,6 +8,7 @@
 #include "UI/HitmenUIEventSubsystem.h"
 #include "Core/HitmenTypes.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/HitmenMenuWidgets.h"
 
 void AHitmenHUD::BeginPlay()
 {
@@ -115,6 +116,10 @@ void AHitmenHUD::SetShown(UUserWidget* Widget, bool bShown)
 
 void AHitmenHUD::HandlePauseToggled(bool bOpen)
 {
+	if (UHitmenPauseMenuWidget* Pause = Cast<UHitmenPauseMenuWidget>(PauseMenuWidget); Pause && bOpen)
+	{
+		Pause->RefreshLegend();
+	}
 	SetShown(PauseMenuWidget, bOpen);
 	RefreshInputMode();
 }

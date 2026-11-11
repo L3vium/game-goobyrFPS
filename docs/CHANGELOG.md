@@ -5,6 +5,55 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-11
+
+### Added
+- Tools/Editor/hitmen_check_reach.py: LD check for the map open in the editor. Every door must be walkable and every
+  loot spawn, NPC and retrieval point reachable on foot from a team start (snipers and roof points are listed as
+  ladder-only).
+- Gym parkour run: ten numbered rooftops along the west and north walls (vault, jump and mantle, gap, jump and grab,
+  beam, ledge grab onto the gutter tower, a zipline north, step-ups, a plank and an overlook above the AI pen); a
+  ladder on the back of the north roofs.
+- Map marker pipeline: a HitmenMapMarker component on any actor shows it on the minimap and the pause map, drawn and
+  named by its kind (DA_MapMarker_* data asset: legend name, colour, shape or icon, size, maps, legend order). The
+  pause legend builds its rows from the kinds on the map. Retrieval points and cameras use it (retrieval points now
+  show on the minimap, pinned to the frame when out of range). Recipe in docs/Pipelines.md.
+- Security cameras draw a Hitman-like electronic ring on the floor exactly where their light ends (the decal
+  material tests the camera's own cone per pixel): a crisp edge, a turning dashed inner ring and faint scanlines; it
+  fills from the edge inward with the detection meter (replicated), and the light and the ring go white, then yellow
+  to red as the meter fills (M_Hitmen_CameraRing).
+- Hook: a small marker where it will grab while it is ready and in range, and a thin cable (1.2 cm) from the hand to
+  the anchor while it pulls, seen by every player. Abilities can ask for both (GetAimMarker, GetCableAnchor); the
+  ability component draws them.
+
+### Changed
+- Navmesh: 10 cm cells (from 19) so every 110 cm doorway is walkable by the AI, and 16384 A* search nodes (from
+  2048) so long patrol legs on a big map are not cut short. L_Empty_01 and L_Empty_02 are re-baked.
+- L_LDTest is rebuilt as San Lazaro, about 3x the area: a village (market street, 20 houses with rooftop planks,
+  plaza, church bell tower), a river with two bridges, a walled mansion estate (three-floor house, sealed dining
+  room, control room, basement down an outside stair well, a seeded hedge maze, greenhouse, garage with the tank,
+  graveyard and chapel) and a cliff zone with three caves, a tunnel to the basement and a cove. Every room is lit;
+  the minimap texture is 1536 px.
+- Map thumbnails are rendered from a fixed camera in the editor (hitmen_map_shots.py capture), no longer from the
+  PIE spawn view, so the shot has no HUD, arms or screen effects; ue_map_shot.sh is gone. New San Lazaro thumbnail.
+  docs/Pipelines.md has the map recipe (build, bake, check, minimap, thumbnail).
+- Vent hatches open like small doors: a vertical hinge on their side edge, swinging away from the opener (they
+  flapped up on their top edge).
+- hitmen_check_reach.py also checks pickups: each needs a reachable standing spot within grabbing range (a pedestal
+  top is a navmesh island of its own).
+
+
+
+
+### Fixed
+- Generated buildings: door openings match the door (110 x 230), stairs leave room to step on and switch back on
+  three-floor houses (upper floors were unreachable); the ground has holes for stair wells instead of covering them.
+- Gym vent: the sealed room overlapped the AI pen wall, so the hatch opened onto a 50 cm gap. The room moved east;
+  the hatch sits in a hole in the pen wall and a crouch duct leads into the room.
+- Gym: the zipline landing and its stairs covered the armor and C4 pickups; the zipline now runs north from the
+  gutter tower. The builder logs any pickup that overlaps geometry. The camera cover wall added by hand is
+  generated.
+
 ## [0.5.0] - 2026-11-11
 
 ### Added

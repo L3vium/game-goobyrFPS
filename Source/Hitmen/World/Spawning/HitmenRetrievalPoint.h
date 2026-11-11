@@ -35,6 +35,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> Mesh;
 
+	/** Shows the point on the minimap and the pause map while it is active. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UHitmenMapMarkerComponent> MapMarker;
+
 	/** Hide the mesh when this candidate is not selected for the match. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Retrieval")
 	bool bHideWhenInactive = true;

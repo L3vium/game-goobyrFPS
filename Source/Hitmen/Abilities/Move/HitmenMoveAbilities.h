@@ -140,6 +140,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Ability|Hook")
 	FVector GetHookPoint() const { return HookPoint; }
 
+	virtual bool GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const override;
+	virtual bool GetCableAnchor(FVector& OutAnchor) const override { OutAnchor = HookPoint; return bHooked; }
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Hook", meta=(ClampMin="0"))
 	float PullSpeed = 1800.f;

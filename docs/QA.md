@@ -9,7 +9,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 
 ## Stability
 - [x] GC stress: the Dev build with `-ExecCmds="gc.CollectGarbageEveryFrame 1"` — 100 s in the Gym (minimap) and
-  400 s on the title screen, no crash (0.4.1); [ ] Create Room map tiles and the pause map by hand
+  400 s on the title screen, no crash (0.4.1); 100 s in the Gym and 90 s on San Lazaro, no crash (0.6.0);
+  [ ] Create Room map tiles and the pause map by hand
 - [ ] Crash reports, if any: `python Tools/Debug/hitmen_crash_report.py "Builds/Windows Dev"`
 - [ ] No crash: 10 min of menu stress with Steam running (create / leave / join / refresh spam / map cycling)
 - [ ] No crash: 10 min in the Gym and LDTest, dying and respawning with proximity chat on
@@ -38,6 +39,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Sprinting with a pistol: lowered and tilted, still in view (screenshot, 0.5.0); [ ] aiming stays low right
 - [x] Takedown from the side of an unaware guard (PIE script, 0.5.0); [ ] from the front in the dark; [ ] smooth blend
 - [x] Thrown weapon is a floating pickup at once, no physics (PIE script, 0.5.0)
+- [x] Hook ready: a small marker where it will grab, only in range (PIE screenshot, 0.6.0); [ ] E: a thin cable from
+  the hand to the anchor while pulling, seen by others too (not triggered by script: check by hand)
 - [ ] Short slide when crouching while walking; long slide from a sprint
 - [ ] Space right after grabbing a ladder does not jump off
 - [ ] Landing sounds (soft / hard) and footsteps per surface
@@ -46,19 +49,26 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 
 ## World
 - [x] Doors open away from you from both sides and fill their opening (PIE script, 0.5.0)
-- [x] Vent hatch swings like a small door, away from you (PIE script, 0.5.0)
+- [x] Vent hatch swings on a side hinge like a small door, away from you (PIE screenshot, 0.6.0)
 - [x] Window frame inside the opening (screenshot, 0.5.0); [ ] no flicker in motion
 - [x] Turret panel: hold F 3 s, bar fills, turret hacked only at the end (PIE script, 0.5.0); [ ] the tower itself has no prompt
 - [x] Security feed shows the room, wide (screenshot, 0.5.0); [ ] "no signal" after disabling
+- [x] Camera floor ring on the light's edge, fills and turns red when it sees you (PIE screenshots, 0.6.0);
+  [ ] yellow while the meter fills, seen from a client
 - [ ] Locker: you step in and out (no teleport)
 - [ ] Radio: plays 8 s with a pulsing light; guards come
 - [ ] Barrels: toon explosion, sound, shake, chain reaction
 - [x] Mounted gun barrel points forward (PIE script, 0.5.0); [ ] turns at the player's speed, shots felt
 - [ ] Tank: glowing straight shell, big blast, barrel follows the aim
-- [ ] Gym: armor and C4 can be picked up; no slide lane
+- [x] Gym: every pickup clear of geometry and reachable (builder check + `hitmen_check_reach.py`, 0.6.0); no slide lane
+- [x] Gym vent: from the AI pen, F opens the hatch, crouch through the duct into the sealed room (PIE script, 0.6.0)
+- [ ] Gym parkour run 1 to 10 in one go by hand (zipline from the gutter tower, plank to the overlook)
+- [x] San Lazaro: every door walkable, every loot / NPC / retrieval point reachable on foot (`hitmen_check_reach.py`,
+  0.6.0); [ ] walk the village, the estate, the maze, the caves and the tunnel by hand
 
 ## AI
 - [x] Attack chain: an armed player in view gets shot, damage arrives slowly (~9 HP/s), guard holds the aim pose (PIE script, 0.5.0)
+- [x] Attack chain on San Lazaro: shot after 6-9 s in a guard's view, ~9 HP/s (PIE script, 0.6.0)
 - [ ] A gunshot 15 m away behind a wall is not heard; a bullet impact draws the nearest guard to the impact
 - [ ] A guard shot from out of its sight turns toward the shot and searches, it does not know where you are
 - [ ] In the dark, a guard that hears you within 2.5 m attacks
@@ -68,3 +78,5 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Awareness arcs toward guards noticing you; minimap Under fire banner (screenshot, 0.5.0)
 - [ ] Headshot hit ticks are red
 - [ ] Minimap: no own view cone, north-up, your arrow turns
+- [x] Map markers: cameras (diamonds) and the retrieval point (yellow, pinned to the edge) on the minimap and the pause map;
+  legend rows come from the marker kinds on the map (screenshots, 0.6.0); [ ] a new DA_MapMarker kind shows up by hand

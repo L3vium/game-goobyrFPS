@@ -8,6 +8,8 @@
 #include "HitmenAbilityComponent.generated.h"
 
 class UMaterialInterface;
+class UStaticMesh;
+class UStaticMeshComponent;
 
 class UHitmenAbility;
 class UHitmenAbilityData;
@@ -68,6 +70,50 @@ protected:
 	/** Seconds between two target scans for the hint (local player only). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities", meta=(ClampMin="0.02", Units="s"))
 	float HintScanInterval = 0.1f;
+
+	/** Cable of pulling abilities (hook): a thin cylinder from the hand to the anchor, seen by everyone. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")
+	TObjectPtr<UStaticMesh> CableMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")
+	TObjectPtr<UMaterialInterface> CableMaterial;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")
+	FLinearColor CableColor = FLinearColor(0.08f, 0.08f, 0.09f);
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals", meta=(ClampMin="0.1", Units="cm"))
+	float CableThickness = 1.2f;
+
+	/** Where the cable starts for the local player, in camera space (forward, right, up): low right, in view. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")
+	FVector FirstPersonCableOffset = FVector(45.f, 20.f, -24.f);
+
+	/** Third person: the hand socket the cable leaves from (the actor centre when missing). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")
+	FName CableSocket = TEXT("hand_r");
+
+	/** Local player: a small marker where the aimed ability will land (hook in range). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")
+	TObjectPtr<UStaticMesh> AimMarkerMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")
+	TObjectPtr<UMaterialInterface> AimMarkerMaterial;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")
+	FLinearColor AimMarkerColor = FLinearColor(1.f, 1.f, 1.f);
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals", meta=(ClampMin="1", Units="cm"))
+	float AimMarkerSize = 12.f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> CableComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> AimMarkerComponent;
+
+	/** Cable (every machine) and aim marker (local player), each frame. */
+	void UpdateAbilityVisuals();
+	UStaticMeshComponent* MakeVisual(UStaticMesh* Mesh, UMaterialInterface* Material, const FLinearColor& Color);
 
 	/** Local: highlights the target the manipulation (then move) ability would act on. */
 	void UpdateTargetHint();

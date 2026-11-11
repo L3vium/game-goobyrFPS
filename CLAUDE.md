@@ -65,7 +65,8 @@ editor when it is connected. Otherwise use Python remote execution (enabled in `
   when missing (`HITMEN_FORCE_MAPS=L_Gym,L_LDTest` regenerates and wipes edits). The content
   builder never recreates an existing asset, so authored graphs survive a re-run.
 - After rebuilding a map, bake its navmesh (`Tools/Editor/ue_bake_nav.sh`); runtime generation
-  does not finish reliably in PIE.
+  does not finish reliably in PIE. Then `Tools/Editor/hitmen_check_reach.py` (ue_remote) must end
+  with `problems 0`: every door walkable, every loot / NPC / retrieval point reachable from a start.
 - `Tools/Editor/ue_shot.sh <map>` plays a map in PIE and saves a HighResShot for UI checks.
 - Python gotchas: `unreal.Rotator` positional order is (roll, pitch, yaw), so use keywords. Maps
   cannot be saved during PIE, and `editor_request_end_play` is asynchronous.

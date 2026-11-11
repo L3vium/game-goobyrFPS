@@ -11,7 +11,7 @@ sys.path.append(os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.P
 import hitmen_content
 from hitmen_common import log, LOG
 
-STEPS = []
+STEPS = globals().get("PATCH_STEPS", [])  # ue_remote: "PATCH_STEPS = ['noise']; exec(open(...).read())"
 EAL = unreal.EditorAssetLibrary
 
 

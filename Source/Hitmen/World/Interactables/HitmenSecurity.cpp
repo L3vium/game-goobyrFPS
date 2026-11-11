@@ -600,7 +600,7 @@ void AHitmenTurret::Tick(float DeltaSeconds)
 		AController* InstigatorController = HackedBy ? HackedBy->GetInstigatorController() : nullptr;
 		UGameplayStatics::ApplyPointDamage(Hit.GetActor(), Damage, Direction, Hit, InstigatorController, this, UDamageType::StaticClass());
 	}
-	UHitmenAISubsystem::ReportNoise(this, Start, 2000.f, this, EHitmenNoiseType::Gunshot);
+	UHitmenAISubsystem::ReportNoise(this, Start, 900.f, this, EHitmenNoiseType::Gunshot);
 	Multicast_Fire(Impact);
 }
 
@@ -761,5 +761,5 @@ void AHitmenCircuitBreaker::OnInteracted(AActor* Interactor)
 		}
 	}
 	// The sudden darkness is suspicious: nearby NPCs come to check the breaker.
-	UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), 1200.f, this, EHitmenNoiseType::Distraction);
+	UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), 800.f, this, EHitmenNoiseType::Distraction);
 }

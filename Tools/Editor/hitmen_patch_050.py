@@ -48,4 +48,31 @@ if wanted("weapon_vfx"):
     clear_bp_defaults("/Game/Hitmen/Weapons/Projectiles/BP_Projectile_Arrow", ("impact_effect",))
     log("weapon VFX cleared")
 
+if wanted("noise"):
+    # Hearing: a gunshot is heard close to the shooter only; the bullet impact is what draws NPCs.
+    report = {"SMG": (600.0, 500.0), "AssaultRifle": (700.0, 600.0), "BurstRifle": (700.0, 600.0), "Shotgun": (800.0, 600.0),
+              "Minigun": (900.0, 700.0), "Sniper": (800.0, 700.0), "RocketLauncher": (1200.0, 0.0), "GrenadeLauncher": (1000.0, 0.0),
+              "BlackHole": (500.0, 0.0), "Pistol": (0.0, 300.0)}
+    for name, (radius, impact) in report.items():
+        data = EAL.load_asset("/Game/Hitmen/Data/Weapons/DA_Weapon_" + name)
+        data.set_editor_property("noise_radius", radius)
+        data.set_editor_property("impact_noise_radius", impact)
+        EAL.save_loaded_asset(data, only_if_is_dirty=False)
+    for bp_path, field, value in (("/Game/Hitmen/Weapons/Projectiles/BP_Projectile_Rocket", "explosion_noise_radius", 1500.0),
+                                  ("/Game/Hitmen/Weapons/Projectiles/BP_Projectile_Grenade", "explosion_noise_radius", 1500.0),
+                                  ("/Game/Hitmen/Weapons/Projectiles/BP_Projectile_TankShell", "explosion_noise_radius", 1500.0),
+                                  ("/Game/Hitmen/World/Vehicles/BP_Tank", "cannon_noise_radius", 1500.0)):
+        bp = EAL.load_asset(bp_path) if EAL.does_asset_exist(bp_path) else None
+        if not bp:
+            log("WARN missing", bp_path)
+            continue
+        unreal.get_default_object(bp.generated_class()).set_editor_property(field, value)
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        EAL.save_loaded_asset(bp, only_if_is_dirty=False)
+    log("noise radii patched")
+
+if wanted("difficulty"):
+    hitmen_content.build_rules()
+    log("match rules (difficulty presets) rebuilt")
+
 print("\n".join(LOG))

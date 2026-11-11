@@ -937,7 +937,7 @@ void AHitmenWeaponBase::Server_Fire_Implementation(FVector_NetQuantize Origin, F
 
 	TArray<FVector> Impacts;
 	FireServer(Origin, Direction, Seed, FMath::Clamp(Charge, 0.f, 1.f), Impacts);
-	ReportShotNoise(Origin);
+	ReportShotNoise(Origin, Impacts);
 
 	TArray<FVector_NetQuantize> NetImpacts;
 	for (const FVector& Impact : Impacts)
@@ -968,7 +968,7 @@ void AHitmenWeaponBase::FireAt(const FVector& TargetLocation, float AimErrorDegr
 
 	TArray<FVector> Impacts;
 	FireServer(Origin, Spread, Seed, 1.f, Impacts);
-	ReportShotNoise(Origin);
+	ReportShotNoise(Origin, Impacts);
 
 	TArray<FVector_NetQuantize> NetImpacts;
 	for (const FVector& Impact : Impacts)
@@ -978,11 +978,21 @@ void AHitmenWeaponBase::FireAt(const FVector& TargetLocation, float AimErrorDegr
 	Multicast_FireEffects(GetMuzzleLocation(), NetImpacts);
 }
 
-void AHitmenWeaponBase::ReportShotNoise(const FVector& Origin) const
+void AHitmenWeaponBase::ReportShotNoise(const FVector& Origin, const TArray<FVector>& Impacts) const
 {
-	if (WeaponData && !WeaponData->bSilenced && WeaponData->NoiseRadius > 0.f)
+	if (!WeaponData)
+	{
+		return;
+	}
+	// The report itself is heard close to the shooter only (silenced: not at all).
+	if (!WeaponData->bSilenced && WeaponData->NoiseRadius > 0.f)
 	{
 		UHitmenAISubsystem::ReportNoise(this, Origin, WeaponData->NoiseRadius, OwnerPawn, EHitmenNoiseType::Gunshot);
+	}
+	// Where the bullet lands is what draws NPCs (they investigate the impact, not the shooter).
+	if (WeaponData->ImpactNoiseRadius > 0.f && Impacts.Num() > 0)
+	{
+		UHitmenAISubsystem::ReportNoise(this, Impacts[0], WeaponData->ImpactNoiseRadius, OwnerPawn, EHitmenNoiseType::Gunshot);
 	}
 }
 

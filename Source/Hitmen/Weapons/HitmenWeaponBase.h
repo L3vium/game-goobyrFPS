@@ -266,7 +266,7 @@ protected:
 	int32 GetOwnerAmmo() const;
 	bool IsLocallyOwned() const;
 	USceneComponent* GetAttachParent() const;
-	void ReportShotNoise(const FVector& Origin) const;
+	void ReportShotNoise(const FVector& Origin, const TArray<FVector>& Impacts) const;
 
 	// ---- Dropped pickup (server) ----
 	void ActivatePickup();

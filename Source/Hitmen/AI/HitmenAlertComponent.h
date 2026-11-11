@@ -149,6 +149,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="s"))
 	float LoseSightGraceTime = 0.5f;
 
+	/** Shot by someone it cannot see: the NPC goes on alert toward a point this far in the shot's direction
+	 *  (it never learns the shooter's real position without seeing them). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="cm"))
+	float UnseenAttackerSearchDistance = 600.f;
+
 	/** Rise rate multiplier for an NPC already alerted (yellow): it fills faster when it sees you again. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="1"))
 	float AlertedSuspicionMultiplier = 2.f;

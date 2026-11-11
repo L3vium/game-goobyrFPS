@@ -151,7 +151,11 @@ public:
 
 	/** Radius in which NPCs hear the shot (occluded by walls). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Stealth", meta=(ClampMin="0", Units="cm"))
-	float NoiseRadius = 2500.f;
+	float NoiseRadius = 600.f;
+
+	/** Noise where a bullet lands (hitscan): this is what draws NPCs, silenced or not. 0 = none. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Noise", meta=(ClampMin="0", Units="cm"))
+	float ImpactNoiseRadius = 500.f;
 
 	// ---- Projectile ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Projectile")

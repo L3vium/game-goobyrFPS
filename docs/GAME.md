@@ -274,11 +274,15 @@ smoke, darkness, invisibility) drives perception, kill witnesses and body sighti
 - Losing sight for a while → search state: C++ scoring of hiding spots (lockers, tall grass,
   actors tagged `HitmenHidingSpot`), the last known position and reachable nav points, favouring
   spots out of sight; spots are claimed so NPCs split up.
-- **Last known position**: a mannequin ghost (`BP_LastKnownGhost`) is shown where you were last
-  seen while at least one NPC searches for you; never on your corpse.
-- **Hearing**: running is heard far, walking only close, crouching not at all; gunshots have a
-  radius (silenced: none). Radii are moderate, occluded by walls, and only the
-  `MaxNoiseResponders` (2) nearest NPCs that would react respond, for every noise type.
+- **Last known position**: where an NPC last **saw** you. A mannequin ghost (`BP_LastKnownGhost`) is shown there while
+  at least one NPC searches for you; never on your corpse. Noise never reveals your position: NPCs go to the sound.
+- **Hearing**: walking is heard within 1.5 m, running 4.5 m, crouching not at all. A gunshot report is heard close to
+  the shooter only (6-9 m, silenced: not at all); **where the bullet lands** makes the noise that draws NPCs (impact
+  radius per weapon). Each wall in between cuts the radius again (x0.45 per wall, more than 3 walls: silence), and only
+  the `MaxNoiseResponders` (2) nearest NPCs that would react respond, for every noise type. Hearing sends NPCs to the
+  sound; only in the dark does a hostile heard within 2.5 m get attacked (`DarkCloseEngageDistance`).
+- **Shot by an unseen shooter**: the NPC goes on alert toward where the shot came from and searches there; it never
+  learns the shooter's real position without seeing them.
 - **Bodies, distractions, weapons** are investigated. Only sentries ignore bodies.
 - **Squad tactics**: alerted NPCs take slots around the player; when the fight spans floors one
   flanker takes another floor / the stairs while another pushes directly; snipers keep far, high

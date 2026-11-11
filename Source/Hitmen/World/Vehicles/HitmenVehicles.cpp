@@ -425,7 +425,7 @@ void AHitmenMountedGun::FireServer()
 		Impact = Hit.ImpactPoint;
 		UGameplayStatics::ApplyPointDamage(Hit.GetActor(), Damage, Direction, Hit, GetController(), this, UDamageType::StaticClass());
 	}
-	UHitmenAISubsystem::ReportNoise(this, Start, 4000.f, Driver ? static_cast<AActor*>(Driver) : this, EHitmenNoiseType::Gunshot);
+	UHitmenAISubsystem::ReportNoise(this, Start, 900.f, Driver ? static_cast<AActor*>(Driver) : this, EHitmenNoiseType::Gunshot);
 	Multicast_Fire(Impact);
 }
 

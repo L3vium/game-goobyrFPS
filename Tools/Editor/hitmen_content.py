@@ -539,6 +539,7 @@ def build_animation():
     wave = montage("AM_Emote_Wave", ANIMS + "/Unarmed/Attack/MM_Attack_02")
     charged = montage("AM_Emote_Taunt", ANIMS + "/Unarmed/Attack/MM_ChargedAttack")
     dash = montage("AM_Emote_Hop", ANIMS + "/Unarmed/Jump/MM_Dash")
+    hit_react = montage("AM_HitReact", ANIMS + "/Rifle/HitReact/MM_HitReact_Front_Lgt_01")
 
     anim_set = make_data("DA_AnimSet_Mannequin", path("Data", "AnimSets"), unreal.HitmenAnimSet)
     emotes = []
@@ -553,7 +554,7 @@ def build_animation():
               jump_start=load(ANIMS + "/Unarmed/Jump/MM_Jump"),
               fall_loop=load(ANIMS + "/Unarmed/Jump/MM_Fall_Loop"),
               land=load(ANIMS + "/Unarmed/Jump/MM_Land"),
-              punch_montage=punch, stealth_kill_attacker_montage=kill,
+              punch_montage=punch, stealth_kill_attacker_montage=kill, hit_react_montage=hit_react,
               first_person_unarmed_pose=load(ANIMS + "/Unarmed/MM_Idle"),
               death_montages=[d for d in deaths if d], emotes=emotes,
               menu_idles=[load(ANIMS + "/Unarmed/MM_Idle")])

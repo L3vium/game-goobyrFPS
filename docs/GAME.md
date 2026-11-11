@@ -242,7 +242,10 @@ drink, or in a vent to poison the sealed rooms it serves).
 ## 10. AI
 All NPCs are hostile. Sight takes priority over hearing. Sight range 1950 cm (lose at 2250), times the
 difficulty multiplier; suspicion fills slower with distance (falloff 1600 cm). Guards in combat hold their
-weapon's aim pose and play its fire montage on each shot. They fire like Hitman guards: a short raise
+weapon's aim pose and play its fire montage on each shot. Searching guards draw their gun (the weapon's equip
+animation) and hold it ready (its aim pose) each time they stop to look around; a hit plays a hit reaction. All of
+these are the Mannequin pack animations (pistol / rifle equip and ADS idle, `MM_HitReact_Front_Lgt_01`), seen on
+every machine. They fire like Hitman guards: a short raise
 (`NPCFirstShotDelay` 0.6 s), bursts of `NPCBurstShots` (3) at 2.5x the weapon's interval, a 1.2 s pause; low
 damage (difficulty multiplier Easy 0.25 / Normal 0.4 / Hard 0.6), so a fight in the open lasts.
 

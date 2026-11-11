@@ -383,10 +383,9 @@ EBTNodeResult::Type UBTTask_HitmenCallReinforcements::ExecuteTask(UBehaviorTreeC
 	Alert->SetCallingReinforcements(true);
 	OwnerComp.GetAIOwner()->StopMovement();
 
-	const AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerComp.GetAIOwner()->GetPawn());
-	if (Character && Character->GetAnimSet() && Character->GetAnimSet()->CallReinforcementsMontage)
+	if (AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerComp.GetAIOwner()->GetPawn()))
 	{
-		Character->GetMesh()->GetAnimInstance()->Montage_Play(Character->GetAnimSet()->CallReinforcementsMontage);
+		Character->PlayAnimSetMontage(EHitmenAnimMontage::CallReinforcements);  // multicast: clients see it too
 	}
 	return EBTNodeResult::InProgress;
 }
@@ -443,10 +442,11 @@ EBTNodeResult::Type UBTTask_HitmenLookAround::ExecuteTask(UBehaviorTreeComponent
 {
 	*reinterpret_cast<float*>(NodeMemory) = 0.f;
 	OwnerComp.GetAIOwner()->ClearFocus(EAIFocusPriority::Gameplay);
-	const AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerComp.GetAIOwner()->GetPawn());
-	if (Character && Character->GetAnimSet() && Character->GetAnimSet()->SearchLookAroundMontage)
+	if (AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerComp.GetAIOwner()->GetPawn()))
 	{
-		Character->GetMesh()->GetAnimInstance()->Montage_Play(Character->GetAnimSet()->SearchLookAroundMontage);
+		// Armed guards hold the aim pose while searching (AHitmenNPC::UpdateAimPose); the set's look-around montage is
+		// for the others. Multicast: clients see it too.
+		Character->PlayAnimSetMontage(EHitmenAnimMontage::SearchLookAround);
 	}
 	return EBTNodeResult::InProgress;
 }

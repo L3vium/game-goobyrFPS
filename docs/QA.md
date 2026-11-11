@@ -69,6 +69,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 ## AI
 - [x] Attack chain: an armed player in view gets shot, damage arrives slowly (~9 HP/s), guard holds the aim pose (PIE script, 0.5.0)
 - [x] Attack chain on San Lazaro: shot after 6-9 s in a guard's view, ~9 HP/s (PIE script, 0.6.0)
+- [x] A searching guard draws its pistol, then holds it ready each time it stops to look around (PIE log and
+  screenshot, 0.6.1); [ ] the hit reaction on a shot guard; [ ] both seen from a client
 - [ ] A gunshot 15 m away behind a wall is not heard; a bullet impact draws the nearest guard to the impact
 - [ ] A guard shot from out of its sight turns toward the shot and searches, it does not know where you are
 - [ ] In the dark, a guard that hears you within 2.5 m attacks

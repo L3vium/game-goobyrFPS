@@ -8,6 +8,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ### Added
 - Headshots play a metallic hit sound for the shooter (HeartBeats MetalHeartbeat1, the HeadshotHit sound of
   DA_SoundSet) with the red hit ticks.
+- Guard state animations from the Mannequin pack: searching guards draw their gun (weapon equip animation) and hold
+  it ready (its aim pose) when they stop to look around; hit guards play a hit reaction (AM_HitReact from
+  MM_HitReact_Front_Lgt_01). The look-around and reinforcement-call montages are multicast so clients see them.
 
 ## [0.6.0] - 2026-11-11
 

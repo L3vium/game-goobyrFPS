@@ -9,7 +9,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 
 ## Stability
 - [x] GC stress: the Dev build with `-ExecCmds="gc.CollectGarbageEveryFrame 1"` — 100 s in the Gym (minimap) and
-  400 s on the title screen, no crash (0.4.1); [ ] Create Room map tiles and the pause map by hand
+  400 s on the title screen, no crash (0.4.1); 100 s in the Gym and 90 s on San Lazaro, no crash (0.6.0);
+  [ ] Create Room map tiles and the pause map by hand
 - [ ] Crash reports, if any: `python Tools/Debug/hitmen_crash_report.py "Builds/Windows Dev"`
 - [ ] No crash: 10 min of menu stress with Steam running (create / leave / join / refresh spam / map cycling)
 - [ ] No crash: 10 min in the Gym and LDTest, dying and respawning with proximity chat on

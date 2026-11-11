@@ -46,7 +46,7 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 
 ## World
 - [x] Doors open away from you from both sides and fill their opening (PIE script, 0.5.0)
-- [x] Vent hatch swings like a small door, away from you (PIE script, 0.5.0)
+- [x] Vent hatch swings on a side hinge like a small door, away from you (PIE screenshot, 0.6.0)
 - [x] Window frame inside the opening (screenshot, 0.5.0); [ ] no flicker in motion
 - [x] Turret panel: hold F 3 s, bar fills, turret hacked only at the end (PIE script, 0.5.0); [ ] the tower itself has no prompt
 - [x] Security feed shows the room, wide (screenshot, 0.5.0); [ ] "no signal" after disabling

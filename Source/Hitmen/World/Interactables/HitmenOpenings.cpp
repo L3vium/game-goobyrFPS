@@ -265,14 +265,14 @@ void AHitmenVentHatch::BeginPlay()
 {
 	Super::BeginPlay();
 	ClosedRotation = Mesh->GetRelativeRotation();
-	// Hatches swing up on their top edge.
-	CacheHinge(FVector(0.f, 0.f, 1.f));
+	// A small door: the hinge is the panel's left edge (local -X), vertical, like the doors.
+	CacheHinge(FVector(-1.f, 0.f, 0.f));
 }
 
 void AHitmenVentHatch::ApplyOpenAlpha(float Alpha)
 {
-	// The panel lies in X-Z (thin along Y): it swings out of its plane around the top edge, like a small door.
-	RotateAroundHinge(FRotator(0.f, 0.f, -OpenAngle * OpenDirection * Alpha));
+	// The panel lies in X-Z (thin along Y): it swings around its vertical hinge, away from the opener.
+	RotateAroundHinge(FRotator(0.f, OpenAngle * OpenDirection * Alpha, 0.f));
 }
 
 void AHitmenVentHatch::ApplyPoison_Implementation(AActor* Poisoner)

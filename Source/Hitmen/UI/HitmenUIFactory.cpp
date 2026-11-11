@@ -31,7 +31,9 @@ namespace HitmenUI
 	FLinearColor PanelLight() { return FLinearColor(0.085f, 0.09f, 0.1f, 0.92f); }
 	FLinearColor Text()       { return FLinearColor(0.95f, 0.95f, 0.95f, 1.f); }
 	FLinearColor TextDim()    { return FLinearColor(0.52f, 0.54f, 0.58f, 1.f); }
-	FLinearColor Accent()     { return FLinearColor(0.80f, 0.06f, 0.08f, 1.f); }
+	// Pure red (sRGB 215, 0, 0); FLinearColor values are linear, so build it from sRGB to avoid a pink cast.
+	FLinearColor Accent()     { return FLinearColor::FromSRGBColor(FColor(215, 0, 0)); }
+	FLinearColor Ink()        { return FLinearColor(0.012f, 0.012f, 0.014f, 1.f); }
 	FLinearColor Hairline()   { return FLinearColor(1.f, 1.f, 1.f, 0.16f); }
 	FLinearColor Warning()    { return FLinearColor(1.f, 0.74f, 0.08f, 1.f); }
 

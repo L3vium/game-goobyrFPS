@@ -44,7 +44,7 @@ namespace HitmenAlert
 		{
 		case EHitmenAlertColor::White:  return FLinearColor(0.95f, 0.95f, 0.95f);
 		case EHitmenAlertColor::Yellow: return FLinearColor(1.0f, 0.78f, 0.1f);
-		case EHitmenAlertColor::Red:    return FLinearColor(0.9f, 0.1f, 0.08f);
+		case EHitmenAlertColor::Red:    return FLinearColor::FromSRGBColor(FColor(215, 0, 0));
 		default:                        return FLinearColor::Transparent;
 		}
 	}

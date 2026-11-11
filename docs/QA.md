@@ -82,5 +82,6 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Awareness arcs toward guards noticing you; minimap Under fire banner (screenshot, 0.5.0)
 - [ ] Headshot hit ticks are red and a metallic hit sound plays (shooter only)
 - [ ] Minimap: no own view cone, north-up, your arrow turns
+- [x] Overhead alert marker: yellow / red triangle with "!" and backup arcs (screenshots, 0.6.1); [ ] white, filling with suspicion
 - [x] Map markers: cameras (diamonds) and the retrieval point (yellow, pinned to the edge) on the minimap and the pause map;
   legend rows come from the marker kinds on the map (screenshots, 0.6.0); [ ] a new DA_MapMarker kind shows up by hand

@@ -14,11 +14,14 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Lobby log lines (LogHitmen): who asked to start and how many players are ready, to diagnose Ready in player
   builds.
 
+
 ### Changed
 - Create Room on one 8 px grid: 112 px side margins, a fixed title band, the map tile and the players panel start on
   the same line and the panel ends on the same edge as Choose your agent; the player name has room again; a dim line
   says how friends join.
-
+- Overhead alert marker redrawn Hitman-like: a small triangle pointing at the head, white and filling from the tip
+  while suspicion builds, solid yellow or red with a dark "!" once alerted, two pulsing arcs while calling for
+  backup (it was a hatched diamond).
 
 ### Fixed
 - A network or travel failure of one game instance no longer closes another's room: the handlers only act on their

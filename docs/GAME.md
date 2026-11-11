@@ -329,7 +329,9 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   glow with `[A] Charm` under them.
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
 - **Scope** overlay for the sniper. **Sightroom** (Tab): a scan wave, a grid on the floor, a cool world.
-- **Alert indicators** above NPCs and at screen centre.
+- **Alert indicators** above NPCs (a small triangle pointing at the head: white and filling from the tip while
+  suspicion builds, solid yellow or red with a dark "!" once alerted, two pulsing arcs while calling for backup) and
+  around the crosshair.
 - **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match); the baked
   schematic in the middle (north up, dimmed under the markers, wheel to zoom around you); the legend on the right
   toggles each marker type and shows its exact colours (you, teammates, VIP, guards on alert in white / yellow / red

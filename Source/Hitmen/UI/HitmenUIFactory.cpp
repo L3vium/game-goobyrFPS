@@ -4,6 +4,7 @@
 #include "Engine/Font.h"
 #include "Engine/World.h"
 #include "Data/HitmenMapDefinition.h"
+#include "Data/HitmenMapMarkerType.h"
 #include "Core/HitmenGameSettings.h"
 #include "Rendering/SlateRenderer.h"
 #include "Fonts/FontMeasure.h"
@@ -186,6 +187,43 @@ namespace HitmenUI
 			}
 		}
 		PaintVerts(Out, Layer, Geo, Points, Indices, Color);
+	}
+
+	void PaintMapMarker(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Size, const UHitmenMapMarkerType* Type, const FSlateBrush* IconBrush)
+	{
+		if (!Type)
+		{
+			return;
+		}
+		const FLinearColor Outline(0.f, 0.f, 0.f, 0.7f);
+		const float Half = Size * 0.5f;
+		if (IconBrush)
+		{
+			PaintImage(Out, Layer + 1, Geo, IconBrush, Center - FVector2D(Half), FVector2D(Size), Type->Color);
+			return;
+		}
+		switch (Type->Shape)
+		{
+		case EHitmenMapMarkerShape::Diamond:
+		{
+			auto Diamond = [&](float R) { return TArray<FVector2D>{ Center + FVector2D(0.f, -R), Center + FVector2D(R, 0.f), Center + FVector2D(0.f, R), Center + FVector2D(-R, 0.f) }; };
+			PaintVerts(Out, Layer, Geo, Diamond(Half + 2.f), { 0, 1, 2, 0, 2, 3 }, Outline);
+			PaintVerts(Out, Layer + 1, Geo, Diamond(Half), { 0, 1, 2, 0, 2, 3 }, Type->Color);
+			break;
+		}
+		case EHitmenMapMarkerShape::Triangle:
+			PaintTriangle(Out, Layer, Geo, Center + FVector2D(0.f, -Half - 3.f), Center + FVector2D(Half + 2.5f, Half + 1.5f), Center + FVector2D(-Half - 2.5f, Half + 1.5f), Outline);
+			PaintTriangle(Out, Layer + 1, Geo, Center + FVector2D(0.f, -Half), Center + FVector2D(Half, Half), Center + FVector2D(-Half, Half), Type->Color);
+			break;
+		case EHitmenMapMarkerShape::Ring:
+			PaintArcFill(Out, Layer, Geo, Center, FMath::Max(0.f, Half - 4.f), Half + 1.5f, 0.f, 360.f, Outline, 20);
+			PaintArcFill(Out, Layer + 1, Geo, Center, FMath::Max(0.f, Half - 3.f), Half, 0.f, 360.f, Type->Color, 20);
+			break;
+		default:
+			PaintBox(Out, Layer, Geo, Center - FVector2D(Half + 2.f), FVector2D(Size + 4.f), Outline);
+			PaintBox(Out, Layer + 1, Geo, Center - FVector2D(Half), FVector2D(Size), Type->Color);
+			break;
+		}
 	}
 
 	const UHitmenMapDefinition* FindCurrentMap(const UObject* WorldContext)

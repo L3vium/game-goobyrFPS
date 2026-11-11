@@ -311,7 +311,8 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   icon and full name (the font shrinks to fit), weapons their ammo as `current / max`, abilities a cooldown shade that
   shrinks as they come back, charge pips and a fuel gauge for the jetpack. No key letters, no "ready", no health bar:
   keycard chips sit above.
-- **Minimap** (bottom left, square): the baked map, north up (your arrow turns, no view cone), alerted NPCs, sonar pings;
+- **Minimap** (bottom left, square): the baked map, north up (your arrow turns, no view cone), alerted NPCs, sonar pings,
+  map markers (cameras, retrieval points pinned to the frame when out of range);
   its frame takes the colour of the worst alert aimed at you and a banner opens across its top with a white flash
   (Suspicious, Alerted, Searching, Spotted; **Under fire** is taller, red and pulses).
 - **Crosshair**: a thin "+"; hit ticks (red, longer and thicker on a headshot); an "x" on a kill (red on a headshot);
@@ -324,9 +325,12 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 - **Alert indicators** above NPCs and at screen centre.
 - **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match); the baked
   schematic in the middle (north up, dimmed under the markers, wheel to zoom around you); the legend on the right
-  toggles each marker type and shows its exact colours (you, teammates, VIP, retrieval points, guards on alert in
-  white / yellow / red like the minimap, cameras). Debug tools (dev builds) open over the legend from a small
-  "Debug tools" button.
+  toggles each marker type and shows its exact colours (you, teammates, VIP, guards on alert in white / yellow / red
+  like the minimap, then one row per map marker kind on the map: retrieval points, cameras...). Debug tools (dev builds)
+  open over the legend from a small "Debug tools" button.
+- **Map markers**: anything with a `HitmenMapMarker` component shows on the minimap and the pause map, drawn and named
+  by its kind (a `DA_MapMarker_*` data asset: legend name, colour, shape or icon, size, which maps, legend order).
+  Recipe in `docs/Pipelines.md`.
 - **Intro**: "Dropping in" and the map name during the parachute drop (no countdown, no sting).
 
 ## 12. Maps

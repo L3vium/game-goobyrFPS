@@ -18,6 +18,7 @@ class UBorder;
 class UVerticalBox;
 class UHorizontalBox;
 class UHitmenMapDefinition;
+class UHitmenMapMarkerType;
 struct FSlateBrush;
 
 /** Visual style of a Hitmen button. */
@@ -75,6 +76,9 @@ namespace HitmenUI
 	HITMEN_API void PaintTriangle(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D A, FVector2D B, FVector2D C, const FLinearColor& Color);
 	/** A filled ring sector (awareness arcs, meters), clockwise from 12 o'clock in degrees. */
 	HITMEN_API void PaintArcFill(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float InnerRadius, float OuterRadius, float StartDeg, float EndDeg, const FLinearColor& Color, int32 Segments = 24);
+	/** A map marker of a kind (UHitmenMapMarkerType) centred on Center: its icon or its shape, on a dark outline.
+	 *  Uses Layer and Layer + 1. */
+	HITMEN_API void PaintMapMarker(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Size, const UHitmenMapMarkerType* Type, const FSlateBrush* IconBrush);
 
 	/** The map definition of the level this widget lives in (minimap, pause map). */
 	HITMEN_API const UHitmenMapDefinition* FindCurrentMap(const UObject* WorldContext);

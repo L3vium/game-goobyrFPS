@@ -17,6 +17,7 @@ class UCheckBox;
 class USlider;
 class UTextureRenderTarget2D;
 class APawn;
+class UHitmenMapMarkerType;
 
 /** Top-down map: you, the VIP, retrieval points (no other information). */
 UCLASS()
@@ -25,13 +26,17 @@ class HITMEN_API UHitmenPauseMapWidget : public UHitmenUserWidget
 	GENERATED_BODY()
 
 public:
-	/** Legend categories: 0 you, 1 teammates, 2 VIP, 3 retrieval points, 4 alerted NPCs, 5 cameras. */
-	static constexpr int32 CategoryCount = 6;
+	/** Legend categories read from the game state: 0 you, 1 teammates, 2 VIP, 3 alerted NPCs. Everything else is a map
+	 *  marker (UHitmenMapMarkerComponent) with a legend row per kind. */
+	static constexpr int32 CategoryCount = 4;
+	static constexpr int32 AlertedCategory = 3;
 	static FText GetCategoryName(int32 Category);
 	static FLinearColor GetCategoryColor(int32 Category);
 
 	void SetCategoryVisible(int32 Category, bool bVisible) { if (Category >= 0 && Category < CategoryCount) { bCategoryVisible[Category] = bVisible; } }
 	bool IsCategoryVisible(int32 Category) const { return Category >= 0 && Category < CategoryCount && bCategoryVisible[Category]; }
+
+	void SetMarkerTypeVisible(UHitmenMapMarkerType* Type, bool bVisible);
 
 protected:
 	virtual void NativeConstruct() override;
@@ -44,7 +49,11 @@ protected:
 	bool bHasMap = false;
 	FBox2D Bounds = FBox2D(FVector2D(-20000.f), FVector2D(20000.f));
 	FText MapName;
-	bool bCategoryVisible[CategoryCount] = { true, true, true, true, true, true };
+	bool bCategoryVisible[CategoryCount] = { true, true, true, true };
+
+	/** Marker kinds switched off in the legend. */
+	UPROPERTY(Transient)
+	TSet<TObjectPtr<UHitmenMapMarkerType>> HiddenMarkerTypes;
 	/** 1 = whole map; zooms around the player with the wheel. */
 	float Zoom = 1.f;
 };
@@ -76,6 +85,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Pause") void OpenOptions();
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Pause") void LeaveMatch();
 
+	/** Legend rows: the built-in categories, then one per map marker kind on this map (rebuilt when they change). */
+	void RefreshLegend();
+
 protected:
 	virtual void BuildDefaultLayout() override;
 	virtual void BindEvents() override;
@@ -83,6 +95,9 @@ protected:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UHitmenPauseMapWidget> Map;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UHitmenDebugPanelWidget> DebugPanel;
 	UPROPERTY(Transient) TArray<TObjectPtr<class UHitmenToggle>> LegendToggles;
+	UPROPERTY(Transient) TObjectPtr<UVerticalBox> LegendBox;
+	/** Marker kind of each legend toggle after the built-in categories. */
+	UPROPERTY(Transient) TArray<TObjectPtr<UHitmenMapMarkerType>> LegendMarkerTypes;
 
 	UFUNCTION() void HandleLegendToggled(bool bChecked);
 	/** Shows / hides the debug tools (they open over the legend). */

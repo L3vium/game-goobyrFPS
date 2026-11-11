@@ -12,9 +12,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Gym parkour run: ten numbered rooftops along the west and north walls (vault, jump and mantle, gap, jump and grab,
   beam, ledge grab onto the gutter tower, a zipline north, step-ups, a plank and an overlook above the AI pen); a
   ladder on the back of the north roofs.
-
-
-
+- Map marker pipeline: a HitmenMapMarker component on any actor shows it on the minimap and the pause map, drawn and
+  named by its kind (DA_MapMarker_* data asset: legend name, colour, shape or icon, size, maps, legend order). The
+  pause legend builds its rows from the kinds on the map. Retrieval points and cameras use it (retrieval points now
+  show on the minimap, pinned to the frame when out of range). Recipe in docs/Pipelines.md.
 
 ### Changed
 - Navmesh: 10 cm cells (from 19) so every 110 cm doorway is walkable by the AI, and 16384 A* search nodes (from
@@ -31,6 +32,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   flapped up on their top edge).
 - hitmen_check_reach.py also checks pickups: each needs a reachable standing spot within grabbing range (a pedestal
   top is a navmesh island of its own).
+
 
 ### Fixed
 - Generated buildings: door openings match the door (110 x 230), stairs leave room to step on and switch back on

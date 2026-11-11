@@ -1,6 +1,7 @@
 // Hitmen — retrieval point
 
 #include "World/Spawning/HitmenRetrievalPoint.h"
+#include "Components/HitmenMapMarkerComponent.h"
 #include "Components/HitmenBodyCarryComponent.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Framework/HitmenMatchGameMode.h"
@@ -19,6 +20,8 @@ AHitmenRetrievalPoint::AHitmenRetrievalPoint()
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	Mesh->SetupAttachment(DeliveryZone);
+
+	MapMarker = CreateDefaultSubobject<UHitmenMapMarkerComponent>(TEXT("MapMarker"));
 }
 
 void AHitmenRetrievalPoint::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -30,6 +33,7 @@ void AHitmenRetrievalPoint::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 void AHitmenRetrievalPoint::BeginPlay()
 {
 	Super::BeginPlay();
+	MapMarker->SetMarkerVisible(bActive);
 	if (HasAuthority())
 	{
 		DeliveryZone->OnComponentBeginOverlap.AddDynamic(this, &AHitmenRetrievalPoint::HandleOverlap);
@@ -55,6 +59,7 @@ void AHitmenRetrievalPoint::OnRep_Active()
 	{
 		SetActorHiddenInGame(!bActive);
 	}
+	MapMarker->SetMarkerVisible(bActive);
 	Juice_OnActiveChanged(bActive);
 }
 

@@ -21,6 +21,22 @@ and sizes it.
 and assigns them (editor open). `Tools/Editor/hitmen_organize_icons.py` re-sorts textures dropped in
 `/Game/Hitmen/UI/Icons` into their folders and keeps every reference.
 
+## Map markers (minimap, pause map, legend)
+
+Anything can show on the minimap and the pause map:
+
+1. **Pick or make a kind**: a data asset of class `HitmenMapMarkerType` in `/Game/Hitmen/Data/MapMarkers`
+   (duplicate `DA_MapMarker_Camera`). Set **Display Name** (the legend row), **Color**, **Shape** (square, diamond,
+   triangle, ring) or an **Icon** (white on transparent, tinted), **Size**, the minimap scale, whether it shows on the
+   minimap / the pause map / the legend, **Clamp To Minimap Edge** for objectives, and **Legend Order**.
+2. **Mark the actor**: in its Blueprint, *Add Component → Hitmen Map Marker*, set **Type** to the kind (and an
+   optional **Label** shown next to it on the pause map).
+3. Done: the legend gets a row with a toggle as soon as one marker of that kind is on the map. Gameplay code hides a
+   marker with **Set Marker Visible** (a disabled camera, an unused retrieval point do it already).
+
+Retrieval points and security cameras carry one (`DA_MapMarker_RetrievalPoint`, `DA_MapMarker_Camera`). You,
+teammates, the VIP and guards on alert are drawn from the game state, not markers.
+
 ## Maps (generated layouts, minimap, thumbnail)
 
 `Tools/Editor/hitmen_levels.py` builds the match maps from code (`build_ldtest()`, `build_gym()`), with helpers for

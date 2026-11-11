@@ -54,8 +54,13 @@ foreach ($T in $Targets) {
         if (Test-Path $SavedKeep) { Remove-Item -Recurse -Force $SavedKeep }
         Move-Item $DestSaved $SavedKeep
     }
+    # steam_appid.txt is written by the game at launch (non-shipping) and versioned: keep it too.
+    $AppIdKeep = $null
+    $DestAppId = Join-Path $Dest 'Hitmen\Binaries\Win64\steam_appid.txt'
+    if (Test-Path $DestAppId) { $AppIdKeep = Get-Content $DestAppId -Raw }
     if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
     Move-Item $Staged $Dest
+    if ($AppIdKeep -and -not (Test-Path $DestAppId)) { Set-Content -Path $DestAppId -Value $AppIdKeep -NoNewline -Encoding ascii }
     if ($SavedKeep) {
         $NewSaved = Join-Path $Dest 'Hitmen\Saved'
         if (Test-Path $NewSaved) { Remove-Item -Recurse -Force $NewSaved }

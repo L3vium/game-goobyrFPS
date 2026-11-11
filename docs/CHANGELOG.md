@@ -5,6 +5,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-11
+
 ### Fixed
 - **Crash about one minute after launch** (all 20 reports of the 0.4.0 playtest). The minimap, the Create Room map
   tile and the pause map drew textures through `FSlateBrush` members that were not `UPROPERTY`: the first garbage

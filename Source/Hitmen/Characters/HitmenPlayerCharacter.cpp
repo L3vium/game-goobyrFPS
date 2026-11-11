@@ -233,7 +233,18 @@ bool AHitmenPlayerCharacter::IsIntroProtected() const
 
 void AHitmenPlayerCharacter::Landed(const FHitResult& Hit)
 {
+	const float FallSpeed = -GetVelocity().Z;
 	Super::Landed(Hit);
+	if (!bParachuting && FallSpeed >= LandingSoundSpeed)
+	{
+		// Every landing is heard (soft or hard); a hard one dips the view.
+		const bool bHard = FallSpeed >= HardLandingSpeed;
+		UHitmenSoundLibrary::PlayHitmenSoundAt(this, bHard ? EHitmenSound::LandingHard : EHitmenSound::Landing, GetActorLocation());
+		if (bHard && IsLocallyControlled())
+		{
+			AddCameraShake(FMath::GetMappedRangeValueClamped(FVector2D(HardLandingSpeed, HardLandingSpeed * 2.f), FVector2D(0.8f, 2.f), FallSpeed), 0.3f);
+		}
+	}
 	if (bParachuting)
 	{
 		ParachuteLandTime = GetWorld()->GetTimeSeconds();
@@ -471,9 +482,15 @@ void AHitmenPlayerCharacter::UpdateFirstPersonArms(float DeltaSeconds)
 	}
 	const FVector Bob(0.f, FMath::Cos(ArmsBobPhase) * ArmsBobAmount * BobAlpha, -FMath::Abs(FMath::Sin(ArmsBobPhase)) * ArmsBobAmount * BobAlpha);
 
+	// Sprinting with a weapon: lowered and tilted, still in view.
+	const bool bSprinting = Movement && Movement->IsSprinting() && bGrounded && Speed > WalkSpeed * 1.05f && !bIsAiming && InventoryComponent->GetActiveWeapon();
+	ArmsSprintAlpha = FMath::FInterpTo(ArmsSprintAlpha, bSprinting ? 1.f : 0.f, DeltaSeconds, 9.f);
+	const FVector SprintShift = (ArmsSprintOffset - ArmsHipOffset) * ArmsSprintAlpha;
+	const FRotator SprintTilt = ArmsSprintRotation * ArmsSprintAlpha;
+
 	// Offsets are in camera space (X forward, Y right, Z up); the mesh is turned by ArmsYawOffset.
-	FirstPersonMesh->SetRelativeLocationAndRotation(CurrentArmsOffset + Bob,
-		FRotator(ArmsSway.Pitch, ArmsYawOffset + ArmsSway.Yaw, 0.f));
+	FirstPersonMesh->SetRelativeLocationAndRotation(CurrentArmsOffset + Bob + SprintShift,
+		FRotator(ArmsSway.Pitch + SprintTilt.Pitch, ArmsYawOffset + ArmsSway.Yaw + SprintTilt.Yaw, SprintTilt.Roll));
 }
 
 void AHitmenPlayerCharacter::UpdateDeathCamera(float DeltaSeconds)

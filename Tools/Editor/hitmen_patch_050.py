@@ -90,6 +90,24 @@ if wanted("openings"):
         EAL.save_loaded_asset(window, only_if_is_dirty=False)
     log("doors and windows patched")
 
+if wanted("arms"):
+    # First-person arms: on the right, aiming stays low right, fists higher (punches cross the view).
+    player = EAL.load_asset("/Game/Hitmen/Characters/BP_PlayerCharacter") if EAL.does_asset_exist("/Game/Hitmen/Characters/BP_PlayerCharacter") else None
+    if not player:
+        for asset in EAL.list_assets("/Game/Hitmen/Characters", recursive=True):
+            if asset.split(".")[-1] == "BP_PlayerCharacter":
+                player = EAL.load_asset(asset)
+    if player:
+        default = unreal.get_default_object(player.generated_class())
+        default.set_editor_property("arms_hip_offset", unreal.Vector(8.0, 20.0, -166.0))
+        default.set_editor_property("arms_aim_offset", unreal.Vector(4.0, 11.0, -161.0))
+        default.set_editor_property("arms_unarmed_offset", unreal.Vector(20.0, 6.0, -150.0))
+        unreal.BlueprintEditorLibrary.compile_blueprint(player)
+        EAL.save_loaded_asset(player, only_if_is_dirty=False)
+        log("player arms offsets patched")
+    else:
+        log("WARN BP_PlayerCharacter not found")
+
 if wanted("difficulty"):
     hitmen_content.build_rules()
     log("match rules (difficulty presets) rebuilt")

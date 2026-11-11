@@ -11,17 +11,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Hold to interact: interactables can ask for F to be held (IHitmenInteractable GetInteractHoldTime). Hacking the
   turret panel takes 3 s and the security console 2 s; a bar fills under the crosshair with a hacking sound;
   releasing F or looking away cancels; the server times the hold too.
-
-
-
-
-
-
-
-
-
-
-
+- Landing sounds on every landing by fall speed (soft / hard), a view dip on hard landings.
 
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
@@ -69,6 +59,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Crouching while walking does a short slide (a sprint gives the long one).
 - Thrown weapons no longer tumble as physics bodies: they land at once as a floating pickup a little ahead (before
   any wall).
+- First-person arms sit further right; aiming keeps the gun low on the right (it re-centred and filled the screen);
+  sprinting with a weapon lowers and tilts it instead of losing it; unarmed arms are higher so punches cross the
+  view.
+
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -89,6 +83,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   the wall).
 - Ladders: Space pressed just before or right after grabbing a ladder no longer jumps you straight off it (0.35 s
   grace).
+
+
 
 
 

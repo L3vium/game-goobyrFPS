@@ -222,15 +222,22 @@ protected:
 	// ---- First-person arms (shown only with a weapon in hand or while acting) ----
 	/** Arms mesh offset from the camera when firing from the hip. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
-	FVector ArmsHipOffset = FVector(8.f, 16.f, -166.f);
+	FVector ArmsHipOffset = FVector(8.f, 20.f, -166.f);
 
-	/** Arms mesh offset from the camera while aiming (sights near the screen centre). */
+	/** Arms mesh offset while aiming: the gun only moves a little toward the centre and stays low right. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
-	FVector ArmsAimOffset = FVector(-4.f, 0.f, -153.f);
+	FVector ArmsAimOffset = FVector(4.f, 11.f, -161.f);
+
+	/** Sprinting: the weapon is lowered and tilted (it stays in view). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
+	FVector ArmsSprintOffset = FVector(4.f, 22.f, -171.f);
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
+	FRotator ArmsSprintRotation = FRotator(-14.f, 12.f, 18.f);
 
 	/** Arms mesh offset with no weapon (punch, takedown): higher, so the fists swing through the view. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
-	FVector ArmsUnarmedOffset = FVector(14.f, 6.f, -162.f);
+	FVector ArmsUnarmedOffset = FVector(20.f, 6.f, -150.f);
 
 	/** Yaw of the arms mesh relative to the camera (mannequin forward is +Y). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
@@ -257,6 +264,17 @@ protected:
 	/** Walking bob of the arms (cm at full walk speed). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
 	float ArmsBobAmount = 0.9f;
+
+	// ---- Landing ----
+	/** Falls faster than this make a landing sound; faster than HardLandingSpeed a hard landing (sound + view dip). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Movement|Landing", meta=(ClampMin="0", Units="cm/s"))
+	float LandingSoundSpeed = 350.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Movement|Landing", meta=(ClampMin="0", Units="cm/s"))
+	float HardLandingSpeed = 950.f;
+
+	/** 0..1 blend toward the sprint arms pose. */
+	float ArmsSprintAlpha = 0.f;
 
 	// ---- Death camera ----
 	/** After death the view leaves the head and orbits the body from behind and above. */

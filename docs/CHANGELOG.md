@@ -12,6 +12,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Changed
 - Navmesh: 10 cm cells (from 19) so every 110 cm doorway is walkable by the AI, and 16384 A* search nodes (from
   2048) so long patrol legs on a big map are not cut short. L_Empty_01 and L_Empty_02 are re-baked.
@@ -20,6 +21,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   room, control room, basement down an outside stair well, a seeded hedge maze, greenhouse, garage with the tank,
   graveyard and chapel) and a cliff zone with three caves, a tunnel to the basement and a cove. Every room is lit;
   the minimap texture is 1536 px.
+- Map thumbnails are rendered from a fixed camera in the editor (hitmen_map_shots.py capture), no longer from the
+  PIE spawn view, so the shot has no HUD, arms or screen effects; ue_map_shot.sh is gone. New San Lazaro thumbnail.
+  docs/Pipelines.md has the map recipe (build, bake, check, minimap, thumbnail).
 
 ### Fixed
 - Generated buildings: door openings match the door (110 x 230), stairs leave room to step on and switch back on

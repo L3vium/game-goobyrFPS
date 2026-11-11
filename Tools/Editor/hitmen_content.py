@@ -907,7 +907,8 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     ghost_mi = create("MI_LastKnownGhost", path("Materials", "Instances"), unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
     if ghost_mi:
         MEL.set_material_instance_parent(ghost_mi, mats["cone"])
-        MEL.set_material_instance_vector_parameter_value(ghost_mi, "Color", unreal.LinearColor(0.85, 0.9, 1.0, 0.35))
+        # Hitman-like: a faint white silhouette.
+        MEL.set_material_instance_vector_parameter_value(ghost_mi, "Color", unreal.LinearColor(0.95, 0.97, 1.0, 0.15))
         save(ghost_mi)
     marker = make_blueprint("BP_LastKnownGhost", path("Characters", "Player"), unreal.SkeletalMeshActor)
     skel = component(cdo(marker), "skeletal_mesh_component")

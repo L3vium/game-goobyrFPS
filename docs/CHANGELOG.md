@@ -18,6 +18,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -73,8 +74,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Explosions (rocket, tank shell, C4, grenade, barrels, flashbang) use 3D toon fire and smoke from
   Anime_Stylized_VFX instead of the 2D flipbook sheets that read as comic book; every slot stays swappable in the
   data.
-
-
+- Last-known-position ghost: a faint white silhouette (15 % opacity, was 35 %), Hitman-like.
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -101,6 +101,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   fixed exposure (MatchExposure post process volume, also made by the level builder).
 - Guards in combat now raise their weapon (aim pose): only snipers ticked, so the others never played it; and the
   additive fire montage no longer replaces the aim pose on each shot (arms dropping).
+
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):

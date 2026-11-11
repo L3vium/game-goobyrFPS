@@ -1,5 +1,6 @@
-"""LD check for the map open in the editor (navmesh baked): every door can be walked through, and every loot spawn,
-NPC and retrieval point is on the navmesh and reachable on foot from a team start.
+"""LD check for the map open in the editor (navmesh baked): every door can be walked through; every NPC and retrieval
+point is on the navmesh and reachable on foot from a team start; every pickup and loot spawn has such a spot within
+grabbing range (pedestal tops are navmesh islands of their own).
 
     python Tools/Editor/ue_remote.py --file Tools/Editor/hitmen_check_reach.py
 
@@ -11,6 +12,7 @@ import math
 import unreal
 
 LADDER_ONLY_Z = 1000.0
+GRAB_RANGE = 220.0  # a pickup counts as reachable from a standing spot this close (3D)
 EAS = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 WORLD = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 NAV = unreal.NavigationSystemV1
@@ -25,6 +27,21 @@ def project(location, extent):
 def reachable(a, b):
     path = NAV.find_path_to_location_synchronously(WORLD, a, b)
     return bool(path and path.path_points and not path.is_partial()), path
+
+
+def reachable_near(origin, location):
+    """True when a reachable navmesh spot lies within GRAB_RANGE of location (around it, at or below its height)."""
+    for dz in (0.0, -100.0, -200.0):
+        for k in range(9):
+            if k == 8:
+                dx = dy = 0.0
+            else:
+                angle = math.radians(k * 45.0)
+                dx, dy = math.cos(angle) * 130.0, math.sin(angle) * 130.0
+            point = project(V(location.x + dx, location.y + dy, location.z + dz), V(40, 40, 100))
+            if point and (point - location).length() <= GRAB_RANGE and reachable(origin, point)[0]:
+                return True
+    return False
 
 
 def class_name(actor):
@@ -62,12 +79,16 @@ def run():
             print("START UNREACHABLE", start.get_actor_label(), start.get_actor_location())
             problems += 1
 
-    targets = [a for a in actors if class_name(a).startswith(("BP_LootSpawn", "BP_RetrievalPoint")) or "NPC" in class_name(a)]
+    targets = [a for a in actors if class_name(a).startswith(("BP_LootSpawn", "BP_RetrievalPoint")) or "NPC" in class_name(a)
+               or "Pickup" in class_name(a)]
     for target in targets:
         loc = target.get_actor_location()
         ladder_only = "Sniper" in class_name(target) or loc.z > LADDER_ONLY_Z
         point = project(loc, V(150, 150, 300))
-        ok = bool(point) and reachable(origin, point)[0]
+        if "Pickup" in class_name(target) or class_name(target).startswith("BP_LootSpawn"):
+            ok = reachable_near(origin, loc)
+        else:
+            ok = bool(point) and reachable(origin, point)[0]
         if ok:
             continue
         if ladder_only:

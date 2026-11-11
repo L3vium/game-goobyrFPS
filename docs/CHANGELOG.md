@@ -15,6 +15,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Changed
 - Navmesh: 10 cm cells (from 19) so every 110 cm doorway is walkable by the AI, and 16384 A* search nodes (from
   2048) so long patrol legs on a big map are not cut short. L_Empty_01 and L_Empty_02 are re-baked.
@@ -28,9 +29,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   docs/Pipelines.md has the map recipe (build, bake, check, minimap, thumbnail).
 - Vent hatches open like small doors: a vertical hinge on their side edge, swinging away from the opener (they
   flapped up on their top edge).
-
-
-
+- hitmen_check_reach.py also checks pickups: each needs a reachable standing spot within grabbing range (a pedestal
+  top is a navmesh island of its own).
 
 ### Fixed
 - Generated buildings: door openings match the door (110 x 230), stairs leave room to step on and switch back on

@@ -5,6 +5,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-11
+
 ### Added
 - Tools/Editor/hitmen_check_reach.py: LD check for the map open in the editor. Every door must be walkable and every
   loot spawn, NPC and retrieval point reachable on foot from a team start (snipers and roof points are listed as

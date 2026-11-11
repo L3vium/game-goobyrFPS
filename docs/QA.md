@@ -28,6 +28,7 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Pause: PAUSE, three big blocks, legend on the right with the real colours, debug tools behind a button (screenshot, 0.5.0)
 - [ ] Space and Escape go back on every page; Space never re-presses the last clicked button
 - [ ] Create Room: watcher eye shows only when hovering a player without team; a click toggles it
+- [x] Create Room on one grid: map tile and players panel aligned, full player name, join hint (screenshot, 0.6.1)
 
 ## Match start
 - [x] Spawn points are out of guard sight (LDTest: the 8 closest removed; Gym start 4.5 km+ away) — script

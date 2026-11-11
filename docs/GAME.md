@@ -85,7 +85,9 @@ adaptation): every room is lit for it. Space or Escape goes back on every menu p
    (count and room code on top) holding opaque team blocks (tinted header, square **ATTACK / PROTECT**
    toggle, a cross to remove) which hold one solid block per player; the host drags players between
    blocks. Hovering a player without team shows the watcher eye (open = watching, struck = playing).
-   A dashed **+ Create team** block below. Bottom: **Leave room** and **Choose your agent**.
+   A line on how friends join and a dashed **+ Create team** block below. Bottom: **Leave room** and **Choose your
+   agent**. One 8 px grid: 112 px side margins, the map tile and the players panel start on the same line under
+   the title, the panel ends on the same edge as **Choose your agent**.
 4. **Your agent** (stage) — the agent stands on the left; the codename above its head, white triangle arrows (every
    click counts) level with its head, torso and legs in two columns `AgentArrowSpacing` away from its axis, and
    **Randomize** under its feet — all placed from the reference pose, so they never move with the idle animation;

@@ -12,6 +12,11 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   it ready (its aim pose) when they stop to look around; hit guards play a hit reaction (AM_HitReact from
   MM_HitReact_Front_Lgt_01). The look-around and reinforcement-call montages are multicast so clients see them.
 
+### Changed
+- Create Room on one 8 px grid: 112 px side margins, a fixed title band, the map tile and the players panel start on
+  the same line and the panel ends on the same edge as Choose your agent; the player name has room again; a dim line
+  says how friends join.
+
 ## [0.6.0] - 2026-11-11
 
 ### Added

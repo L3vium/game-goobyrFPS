@@ -11,11 +11,19 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Guard state animations from the Mannequin pack: searching guards draw their gun (weapon equip animation) and hold
   it ready (its aim pose) when they stop to look around; hit guards play a hit reaction (AM_HitReact from
   MM_HitReact_Front_Lgt_01). The look-around and reinforcement-call montages are multicast so clients see them.
+- Lobby log lines (LogHitmen): who asked to start and how many players are ready, to diagnose Ready in player
+  builds.
 
 ### Changed
 - Create Room on one 8 px grid: 112 px side margins, a fixed title band, the map tile and the players panel start on
   the same line and the panel ends on the same edge as Choose your agent; the player name has room again; a dim line
   says how friends join.
+
+
+### Fixed
+- A network or travel failure of one game instance no longer closes another's room: the handlers only act on their
+  own world (with several players in one process, the PIE client dropping its first connection closed the host's
+  room and cleared the room code).
 
 ## [0.6.0] - 2026-11-11
 

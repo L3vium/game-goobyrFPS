@@ -24,7 +24,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Your agent: arrows further out, fixed while the agent idles, codename and Randomize centred (screenshot, 0.5.0)
 - [x] Loadout: big tiles, full names on up to two lines, red band on the pick (screenshot, 0.5.0)
 - [ ] Icons: swapping a texture in `/Game/Hitmen/UI/Icons/...` changes the tile and the HUD card
-- [ ] Ready: the match starts a second after everyone is ready, no 5-4-3-2-1; the drop shows no 3-2-1
+- [x] Ready with two players (PIE listen server + client joining by room code): nobody leaves while one is not
+  ready, both travel ~1 s after the last Ready, no 5-4-3-2-1 (PIE script, 0.6.1); [ ] two machines over Steam
 - [x] Pause: PAUSE, three big blocks, legend on the right with the real colours, debug tools behind a button (screenshot, 0.5.0)
 - [ ] Space and Escape go back on every page; Space never re-presses the last clicked button
 - [ ] Create Room: watcher eye shows only when hovering a player without team; a click toggles it

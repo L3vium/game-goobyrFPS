@@ -588,7 +588,7 @@ def build_weapons(mats):
     # On the first-person arms the gun is turned so its barrel runs along the view and its top is up. Solved in
     # PIE by Tools/Editor/hitmen_fp_solve.py (the same for every gun, their VisualTransforms share one convention).
     fp_offset = unreal.Transform()
-    fp_offset.rotation = unreal.Rotator(roll=8.7, pitch=-0.3, yaw=-2.9).quaternion()
+    fp_offset.rotation = unreal.Rotator(roll=9.5, pitch=0.9, yaw=-3.3).quaternion()
     gun_fx["first_person_attach_offset"] = fp_offset
     pistol_vis = dict(first_person_pose=pistol_pose, fire_montage=pistol_fire, equip_montage=pistol_equip, aim_montage=pistol_aim, **gun_fx)
     pistol_vis["muzzle_fx"] = fx("MuzzleFlash/OneShot/NS_Muzzle_Smoke_01_Aligned_X_OS")
@@ -607,9 +607,10 @@ def build_weapons(mats):
     launcher_offset.scale3d = unreal.Vector(0.55, 0.55, 0.55)
     launcher_vis["first_person_attach_offset"] = launcher_offset
     knife_offset = unreal.Transform()
-    knife_offset.rotation = unreal.Rotator(roll=-179.3, pitch=-79.6, yaw=-94.7).quaternion()
+    knife_offset.rotation = unreal.Rotator(roll=174.8, pitch=-80.4, yaw=-88.1).quaternion()
     bow_offset = unreal.Transform()
-    bow_offset.rotation = unreal.Rotator(roll=-90.3, pitch=-8.7, yaw=87.2).quaternion()
+    bow_offset.rotation = unreal.Rotator(roll=-89.1, pitch=-9.5, yaw=86.6).quaternion()
+    bow_offset.scale3d = unreal.Vector(0.5, 0.5, 0.5)
     launcher_vis["fire_sound"] = load("/Game/Weapons/GrenadeLauncher/Audio/FirstPersonTemplateWeaponFire02")
 
     A = unreal.HitmenFireMode

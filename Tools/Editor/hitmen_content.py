@@ -550,10 +550,11 @@ def build_weapons(mats):
     smoke = projectile_bp("BP_Projectile_Smoke", unreal.HitmenProjectile_Smoke, "cylinder", (0.08, 0.08, 0.15), mi["MI_Metal"],
                           explosion_sound=load(SFX + "SFX_DustPuff_Cue"), explosion_shake_intensity=0.0)
     c4 = projectile_bp("BP_Projectile_C4", unreal.HitmenC4Charge, "cube", (0.15, 0.1, 0.05), mi["MI_Red"])
-    shell = projectile_bp("BP_Projectile_TankShell", unreal.HitmenProjectile, "sphere", (0.2, 0.2, 0.2), mi["MI_Dark"],
-                          explode_on_impact=True, explosion_noise_radius=1500.0, explosion_radius=650.0, explosion_damage=200.0, explosion_effect=explosion_fx,
-                          explosion_sound=explosion_sfx, explosion_effect_scale=2.0, explosion_shake_intensity=4.0,
-                          movement={"projectile_gravity_scale": 0.2})
+    # Tank shell: a glowing slug that flies straight (no gravity, near-instant), then a big blast.
+    shell = projectile_bp("BP_Projectile_TankShell", unreal.HitmenProjectile, "sphere", (0.35, 0.35, 0.35), mats["laser"],
+                          explode_on_impact=True, explosion_noise_radius=1500.0, explosion_radius=1200.0, explosion_damage=260.0, explosion_effect=explosion_fx,
+                          explosion_sound=explosion_sfx, explosion_effect_scale=3.5, explosion_shake_intensity=6.0, trail_effect=smoke_trail,
+                          movement={"projectile_gravity_scale": 0.0, "rotation_follows_velocity": True})
 
     # Gun pack (Weapons_Free) for firearms and melee; the launchers keep the template launcher.
     free = "/Game/Weapons_Free/Meshes/"
@@ -1143,11 +1144,17 @@ def build_world(mats, weapons):
     fixture("BP_PoisonableDrink", unreal.HitmenPoisonableDrink, W + "/Drink", {"mesh": ("cylinder", (0.08, 0.08, 0.15), mi["MI_Glass"], (0, 0, 8))})
     fixture("BP_ExplosiveBarrel", unreal.HitmenExplosiveBarrel, W + "/Barrel", {"mesh": ("cylinder", (0.6, 0.6, 1.0), mi["MI_Red"], (0, 0, 50))})
     fixture("BP_BreakableWall", unreal.HitmenBreakableWall, W + "/Breakable", {"mesh": ("cube", (3.0, 0.3, 3.0), mi["MI_Stone"], (0, 0, 150))})
-    fixture("BP_MountedGun", unreal.HitmenMountedGun, V, {"mesh": ("cylinder", (0.12, 0.12, 1.4), mi["MI_Dark"], (40, 0, 0)),
+    mounted = fixture("BP_MountedGun", unreal.HitmenMountedGun, V, {"mesh": ("cylinder", (0.12, 0.12, 1.4), mi["MI_Dark"], (70, 0, 0)),
                                                           "tripod": ("cone", (0.9, 0.9, 0.85), mi["MI_Metal"], (0, 0, -35)),
                                                           "shield": ("cube", (0.06, 1.1, 0.7), mi["MI_Metal"], (25, 0, 15))})
-    fixture("BP_Tank", unreal.HitmenTank, V, {"mesh": ("cube", (6.0, 3.6, 1.6), mi["MI_Green"], None), "turret": ("cube", (2.6, 2.0, 0.8), mi["MI_Green"], None)},
-            {"shell_class": gen_class(load(path("Weapons", "Projectiles", "BP_Projectile_TankShell")))})
+    # The barrel cylinder is modelled along Z: pitch it onto the gun's forward axis.
+    mounted_mesh = component(cdo(mounted), "mesh")
+    if mounted_mesh:
+        mounted_mesh.set_editor_property("relative_rotation", unreal.Rotator(pitch=-90.0, yaw=0.0, roll=0.0))
+    save(mounted)
+    tank = fixture("BP_Tank", unreal.HitmenTank, V, {"mesh": ("cube", (6.0, 3.6, 1.6), mi["MI_Green"], None), "turret": ("cube", (2.6, 2.0, 0.8), mi["MI_Green"], None),
+                                                    "barrel": ("cylinder", (0.32, 0.32, 3.4), mi["MI_Dark"], None)},
+                   {"shell_class": gen_class(load(path("Weapons", "Projectiles", "BP_Projectile_TankShell"))), "shell_speed": 20000.0})
     fixture("BP_RetrievalPoint", unreal.HitmenRetrievalPoint, S, {"mesh": ("cylinder", (4.0, 4.0, 0.1), mi["MI_Yellow"], (0, 0, 5))})
     fixture("BP_LootSpawn_Weapon", unreal.HitmenLootSpawnPoint, S, None, {"category": unreal.HitmenLootCategory.WEAPON})
     fixture("BP_LootSpawn_Item", unreal.HitmenLootSpawnPoint, S, None, {"category": unreal.HitmenLootCategory.ANY_ITEM})

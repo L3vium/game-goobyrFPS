@@ -13,6 +13,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   releasing F or looking away cancels; the server times the hold too.
 - Landing sounds on every landing by fall speed (soft / hard), a view dip on hard landings.
 
+
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -62,7 +64,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - First-person arms sit further right; aiming keeps the gun low on the right (it re-centred and filled the screen);
   sprinting with a weapon lowers and tilts it instead of losing it; unarmed arms are higher so punches cross the
   view.
-
+- Mounted gun shots are felt: sound, muzzle light flash, view shake. Tank: a real cannon barrel that follows the aim
+  pitch and kicks back; the shell glows, flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m
+  wide (was 6.5 m); fire sound, muzzle flash, view shake.
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -83,9 +87,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   the wall).
 - Ladders: Space pressed just before or right after grabbing a ladder no longer jumps you straight off it (0.35 s
   grace).
-
-
-
+- Mounted gun: its barrel pointed straight up (unrotated cylinder) and it turned 2.5x slower than the player's view
+  (raw look input); it now points forward and matches the player's sensitivity.
 
 
 ### Removed

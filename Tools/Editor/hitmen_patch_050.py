@@ -108,6 +108,48 @@ if wanted("arms"):
     else:
         log("WARN BP_PlayerCharacter not found")
 
+if wanted("vehicles"):
+    from hitmen_common import set_mesh, SHAPES
+
+    def find(name, root="/Game/Hitmen"):
+        for asset in EAL.list_assets(root, recursive=True):
+            if asset.split(".")[-1] == name:
+                return EAL.load_asset(asset)
+        return None
+
+    dark = find("MI_Dark")
+    laser = find("MI_Laser")
+    # Mounted gun: the barrel cylinder lies along the gun's forward axis (it pointed straight up).
+    mounted = find("BP_MountedGun")
+    if mounted:
+        set_mesh(unreal.get_default_object(mounted.generated_class()).get_editor_property("mesh"), SHAPES["cylinder"], (0.12, 0.12, 1.4), dark, (70, 0, 0), (-90, 0, 0))
+        unreal.BlueprintEditorLibrary.compile_blueprint(mounted)
+        EAL.save_loaded_asset(mounted, only_if_is_dirty=False)
+    # Tank: a real cannon barrel; the shell is a glowing straight slug.
+    tank = find("BP_Tank")
+    if tank:
+        tank_cdo = unreal.get_default_object(tank.generated_class())
+        set_mesh(tank_cdo.get_editor_property("barrel"), SHAPES["cylinder"], (0.32, 0.32, 3.4), dark)
+        tank_cdo.set_editor_property("shell_speed", 20000.0)
+        unreal.BlueprintEditorLibrary.compile_blueprint(tank)
+        EAL.save_loaded_asset(tank, only_if_is_dirty=False)
+    shell = find("BP_Projectile_TankShell")
+    if shell:
+        shell_cdo = unreal.get_default_object(shell.generated_class())
+        set_mesh(shell_cdo.get_editor_property("mesh"), SHAPES["sphere"], (0.35, 0.35, 0.35), laser)
+        for field, value in (("explosion_radius", 1200.0), ("explosion_damage", 260.0), ("explosion_effect_scale", 3.5),
+                             ("explosion_shake_intensity", 6.0)):
+            shell_cdo.set_editor_property(field, value)
+        trail = EAL.load_asset("/Game/Vefects/Essential_Trails_VFX/Shared/Particles/NS_Trail_Simple_02")
+        if trail:
+            shell_cdo.set_editor_property("trail_effect", trail)
+        movement = shell_cdo.get_editor_property("movement")
+        movement.set_editor_property("projectile_gravity_scale", 0.0)
+        movement.set_editor_property("rotation_follows_velocity", True)
+        unreal.BlueprintEditorLibrary.compile_blueprint(shell)
+        EAL.save_loaded_asset(shell, only_if_is_dirty=False)
+    log("vehicles patched")
+
 if wanted("difficulty"):
     hitmen_content.build_rules()
     log("match rules (difficulty presets) rebuilt")

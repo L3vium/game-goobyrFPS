@@ -231,8 +231,8 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Vent | Crouch-size duct; its hatches swing open like small doors on their top edge, away from the opener; poison spreads to linked rooms only if fully closed |
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
-| Mounted machine gun | Usable from any side (option), 180° arc; takes damage, part of it reaches the gunner |
-| Tank | Enter, third-person view, cannon; server-driven from any client; damageable, driver ejected when destroyed |
+| Mounted machine gun | Usable from any side (option), 180° arc, look speed matches the player's; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
+| Tank | Enter, third-person view; its cannon barrel follows the aim and kicks back; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle flash, view shake; server-driven from any client; damageable, driver ejected when destroyed |
 | Teleporter | Fixed pair: in → out |
 | Retrieval point candidate | See §2 |
 | Weapon / item spawn candidate | See §2 |

@@ -617,9 +617,6 @@ def build_gym():
     block(X - 600, -1900, 100, 100, 80, mi("MI_Dark"), G)
     spawn(bp("World/Interactables/Distraction/BP_Distraction_Radio"), (X - 600, -1900, 80), folder=G)
     label(X - 600, -1900, 120, "RADIO  noise")
-    block(X + 300, -1840, 300, 20, 260, GRID_DARK, G)
-    spawn(bp("World/Interactables/Distraction/BP_HackableDistraction_TV"), (X + 300, -1900, 0), folder=G)
-    label(X + 300, -1900, 260, "TV  silent, hack with F")
     # Security: camera on a pole watching the path, station with its feed.
     block(X + 800, -1150, 50, 50, 420, GRID_DARK, G)
     camera = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (X + 800, -1190, 400), (0, -150, 0), folder=G)

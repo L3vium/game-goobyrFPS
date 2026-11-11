@@ -9,6 +9,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Health regeneration: players heal back 30 per second after 6 s without being hit (UHitmenHealthComponent
   RegenDelay / RegenRate).
 
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -45,6 +46,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   instead of a few seconds.
 
 
+
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -57,12 +59,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):
   the comic-book flipbooks are gone; the data slots stay for the team's own effects.
 - The launch countdown (5-4-3-2-1) and the intro 3-2-1: when everyone is ready the match starts a second later; the
   drop only shows 'Dropping in' and the map name.
 - The health line and the health text: health shows only through the red screen edges and the heartbeat.
+- The 'TV / silent hack with F' hackable distraction, everywhere: class, Blueprint, its Gym placement and label,
+  builders and docs.
 
 ## [0.4.1] - 2026-11-11
 

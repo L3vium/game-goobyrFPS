@@ -1,4 +1,4 @@
-// Hitmen — stealth fixtures: lockers, tall grass, noisy distractions, silent hackable distractions
+// Hitmen — stealth fixtures: lockers, tall grass, noisy distractions (radio)
 
 #pragma once
 
@@ -158,17 +158,4 @@ protected:
 	void Juice_OnTriggered();
 
 	float LastTriggerTime = -1000.f;
-};
-
-/** Silent: draws NPCs that can see it (screens, lights). Hack it with F or remotely. */
-UCLASS(Blueprintable)
-class HITMEN_API AHitmenHackableDistraction : public AHitmenDistraction
-{
-	GENERATED_BODY()
-
-public:
-	AHitmenHackableDistraction();
-
-protected:
-	virtual void Trigger(AActor* Activator) override;
 };

@@ -143,7 +143,7 @@ public:
 	void ApplyPoison(AActor* Poisoner);
 };
 
-/** Distractions and hackables that the Remote Distraction ability can trigger from afar. */
+/** Distractions, panels and consoles that the Remote Distraction ability can trigger from afar. */
 UINTERFACE(MinimalAPI, BlueprintType)
 class UHitmenRemoteActivatable : public UInterface
 {

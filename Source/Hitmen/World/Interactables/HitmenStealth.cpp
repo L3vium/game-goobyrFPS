@@ -251,48 +251,23 @@ void AHitmenDistraction::OnInteracted(AActor* Interactor)
 void AHitmenDistraction::Trigger(AActor* Activator)
 {
 	LastTriggerTime = GetWorld()->GetTimeSeconds();
-	// The noise comes from the device, not from the player.
-	UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), NoiseRadius, this, EHitmenNoiseType::Distraction);
+	// The noise comes from the device, not from the player, again on every pulse while it plays.
 	Multicast_Triggered();
 }
 
 void AHitmenDistraction::Multicast_Triggered_Implementation()
 {
-	Juice_OnTriggered();
-}
-
-AHitmenHackableDistraction::AHitmenHackableDistraction()
-{
-	InteractionText = NSLOCTEXT("Hitmen", "Hack", "Hack");
-	NoiseRadius = 1200.f;
-}
-
-void AHitmenHackableDistraction::Trigger(AActor* Activator)
-{
-	LastTriggerTime = GetWorld()->GetTimeSeconds();
-	// Silent: only NPCs that can see the device react.
-	const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
-	if (AI)
+	// Every machine: plays for PlayTime with a pulsing light and a sound each PulseInterval.
+	PlayingUntil = GetWorld()->GetTimeSeconds() + PlayTime;
+	SetActorTickEnabled(true);
+	if (!PlayingAudio && GetNetMode() != NM_DedicatedServer)
 	{
-		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenHackable), false, this);
-		for (UHitmenAlertComponent* Alert : AI->GetAlertComponents())
+		if (USoundBase* Loop = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::RadioLoop))
 		{
-			const APawn* NPC = Cast<APawn>(Alert->GetOwner());
-			if (!NPC)
-			{
-				continue;
-			}
-			const FVector Eye = NPC->GetPawnViewLocation();
-			const float Distance = FVector::Dist(Eye, GetActorLocation());
-			FHitResult Hit;
-			Params.ClearIgnoredSourceObjects();
-			Params.AddIgnoredActor(this);
-			Params.AddIgnoredActor(NPC);
-			if (Distance <= NoiseRadius && !GetWorld()->LineTraceSingleByChannel(Hit, Eye, GetActorLocation(), ECC_Visibility, Params))
-			{
-				Alert->HearNoise(GetActorLocation(), EHitmenNoiseType::Distraction, this, Distance);
-			}
+			PlayingAudio = UGameplayStatics::SpawnSoundAttached(Loop, Root);
 		}
 	}
-	Multicast_Triggered();
+	Pulse();
+	GetWorldTimerManager().SetTimer(PulseTimer, this, &AHitmenDistraction::Pulse, PulseInterval, true);
+	Juice_OnTriggered();
 }

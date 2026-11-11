@@ -1110,7 +1110,6 @@ def build_world(mats, weapons):
             {"contents_mode": unreal.HitmenContainerContents.RANDOM})
     fixture("BP_TallGrass", unreal.HitmenTallGrass, W + "/Grass", {"mesh": ("cube", (6.0, 6.0, 1.1), mi["MI_Grass"], (0, 0, -5))})
     fixture("BP_Distraction_Radio", unreal.HitmenDistraction, W + "/Distraction", {"mesh": ("cube", (0.4, 0.2, 0.25), mi["MI_Red"], (0, 0, 12))})
-    fixture("BP_HackableDistraction_TV", unreal.HitmenHackableDistraction, W + "/Distraction", {"mesh": ("cube", (1.2, 0.1, 0.7), mi["MI_Dark"], (0, 0, 120))})
     fixture("BP_SecurityCamera", unreal.HitmenSecurityCamera, W + "/Security",
             {"body": ("cube", (0.4, 0.2, 0.2), mi["MI_White"], None), "view_cone": ("cone", (1, 1, 1), mats["cone"], None)})
     decal_comp = component(cdo(bps["BP_SecurityCamera"]), "floor_decal")

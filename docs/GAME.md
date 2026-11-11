@@ -220,7 +220,6 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Window | Thin frame, two shutters swinging sideways; vaultable when open |
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
 | Distraction | Interact → noise that attracts NPCs |
-| Hackable distraction | Silent, interact or remote-activate |
 | Turret | Red laser while locking on, then shoots players; hack with `F` (or its panel): shoots NPCs |
 | Security camera | A shadowed spotlight aimed at the floor (white → red when it sees you; walls cut it); sees you only through open air; spotting calls reinforcements |
 | Security station | Desk + screen cycling through its cameras; `F` disables / enables them ("no signal") |

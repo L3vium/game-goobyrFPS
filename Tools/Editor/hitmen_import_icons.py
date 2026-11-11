@@ -1,5 +1,7 @@
-"""Imports Tools/Icons/Out/T_Icon_*.png into /Game/Hitmen/UI/Icons and assigns them to the matching
-DA_Weapon_<Name> / DA_Ability_<Name> (Icon). Re-run after replacing a PNG. Editor open:
+"""Imports Tools/Icons/Out/T_Icon_*.png into /Game/Hitmen/UI/Icons/<kind> and assigns them to the matching
+DA_Weapon_<Name> / DA_Ability_<Name> (Icon). Kinds: Weapons, Abilities/Move, Abilities/Manipulation (by the
+ability's slot). Re-run after replacing a PNG. To swap one icon by hand, reimport a PNG over the texture in its
+folder or point the data asset's Icon at any texture (docs/Pipelines.md). Editor open:
     python Tools/Editor/ue_remote.py --file Tools/Editor/hitmen_import_icons.py"""
 import glob
 import os
@@ -8,14 +10,24 @@ import unreal
 
 PROJECT = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir())
 SOURCE = os.path.join(PROJECT, "Tools", "Icons", "Out")
-DEST = "/Game/Hitmen/UI/Icons"
+ROOT = "/Game/Hitmen/UI/Icons"
 EAL = unreal.EditorAssetLibrary
+
+
+def dest_for(name):
+    if name.startswith("T_Icon_Weapon_"):
+        return ROOT + "/Weapons"
+    data_path = "/Game/Hitmen/Data/Abilities/DA_Ability_" + name[len("T_Icon_Ability_"):]
+    data = EAL.load_asset(data_path) if EAL.does_asset_exist(data_path) else None
+    slot = data.get_editor_property("slot") if data else None
+    return ROOT + ("/Abilities/Move" if slot == unreal.HitmenAbilitySlot.MOVE else "/Abilities/Manipulation")
+
 
 tasks = []
 for png in sorted(glob.glob(os.path.join(SOURCE, "T_Icon_*.png"))):
     task = unreal.AssetImportTask()
     task.filename = png
-    task.destination_path = DEST
+    task.destination_path = dest_for(os.path.splitext(os.path.basename(png))[0])
     task.replace_existing = True
     task.automated = True
     task.save = False
@@ -25,7 +37,7 @@ unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks(tasks)
 assigned = 0
 for png in sorted(glob.glob(os.path.join(SOURCE, "T_Icon_*.png"))):
     name = os.path.splitext(os.path.basename(png))[0]
-    texture = EAL.load_asset(DEST + "/" + name)
+    texture = EAL.load_asset(dest_for(name) + "/" + name)
     if not texture:
         print("missing", name)
         continue

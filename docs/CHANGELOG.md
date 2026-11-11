@@ -33,21 +33,20 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   hits get red, longer hit ticks (not only headshot kills).
 - Minimap: your own view cone is gone; the status (Suspicious ... Under fire) is a solid banner inside the top of
   the map that opens with a white flash; Under fire is taller, red and pulses.
+- AI hearing is far smaller and never reveals you: footsteps 1.5 m walking / 4.5 m running; a gunshot report is
+  heard 6-9 m around the shooter (was 26-60 m), the bullet impact is what draws guards (they investigate where it
+  landed); each wall cuts the radius again (more than 3 walls: silence); explosions 15 m.
+
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
   rotation in each mesh's own frame (its 0.4.0 guess laid guns on their side); launchers are drawn at 0.55 and long
   guns at 0.75 as intended, the placeholder bow at 0.5.
-
-
-
-
-
-
-
-
-
+- Guards knew where you were: a gunshot within 9 m or any hit made them lock onto your real position and shoot
+  through walls (the target stayed 'visible' forever). Now noise only sends them to the sound or impact, a hit from
+  an unseen shooter puts them on alert toward the shot, and only sight reveals you; in the dark a hostile heard
+  within 2.5 m is attacked.
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):

@@ -109,7 +109,7 @@ players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players 
 | Move | Z Q S D |
 | Look | Mouse |
 | Jump / ledge grab / vault | Space |
-| Crouch (held) — slide when moving, longer slide when sprinting | Left Ctrl |
+| Crouch (held) — a short slide when walking, a longer one when sprinting | Left Ctrl |
 | Sprint (held) | Left Shift |
 | Fire / melee | LMB |
 | Aim | RMB |

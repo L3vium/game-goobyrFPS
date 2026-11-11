@@ -87,13 +87,13 @@ public:
 	float SprintMinForwardDot = 0.5f;
 
 	// ---- Slide ----
-	/** Crouching while moving at least this fast starts a slide (keep above WalkSpeed). */
+	/** Crouching while moving at least this fast starts a slide: a short one from a walk, a long one from a sprint. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
-	float SlideMinStartSpeed = 560.f;
+	float SlideMinStartSpeed = 380.f;
 
-	/** Crouch-walking never slides: only a sprint (or a fall) does. */
+	/** When set, only a sprint slides (crouch-walking just crouches). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide")
-	bool bSlideRequiresSprint = true;
+	bool bSlideRequiresSprint = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
 	float SlideImpulse = 250.f;

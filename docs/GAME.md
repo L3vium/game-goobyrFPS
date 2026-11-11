@@ -151,8 +151,10 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   pistol is silenced.
 - **Keycards**: acquired items shown next to the inventory, cannot be dropped. Doors may require
   a keycard ID (0, 1, 2…). NPCs can carry keycards and drop them on death.
-- **Stealth kill**: `F` behind an unaware target: both are held, the attacker steps in behind, the
-  attack plays (body and first-person arms), the victim reacts and dies on the strike (1 s).
+- **Stealth kill**: `F` next to a target that is not looking at you — from any side, standing or crouched (a guard
+  that sees you coming detects you first and fights). The attacker blends in to the strike position and the view
+  turns over 0.25 s (no snap); both are held, the attack plays (body and first-person arms), the victim reacts and dies
+  on the strike (1 s). Pickpocketing still needs you behind.
 - **Health**: players 300, guards 100 (guards also hit softer, difficulty damage multiplier). Players heal back
   (30 per second) after 6 s without being hit; there is no health bar (red screen edges and heartbeat).
 - **Intro**: the move keys steer the parachute; nobody can see a player under the canopy or for 2 s

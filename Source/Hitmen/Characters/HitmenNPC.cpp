@@ -348,6 +348,25 @@ int32 AHitmenNPC::GetHitmenTeamId_Implementation() const
 	return HitmenTeams::NPC;
 }
 
+bool AHitmenNPC::CanBeTakenDownBy(const AActor* Attacker) const
+{
+	if (!Attacker)
+	{
+		return false;
+	}
+	if (StatusEffectComponent && StatusEffectComponent->IsIncapacitated())
+	{
+		return true;
+	}
+	if (!AlertComponent)
+	{
+		return Super::CanBeTakenDownBy(Attacker);
+	}
+	// Unaware of this attacker = not looking at it right now (any state, any angle, standing or crouched).
+	// An NPC that sees you coming detects you before you reach it (instant detection range) and fights.
+	return !(AlertComponent->GetTarget() == Attacker && AlertComponent->IsTargetVisible());
+}
+
 bool AHitmenNPC::IsUnawareOf(const AActor* Other) const
 {
 	if (!AlertComponent)

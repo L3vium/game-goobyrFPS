@@ -99,16 +99,12 @@ bool UHitmenMeleeComponent::IsValidStealthKillVictim(const AHitmenCharacterBase*
 	{
 		return false;
 	}
-	if (FVector::DotProduct(Victim->GetActorForwardVector(), VictimToAttacker.GetSafeNormal2D()) > StealthKillBehindDot)
-	{
-		return false;
-	}
-	// The attacker must face the victim.
+	// The attacker must face the victim; any side of the victim is fine as long as it is not onto the attacker.
 	if (FVector::DotProduct(Owner->GetActorForwardVector(), -VictimToAttacker.GetSafeNormal2D()) < 0.4f)
 	{
 		return false;
 	}
-	return Victim->IsUnawareOf(Owner);
+	return Victim->CanBeTakenDownBy(Owner);
 }
 
 AHitmenCharacterBase* UHitmenMeleeComponent::FindStealthKillTarget() const
@@ -165,13 +161,19 @@ void UHitmenMeleeComponent::Server_StealthKill_Implementation(AHitmenCharacterBa
 	// A takedown, not an instant kill: both bodies freeze, the attacker steps in behind the
 	// victim facing it, the montages play, and the victim dies on the strike.
 	bTakedownActive = true;
-	const FVector Behind = Victim->GetActorLocation() - Victim->GetActorForwardVector().GetSafeNormal2D() * StealthKillHoldDistance;
-	Attacker->SetActorLocation(FVector(Behind.X, Behind.Y, Attacker->GetActorLocation().Z), true);
-	Attacker->SetActorRotation(FRotator(0.f, Victim->GetActorRotation().Yaw, 0.f));
+	// The attacker keeps its approach side and blends to the hold distance, turning to the victim: no snap.
+	const FVector Approach = (Victim->GetActorLocation() - Attacker->GetActorLocation()).GetSafeNormal2D();
+	const FVector Hold = Victim->GetActorLocation() - Approach * StealthKillHoldDistance;
+	BlendVictim = Victim;
+	BlendFrom = Attacker->GetActorLocation();
+	BlendTo = FVector(Hold.X, Hold.Y, Attacker->GetActorLocation().Z);
+	BlendStart = GetWorld()->GetTimeSeconds();
+	GetWorld()->GetTimerManager().SetTimer(TakedownBlendTimer, this, &UHitmenMeleeComponent::UpdateTakedownBlend, 1.f / 60.f, true);
+	const float TargetYaw = Approach.Rotation().Yaw;
 	if (AController* AttackerController = Attacker->GetController())
 	{
-		AttackerController->SetControlRotation(FRotator(AttackerController->GetControlRotation().Pitch, Victim->GetActorRotation().Yaw, 0.f));
 		AttackerController->SetIgnoreMoveInput(true);
+		Client_BlendView(TargetYaw, -8.f, TakedownBlendTime);
 	}
 	Attacker->GetCharacterMovement()->StopMovementImmediately();
 	if (AController* VictimController = Victim->GetController())
@@ -239,4 +241,54 @@ void UHitmenMeleeComponent::Multicast_PlayStealthKill_Implementation(AHitmenChar
 		Victim->PlayCosmeticMontage(VictimMontage, 1.f);
 	}
 	Juice_OnStealthKill(Victim);
+}
+
+void UHitmenMeleeComponent::UpdateTakedownBlend()
+{
+	ACharacter* Attacker = Cast<ACharacter>(GetOwner());
+	const float T = TakedownBlendTime > 0.f ? FMath::Clamp((GetWorld()->GetTimeSeconds() - BlendStart) / TakedownBlendTime, 0.f, 1.f) : 1.f;
+	if (Attacker)
+	{
+		const float Ease = FMath::InterpEaseInOut(0.f, 1.f, T, 2.f);
+		const FVector Location = FMath::Lerp(BlendFrom, BlendTo, Ease);
+		const FVector ToVictim = BlendVictim.IsValid() ? (BlendVictim->GetActorLocation() - Location).GetSafeNormal2D() : Attacker->GetActorForwardVector();
+		const FRotator Current = Attacker->GetActorRotation();
+		Attacker->SetActorLocationAndRotation(Location, FMath::Lerp(Current, FRotator(0.f, ToVictim.Rotation().Yaw, 0.f), Ease), true);
+	}
+	if (T >= 1.f)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(TakedownBlendTimer);
+	}
+}
+
+void UHitmenMeleeComponent::Client_BlendView_Implementation(float TargetYaw, float TargetPitch, float Duration)
+{
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	AController* Controller = Pawn ? Pawn->GetController() : nullptr;
+	if (!Controller)
+	{
+		return;
+	}
+	ViewBlendFrom = Controller->GetControlRotation();
+	ViewBlendTo = FRotator(TargetPitch, TargetYaw, 0.f);
+	ViewBlendStart = GetWorld()->GetTimeSeconds();
+	ViewBlendDuration = Duration;
+	GetWorld()->GetTimerManager().SetTimer(ViewBlendTimer, this, &UHitmenMeleeComponent::UpdateViewBlend, 1.f / 120.f, true);
+	UpdateViewBlend();
+}
+
+void UHitmenMeleeComponent::UpdateViewBlend()
+{
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	AController* Controller = Pawn ? Pawn->GetController() : nullptr;
+	const float T = ViewBlendDuration > 0.f ? FMath::Clamp((GetWorld()->GetTimeSeconds() - ViewBlendStart) / ViewBlendDuration, 0.f, 1.f) : 1.f;
+	if (Controller)
+	{
+		const FQuat Blended = FQuat::Slerp(ViewBlendFrom.Quaternion(), ViewBlendTo.Quaternion(), FMath::InterpEaseInOut(0.f, 1.f, T, 2.f));
+		Controller->SetControlRotation(Blended.Rotator());
+	}
+	if (T >= 1.f)
+	{
+		GetWorld()->GetTimerManager().ClearTimer(ViewBlendTimer);
+	}
 }

@@ -76,6 +76,9 @@ public:
 
 	/** NPC alert state or "unaware from behind" for players; used by stealth kills. */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")
+	/** Silent takedown allowed by Attacker: default = from behind (players see what is in front of them);
+	 *  NPCs: from any angle, standing or crouched, as long as they are not seeing the attacker. */
+	virtual bool CanBeTakenDownBy(const AActor* Attacker) const { return IsUnawareOf(Attacker); }
 	virtual bool IsUnawareOf(const AActor* Other) const;
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")

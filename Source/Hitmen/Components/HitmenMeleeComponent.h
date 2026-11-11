@@ -49,8 +49,9 @@ protected:
 	float StealthKillRange = 170.f;
 
 	/** Attacker must be behind the victim: dot(victim forward, victim->attacker) below this. */
-	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|StealthKill", meta=(ClampMin="-1", ClampMax="1"))
-	float StealthKillBehindDot = -0.35f;
+	/** The attacker blends into the strike position (and the view turns) over this time: no snap. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|StealthKill", meta=(ClampMin="0", Units="s"))
+	float TakedownBlendTime = 0.25f;
 
 	UFUNCTION(Server, Reliable)
 	void Server_Punch();
@@ -108,4 +109,21 @@ public:
 	/** True during a takedown (input ignored by the owner). */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Melee")
 	bool IsPerformingTakedown() const { return bTakedownActive; }
+
+	// Takedown blend (server moves the attacker; the owning client turns its view).
+	FTimerHandle TakedownBlendTimer;
+	TWeakObjectPtr<AActor> BlendVictim;
+	FVector BlendFrom = FVector::ZeroVector;
+	FVector BlendTo = FVector::ZeroVector;
+	float BlendStart = 0.f;
+	void UpdateTakedownBlend();
+
+	UFUNCTION(Client, Reliable)
+	void Client_BlendView(float TargetYaw, float TargetPitch, float Duration);
+	FTimerHandle ViewBlendTimer;
+	FRotator ViewBlendFrom = FRotator::ZeroRotator;
+	FRotator ViewBlendTo = FRotator::ZeroRotator;
+	float ViewBlendStart = 0.f;
+	float ViewBlendDuration = 0.f;
+	void UpdateViewBlend();
 };

@@ -66,6 +66,7 @@ public:
 
 	virtual int32 GetHitmenTeamId_Implementation() const override;
 	virtual bool IsUnawareOf(const AActor* Other) const override;
+	virtual bool CanBeTakenDownBy(const AActor* Attacker) const override;
 	virtual void Tick(float DeltaSeconds) override;
 
 	/** NPCs in combat raise their gun (weapon AimMontage) while standing or walking slowly. */

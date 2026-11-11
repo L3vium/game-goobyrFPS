@@ -19,6 +19,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -60,6 +61,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   indicator), and makes its noise (10 m) on every beat.
 - Explosive barrels: explosion sound and view shake (effect slot for the toon explosion), chain reactions; the
   default explosion noise is 15 m (was 40 m).
+- Silent takedown from any side, standing or crouched, as long as the guard is not looking at you (it used to need
+  you behind it); the attacker blends in and the view turns over 0.25 s instead of snapping (also for clients).
 
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
@@ -78,6 +81,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Window flicker: the frame faces were coplanar with the wall's opening and the closed shutters overlapped in one
   plane; the frame now sits inside the opening, the shutters at two depths, and they open 80 degrees (105 cut into
   the wall).
+
 
 
 

@@ -189,6 +189,19 @@ if wanted("exposure"):
         log("fixed exposure:", map_name)
     les.load_level(current)
 
+if wanted("footsteps"):
+    # Footstep sounds per surface for the player and every NPC (the slots were empty: steps were silent).
+    for bp_path in ("/Game/Hitmen/Characters/Player/BP_PlayerCharacter", "/Game/Hitmen/Characters/NPC/BP_NPC_Guard",
+                    "/Game/Hitmen/Characters/NPC/BP_NPC_Sniper", "/Game/Hitmen/Characters/NPC/BP_NPC_VIPCandidate"):
+        bp = EAL.load_asset(bp_path) if EAL.does_asset_exist(bp_path) else None
+        if not bp:
+            log("WARN missing", bp_path)
+            continue
+        hitmen_content.set_footstep_sounds(unreal.get_default_object(bp.generated_class()))
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        EAL.save_loaded_asset(bp, only_if_is_dirty=False)
+    log("footstep sounds set")
+
 if wanted("difficulty"):
     hitmen_content.build_rules()
     log("match rules (difficulty presets) rebuilt")

@@ -166,8 +166,8 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   any distance. No waypoint in normal view. Radii live on the player controller
   (`Hitmen|Sightroom`) so a 3C swap keeps them.
 - **Emotes**: hold `R` for a radial wheel.
-- **Footsteps**: different sounds per surface (grass, stone, sand, wood, metal) through physical
-  materials and an anim notify.
+- **Footsteps**: a sound per surface (grass, stone, sand / dirt, wood, metal; concrete elsewhere) through physical
+  materials (PM_*), for players and NPCs; the surface also scales how far NPCs hear the step.
 
 ## 7. Weapons
 All weapons share ammo, fire rate, spread (fixed: firing never widens it), recoil, damage, headshot

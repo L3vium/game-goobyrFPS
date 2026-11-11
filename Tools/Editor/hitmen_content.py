@@ -402,6 +402,30 @@ def montage(name, source):
     return m
 
 
+
+def set_footstep_sounds(character_cdo):
+    """Footstep sounds per physical surface (PM_Grass / Stone / Sand / Wood / Metal) and a default."""
+    steps1 = ESS + "SFX_Essentials_11_FOOTSTEPS_01/Cues/FEETHmn_InsJ_Footsteps_"
+    steps2 = ESS + "SFX_Essentials_20_FOOTSTEPS_02/Cues/FEETHmn_InsJ_Footsteps_"
+    P = unreal.PhysicalSurface
+    table = {P.SURFACE_TYPE1: (steps1 + "Grass_Running_Trainers_01-01_Single-01_Cue", 0.8),
+             P.SURFACE_TYPE2: (steps2 + "Stones_Running_Trainers_01-01_Single-01_Cue", 1.0),
+             P.SURFACE_TYPE3: (steps2 + "Dirt_Running_Trainers_01-01_Single-01_Cue", 0.6),
+             P.SURFACE_TYPE4: (steps2 + "Wood_Jogging_Trainers_02-01_Single_01_Cue", 1.1),
+             P.SURFACE_TYPE5: (steps2 + "Glass_Running_Trainers_03-01_Single-01_Cue", 1.4)}
+    comp = component(character_cdo, "footstep_component")
+    if not comp:
+        return
+    feedback = {}
+    for surface, (sound_path, noise) in table.items():
+        f = unreal.HitmenSurfaceFeedback()
+        f.set_editor_property("sound", load(sound_path))
+        f.set_editor_property("noise_multiplier", noise)
+        feedback[surface] = f
+    default = unreal.HitmenSurfaceFeedback()
+    default.set_editor_property("sound", load(steps1 + "Concrete_Jogging_Trainers_01-01_Single-01_Cue"))
+    set_props(comp, surface_feedback=feedback, default_feedback=default)
+
 def build_animation():
     folder = path("Characters", "Shared", "Anims")
     ensure_folder(folder)
@@ -956,6 +980,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     if fp:
         set_props(fp, skeletal_mesh_asset=manny, anim_class=gen_class(fp_abp) if fp_abp else gen_class(abp))
     set_props(pcdo, anim_set=anim_set)
+    set_footstep_sounds(pcdo)
     interaction = component(pcdo, "interaction_component")
     if interaction:
         set_props(interaction, focus_overlay_material=mats["focus"])

@@ -20,6 +20,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
 - Menu buttons: hover snaps (no fade, no sliding label) and a lit block turns white with a dark label; the red bar
@@ -78,6 +79,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Last-known-position ghost: a faint white silhouette (15 % opacity, was 35 %), Hitman-like.
 
 
+
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -107,6 +109,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   34-degree view, untonemapped, at 512 x 288. It now looks ahead with a 90-degree view (FeedFOV), tonemapped at the
   match exposure, at 1024 x 576. The 'no signal' screen works on consoles too (wrong material path, unset on the
   console).
+- Footsteps were silent (the per-surface sound slots were empty): players and NPCs now play a footstep per surface
+  (grass, stone, dirt, wood, metal, concrete by default).
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):

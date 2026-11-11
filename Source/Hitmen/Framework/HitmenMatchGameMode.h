@@ -95,7 +95,6 @@ protected:
 	FTimerHandle SonarTimer;
 	FTimerHandle EndTimer;
 	float CarryStartTime = 0.f;
-	TMap<int32, TArray<AActor*>> UsedStarts;
 	bool bMatchSetup = false;
 	bool bMatchOver = false;
 };

@@ -169,7 +169,10 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	{
 		for (const AActor* Point : GS->GetActiveRetrievalPoints())
 		{
-			Marker(3, Point->GetActorLocation(), TEXT(""), 14.f);
+			if (Point)
+			{
+				Marker(3, Point->GetActorLocation(), TEXT(""), 14.f);
+			}
 		}
 		if (const AActor* VIP = GS->GetVIP())
 		{

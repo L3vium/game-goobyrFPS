@@ -229,6 +229,7 @@ protected:
 	UPROPERTY(Transient)
 	TArray<FHitmenChoiceItem> Choices;
 
+	UPROPERTY(Transient)
 	TArray<FSlateBrush> Brushes;
 	int32 Selected = 0;
 	int32 Hovered = INDEX_NONE;
@@ -325,6 +326,7 @@ protected:
 	FText Title;
 	FText Key;
 	float Size = 170.f;
+	UPROPERTY(Transient)
 	FSlateBrush ImageBrush;
 	bool bHasImage = false;
 	bool bSelected = false;

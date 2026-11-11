@@ -126,8 +126,9 @@ void AHitmenExplosiveBarrel::ReceiveExplosion_Implementation(const FVector& Orig
 	{
 		return;
 	}
-	AController* InstigatorController = InstigatorActor ? InstigatorActor->GetInstigatorController() : nullptr;
-	GetWorldTimerManager().SetTimer(ChainTimer, FTimerDelegate::CreateWeakLambda(this, [this, InstigatorController]() { Explode(InstigatorController); }), ChainDelay, false);
+	// Weak: the instigating player may leave before the chain delay ends.
+	TWeakObjectPtr<AController> InstigatorController = InstigatorActor ? InstigatorActor->GetInstigatorController() : nullptr;
+	GetWorldTimerManager().SetTimer(ChainTimer, FTimerDelegate::CreateWeakLambda(this, [this, InstigatorController]() { Explode(InstigatorController.Get()); }), ChainDelay, false);
 }
 
 void AHitmenExplosiveBarrel::Explode(AController* InstigatorController)

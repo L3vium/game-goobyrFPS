@@ -114,6 +114,10 @@ int32 UHitmenCompassWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		{
 			for (const AActor* Point : GS->GetActiveRetrievalPoints())
 			{
+				if (!Point)
+				{
+					continue;
+				}
 				bool bVisible = false;
 				const float X = ToX((Point->GetActorLocation() - Pawn->GetActorLocation()).Rotation().Yaw, bVisible);
 				if (bVisible)

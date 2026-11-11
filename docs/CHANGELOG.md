@@ -5,6 +5,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+### Fixed
+- **Crash about one minute after launch** (all 20 reports of the 0.4.0 playtest). The minimap, the Create Room map
+  tile and the pause map drew textures through `FSlateBrush` members that were not `UPROPERTY`: the first garbage
+  collection (about 61 s in) freed the textures and the next paint read freed memory. PIE never showed it because the
+  editor keeps the assets loaded. Every brush is now a `UPROPERTY(Transient)`.
+- Related hardening from a GC audit of the whole module: the UI font is kept loaded once found (it silently fell back to
+  the engine font after a GC), the barrel chain-explosion timer holds its instigator weakly, the lobby's local loadout
+  copies are `UPROPERTY`, retrieval-point markers skip destroyed points.
+
 ## [0.4.0] - 2026-11-10
 
 ### Fixed

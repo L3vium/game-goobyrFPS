@@ -99,6 +99,15 @@ if wanted("burst_rifle"):
             EAL.delete_asset(icon)
         log("burst rifle: deleted")
 
+if wanted("fp_motion"):
+    # Procedural first-person motion per weapon (hip / aim deltas, equip, kick, scope).
+    for name in hitmen_content.FP_MOTION:
+        data = load(WEAPONS + "DA_Weapon_" + name)
+        if data:
+            data.set_editor_property("fp_motion", hitmen_content.fp_motion(name))
+            save(data)
+    log("fp motion: weapons", len(hitmen_content.FP_MOTION))
+
 if wanted("sound"):
     # Attenuation per sound space (steps, gunshots, impacts, world) and the space of each sound-set entry.
     hitmen_content.build_sound_set()

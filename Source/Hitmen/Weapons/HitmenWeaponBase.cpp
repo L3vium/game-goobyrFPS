@@ -12,6 +12,8 @@
 #include "Interaction/HitmenScanRegistry.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Hitmen.h"
+#include "StatusEffects/HitmenStatusEffectComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -355,25 +357,17 @@ void AHitmenWeaponBase::Drop(int32 InAmmo, const FVector& Location, const FRotat
 	ApplyWeaponState();
 
 	FVector PlaceAt = Location;
-	if (Thrower)
+	if (Thrower && !Velocity.IsNearlyZero())
 	{
-		// Thrown: no physics phase either. It lands as a floating pickup a little ahead of the thrower (in front of
-		// any wall), on the ground below.
-		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenThrowPlace), false, this);
-		Params.AddIgnoredActor(Thrower);
-		const FVector Dir = Velocity.GetSafeNormal2D().IsNearlyZero() ? Thrower->GetActorForwardVector() : Velocity.GetSafeNormal2D();
-		FVector Ahead = Location + Dir * ThrowPlaceDistance;
-		FHitResult Hit;
-		if (GetWorld()->LineTraceSingleByChannel(Hit, Location, Ahead, ECC_Visibility, Params))
-		{
-			Ahead = Hit.ImpactPoint - Dir * 40.f;
-		}
-		FHitResult Ground;
-		if (GetWorld()->LineTraceSingleByChannel(Ground, Ahead, Ahead - FVector(0.f, 0.f, 2000.f), ECC_Visibility, Params))
-		{
-			Ahead = Ground.ImpactPoint;
-		}
-		PlaceAt = Ahead;
+		// Thrown: it really flies, spinning (physics, replicated). Its first hit can stun a pawn (HandleDropHit);
+		// an empty gun then vanishes, a loaded one settles and floats as a pickup (UpdateDropped).
+		SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+		DropCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+		DropCollision->SetPhysicsLinearVelocity(Velocity + FVector::UpVector * Velocity.Size() * ThrowLift);
+		DropCollision->SetPhysicsAngularVelocityInDegrees(Rotation.RotateVector(FVector::RightVector) * ThrowSpinSpeed);
+		GetWorldTimerManager().ClearTimer(PickupActivationTimer);
+		GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, FMath::Max(0.05f, ThrownPickupDelay), false);
+		return;
 	}
 	SetActorLocationAndRotation(PlaceAt, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
 	// Swapped, dropped or thrown: it becomes a floating pickup at once, no tumbling.
@@ -537,12 +531,54 @@ void AHitmenWeaponBase::HandleDropHit(UPrimitiveComponent* HitComponent, AActor*
 	{
 		return;
 	}
-	// First impact of a throw: hurt a hostile pawn once, then become a plain pickup.
+	// First impact of a throw: hurt a hostile pawn once (stun it on a head hit), then become a plain pickup
+	// - or vanish when the gun was empty.
 	bThrowDamageDone = true;
 	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	if (!HasAuthority())
+	{
+		return;
+	}
 	if (WeaponData && LastThrower && Cast<APawn>(OtherActor) && UHitmenTeamLibrary::AreHostile(LastThrower, OtherActor))
 	{
 		UGameplayStatics::ApplyPointDamage(OtherActor, WeaponData->ThrowDamage, DropCollision->GetPhysicsLinearVelocity().GetSafeNormal(), Hit, LastThrower->GetController(), this, UDamageType::StaticClass());
+		if (AHitmenCharacterBase* Victim = Cast<AHitmenCharacterBase>(OtherActor); Victim && !Victim->IsDead())
+		{
+			const float HeadZ = Victim->GetActorLocation().Z + Victim->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.55f;
+			if (Hit.ImpactPoint.Z >= HeadZ)
+			{
+				Victim->GetStatusEffects()->ApplyStatus(EHitmenStatusEffect::Stunned, ThrowStunDuration, 1.f, LastThrower);
+			}
+		}
+	}
+	if (IsEmptyThrow())
+	{
+		VanishAfterThrow();
+	}
+}
+
+bool AHitmenWeaponBase::IsEmptyThrow() const
+{
+	return WeaponData && WeaponData->bUsesAmmo && DroppedAmmo <= 0;
+}
+
+void AHitmenWeaponBase::VanishAfterThrow()
+{
+	if (!HasAuthority() || bConsumed)
+	{
+		return;
+	}
+	bConsumed = true;
+	Multicast_ThrownVanish(GetActorLocation());
+	SetLifeSpan(0.05f);
+}
+
+void AHitmenWeaponBase::Multicast_ThrownVanish_Implementation(FVector_NetQuantize Location)
+{
+	SetActorHiddenInGame(true);
+	if (ThrownVanishFX && GetNetMode() != NM_DedicatedServer)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ThrownVanishFX, Location, FRotator::ZeroRotator, FVector(0.6f));
 	}
 }
 
@@ -929,10 +965,11 @@ void AHitmenWeaponBase::FireOnce()
 	SimulateImpacts(Origin, SpreadDirection, Seed, Impacts);
 	PlayFireEffects(GetMuzzleLocation(), Impacts, true);
 
-	// The view kicks up, then comes back down smoothly (spring on the player character).
+	// The view kicks up, then comes back down smoothly (spring on the player character); the arms kick too.
 	if (AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(OwnerPawn))
 	{
 		Player->AddRecoil(WeaponData->RecoilPitch, FMath::FRandRange(-WeaponData->RecoilYawRandom, WeaponData->RecoilYawRandom));
+		Player->OnFirstPersonFired(WeaponData);
 	}
 	if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()); PC && WeaponData->FireCameraShake)
 	{

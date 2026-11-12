@@ -14,6 +14,7 @@
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenAbilityData.h"
 #include "Components/HitmenHealthComponent.h"
+#include "Components/HitmenFootstepComponent.h"
 #include "Components/HitmenCosmeticComponent.h"
 #include "Components/HitmenMeleeComponent.h"
 #include "Components/HitmenBodyCarryComponent.h"
@@ -72,7 +73,7 @@ AHitmenPlayerCharacter::AHitmenPlayerCharacter(const FObjectInitializer& ObjectI
 	FirstPersonCamera->bEnableFirstPersonFieldOfView = true;
 	FirstPersonCamera->bEnableFirstPersonScale = true;
 	FirstPersonCamera->FirstPersonFieldOfView = 70.f;
-	FirstPersonCamera->FirstPersonScale = 0.6f;
+	FirstPersonCamera->FirstPersonScale = FirstPersonViewScale;
 
 	SpectatorCapture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("SpectatorCapture"));
 	SpectatorCapture->SetupAttachment(FirstPersonCamera);
@@ -120,6 +121,7 @@ void AHitmenPlayerCharacter::BeginPlay()
 	Super::BeginPlay();
 	CurrentEyeHeight = StandingViewHeight;
 	FirstPersonCamera->SetRelativeLocation(FVector(0.f, 0.f, CurrentEyeHeight));
+	FirstPersonCamera->FirstPersonScale = FirstPersonViewScale;
 	CurrentArmsOffset = ArmsHipOffset;
 	for (const FName& Bone : FirstPersonHiddenBones)
 	{
@@ -163,11 +165,9 @@ void AHitmenPlayerCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AHitmenPlayerCharacter::GetMontageMeshes(TArray<USkeletalMeshComponent*>& OutMeshes) const
 {
+	// Body montages (fire, equip, punch, takedown, throw) play on the body only: the first-person arms move
+	// procedurally (UpdateFirstPersonArms), so you never see a third-person motion (the body leaning into a punch).
 	Super::GetMontageMeshes(OutMeshes);
-	if (IsLocallyControlled() && FirstPersonMesh)
-	{
-		OutMeshes.AddUnique(FirstPersonMesh);
-	}
 }
 
 void AHitmenPlayerCharacter::ApplyUserSettings()
@@ -295,15 +295,39 @@ void AHitmenPlayerCharacter::Tick(float DeltaSeconds)
 	{
 		return;
 	}
-	float TargetFOV = BaseFOV;
-	if (bIsAiming)
+	if (FootstepComponent)
 	{
-		if (const UHitmenWeaponData* Data = InventoryComponent->GetActiveWeaponData())
+		// Your own steps fall on the head bob (UpdateHeadBob); everyone else's come from their animation.
+		FootstepComponent->SetExternalStepTiming(true);
+	}
+	AimHeldTime = bIsAiming ? AimHeldTime + DeltaSeconds : 0.f;
+	float TargetFOV = BaseFOV;
+	const UHitmenWeaponData* AimData = InventoryComponent->GetActiveWeaponData();
+	if (bIsAiming && AimData)
+	{
+		// Scoped weapons first come up to the eye and steady themselves, then the zoom comes in.
+		const float ScopeDelay = AimData->bScopeOverlay ? AimData->FPMotion.ScopeRaiseTime + AimData->FPMotion.ScopeWobbleTime : 0.f;
+		if (AimHeldTime >= ScopeDelay)
 		{
-			TargetFOV = Data->AimFOV;
+			TargetFOV = AimData->AimFOV;
 		}
 	}
 	FirstPersonCamera->SetFieldOfView(FMath::FInterpTo(FirstPersonCamera->FieldOfView, TargetFOV, DeltaSeconds, AimInterpSpeed));
+	// Zoomed in, the aim breathes a little (a real offset of the view, so the shot follows it).
+	FVector2D ScopeSway = FVector2D::ZeroVector;
+	if (bIsAiming && AimData && AimData->bScopeOverlay && FirstPersonCamera->FieldOfView < BaseFOV - 5.f)
+	{
+		const float Time = GetWorld()->GetTimeSeconds();
+		const float Amount = AimData->FPMotion.ScopeSway;
+		ScopeSway = FVector2D(FMath::Sin(Time * 0.9f) * Amount, FMath::Sin(Time * 1.3f + 1.f) * Amount * 0.7f);
+	}
+	if (AController* ViewController = GetController(); ViewController && !ScopeSway.Equals(ScopeSwayApplied, 0.0001f))
+	{
+		const FVector2D Delta = ScopeSway - ScopeSwayApplied;
+		ViewController->SetControlRotation(ViewController->GetControlRotation() + FRotator(Delta.X, Delta.Y, 0.f));
+		ScopeSwayApplied = ScopeSway;
+	}
+	UpdateHeadBob(DeltaSeconds);
 	UpdateEyeHeight(DeltaSeconds);
 	UpdateRecoil(DeltaSeconds);
 	UpdateFirstPersonArms(DeltaSeconds);
@@ -381,7 +405,146 @@ void AHitmenPlayerCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHal
 void AHitmenPlayerCharacter::UpdateEyeHeight(float DeltaSeconds)
 {
 	CurrentEyeHeight = FMath::FInterpTo(CurrentEyeHeight, GetTargetEyeHeight(), DeltaSeconds, EyeHeightInterpSpeed);
-	FirstPersonCamera->SetRelativeLocation(FVector(0.f, 0.f, CurrentEyeHeight));
+	FirstPersonCamera->SetRelativeLocation(FVector(0.f, HeadBobOffset.Y, CurrentEyeHeight + HeadBobOffset.Z));
+}
+
+void AHitmenPlayerCharacter::UpdateHeadBob(float DeltaSeconds)
+{
+	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
+	const bool bGrounded = Movement && Movement->IsMovingOnGround() && !Movement->IsSliding();
+	const float Speed = GetVelocity().Size2D();
+	const bool bSprint = Movement && Movement->IsSprinting();
+	const bool bCrouch = bIsCrouched;
+	const bool bWalking = bGrounded && Speed > 40.f;
+	HeadBobAlpha = FMath::FInterpTo(HeadBobAlpha, bWalking ? 1.f : 0.f, DeltaSeconds, 8.f);
+	if (bWalking)
+	{
+		// One step per half turn of the phase: the view is lowest (the foot lands) at every multiple of PI.
+		const float StepLength = bCrouch ? CrouchStepLength : (bSprint ? SprintStepLength : WalkStepLength);
+		HeadBobPhase += Speed * DeltaSeconds / StepLength * PI;
+		const int32 Step = FMath::FloorToInt(HeadBobPhase / PI);
+		if (Step != HeadBobStep)
+		{
+			HeadBobStep = Step;
+			if (FootstepComponent)
+			{
+				FootstepComponent->HandleTimedFootstep();
+			}
+		}
+	}
+	else
+	{
+		// Standing still: settle on the next low point so the first step starts there.
+		const float Rest = FMath::CeilToFloat(HeadBobPhase / PI) * PI;
+		HeadBobPhase = FMath::FInterpTo(HeadBobPhase, Rest, DeltaSeconds, 6.f);
+		HeadBobStep = FMath::FloorToInt(HeadBobPhase / PI);
+	}
+	const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
+	const float UserScale = Settings ? FMath::Clamp(Settings->HeadBobScale, 0.f, 2.f) : 1.f;
+	const float GaitScale = bSprint ? HeadBobSprintScale : (bCrouch ? HeadBobCrouchScale : 1.f);
+	const float Scale = UserScale * GaitScale * HeadBobAlpha * (bIsAiming ? 0.3f : 1.f);
+	HeadBobOffset = FVector(0.f,
+		FMath::Sin(HeadBobPhase * 0.5f) * HeadBobSide * Scale,
+		(FMath::Abs(FMath::Sin(HeadBobPhase)) - 0.5f) * HeadBobHeight * Scale);
+}
+
+void AHitmenPlayerCharacter::PlayFirstPersonAction(EHitmenFPAction Action, float Duration)
+{
+	FPAction = Action;
+	FPActionStart = GetWorld()->GetTimeSeconds();
+	FPActionDuration = FMath::Max(0.05f, Duration);
+	if (Action == EHitmenFPAction::Punch)
+	{
+		// Left, right, left...
+		FPActionSide = -FPActionSide;
+	}
+	ShowFirstPersonArms(FPActionDuration + 0.1f);
+}
+
+void AHitmenPlayerCharacter::OnFirstPersonFired(const UHitmenWeaponData* Weapon)
+{
+	if (!Weapon || !IsLocallyControlled())
+	{
+		return;
+	}
+	if (!Weapon->bUsesAmmo && Weapon->MeleeRange > 0.f)
+	{
+		PlayFirstPersonAction(EHitmenFPAction::KnifeSlash, FMath::Clamp(Weapon->GetFireInterval() * 0.9f, 0.3f, 0.55f));
+		return;
+	}
+	// A spring kick per shot: an initial speed of Amount * sqrt(K) peaks at about Amount.
+	const FHitmenFPMotion& Motion = Weapon->FPMotion;
+	KickStiffness = Motion.KickStiffness;
+	const float Omega = FMath::Sqrt(KickStiffness);
+	const float AimScale = bIsAiming ? 0.6f : 1.f;
+	KickOffsetVelocity += FVector(-Motion.KickBack, 0.f, Motion.KickBack * 0.15f) * Omega * AimScale;
+	KickRotationVelocity += FVector(Motion.KickUp, FMath::FRandRange(-Motion.KickSide, Motion.KickSide), FMath::FRandRange(-Motion.KickSide, Motion.KickSide) * 1.5f) * Omega * AimScale;
+}
+
+void AHitmenPlayerCharacter::HandleWeaponThrown(UHitmenWeaponData* Weapon)
+{
+	Super::HandleWeaponThrown(Weapon);
+	if (IsLocallyControlled())
+	{
+		PlayFirstPersonAction(EHitmenFPAction::Throw, 0.5f);
+	}
+}
+
+void AHitmenPlayerCharacter::EvaluateFirstPersonAction(FVector& OutOffset, FRotator& OutRotation) const
+{
+	OutOffset = FVector::ZeroVector;
+	OutRotation = FRotator::ZeroRotator;
+	const float Elapsed = GetWorld()->GetTimeSeconds() - FPActionStart;
+	if (FPAction == EHitmenFPAction::None || Elapsed < 0.f || Elapsed > FPActionDuration)
+	{
+		return;
+	}
+	struct FKey { float T; FVector Offset; FRotator Rotation; };
+	// Keys in camera space (X forward, Y right, Z up; pitch up, yaw right, roll right), eased between keys.
+	const float S = FPActionSide;
+	TArray<FKey> Keys;
+	switch (FPAction)
+	{
+	case EHitmenFPAction::Punch:
+		Keys = { { 0.f, FVector::ZeroVector, FRotator::ZeroRotator },
+				 { 0.3f, FVector(26.f, -7.f * S, 5.f), FRotator(4.f, -10.f * S, 14.f * S) },
+				 { 1.f, FVector::ZeroVector, FRotator::ZeroRotator } };
+		break;
+	case EHitmenFPAction::KnifeSlash:
+		Keys = { { 0.f, FVector::ZeroVector, FRotator::ZeroRotator },
+				 { 0.25f, FVector(-6.f, 7.f, 5.f), FRotator(10.f, 30.f, 25.f) },
+				 { 0.55f, FVector(18.f, -12.f, -4.f), FRotator(-12.f, -40.f, -20.f) },
+				 { 1.f, FVector::ZeroVector, FRotator::ZeroRotator } };
+		break;
+	case EHitmenFPAction::Throw:
+		Keys = { { 0.f, FVector::ZeroVector, FRotator::ZeroRotator },
+				 { 0.4f, FVector(-10.f, -2.f, 14.f), FRotator(35.f, 5.f, -15.f) },
+				 { 0.6f, FVector(28.f, -6.f, -10.f), FRotator(-30.f, -8.f, 10.f) },
+				 { 1.f, FVector::ZeroVector, FRotator::ZeroRotator } };
+		break;
+	case EHitmenFPAction::Takedown:
+		Keys = { { 0.f, FVector::ZeroVector, FRotator::ZeroRotator },
+				 { 0.25f, FVector(24.f, -4.f, -14.f), FRotator(-22.f, -6.f, 10.f) },
+				 { 0.7f, FVector(20.f, -3.f, -12.f), FRotator(-18.f, -4.f, 8.f) },
+				 { 1.f, FVector::ZeroVector, FRotator::ZeroRotator } };
+		break;
+	default:
+		return;
+	}
+	const float T = FMath::Clamp(Elapsed / FPActionDuration, 0.f, 1.f);
+	for (int32 Index = 1; Index < Keys.Num(); ++Index)
+	{
+		if (T <= Keys[Index].T)
+		{
+			const FKey& A = Keys[Index - 1];
+			const FKey& B = Keys[Index];
+			const float Alpha = FMath::SmoothStep(0.f, 1.f, (T - A.T) / FMath::Max(B.T - A.T, KINDA_SMALL_NUMBER));
+			OutOffset = FMath::Lerp(A.Offset, B.Offset, Alpha);
+			OutRotation = FRotator(FMath::Lerp(A.Rotation.Pitch, B.Rotation.Pitch, Alpha), FMath::Lerp(A.Rotation.Yaw, B.Rotation.Yaw, Alpha),
+				FMath::Lerp(A.Rotation.Roll, B.Rotation.Roll, Alpha));
+			return;
+		}
+	}
 }
 
 void AHitmenPlayerCharacter::AddRecoil(float PitchDegrees, float YawDegrees)
@@ -444,11 +607,13 @@ void AHitmenPlayerCharacter::ShowFirstPersonArms(float Duration)
 void AHitmenPlayerCharacter::UpdateFirstPersonArms(float DeltaSeconds)
 {
 	const UHitmenWeaponData* Data = InventoryComponent->GetActiveWeaponData();
+	AHitmenWeaponBase* Weapon = InventoryComponent->GetActiveWeapon();
+	const float Now = GetWorld()->GetTimeSeconds();
 	const bool bScoped = bIsAiming && Data && Data->bScopeOverlay && FirstPersonCamera->FieldOfView < BaseFOV - 1.f;
 	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
-	const bool bBusy = Movement && Movement->IsClimbing();
-	const bool bWantArms = !IsDead() && !bScoped && !bBusy
-		&& (InventoryComponent->GetActiveWeapon() != nullptr || GetWorld()->GetTimeSeconds() < ArmsVisibleUntil);
+	const bool bBusy = Movement && (Movement->IsClimbing() || Movement->IsHanging());
+	const bool bActing = FPAction != EHitmenFPAction::None && Now < FPActionStart + FPActionDuration;
+	const bool bWantArms = !IsDead() && !bScoped && !bBusy && (Weapon != nullptr || Now < ArmsVisibleUntil || bActing);
 	if (bWantArms != bArmsVisible || !bArmsInitialised)
 	{
 		bArmsVisible = bWantArms;
@@ -458,45 +623,139 @@ void AHitmenPlayerCharacter::UpdateFirstPersonArms(float DeltaSeconds)
 	if (!bArmsVisible)
 	{
 		LastControlRotation = GetControlRotation();
+		LastArmsWeapon = Weapon;
 		return;
 	}
+	const FHitmenFPMotion Motion = Data ? Data->FPMotion : FHitmenFPMotion();
+	const float SafeDelta = FMath::Max(DeltaSeconds, KINDA_SMALL_NUMBER);
 
-	// Hip / aim offset.
-	const FVector TargetArmsOffset = !InventoryComponent->GetActiveWeapon() ? ArmsUnarmedOffset : (bIsAiming ? ArmsAimOffset : ArmsHipOffset);
-	// Fists appear at once (a punch is short); weapons blend between hip and aim.
-	CurrentArmsOffset = InventoryComponent->GetActiveWeapon() ? FMath::VInterpTo(CurrentArmsOffset, TargetArmsOffset, DeltaSeconds, ArmsOffsetInterpSpeed) : TargetArmsOffset;
+	// Equip: every weapon that comes into hand rises from below the view (fast, eased out).
+	if (Weapon != LastArmsWeapon.Get())
+	{
+		LastArmsWeapon = Weapon;
+		EquipStartTime = Weapon ? Now : -100.f;
+	}
+	const float EquipAlpha = FMath::Clamp((Now - EquipStartTime) / FMath::Max(Motion.EquipTime, 0.01f), 0.f, 1.f);
+	const float EquipLeft = FMath::Pow(1.f - EquipAlpha, 3.f);
+	const FVector EquipOffset = Motion.EquipFrom * EquipLeft;
+	const FRotator EquipRotation = Motion.EquipFromRotation * EquipLeft;
 
-	// Sway: the arms lag behind fast view turns, then catch up.
+	// Hip <-> aim: a spring toward the target (the gun travels to the centre, overshoots a hair and settles).
+	const FVector TargetArmsOffset = !Weapon ? ArmsUnarmedOffset : (bIsAiming ? ArmsAimOffset + Motion.AimOffset : ArmsHipOffset + Motion.HipOffset);
+	const int32 Steps = FMath::Clamp(FMath::CeilToInt(SafeDelta / 0.005f), 1, 40);
+	const float H = SafeDelta / Steps;
+	if (!Weapon)
+	{
+		CurrentArmsOffset = TargetArmsOffset;
+		ArmsOffsetVelocity = FVector::ZeroVector;
+	}
+	const float AimDampingC = 2.f * FMath::Sqrt(ArmsAimStiffness) * ArmsAimDamping;
+	const float KickDampingC = 2.f * FMath::Sqrt(KickStiffness) * 0.6f;
+	for (int32 Step = 0; Step < Steps; ++Step)
+	{
+		if (Weapon)
+		{
+			ArmsOffsetVelocity += (ArmsAimStiffness * (TargetArmsOffset - CurrentArmsOffset) - AimDampingC * ArmsOffsetVelocity) * H;
+			CurrentArmsOffset += ArmsOffsetVelocity * H;
+		}
+		// Fire kick springs back to rest.
+		KickOffsetVelocity += (-KickStiffness * KickOffset - KickDampingC * KickOffsetVelocity) * H;
+		KickOffset += KickOffsetVelocity * H;
+		KickRotationVelocity += (-KickStiffness * KickRotation - KickDampingC * KickRotationVelocity) * H;
+		KickRotation += KickRotationVelocity * H;
+	}
+
+	// Sway: the arms lag behind fast view turns, then catch up (and lean into the turn).
 	const FRotator Control = GetControlRotation();
 	const FRotator Turn = (Control - LastControlRotation).GetNormalized();
 	LastControlRotation = Control;
-	const float SafeDelta = FMath::Max(DeltaSeconds, KINDA_SMALL_NUMBER);
-	const float Scale = bIsAiming ? 0.35f : 1.f;
-	const FRotator SwayTarget(
-		FMath::Clamp(-Turn.Pitch / SafeDelta * ArmsSwayAmount * Scale, -ArmsSwayMax, ArmsSwayMax),
-		FMath::Clamp(-Turn.Yaw / SafeDelta * ArmsSwayAmount * Scale, -ArmsSwayMax, ArmsSwayMax), 0.f);
-	ArmsSway = FMath::RInterpTo(ArmsSway, SwayTarget, DeltaSeconds, 10.f);
+	const float SwayScale = bIsAiming ? 0.35f : 1.f;
+	const float SwayPitch = FMath::Clamp(-Turn.Pitch / SafeDelta * ArmsSwayAmount * SwayScale, -ArmsSwayMax, ArmsSwayMax);
+	const float SwayYaw = FMath::Clamp(-Turn.Yaw / SafeDelta * ArmsSwayAmount * SwayScale, -ArmsSwayMax, ArmsSwayMax);
+	ArmsSway = FMath::RInterpTo(ArmsSway, FRotator(SwayPitch, SwayYaw, SwayYaw * 0.6f), DeltaSeconds, 10.f);
 
-	// Bob with ground speed.
-	const float Speed = GetVelocity().Size2D();
+	// Moving: walking forward / back pushes the arms a little, strafing tilts them.
 	const float WalkSpeed = Movement ? FMath::Max(1.f, Movement->WalkSpeed) : 480.f;
+	const FVector LocalVelocity = FRotator(0.f, Control.Yaw, 0.f).UnrotateVector(GetVelocity());
+	const FVector2D MoveTarget(-LocalVelocity.X / WalkSpeed * ArmsMoveLag, LocalVelocity.Y / WalkSpeed * ArmsStrafeTilt);
+	ArmsMoveState = FMath::Vector2DInterpTo(ArmsMoveState, MoveTarget * (bIsAiming ? 0.3f : 1.f), DeltaSeconds, 8.f);
+
+	// Bob on the same phase as the head bob (one dip per step).
+	const float Speed = GetVelocity().Size2D();
 	const bool bGrounded = Movement && Movement->IsMovingOnGround();
-	const float BobAlpha = bGrounded ? FMath::Clamp(Speed / WalkSpeed, 0.f, 1.6f) * (bIsAiming ? 0.25f : 1.f) : 0.f;
-	if (BobAlpha > 0.05f)
-	{
-		ArmsBobPhase += DeltaSeconds * (6.f + 4.f * BobAlpha);
-	}
-	const FVector Bob(0.f, FMath::Cos(ArmsBobPhase) * ArmsBobAmount * BobAlpha, -FMath::Abs(FMath::Sin(ArmsBobPhase)) * ArmsBobAmount * BobAlpha);
+	const float BobAlpha = HeadBobAlpha * FMath::Clamp(Speed / WalkSpeed, 0.f, 1.6f) * (bIsAiming ? 0.25f : 1.f);
+	const FVector Bob(0.f, FMath::Sin(HeadBobPhase * 0.5f) * ArmsBobAmount * BobAlpha, -FMath::Abs(FMath::Sin(HeadBobPhase)) * ArmsBobAmount * BobAlpha);
 
 	// Sprinting with a weapon: lowered and tilted, still in view.
-	const bool bSprinting = Movement && Movement->IsSprinting() && bGrounded && Speed > WalkSpeed * 1.05f && !bIsAiming && InventoryComponent->GetActiveWeapon();
+	const bool bSprinting = Movement && Movement->IsSprinting() && bGrounded && Speed > WalkSpeed * 1.05f && !bIsAiming && Weapon;
 	ArmsSprintAlpha = FMath::FInterpTo(ArmsSprintAlpha, bSprinting ? 1.f : 0.f, DeltaSeconds, 9.f);
 	const FVector SprintShift = (ArmsSprintOffset - ArmsHipOffset) * ArmsSprintAlpha;
 	const FRotator SprintTilt = ArmsSprintRotation * ArmsSprintAlpha;
 
-	// Offsets are in camera space (X forward, Y right, Z up); the mesh is turned by ArmsYawOffset.
-	FirstPersonMesh->SetRelativeLocationAndRotation(CurrentArmsOffset + Bob + SprintShift,
-		FRotator(ArmsSway.Pitch + SprintTilt.Pitch, ArmsYawOffset + ArmsSway.Yaw + SprintTilt.Yaw, SprintTilt.Roll));
+	// Scoped weapons: once raised, the gun wobbles and steadies before the zoom.
+	FRotator Wobble = FRotator::ZeroRotator;
+	if (bIsAiming && Data && Data->bScopeOverlay)
+	{
+		const float T = AimHeldTime - Motion.ScopeRaiseTime;
+		if (T > 0.f && T < Motion.ScopeWobbleTime + 0.2f)
+		{
+			const float Decay = FMath::Exp(-T * 9.f) * Motion.ScopeWobble;
+			Wobble = FRotator(FMath::Sin(T * 31.f) * Decay, FMath::Cos(T * 23.f) * Decay * 0.7f, FMath::Sin(T * 17.f) * Decay * 0.5f);
+		}
+	}
+
+	// Minigun: the faster the barrels turn, the harder it shakes.
+	FVector Jitter = FVector::ZeroVector;
+	FRotator JitterRotation = FRotator::ZeroRotator;
+	if (Weapon && Data && Data->SpinUpTime > 0.f)
+	{
+		const float Spin = Weapon->GetSpinAlpha();
+		Jitter = FVector(FMath::FRandRange(-0.25f, 0.25f), FMath::FRandRange(-0.25f, 0.25f), FMath::FRandRange(-0.25f, 0.25f)) * Spin;
+		JitterRotation = FRotator(0.f, 0.f, FMath::Sin(Now * 55.f) * 1.5f * Spin);
+	}
+
+	// Bow: drawing pulls the arms toward you; full draw trembles.
+	FVector Draw = FVector::ZeroVector;
+	FRotator DrawRotation = FRotator::ZeroRotator;
+	if (Weapon && Data && Data->bChargeToFire)
+	{
+		const float Charge = Weapon->GetCharge();
+		Draw = FVector(-9.f * Charge, -2.f * Charge, 1.f * Charge) + (Charge >= 0.99f ? FVector(0.f, 0.f, FMath::Sin(Now * 40.f) * 0.3f) : FVector::ZeroVector);
+		DrawRotation = FRotator(2.f * Charge, 0.f, -5.f * Charge);
+	}
+
+	// Near a wall the gun is pulled back and lowered (never through the wall).
+	float WallTarget = 0.f;
+	if (Weapon)
+	{
+		FHitResult WallHit;
+		FCollisionQueryParams WallParams(SCENE_QUERY_STAT(HitmenArmsWall), false, this);
+		const FVector Eye = FirstPersonCamera->GetComponentLocation();
+		if (GetWorld()->SweepSingleByChannel(WallHit, Eye, Eye + Control.Vector() * ArmsWallCheckDistance, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(6.f), WallParams))
+		{
+			WallTarget = 1.f - WallHit.Distance / ArmsWallCheckDistance;
+		}
+	}
+	WallPullAlpha = FMath::FInterpTo(WallPullAlpha, WallTarget, DeltaSeconds, 12.f);
+	const FVector WallOffset = FVector(-16.f, 3.f, -9.f) * WallPullAlpha;
+	const FRotator WallRotation = FRotator(-24.f, 6.f, 12.f) * WallPullAlpha;
+
+	FVector ActionOffset;
+	FRotator ActionRotation;
+	EvaluateFirstPersonAction(ActionOffset, ActionRotation);
+
+	// Compose in camera space (X forward, Y right, Z up); rotations turn around the hands (ArmsPivot).
+	const FVector Location = CurrentArmsOffset + Bob + SprintShift + KickOffset + EquipOffset + ActionOffset + WallOffset + Jitter + Draw
+		+ FVector(ArmsMoveState.X, 0.f, 0.f);
+	const FRotator Rotation(
+		ArmsSway.Pitch + SprintTilt.Pitch + KickRotation.X + EquipRotation.Pitch + ActionRotation.Pitch + WallRotation.Pitch + Wobble.Pitch + DrawRotation.Pitch,
+		ArmsSway.Yaw + SprintTilt.Yaw + KickRotation.Y + EquipRotation.Yaw + ActionRotation.Yaw + WallRotation.Yaw + Wobble.Yaw,
+		ArmsSway.Roll + SprintTilt.Roll + KickRotation.Z + EquipRotation.Roll + ActionRotation.Roll + WallRotation.Roll + Wobble.Roll
+			+ JitterRotation.Roll + DrawRotation.Roll + ArmsMoveState.Y);
+	const FQuat Turned = Rotation.Quaternion();
+	const FVector Final = ArmsPivot + Turned.RotateVector(Location - ArmsPivot);
+	// The mannequin faces +Y: turn it to the view first, then apply the camera-space rotation.
+	FirstPersonMesh->SetRelativeLocationAndRotation(Final, Turned * FRotator(0.f, ArmsYawOffset, 0.f).Quaternion());
 }
 
 void AHitmenPlayerCharacter::UpdateDeathCamera(float DeltaSeconds)

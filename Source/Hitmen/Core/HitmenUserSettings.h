@@ -42,6 +42,10 @@ public:
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Camera")
 	float FieldOfView = 90.f;
 
+	/** Head bob strength (0 = none, 1 = full). */
+	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Camera")
+	float HeadBobScale = 1.f;
+
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Audio")
 	float MasterVolume = 1.f;
 

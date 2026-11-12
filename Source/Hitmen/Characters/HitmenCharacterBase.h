@@ -226,7 +226,7 @@ protected:
 
 	/** Inventory throw event (every machine): throw montage. */
 	UFUNCTION()
-	void HandleWeaponThrown(UHitmenWeaponData* Weapon);
+	virtual void HandleWeaponThrown(UHitmenWeaponData* Weapon);
 
 	/** Server: death montage index from the last hit direction. */
 	int32 ChooseDeathMontageIndex() const;

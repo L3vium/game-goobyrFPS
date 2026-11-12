@@ -629,6 +629,33 @@ def projectile_bp(name, parent, mesh="sphere", scale=(0.1, 0.1, 0.1), material=N
     return bp
 
 
+# First-person motion per weapon (FHitmenFPMotion): hip / aim deltas (camera space cm), equip time, kick back (cm),
+# up / side (deg) and spring stiffness. Machine guns sit lower in the hand; the sniper raises to the centre.
+FP_MOTION = {
+    "Pistol": dict(equip_time=0.18, kick_back=2.2, kick_up=3.5, kick_side=0.6, kick_stiffness=260.0),
+    "SMG": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.2, kick_back=0.9, kick_up=1.2, kick_side=0.5, kick_stiffness=320.0),
+    "AssaultRifle": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.22, kick_back=1.3, kick_up=1.6, kick_side=0.5, kick_stiffness=300.0),
+    "Shotgun": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.24, kick_back=4.5, kick_up=7.0, kick_side=1.2, kick_stiffness=160.0),
+    "Minigun": dict(hip_offset=(0.0, 2.0, -6.0), equip_time=0.3, kick_back=0.6, kick_up=0.6, kick_side=0.4, kick_stiffness=380.0),
+    "Sniper": dict(hip_offset=(0.0, 0.0, -2.0), aim_offset=(0.0, -6.0, 4.0), equip_time=0.28, kick_back=5.0, kick_up=8.0, kick_side=1.0,
+                   kick_stiffness=140.0),
+    "Bow": dict(equip_time=0.2, kick_back=0.5, kick_up=0.5, kick_side=0.3, kick_stiffness=200.0),
+    "RocketLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.3, kick_back=4.0, kick_up=6.0, kick_side=1.0, kick_stiffness=150.0),
+    "GrenadeLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.28, kick_back=3.0, kick_up=4.5, kick_side=0.8, kick_stiffness=170.0),
+    "BlackHole": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.28, kick_back=3.0, kick_up=4.0, kick_side=0.8, kick_stiffness=170.0),
+    "Sword": dict(equip_time=0.15, kick_back=0.0, kick_up=0.0, kick_side=0.0),
+}
+
+
+def fp_motion(name):
+    motion = unreal.HitmenFPMotion()
+    for key, value in FP_MOTION.get(name, {}).items():
+        if isinstance(value, tuple):
+            value = unreal.Vector(*value)
+        motion.set_editor_property(key, value)
+    return motion
+
+
 def build_weapons(mats):
     mi = mats["mi"]
     folder = path("Weapons", "Blueprints")
@@ -777,7 +804,7 @@ def build_weapons(mats):
     datas = {}
     for name, (display, bp, props) in weapons.items():
         data = make_data("DA_Weapon_" + name, path("Data", "Weapons"), unreal.HitmenWeaponData)
-        set_props(data, display_name=display, weapon_class=gen_class(bp), pickup_class=gen_class(pickup), **props)
+        set_props(data, display_name=display, weapon_class=gen_class(bp), pickup_class=gen_class(pickup), fp_motion=fp_motion(name), **props)
         save(data)
         datas[name] = data
     log("weapons:", len(datas))

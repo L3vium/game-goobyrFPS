@@ -23,6 +23,57 @@ class UHitmenAnimSet;
  * Data of a weapon type. Two pickups with the same data are the same type (ammo merges).
  * Every gameplay number lives here so designers balance without code.
  */
+/** How the weapon moves in first person (procedural, per weapon). Offsets are camera space: X forward, Y right, Z up. */
+USTRUCT(BlueprintType)
+struct FHitmenFPMotion
+{
+	GENERATED_BODY()
+
+	/** Added to the character's hip offset (machine guns sit lower). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP")
+	FVector HipOffset = FVector::ZeroVector;
+
+	/** Added to the character's aim offset (the gun comes toward the centre, still low). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP")
+	FVector AimOffset = FVector::ZeroVector;
+
+	/** Coming into hand: seconds, and where it starts (below the view, tipped). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0.01", Units="s"))
+	float EquipTime = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP")
+	FVector EquipFrom = FVector(-4.f, 6.f, -26.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP")
+	FRotator EquipFromRotation = FRotator(-40.f, 10.f, -25.f);
+
+	/** Kick per shot: back (cm), up (deg), random sideways (deg); stiffness of the spring that brings it back. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="cm"))
+	float KickBack = 2.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
+	float KickUp = 3.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
+	float KickSide = 0.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="1"))
+	float KickStiffness = 220.f;
+
+	/** Scoped weapons: raise to the centre (s), then wobble before the zoom (deg, s); breathing sway while zoomed (deg). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="s"))
+	float ScopeRaiseTime = 0.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
+	float ScopeWobble = 2.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="s"))
+	float ScopeWobbleTime = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
+	float ScopeSway = 0.12f;
+};
+
 UCLASS(BlueprintType)
 class HITMEN_API UHitmenWeaponData : public UPrimaryDataAsset
 {
@@ -210,6 +261,10 @@ public:
 	/** Offset on the first-person arms (the local player's view); AttachOffset is used on bodies. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
 	FTransform FirstPersonAttachOffset;
+
+	/** Procedural first-person motion: hip / aim offsets, equip, kick, scope sequence. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
+	FHitmenFPMotion FPMotion;
 
 	/** Looping arms pose while this weapon is in hand (first person). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")

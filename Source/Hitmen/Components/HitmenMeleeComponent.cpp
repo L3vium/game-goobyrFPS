@@ -48,6 +48,8 @@ void UHitmenMeleeComponent::PlayPunchLocal()
 	const float Length = Character->PlayCosmeticMontage(Set ? Set->PunchMontage.Get() : nullptr, PunchPlayRate);
 	if (AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Character); Player && Player->IsLocallyControlled())
 	{
+		// First person: a quick jab of one fist (procedural), alternating left and right.
+		Player->PlayFirstPersonAction(EHitmenFPAction::Punch, FMath::Clamp(PunchCooldown * 0.8f, 0.25f, 0.45f));
 		Player->ShowFirstPersonArms(FMath::Max(Length / FMath::Max(PunchPlayRate, 0.1f), PunchCooldown) + 0.2f);
 	}
 	Juice_OnPunch();
@@ -230,6 +232,7 @@ void UHitmenMeleeComponent::Multicast_PlayStealthKill_Implementation(AHitmenChar
 		const float Length = Attacker->PlayCosmeticMontage(AttackMontage, 1.f);
 		if (AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Attacker); Player && Player->IsLocallyControlled())
 		{
+			Player->PlayFirstPersonAction(EHitmenFPAction::Takedown, FMath::Max(StealthKillDuration, 0.6f));
 			Player->ShowFirstPersonArms(FMath::Max(Length, StealthKillDuration) + 0.2f);
 			Player->AddCameraShake(0.6f, 0.25f);
 		}

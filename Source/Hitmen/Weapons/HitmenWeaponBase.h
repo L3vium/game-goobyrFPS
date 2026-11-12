@@ -321,6 +321,29 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnDropped(bool bDropped);
 
+	/** Thrown weapons fly with physics and spin; one on the head stuns a pawn this long. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw", meta=(ClampMin="0", Units="deg"))
+	float ThrowSpinSpeed = 900.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw", meta=(ClampMin="0", Units="s"))
+	float ThrowStunDuration = 3.f;
+
+	/** Lob added to a throw: upward speed as a share of the throw speed. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw", meta=(ClampMin="0"))
+	float ThrowLift = 0.15f;
+
+	/** Puff where an empty weapon vanishes after its throw. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw")
+	TObjectPtr<class UNiagaraSystem> ThrownVanishFX;
+
+	/** An empty gun is gone after its throw (whatever it hits); a loaded one stays a pickup. */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_ThrownVanish(FVector_NetQuantize Location);
+	void VanishAfterThrow();
+
+	/** Empty (and using ammo): thrown, it vanishes. */
+	bool IsEmptyThrow() const;
+
 	/** Silenced weapons: a bullet into a body is heard this far at most. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Noise", meta=(ClampMin="0", Units="cm"))
 	float SilencedFleshNoiseRadius = 150.f;

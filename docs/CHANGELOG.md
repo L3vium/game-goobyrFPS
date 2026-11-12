@@ -68,6 +68,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
 
 ### Changed
+- Rendering: room for 32 shadowed lights per pixel in the virtual shadow map projection (the default 16 overflowed with an
+  on-screen warning); Lumen in software by default (hardware ray tracing stays available).
+- Packaged builds (Shipping and Dev) never print engine messages on screen.
 - Room lamps in lumens, two per room; only one per room casts shadows (estate and cave), fixtures cast none by default.
 - The map bake cuts roofs at a height above the terrain under each point; the reach check's "ladder only" is relative to
   the ground.

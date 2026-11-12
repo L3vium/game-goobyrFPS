@@ -8,6 +8,9 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 `Tools/Editor/hitmen_pie_loadout.py` (give weapons / abilities), `Tools/Editor/ue_ui_call.py` (call a widget function).
 
 ## Stability
+- [ ] Dev build: no engine message on screen anywhere (shadow map warnings and the like), on San Lazaro included
+- [ ] First launch of a packaged build picks a graphics preset (Options > Graphics shows it; delete
+  `Saved/Config/Windows/GameUserSettings.ini` to try again)
 - [x] GC stress: the Dev build with `-ExecCmds="gc.CollectGarbageEveryFrame 1"` — 100 s in the Gym (minimap) and
   400 s on the title screen, no crash (0.4.1); 100 s in the Gym and 90 s on San Lazaro, no crash (0.6.0, 0.6.1);
   [ ] Create Room map tiles and the pause map by hand

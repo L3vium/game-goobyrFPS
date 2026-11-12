@@ -16,6 +16,11 @@
 void UHitmenGameInstance::Init()
 {
 	Super::Init();
+	// Packaged builds (Shipping and Dev) never print engine messages on screen (shadow map warnings and the like).
+	if (!GIsEditor)
+	{
+		GAreScreenMessagesEnabled = false;
+	}
 	if (GEngine)
 	{
 		GEngine->OnNetworkFailure().AddUObject(this, &UHitmenGameInstance::HandleNetworkFailure);

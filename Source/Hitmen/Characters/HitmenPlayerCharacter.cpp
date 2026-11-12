@@ -449,6 +449,21 @@ void AHitmenPlayerCharacter::UpdateHeadBob(float DeltaSeconds)
 		(FMath::Abs(FMath::Sin(HeadBobPhase)) - 0.5f) * HeadBobHeight * Scale);
 }
 
+void AHitmenPlayerCharacter::Server_TrapMash_Implementation()
+{
+	if (!StatusEffectComponent->HasStatus(EHitmenStatusEffect::Trapped))
+	{
+		TrapEscapeProgress = 0.f;
+		return;
+	}
+	TrapEscapeProgress += 1.f / FMath::Max(1, TrapMashPresses);
+	if (TrapEscapeProgress >= 1.f)
+	{
+		TrapEscapeProgress = 0.f;
+		StatusEffectComponent->RemoveStatus(EHitmenStatusEffect::Trapped);
+	}
+}
+
 void AHitmenPlayerCharacter::UpdateDamageFeel(float DeltaSeconds)
 {
 	// Each hit: a colour fringe, a red tint and a small shake; the lower the health, the greyer the world.
@@ -476,6 +491,41 @@ void AHitmenPlayerCharacter::UpdateDamageFeel(float DeltaSeconds)
 	Post.bOverride_ColorSaturation = Low > 0.f;
 	const float Saturation = FMath::Lerp(1.f, LowHealthSaturation, Low);
 	Post.ColorSaturation = FVector4(Saturation, Saturation, Saturation, 1.f);
+
+	// Invisible: a cool, slightly warped view with dark edges. Armored: steel-blue edges, a flash when the armor
+	// takes a hit.
+	const bool bInvisible = StatusEffectComponent->HasStatus(EHitmenStatusEffect::Invisible);
+	const bool bArmored = StatusEffectComponent->HasStatus(EHitmenStatusEffect::Armored) || Health->GetArmor() > 0.f;
+	const float Armor = Health->GetArmor();
+	if (LastArmorSeen >= 0.f && Armor < LastArmorSeen - 0.5f)
+	{
+		ArmorPulse = 1.f;
+	}
+	LastArmorSeen = Armor;
+	ArmorPulse = FMath::Max(0.f, ArmorPulse - DeltaSeconds * 2.5f);
+	Post.bOverride_VignetteIntensity = bInvisible || bArmored;
+	Post.VignetteIntensity = bInvisible ? 0.9f : (bArmored ? 0.55f + 0.4f * ArmorPulse : 0.4f);
+	Post.bOverride_ColorGain = bInvisible || bArmored;
+	Post.ColorGain = bInvisible ? FVector4(0.8f, 0.92f, 1.15f, 1.f)
+		: (bArmored ? FVector4(0.92f + 0.3f * ArmorPulse, 0.97f + 0.3f * ArmorPulse, 1.06f + 0.3f * ArmorPulse, 1.f) : FVector4(1.f, 1.f, 1.f, 1.f));
+	if (bInvisible)
+	{
+		Post.bOverride_SceneFringeIntensity = true;
+		Post.SceneFringeIntensity = FMath::Max(Post.SceneFringeIntensity, 2.5f + FMath::Sin(GetWorld()->GetTimeSeconds() * 3.f));
+	}
+
+	// Trapped: the escape slowly drains between presses (server); the HUD asks to mash.
+	if (HasAuthority() && TrapEscapeProgress > 0.f)
+	{
+		TrapEscapeProgress = FMath::Max(0.f, TrapEscapeProgress - TrapEscapeDrain * DeltaSeconds);
+	}
+	if (StatusEffectComponent->HasStatus(EHitmenStatusEffect::Trapped))
+	{
+		if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(this))
+		{
+			UI->SetTraversalHint(NSLOCTEXT("Hitmen", "HintTrapMash", "Mash Z Q S D to break free"));
+		}
+	}
 }
 
 void AHitmenPlayerCharacter::PlayFirstPersonAction(EHitmenFPAction Action, float Duration)
@@ -872,6 +922,18 @@ bool AHitmenPlayerCharacter::CanAct() const
 
 void AHitmenPlayerCharacter::Input_Move(const FVector2D& Axis)
 {
+	// Trapped: every new move key pressed counts toward breaking free (mash ZQSD).
+	if (StatusEffectComponent->HasStatus(EHitmenStatusEffect::Trapped))
+	{
+		const FIntPoint Keys(FMath::RoundToInt(Axis.X), FMath::RoundToInt(Axis.Y));
+		if (Keys != LastMoveKeys && Keys != FIntPoint::ZeroValue)
+		{
+			Server_TrapMash();
+		}
+		LastMoveKeys = Keys;
+		return;
+	}
+	LastMoveKeys = FIntPoint::ZeroValue;
 	// Under the canopy the same keys steer the drop.
 	if (!CanAct() || !StatusEffectComponent->CanMove())
 	{

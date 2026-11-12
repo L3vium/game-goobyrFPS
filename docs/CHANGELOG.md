@@ -6,6 +6,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ## [Unreleased]
 
 ### Added
+- Remote abilities target the best candidate in an 8° cone with a line of sight (fresnel + `[A] action`): the remote
+  distraction works at range again; transposition swaps with bodies too.
+- Lighter: `[A] Lighter` on a body you look at nearby; it burns (toon fire) and is gone.
+- Multi-kill: hold A to mark up to 5 enemies in view one after another (red glow, red links); release confirms.
+- Stone rests where it lands with a toon "noise" effect; a guard who comes to look picks it up.
+- Wind grenade (the wind mine, now thrown): bursts on impact and blows everyone away, the thrower too.
+- Trap catches anyone, you too once armed; players mash the move keys to break free.
+- Sleep dart: the target goes limp (ragdoll) with "Z z z" over its head, then stands up.
+- Picking up an ability with the slot taken swaps them; screen effects while invisible and armored.
 - Toon weapon juice (no blood): muzzle flash (Anime_Stylized), muzzle light and soft glow, toon impacts on walls and
   bodies, tracers (AHitmenTracer) for shotgun pellets, sniper shots and part of the machine-gun bullets, explosion
   flashes (AHitmenFlashBurst; the flashbang is a big white flash), jetpack smoke, ladder / gutter puffs and grab

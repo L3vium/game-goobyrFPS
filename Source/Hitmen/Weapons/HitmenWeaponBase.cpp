@@ -1135,6 +1135,7 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 			Facing, EAttachLocation::KeepRelativeOffset, true))
 		{
 			Flash->FirstPersonPrimitiveType = bFirstPersonGun ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::None;
+			Flash->SetWorldScale3D(FVector(WeaponData->MuzzleFXScale));
 		}
 	}
 	// A short burst of light and a hot glow at the muzzle, like the mounted gun.

@@ -215,6 +215,11 @@ protected:
 
 	void RefreshBrainPause();
 
+	/** Asleep (sleep dart): the body goes limp (ragdoll) with "Z z z" over the head, then stands up. */
+	void SetSleepRagdoll(bool bAsleep);
+	bool bSleepRagdoll = false;
+	FTransform SleepMeshRelative;
+
 private:
 	/** Cosmetic: keeps the weapon's aim montage looping while fighting. */
 	void UpdateAimPose();

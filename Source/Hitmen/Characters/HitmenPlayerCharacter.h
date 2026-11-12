@@ -329,6 +329,23 @@ protected:
 
 	float HitPulse = 0.f;
 	float LastHealthSeen = -1.f;
+	float LastArmorSeen = -1.f;
+	float ArmorPulse = 0.f;
+
+	// ---- Trap: mash the move keys to break free ----
+	/** Distinct move-key presses needed to break out of a trap (each press counts once; progress drains). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Movement|Trap", meta=(ClampMin="1"))
+	int32 TrapMashPresses = 8;
+
+	/** Share of the escape lost per second without a press. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Movement|Trap", meta=(ClampMin="0"))
+	float TrapEscapeDrain = 0.35f;
+
+	UFUNCTION(Server, Reliable)
+	void Server_TrapMash();
+
+	float TrapEscapeProgress = 0.f;
+	FIntPoint LastMoveKeys = FIntPoint::ZeroValue;
 	void UpdateDamageFeel(float DeltaSeconds);
 
 	// ---- Head bob (the camera; footsteps fall on the low point of each bob) ----

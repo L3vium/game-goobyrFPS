@@ -68,6 +68,14 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Health comes back after 6 s without being hit; no health bar
 - [ ] Mouse sensitivity default 0.25 feels right
 
+## Abilities
+- [x] Stone rests on the ground after the throw (PIE script, 0.7.0); [ ] a guard who comes picks it up; notes on landing
+- [x] Multi-kill: holding A marks 5 guards in view (PIE script, 0.7.0); [ ] red links and glow; one dies, all die
+- [ ] Remote distraction on the gym radio from 25 m; lighter on a body (`[A] Lighter`, fire, gone)
+- [ ] Transposition with a body; trap catches you after 1 s, mashing frees you
+- [ ] Wind grenade blows you away too; sleep dart: ragdoll + Z z z, stands up after
+- [ ] Ability pickup with the slot taken: swap, the old one stays
+
 ## World
 - [x] Muzzle flash, light and glow on firing; toon impact puff (PIE screenshots, 0.7.0); [ ] flash size in first person
 - [ ] Shotgun pellets and sniper shots draw tracers; the turret fires red tracers

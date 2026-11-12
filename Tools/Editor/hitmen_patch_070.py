@@ -162,6 +162,62 @@ if wanted("vfx"):
     bp_defaults("/Game/Hitmen/World/Interactables/Security/BP_Turret", muzzle_fx=load(TOON + "NS_Gunshot_Cast"), impact_fx=load(TOON + "NS_Gunshot_Hit"))
     log("vfx: toon weapons, flashes, smoke, jetpack, traversal, tank, turret")
 
+if wanted("abilities"):
+    # Stone that rests and gets picked up, thrown wind grenade, activation effects, display names.
+    TOON = hitmen_content.TOON
+    SOUND_NOTES = "/Game/Vefects/Stylized_VFX/Skills/MagicAttacks/Sound/NS_SoundMagic_Hit"
+    proj_folder = "/Game/Hitmen/Weapons/Projectiles/"
+    stone = load(proj_folder + "BP_Projectile_Stone")
+    if stone and not isinstance(unreal.get_default_object(stone.generated_class()), unreal.HitmenStone):
+        unreal.BlueprintEditorLibrary.reparent_blueprint(stone, unreal.HitmenStone)
+    if stone:
+        d = unreal.get_default_object(stone.generated_class())
+        d.set_editor_property("noise_fx", load(SOUND_NOTES))
+        d.set_editor_property("land_sound", load(hitmen_content.DRY_SOUND))
+        unreal.BlueprintEditorLibrary.compile_blueprint(stone)
+        save(stone)
+    wind = hitmen_content.make_blueprint("BP_Projectile_Wind", "/Game/Hitmen/Weapons/Projectiles", unreal.HitmenProjectile_Wind)
+    if wind:
+        d = hitmen_content.cdo(wind)
+        hitmen_content.set_mesh(hitmen_content.component(d, "mesh"), hitmen_content.SHAPES["sphere"], (0.12, 0.12, 0.12),
+                                load("/Game/Hitmen/Materials/Instances/MI_Blue") or None)
+        d.set_editor_property("explosion_effect", load(TOON + "NS_Explosion_Ice_Omni"))
+        d.set_editor_property("explosion_effect_scale", 1.4)
+        unreal.BlueprintEditorLibrary.compile_blueprint(wind)
+        save(wind)
+    ab = "/Game/Hitmen/Abilities/"
+    def ability_bp(rel, **props):
+        bp = load(ab + rel)
+        if not bp:
+            log("WARN missing", rel)
+            return
+        d = unreal.get_default_object(bp.generated_class())
+        for field, value in props.items():
+            try:
+                d.set_editor_property(field, value)
+            except Exception as error:
+                log("WARN", rel, field, error)
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        save(bp)
+    ability_bp("Manipulation/WindMine/BP_Ability_WindMine", projectile_class=wind.generated_class() if wind else None)
+    ability_bp("Manipulation/Lighter/BP_Ability_Lighter", activated_fx=load("/Game/Vefects/Free_Fire/Shared/Particles/NS_Fire_Small"),
+               activated_fx_scale=0.7, activated_fx_duration=1.4)
+    ability_bp("Manipulation/RemoteDistraction/BP_Ability_RemoteDistraction", activated_fx=load(SOUND_NOTES), activated_fx_scale=0.5)
+    ability_bp("Manipulation/Charm/BP_Ability_Charm", activated_fx=load(TOON + "NS_Buff_Cast"), activated_fx_scale=0.6)
+    ability_bp("Manipulation/MultiKill/BP_Ability_MultiKill", activated_fx=load(TOON + "NS_Debuff_Cast"), activated_fx_scale=0.4)
+    ability_bp("Move/Transposition/BP_Ability_Transposition", activated_fx=load(TOON + "NS_Dash"), activated_fx_scale=0.6)
+    ability_bp("Move/Blink/BP_Ability_Blink", activated_fx=load(TOON + "NS_Dash"), activated_fx_scale=0.6)
+    data = load("/Game/Hitmen/Data/Abilities/DA_Ability_WindMine")
+    if data:
+        data.set_editor_property("display_name", unreal.Text("Wind grenade"))
+        data.set_editor_property("description", unreal.Text("Thrown: blows everyone around away, you too."))
+        save(data)
+    data = load("/Game/Hitmen/Data/Abilities/DA_Ability_Trap")
+    if data:
+        data.set_editor_property("description", unreal.Text("Catches anyone who steps in, you too. Mash the move keys to break free."))
+        save(data)
+    log("abilities: stone, wind grenade, activation effects")
+
 if wanted("sound"):
     # Attenuation per sound space (steps, gunshots, impacts, world) and the space of each sound-set entry.
     hitmen_content.build_sound_set()

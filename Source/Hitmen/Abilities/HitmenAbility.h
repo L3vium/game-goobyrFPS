@@ -118,6 +118,21 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Common", meta=(ClampMin="0"))
 	float Cooldown = 8.f;
 
+	/** Remote abilities: targets within this angle of the crosshair count (best: closest to the crosshair, then
+	 *  nearest), with a line of sight to the middle of their bounds. Replaces a thin trace that missed at range. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Common", meta=(ClampMin="0", ClampMax="45", Units="deg"))
+	float TargetConeAngle = 8.f;
+
+	/** Effect played where the ability acts (every machine), e.g. the lighter's fire. Duration 0 = one shot. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Juice")
+	TObjectPtr<class UNiagaraSystem> ActivatedFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Juice", meta=(ClampMin="0.01"))
+	float ActivatedFXScale = 1.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Juice", meta=(ClampMin="0", Units="s"))
+	float ActivatedFXDuration = 0.f;
+
 	/** Uses available (0 = unlimited, gated only by cooldown). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Common", meta=(ClampMin="0"))
 	int32 MaxCharges = 0;
@@ -157,6 +172,20 @@ protected:
 	bool AimTrace(const FVector& Origin, const FVector& Direction, FHitResult& OutHit, float TraceRadius = 0.f) const;
 	/** First living (or dead if bAllowDead) character under the crosshair. */
 	AHitmenCharacterBase* AimCharacter(const FVector& Origin, const FVector& Direction, bool bAllowDead = false) const;
+
+	/** Best actor among Candidates within ConeAngle of the aim and Range, seen from Origin (middle of its bounds). */
+	AActor* PickConeTarget(const FVector& Origin, const FVector& Direction, const TArray<AActor*>& Candidates, float ConeAngle) const;
+
+	/** Characters other than the owner within Range (alive, or dead too with bAllowDead), best in the cone. */
+	AHitmenCharacterBase* AimCharacterInCone(const FVector& Origin, const FVector& Direction, bool bAllowDead, bool bOnlyDead = false) const;
+
+	/** True when Target can be seen from Origin (nothing solid before the middle of its bounds). */
+	bool HasLineOfSightTo(const FVector& Origin, const AActor* Target) const;
+
+public:
+	/** Every machine: plays ActivatedFX at Location (from the component's activation multicast). */
+	void PlayActivatedFX(const FVector& Location) const;
+protected:
 	AActor* SpawnOwnedActor(TSubclassOf<AActor> Class, const FTransform& Transform) const;
 	void PlayActivatedJuice(const FVector& Location) const;
 };

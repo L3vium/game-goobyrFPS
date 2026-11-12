@@ -387,7 +387,7 @@ void UHitmenAbility_Hook::Pull(float DeltaTime)
 
 AActor* UHitmenAbility_Transposition::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
 {
-	if (AHitmenCharacterBase* Target = AimCharacter(Origin, Direction))
+	if (AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, true))
 	{
 		OutAction = NSLOCTEXT("Hitmen", "HintTransposition", "Swap places");
 		return Target;
@@ -398,12 +398,27 @@ AActor* UHitmenAbility_Transposition::FindHintTarget(const FVector& Origin, cons
 bool UHitmenAbility_Transposition::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
 	AHitmenCharacterBase* Self = GetOwnerCharacter();
-	AHitmenCharacterBase* Target = AimCharacter(AimOrigin, AimDirection);
+	AHitmenCharacterBase* Target = AimCharacterInCone(AimOrigin, AimDirection, true);
 	if (!Self || !Target)
 	{
 		return false;
 	}
 	const FVector SelfLocation = Self->GetActorLocation();
+	if (Target->IsDead())
+	{
+		// A body: you take its place, the ragdoll is moved where you stood.
+		USkeletalMeshComponent* BodyMesh = Target->GetMesh();
+		const FVector BodyLocation = BodyMesh ? BodyMesh->GetBoneLocation(TEXT("pelvis")) : Target->GetActorLocation();
+		const FVector Offset = SelfLocation - BodyLocation;
+		Self->TeleportTo(BodyLocation + FVector::UpVector * Self->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), Self->GetActorRotation());
+		Target->SetActorLocation(Target->GetActorLocation() + Offset, false, nullptr, ETeleportType::TeleportPhysics);
+		if (BodyMesh && BodyMesh->IsSimulatingPhysics())
+		{
+			BodyMesh->SetWorldLocation(BodyMesh->GetComponentLocation() + Offset, false, nullptr, ETeleportType::TeleportPhysics);
+		}
+		PlayActivatedJuice(BodyLocation);
+		return true;
+	}
 	const FVector TargetLocation = Target->GetActorLocation();
 	// Move the target out of the way first so the swap never overlaps.
 	Target->SetActorLocation(TargetLocation + FVector::UpVector * 2000.f, false, nullptr, ETeleportType::TeleportPhysics);

@@ -195,7 +195,7 @@ protected:
 	float PullTime = 0.f;
 };
 
-/** Swap positions with the aimed character (NPC or player). */
+/** Swap positions with the aimed character (NPC or player), alive or dead (a body is moved where you stood). */
 UCLASS(Blueprintable)
 class HITMEN_API UHitmenAbility_Transposition : public UHitmenMoveAbility
 {

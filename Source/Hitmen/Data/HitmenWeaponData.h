@@ -323,6 +323,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="cm"))
 	float MuzzleGlowRadius = 9.f;
 
+	/** Uniform scale of MuzzleFX (the toon effects are sized for big stylised characters). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0.01"))
+	float MuzzleFXScale = 0.25f;
+
 	/** Played by the owner when firing with no ammo left, just before the weapon is thrown. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<USoundBase> DryFireSound;

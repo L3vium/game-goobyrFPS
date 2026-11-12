@@ -244,13 +244,22 @@ client-predicted like sprint and also runs on Space held in the air; the dash al
 hook climbs (or hangs from) the ledge at its anchor. The hook shows a small marker where it will grab while it is ready and in range, and a thin cable from the hand
 to the anchor while it pulls (seen by everyone; `UHitmenAbilityComponent` draws both for any ability that asks).
 
-**Manipulation**: Stone (throw, noise), Remote distraction (activate a distraction at range),
-Sleep dart (one target), Charm (target becomes an ally and attacks others; a charmed player is
-driven by the NPC behavior tree, reckless), Flashbang (stuns around, blinds players with
-`PP_Blind`), Smoke grenade (blocks sight for NPCs and players; basic-shape puffs until a Niagara
-system is assigned), Lighter (vanish a body), Multi-kill (mark several targets; killing one kills all),
-Trap (NPCs stuck; players freed after a delay), Wind mine (big knockback), Poison vial (pour in a
-drink, or in a vent to poison the sealed rooms it serves).
+**Manipulation**: Stone (thrown; it rests where it lands, makes a noise with toon "sound" notes, and a guard who
+comes to look picks it up), Remote distraction (activate a distraction, a panel or a console at range), Sleep dart
+(one target goes limp in a ragdoll with "Z z z" over its head, then stands up), Charm (target becomes an ally and
+attacks others; a charmed player is driven by the NPC behavior tree, reckless), Flashbang (stuns around, blinds
+players with `PP_Blind`), Smoke grenade (blocks sight for NPCs and players), Lighter (look at a body nearby:
+`[A] Lighter`, it burns and is gone), Multi-kill (hold A: every enemy you look at is marked, up to 5; marks glow red
+and are linked by a red line; killing one kills all), Trap (catches anyone, you too once armed; NPCs stuck 30 s,
+players break free by mashing the move keys), Wind grenade (thrown, bursts on impact and blows everyone around away,
+you too), Poison vial (pour in a drink, or in a vent to poison the sealed rooms it serves).
+
+**Remote targeting**: remote abilities (remote distraction, charm, transposition, lighter, multi-kill) pick the best
+target within `TargetConeAngle` (8°) of the crosshair and in range, with a line of sight to the middle of it; the
+target glows (fresnel) and `[A] action` shows under it. Transposition also swaps with bodies. Picking up an ability
+when the slot is taken swaps them (the old one stays on the pedestal). Invisible: a cool, dark-edged, slightly warped
+view; armored: steel-blue edges that flash when the armor takes a hit. Abilities can play an `ActivatedFX` where they
+act (fire for the lighter, notes for the remote distraction, a swirl for blink and transposition).
 
 ## 9. World fixtures
 | Fixture | Behaviour |

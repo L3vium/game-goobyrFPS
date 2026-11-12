@@ -678,8 +678,26 @@ void UHitmenAlertIndicatorWidget::SetAlertView(EHitmenAlertColor InColor, float 
 	bCallingReinforcements = bInCallingReinforcements;
 }
 
+void UHitmenAlertIndicatorWidget::SetAsleep(bool bInAsleep)
+{
+	bAsleep = bInAsleep;
+}
+
 int32 UHitmenAlertIndicatorWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
+	if (bAsleep)
+	{
+		// Asleep: three Z letters drifting up and fading, bigger as they rise.
+		const float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			const float Phase = FMath::Fmod(Time * 0.6f + Index / 3.f, 1.f);
+			const FVector2D Position(6.f + Phase * 14.f + Index * 2.f, 14.f - Phase * 26.f);
+			DrawText(OutDrawElements, LayerId, AllottedGeometry, TEXT("Z"), Position, FMath::RoundToInt(9.f + Phase * 7.f),
+				FLinearColor(1.f, 1.f, 1.f, 0.9f * (1.f - Phase)));
+		}
+		return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 1, InWidgetStyle, bParentEnabled);
+	}
 	if (Color == EHitmenAlertColor::None)
 	{
 		return LayerId;

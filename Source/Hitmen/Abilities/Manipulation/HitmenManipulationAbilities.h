@@ -63,7 +63,7 @@ protected:
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
 };
 
-/** Lighter: vanishes a body so nobody finds it (not the VIP). */
+/** Lighter: burns a body away so nobody finds it (not the VIP). Look at a body nearby: [A] Lighter. */
 UCLASS(Blueprintable)
 class HITMEN_API UHitmenAbility_Lighter : public UHitmenManipulationAbility
 {
@@ -71,12 +71,18 @@ class HITMEN_API UHitmenAbility_Lighter : public UHitmenManipulationAbility
 
 public:
 	UHitmenAbility_Lighter();
+	virtual AActor* FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const override;
 
 protected:
+	/** The body burns this long before it is gone. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Lighter", meta=(ClampMin="0", Units="s"))
+	float BurnTime = 1.2f;
+
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
 };
 
-/** Mark several targets; when one dies, every marked target dies. */
+/** Hold A: every enemy you look at is marked, one after the other (up to MaxMarks); release to confirm.
+ *  When one marked target dies, every marked target dies. Marks are linked by a red line (owner only). */
 UCLASS(Blueprintable)
 class HITMEN_API UHitmenAbility_MultiKill : public UHitmenManipulationAbility
 {
@@ -89,11 +95,31 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Ability|MultiKill")
 	const TArray<AHitmenCharacterBase*>& GetMarkedTargets() const { return MarkedTargets; }
 
+	virtual bool WantsTick() const override { return bMarking; }
+	virtual void TickAbility(float DeltaTime) override;
+	virtual AActor* FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const override;
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|MultiKill", meta=(ClampMin="2"))
-	int32 MaxMarks = 4;
+	int32 MaxMarks = 5;
+
+	/** While A is held, one more target every MarkInterval (the next in view, closest to the crosshair). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|MultiKill", meta=(ClampMin="0.02", Units="s"))
+	float MarkInterval = 0.12f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|MultiKill", meta=(ClampMin="1", ClampMax="60", Units="deg"))
+	float MarkConeAngle = 25.f;
 
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
+	virtual void Release(const FVector& AimOrigin, const FVector& AimDirection) override;
+
+	/** Server: marks the best unmarked target in view (true when one was added). */
+	bool MarkNext();
+
+	UPROPERTY(Replicated)
+	bool bMarking = false;
+
+	float LastMarkTime = -100.f;
 
 	UFUNCTION()
 	void HandleMarkedDeath(AActor* Killer, AActor* DamageCauser, bool bHeadshot);
@@ -121,7 +147,8 @@ protected:
 };
 
 UCLASS(Blueprintable) class HITMEN_API UHitmenAbility_Trap : public UHitmenAbility_PlaceDevice { GENERATED_BODY() public: UHitmenAbility_Trap(); };
-UCLASS(Blueprintable) class HITMEN_API UHitmenAbility_WindMine : public UHitmenAbility_PlaceDevice { GENERATED_BODY() public: UHitmenAbility_WindMine(); };
+/** Wind grenade: thrown, it bursts on impact and blows everyone around away, you included. */
+UCLASS(Blueprintable) class HITMEN_API UHitmenAbility_WindMine : public UHitmenAbility_Throwable { GENERATED_BODY() public: UHitmenAbility_WindMine(); };
 
 /**
  * Pour into a drink or a vent hatch (poisons sealed rooms on that vent network).

@@ -1,6 +1,12 @@
 // Hitmen — ability actors
 
 #include "Abilities/HitmenAbilityActors.h"
+#include "Abilities/HitmenAbility.h"
+#include "Data/HitmenSoundSet.h"
+#include "AI/HitmenAlertComponent.h"
+#include "Characters/HitmenNPC.h"
+#include "NiagaraFunctionLibrary.h"
+#include "EngineUtils.h"
 #include "Abilities/HitmenAbilityComponent.h"
 #include "Data/HitmenAbilityData.h"
 #include "Characters/HitmenCharacterBase.h"
@@ -159,6 +165,7 @@ AHitmenTrap::AHitmenTrap()
 void AHitmenTrap::BeginPlay()
 {
 	Super::BeginPlay();
+	ArmTime = GetWorld()->GetTimeSeconds() + ArmDelay;
 	if (HasAuthority())
 	{
 		Trigger->OnComponentBeginOverlap.AddDynamic(this, &AHitmenTrap::HandleOverlap);
@@ -167,8 +174,9 @@ void AHitmenTrap::BeginPlay()
 
 void AHitmenTrap::HandleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
+	// Anyone steps in: guards, other players, and whoever placed it (once it is armed).
 	AHitmenCharacterBase* Victim = Cast<AHitmenCharacterBase>(OtherActor);
-	if (bTriggered || !Victim || Victim->IsDead() || !UHitmenTeamLibrary::AreHostile(GetInstigator(), Victim))
+	if (bTriggered || !Victim || Victim->IsDead() || GetWorld()->GetTimeSeconds() < ArmTime)
 	{
 		return;
 	}
@@ -296,14 +304,148 @@ bool AHitmenAbilityPickup::CanInteract_Implementation(AActor* Interactor) const
 
 FText AHitmenAbilityPickup::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return Ability ? FText::Format(NSLOCTEXT("Hitmen", "TakeAbility", "Take {0}"), Ability->DisplayName) : FText::GetEmpty();
+	if (!Ability)
+	{
+		return FText::GetEmpty();
+	}
+	const UHitmenAbilityComponent* Abilities = Interactor ? Interactor->FindComponentByClass<UHitmenAbilityComponent>() : nullptr;
+	const UHitmenAbility* Current = Abilities ? Abilities->GetAbility(Ability->Slot) : nullptr;
+	if (Current && Current->GetData() && Current->GetData() != Ability)
+	{
+		return FText::Format(NSLOCTEXT("Hitmen", "SwapAbility", "Swap for {0}"), Ability->DisplayName);
+	}
+	return FText::Format(NSLOCTEXT("Hitmen", "TakeAbility", "Take {0}"), Ability->DisplayName);
 }
 
 void AHitmenAbilityPickup::OnInteracted(AActor* Interactor)
 {
-	if (UHitmenAbilityComponent* Abilities = Interactor ? Interactor->FindComponentByClass<UHitmenAbilityComponent>() : nullptr)
+	UHitmenAbilityComponent* Abilities = Interactor ? Interactor->FindComponentByClass<UHitmenAbilityComponent>() : nullptr;
+	if (!Abilities || !Ability)
 	{
-		Abilities->SetAbility(Ability);
-		Destroy();
+		return;
 	}
+	// A swap: the ability you had stays here in its place.
+	const UHitmenAbility* Current = Abilities->GetAbility(Ability->Slot);
+	UHitmenAbilityData* Previous = Current ? Current->GetData() : nullptr;
+	Abilities->SetAbility(Ability);
+	if (Previous && Previous != Ability)
+	{
+		Ability = Previous;
+		ForceNetUpdate();
+		return;
+	}
+	Destroy();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Stone: lands, rests, makes a noise; a guard who comes to look picks it up
+// ---------------------------------------------------------------------------------------------
+
+AHitmenStone::AHitmenStone()
+{
+	PrimaryActorTick.bCanEverTick = true;
+	bExplodeOnImpact = false;
+	bStickOnImpact = false;
+	Movement->bShouldBounce = true;
+	Movement->Bounciness = 0.25f;
+	Movement->Friction = 0.6f;
+	ImpactNoiseType = EHitmenNoiseType::Distraction;
+}
+
+bool AHitmenStone::OnImpact(const FHitResult& Hit)
+{
+	// Only the first impact makes the noise; it then bounces and rests where it stops.
+	if (!bNoiseMade)
+	{
+		bNoiseMade = true;
+		if (ImpactNoiseRadius > 0.f)
+		{
+			UHitmenAISubsystem::ReportNoise(this, Hit.ImpactPoint, ImpactNoiseRadius, GetInstigator(), EHitmenNoiseType::Distraction);
+		}
+		Multicast_StoneNoise(Hit.ImpactPoint);
+		SetLifeSpan(RestLifetime);
+	}
+	return false;
+}
+
+void AHitmenStone::Multicast_StoneNoise_Implementation(FVector_NetQuantize Location)
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	if (NoiseFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, NoiseFX, Location, FRotator::ZeroRotator, FVector(0.6f));
+	}
+	if (LandSound)
+	{
+		UHitmenSoundLibrary::PlaySoundInSpace(this, LandSound, Location, EHitmenSoundSpace::Impact);
+	}
+}
+
+void AHitmenStone::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!HasAuthority() || !bNoiseMade || GetWorld()->GetTimeSeconds() < NextPickupCheck)
+	{
+		return;
+	}
+	NextPickupCheck = GetWorld()->GetTimeSeconds() + 0.4f;
+	// A guard that came to look (investigating / searching) and stands next to it picks it up.
+	for (TActorIterator<AHitmenNPC> It(GetWorld()); It; ++It)
+	{
+		AHitmenNPC* NPC = *It;
+		const UHitmenAlertComponent* Alert = NPC->GetAlert();
+		if (NPC->IsDead() || !Alert || FVector::Dist2D(NPC->GetActorLocation(), GetActorLocation()) > PickupRadius)
+		{
+			continue;
+		}
+		const EHitmenAlertState State = Alert->GetAlertState();
+		if (State == EHitmenAlertState::Investigating || State == EHitmenAlertState::Searching)
+		{
+			NPC->PlayAnimSetMontage(EHitmenAnimMontage::SearchLookAround);
+			Destroy();
+			return;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------------------------
+// Wind grenade
+// ---------------------------------------------------------------------------------------------
+
+AHitmenProjectile_Wind::AHitmenProjectile_Wind()
+{
+	bExplodeOnImpact = true;
+	ExplosionDamage = 0.f;
+	ExplosionRadius = BlastRadius;
+	ExplosionNoiseRadius = 1500.f;
+}
+
+void AHitmenProjectile_Wind::OnExplode(const FVector& Origin)
+{
+	// Everyone around is blown away from the burst, the thrower included; loose physics objects too.
+	TArray<FOverlapResult> Overlaps;
+	GetWorld()->OverlapMultiByObjectType(Overlaps, Origin, FQuat::Identity, FCollisionObjectQueryParams(FCollisionObjectQueryParams::AllDynamicObjects), FCollisionShape::MakeSphere(BlastRadius));
+	TSet<AActor*> Done;
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* Actor = Overlap.GetActor();
+		if (!Actor || Done.Contains(Actor))
+		{
+			continue;
+		}
+		Done.Add(Actor);
+		const FVector Away = ((Actor->GetActorLocation() - Origin).GetSafeNormal2D() + FVector::UpVector * 0.6f).GetSafeNormal();
+		if (ACharacter* Character = Cast<ACharacter>(Actor))
+		{
+			Character->LaunchCharacter(Away * KnockbackSpeed, true, true);
+		}
+		else if (UPrimitiveComponent* Primitive = Overlap.GetComponent(); Primitive && Primitive->IsSimulatingPhysics())
+		{
+			Primitive->AddImpulse(Away * KnockbackSpeed * Primitive->GetMass());
+		}
+	}
+	UHitmenAISubsystem::ReportNoise(this, Origin, ExplosionNoiseRadius, GetInstigator(), EHitmenNoiseType::Explosion);
 }

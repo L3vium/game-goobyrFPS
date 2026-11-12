@@ -31,6 +31,10 @@ protected:
 	bool ComputeDestination(const FVector& AimOrigin, const FVector& AimDirection, FVector& OutDestination) const;
 
 	bool bAiming = false;
+
+public:
+	/** Holding E shows where you will land (the ability component draws the marker). */
+	virtual bool GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const override;
 };
 
 /** Passive: one extra jump in the air. */
@@ -46,6 +50,10 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|DoubleJump", meta=(ClampMin="2"))
 	int32 JumpCount = 2;
+
+	/** The jumps after the first go this much higher. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|DoubleJump", meta=(ClampMin="0.5"))
+	float ExtraJumpMultiplier = 1.35f;
 };
 
 /**

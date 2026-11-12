@@ -6,6 +6,11 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ## [Unreleased]
 
 ### Added
+- Hang: thin ledges (the ledge under every window, roof edges) can be hung from with Space in the air; shimmy left /
+  right (Shift faster), Space climbs into the window above or onto the ledge, Ctrl lets go. Vaulting out of an upper
+  window over a drop hangs from the ledge under it.
+- `HitmenNoTraversal` actor tag: barrels, hack panels, turrets, cameras, mounted guns, the tank and distractions are
+  never vaulted or climbed.
 - Sound spaces: every 3D sound goes through an attenuation per space (SA_Hitmen_World, _Footstep, _Gunshot, _Impact
   in DA_SoundSet), with falloff and occlusion. Guards' steps across the map are no longer heard; gunshots carry far
   and are muffled with distance.
@@ -14,6 +19,14 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
 
 ### Changed
+- Slides always brake (friction + deceleration), left / right only bend them, they last about 0.5 s from a walk and
+  0.7 s from a sprint, and Ctrl must be released before the next one: no more endless sideways slides or chained
+  sprint slides. Releasing the keys after a sprint stops you crisply.
+- Ledge grab: probes the centre and 25 cm to each side, reaches further (76 cm) and, in the air, catches ledges down to
+  the feet with any input toward the wall: jumping at the edge of a ledge grabs it.
+- Dash on a tap of Shift (cooldown 1.5 s); jetpack on Space held in the air; the second jump goes 1.35x higher;
+  holding E with the blink shows the landing spot; the hook climbs the ledge at its anchor.
+- Ziplines ride at 16 m/s (9) and reach full speed in 0.25 s; the parachute drop falls at 15 m/s (5.2) in a 3 s intro.
 - Guards hold their ground in a fight: they stand and shoot while in range, close in when out of range or sight, and
   never back away (they used to retreat to a flank point 7 m from the player every 1.5 s). They turn to face their
   target while shooting (strafing when they move).

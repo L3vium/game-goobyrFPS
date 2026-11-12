@@ -106,6 +106,7 @@ public:
 	virtual void Input_JumpReleased() override;
 	virtual void Input_CrouchChanged(bool bWantsCrouch) override;
 	virtual void Input_SprintChanged(bool bWantsSprint) override;
+	virtual void Input_SprintTapped() override;
 	virtual void Input_FirePressed() override;
 	virtual void Input_FireReleased() override;
 	virtual void Input_AimChanged(bool bWantsAim) override;
@@ -158,7 +159,7 @@ protected:
 
 	/** Fall speed under the canopy. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="50", Units="cm/s"))
-	float ParachuteFallSpeed = 520.f;
+	float ParachuteFallSpeed = 1500.f;
 
 	/** Gentle drift of the canopy while falling (cm/s). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0", Units="cm/s"))
@@ -372,4 +373,17 @@ protected:
 	void UpdateHUDHints(float DeltaSeconds);
 	bool bWantsCrouchInput = false;
 	bool bWantsSprintInput = false;
+
+	// Jetpack on Space: holding Space in the air thrusts (E still works).
+	bool bJumpInputHeld = false;
+	float JumpInputPressTime = -100.f;
+	bool bJetpackFromSpace = false;
+
+	/** Space held this long in the air starts the jetpack (a plain jump stays a jump). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Movement", meta=(ClampMin="0", Units="s"))
+	float JetpackSpaceHoldDelay = 0.2f;
+
+	/** Move ability of this class equipped? */
+	bool HasMoveAbility(TSubclassOf<class UHitmenAbility> AbilityClass) const;
+	void UpdateJetpackFromSpace();
 };

@@ -307,4 +307,10 @@ protected:
 	bool bIsWatcher = false;
 	bool bCrouchToggled = false;
 	bool bSprintToggled = false;
+
+	/** Shift released within this time of the press = a tap (dash when equipped); held = sprint. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input", meta=(ClampMin="0", Units="s"))
+	float SprintTapTime = 0.18f;
+
+	float SprintPressTime = -100.f;
 };

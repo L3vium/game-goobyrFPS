@@ -52,6 +52,20 @@ bool UHitmenAbility_Blink::ComputeDestination(const FVector& AimOrigin, const FV
 	return true;
 }
 
+bool UHitmenAbility_Blink::GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const
+{
+	// Only while E is held: the exact landing spot, on the ground under the capsule.
+	FVector Destination;
+	if (!bAiming || !ComputeDestination(Origin, Direction, Destination))
+	{
+		return false;
+	}
+	const AHitmenCharacterBase* Character = GetOwnerCharacter();
+	const float HalfHeight = Character ? Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.f;
+	OutPoint = Destination - FVector::UpVector * HalfHeight;
+	return true;
+}
+
 void UHitmenAbility_Blink::LocalPress(const FVector& AimOrigin, const FVector& AimDirection)
 {
 	bAiming = true;
@@ -102,6 +116,10 @@ void UHitmenAbility_DoubleJump::OnEquipped()
 	if (AHitmenCharacterBase* Character = GetOwnerCharacter())
 	{
 		Character->JumpMaxCount = JumpCount;
+		if (UHitmenCharacterMovementComponent* Movement = Character->GetHitmenMovement())
+		{
+			Movement->ExtraJumpMultiplier = ExtraJumpMultiplier;
+		}
 	}
 }
 
@@ -110,6 +128,10 @@ void UHitmenAbility_DoubleJump::OnUnequipped()
 	if (AHitmenCharacterBase* Character = GetOwnerCharacter())
 	{
 		Character->JumpMaxCount = 1;
+		if (UHitmenCharacterMovementComponent* Movement = Character->GetHitmenMovement())
+		{
+			Movement->ExtraJumpMultiplier = 1.f;
+		}
 	}
 }
 
@@ -225,7 +247,7 @@ float UHitmenAbility_Jetpack::GetFuelNormalized() const
 
 UHitmenAbility_Dash::UHitmenAbility_Dash()
 {
-	Cooldown = 3.f;
+	Cooldown = 1.5f;
 }
 
 FVector UHitmenAbility_Dash::GetDashVelocity() const
@@ -330,6 +352,14 @@ void UHitmenAbility_Hook::Pull(float DeltaTime)
 	const FVector ToPoint = HookPoint - Character->GetActorLocation();
 	if (ToPoint.Size() < StopDistance || PullTime > MaxPullTime || Character->IsDead())
 	{
+		// At the anchor: climb the ledge there (or hang from it) instead of dropping off the wall.
+		if (!Character->IsDead() && ToPoint.Size() < StopDistance * 1.5f)
+		{
+			if (UHitmenCharacterMovementComponent* Movement = Character->GetHitmenMovement(); Movement && Movement->IsFalling())
+			{
+				Movement->TryAutoMantle(ToPoint.GetSafeNormal2D().IsNearlyZero() ? Character->GetActorForwardVector() : ToPoint.GetSafeNormal2D());
+			}
+		}
 		if (Character->HasAuthority())
 		{
 			bHooked = false;

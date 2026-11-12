@@ -31,6 +31,8 @@ public:
 	virtual void Input_JumpReleased() {}
 	virtual void Input_CrouchChanged(bool bWantsCrouch) {}
 	virtual void Input_SprintChanged(bool bWantsSprint) {}
+	/** Sprint pressed and released quickly (a tap): the dash. */
+	virtual void Input_SprintTapped() {}
 	virtual void Input_FirePressed() {}
 	virtual void Input_FireReleased() {}
 	virtual void Input_AimChanged(bool bWantsAim) {}

@@ -248,6 +248,8 @@ void AHitmenTallGrass::UpdateOccupants()
 
 AHitmenDistraction::AHitmenDistraction()
 {
+	// Fixtures are never vaulted, climbed or hung from.
+	Tags.AddUnique(HitmenTags::NoTraversal);
 	InteractionText = NSLOCTEXT("Hitmen", "Distract", "Turn on");
 	NoiseRadius = 1000.f;
 	PrimaryActorTick.bCanEverTick = true;

@@ -29,6 +29,8 @@
 
 AHitmenVehiclePawn::AHitmenVehiclePawn()
 {
+	// Fixtures are never vaulted, climbed or hung from.
+	Tags.AddUnique(HitmenTags::NoTraversal);
 	PrimaryActorTick.bCanEverTick = true;
 	bReplicates = true;
 	SetReplicatingMovement(true);

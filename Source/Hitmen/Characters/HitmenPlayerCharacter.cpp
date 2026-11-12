@@ -22,6 +22,7 @@
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Abilities/HitmenAbilityComponent.h"
+#include "Abilities/Move/HitmenMoveAbilities.h"
 #include "Interaction/HitmenInteractionComponent.h"
 #include "Movement/HitmenCharacterMovementComponent.h"
 #include "UI/HitmenUIEventSubsystem.h"
@@ -265,6 +266,10 @@ void AHitmenPlayerCharacter::Landed(const FHitResult& Hit)
 void AHitmenPlayerCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (IsLocallyControlled())
+	{
+		UpdateJetpackFromSpace();
+	}
 	if (bParachuting)
 	{
 		// Slow, steady descent steered with the move keys (a little drift when no key is held).
@@ -329,6 +334,7 @@ void AHitmenPlayerCharacter::UpdateHUDHints(float DeltaSeconds)
 		case EHitmenTraversalAction::Vault:     Hint = NSLOCTEXT("Hitmen", "HintVault", "Vault"); break;
 		case EHitmenTraversalAction::Climb:     Hint = NSLOCTEXT("Hitmen", "HintClimb", "Climb"); break;
 		case EHitmenTraversalAction::ClimbOver: Hint = NSLOCTEXT("Hitmen", "HintClimbOver", "Climb over"); break;
+		case EHitmenTraversalAction::Hang:      Hint = NSLOCTEXT("Hitmen", "HintHang", "Climb out"); break;
 		default: break;
 		}
 	}
@@ -612,15 +618,57 @@ void AHitmenPlayerCharacter::Input_Look(const FVector2D& Axis)
 
 void AHitmenPlayerCharacter::Input_JumpPressed()
 {
+	bJumpInputHeld = true;
+	JumpInputPressTime = GetWorld()->GetTimeSeconds();
 	if (CanAct() && !bParachuting)
 	{
 		Jump();
 	}
+	UpdateJetpackFromSpace();
 }
 
 void AHitmenPlayerCharacter::Input_JumpReleased()
 {
+	bJumpInputHeld = false;
 	StopJumping();
+	UpdateJetpackFromSpace();
+}
+
+bool AHitmenPlayerCharacter::HasMoveAbility(TSubclassOf<UHitmenAbility> AbilityClass) const
+{
+	const UHitmenAbility* Ability = AbilityComponent ? AbilityComponent->GetAbility(EHitmenAbilitySlot::Move) : nullptr;
+	return Ability && AbilityClass && Ability->IsA(AbilityClass);
+}
+
+void AHitmenPlayerCharacter::UpdateJetpackFromSpace()
+{
+	// Space held in the air (a moment after the jump, so a jump stays a jump) thrusts; ledge grabs come first.
+	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
+	const bool bAirborne = Movement && Movement->IsFalling();
+	const bool bBusy = Movement && (Movement->IsMantling() || Movement->IsHanging() || Movement->IsClimbing());
+	const bool bWant = bJumpInputHeld && CanAct() && !bParachuting && bAirborne && !bBusy
+		&& GetWorld()->GetTimeSeconds() - JumpInputPressTime >= JetpackSpaceHoldDelay
+		&& HasMoveAbility(UHitmenAbility_Jetpack::StaticClass());
+	if (bWant && !bJetpackFromSpace)
+	{
+		bJetpackFromSpace = true;
+		AbilityComponent->PressSlot(EHitmenAbilitySlot::Move);
+	}
+	else if (!bJumpInputHeld && bJetpackFromSpace)
+	{
+		bJetpackFromSpace = false;
+		AbilityComponent->ReleaseSlot(EHitmenAbilitySlot::Move);
+	}
+}
+
+void AHitmenPlayerCharacter::Input_SprintTapped()
+{
+	// A tap of Shift dashes (E still works).
+	if (CanAct() && HasMoveAbility(UHitmenAbility_Dash::StaticClass()))
+	{
+		AbilityComponent->PressSlot(EHitmenAbilitySlot::Move);
+		AbilityComponent->ReleaseSlot(EHitmenAbilitySlot::Move);
+	}
 }
 
 void AHitmenPlayerCharacter::Input_CrouchChanged(bool bWantsCrouch)

@@ -15,7 +15,9 @@ enum class EHitmenCustomMovement : uint8
 	None,
 	Slide,
 	Climb,
-	Mantle
+	Mantle,
+	/** Hanging from a thin ledge (window ledges): shimmy left / right, climb up or drop. */
+	Hang
 };
 
 /** What Space would do in front of the character (shown at the crosshair). */
@@ -28,7 +30,9 @@ enum class EHitmenTraversalAction : uint8
 	/** Ledge (up to MantleMaxHeight) with room on top: climb and stand on it. */
 	Climb,
 	/** Thin wall too high to vault: climb up and drop on the far side. */
-	ClimbOver
+	ClimbOver,
+	/** Out of a window over a drop: hang from the ledge under it. */
+	Hang
 };
 
 /** A planned ledge grab / vault: cubic path from Start to Target. */
@@ -41,6 +45,12 @@ struct FHitmenMantlePlan
 	FVector Target = FVector::ZeroVector;
 	float Duration = 0.4f;
 	float LedgeHeight = 0.f;
+	/** The path ends hanging from a ledge (facing -HangNormal) instead of standing. */
+	bool bEndsInHang = false;
+	FVector HangFace = FVector::ZeroVector;
+	FVector HangNormal = FVector::ZeroVector;
+	float HangLedgeZ = 0.f;
+	float HangEdgeDistance = 0.f;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenTraversal, bool, bIsVault);
@@ -100,10 +110,11 @@ public:
 
 	/** Impulse when the slide starts from a sprint (slides further). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
-	float SprintSlideImpulse = 550.f;
+	float SprintSlideImpulse = 300.f;
 
+	/** Speed lost per second, proportional to speed (on top of SlideBrakingDeceleration). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0"))
-	float SlideFriction = 0.4f;
+	float SlideFriction = 1.2f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0"))
 	float SlideBrakingDeceleration = 500.f;
@@ -112,10 +123,14 @@ public:
 	float SlideExitSpeed = 220.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="s"))
-	float SlideMaxDuration = 1.4f;
+	float SlideMaxDuration = 0.9f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="s"))
-	float SlideCooldown = 0.4f;
+	float SlideCooldown = 1.f;
+
+	/** Left / right only bend the slide this fast; they never push it (no endless sideways slides). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="deg"))
+	float SlideSteerRate = 60.f;
 
 	// ---- Ledge grab / vault ----
 	/** Max height above the feet of a ledge you can climb onto. */
@@ -149,7 +164,15 @@ public:
 
 	/** How far in front of the capsule a wall is searched. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
-	float MantleReach = 60.f;
+	float MantleReach = 76.f;
+
+	/** Extra wall probes this far left and right of the centre: a ledge is caught a little to the side too. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
+	float MantleSideProbeOffset = 25.f;
+
+	/** In the air a ledge down to this height above the feet is still grabbed (near the top of a jump). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(Units="cm"))
+	float AirMantleMinHeight = -10.f;
 
 	/** Probe depths past the wall face; several so thin walls (30 cm) and sills are found. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle")
@@ -175,6 +198,25 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="s"))
 	float MantleCooldown = 0.35f;
 
+	// ---- Hang (ledges under windows) ----
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Hang", meta=(ClampMin="0", Units="cm/s"))
+	float HangShimmySpeed = 140.f;
+
+	/** Shimmy speed with Shift held. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Hang", meta=(ClampMin="0", Units="cm/s"))
+	float HangShimmyFastSpeed = 240.f;
+
+	/** The capsule top sits this far below the ledge top (hands on the ledge, head below a window sill above it). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Hang", meta=(Units="cm"))
+	float HangHeadBelowLedge = 8.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Hang", meta=(ClampMin="0.05", Units="s"))
+	float HangClimbDuration = 0.6f;
+
+	/** After dropping from a ledge, no new grab for this long. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Hang", meta=(ClampMin="0", Units="s"))
+	float HangRegrabCooldown = 0.5f;
+
 	// ---- Climb ----
 	/** Push away from a ladder when jumping off. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0"))
@@ -193,7 +235,12 @@ public:
 
 	/** Zipline rides start slow and accelerate to the cable speed over this time. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0", Units="s"))
-	float ZiplineAccelerationTime = 0.5f;
+	float ZiplineAccelerationTime = 0.25f;
+
+	// ---- Jumps ----
+	/** Jumps after the first one (double jump) launch this much higher. Set by the double jump ability. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Jump", meta=(ClampMin="0"))
+	float ExtraJumpMultiplier = 1.f;
 
 	// ---- State API ----
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Movement")
@@ -216,6 +263,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
 	bool IsMantling() const { return IsCustomMode(EHitmenCustomMovement::Mantle); }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
+	bool IsHanging() const { return IsCustomMode(EHitmenCustomMovement::Hang); }
+
+	/** Hook end: climbs the ledge in front (Forward) if there is one. */
+	bool TryAutoMantle(const FVector& Forward);
 
 	/** Climb axis speed for the animation (-1 down .. 1 up). */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
@@ -287,6 +340,7 @@ public:
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual class FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
+	virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
 
 protected:
 	virtual void PhysCustom(float DeltaTime, int32 Iterations) override;
@@ -294,6 +348,20 @@ protected:
 	void PhysSlide(float DeltaTime, int32 Iterations);
 	void PhysClimb(float DeltaTime, int32 Iterations);
 	void PhysMantle(float DeltaTime, int32 Iterations);
+	void PhysHang(float DeltaTime, int32 Iterations);
+
+	/** A thin ledge in front of a wall face: its top near NearZ and how far it sticks out (false = none). */
+	bool FindHangLedge(const FVector& WallFace, const FVector& WallNormal, float NearZ, float& OutLedgeZ, float& OutEdgeDistance) const;
+	/** The wall face under a ledge, seen from Location (false = no wall). */
+	bool FindHangWall(const FVector& Location, const FVector& TowardWall, float LedgeZ, FVector& OutFace, FVector& OutNormal) const;
+	/** Capsule centre hanging from LedgeZ in front of a wall face. */
+	FVector GetHangLocation(const FVector& WallFace, const FVector& WallNormal, float LedgeZ, float EdgeDistance) const;
+	/** In the air with Space: a thin ledge at hand height in front (no floor right under it) -> hang. */
+	bool TryStartHang();
+	void StartHang(const FVector& WallFace, const FVector& WallNormal, float LedgeZ, float EdgeDistance);
+	void StopHang(bool bDrop);
+	/** Space while hanging: into an open window above the ledge, else onto the ledge top if there is room. */
+	bool PlanHangClimb(FHitmenMantlePlan& OutPlan) const;
 
 	bool CanStartSlide() const;
 	void StartSlide();
@@ -335,6 +403,18 @@ protected:
 	// Slide state
 	float SlideStartTime = -100.f;
 	float LastSlideEndTime = -100.f;
+	/** Seconds into the current slide (saved with moves so replays end it at the same point). */
+	float SlideElapsed = 0.f;
+	/** A slide ended: crouch must be released before the next one (no chained slides with Ctrl held). */
+	bool bSlideNeedsCrouchRelease = false;
+	/** Speed when the slide started: slopes never push it faster. */
+	float SlideEntrySpeed = 0.f;
+
+	// Hang state
+	FVector HangNormal = FVector::ZeroVector;
+	float HangLedgeZ = 0.f;
+	float HangEdgeDistance = 0.f;
+	float LastHangReleaseTime = -100.f;
 
 	// Mantle state
 	FVector MantleStart = FVector::ZeroVector;
@@ -347,6 +427,12 @@ protected:
 	float MantleTotal = 0.f;
 	bool bMantleIsVault = false;
 	float LastMantleTime = -100.f;
+	/** The running mantle ends hanging (vault out of a window). */
+	bool bMantleEndsInHang = false;
+	FVector MantleHangNormal = FVector::ZeroVector;
+	FVector MantleHangFace = FVector::ZeroVector;
+	float MantleHangLedgeZ = 0.f;
+	float MantleHangEdge = 0.f;
 
 	// Climb state
 	TWeakObjectPtr<AActor> ClimbTarget;
@@ -373,6 +459,7 @@ public:
 	uint8 bSavedWantsToSprint : 1;
 	uint8 bSavedWantsJetpackThrust : 1;
 	float SavedJetpackFuel = 0.f;
+	float SavedSlideElapsed = 0.f;
 
 	virtual void Clear() override;
 	virtual uint8 GetCompressedFlags() const override;

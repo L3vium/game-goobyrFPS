@@ -91,7 +91,7 @@ protected:
 	FVector EndPoint = FVector(1500.f, 0.f, -300.f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Zipline", meta=(ClampMin="0"))
-	float Speed = 900.f;
+	float Speed = 1600.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Zipline")
 	EHitmenZiplineDirection Direction = EHitmenZiplineDirection::Both;

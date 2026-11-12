@@ -541,6 +541,7 @@ void AHitmenPlayerController::HandleSprintPressed()
 	{
 		return;
 	}
+	SprintPressTime = GetWorld()->GetTimeSeconds();
 	const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
 	if (Settings && Settings->bToggleSprint)
 	{
@@ -560,7 +561,17 @@ void AHitmenPlayerController::HandleSprintReleased()
 	{
 		return;
 	}
-	if (IHitmenInputReceiver* R = GetReceiver()) { R->Input_SprintChanged(false); }
+	IHitmenInputReceiver* R = GetReceiver();
+	if (!R)
+	{
+		return;
+	}
+	R->Input_SprintChanged(false);
+	// A quick tap of Shift dashes (when the dash is equipped); holding it sprints.
+	if (GetWorld()->GetTimeSeconds() - SprintPressTime <= SprintTapTime && !IsGameplayInputBlocked())
+	{
+		R->Input_SprintTapped();
+	}
 }
 
 void AHitmenPlayerController::HandleFirePressed()

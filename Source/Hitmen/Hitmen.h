@@ -12,6 +12,13 @@ HITMEN_API DECLARE_LOG_CATEGORY_EXTERN(LogHitmen, Log, All);
 #define HITMEN_OBJECT_PROJECTILE ECC_GameTraceChannel1
 
 /** Custom depth stencil values used by the Sightroom post-process. */
+/** Actor tags read by gameplay code. */
+namespace HitmenTags
+{
+	/** Never vaulted, climbed or hung from (barrels, hack panels, turrets, cameras, mounted guns...). */
+	inline const FName NoTraversal(TEXT("HitmenNoTraversal"));
+}
+
 namespace HitmenStencil
 {
 	constexpr int32 Enemy = 1;

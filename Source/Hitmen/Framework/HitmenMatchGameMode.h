@@ -65,7 +65,7 @@ protected:
 
 	/** Intro phase length (countdown on screen; landing gives control earlier). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match|Intro", meta=(ClampMin="0", Units="s", EditCondition="bParachuteIntro"))
-	float IntroDuration = 7.f;
+	float IntroDuration = 3.f;
 
 	FTimerHandle IntroTimer;
 	void HandleIntroEnd();

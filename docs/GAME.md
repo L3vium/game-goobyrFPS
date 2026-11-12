@@ -100,7 +100,7 @@ adaptation): every room is lit for it. Space or Escape goes back on every menu p
 Spawns: maps carry many `BP_TeamStart` points. Each team (or solo player) takes a random free point
 and teammates take the nearest free points around it. During the intro (`bParachuteIntro`,
 `IntroDropHeight`, `IntroDuration` on the match game mode) everyone falls from above their point
-under a canopy, steering a little; control returns on landing. The Gym skips the intro.
+under a canopy, steering a little (falling at 15 m/s, 3 s intro); control returns on landing. The Gym skips the intro.
 
 Watchers get a spectator mode (`V` cycles): free fly, single-player view (LMB / RMB switch between
 players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players follow teammates.
@@ -110,9 +110,9 @@ players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players 
 |---|---|
 | Move | Z Q S D |
 | Look | Mouse |
-| Jump / ledge grab / vault | Space |
+| Jump / ledge grab / vault (held in the air: jetpack) | Space |
 | Crouch (held) — a short slide when walking, a longer one when sprinting | Left Ctrl |
-| Sprint (held) | Left Shift |
+| Sprint (held) / dash (tap, when equipped) | Left Shift |
 | Fire / melee | LMB |
 | Aim | RMB |
 | Interact / stealth kill / swap / throw held item | F |
@@ -128,8 +128,13 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
 
 ## 6. Player
 - **Movement**: walk (480), sprint (820), crouch (240, the view lowers smoothly), slide (crouch while
-  sprinting), jump, ladders / gutters (automatic, forward = up, smooth pull-up at the top), ziplines (`F` at a
-  post: rides to the other end on its own), jump pads, lockers (you stand inside and look through the slit).
+  moving: about 0.5 s from a walk, 0.7 s from a sprint; it always brakes, left / right only bend it, and Ctrl must be
+  released before the next one), jump, ladders / gutters (automatic, forward = up, smooth pull-up at the top),
+  ziplines (`F` at a post: rides to the other end on its own at 16 m/s), jump pads, lockers (you stand inside and look
+  through the slit). Releasing the keys stops you crisply.
+- **Hang**: Space in the air in front of a thin ledge (the ledge under every window, a roof edge) hangs from it. Left /
+  right shimmy along it (Shift: faster), Space climbs into the open window above (or onto the ledge top), Ctrl lets go.
+  Vaulting out of an upper-floor window over a drop ends hanging from the ledge under it.
 - **Traversal metrics** (Space while moving into it; the action shows at the crosshair):
 
   | Obstacle | Action |
@@ -138,9 +143,12 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   | up to 120 cm, thin, floor behind | vault (also through an open window) |
   | up to 250 cm, top at least 40 cm deep | climb onto it (a block wall: walk along its top) |
   | up to 250 cm, thinner wall | climb over |
+  | window sill over a drop | climb out and hang from the ledge under it |
   | above 250 cm | out of reach (ladder, gutter, ability) |
 - The hint only shows on the ground. Space counts for 0.25 s after the press (late ledge grabs); jumping at a
-  ladder grabs it at once.
+  ladder grabs it at once. Ledges are probed at the centre and 25 cm to each side (a corner is caught), and in the air
+  down to the feet. Fixtures (barrels, hack panels, turrets, cameras, mounted guns, distractions) carry the
+  `HitmenNoTraversal` actor tag and are never climbed.
 - **First person**: no body or arms while moving without a weapon (the body's shadow stays); the arms appear with a
   weapon in hand (held low on the right, barrel along the view; aiming only re-centres it a little, it stays low right;
   sprinting lowers and tilts it, still in view) or while punching (arms at chest height, the fists cross the view).
@@ -208,7 +216,9 @@ user and does not spend a charge.
 **Move**: Blink (Dishonored-like teleport), Double jump, Jetpack, Dash, Hook (grapple),
 Transposition (swap positions with an aimed NPC/player), Pill (boost damage/speed/resistance with
 a distorted view, `PP_Pill`), Invisibility, Armor, C4 (place, then detonate). The jetpack is
-client-predicted like sprint. The hook shows a small marker where it will grab while it is ready and in range, and a thin cable from the hand
+client-predicted like sprint and also runs on Space held in the air; the dash also runs on a tap of Shift (cooldown
+1.5 s); the second jump of the double jump goes 1.35x higher; holding E with the blink shows where you will land; the
+hook climbs (or hangs from) the ledge at its anchor. The hook shows a small marker where it will grab while it is ready and in range, and a thin cable from the hand
 to the anchor while it pulls (seen by everyone; `UHitmenAbilityComponent` draws both for any ability that asks).
 
 **Manipulation**: Stone (throw, noise), Remote distraction (activate a distraction at range),

@@ -37,6 +37,12 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] No brightness drift on arrival (fixed exposure on every match map)
 
 ## Player
+- [x] A sprint slide with no input brakes and ends near 220 cm/s (PIE recording, 0.7.0); [ ] sideways input only bends it
+- [ ] Holding Ctrl after a slide does not slide again; release and press slides
+- [ ] Jumping at the corner of a crate grabs it; no vault onto a barrel or the hack panel
+- [ ] Hang under a window: shimmy both ways, Space enters the window, Ctrl drops
+- [ ] Shift tap dashes (dash equipped), Shift held sprints; Space held in the air flies (jetpack equipped)
+- [ ] Double jump: the second jump is higher; blink: holding E shows the landing marker
 - [ ] A headshot kills a guard and a player with any gun; guards never one-shot you
 - [ ] A picked-up weapon lands in the left slot
 - [ ] Minigun fires at once and speeds up; a short release keeps the speed

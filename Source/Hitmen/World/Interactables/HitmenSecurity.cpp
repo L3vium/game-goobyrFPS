@@ -31,6 +31,8 @@
 
 AHitmenSecurityCamera::AHitmenSecurityCamera()
 {
+	// Fixtures are never vaulted, climbed or hung from.
+	Tags.AddUnique(HitmenTags::NoTraversal);
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.05f;
 	bReplicates = true;
@@ -494,6 +496,8 @@ void AHitmenControlConsole::OnInteracted(AActor* Interactor)
 
 AHitmenTurret::AHitmenTurret()
 {
+	// Fixtures are never vaulted, climbed or hung from.
+	Tags.AddUnique(HitmenTags::NoTraversal);
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.03f;
 	bReplicates = true;
@@ -689,6 +693,8 @@ void AHitmenTurret::Multicast_Fire_Implementation(FVector_NetQuantize Impact)
 
 AHitmenHackPanel::AHitmenHackPanel()
 {
+	// Fixtures are never vaulted, climbed or hung from.
+	Tags.AddUnique(HitmenTags::NoTraversal);
 	InteractionText = NSLOCTEXT("Hitmen", "HackTurret", "Hack turret");
 }
 
@@ -786,6 +792,8 @@ bool AHitmenBlackoutVolume::IsLocationDark(const FVector& Location) const
 
 AHitmenCircuitBreaker::AHitmenCircuitBreaker()
 {
+	// Fixtures are never vaulted, climbed or hung from.
+	Tags.AddUnique(HitmenTags::NoTraversal);
 	InteractionText = NSLOCTEXT("Hitmen", "CutPower", "Cut the power");
 }
 

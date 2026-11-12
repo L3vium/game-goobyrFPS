@@ -1,6 +1,7 @@
 // Hitmen — hazards
 
 #include "World/Interactables/HitmenHazards.h"
+#include "Hitmen.h"
 #include "GameFramework/PlayerController.h"
 #include "Data/HitmenSoundSet.h"
 #include "Characters/HitmenPlayerCharacter.h"
@@ -70,6 +71,8 @@ void AHitmenRoomVolume::Multicast_Gassed_Implementation()
 
 AHitmenPoisonableDrink::AHitmenPoisonableDrink()
 {
+	// Fixtures are never vaulted, climbed or hung from.
+	Tags.AddUnique(HitmenTags::NoTraversal);
 	bUsableWithInteract = false;
 }
 
@@ -105,6 +108,8 @@ void AHitmenPoisonableDrink::NPCUse_Implementation(AHitmenCharacterBase* NPC)
 
 AHitmenExplosiveBarrel::AHitmenExplosiveBarrel()
 {
+	// Fixtures are never vaulted, climbed or hung from.
+	Tags.AddUnique(HitmenTags::NoTraversal);
 	bUsableWithInteract = false;
 	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
 	Mesh->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block);

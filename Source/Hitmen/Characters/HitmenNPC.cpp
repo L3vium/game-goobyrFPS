@@ -305,7 +305,25 @@ void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAler
 		case EHitmenAlertState::Searching:     Movement->WalkSpeed = AlertWalkSpeed; break;
 		default:                               Movement->WalkSpeed = CalmWalkSpeed; break;
 		}
+		// Fighting: face the target (controller focus), strafing while moving; otherwise face where it walks.
+		// Orient-to-movement wins over the controller rotation in the movement code, so it must be off.
+		const bool bFighting = NewState == EHitmenAlertState::Combat;
+		Movement->bOrientRotationToMovement = !bFighting;
+		Movement->bUseControllerDesiredRotation = true;
+		if (bFighting)
+		{
+			Movement->RotationRate = FRotator(0.f, CombatTurnRate, 0.f);
+		}
+		else
+		{
+			Movement->RotationRate = GetClass()->GetDefaultObject<AHitmenNPC>()->GetCharacterMovement()->RotationRate;
+		}
 	}
+}
+
+float AHitmenNPC::GetEffectiveShootingRange() const
+{
+	return IsSniper() || ShootingRange <= 0.f ? TNumericLimits<float>::Max() : ShootingRange;
 }
 
 int32 AHitmenNPC::AdvancePatrolIndex(int32 PointCount)

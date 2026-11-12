@@ -181,13 +181,18 @@ void UBTTask_HitmenShoot::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 	const FVector AimPoint = Target->GetActorLocation() + FVector::UpVector * AimHeightOffset;
 	if (AHitmenNPC* NPC = Cast<AHitmenNPC>(Pawn))
 	{
-		if (NPC->GetWeapon())
+		// Out of shooting range: keep aiming (focus) without firing; the background branch walks closer.
+		const bool bInRange = FVector::Dist(Pawn->GetActorLocation(), Target->GetActorLocation()) <= NPC->GetEffectiveShootingRange();
+		if (bInRange && NPC->GetWeapon())
 		{
 			NPC->FireAt(AimPoint);
 		}
-		else if (UHitmenMeleeComponent* Melee = NPC->FindComponentByClass<UHitmenMeleeComponent>())
+		else if (bInRange)
 		{
-			Melee->Punch();
+			if (UHitmenMeleeComponent* Melee = NPC->FindComponentByClass<UHitmenMeleeComponent>())
+			{
+				Melee->Punch();
+			}
 		}
 	}
 	else
@@ -230,8 +235,23 @@ EBTNodeResult::Type UBTTask_HitmenFindFlankPosition::ExecuteTask(UBehaviorTreeCo
 	{
 		return EBTNodeResult::Failed;
 	}
-	const float Distance = BB->GetValueAsBool(HitmenBBKeys::IsSniper) ? SniperDistance : PreferredDistance;
-	BB->SetValueAsVector(HitmenBBKeys::MoveLocation, AI->GetFlankLocation(Pawn, Target, Distance));
+	const bool bSniper = BB->GetValueAsBool(HitmenBBKeys::IsSniper);
+	if (bSniper)
+	{
+		BB->SetValueAsVector(HitmenBBKeys::MoveLocation, AI->GetFlankLocation(Pawn, Target, SniperDistance));
+		return EBTNodeResult::Succeeded;
+	}
+	// Guards hold their ground while they can shoot: never back away from the target. Out of range or
+	// out of sight, they close in to a point inside their shooting range.
+	const AHitmenNPC* NPC = Cast<AHitmenNPC>(Pawn);
+	const float Range = NPC ? NPC->GetEffectiveShootingRange() : PreferredDistance;
+	const float Distance = FVector::Dist(Pawn->GetActorLocation(), Target->GetActorLocation());
+	if (BB->GetValueAsBool(HitmenBBKeys::TargetVisible) && Distance <= Range)
+	{
+		return EBTNodeResult::Failed;
+	}
+	const float Wanted = FMath::Min(Distance - 100.f, FMath::Min(Range, 100000.f) * ApproachRangeFraction);
+	BB->SetValueAsVector(HitmenBBKeys::MoveLocation, AI->GetFlankLocation(Pawn, Target, FMath::Max(MinApproachDistance, Wanted)));
 	return EBTNodeResult::Succeeded;
 }
 

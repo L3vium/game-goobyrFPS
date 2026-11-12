@@ -119,6 +119,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	FVector GetMuzzleLocation() const;
 
+	/** Minigun barrels: 0 at rest, 1 at full speed (drives the spin animation). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
+	float GetSpinAlpha() const;
+
+	/** Seconds between shots right now (the minigun ramps up while the trigger is held). */
+	float GetCurrentFireInterval() const;
+
 	// IHitmenInteractable (dropped weapons: pick up / swap)
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
@@ -314,6 +321,10 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnDropped(bool bDropped);
 
+	/** Silenced weapons: a bullet into a body is heard this far at most. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Noise", meta=(ClampMin="0", Units="cm"))
+	float SilencedFleshNoiseRadius = 150.f;
+
 	UPROPERTY(Transient)
 	TObjectPtr<APawn> LastThrower;
 
@@ -326,6 +337,9 @@ protected:
 	bool bStateApplied = false;
 	bool bTriggerHeld = false;
 	bool bSpunUp = false;
+	/** Minigun ramp: when the barrels started turning, and when the trigger was last released. */
+	float SpinStartTime = -100.f;
+	float SpinReleaseTime = -100.f;
 	bool bPickupActive = false;
 	bool bThrowDamageDone = false;
 	bool bConsumed = false;

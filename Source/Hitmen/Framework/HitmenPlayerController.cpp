@@ -192,6 +192,9 @@ void AHitmenPlayerController::SetPawn(APawn* InPawn)
 	}
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
 	{
+		// The previous pawn can no longer reach this UI to clear its prompt (entering a vehicle left
+		// "Use" on screen): a new pawn always starts without one.
+		UI->BroadcastPrompt(FText::GetEmpty(), false);
 		UI->BroadcastPawnChanged(InPawn);
 	}
 	// A new body restarts toggles.

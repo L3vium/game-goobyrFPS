@@ -77,6 +77,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Combat")
 	bool bReadyGunWhileSearching = true;
 
+	/** Guards only shoot within this distance; farther away they walk closer until in range (snipers ignore it). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC|Combat", meta=(ClampMin="0", Units="cm"))
+	float ShootingRange = 1500.f;
+
+	/** In combat the guard turns toward its target (strafing) at this rate instead of facing where it walks. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Combat", meta=(ClampMin="0", Units="deg"))
+	float CombatTurnRate = 600.f;
+
+	/** Shooting range, or no limit for snipers. */
+	float GetEffectiveShootingRange() const;
+
 	/** Every machine: the gun is drawn (weapon EquipMontage played when it became ready). */
 	bool bGunReady = false;
 

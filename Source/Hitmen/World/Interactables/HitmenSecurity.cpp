@@ -677,7 +677,7 @@ void AHitmenTurret::Multicast_Fire_Implementation(FVector_NetQuantize Impact)
 		}
 		if (FireSound)
 		{
-			UGameplayStatics::PlaySoundAtLocation(this, FireSound, Muzzle);
+			UHitmenSoundLibrary::PlaySoundInSpace(this, FireSound, Muzzle, EHitmenSoundSpace::Gunshot);
 		}
 	}
 	Juice_OnFire(Impact);

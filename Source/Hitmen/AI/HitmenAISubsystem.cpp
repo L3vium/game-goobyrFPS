@@ -27,6 +27,8 @@ namespace
 	/** Vertical offsets of the hearing test (ear above the NPC pivot, source above the noise point). */
 	constexpr float HearingEarHeight = 60.f;
 	constexpr float HearingSourceHeight = 30.f;
+	// Height difference that does not count toward hearing distance (about one storey).
+	constexpr float HearingFreeHeight = 200.f;
 
 	bool IsDeadCharacter(const AActor* Actor)
 	{
@@ -263,7 +265,9 @@ void UHitmenAISubsystem::ReportNoise(const UObject* WorldContext, const FVector&
 			continue;
 		}
 		const FVector Ear = NPC->GetActorLocation() + FVector::UpVector * HearingEarHeight;
-		const float Distance = FVector::Dist(Location, Ear);
+		// Hearing distance: horizontal, plus only the height beyond one storey (a step on the floor right
+		// behind a guard is 1.5 m below its ear, yet right next to it).
+		const float Distance = FVector::Dist2D(Location, Ear) + FMath::Max(0.f, FMath::Abs(Location.Z - Ear.Z) - HearingFreeHeight);
 		if (Distance > Radius)
 		{
 			continue;

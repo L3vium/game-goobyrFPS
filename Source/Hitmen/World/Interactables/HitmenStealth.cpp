@@ -332,7 +332,8 @@ void AHitmenDistraction::Multicast_Triggered_Implementation()
 	{
 		if (USoundBase* Loop = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::RadioLoop))
 		{
-			PlayingAudio = UGameplayStatics::SpawnSoundAttached(Loop, Root);
+			PlayingAudio = UGameplayStatics::SpawnSoundAttached(Loop, Root, NAME_None, FVector::ZeroVector, EAttachLocation::KeepRelativeOffset, false, 1.f, 1.f, 0.f,
+				UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World));
 		}
 	}
 	Pulse();

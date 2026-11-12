@@ -37,6 +37,10 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] No brightness drift on arrival (fixed exposure on every match map)
 
 ## Player
+- [ ] A headshot kills a guard and a player with any gun; guards never one-shot you
+- [ ] A picked-up weapon lands in the left slot
+- [ ] Minigun fires at once and speeds up; a short release keeps the speed
+- [ ] Only nearby guards' steps are heard; gunshots are muffled far away
 - [x] Every gun points along the view, held bottom-right (screenshots of 6 weapons, 0.5.0)
 - [x] Sprinting with a pistol: lowered and tilted, still in view (screenshot, 0.5.0); [ ] aiming stays low right
 - [x] Takedown from the side of an unaware guard (PIE script, 0.5.0); [ ] from the front in the dark; [ ] smooth blend
@@ -69,6 +73,9 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
   0.6.0); [ ] walk the village, the estate, the maze, the caves and the tunnel by hand
 
 ## AI
+- [x] Guards in range hold their ground, face you and shoot; nobody backs away (PIE script, gym AI pen, 0.7.0)
+- [x] A step right behind an unaware guard is heard: it turns and engages (PIE script, 0.7.0)
+- [ ] Guards beyond 15 m walk closer before shooting
 - [x] Attack chain: an armed player in view gets shot, damage arrives slowly (~9 HP/s), guard holds the aim pose (PIE script, 0.5.0)
 - [x] Attack chain on San Lazaro: shot after 6-9 s in a guard's view, ~9 HP/s (PIE script, 0.6.0)
 - [x] A searching guard draws its pistol, then holds it ready each time it stops to look around (PIE log and

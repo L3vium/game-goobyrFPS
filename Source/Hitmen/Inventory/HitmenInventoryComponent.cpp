@@ -96,6 +96,30 @@ AHitmenWeaponBase* UHitmenInventoryComponent::SpawnWeaponActor(UHitmenWeaponData
 	return WeaponActor;
 }
 
+namespace
+{
+	/** New weapons always go to the left-most slot: a weapon already there slides right into the free slot.
+	 *  Returns the slot to fill (0), or INDEX_NONE when both slots are taken. */
+	int32 FreeLeftSlot(TArray<FHitmenInventorySlot>& Slots)
+	{
+		if (Slots.Num() < 2)
+		{
+			return Slots.IndexOfByPredicate([](const FHitmenInventorySlot& S) { return S.IsEmpty(); });
+		}
+		if (Slots[0].IsEmpty())
+		{
+			return 0;
+		}
+		if (Slots[1].IsEmpty())
+		{
+			Slots[1] = Slots[0];
+			Slots[0] = FHitmenInventorySlot();
+			return 0;
+		}
+		return INDEX_NONE;
+	}
+}
+
 bool UHitmenInventoryComponent::GiveWeapon(UHitmenWeaponData* Weapon, int32 Ammo, bool bForceReplace)
 {
 	if (!GetOwner()->HasAuthority() || !Weapon)
@@ -108,7 +132,7 @@ bool UHitmenInventoryComponent::GiveWeapon(UHitmenWeaponData* Weapon, int32 Ammo
 		return true;
 	}
 
-	int32 Target = Slots.IndexOfByPredicate([](const FHitmenInventorySlot& S) { return S.IsEmpty(); });
+	int32 Target = FreeLeftSlot(Slots);
 	if (Target == INDEX_NONE)
 	{
 		if (!bForceReplace)
@@ -119,7 +143,7 @@ bool UHitmenInventoryComponent::GiveWeapon(UHitmenWeaponData* Weapon, int32 Ammo
 		FVector Origin, Direction;
 		UHitmenCombatLibrary::GetAimPoint(Cast<APawn>(GetOwner()), Origin, Direction);
 		DropSlot(Slots.IsValidIndex(ActiveSlot) ? ActiveSlot : 0, Origin + Direction * ThrowSpawnDistance, Direction.Rotation(), Direction * ReplaceDropSpeed, nullptr);
-		Target = Slots.IndexOfByPredicate([](const FHitmenInventorySlot& S) { return S.IsEmpty(); });
+		Target = FreeLeftSlot(Slots);
 		if (Target == INDEX_NONE)
 		{
 			return false;
@@ -147,7 +171,7 @@ bool UHitmenInventoryComponent::PickUpWeapon(AHitmenWeaponBase* WorldWeapon, boo
 		return true;
 	}
 
-	int32 Target = Slots.IndexOfByPredicate([](const FHitmenInventorySlot& S) { return S.IsEmpty(); });
+	int32 Target = FreeLeftSlot(Slots);
 	if (Target == INDEX_NONE)
 	{
 		if (!bAllowSwap)
@@ -157,7 +181,7 @@ bool UHitmenInventoryComponent::PickUpWeapon(AHitmenWeaponBase* WorldWeapon, boo
 		// Swap: the held weapon takes the picked weapon's place in the world.
 		const FTransform PlaceAt = WorldWeapon->GetActorTransform();
 		DropSlot(Slots.IsValidIndex(ActiveSlot) ? ActiveSlot : 0, PlaceAt.GetLocation(), PlaceAt.Rotator(), FVector::ZeroVector, nullptr);
-		Target = Slots.IndexOfByPredicate([](const FHitmenInventorySlot& S) { return S.IsEmpty(); });
+		Target = FreeLeftSlot(Slots);
 		if (Target == INDEX_NONE)
 		{
 			return false;

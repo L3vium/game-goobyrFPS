@@ -84,9 +84,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing", meta=(EditCondition="FireMode==EHitmenFireMode::Burst", ClampMin="1"))
 	int32 BurstCount = 3;
 
-	/** Seconds of spin-up before the first shot (minigun). */
+	/** Minigun: seconds to ramp from SpinUpStartRPM to RoundsPerMinute. It fires from the first press. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing", meta=(ClampMin="0"))
 	float SpinUpTime = 0.f;
+
+	/** Minigun: shots per minute at the start of the spin-up. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing", meta=(EditCondition="SpinUpTime>0", ClampMin="1"))
+	float SpinUpStartRPM = 450.f;
+
+	/** Minigun: releasing the trigger for less than this keeps the barrels spinning (no new ramp). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing", meta=(EditCondition="SpinUpTime>0", ClampMin="0"))
+	float SpinDownGrace = 0.4f;
 
 	/** Bow: hold to charge, release to fire. Damage/speed scale with charge. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing")

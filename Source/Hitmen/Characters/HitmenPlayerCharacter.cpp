@@ -43,7 +43,7 @@ AHitmenPlayerCharacter::AHitmenPlayerCharacter(const FObjectInitializer& ObjectI
 	bUseControllerRotationYaw = true;
 	// Players last much longer than guards (default of the Health component's MaxHealth on the
 	// player; BP_PlayerCharacter can still change it).
-	static constexpr float DefaultPlayerMaxHealth = 300.f;
+	static constexpr float DefaultPlayerMaxHealth = 150.f;
 	if (UHitmenHealthComponent* PlayerHealth = GetHealth())
 	{
 		PlayerHealth->SetDefaultMaxHealth(DefaultPlayerMaxHealth);

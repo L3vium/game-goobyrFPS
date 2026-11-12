@@ -5,6 +5,35 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+### Added
+- Sound spaces: every 3D sound goes through an attenuation per space (SA_Hitmen_World, _Footstep, _Gunshot, _Impact
+  in DA_SoundSet), with falloff and occlusion. Guards' steps across the map are no longer heard; gunshots carry far
+  and are muffled with distance.
+- Headshots always kill (bullets and arrows), Project Settings -> Hitmen -> Combat (`bHeadshotKills`; NPC shots are
+  excluded by `bHeadshotKillsFromNPCs`).
+- NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
+
+### Changed
+- Guards hold their ground in a fight: they stand and shoot while in range, close in when out of range or sight, and
+  never back away (they used to retreat to a flank point 7 m from the player every 1.5 s). They turn to face their
+  target while shooting (strafing when they move).
+- Hearing: steps are heard 4 m away walking and 9 m sprinting (1.5 / 4.5), and a height difference within one storey
+  no longer counts (a step right behind a guard was 1.5 m below its ear and never heard).
+- Players have 150 health (300); guards hit harder (difficulty multipliers 0.35 / 0.55 / 0.8).
+- Picked-up weapons always go to the left slot; the other weapon slides right.
+- Minigun: fires at once at 450 rpm and ramps to 1100 rpm over 1.2 s (0.4 s grace on release) instead of 0.8 s of
+  silence then 1500 rpm.
+- A silenced bullet into a body is only heard 1.5 m away.
+- Footsteps: volume per gait and a random pitch; your own steps are quieter.
+- The overhead alert marker is the hatched diamond again.
+- Tools find the engine through the Epic launcher's install list (UE_ROOT still wins).
+
+### Removed
+- The burst rifle (data asset, catalog, gym pedestal).
+
+### Fixed
+- After entering a vehicle the "F Use" prompt stayed on screen: a new pawn always starts without a prompt.
+
 ## [0.6.1] - 2026-11-11
 
 ### Added

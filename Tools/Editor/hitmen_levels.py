@@ -612,7 +612,7 @@ def build_gym():
     # =========================== B. ARMOURY (centre-south) ===========================
     G = "Gym/Armoury"
     zone_title(0, -3000, "ARMOURY")
-    weapons = ["Pistol", "SMG", "AssaultRifle", "BurstRifle", "Shotgun", "Minigun", "Sniper", "Bow", "RocketLauncher", "GrenadeLauncher", "BlackHole", "Sword"]
+    weapons = ["Pistol", "SMG", "AssaultRifle", "Shotgun", "Minigun", "Sniper", "Bow", "RocketLauncher", "GrenadeLauncher", "BlackHole", "Sword"]
     for i, name in enumerate(weapons):
         x = -1000 + (i % 6) * 400
         y = -2600 if i < 6 else -2100

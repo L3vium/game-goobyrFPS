@@ -5,6 +5,7 @@
 #include "Framework/HitmenGameModeBase.h"
 #include "Data/HitmenMatchRules.h"
 #include "AI/HitmenAISubsystem.h"
+#include "Data/HitmenSoundSet.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
 #include "NiagaraFunctionLibrary.h"
@@ -41,7 +42,7 @@ void UHitmenFootstepComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	const float Travelled = FVector::Dist2D(Location, LastLocation);
 	LastLocation = Location;
 
-	if (!bUseDistanceFallback || !Movement || !Movement->IsMovingOnGround() || Movement->IsSliding() || GetWorld()->GetTimeSeconds() - LastNotifyTime < NotifySuppressesFallbackTime)
+	if (bExternalStepTiming || !bUseDistanceFallback || !Movement || !Movement->IsMovingOnGround() || Movement->IsSliding() || GetWorld()->GetTimeSeconds() - LastNotifyTime < NotifySuppressesFallbackTime)
 	{
 		DistanceAccumulator = 0.f;
 		return;
@@ -51,7 +52,7 @@ void UHitmenFootstepComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	if (DistanceAccumulator >= Stride * 0.5f)
 	{
 		DistanceAccumulator = 0.f;
-		HandleFootstep();
+		HandleFootstepInternal(NAME_None);
 		// HandleFootstep marks LastNotifyTime; fallback steps must not suppress themselves.
 		LastNotifyTime = -100.f;
 	}
@@ -81,6 +82,16 @@ float UHitmenFootstepComponent::ComputeNoiseRadius(float SurfaceMultiplier) cons
 
 void UHitmenFootstepComponent::HandleFootstep(FName FootBone)
 {
+	// Anim notifies: ignored while the owner times its own steps (first-person head bob).
+	if (bExternalStepTiming)
+	{
+		return;
+	}
+	HandleFootstepInternal(FootBone);
+}
+
+void UHitmenFootstepComponent::HandleFootstepInternal(FName FootBone)
+{
 	LastNotifyTime = GetWorld()->GetTimeSeconds();
 
 	const AActor* Owner = GetOwner();
@@ -102,9 +113,31 @@ void UHitmenFootstepComponent::HandleFootstep(FName FootBone)
 	const FHitmenSurfaceFeedback* Found = SurfaceFeedback.Find(Surface);
 	const FHitmenSurfaceFeedback& Feedback = Found ? *Found : DefaultFeedback;
 
-	if (Feedback.Sound)
+	if (Feedback.Sound && GetNetMode() != NM_DedicatedServer)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, Feedback.Sound, Hit.ImpactPoint);
+		const ACharacter* Character = Cast<ACharacter>(Owner);
+		const UHitmenCharacterMovementComponent* Movement = Character ? Cast<UHitmenCharacterMovementComponent>(Character->GetCharacterMovement()) : nullptr;
+		float Volume = WalkVolume;
+		if (Movement && Movement->IsCrouching())
+		{
+			Volume = CrouchVolume;
+		}
+		else if (Movement && Movement->IsSprinting())
+		{
+			Volume = SprintVolume;
+		}
+		const float Pitch = 1.f + FMath::FRandRange(-PitchJitter, PitchJitter);
+		const APawn* Pawn = Cast<APawn>(Owner);
+		if (Pawn && Pawn->IsLocallyControlled() && Pawn->IsPlayerControlled())
+		{
+			// Your own steps: close and centred, quieter than everyone else's.
+			UGameplayStatics::PlaySound2D(this, Feedback.Sound, Volume * LocalPlayerVolume, Pitch);
+		}
+		else
+		{
+			// Everyone else's steps carry a few metres only (attenuation + occlusion).
+			UHitmenSoundLibrary::PlaySoundInSpace(this, Feedback.Sound, Hit.ImpactPoint, EHitmenSoundSpace::Footstep, Volume, Pitch);
+		}
 	}
 	if (Feedback.Effect)
 	{

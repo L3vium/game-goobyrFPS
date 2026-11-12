@@ -747,13 +747,10 @@ def build_weapons(mats):
         "AssaultRifle": ("Assault rifle", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=620.0, damage=22.0, start_ammo=90,
                          max_ammo=210, ammo_per_pickup=30, hip_spread=2.0, aim_spread=0.5, noise_radius=700.0, impact_noise_radius=600.0, recoil_pitch=0.8,
                          recoil_yaw_random=0.3, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
-        "BurstRifle": ("Burst rifle", hitscan, dict(fire_mode=A.BURST, burst_count=3, rounds_per_minute=780.0, damage=24.0, start_ammo=72,
-                       max_ammo=180, ammo_per_pickup=24, hip_spread=1.8, aim_spread=0.4, noise_radius=700.0, impact_noise_radius=600.0, recoil_pitch=0.7,
-                       recoil_yaw_random=0.25, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "Shotgun": ("Shotgun", shotgun, dict(fire_mode=A.SINGLE, rounds_per_minute=70.0, damage=12.0, pellet_count=9, range=2500.0,
                     start_ammo=16, max_ammo=40, ammo_per_pickup=6, hip_spread=1.0, aim_spread=0.6, noise_radius=800.0, impact_noise_radius=600.0,
                     recoil_pitch=3.5, recoil_yaw_random=0.6, static_mesh=shotgun_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
-        "Minigun": ("Minigun", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=1500.0, damage=9.0, spin_up_time=0.8, start_ammo=300,
+        "Minigun": ("Minigun", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=1100.0, damage=9.0, spin_up_time=1.2, spin_up_start_rpm=450.0, spin_down_grace=0.4, start_ammo=300,
                     max_ammo=600, ammo_per_pickup=150, hip_spread=3.0, aim_spread=2.0, noise_radius=900.0, impact_noise_radius=700.0, recoil_pitch=0.3,
                     recoil_yaw_random=0.4, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "Sniper": ("Sniper rifle", hitscan, dict(fire_mode=A.SINGLE, rounds_per_minute=40.0, damage=120.0, headshot_multiplier=3.0,
@@ -882,8 +879,9 @@ def build_cosmetics(mats):
     return result
 
 
-def build_rules():
-    rules = make_data("DA_MatchRules_Default", path("Data", "Rules"), unreal.HitmenMatchRules)
+def difficulty_presets():
+    """Per-difficulty values (also used by hitmen_patch_070). Guards hit harder than 0.6 (players have 150 HP and
+    regenerate): a guard that has you in the open kills you in a few bursts."""
     D = unreal.HitmenDifficulty
 
     def preset(retrieval, weapons, items, sight, suspicion, damage, aim):
@@ -892,10 +890,14 @@ def build_rules():
                   npc_suspicion_rate_multiplier=suspicion, npc_damage_multiplier=damage, npc_aim_error_degrees=aim)
         return p
 
-    # Damage stays low (with the slow paced fire of the match rules, a fight lasts): Hitman-like.
-    set_props(rules, difficulty_presets={D.EASY: preset(4, 10, 10, 0.8, 0.7, 0.25, 7.0),
-                                         D.NORMAL: preset(3, 6, 6, 1.0, 1.0, 0.4, 4.0),
-                                         D.HARD: preset(2, 4, 4, 1.2, 1.4, 0.6, 2.5)})
+    return {D.EASY: preset(4, 10, 10, 0.8, 0.7, 0.35, 7.0),
+            D.NORMAL: preset(3, 6, 6, 1.0, 1.0, 0.55, 4.0),
+            D.HARD: preset(2, 4, 4, 1.2, 1.4, 0.8, 2.5)}
+
+
+def build_rules():
+    rules = make_data("DA_MatchRules_Default", path("Data", "Rules"), unreal.HitmenMatchRules)
+    set_props(rules, difficulty_presets=difficulty_presets())
     save(rules)
     return rules
 
@@ -967,14 +969,47 @@ def build_sound_set():
             volumes[event] = volume
         else:
             log("WARN missing sound", asset_path)
-    set_props(data, sounds=sounds, volumes=volumes)
+    G, W, F = unreal.HitmenSoundSpace.GUNSHOT, unreal.HitmenSoundSpace.WORLD, unreal.HitmenSoundSpace.FOOTSTEP
+    spaces = {S.EXPLOSION: G, S.TANK_FIRE: G, S.MOUNTED_GUN_FIRE: G, S.LANDING: F, S.LANDING_HARD: F}
+    set_props(data, sounds=sounds, volumes=volumes, attenuations=build_attenuations(), spaces=spaces)
     save(data)
     return data
 
 
+# Sound spaces: every 3D sound goes through one of these (falloff + occlusion), so a guard's steps across
+# the map are not heard. (inner radius, falloff distance, low-pass with distance, occlusion)
+ATTENUATIONS = {
+    "World": (200.0, 1800.0, False, True),
+    "Footstep": (150.0, 1450.0, False, True),
+    "Gunshot": (600.0, 7000.0, True, True),
+    "Impact": (150.0, 2400.0, True, True),
+}
+
+
+def build_attenuations():
+    """SA_Hitmen_* attenuation assets, one per EHitmenSoundSpace; returns {space: asset} for DA_SoundSet."""
+    folder = path("Audio", "Attenuation")
+    result = {}
+    for name, (inner, falloff, lpf, occlusion) in ATTENUATIONS.items():
+        asset = create("SA_Hitmen_" + name, folder, unreal.SoundAttenuation, unreal.SoundAttenuationFactory())
+        if not asset:
+            continue
+        settings = asset.get_editor_property("attenuation")
+        set_props(settings, attenuate=True, spatialize=True, attenuation_shape=unreal.AttenuationShape.SPHERE,
+                  attenuation_shape_extents=unreal.Vector(inner, 0.0, 0.0), falloff_distance=falloff,
+                  distance_algorithm=unreal.AttenuationDistanceModel.NATURAL_SOUND, enable_occlusion=occlusion,
+                  occlusion_trace_channel=unreal.CollisionChannel.ECC_VISIBILITY, occlusion_low_pass_filter_frequency=1200.0,
+                  occlusion_volume_attenuation=0.45, occlusion_interpolation_time=0.15, attenuate_with_lpf=lpf,
+                  lpf_radius_min=inner * 2.0, lpf_radius_max=falloff, lpf_frequency_at_min=20000.0, lpf_frequency_at_max=2500.0)
+        asset.set_editor_property("attenuation", settings)
+        save(asset)
+        result[getattr(unreal.HitmenSoundSpace, name.upper())] = asset
+    log("sound: attenuations", len(result))
+    return result
+
+
 def build_catalog(weapons, move, manip, cosmetics):
     catalog = make_data("DA_Catalog", path("Data"), unreal.HitmenCatalog)
-    loadout = [weapons[n] for n in ("Pistol", "SMG", "AssaultRifle", "BurstRifle", "Shotgun", "Sniper", "Bow", "Sword")]
     set_props(catalog, weapons=list(weapons.values()), loot_weapons=[w for k, w in weapons.items() if k != "Pistol"],
               move_abilities=move, manipulation_abilities=manip, cosmetics=cosmetics)
     save(catalog)

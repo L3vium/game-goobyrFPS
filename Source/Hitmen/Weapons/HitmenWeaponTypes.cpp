@@ -1,6 +1,7 @@
 // Hitmen — weapon families
 
 #include "Weapons/HitmenWeaponTypes.h"
+#include "Characters/HitmenCharacterBase.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Weapons/HitmenProjectile.h"
 #include "Data/HitmenWeaponData.h"
@@ -64,7 +65,9 @@ void AHitmenWeapon_Hitscan::FireServer(const FVector& Origin, const FVector& Dir
 		const float Distance = FVector::Dist(Origin, Hit.ImpactPoint);
 		const float FalloffAlpha = FMath::Clamp((Distance / WeaponData->Range - 0.5f) * 2.f, 0.f, 1.f);
 		float Damage = WeaponData->Damage * FMath::Lerp(1.f, WeaponData->FalloffAtMaxRange, FalloffAlpha);
-		if (WeaponData->HeadBones.Contains(Hit.BoneName))
+		const AHitmenCharacterBase* HitCharacter = Cast<AHitmenCharacterBase>(HitActor);
+		const TArray<FName>& HeadBones = HitCharacter ? HitCharacter->GetHeadBones() : WeaponData->HeadBones;
+		if (HeadBones.Contains(Hit.BoneName))
 		{
 			Damage *= WeaponData->HeadshotMultiplier;
 		}

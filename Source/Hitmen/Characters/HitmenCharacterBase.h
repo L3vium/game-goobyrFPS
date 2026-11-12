@@ -118,6 +118,9 @@ public:
 	virtual EHitmenScanCategory GetScanCategory_Implementation(const AActor* Observer) const override;
 	virtual void SetScanHighlight_Implementation(bool bEnabled, int32 StencilValue) override;
 
+	/** Bones that count as a headshot (weapons use this list too). */
+	const TArray<FName>& GetHeadBones() const { return HeadBones; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UHitmenHealthComponent> HealthComponent;

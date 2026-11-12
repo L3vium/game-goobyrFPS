@@ -30,7 +30,20 @@ param(
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $Uproject = Join-Path $Root 'Hitmen.uproject'
-$EngineRoot = if ($env:UE_ROOT) { $env:UE_ROOT } else { 'C:\Program Files\Epic Games\UE_5.7' }
+function Resolve-EngineRoot {
+    # UE_ROOT, else the launcher's install of UE_5.7, else the default install folder.
+    if ($env:UE_ROOT) { return $env:UE_ROOT }
+    $Manifest = 'C:\ProgramData\Epic\UnrealEngineLauncher\LauncherInstalled.dat'
+    if (Test-Path $Manifest) {
+        try {
+            $Install = (Get-Content $Manifest -Raw | ConvertFrom-Json).InstallationList |
+                Where-Object { $_.AppName -eq 'UE_5.7' -and (Test-Path $_.InstallLocation) } | Select-Object -First 1
+            if ($Install) { return $Install.InstallLocation }
+        } catch { }
+    }
+    return 'C:\Program Files\Epic Games\UE_5.7'
+}
+$EngineRoot = Resolve-EngineRoot
 $EditorExe = Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor.exe'
 $BuildBat = Join-Path $EngineRoot 'Engine\Build\BatchFiles\Build.bat'
 $Remote = Join-Path $PSScriptRoot 'ue_remote.py'

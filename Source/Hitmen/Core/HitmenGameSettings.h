@@ -49,6 +49,15 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="AI")
 	TSoftObjectPtr<UBehaviorTree> DefaultBehaviorTree;
 
+	// ---- Combat ----
+	/** A bullet or arrow in the head always kills (the multiplier no longer matters). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Combat")
+	bool bHeadshotKills = true;
+
+	/** Also for NPC shots (off: guards would one-shot players through their aim error). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Combat", meta=(EditCondition="bHeadshotKills"))
+	bool bHeadshotKillsFromNPCs = false;
+
 	// ---- Levels ----
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Levels")
 	TSoftObjectPtr<UWorld> TitleLevel;

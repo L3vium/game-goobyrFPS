@@ -15,6 +15,9 @@
 #include "Components/HitmenBodyCarryComponent.h"
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Data/HitmenAnimSet.h"
+#include "Core/HitmenGameSettings.h"
+#include "Weapons/HitmenWeaponBase.h"
+#include "Weapons/HitmenProjectile.h"
 #include "Hitmen.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -321,6 +324,19 @@ float AHitmenCharacterBase::TakeDamage(float DamageAmount, FDamageEvent const& D
 			{
 				Damage *= GM->GetRules()->GetPreset(GS->GetLobbySettings().Difficulty).NPCDamageMultiplier;
 			}
+		}
+	}
+
+	// Headshot = death for bullets and arrows (explosions and fists are radial / not point hits on bones).
+	if (bHeadshot && Damage > 0.f)
+	{
+		const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+		const AHitmenCharacterBase* Shooter = Cast<AHitmenCharacterBase>(InstigatorActor);
+		const bool bFromNPC = Shooter && !Shooter->IsPlayerControlled();
+		const bool bLethalCauser = Cast<AHitmenWeaponBase>(DamageCauser) || Cast<AHitmenProjectile>(DamageCauser);
+		if (Settings->bHeadshotKills && bLethalCauser && (!bFromNPC || Settings->bHeadshotKillsFromNPCs))
+		{
+			Damage = FMath::Max(Damage, HealthComponent->GetHealth() + HealthComponent->GetArmor() + 1.f);
 		}
 	}
 

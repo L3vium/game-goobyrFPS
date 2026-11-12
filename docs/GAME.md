@@ -146,7 +146,8 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   sprinting lowers and tilts it, still in view) or while punching (arms at chest height, the fists cross the view).
   Recoil kicks the view up and it recovers smoothly. On death the view leaves the head. Landings are heard (soft or
   hard, by fall speed); a hard landing dips the view.
-- **Inventory**: 2 weapon slots (mouse wheel). `F` with no interactable in focus throws the held
+- **Inventory**: 2 weapon slots (mouse wheel). A new weapon always goes to the left slot (the other one slides right;
+  with both full, the held weapon is swapped out). `F` with no interactable in focus throws the held
   item (it lands at once as a floating pickup a little ahead, no physics): if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
   stays. Firing with an empty magazine and no reserve throws the weapon where you look. No weapon
   in hand = fists (melee).
@@ -159,8 +160,9 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   that sees you coming detects you first and fights). The attacker blends in to the strike position and the view
   turns over 0.25 s (no snap); both are held, the attack plays (body and first-person arms), the victim reacts and dies
   on the strike (1 s). Pickpocketing still needs you behind.
-- **Health**: players 300, guards 100 (guards also hit softer, difficulty damage multiplier). Players heal back
-  (30 per second) after 6 s without being hit; there is no health bar (red screen edges and heartbeat).
+- **Health**: players 150, guards 100. A bullet or an arrow in the head always kills (`bHeadshotKills` in Project
+  Settings → Hitmen; NPC shots excluded by `bHeadshotKillsFromNPCs`). Players heal back (30 per second) after 6 s
+  without being hit; there is no health bar (red screen edges and heartbeat).
 - **Intro**: the move keys steer the parachute; nobody can see a player under the canopy or for 2 s
   after landing.
 - **Sightroom (`Tab`)**: a scan sweeps the surroundings; enemies within a radius are shown in
@@ -169,7 +171,11 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   (`Hitmen|Sightroom`) so a 3C swap keeps them.
 - **Emotes**: hold `R` for a radial wheel.
 - **Footsteps**: a sound per surface (grass, stone, sand / dirt, wood, metal; concrete elsewhere) through physical
-  materials (PM_*), for players and NPCs; the surface also scales how far NPCs hear the step.
+  materials (PM_*), for players and NPCs; the surface also scales how far NPCs hear the step. Volume per gait (walk,
+  sprint, crouch) and a small random pitch; your own steps are 2D and quieter.
+- **Sound spaces**: every 3D sound goes through one attenuation per space (`DA_SoundSet` → Attenuations:
+  `SA_Hitmen_World`, `_Footstep`, `_Gunshot`, `_Impact`), with distance falloff and occlusion: a guard's steps are
+  heard a few metres away, gunshots far and muffled.
 
 ## 7. Weapons
 All weapons share ammo, fire rate, spread (fixed: firing never widens it), recoil, damage, headshot
@@ -184,9 +190,8 @@ sniper shows a scope overlay; zoom keeps the mouse feel (sensitivity follows the
 | Pistol | Hitscan | silenced |
 | SMG | Hitscan, automatic | fast, inaccurate |
 | Assault rifle | Hitscan, automatic | balanced |
-| Burst rifle | Hitscan, burst | 3-round burst |
 | Shotgun | Hitscan, pellets | |
-| Minigun | Hitscan, automatic | spin-up |
+| Minigun | Hitscan, automatic | fires at once, ramps 450 → 1100 rpm over 1.2 s (0.4 s grace on release) |
 | Sniper | Hitscan | high damage, zoom |
 | Rocket launcher | Projectile | explosion breaks walls |
 | Grenade launcher | Projectile | bouncing, timed |
@@ -249,7 +254,11 @@ animation) and hold it ready (its aim pose) each time they stop to look around; 
 these are the Mannequin pack animations (pistol / rifle equip and ADS idle, `MM_HitReact_Front_Lgt_01`), seen on
 every machine. They fire like Hitman guards: a short raise
 (`NPCFirstShotDelay` 0.6 s), bursts of `NPCBurstShots` (3) at 2.5x the weapon's interval, a 1.2 s pause; low
-damage (difficulty multiplier Easy 0.25 / Normal 0.4 / Hard 0.6), so a fight in the open lasts.
+damage multiplier per difficulty (Easy 0.35 / Normal 0.55 / Hard 0.8).
+
+**In combat** guards hold their ground: within `ShootingRange` (15 m, on the NPC; snipers unlimited) they stand and shoot,
+farther away or out of sight they walk closer until in range, and they never back away. They turn to face their target
+(strafing while they move) instead of facing where they walk.
 
 There are no civilians: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate.
 
@@ -288,7 +297,8 @@ smoke, darkness, invisibility) drives perception, kill witnesses and body sighti
   spots out of sight; spots are claimed so NPCs split up.
 - **Last known position**: where an NPC last **saw** you. A mannequin ghost (`BP_LastKnownGhost`) is shown there while
   at least one NPC searches for you; never on your corpse. Noise never reveals your position: NPCs go to the sound.
-- **Hearing**: walking is heard within 1.5 m, running 4.5 m, crouching not at all. A gunshot report is heard close to
+- **Hearing**: walking is heard within 4 m, sprinting 9 m, crouching not at all (height within one storey does not
+  count). A silenced bullet into a body is heard 1.5 m away. A gunshot report is heard close to
   the shooter only (6-9 m, silenced: not at all); **where the bullet lands** makes the noise that draws NPCs (impact
   radius per weapon). Each wall in between cuts the radius again (x0.45 per wall, more than 3 walls: silence), and only
   the `MaxNoiseResponders` (2) nearest NPCs that would react respond, for every noise type. Hearing sends NPCs to the
@@ -329,9 +339,8 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   glow with `[A] Charm` under them.
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
 - **Scope** overlay for the sniper. **Sightroom** (Tab): a scan wave, a grid on the floor, a cool world.
-- **Alert indicators** above NPCs (a small triangle pointing at the head: white and filling from the tip while
-  suspicion builds, solid yellow or red with a dark "!" once alerted, two pulsing arcs while calling for backup) and
-  around the crosshair.
+- **Alert indicators** above NPCs (a hatched diamond: white and filling from the bottom while suspicion builds, solid
+  yellow or red once alerted, a red "!" beside it while calling for backup) and around the crosshair.
 - **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match); the baked
   schematic in the middle (north up, dimmed under the markers, wheel to zoom around you); the legend on the right
   toggles each marker type and shows its exact colours (you, teammates, VIP, guards on alert in white / yellow / red

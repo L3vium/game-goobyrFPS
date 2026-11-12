@@ -1,6 +1,7 @@
 // Hitmen — weapon base
 
 #include "Weapons/HitmenWeaponBase.h"
+#include "Data/HitmenSoundSet.h"
 #include "Characters/HitmenNPC.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Data/HitmenWeaponData.h"
@@ -763,6 +764,37 @@ void AHitmenWeaponBase::SetFirstPersonVisuals(bool bFirstPerson)
 	SkeletalMesh->MarkRenderStateDirty();
 }
 
+float AHitmenWeaponBase::GetSpinAlpha() const
+{
+	if (!WeaponData || WeaponData->SpinUpTime <= 0.f)
+	{
+		return 0.f;
+	}
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	if (bSpunUp)
+	{
+		return FMath::Clamp((Now - SpinStartTime) / WeaponData->SpinUpTime, 0.f, 1.f);
+	}
+	// Released: the barrels coast down over the grace time.
+	const float AtRelease = FMath::Clamp((SpinReleaseTime - SpinStartTime) / WeaponData->SpinUpTime, 0.f, 1.f);
+	const float Coast = WeaponData->SpinDownGrace > 0.f ? 1.f - (Now - SpinReleaseTime) / WeaponData->SpinDownGrace : 0.f;
+	return FMath::Clamp(AtRelease * Coast, 0.f, 1.f);
+}
+
+float AHitmenWeaponBase::GetCurrentFireInterval() const
+{
+	if (!WeaponData)
+	{
+		return 1.f;
+	}
+	if (WeaponData->SpinUpTime <= 0.f)
+	{
+		return WeaponData->GetFireInterval();
+	}
+	const float StartInterval = 60.f / FMath::Max(1.f, WeaponData->SpinUpStartRPM);
+	return FMath::Lerp(StartInterval, WeaponData->GetFireInterval(), GetSpinAlpha());
+}
+
 bool AHitmenWeaponBase::CanFireNow() const
 {
 	if (!WeaponData || !IsEquipped() || !OwnerPawn)
@@ -795,16 +827,12 @@ void AHitmenWeaponBase::StartFire()
 
 	if (WeaponData->SpinUpTime > 0.f && !bSpunUp)
 	{
+		// Minigun: fires at once and ramps up. A short release keeps the barrels turning (no new ramp).
+		const float Now = GetWorld()->GetTimeSeconds();
+		const float Kept = Now - SpinReleaseTime <= WeaponData->SpinDownGrace ? GetSpinAlpha() : 0.f;
+		SpinStartTime = Now - Kept * WeaponData->SpinUpTime;
+		bSpunUp = true;
 		Juice_OnSpinUp(true);
-		GetWorldTimerManager().SetTimer(SpinUpTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
-		{
-			bSpunUp = true;
-			if (bTriggerHeld)
-			{
-				HandleAutoFire();
-			}
-		}), WeaponData->SpinUpTime, false);
-		return;
 	}
 
 	BurstRemaining = WeaponData->FireMode == EHitmenFireMode::Burst ? WeaponData->BurstCount : 0;
@@ -824,9 +852,12 @@ void AHitmenWeaponBase::StopFire()
 	{
 		GetWorldTimerManager().ClearTimer(FireTimer);
 	}
-	if (bSpunUp || GetWorldTimerManager().IsTimerActive(SpinUpTimer))
+	if (bSpunUp)
 	{
-		GetWorldTimerManager().ClearTimer(SpinUpTimer);
+		// Remember how fast the barrels were turning when the trigger came up (SpinDownGrace).
+		const float Alpha = GetSpinAlpha();
+		SpinReleaseTime = GetWorld()->GetTimeSeconds();
+		SpinStartTime = SpinReleaseTime - Alpha * (WeaponData ? WeaponData->SpinUpTime : 0.f);
 		bSpunUp = false;
 		Juice_OnSpinUp(false);
 	}
@@ -838,7 +869,7 @@ void AHitmenWeaponBase::HandleAutoFire()
 	{
 		return;
 	}
-	const float Interval = WeaponData->GetFireInterval();
+	const float Interval = GetCurrentFireInterval();
 	const float Wait = FMath::Max(0.f, LastFireTime + Interval - GetWorld()->GetTimeSeconds());
 	if (Wait > 0.f)
 	{
@@ -873,7 +904,7 @@ void AHitmenWeaponBase::FireOnce()
 	{
 		if (USoundBase* DrySound = WeaponData->DryFireSound.LoadSynchronous())
 		{
-			UGameplayStatics::PlaySoundAtLocation(this, DrySound, GetMuzzleLocation());
+			UHitmenSoundLibrary::PlaySoundInSpace(this, DrySound, GetMuzzleLocation(), EHitmenSoundSpace::World);
 		}
 		Juice_OnDryFire();
 		if (UHitmenInventoryComponent* Inventory = OwnerPawn->FindComponentByClass<UHitmenInventoryComponent>())
@@ -992,7 +1023,18 @@ void AHitmenWeaponBase::ReportShotNoise(const FVector& Origin, const TArray<FVec
 	// Where the bullet lands is what draws NPCs (they investigate the impact, not the shooter).
 	if (WeaponData->ImpactNoiseRadius > 0.f && Impacts.Num() > 0)
 	{
-		UHitmenAISubsystem::ReportNoise(this, Impacts[0], WeaponData->ImpactNoiseRadius, OwnerPawn, EHitmenNoiseType::Gunshot);
+		float Radius = WeaponData->ImpactNoiseRadius;
+		// A silenced bullet into a body is almost silent: only someone right there hears it.
+		if (WeaponData->bSilenced)
+		{
+			FCollisionQueryParams FleshParams(SCENE_QUERY_STAT(HitmenSilencedFlesh), false, this);
+			FleshParams.AddIgnoredActor(OwnerPawn);
+			if (GetWorld()->OverlapAnyTestByChannel(Impacts[0], FQuat::Identity, ECC_Pawn, FCollisionShape::MakeSphere(25.f), FleshParams))
+			{
+				Radius = FMath::Min(Radius, SilencedFleshNoiseRadius);
+			}
+		}
+		UHitmenAISubsystem::ReportNoise(this, Impacts[0], Radius, OwnerPawn, EHitmenNoiseType::Gunshot);
 	}
 }
 
@@ -1027,7 +1069,7 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	}
 	if (USoundBase* Sound = WeaponData->FireSound.LoadSynchronous())
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, Sound, Origin);
+		UHitmenSoundLibrary::PlaySoundInSpace(this, Sound, Origin, EHitmenSoundSpace::Gunshot, 1.f, FMath::FRandRange(0.97f, 1.03f));
 	}
 	// Same cosmetic path as the FX: predicted on the shooter, multicast to everyone else.
 	// NPCs hold their weapon's aim pose between shots: the fire montages are additive and, in the same slot, they
@@ -1078,7 +1120,7 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 		}
 		if (ImpactSound)
 		{
-			UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, Impact);
+			UHitmenSoundLibrary::PlaySoundInSpace(this, ImpactSound, Impact, EHitmenSoundSpace::Impact, 1.f, FMath::FRandRange(0.92f, 1.08f));
 		}
 		Juice_OnImpact(Impact);
 	}

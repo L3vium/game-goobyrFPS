@@ -181,7 +181,7 @@ void AHitmenProjectile::Multicast_Impact_Implementation(FVector_NetQuantize Loca
 	}
 	if (Sound)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, Sound, Location);
+		UHitmenSoundLibrary::PlaySoundInSpace(this, Sound, Location, bExploded ? EHitmenSoundSpace::Gunshot : EHitmenSoundSpace::Impact);
 	}
 	else if (bExploded)
 	{

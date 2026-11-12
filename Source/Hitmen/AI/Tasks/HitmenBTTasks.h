@@ -82,11 +82,20 @@ public:
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 
 protected:
+	/** Used when the pawn has no shooting range (charmed players). */
 	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0"))
 	float PreferredDistance = 700.f;
 
 	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0"))
 	float SniperDistance = 2500.f;
+
+	/** Closing in: stop this deep inside the shooting range (0.7 = 70 % of it). */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0.1", ClampMax="1"))
+	float ApproachRangeFraction = 0.7f;
+
+	/** Never walk closer than this to the target. */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
+	float MinApproachDistance = 400.f;
 };
 
 /**

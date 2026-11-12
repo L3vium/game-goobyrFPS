@@ -313,4 +313,9 @@ protected:
 	float SprintTapTime = 0.18f;
 
 	float SprintPressTime = -100.f;
+
+	virtual void PlayerTick(float DeltaTime) override;
+	/** Vehicle HUD (health, reload, exit): pushed every frame while driving. */
+	void PushVehicleView();
+	bool bVehicleViewActive = false;
 };

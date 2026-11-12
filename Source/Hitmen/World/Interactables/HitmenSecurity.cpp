@@ -1,6 +1,8 @@
 // Hitmen — security fixtures
 
 #include "World/Interactables/HitmenSecurity.h"
+#include "Engine/DamageEvents.h"
+#include "Components/TextRenderComponent.h"
 #include "Core/HitmenGameSettings.h"
 #include "Weapons/HitmenCosmeticActors.h"
 #include "Components/HitmenMapMarkerComponent.h"
@@ -78,6 +80,7 @@ void AHitmenSecurityCamera::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(AHitmenSecurityCamera, bDisabled);
 	DOREPLIFETIME(AHitmenSecurityCamera, bSeeingIntruder);
 	DOREPLIFETIME(AHitmenSecurityCamera, DetectionProgress);
+	DOREPLIFETIME(AHitmenSecurityCamera, bBroken);
 }
 
 void AHitmenSecurityCamera::BeginPlay()
@@ -98,6 +101,9 @@ void AHitmenSecurityCamera::BeginPlay()
 	Capture->PostProcessSettings.AutoExposureMinBrightness = FeedExposureEV100;
 	Capture->PostProcessSettings.AutoExposureMaxBrightness = FeedExposureEV100;
 	Capture->ShowFlags.SetEyeAdaptation(false);
+	// The footage shows the room, not the camera's own zone pattern.
+	Capture->ShowFlags.SetLightFunctions(false);
+	Capture->ShowFlags.SetDecals(false);
 
 	// Cone length / width follow the view settings (default mesh: engine cone pointing up).
 	const float Radius = FMath::Tan(FMath::DegreesToRadians(ViewHalfAngle)) * ViewDistance;
@@ -115,6 +121,16 @@ void AHitmenSecurityCamera::BeginPlay()
 	ViewLight->SetAttenuationRadius(ViewDistance * 1.35f);
 	ViewLight->SetSourceRadius(4.f);
 	ViewCone->SetHiddenInGame(!bShowViewCone);
+	// The zone is projected by the light itself (walls cut it like the light), and the beam shows in the air.
+	if (ProjectionMaterial)
+	{
+		ProjectionInstance = UMaterialInstanceDynamic::Create(ProjectionMaterial, this);
+		ProjectionInstance->SetScalarParameterValue(TEXT("TanHalf"), FMath::Tan(FMath::DegreesToRadians(ViewHalfAngle)));
+		ViewLight->SetLightFunctionMaterial(ProjectionInstance);
+		ViewLight->SetLightFunctionScale(FVector(ViewDistance, ViewDistance, ViewDistance));
+	}
+	ViewLight->SetVolumetricScatteringIntensity(BeamScattering);
+	ViewLight->bCastVolumetricShadow = true;
 
 	for (UMeshComponent* MeshComp : { static_cast<UMeshComponent*>(ViewCone.Get()) })
 	{
@@ -174,12 +190,8 @@ void AHitmenSecurityCamera::UpdateFootprint()
 
 FLinearColor AHitmenSecurityCamera::GetStateColor() const
 {
-	if (!bSeeingIntruder && DetectionProgress == 0)
-	{
-		return IdleColor;
-	}
-	const float Meter = DetectionProgress / 255.f;
-	return FLinearColor::LerpUsingHSV(SuspiciousColor, AlertColor, Meter * Meter);
+	// One colour only (yellow): the zone stays yellow whatever happens; the meter fills inside it.
+	return SuspiciousColor;
 }
 
 void AHitmenSecurityCamera::Tick(float DeltaSeconds)
@@ -287,7 +299,8 @@ void AHitmenSecurityCamera::RaiseAlarm(APawn* Intruder)
 
 void AHitmenSecurityCamera::SetCameraDisabled(bool bInDisabled)
 {
-	if (HasAuthority())
+	// A broken camera stays dead (the console cannot bring it back).
+	if (HasAuthority() && !(bBroken && !bInDisabled))
 	{
 		bDisabled = bInDisabled;
 		bSeeingIntruder = false;
@@ -299,6 +312,15 @@ void AHitmenSecurityCamera::SetCameraDisabled(bool bInDisabled)
 
 void AHitmenSecurityCamera::OnRep_Visuals()
 {
+	if (ProjectionInstance)
+	{
+		ProjectionInstance->SetScalarParameterValue(TEXT("Progress"), DetectionProgress / 255.f);
+	}
+	if (bBroken)
+	{
+		// Hanging dead: head down, no light.
+		Head->SetRelativeRotation(BaseHeadRotation + FRotator(-50.f, 0.f, 25.f));
+	}
 	ViewCone->SetVisibility(!bDisabled && bShowViewCone);
 	FloorDecal->SetVisibility(!bDisabled && bShowFloorRing);
 	ViewLight->SetVisibility(!bDisabled);
@@ -341,6 +363,16 @@ AHitmenSecurityMonitor::AHitmenSecurityMonitor()
 {
 	Screen = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Screen"));
 	SetRootComponent(Screen);
+	NoSignalText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("NoSignalText"));
+	NoSignalText->SetupAttachment(Screen);
+	NoSignalText->SetText(NSLOCTEXT("Hitmen", "NoSignal", "NO SIGNAL"));
+	NoSignalText->SetHorizontalAlignment(EHTA_Center);
+	NoSignalText->SetVerticalAlignment(EVRTA_TextCenter);
+	NoSignalText->SetTextRenderColor(FColor(230, 230, 230));
+	NoSignalText->SetWorldSize(12.f);
+	NoSignalText->SetRelativeLocation(FVector(0.f, -6.f, 0.f));
+	NoSignalText->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+	NoSignalText->SetVisibility(false);
 }
 
 void AHitmenSecurityMonitor::BeginPlay()
@@ -364,19 +396,26 @@ void AHitmenSecurityMonitor::HandleCameraDisabledChanged(bool bCameraDisabled)
 {
 	if (bCameraDisabled)
 	{
-		// Stop refreshing (no capture cost) and show the "no signal" screen instead of a frozen frame.
+		// Stop refreshing: the last frame stays on the screen, dimmed and noisy, with NO SIGNAL over it.
 		GetWorldTimerManager().ClearTimer(RefreshTimer);
-		if (UMaterialInterface* NoSignal = NoSignalMaterial.LoadSynchronous())
+		if (FeedMaterial)
+		{
+			FeedMaterial->SetScalarParameterValue(TEXT("Signal"), 0.f);
+		}
+		else if (UMaterialInterface* NoSignal = NoSignalMaterial.LoadSynchronous())
 		{
 			Screen->SetMaterial(ScreenMaterialIndex, NoSignal);
 		}
+		NoSignalText->SetVisibility(true);
 	}
 	else
 	{
 		if (FeedMaterial)
 		{
+			FeedMaterial->SetScalarParameterValue(TEXT("Signal"), 1.f);
 			Screen->SetMaterial(ScreenMaterialIndex, FeedMaterial);
 		}
+		NoSignalText->SetVisibility(false);
 		GetWorldTimerManager().SetTimer(RefreshTimer, this, &AHitmenSecurityMonitor::Refresh, RefreshInterval, true);
 		Refresh();
 	}
@@ -735,6 +774,8 @@ AHitmenLightFixture::AHitmenLightFixture()
 	Light->SetupAttachment(Mesh);
 	Light->SetIntensity(5000.f);
 	Light->SetAttenuationRadius(1200.f);
+	// Room lamps never glow in the volumetric fog (only camera beams do).
+	Light->SetVolumetricScatteringIntensity(0.f);
 }
 
 void AHitmenLightFixture::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -755,6 +796,15 @@ void AHitmenLightFixture::SetPowered(bool bInPowered)
 void AHitmenLightFixture::OnRep_Powered()
 {
 	Light->SetVisibility(bPowered);
+	// The bulb goes dark with the power.
+	if (!OnMaterial)
+	{
+		OnMaterial = Mesh->GetMaterial(0);
+	}
+	if (OffMaterial)
+	{
+		Mesh->SetMaterial(0, bPowered ? OnMaterial.Get() : OffMaterial.Get());
+	}
 	Juice_OnPowerChanged(bPowered);
 }
 
@@ -801,6 +851,27 @@ AHitmenCircuitBreaker::AHitmenCircuitBreaker()
 	// Fixtures are never vaulted, climbed or hung from.
 	Tags.AddUnique(HitmenTags::NoTraversal);
 	InteractionText = NSLOCTEXT("Hitmen", "CutPower", "Cut the power");
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
+	Lever = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Lever"));
+	Lever->SetupAttachment(Root);
+	Lever->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
+void AHitmenCircuitBreaker::OnRep_BreakerPowered()
+{
+	ApplyLever();
+	if (GetNetMode() != NM_DedicatedServer && SwitchFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SwitchFX, Lever->GetComponentLocation(), FRotator::ZeroRotator, FVector(0.4f));
+	}
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::BreakerSwitch, GetActorLocation());
+}
+
+void AHitmenCircuitBreaker::ApplyLever()
+{
+	// Up when powered, thrown down when cut.
+	Lever->SetRelativeRotation(FRotator(bPowered ? 35.f : -35.f, 0.f, 0.f));
 }
 
 void AHitmenCircuitBreaker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -817,6 +888,7 @@ FText AHitmenCircuitBreaker::GetInteractionText_Implementation(AActor* Interacto
 void AHitmenCircuitBreaker::OnInteracted(AActor* Interactor)
 {
 	bPowered = !bPowered;
+	OnRep_BreakerPowered();
 	for (AHitmenLightFixture* Light : LinkedLights)
 	{
 		if (Light)
@@ -833,4 +905,32 @@ void AHitmenCircuitBreaker::OnInteracted(AActor* Interactor)
 	}
 	// The sudden darkness is suspicious: nearby NPCs come to check the breaker.
 	UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), 800.f, this, EHitmenNoiseType::Distraction);
+}
+
+float AHitmenSecurityCamera::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	const float Taken = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	if (!HasAuthority() || bBroken || DamageAmount <= 0.f)
+	{
+		return Taken;
+	}
+	DamageTaken += DamageAmount;
+	if (DamageTaken >= CameraHealth)
+	{
+		// Shot to pieces: sparks, the head drops, the feed is lost, a noise draws a guard.
+		bBroken = true;
+		SetCameraDisabled(true);
+		Multicast_Broken();
+		UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), 800.f, EventInstigator ? EventInstigator->GetPawn() : nullptr, EHitmenNoiseType::Impact);
+	}
+	return DamageAmount;
+}
+
+void AHitmenSecurityCamera::Multicast_Broken_Implementation()
+{
+	if (BrokenFX && GetNetMode() != NM_DedicatedServer)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, BrokenFX, Body->GetComponentLocation(), FRotator::ZeroRotator, FVector(0.5f));
+	}
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::BreakerSwitch, Body->GetComponentLocation());
 }

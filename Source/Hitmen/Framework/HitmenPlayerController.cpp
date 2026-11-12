@@ -1,6 +1,7 @@
 // Hitmen — player controller
 
 #include "Framework/HitmenPlayerController.h"
+#include "World/Vehicles/HitmenVehicles.h"
 #include "Data/HitmenSoundSet.h"
 #include "Framework/HitmenPlayerState.h"
 #include "Framework/HitmenGameState.h"
@@ -1200,4 +1201,34 @@ void AHitmenPlayerController::ApplySpectatorView()
 		SetViewTargetWithBlend(GetPawnOrSpectator(), 0.25f);
 	}
 	OnSpectatorTargetChanged.Broadcast(SpectatorTarget.Get());
+}
+
+void AHitmenPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+	PushVehicleView();
+}
+
+void AHitmenPlayerController::PushVehicleView()
+{
+	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
+	if (!UI)
+	{
+		return;
+	}
+	const AHitmenVehiclePawn* Vehicle = Cast<AHitmenVehiclePawn>(GetPawn());
+	if (!Vehicle && !bVehicleViewActive)
+	{
+		return;
+	}
+	FHitmenHUDVehicleView View;
+	if (Vehicle)
+	{
+		View.bActive = true;
+		View.Name = Vehicle->DisplayName;
+		View.Health = Vehicle->GetHealthNormalized();
+		View.Reload = Vehicle->GetReloadAlpha();
+	}
+	bVehicleViewActive = View.bActive;
+	UI->SetVehicleView(View);
 }

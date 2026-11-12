@@ -6,6 +6,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ## [Unreleased]
 
 ### Added
+- Vehicle HUD: health bar at the top, reload ring around the crosshair, `[F] Exit` bottom right; keycards moved bottom
+  right above it.
+- Security cameras can be shot to pieces (30 health): sparks, the head drops, the feed is lost for good.
+- Distraction variants (radio, TV, alarm clock) as data-only Blueprints with toon notes on every pulse.
 - Carry any body in your arms (it takes the left weapon slot; no shooting while carrying; F or the wheel puts it
   down); hide bodies in a body container (BP_BodyContainer, 2 per container by default; never the VIP).
 - Remote abilities target the best candidate in an 8° cone with a line of sight (fresnel + `[A] action`): the remote
@@ -44,6 +48,13 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
 
 ### Changed
+- Doors, vent hatches and lockers hinge on the other edge.
+- Cameras: one colour (yellow); the zone is the camera's shadowed spotlight (walls cut it), much brighter; the floor ring
+  decal tests the global distance field so walls hide it too; the monitor keeps the last frame (dimmed, NO SIGNAL).
+- Distractions stay on until a guard who comes to look switches them off (or you, with F or remotely).
+- Hacking: a ring fills around the F key (the bar under the crosshair overlapped the prompt).
+- Circuit breaker lever with sparks; bulbs go dark with the power; room lamps never glow in volumetric fog.
+- Mounted gun: free-standing tripod, gun higher, view above it. Tank reload 1.25 s (2.5).
 - Gun sounds: one recording pitched and levelled per weapon (FireSoundPitch / FireSoundVolume); the silenced pistol is
   a quiet high snap (it played a dust puff); dry fire is a metal click instead of a clock tick.
 - The smoke grenade shows the Smoke_Bombs toon cloud (its path was wrong: grey spheres were drawn) and plays 1.8x faster.

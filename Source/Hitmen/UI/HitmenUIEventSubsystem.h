@@ -42,6 +42,19 @@ struct FHitmenHUDInventoryView
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bCarryingVIP = false;
 };
 
+/** The vehicle you drive (tank, mounted gun) as the HUD shows it. */
+USTRUCT(BlueprintType)
+struct FHitmenHUDVehicleView
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bActive = false;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FText Name;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Health = 1.f;
+	/** 0..1 while reloading, 1 ready; negative = no reload. */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Reload = -1.f;
+};
+
 /** One ability (E move / A manipulation) as the HUD shows it. */
 USTRUCT(BlueprintType)
 struct FHitmenHUDAbilityView
@@ -248,6 +261,8 @@ public:
 	void SetScoped(bool bInScoped) { if (bScoped != bInScoped) { bScoped = bInScoped; OnScopeToggled.Broadcast(bScoped); } }
 	/** Hold-to-interact progress 0..1 (hacking a panel...), negative = no hold in progress. */
 	void SetInteractProgress(float Progress) { InteractProgress = Progress; }
+	void SetVehicleView(const FHitmenHUDVehicleView& View) { VehicleView = View; }
+	const FHitmenHUDVehicleView& GetVehicleView() const { return VehicleView; }
 	UFUNCTION(BlueprintPure, Category="Hitmen|UI") float GetInteractProgress() const { return InteractProgress; }
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|UI") const FHitmenWorldHint& GetAbilityHint() const { return AbilityHint; }
@@ -317,4 +332,5 @@ private:
 	FText TraversalHint;
 	bool bScoped = false;
 	float InteractProgress = -1.f;
+	FHitmenHUDVehicleView VehicleView;
 };

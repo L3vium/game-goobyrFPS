@@ -135,7 +135,21 @@ float inner = saturate(1.0 - abs(edge + 16.0) / 1.5) * dashes;
 float scan = inside * step(0.9, frac((P.x + P.y) / 22.0 - T * 0.6)) * 0.07;
 // Detection meter: fills from the edge toward the centre as the camera builds up.
 float fill = inside * step(1.0 - Progress, ang / max(halfAngle, 0.001)) * step(0.004, Progress) * 0.28;
-return saturate(ring * 0.95 + inner * 0.55 + scan + fill) * saturate(A * 2.5);"""
+// Walls and obstacles between the camera and this point hide the zone: march the global distance field from the
+// point toward the lens (camera-relative positions, as the distance field wants them).
+float3 toEye = EyeRel - PRel;
+float len = length(toEye);
+float3 rd = toEye / max(len, 1.0);
+float t = 25.0;
+float visible = 1.0;
+for (int i = 0; i < 48; i++)
+{
+    if (t > len - 25.0) { break; }
+    float sd = GetDistanceToNearestSurfaceGlobal(PRel + rd * t);
+    if (sd < 2.0) { visible = 0.0; break; }
+    t += max(sd, 6.0);
+}
+return saturate(ring * 0.95 + inner * 0.55 + scan + fill) * saturate(A * 2.5) * visible + DF * 0.0;"""
 
 
 def build_camera_ring():
@@ -157,15 +171,25 @@ def build_camera_ring():
     progress = param(unreal.MaterialExpressionScalarParameter, "Progress", 0.0, -700, 400)
     world = MEL.create_material_expression(ring, unreal.MaterialExpressionWorldPosition, -700, 500)
     time = MEL.create_material_expression(ring, unreal.MaterialExpressionTime, -700, 600)
+    # Camera-relative positions for the distance-field occlusion march (and a distance-field node so the material
+    # compiles with the global distance field available).
+    world_rel = MEL.create_material_expression(ring, unreal.MaterialExpressionWorldPosition, -900, 700)
+    set_props(world_rel, world_position_shader_offset=unreal.WorldPositionIncludedOffsets.WPT_CAMERA_RELATIVE)
+    cam_pos = MEL.create_material_expression(ring, unreal.MaterialExpressionCameraPositionWS, -1100, 800)
+    eye_rel = MEL.create_material_expression(ring, unreal.MaterialExpressionSubtract, -900, 850)
+    MEL.connect_material_expressions(eye, "", eye_rel, "A")
+    MEL.connect_material_expressions(cam_pos, "", eye_rel, "B")
+    df_node = MEL.create_material_expression(ring, unreal.MaterialExpressionDistanceToNearestSurface, -700, 950)
     mask = MEL.create_material_expression(ring, unreal.MaterialExpressionCustom, -300, 200)
     inputs = []
-    for input_name in ("P", "Eye", "Fwd", "CosHalf", "Progress", "T", "A"):
+    for input_name in ("P", "Eye", "Fwd", "CosHalf", "Progress", "T", "A", "PRel", "EyeRel", "DF"):
         ci = unreal.CustomInput()
         ci.set_editor_property("input_name", input_name)
         inputs.append(ci)
     set_props(mask, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, description="CameraRing", inputs=inputs, code=CAMERA_RING_HLSL)
     for node, pin, input_name in ((world, "", "P"), (eye, "", "Eye"), (forward, "", "Fwd"), (cos_half, "", "CosHalf"),
-                                  (progress, "", "Progress"), (time, "", "T"), (color, "A", "A")):
+                                  (progress, "", "Progress"), (time, "", "T"), (color, "A", "A"), (world_rel, "", "PRel"),
+                                  (eye_rel, "", "EyeRel"), (df_node, "", "DF")):
         MEL.connect_material_expressions(node, pin, mask, input_name)
     glow = MEL.create_material_expression(ring, unreal.MaterialExpressionMultiply, -300, -200)
     set_props(glow, const_b=2.0)
@@ -204,6 +228,105 @@ def build_map_markers():
             marker.set_editor_property("type", assets[kind])
             save(bp)
     return assets
+
+
+def build_screen_material(folder):
+    """M_Hitmen_Screen: a monitor showing a render target. Scalar "Signal" 1 = live; 0 = the last frame frozen, dimmed,
+    with rolling scanlines and static (the camera is off or broken)."""
+    screen = new_material("M_Hitmen_Screen", folder)
+    set_props(screen, shading_model=unreal.MaterialShadingModel.MSM_UNLIT)
+    tex = MEL.create_material_expression(screen, unreal.MaterialExpressionTextureSampleParameter2D, -700, 0)
+    set_props(tex, parameter_name="ScreenTexture")
+    signal = MEL.create_material_expression(screen, unreal.MaterialExpressionScalarParameter, -700, 250)
+    set_props(signal, parameter_name="Signal", default_value=1.0)
+    uv = MEL.create_material_expression(screen, unreal.MaterialExpressionTextureCoordinate, -700, 380)
+    time = MEL.create_material_expression(screen, unreal.MaterialExpressionTime, -700, 480)
+    custom = MEL.create_material_expression(screen, unreal.MaterialExpressionCustom, -350, 100)
+    inputs = []
+    for name in ("Tex", "Signal", "UV", "T"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        inputs.append(ci)
+    code = ("float lost = 1.0 - saturate(Signal);\n"
+            "float scan = 0.75 + 0.25 * sin(UV.y * 420.0 + T * 18.0);\n"
+            "float n = frac(sin(dot(floor(UV * float2(320.0, 180.0)) + floor(T * 24.0), float2(12.9898, 78.233))) * 43758.5453);\n"
+            "float3 dead = Tex * 0.28 * scan + n * 0.12;\n"
+            "return lerp(Tex, dead, lost);")
+    set_props(custom, code=code, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Screen", inputs=inputs)
+    MEL.connect_material_expressions(tex, "RGB", custom, "Tex")
+    MEL.connect_material_expressions(signal, "", custom, "Signal")
+    MEL.connect_material_expressions(uv, "", custom, "UV")
+    MEL.connect_material_expressions(time, "", custom, "T")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(screen)
+    save(screen)
+    return screen
+
+
+def build_camera_projection(folder):
+    """M_Hitmen_CameraProjection (light function): the camera's zone drawn by its own light, so walls cut it like the
+    light. Bright edge ring, a turning dashed inner ring, faint scanlines; "Progress" (detection meter) fills from the
+    edge inward. "TanHalf" = tan of the cone half angle."""
+    mat = new_material("M_Hitmen_CameraProjection", folder)
+    set_props(mat, material_domain=unreal.MaterialDomain.MD_LIGHT_FUNCTION)
+    lv = MEL.create_material_expression(mat, unreal.MaterialExpressionLightVector, -800, 0)
+    progress = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -800, 150)
+    set_props(progress, parameter_name="Progress", default_value=0.0)
+    tan_half = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -800, 260)
+    set_props(tan_half, parameter_name="TanHalf", default_value=0.306)
+    time = MEL.create_material_expression(mat, unreal.MaterialExpressionTime, -800, 370)
+    custom = MEL.create_material_expression(mat, unreal.MaterialExpressionCustom, -400, 100)
+    inputs = []
+    for name in ("LV", "Progress", "TanHalf", "T"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        inputs.append(ci)
+    code = ("float3 d = normalize(LV);\n"
+            "float x = max(d.x, 0.0001);\n"
+            "float2 p = d.yz / (x * TanHalf);\n"
+            "float r = length(p);\n"
+            "float a = atan2(p.y, p.x);\n"
+            "float inside = 1.0 - smoothstep(0.97, 1.0, r);\n"
+            "float edge = smoothstep(0.86, 0.95, r) * inside;\n"
+            "float dashes = step(0.5, frac(a / 6.2831853 * 18.0 + T * 0.35)) * (1.0 - smoothstep(0.012, 0.03, abs(r - 0.8)));\n"
+            "float scan = 0.06 * step(0.5, frac(p.y * 22.0 - T * 0.8));\n"
+            "float fill = smoothstep(1.0 - Progress - 0.02, 1.0 - Progress, r) * 0.55 * step(0.001, Progress);\n"
+            "return inside * (0.42 + scan) + edge * 1.6 + dashes * 0.9 * inside + fill * inside;")
+    set_props(custom, code=code, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, description="CameraZone", inputs=inputs)
+    MEL.connect_material_expressions(lv, "", custom, "LV")
+    MEL.connect_material_expressions(progress, "", custom, "Progress")
+    MEL.connect_material_expressions(tan_half, "", custom, "TanHalf")
+    MEL.connect_material_expressions(time, "", custom, "T")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
+# Distraction variants: name -> (mesh shape, scale, material instance, loop sound, light colour)
+DISTRACTIONS = {
+    "Radio": ("cube", (0.4, 0.2, 0.25), "MI_Red", "/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_05_GLITCH/Cues/COMRadio_InsJ_Radio_Noise_Long-Wave_01-01_LOOP_Cue",
+              (1.0, 0.55, 0.15)),
+    "TV": ("cube", (0.7, 0.12, 0.45), "MI_Dark", "/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_05_GLITCH/Cues/UIGlitch_InsJ_Glitching_Digital_Data-Corruption_01-01_LOOP_Cue",
+           (0.4, 0.65, 1.0)),
+    "Alarm": ("cylinder", (0.18, 0.18, 0.12), "MI_Gold", "/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_02_CLOCKS/Cues/CLOCKTick_InsJ_Clock-01_Ticking_Single-01_Cue",
+              (1.0, 0.85, 0.2)),
+}
+
+
+def build_distractions(folder):
+    """BP_Distraction_<Name>: one data-only Blueprint per look (mesh, loop, light colour); toon notes on every pulse."""
+    notes = load("/Game/Vefects/Stylized_VFX/Skills/MagicAttacks/Sound/NS_SoundMagic_Hit")
+    result = []
+    for name, (shape, scale, material, sound, color) in DISTRACTIONS.items():
+        bp = make_blueprint("BP_Distraction_" + name, folder, unreal.HitmenDistraction)
+        d = cdo(bp)
+        height = scale[2] * 100.0 * 0.5
+        set_mesh(component(d, "mesh"), SHAPES[shape], scale, load("/Game/Hitmen/Materials/Instances/" + material), (0, 0, height))
+        set_props(d, loop_sound=load(sound), pulse_fx=notes, light_color=unreal.LinearColor(*color, 1.0), play_time=0.0, cooldown=1.0)
+        save(bp)
+        result.append(bp)
+    return result
 
 
 def glow_material(name, folder, intensity, soft=False):
@@ -379,14 +502,7 @@ def build_materials(physical):
     save(decal)
     camera_ring = build_camera_ring()
 
-    # Monitor screen showing a render target.
-    screen = new_material("M_Hitmen_Screen", folder)
-    set_props(screen, shading_model=unreal.MaterialShadingModel.MSM_UNLIT)
-    tex = MEL.create_material_expression(screen, unreal.MaterialExpressionTextureSampleParameter2D, -500, 0)
-    set_props(tex, parameter_name="ScreenTexture")
-    MEL.connect_material_property(tex, "RGB", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    MEL.recompile_material(screen)
-    save(screen)
+    screen = build_screen_material(folder)
 
     # Sightroom post-process: an expanding scan wave from the player, a world grid on the floor
     # behind it, a cool desaturated world, highlighted actors through walls. Driven by C++:
@@ -1414,7 +1530,7 @@ def build_world(mats, weapons):
             {"contents_mode": unreal.HitmenContainerContents.RANDOM})
     build_body_container(W, mi)
     fixture("BP_TallGrass", unreal.HitmenTallGrass, W + "/Grass", {"mesh": ("cube", (6.0, 6.0, 1.1), mi["MI_Grass"], (0, 0, -5))})
-    fixture("BP_Distraction_Radio", unreal.HitmenDistraction, W + "/Distraction", {"mesh": ("cube", (0.4, 0.2, 0.25), mi["MI_Red"], (0, 0, 12))})
+    build_distractions(W + "/Distraction")
     fixture("BP_SecurityCamera", unreal.HitmenSecurityCamera, W + "/Security",
             {"body": ("cube", (0.4, 0.2, 0.2), mi["MI_White"], None), "view_cone": ("cone", (1, 1, 1), mats["cone"], None)})
     decal_comp = component(cdo(bps["BP_SecurityCamera"]), "floor_decal")

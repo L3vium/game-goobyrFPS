@@ -338,11 +338,12 @@ AHitmenMountedGun::AHitmenMountedGun()
 {
 	GunPivot = CreateDefaultSubobject<USceneComponent>(TEXT("GunPivot"));
 	GunPivot->SetupAttachment(Collision);
-	GunPivot->SetRelativeLocation(FVector(0.f, 0.f, 80.f));
+	GunPivot->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
+	DisplayName = NSLOCTEXT("Hitmen", "MountedGun", "Mounted gun");
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(GunPivot);
-	Camera->SetRelativeLocation(FVector(-90.f, 0.f, 30.f));
+	Camera->SetRelativeLocation(FVector(-85.f, 0.f, 55.f));
 
 	Mesh->SetupAttachment(GunPivot);
 
@@ -468,6 +469,7 @@ AHitmenTank::AHitmenTank()
 {
 	Collision->SetBoxExtent(FVector(300.f, 180.f, 100.f));
 
+	DisplayName = NSLOCTEXT("Hitmen", "Tank", "Tank");
 	Turret = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Turret"));
 	Turret->SetupAttachment(Collision);
 	Barrel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Barrel"));
@@ -734,4 +736,14 @@ void AHitmenTank::Multicast_TankFired_Implementation()
 	{
 		Gunner->AddCameraShake(FireShake, 0.35f);
 	}
+}
+
+float AHitmenVehiclePawn::GetHealthNormalized() const
+{
+	return Health && Health->GetMaxHealth() > 0.f ? FMath::Clamp(Health->GetHealth() / Health->GetMaxHealth(), 0.f, 1.f) : 1.f;
+}
+
+float AHitmenTank::GetReloadAlpha() const
+{
+	return ReloadTime > 0.f ? FMath::Clamp((GetWorld()->GetTimeSeconds() - LastShotTime) / ReloadTime, 0.f, 1.f) : 1.f;
 }

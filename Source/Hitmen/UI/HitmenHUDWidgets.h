@@ -147,6 +147,7 @@ protected:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenDamageVignetteWidget> DamageVignette;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenScopeWidget> Scope;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenInventoryBarWidget> InventoryBar;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenStatusCornerWidget> StatusCorner;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenWorldHintWidget> WorldHint;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenIntroWidget> Intro;
 

@@ -224,6 +224,52 @@ if wanted("bodies"):
     hitmen_content.build_body_container("/Game/Hitmen/World/Interactables", mi)
     log("bodies: BP_BodyContainer")
 
+if wanted("fixtures"):
+    # Cameras (yellow zone projected by the light, beam, breakable), monitors (frozen frame), breaker lever, dark
+    # bulbs, distraction variants, mounted gun without a pedestal.
+    TOON = hitmen_content.TOON
+    mats_folder = "/Game/Hitmen/Materials/Master"
+    projection = hitmen_content.build_camera_projection(mats_folder)
+    hitmen_content.build_screen_material(mats_folder)
+    W = "/Game/Hitmen/World/Interactables/"
+
+    def bp_set(bp_path, **props):
+        bp = load(bp_path)
+        if not bp:
+            log("WARN missing", bp_path)
+            return None
+        d = unreal.get_default_object(bp.generated_class())
+        for field, value in props.items():
+            try:
+                d.set_editor_property(field, value)
+            except Exception as error:
+                log("WARN", bp_path, field, error)
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        save(bp)
+        return d
+
+    ring = hitmen_content.build_camera_ring()
+    bp_set(W + "Security/BP_SecurityCamera", projection_material=None, show_floor_ring=True, beam_scattering=25.0, view_light_intensity=9000.0,
+           broken_fx=load(TOON + "NS_Lightning_Hit"), suspicious_color=unreal.LinearColor(1.0, 0.78, 0.1, 0.4))
+    breaker = load(W + "Power/BP_CircuitBreaker")
+    if breaker:
+        d = unreal.get_default_object(breaker.generated_class())
+        hitmen_content.set_mesh(d.get_editor_property("lever"), hitmen_content.SHAPES["cube"], (0.06, 0.06, 0.32),
+                                load("/Game/Hitmen/Materials/Instances/MI_Red"), (14, 0, 150))
+        d.set_editor_property("switch_fx", load(TOON + "NS_Lightning_Hit"))
+        unreal.BlueprintEditorLibrary.compile_blueprint(breaker)
+        save(breaker)
+    bp_set(W + "Power/BP_LightFixture", off_material=load("/Game/Hitmen/Materials/Instances/MI_Dark"))
+    hitmen_content.build_distractions(W + "Distraction")
+    mounted = load("/Game/Hitmen/World/Vehicles/BP_MountedGun")
+    if mounted:
+        d = unreal.get_default_object(mounted.generated_class())
+        hitmen_content.set_mesh(d.get_editor_property("tripod"), hitmen_content.SHAPES["cone"], (0.9, 0.9, 1.2),
+                                load("/Game/Hitmen/Materials/Instances/MI_Metal"), (0, 0, 60))
+        unreal.BlueprintEditorLibrary.compile_blueprint(mounted)
+        save(mounted)
+    log("fixtures: cameras, monitors, breaker, lamps, distractions, mounted gun")
+
 if wanted("sound"):
     # Attenuation per sound space (steps, gunshots, impacts, world) and the space of each sound-set entry.
     hitmen_content.build_sound_set()

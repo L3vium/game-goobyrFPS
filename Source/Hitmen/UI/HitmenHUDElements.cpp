@@ -112,6 +112,20 @@ int32 UHitmenActionPromptWidget::NativePaint(const FPaintArgs& Args, const FGeom
 	if (PromptAlpha > 0.01f && !Action.IsEmpty())
 	{
 		PaintRow(TEXT("F"), Action, Reason, 0.f, PromptAlpha);
+		// Hold to interact (hacking): a ring fills around the F key.
+		const UHitmenUIEventSubsystem* HoldUI = GetUIEvents();
+		const float Hold = HoldUI ? HoldUI->GetInteractProgress() : -1.f;
+		if (Hold >= 0.f)
+		{
+			const FSlateFontInfo LabelFont = HitmenUI::SpacedFont(19, TEXT("SemiBold"), 60);
+			const FSlateFontInfo ExtraFont = HitmenUI::SpacedFont(17, TEXT("Italic"), 30);
+			const float LabelWidth = HitmenUI::MeasureText(Action.ToUpper(), LabelFont).X;
+			const float ExtraWidth = Reason.IsEmpty() ? 0.f : 12.f + HitmenUI::MeasureText(Reason, ExtraFont).X;
+			const float Total = 30.f + 10.f + LabelWidth + ExtraWidth;
+			const FVector2D KeyCenter((Size.X - Total) * 0.5f + 15.f, 15.f);
+			HitmenUI::PaintArc(OutDrawElements, LayerId + 3, AllottedGeometry, KeyCenter, 23.f, 0.f, 360.f, FLinearColor(1.f, 1.f, 1.f, 0.2f), 3.f, 40);
+			HitmenUI::PaintArc(OutDrawElements, LayerId + 4, AllottedGeometry, KeyCenter, 23.f, 0.f, 360.f * FMath::Clamp(Hold, 0.f, 1.f), HitmenUI::Text(), 3.f, 40);
+		}
 	}
 	if (TraversalAlpha > 0.01f && !Traversal.IsEmpty())
 	{
@@ -499,17 +513,7 @@ int32 UHitmenInventoryBarWidget::NativePaint(const FPaintArgs& Args, const FGeom
 	PaintAbility(ManipulationAbility, X);
 	PaintAbility(MoveAbility, X + Card.X + Gap);
 
-	// ---- Keycards: chips above the weapon cards ----
-	float ChipX = StartX;
-	for (const int32 KeyCard : Inventory.Keycards)
-	{
-		const FString Label = FString::Printf(TEXT("KEYCARD %d"), KeyCard);
-		const FVector2D LabelSize = HitmenUI::MeasureText(Label, SmallFont);
-		const FVector2D ChipSize(LabelSize.X + 22.f, 22.f);
-		HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, FVector2D(ChipX, Y - 30.f), ChipSize, FLinearColor(0.08f, 0.32f, 0.85f, 0.85f));
-		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Label, FVector2D(ChipX + 11.f, Y - 30.f + (22.f - LabelSize.Y) * 0.5f), SmallFont, HitmenUI::Text());
-		ChipX += ChipSize.X + 6.f;
-	}
+	// Keycards are drawn bottom right (UHitmenStatusCornerWidget).
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 6, InWidgetStyle, bParentEnabled);
 }
 
@@ -607,5 +611,88 @@ int32 UHitmenIntroWidget::NativePaint(const FPaintArgs& Args, const FGeometry& A
 	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Over, FVector2D((Size.X - OverSize.X) * 0.5f, Y), Overline, HitmenUI::TextDim() * FLinearColor(1, 1, 1, Alpha));
 	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Name, FVector2D((Size.X - NameSize.X) * 0.5f, Y + 26.f), Title, HitmenUI::Text() * FLinearColor(1, 1, 1, Alpha));
 	HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(Size.X * 0.5f - 50.f, Y + 26.f + NameSize.Y + 6.f), FVector2D(100.f, 4.f), HitmenUI::Accent() * FLinearColor(1, 1, 1, Alpha));
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
+}
+
+// =============================================================================================
+// Status corner: vehicle health bar (top), reload ring (centre), keycards + "[F] Exit" (bottom right)
+// =============================================================================================
+
+void UHitmenStatusCornerWidget::BindEvents()
+{
+	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
+	{
+		UI->OnInventoryViewChanged.AddUniqueDynamic(this, &UHitmenStatusCornerWidget::HandleInventory);
+		HandleInventory(UI->GetInventoryView());
+	}
+}
+
+void UHitmenStatusCornerWidget::UnbindEvents()
+{
+	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
+	{
+		UI->OnInventoryViewChanged.RemoveAll(this);
+	}
+}
+
+void UHitmenStatusCornerWidget::HandleInventory(const FHitmenHUDInventoryView& View)
+{
+	Keycards = View.Keycards;
+}
+
+int32 UHitmenStatusCornerWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
+{
+	const FVector2D Size = AllottedGeometry.GetLocalSize();
+	const UHitmenUIEventSubsystem* UI = GetUIEvents();
+	const FHitmenHUDVehicleView Vehicle = UI ? UI->GetVehicleView() : FHitmenHUDVehicleView();
+	const float Margin = 28.f;
+	const FSlateFontInfo SmallFont = HitmenUI::SpacedFont(13, TEXT("Medium"), 120);
+	const FSlateFontInfo TitleFont = HitmenUI::SpacedFont(15, TEXT("SemiBold"), 160);
+
+	if (Vehicle.bActive)
+	{
+		// Health: a bar at the top centre, under the compass.
+		const FVector2D BarSize(420.f, 8.f);
+		const FVector2D BarPos((Size.X - BarSize.X) * 0.5f, 86.f);
+		const FString Title = Vehicle.Name.ToString().ToUpper();
+		const FVector2D TitleSize = HitmenUI::MeasureText(Title, TitleFont);
+		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Title, FVector2D((Size.X - TitleSize.X) * 0.5f, BarPos.Y - TitleSize.Y - 4.f), TitleFont, HitmenUI::Text());
+		HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, BarPos - FVector2D(2.f), BarSize + FVector2D(4.f), FLinearColor(0.f, 0.f, 0.f, 0.55f));
+		const FLinearColor Fill = Vehicle.Health < 0.3f ? HitmenUI::Accent() : HitmenUI::Text();
+		HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, BarPos, FVector2D(BarSize.X * FMath::Clamp(Vehicle.Health, 0.f, 1.f), BarSize.Y), Fill);
+
+		// Reload: a ring around the crosshair that closes when the cannon is ready.
+		if (Vehicle.Reload >= 0.f && Vehicle.Reload < 1.f)
+		{
+			const FVector2D Center = Size * 0.5f;
+			HitmenUI::PaintArc(OutDrawElements, LayerId, AllottedGeometry, Center, 30.f, 0.f, 360.f, FLinearColor(1.f, 1.f, 1.f, 0.18f), 3.f, 48);
+			HitmenUI::PaintArc(OutDrawElements, LayerId + 1, AllottedGeometry, Center, 30.f, 0.f, 360.f * Vehicle.Reload, HitmenUI::Text(), 3.f, 48);
+		}
+	}
+
+	// Bottom right, from the bottom up: "[F] Exit" while driving, then the keycards.
+	float Bottom = Size.Y - Margin;
+	if (Vehicle.bActive)
+	{
+		const FString Label = TEXT("EXIT");
+		const FSlateFontInfo LabelFont = HitmenUI::SpacedFont(19, TEXT("SemiBold"), 60);
+		const FVector2D LabelSize = HitmenUI::MeasureText(Label, LabelFont);
+		const float RowHeight = 30.f;
+		const float Width = 30.f + 10.f + LabelSize.X;
+		const FVector2D Pos(Size.X - Margin - Width, Bottom - RowHeight);
+		const FVector2D KeySize = HitmenUI::PaintKey(OutDrawElements, LayerId + 1, AllottedGeometry, TEXT("F"), Pos, 17, 1.f);
+		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Label, Pos + FVector2D(KeySize.X + 10.f, (KeySize.Y - LabelSize.Y) * 0.5f), LabelFont, HitmenUI::Text());
+		Bottom -= RowHeight + 10.f;
+	}
+	for (int32 Index = Keycards.Num() - 1; Index >= 0; --Index)
+	{
+		const FString Label = FString::Printf(TEXT("KEYCARD %d"), Keycards[Index]);
+		const FVector2D LabelSize = HitmenUI::MeasureText(Label, SmallFont);
+		const FVector2D ChipSize(LabelSize.X + 22.f, 22.f);
+		const FVector2D ChipPos(Size.X - Margin - ChipSize.X, Bottom - ChipSize.Y);
+		HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, ChipPos, ChipSize, FLinearColor(0.08f, 0.32f, 0.85f, 0.85f));
+		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Label, ChipPos + FVector2D(11.f, (22.f - LabelSize.Y) * 0.5f), SmallFont, HitmenUI::Text());
+		Bottom -= ChipSize.Y + 6.f;
+	}
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
 }

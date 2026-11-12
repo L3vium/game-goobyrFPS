@@ -274,20 +274,20 @@ act (fire for the lighter, notes for the remote distraction, a swirl for blink a
 | Ladder / gutter | Automatic climb |
 | Zipline | Automatic, up/down |
 | Jump pad | Launches high |
-| Locker | Hollow cabinet; the door opens and you step in (0.5 s, turning to face out), the door closes; look through the door slit; stepping out is the reverse |
-| Door | Open/close, swings away from whoever opens it; fills its 110 x 230 opening; optional keycard ID (`[Locked - Keycard N]` in the prompt) |
+| Locker | Hollow cabinet; the door (hinged on its right edge) opens and you step in (0.5 s, turning to face out), the door closes; look through the door slit; stepping out is the reverse |
+| Door | Open/close, swings away from whoever opens it; hinged on its +X edge (`bHingeAtPositiveEnd`, the other edge when off); fills its 110 x 230 opening; optional keycard ID (`[Locked - Keycard N]` in the prompt) |
 | Window | Frame inside the wall opening, two shutters opening 80 degrees away from the opener; vaultable when open |
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
-| Distraction (radio) | Turn on with `F` (or remotely): it plays a radio loop for 8 s with a pulsing light, and its noise (10 m) draws NPCs on every beat |
-| Turret | Red laser while locking on, then shoots players; hacked only from its panel by **holding** `F` 3 s (a bar fills under the crosshair; releasing or looking away cancels): then shoots NPCs |
-| Security camera | A shadowed spotlight aimed at the floor; an electronic ring marks exactly where the light ends (a crisp edge, a turning dashed ring, faint scanlines) and fills from the edge inward as the detection meter builds; light and ring go white → yellow → red; walls cut it; sees you only through open air; spotting calls reinforcements; a marker on the maps |
-| Security station | Desk + screen cycling through its cameras (a 90° feed, tonemapped at the match exposure); holding `F` 2 s disables / enables them ("no signal") |
-| Circuit breaker | Turns off its linked lights: NPCs cannot see (only hear), players see less |
+| Distraction | Radio, TV, alarm clock (`BP_Distraction_*`: mesh, loop sound, light colour, toon notes on every pulse are data). `F` (or the remote distraction) turns it on or off; once on it plays until switched off (`PlayTime` 0); only guards within its noise radius hear it (walls cut it, the nearest two come), and a guard who comes to look switches it off |
+| Turret | Red laser while locking on, then shoots players (muzzle flash, light, red tracers); hacked only from its panel by **holding** `F` 3 s (a ring fills around the F key; releasing or looking away cancels): then shoots NPCs |
+| Security camera | A shadowed yellow spotlight aimed at the floor: its lit zone is the camera's view, so walls and obstacles cut it; one colour (yellow) whatever happens while the detection meter fills; sees you only through open air; spotting calls reinforcements; a marker on the maps. 30 health: shot to pieces it sparks, hangs dead and its feed is lost for good |
+| Security station | Desk + screen cycling through its cameras (a 90° feed, tonemapped at the match exposure, without the zone pattern); holding `F` 2 s disables / enables them: the screen keeps the last frame, dimmed and noisy, with NO SIGNAL over it |
+| Circuit breaker | A lever thrown with sparks and a clunk turns off its linked lights (the bulbs go dark too): NPCs cannot see (only hear), players see less |
 | Vent | Crouch-size duct; its hatches are small doors (vertical hinge on the side) that swing away from the opener; poison spreads to linked rooms only if fully closed |
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
-| Mounted machine gun | Usable from any side (option), 180° arc, look speed matches the player's; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
-| Tank | Enter, third-person view; its cannon barrel follows the aim and kicks back; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle flash, view shake; server-driven from any client; damageable, driver ejected when destroyed |
+| Mounted machine gun | A free-standing tripod (no pedestal: place it anywhere), the gun high on it; usable from any side (option), 180° arc, look speed matches the player's; the view sits above the gun; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
+| Tank | Enter, third-person view; health bar at the top of the HUD, a reload ring around the crosshair (1.25 s), `[F] Exit` bottom right; its cannon barrel follows the aim, slides back 120 cm and the hull rocks on a shot; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle blast, view shake; server-driven from any client; damageable, driver ejected when destroyed |
 | Teleporter | Fixed pair: in → out |
 | Retrieval point candidate | See §2 |
 | Weapon / item spawn candidate | See §2 |
@@ -382,7 +382,7 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   hears); an "x" on a kill (red on a headshot);
   Hitman-like awareness arcs around it, one per guard or camera noticing you, placed toward it: the arc fills from its
   middle as suspicion grows (white), then turns yellow or red; cameras add a small camera mark.
-- **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault`; remote-ability targets
+- **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault`; remote-ability targets glow with `[A] Charm` under them; holding F fills a ring around the key. Keycards are chips bottom right (above `[F] Exit` while driving).
   glow with `[A] Charm` under them.
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
 - **Scope** overlay for the sniper. **Sightroom** (Tab): a scan wave, a grid on the floor, a cool world.

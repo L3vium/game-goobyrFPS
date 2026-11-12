@@ -83,6 +83,13 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Ability pickup with the slot taken: swap, the old one stays
 
 ## World
+- [x] Camera zone: yellow, lit from above, cut by a wall (PIE screenshot, 0.7.0); [ ] shooting a camera breaks it
+- [ ] Doors and lockers open on the other hinge, away from you
+- [ ] Hold F on the turret panel: a ring fills around F
+- [ ] Monitor after disabling: frozen dim frame with NO SIGNAL
+- [ ] Distraction stays on until a guard comes and turns it off; F turns it off
+- [ ] Tank: health at the top, reload ring, [F] Exit bottom right; no stuck "F Use"; keycards bottom right
+- [ ] Breaker lever flips with sparks; bulbs go dark
 - [x] Muzzle flash, light and glow on firing; toon impact puff (PIE screenshots, 0.7.0); [ ] flash size in first person
 - [ ] Shotgun pellets and sniper shots draw tracers; the turret fires red tracers
 - [ ] Flashbang: a big white flash; smoke grenade: the beige toon cloud fills quickly

@@ -32,6 +32,13 @@ public:
 	bool IsOpen() const { return bOpen; }
 
 protected:
+	/** Hinge on the panel's +X edge (the default since 0.7.0); off = the -X edge. Doors and vent hatches. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Opening")
+	bool bHingeAtPositiveEnd = true;
+
+	/** -1 or +1: which edge the hinge is on (from bHingeAtPositiveEnd); opening angles use it to stay "away from you". */
+	float GetHingeSign() const { return bHingeAtPositiveEnd ? 1.f : -1.f; }
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Opening")
 	FText OpenText;
 

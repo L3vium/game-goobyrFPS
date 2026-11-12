@@ -34,6 +34,16 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void BeginPlay() override;
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
+	/** Shown on the vehicle HUD (health bar title). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Vehicle")
+	FText DisplayName = NSLOCTEXT("Hitmen", "Vehicle", "Vehicle");
+
+	/** Health 0..1 for the HUD. */
+	float GetHealthNormalized() const;
+
+	/** Reload progress 0..1 for the HUD ring (negative: no reload, e.g. machine guns). */
+	virtual float GetReloadAlpha() const { return -1.f; }
 	/** Server: the controller left (disconnect) — put the driver back in the world. */
 	virtual void UnPossessed() override;
 
@@ -268,6 +278,7 @@ public:
 	virtual void Input_Move(const FVector2D& Axis) override;
 	virtual void Input_Look(const FVector2D& Axis) override;
 	virtual void Input_FirePressed() override;
+	virtual float GetReloadAlpha() const override;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
@@ -327,7 +338,7 @@ protected:
 	float ShellSpeed = 20000.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank", meta=(ClampMin="0"))
-	float ReloadTime = 2.5f;
+	float ReloadTime = 1.25f;
 
 	/** Gap kept between the hull box and the ground (keeps the drive sweep off the floor). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank", meta=(ClampMin="0"))

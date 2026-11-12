@@ -100,6 +100,26 @@ protected:
  * Bottom bar: [weapon 1][weapon 2] | [A ability][E ability]. Weapon cards show a name and the
  * ammo in dimmed italics; switching weapons slides the cards. Keycards sit above as chips.
  */
+/**
+ * Vehicles and the bottom-right stack: the vehicle's health bar at the top, its reload ring around the crosshair,
+ * keycards stacked bottom right and "[F] Exit" under them while you drive (nothing overlaps the vehicle UI).
+ */
+UCLASS()
+class HITMEN_API UHitmenStatusCornerWidget : public UHitmenUserWidget
+{
+	GENERATED_BODY()
+
+protected:
+	virtual void BindEvents() override;
+	virtual void UnbindEvents() override;
+	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+
+	UFUNCTION()
+	void HandleInventory(const FHitmenHUDInventoryView& View);
+
+	TArray<int32> Keycards;
+};
+
 UCLASS()
 class HITMEN_API UHitmenInventoryBarWidget : public UHitmenUserWidget
 {

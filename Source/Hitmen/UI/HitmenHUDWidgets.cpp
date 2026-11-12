@@ -224,14 +224,7 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 		}
 	}
 
-	// Hold-to-interact (hacking): a bar under the crosshair.
-	if (UI && UI->GetInteractProgress() >= 0.f)
-	{
-		const FVector2D BarSize(140.f, 6.f);
-		const FVector2D BarPos = Center + FVector2D(-BarSize.X * 0.5f, 34.f);
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 2, AllottedGeometry, BarPos - FVector2D(2.f), BarSize + FVector2D(4.f), FLinearColor(0.f, 0.f, 0.f, 0.6f));
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, BarPos, FVector2D(BarSize.X * UI->GetInteractProgress(), BarSize.Y), HitmenUI::Text());
-	}
+	// Hold-to-interact (hacking) is a ring around the prompt's F key (UHitmenActionPromptWidget).
 
 	// Awareness arcs (Hitman-like): one arc around the crosshair per guard or camera that is noticing you,
 	// placed toward it. It fills from its middle as suspicion grows (white), then turns yellow / red.
@@ -544,6 +537,11 @@ void UHitmenHUDWidget::BuildDefaultLayout()
 	const float Margin = 28.f;
 	InventoryBar = WidgetTree->ConstructWidget<UHitmenInventoryBarWidget>(UHitmenInventoryBarWidget::StaticClass());
 	HitmenUI::AddToCanvas(Canvas, InventoryBar, FAnchors(0.5f, 1.f), FVector2D(0.f, -Margin), FVector2D(0.5f, 1.f), FVector2D(1100.f, 110.f));
+
+	// Vehicle health / reload and the bottom-right stack (keycards, "[F] Exit"), full screen.
+	StatusCorner = WidgetTree->ConstructWidget<UHitmenStatusCornerWidget>(UHitmenStatusCornerWidget::StaticClass());
+	StatusCorner->SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (UCanvasPanelSlot* CornerSlot = Canvas->AddChildToCanvas(StatusCorner)) { CornerSlot->SetAnchors(Full); CornerSlot->SetOffsets(FMargin(0.f)); }
 
 	// Match intro (dropping in + countdown), over everything.
 	Intro = WidgetTree->ConstructWidget<UHitmenIntroWidget>(UHitmenIntroWidget::StaticClass());

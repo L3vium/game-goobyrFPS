@@ -46,6 +46,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
 	bool IsSeeingIntruder() const { return bSeeingIntruder; }
 
+	/** Shot to pieces: it goes dark for good (sparks, the head drops, monitors lose it, a noise). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
+	bool IsBroken() const { return bBroken; }
+
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
 	/** Every machine: the camera was disabled / re-enabled (monitors show "no signal"). */
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Camera")
 	FOnHitmenCameraDisabledChanged OnDisabledChanged;
@@ -140,7 +146,34 @@ protected:
 
 	/** The electronic floor ring (Hitman-like): on by default; the decal material draws it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
-	bool bShowFloorRing = true;
+	bool bShowFloorRing = false;
+
+	/** The camera's zone is projected by its light (a light function: edge ring, turning dashes, scanlines), so walls
+	 *  and obstacles cut it exactly like they cut the light. Scalar parameter "Progress" = detection meter. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
+	TObjectPtr<UMaterialInterface> ProjectionMaterial;
+
+	/** Visible beam from the lens (volumetric fog scattering of its light, shadowed by walls). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice", meta=(ClampMin="0"))
+	float BeamScattering = 6.f;
+
+	/** Health: a few bullets break it. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="1"))
+	float CameraHealth = 30.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
+	TObjectPtr<class UNiagaraSystem> BrokenFX;
+
+	UPROPERTY(ReplicatedUsing=OnRep_Visuals)
+	bool bBroken = false;
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_Broken();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ProjectionInstance;
+
+	float DamageTaken = 0.f;
 
 	/** Detection meter, 0..255 for 0..DetectionTime of continuous sight (replicated: ring fill and colour). */
 	UPROPERTY(ReplicatedUsing=OnRep_Visuals)
@@ -192,6 +225,10 @@ public:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> Screen;
+
+	/** "NO SIGNAL" over the frozen last frame while the camera is off or broken. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UTextRenderComponent> NoSignalText;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Monitor")
 	TObjectPtr<AHitmenSecurityCamera> LinkedCamera;
@@ -459,6 +496,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UPointLightComponent> Light;
 
+	/** The lamp's look when the power is cut (the bulb goes dark). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Light")
+	TObjectPtr<UMaterialInterface> OffMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> OnMaterial;
+
 	UPROPERTY(ReplicatedUsing=OnRep_Powered)
 	bool bPowered = true;
 
@@ -512,8 +556,19 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Breaker")
 	TArray<TObjectPtr<AHitmenBlackoutVolume>> LinkedVolumes;
 
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing=OnRep_BreakerPowered)
 	bool bPowered = true;
+
+	/** The lever (flips down when the power is cut); the team swaps the mesh. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Lever;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Breaker|Juice")
+	TObjectPtr<class UNiagaraSystem> SwitchFX;
+
+	UFUNCTION()
+	void OnRep_BreakerPowered();
+	void ApplyLever();
 
 	virtual void OnInteracted(AActor* Interactor) override;
 };

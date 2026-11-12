@@ -3,7 +3,7 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
-## [Unreleased]
+## [0.7.0] - 2026-11-12
 
 ### Added
 - San Lazaro rebuilt as one organic map on hills (about 240 x 210 m): a favela on five terraces (houses of 1 to 3

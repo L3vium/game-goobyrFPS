@@ -6,6 +6,12 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ## [Unreleased]
 
 ### Added
+- San Lazaro rebuilt as one organic map on hills (about 240 x 210 m): a favela on five terraces (houses of 1 to 3
+  floors, alleys, stairs, yards, roofs reached from the terrace above), a dry ravine with two arched bridges and a high
+  walkway, the mansion on a plateau with grounds about 40 % smaller, and a real cave dug into a ridge with a tunnel
+  to the mansion basement. The ground is a heightfield (`UHitmenContentTools::BuildHeightfieldMesh`).
+- Every facade of a generated building has vaultable windows and a ledge band under them from the first floor up.
+- `hitmen_check_patrols.py`: every patrolling guard has a route (or a group leader) and walks.
 - Cheats on F1-F8 with a panel on the right (gym always, dev builds elsewhere): invulnerable, infinite ammo, no
   cooldown, invisible to AI, respawn NPCs as placed, kill all, reload the map, fly.
 - Gym: ladder behind the ladder block with a path on the right and a stair up to the zipline tower; room in front of
@@ -62,6 +68,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
 
 ### Changed
+- Room lamps in lumens, two per room; only one per room casts shadows (estate and cave), fixtures cast none by default.
+- The map bake cuts roofs at a height above the terrain under each point; the reach check's "ladder only" is relative to
+  the ground.
 - HUD: the ability cards show their key (A / E as bound), a stronger divider, the bar is centred (it was 12 px off);
   prompt keys (F, SPACE, Exit) follow the rebinding.
 - Sightroom: the wave takes 0.35 s (0.8) and highlights follow it every frame (no 0.15 s steps); when it ends the whole

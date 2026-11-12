@@ -44,11 +44,19 @@ walls with openings, buildings with switchback stairs, stair wells into the grou
 mazes. After changing a layout, in the open editor:
 
 1. Rebuild the map: `import hitmen_levels; hitmen_levels.build_ldtest()` (ue_remote), then
-   `hitmen_content.build_maps()` for its bounds (`DA_Map_<Name>`, World Bounds).
+   `hitmen_content.build_maps()` for its bounds (`DA_Map_<Name>`, World Bounds). San Lazaro lives in
+   `hitmen_sanlazaro.py`: the layout constants at the top (outline, terraces, estate, cave rooms), `height(x, y)` for
+   the ground (hills, terraces, plateau, cave floor, ravine) and `gz(x, y)` to stand anything on it. Its ground is a
+   heightfield: 5 x 5 tiles of 64 m (1 m cells) built by `UHitmenContentTools::BuildHeightfieldMesh` into
+   `/Game/Hitmen/Maps/Terrain/LDTest` (collision = mesh, tagged `HitmenTerrain`), with holes for stair wells and slabs
+   of their own. Building the map takes a few minutes.
 2. Bake its navmesh: `Tools/Editor/ue_bake_nav.sh L_<Name>`.
 3. Check it: `python Tools/Editor/ue_remote.py --file Tools/Editor/hitmen_check_reach.py` must end with
-   `problems 0`. Snipers and roof points are reached by ladder and are only listed.
-4. Minimap and pause map: `hitmen_levels.bake_map_textures()` writes `/Game/Hitmen/UI/Maps/T_Map_<Name>`.
+   `problems 0`. Snipers and roof points are reached by ladder and are only listed. Then the patrols, in PIE:
+   `hitmen_check_patrols.py` twice about 15 s apart (every Patrol guard has a route of two points or more, or follows a
+   group leader, and walks) must end with `problems 0`.
+4. Minimap and pause map: `hitmen_levels.bake_map_textures()` writes `/Game/Hitmen/UI/Maps/T_Map_<Name>`. On hills the
+   cut that opens the roofs follows the terrain under each point (tiles tagged `HitmenTerrain`).
 5. Create Room thumbnail: `hitmen_map_shots.py` → `capture('<Name>'); finish(['<Name>'])` renders the camera set
    in its `VIEWS` table and assigns `/Game/Hitmen/UI/MapShots/T_MapShot_<Name>`.
 

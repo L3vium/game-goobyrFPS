@@ -348,6 +348,55 @@ def build_sightroom_pp():
     return pp
 
 
+TERRAIN_HLSL = """float slope = saturate(N.z);
+// Grass on the flats, earth on slopes, rock on cliffs (cave walls, terrace steps, mountains).
+float grassAmt = smoothstep(0.80, 0.92, slope);
+float rockAmt = 1.0 - smoothstep(0.50, 0.68, slope);
+float3 grass = float3(0.13, 0.25, 0.07);
+float3 dirt = float3(0.30, 0.22, 0.13);
+float3 rock = float3(0.27, 0.26, 0.25);
+float3 c = lerp(dirt, grass, grassAmt);
+c = lerp(c, rock, rockAmt);
+// Prototype grid: 1 m and 4 m lines, like the checker material of the buildings.
+float2 g1 = abs(frac(WP.xy / 100.0) - 0.5);
+float2 g4 = abs(frac(WP.xy / 400.0) - 0.5);
+float line1 = 1.0 - saturate(min(g1.x, g1.y) * 70.0);
+float line4 = 1.0 - saturate(min(g4.x, g4.y) * 200.0);
+// Height bands on steep faces read as strata.
+float strata = (1.0 - smoothstep(0.0, 0.08, abs(frac(WP.z / 120.0) - 0.5))) * rockAmt;
+float n = frac(sin(dot(floor(WP.xy / 350.0), float2(12.9898, 78.233))) * 43758.5453);
+c *= (0.9 + 0.2 * n) * (1.0 - 0.10 * line1 - 0.18 * line4 - 0.12 * strata);
+return c;"""
+
+
+def build_terrain_material(folder=None):
+    """M_Hitmen_Terrain: the heightfield tiles. Colour by slope (grass, earth, rock) with the prototype grid; grass
+    footsteps."""
+    folder = folder or path("Materials", "Master")
+    mat = new_material("M_Hitmen_Terrain", folder)
+    normal = MEL.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -700, 0)
+    world = MEL.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -700, 150)
+    custom = MEL.create_material_expression(mat, unreal.MaterialExpressionCustom, -350, 0)
+    inputs = []
+    for name in ("N", "WP"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        inputs.append(ci)
+    set_props(custom, code=TERRAIN_HLSL, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Terrain", inputs=inputs)
+    MEL.connect_material_expressions(normal, "", custom, "N")
+    MEL.connect_material_expressions(world, "", custom, "WP")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    rough = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 200)
+    set_props(rough, r=0.92)
+    MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    grass = load(path("Physics", "PM_Grass"))
+    if grass:
+        set_props(mat, phys_material=grass)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
 def build_screen_material(folder):
     """M_Hitmen_Screen: a monitor showing a render target. Scalar "Signal" 1 = live; 0 = the last frame frozen, dimmed,
     with rolling scanlines and static (the camera is off or broken)."""
@@ -1335,7 +1384,7 @@ def build_catalog(weapons, move, manip, cosmetics):
 
 def build_maps():
     maps = []
-    for name, display, carousel, half in (("LDTest", "San Lazaro", True, 16500.0), ("Empty_01", "Empty 01", True, 10000.0),
+    for name, display, carousel, half in (("LDTest", "San Lazaro", True, 12800.0), ("Empty_01", "Empty 01", True, 10000.0),
                                           ("Empty_02", "Empty 02", True, 10000.0), ("Gym", "Debug gym", False, 3800.0)):
         data = make_data("DA_Map_" + name, path("Data", "Maps"), unreal.HitmenMapDefinition)
         level = unreal.SoftObjectPath(path("Maps", "L_" + name) + ".L_" + name)

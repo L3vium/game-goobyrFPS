@@ -115,8 +115,12 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Gym: every pickup clear of geometry and reachable (builder check + `hitmen_check_reach.py`, 0.6.0); no slide lane
 - [x] Gym vent: from the AI pen, F opens the hatch, crouch through the duct into the sealed room (PIE script, 0.6.0)
 - [ ] Gym parkour run 1 to 10 in one go by hand (zipline from the gutter tower, plank to the overlook)
-- [x] San Lazaro: every door walkable, every loot / NPC / retrieval point reachable on foot (`hitmen_check_reach.py`,
-  0.6.0); [ ] walk the village, the estate, the maze, the caves and the tunnel by hand
+- [x] San Lazaro (0.7.0 rebuild): `hitmen_check_reach.py` problems 0 (54 doors, 82 targets, 24 starts; snipers and the
+  helipad by ladder); `hitmen_check_patrols.py` problems 0 (22 patrollers walking, 3 followers); room luminance in
+  PIE screenshots: village house 131 / 127 (ground / first floor), estate wing room 105, cave chamber 98 (0-255);
+  minimap and thumbnail rebaked (0.7.0)
+- [ ] San Lazaro by hand: climb the terraces by their stairs, hang and shimmy along a ledge band, cross both bridges
+  and the walkway, enter the cave through the trench, take the tunnel to the basement, the tank out of the garage
 
 ## AI
 - [x] Guards in range hold their ground, face you and shoot; nobody backs away (PIE script, gym AI pen, 0.7.0)

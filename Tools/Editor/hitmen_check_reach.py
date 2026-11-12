@@ -4,8 +4,9 @@ grabbing range (pedestal tops are navmesh islands of their own).
 
     python Tools/Editor/ue_remote.py --file Tools/Editor/hitmen_check_reach.py
 
-Snipers and points above LADDER_ONLY_Z (roofs, towers) are reached by ladder, which the navmesh does not link:
-they are listed as information, not as problems. Ends with "problems N".
+Snipers and points more than LADDER_ONLY_Z above the ground (roofs, towers; on hills the ground is the terrain tiles
+tagged HitmenTerrain) are reached by ladder, which the navmesh does not link: they are listed as information, not as
+problems. Ends with "problems N".
 """
 import math
 
@@ -17,6 +18,26 @@ EAS = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 WORLD = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 NAV = unreal.NavigationSystemV1
 V = unreal.Vector
+
+
+def ground_z(location):
+    """Height of the terrain under a point (actors tagged HitmenTerrain; floors and roofs in between are skipped),
+    else 0 (flat maps)."""
+    ignore = []
+    start = V(location.x, location.y, location.z + 50)
+    for _ in range(16):
+        hit = unreal.SystemLibrary.line_trace_single(WORLD, start, V(location.x, location.y, -50000), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1,
+                                                     True, ignore, unreal.DrawDebugTrace.NONE, True)
+        if hit is None:
+            return 0.0
+        t = hit.to_tuple()
+        actor = t[9] if t[0] else None
+        if not actor:
+            return 0.0
+        if actor.actor_has_tag("HitmenTerrain"):
+            return t[4].z
+        ignore.append(actor)
+    return 0.0
 
 
 def project(location, extent):
@@ -83,7 +104,7 @@ def run():
                or "Pickup" in class_name(a)]
     for target in targets:
         loc = target.get_actor_location()
-        ladder_only = "Sniper" in class_name(target) or loc.z > LADDER_ONLY_Z
+        ladder_only = "Sniper" in class_name(target) or loc.z - ground_z(loc) > LADDER_ONLY_Z
         point = project(loc, V(150, 150, 300))
         if "Pickup" in class_name(target) or class_name(target).startswith("BP_LootSpawn"):
             ok = reachable_near(origin, loc)

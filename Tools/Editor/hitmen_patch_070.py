@@ -283,6 +283,11 @@ if wanted("input"):
         save(pc_bp)
     log("input: categories, confirm, spectator keys")
 
+if wanted("terrain"):
+    # San Lazaro heightfield material.
+    hitmen_content.build_terrain_material()
+    log("terrain: M_Hitmen_Terrain")
+
 if wanted("sightroom"):
     # Sightroom: anti-aliased stencil with an outline, map-wide look at the end of the wave.
     hitmen_content.build_sightroom_pp()

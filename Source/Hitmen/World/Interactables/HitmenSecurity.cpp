@@ -776,6 +776,8 @@ AHitmenLightFixture::AHitmenLightFixture()
 	Light->SetAttenuationRadius(1200.f);
 	// Room lamps never glow in the volumetric fog (only camera beams do).
 	Light->SetVolumetricScatteringIntensity(0.f);
+	// No shadow unless a level asks for it (one lamp per room): every shadowed light costs a virtual shadow map pass.
+	Light->SetCastShadows(false);
 }
 
 void AHitmenLightFixture::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

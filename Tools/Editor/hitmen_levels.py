@@ -814,14 +814,18 @@ def check_pickups_clear(radius=25.0):
 # cave + tunnel, mountains around a basin, invisible walls.
 # ---------------------------------------------------------------------------------------------
 
-def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", windows=True, gutter=True, roof_access=True):
-    """Hollow building with a door, vaultable windows per floor, floors, a stair and a gutter."""
+def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", windows=True, gutter=True, roof_access=True,
+             z0=0.0, ledges=True, shadow_lamp=False, blind_faces=()):
+    """Hollow building standing at z0: a door, vaultable windows (BP_Window) on every facade and floor, floors, a
+    switchback stair and a gutter. ledges: a continuous band just under the windows all around each floor (hang and
+    shimmy along it). Two lamps per floor (shadow_lamp: the first one casts shadows)."""
     x0, x1, y0, y1 = cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2
     H = floors * floor_h
     lane_w = 280  # stair lane (260 cm flight + margins)
     sy0, sy1 = y0 + 120, cy + 60  # every flight spans sy0..sy1
+    side_t = (0.5,) if d < 1300 else (0.3, 0.7)
     for f in range(floors):
-        z = f * floor_h
+        z = z0 + f * floor_h
         win = [(w * 0.25, 120, 100, 220), (w * 0.75, 120, 100, 220)] if windows else []
         south = list(win)
         if f == 0 and door_side == "S":
@@ -831,9 +835,9 @@ def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", 
             north = [(w * 0.5, 110, 0, 230)] + [o for o in win if abs(o[0] - w * 0.5) > 200]
         wall((x0, y0), (x1, y0), z, floor_h, 25, south, GRID_DARK, folder)
         wall((x0, y1), (x1, y1), z, floor_h, 25, north, GRID_DARK, folder)
-        side_win = [(d * 0.5, 120, 100, 220)] if windows else []
-        wall((x0, y0), (x0, y1), z, floor_h, 25, side_win, GRID_DARK, folder)
-        wall((x1, y0), (x1, y1), z, floor_h, 25, side_win, GRID_DARK, folder)
+        side_win = [(d * t, 120, 100, 220) for t in side_t] if windows else []
+        wall((x0, y0), (x0, y1), z, floor_h, 25, [] if "W" in blind_faces else side_win, GRID_DARK, folder)
+        wall((x1, y0), (x1, y1), z, floor_h, 25, [] if "E" in blind_faces else side_win, GRID_DARK, folder)
         if f > 0:
             # Floor slab: the main part, then two stair lanes on the east side. The lane of the flight that comes up
             # here has a hole over the flight; a 1.2 m landing stays at each end.
@@ -845,34 +849,68 @@ def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", 
                     box((lx, (sy1 + y1) / 2, z), (lane_w, y1 - sy1, 25), GRID, folder=folder)
                 else:
                     box((lx, cy, z), (lane_w, d, 25), GRID, folder=folder)
-    box((cx, cy, H), (w, d, 25), GRID, folder=folder)
+        if ledges and windows and f > 0:
+            # 18 cm band, its top 20 cm under the sills, wrapping the corners.
+            lz = z + 80 - 6
+            out = 12.5 + 9
+            box((cx, y0 - out, lz), (w + 2 * (12.5 + 18), 18, 12), GRID_ALT, folder=folder + "/Ledges")
+            box((cx, y1 + out, lz), (w + 2 * (12.5 + 18), 18, 12), GRID_ALT, folder=folder + "/Ledges")
+            box((x0 - out, cy, lz), (18, d + 25, 12), GRID_ALT, folder=folder + "/Ledges")
+            box((x1 + out, cy, lz), (18, d + 25, 12), GRID_ALT, folder=folder + "/Ledges")
+    box((cx, cy, z0 + H), (w, d, 25), GRID, folder=folder)
     # Switchback: even flights rise north on the east lane, odd flights rise south on the next lane, so a flight
     # never runs under the one above it (head room), with room to step on at the bottom.
     for f in range(floors - 1):
         if f % 2 == 0:
-            stairs((x1 - lane_w * 0.5, sy0, f * floor_h), 90, floor_h, sy1 - sy0, 260, folder=folder)
+            stairs((x1 - lane_w * 0.5, sy0, z0 + f * floor_h), 90, floor_h, sy1 - sy0, 260, folder=folder)
         else:
-            stairs((x1 - lane_w * 1.5, sy1, f * floor_h), -90, floor_h, sy1 - sy0, 260, folder=folder)
+            stairs((x1 - lane_w * 1.5, sy1, z0 + f * floor_h), -90, floor_h, sy1 - sy0, 260, folder=folder)
     # Doors and windows actors.
     if door_side == "S":
-        spawn(bp("World/Interactables/Door/BP_Door"), (cx - 55, y0, 0), folder=folder)
+        spawn(bp("World/Interactables/Door/BP_Door"), (cx - 55, y0, z0), folder=folder)
     else:
-        spawn(bp("World/Interactables/Door/BP_Door"), (cx + 55, y1, 0), (0, 180, 0), folder=folder)
-    # Fixed exposure: every floor has a ceiling light.
+        spawn(bp("World/Interactables/Door/BP_Door"), (cx + 55, y1, z0), (0, 180, 0), folder=folder)
+    # Fixed exposure: two lamps per floor (a key and a fill).
     for f in range(floors):
-        room_light(cx - w * 0.2, cy, f * floor_h + floor_h - 45, folder)
+        lz = z0 + f * floor_h + floor_h - 45
+        room_light(cx - w * 0.22, cy - d * 0.15, lz, folder, shadow=shadow_lamp)
+        room_light(cx + w * 0.12, cy + d * 0.2, lz, folder, lumens=LAMP_FILL_LUMENS)
     if windows:
+        win_actor = bp("World/Interactables/Window/BP_Window")
         for f in range(floors):
+            z = z0 + f * floor_h
             for t in (0.25, 0.75):
-                spawn(bp("World/Interactables/Window/BP_Window"), (x0 + w * t, y0, f * floor_h), (0, 90, 0), folder=folder)
+                if not (f == 0 and abs(w * t - w * 0.5) <= 200 and door_side == "S"):
+                    spawn(win_actor, (x0 + w * t, y0, z), (0, 90, 0), folder=folder)
+                if not (f == 0 and abs(w * t - w * 0.5) <= 200 and door_side == "N"):
+                    spawn(win_actor, (x0 + w * t, y1, z), (0, -90, 0), folder=folder)
+            for t in side_t:
+                if "W" not in blind_faces:
+                    spawn(win_actor, (x0, y0 + d * t, z), (0, 180, 0), folder=folder)
+                if "E" not in blind_faces:
+                    spawn(win_actor, (x1, y0 + d * t, z), (0, 0, 0), folder=folder)
     if gutter:
-        ladder((x0 - 15, cy + d * 0.3, 0), 180, H + 20, gutter=True, folder=folder)
-    return (x0, x1, y0, y1, H)
+        ladder((x0 - 15, cy + d * 0.3, z0), 180, H + 20, gutter=True, folder=folder)
+    return (x0, x1, y0, y1, z0 + H)
 
 
-def room_light(x, y, z, folder):
-    """A ceiling light fixture (fixed exposure: every room is lit)."""
-    return spawn(bp("World/Interactables/Power/BP_LightFixture"), (x, y, z), folder=folder)
+# Room lamps, in lumens (fixed exposure EV100 -0.3): a key (one per room may cast shadows) and a fill.
+LAMP_KEY_LUMENS = 420.0
+LAMP_FILL_LUMENS = 260.0
+LAMP_RADIUS = 1100.0
+
+
+def room_light(x, y, z, folder, shadow=False, lumens=LAMP_KEY_LUMENS, radius=LAMP_RADIUS):
+    """A ceiling light fixture with explicit units; shadow only when asked (one lamp per room)."""
+    lamp = spawn(bp("World/Interactables/Power/BP_LightFixture"), (x, y, z), folder=folder)
+    if lamp:
+        light = lamp.get_editor_property("light")
+        if light:
+            light.set_editor_property("intensity_units", unreal.LightUnits.LUMENS)
+            light.set_editor_property("intensity", float(lumens))
+            light.set_editor_property("attenuation_radius", float(radius))
+            light.set_cast_shadows(bool(shadow))
+    return lamp
 
 
 def ground(half, holes, material, folder="Ground"):
@@ -900,7 +938,7 @@ def ground(half, holes, material, folder="Ground"):
             floor(((x0 + x1) / 2, (run_start + ys[-1]) / 2, 0), (x1 - x0, ys[-1] - run_start, 0), material, folder)
 
 
-def stair_well(rect, bottom_z, rise_dir, run, holes, mouths=None, low_wall=True, folder="StairWell"):
+def stair_well(rect, bottom_z, rise_dir, run, holes, mouths=None, low_wall=True, folder="StairWell", top_z=0.0):
     """A hole in the ground (rect = x0, y0, x1, y1) down to bottom_z, with stairs rising along rise_dir ("+x", "-x",
     "+y", "-y") to ground level at the far end; a landing fills the rest. Walls line the hole below ground, a 1 m
     parapet runs around it except at the stair top. mouths = {"left" | "right" | "low": [(offset, width, sill, top)]}
@@ -908,7 +946,7 @@ def stair_well(rect, bottom_z, rise_dir, run, holes, mouths=None, low_wall=True,
     x0, y0, x1, y1 = rect
     holes.append(rect)
     mouths = mouths or {}
-    depth = -bottom_z
+    depth = top_z - bottom_z
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     floor((cx, cy, bottom_z), (x1 - x0, y1 - y0, 0), GRID_DARK, folder)
     # Low end -> high end along the rise axis, and the side walls (left / right looking up the stairs).
@@ -937,10 +975,10 @@ def stair_well(rect, bottom_z, rise_dir, run, holes, mouths=None, low_wall=True,
     stairs(stair_start, yaw, depth, run, width, folder=folder)
     for name, (a, b) in sides.items():
         wall(a, b, bottom_z - 20, depth + 20, 20, mouths.get(name, ()), GRID_DARK, folder)
-        wall(a, b, 0, 100, 20, (), GRID_ALT, folder + "/Parapet")
+        wall(a, b, top_z, 100, 20, (), GRID_ALT, folder + "/Parapet")
     if low_wall:
         wall(low_edge[0], low_edge[1], bottom_z - 20, depth + 20, 20, mouths.get("low", ()), GRID_DARK, folder)
-        wall(low_edge[0], low_edge[1], 0, 100, 20, (), GRID_ALT, folder + "/Parapet")
+        wall(low_edge[0], low_edge[1], top_z, 100, 20, (), GRID_ALT, folder + "/Parapet")
     return length
 
 
@@ -1034,394 +1072,11 @@ def hedge_maze(cx, cy, size, cells, folder, seed=7):
 
 
 def build_ldtest():
-    """San Lazaro, about 320 x 320 m playable (3x the old area). Three zones linked by several routes:
-    a village (west) with a market street, alleys, a plaza, a church tower and rooftops; a river with two bridges;
-    a walled mansion estate (east) with its house, gardens, hedge maze, greenhouse, garage and graveyard; a cave
-    zone (north) behind a cliff ridge, with chambers, a tunnel to the mansion basement and a cove with a dock.
-    Basic shapes and checker materials only; every room has a light (fixed exposure)."""
-    new_map("L_LDTest")
-    game_mode("BP_GM_Match")
-    half = 16000
-    holes = []  # ground holes: stair wells and slabs of their own (the ground is built last, around them)
-    environment(sun_pitch=-38, sun_yaw=55)
-    nav_bounds((0, 0, 600), (half + 500, half + 500, 3000))
-
-    # Basin: mountains on a square ring just outside the border (they never cut into the playable square),
-    # invisible walls on the border.
-    i = 0
-    for side in range(4):
-        for k in range(13):
-            size = 4500 + (i % 4) * 1200
-            t = -half - 1500 + (k + 0.5) * (2 * half + 3000) / 13
-            d = half + size * 0.42
-            x, y = ((t, -d), (d, t), (t, d), (-d, t))[side]
-            box((x, y, size * 0.4), (size, size, size * 0.8 + (i % 5) * 800), mi("MI_Mountain"), folder="Mountains", shape="cone")
-            i += 1
-    for (cx, cy, sx, sy) in ((0, half, 2 * half, 100), (0, -half, 2 * half, 100), (half, 0, 100, 2 * half), (-half, 0, 100, 2 * half)):
-        box((cx, cy, 3000), (sx, sy, 6000), GRID, folder="InvisibleWalls", hidden=True)
-
-    # Roads: village street, the road over the south bridge to the mansion gate, the cliff path to the caves.
-    road((-9500, -14000), (-9500, 9000), 1200, folder="Roads/Village")
-    road((-9500, -1500), (2600, -1500), 900, folder="Roads/GateRoad")
-    road((-9500, 9000), (-1500, 11500), 700, "MI_Sand", folder="Roads/CliffPath")
-    road((12500, 6800), (12500, 12000), 700, "MI_Sand", folder="Roads/StaffPath")
-    road((12500, 12000), (7500, 13400), 700, "MI_Sand", folder="Roads/StaffPath")
-    road((-6000, 5500), (2600, 5500), 700, "MI_Sand", folder="Roads/NorthBridge")
-
-    # ---------------- Village (west) ----------------
-    village = [(-13500, -11500, 1500, 1100, 3), (-11400, -11500, 1300, 1100, 3), (-7600, -11500, 1400, 1100, 2), (-5500, -11500, 1300, 1000, 2),
-               (-13500, -8200, 1500, 1200, 3), (-11400, -8200, 1300, 1100, 3), (-7600, -8200, 1400, 1200, 3), (-5500, -8200, 1300, 1100, 2),
-               (-13500, -4800, 1500, 1100, 2), (-11400, -4800, 1300, 1100, 2), (-7600, -4800, 1400, 1100, 2), (-5500, -4800, 1300, 1100, 3),
-               (-13500, 2200, 1500, 1100, 2), (-11400, 2200, 1300, 1200, 3), (-7600, 2200, 1400, 1100, 2), (-5500, 2200, 1300, 1100, 2),
-               (-13500, 5600, 1500, 1100, 3), (-11400, 5600, 1300, 1100, 3), (-7600, 5600, 1400, 1200, 3), (-5500, 5600, 1300, 1100, 3)]
-    roofs = []
-    for i, (cx, cy, w, d, floors) in enumerate(village):
-        # Doors face the street; back windows face the alleys (routes in for players).
-        roofs.append(building(cx, cy, w, d, floors, door_side="S" if i % 2 == 0 else "N", folder="Village/House%02d" % i))
-    # Rooftop planks between neighbours of the same height (a rooftop route).
-    for a_i, b_i in ((0, 1), (2, 3), (4, 5), (8, 9), (14, 15), (16, 17), (18, 19)):
-        ax0, ax1, ay0, ay1, ah = roofs[a_i]
-        bx0, bx1, by0, by1, bh = roofs[b_i]
-        z = min(ah, bh) + 12
-        box(((ax1 + bx0) / 2, (ay0 + ay1) / 2, z), (bx0 - ax1 + 200, 120, 10), mi("MI_Wood"), folder="Village/Rooftops")
-    # Plaza: fountain, market stalls, cafe tables, the radio, tall grass in the park behind.
-    px, py = -9500, -1500
-    box((px, py, 60), (700, 700, 120), mi("MI_Stone"), folder="Village/Plaza", shape="cylinder")
-    for i in range(6):
-        sx = px - 1700 + (i % 3) * 1700
-        sy = py + (1500 if i < 3 else -1500)
-        box((sx, sy, 110), (500, 260, 220), mi(["MI_Red", "MI_Yellow", "MI_Blue", "MI_Green", "MI_Wood", "MI_Red"][i]), folder="Village/Market")
-        box((sx, sy, 260), (620, 360, 10), mi("MI_White"), folder="Village/Market")
-    for i in range(4):
-        box((px + 1200 + (i % 2) * 400, py - 500 + (i // 2) * 600, 40), (120, 120, 80), mi("MI_Wood"), folder="Village/Cafe", shape="cylinder")
-    spawn(bp("World/Interactables/Distraction/BP_Distraction_Radio"), (px - 1700, py + 1500, 220), folder="Village/Market")
-    for gx, gy in ((-12500, 300), (-12500, 900), (-6500, 300), (-6500, 900), (-4300, 3900)):
-        spawn(bp("World/Interactables/Grass/BP_TallGrass"), (gx, gy, 55), folder="Village/Gardens")
-    for bx, by in ((-8300, -6400), (-10700, 3900), (-6300, -10000), (-8500, 7400)):
-        spawn(bp("World/Interactables/Barrel/BP_ExplosiveBarrel"), (bx, by, 0), folder="Village/Props")
-    for lx, ly in ((-6400, -6500), (-12600, 3900)):
-        spawn(bp("World/Interactables/Locker/BP_Locker"), (lx, ly, 0), (0, 90, 0), folder="Village/Props")
-    # Street lamps on one breaker (utility shed behind the plaza).
-    lamps = []
-    for ly in range(-13000, 9001, 2200):
-        box((-8800, ly, 220), (30, 30, 440), mi("MI_Dark"), folder="Village/Lamps")
-        lamp = room_light(-8800, ly, 460, "Village/Lamps")
-        if lamp:
-            lamps.append(lamp)
-    shed = (-9500, 1000)  # a kiosk on the street north of the market (the stalls stop at y 130)
-    for (a, b, op) in (((shed[0] - 300, shed[1] - 250), (shed[0] + 300, shed[1] - 250), [(300, 110, 0, 230)]), ((shed[0] - 300, shed[1] + 250), (shed[0] + 300, shed[1] + 250), ()),
-                       ((shed[0] - 300, shed[1] - 250), (shed[0] - 300, shed[1] + 250), ()), ((shed[0] + 300, shed[1] - 250), (shed[0] + 300, shed[1] + 250), ())):
-        wall(a, b, 0, 300, 25, op, GRID_DARK, "Village/UtilityShed")
-    box((shed[0], shed[1], 300), (650, 550, 25), GRID, folder="Village/UtilityShed")
-    spawn(bp("World/Interactables/Door/BP_Door_Keycard1"), (shed[0] - 55, shed[1] - 250, 0), folder="Village/UtilityShed")
-    room_light(shed[0], shed[1], 260, "Village/UtilityShed")
-    village_breaker = spawn(bp("World/Interactables/Power/BP_CircuitBreaker"), (shed[0], shed[1] + 220, 0), (0, 180, 0), folder="Village/UtilityShed")
-    if village_breaker:
-        village_breaker.set_editor_property("linked_lights", lamps)
-    # Church with a bell tower (sniper nest, ladder inside the tower).
-    chx, chy = -12000, 8800
-    building(chx, chy, 2400, 1600, 1, 700, door_side="S", folder="Village/Church", gutter=False)
-    tx, ty = chx + 1500, chy - 400
-    for (a, b, op) in (((tx - 400, ty - 400), (tx + 400, ty - 400), [(400, 110, 0, 230)]), ((tx - 400, ty + 400), (tx + 400, ty + 400), ()),
-                       ((tx - 400, ty - 400), (tx - 400, ty + 400), ()), ((tx + 400, ty - 400), (tx + 400, ty + 400), ())):
-        wall(a, b, 0, 2200, 40, op, GRID_ALT, "Village/ChurchTower")
-    box((tx, ty, 2200), (840, 840, 30), GRID_ALT, folder="Village/ChurchTower")
-    for (a, b) in (((tx - 400, ty - 400), (tx + 400, ty - 400)), ((tx - 400, ty + 400), (tx + 400, ty + 400)), ((tx - 400, ty - 400), (tx - 400, ty + 400)), ((tx + 400, ty - 400), (tx + 400, ty + 400))):
-        wall(a, b, 2215, 110, 30, (), GRID_ALT, "Village/ChurchTower")
-    ladder((tx, ty + 360, 0), 0, 2215, folder="Village/ChurchTower")
-    room_light(tx, ty, 2100, "Village/ChurchTower")
-    spawn(bp("World/Interactables/Door/BP_Door"), (tx - 55, ty - 400, 0), folder="Village/ChurchTower")
-
-    # ---------------- River (between village and estate): two bridges ----------------
-    rx0, rx1 = -3600, -1800
-    box(((rx0 + rx1) / 2, 0, 3), (rx1 - rx0, 2 * half, 6), mi("MI_Blue"), folder="River/Water")
-    for bank_x in (rx0, rx1):
-        for (y0, y1) in ((-half, -2500), (-500, 4500), (6500, 9800)):
-            box((bank_x, (y0 + y1) / 2, 150), (60, y1 - y0, 300), mi("MI_Stone"), folder="River/Banks")
-    for by in (-1500, 5500):
-        box(((rx0 + rx1) / 2, by, 40), (rx1 - rx0 + 400, 1000, 80), mi("MI_Wood"), folder="River/Bridges")
-        for side in (-1, 1):
-            box(((rx0 + rx1) / 2, by + side * 480, 140), (rx1 - rx0 + 400, 40, 120), mi("MI_Wood"), folder="River/Bridges")
-    # The river reaches the cliffs in the north: it is crossed only on the bridges or through the caves.
-
-    # ---------------- Mansion estate (east) ----------------
-    ex0, ex1, ey0, ey1 = 2600, 15400, -10500, 7000
-    gate_y = -1500
-    estate_wall = GRID_ALT
-    wall((ex0, ey0), (ex0, ey1), 0, 420, 50, [(gate_y - ey0, 900, 0, 420)], estate_wall, "Estate/Wall")
-    wall((ex1, ey0), (ex1, ey1), 0, 420, 50, [(9000, 110, 0, 230)], estate_wall, "Estate/Wall")
-    wall((ex0, ey0), (ex1, ey0), 0, 420, 50, [(6400, 110, 0, 230)], estate_wall, "Estate/Wall")
-    wall((ex0, ey1), (ex1, ey1), 0, 420, 50, [(9900, 600, 0, 420)], estate_wall, "Estate/Wall")
-    spawn(bp("World/Interactables/Door/BP_Door"), (ex0 + 6400 - 55, ey0, 0), folder="Estate/Wall")
-    spawn(bp("World/Interactables/Door/BP_Door_Keycard1"), (ex1, ey0 + 9000 - 55, 0), (0, 90, 0), folder="Estate/Wall")
-    ladder((ex1 + 50, ey0 + 3000, 0), 0, 420, gutter=True, folder="Estate/Wall")
-    ladder((ex0 + 6000, ey1 + 50, 0), 90, 420, gutter=True, folder="Estate/Wall")
-    # Gatehouse: guards, the security console, a camera on the gate, a mounted gun.
-    ghx, ghy = ex0 + 700, gate_y - 1100
-    for (a, b, op) in (((ghx - 500, ghy - 350), (ghx + 500, ghy - 350), ()), ((ghx - 500, ghy + 350), (ghx + 500, ghy + 350), [(500, 110, 0, 230)]),
-                       ((ghx - 500, ghy - 350), (ghx - 500, ghy + 350), [(350, 120, 100, 220)]), ((ghx + 500, ghy - 350), (ghx + 500, ghy + 350), ())):
-        wall(a, b, 0, 320, 25, op, GRID_DARK, "Estate/Gatehouse")
-    box((ghx, ghy, 320), (1050, 750, 25), GRID, folder="Estate/Gatehouse")
-    spawn(bp("World/Interactables/Door/BP_Door"), (ghx - 55, ghy + 350, 0), (0, 180, 0), folder="Estate/Gatehouse")
-    room_light(ghx, ghy, 280, "Estate/Gatehouse")
-    gate_cam = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (ex0 + 80, gate_y + 700, 400), (-25, 0, 0), folder="Estate/Security")
-    spawn(bp("World/Vehicles/BP_MountedGun"), (ex0 + 1400, gate_y + 900, 100), (0, 180, 0), folder="Estate/Security")
-    box((ex0 + 1400, gate_y + 900, 50), (160, 160, 100), mi("MI_Dark"), folder="Estate/Security")
-    # Main house: 3 floors and a basement, a central hall with the stair, rooms on both sides.
-    hx, hy = 9200, -1500
-    hw, hd = 5600, 3200
-    hx0, hx1, hy0, hy1 = hx - hw / 2, hx + hw / 2, hy - hd / 2, hy + hd / 2
-    FH = 420
-    house = "Estate/House"
-    for f in range(3):
-        z = f * FH
-        front = [(hw / 2, 240, 0, 280)] if f == 0 else []
-        front += [(hw * t, 120, 100, 220) for t in (0.12, 0.3, 0.7, 0.88)]
-        wall((hx0, hy0), (hx1, hy0), z, FH, 35, front, GRID_DARK, house)
-        wall((hx0, hy1), (hx1, hy1), z, FH, 35, [(hw * t, 120, 100, 220) for t in (0.12, 0.3, 0.5, 0.7, 0.88)], GRID_DARK, house)
-        # Ground floor west: the side door into the front room, the vent hatch (120 x 120) into the dining room.
-        west = [(hd * 0.5, 120, 100, 220)] + ([(hd * 0.2, 110, 0, 230), (hd * 0.5 + 1100, 120, 0, 120)] if f == 0 else [])
-        wall((hx0, hy0), (hx0, hy1), z, FH, 35, west, GRID_DARK, house)
-        wall((hx1, hy0), (hx1, hy1), z, FH, 35, [(hd * 0.5, 120, 100, 220)], GRID_DARK, house)
-        # Interior: the hall (centre third) and two wings split into front / back rooms.
-        for sx in (hx - 900, hx + 900):
-            wall((sx, hy0), (sx, hy1), z, FH, 25, [(hd * 0.3, 110, 0, 230), (hd * 0.75, 110, 0, 230)], GRID, house)
-            spawn(bp("World/Interactables/Door/BP_Door"), (sx, hy0 + hd * 0.3 - 55, z), (0, 90, 0), folder=house)
-            spawn(bp("World/Interactables/Door/BP_Door"), (sx, hy0 + hd * 0.75 - 55, z), (0, 90, 0), folder=house)
-        for (wx0, wx1) in ((hx0, hx - 900), (hx + 900, hx1)):
-            wall((wx0, hy), (wx1, hy), z, FH, 25, [((wx1 - wx0) * 0.5, 110, 0, 230)], GRID, house)
-            spawn(bp("World/Interactables/Door/BP_Door"), ((wx0 + wx1) / 2 - 55, hy, z), folder=house)
-        # A light in every room and in the hall.
-        for (lx, ly) in ((hx0 + 950, hy - 800), (hx0 + 950, hy + 800), (hx1 - 950, hy - 800), (hx1 - 950, hy + 800), (hx, hy - 600), (hx, hy + 700)):
-            room_light(lx, ly, z + FH - 50, house)
-        if f > 0:
-            # Wing slabs, then the hall slab around the stair hole of the flight that comes up here.
-            box(((hx0 + hx - 900) / 2, hy, z), (hx - 900 - hx0, hd, 25), GRID, folder=house)
-            box(((hx + 900 + hx1) / 2, hy, z), (hx1 - hx - 900, hd, 25), GRID, folder=house)
-            hole_x0, hole_x1 = (hx + 450, hx + 750) if f == 1 else (hx + 100, hx + 400)
-            hole_y1 = hy0 + 1650
-            box(((hx - 900 + hole_x0) / 2, hy, z), (hole_x0 - (hx - 900), hd, 25), GRID, folder=house)
-            box(((hole_x1 + hx + 900) / 2, hy, z), (hx + 900 - hole_x1, hd, 25), GRID, folder=house)
-            box(((hole_x0 + hole_x1) / 2, (hole_y1 + hy1) / 2, z), (hole_x1 - hole_x0, hy1 - hole_y1, 25), GRID, folder=house)
-    box((hx, hy, 3 * FH), (hw + 100, hd + 100, 30), GRID_ALT, folder=house)
-    # Switchback: up toward the back on the east side, then back toward the front.
-    stairs((hx + 600, hy0 + 150, 0), 90, FH, 1500, 300, folder=house)
-    stairs((hx + 250, hy0 + 1650, FH), -90, FH, 1500, 300, folder=house)
-    spawn(bp("World/Interactables/Door/BP_Door"), (hx - 55, hy0, 0), folder=house)
-    spawn(bp("World/Interactables/Door/BP_Door"), (hx0, hy0 + hd * 0.2 - 55, 0), (0, 90, 0), folder=house)
-    for f in range(3):
-        for t in (0.12, 0.3, 0.7, 0.88):
-            spawn(bp("World/Interactables/Window/BP_Window"), (hx0 + hw * t, hy0, f * FH), (0, 90, 0), folder=house)
-    ladder((hx1 + 25, hy + 1200, 0), 0, 3 * FH + 30, gutter=True, folder=house)
-    ladder((hx0 - 25, hy - 1200, 0), 180, 3 * FH + 30, gutter=True, folder=house)
-    # Roof: the turret, a helipad (retrieval point), a sniper.
-    box((hx + 1600, hy, 3 * FH + 20), (1400, 1400, 10), mi("MI_Yellow"), folder="Estate/Roof")
-    turret = spawn(bp("World/Interactables/Security/BP_Turret"), (hx - 1500, hy0 + 400, 3 * FH + 15), (0, -90, 0), folder="Estate/Roof")
-    # Dining room (sealed: door, window and a vent hatch) in the ground-floor west back room.
-    dining_door = None
-    for a in EAS.get_all_level_actors():
-        loc = a.get_actor_location()
-        if a.get_class().get_name().startswith("BP_Door") and abs(loc.x - ((hx0 + hx - 900) / 2 - 55)) < 2 and abs(loc.y - hy) < 2 and loc.z < 5:
-            dining_door = a
-    dining = spawn(bp("World/Interactables/Vent/BP_RoomVolume"), (hx0 + 950, hy + 800, 210), folder="Estate/Dining")
-    hatch = spawn(bp("World/Interactables/Vent/BP_VentHatch"), (hx0, hy + 1100, 0), (0, 90, 0), folder="Estate/Dining")
-    if dining:
-        dining.set_actor_scale3d(unreal.Vector(1.7, 1.5, 1.3))
-        dining.set_editor_property("openings", [o for o in (dining_door, hatch) if o])
-    if hatch and dining:
-        hatch.set_editor_property("linked_rooms", [dining])
-    box((hx0 + 950, hy + 800, 40), (900, 300, 80), mi("MI_Wood"), folder="Estate/Dining")
-    spawn(bp("World/Interactables/Drink/BP_PoisonableDrink"), (hx0 + 950, hy + 800, 80), folder="Estate/Dining")
-    # Control room upstairs behind the keycard door (console, monitors).
-    control_door = spawn(bp("World/Interactables/Door/BP_Door_Keycard1"), (hx + 2000 - 55, hy, FH), folder="Estate/Control")
-    console = spawn(bp("World/Interactables/Security/BP_ControlConsole"), (hx1 - 600, hy + 1300, FH), (0, 180, 0), folder="Estate/Control")
-    hall_cam = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (hx - 800, hy0 + 150, FH - 40), (-30, 60, 0), folder="Estate/Security")
-    garden_cam = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (hx1 - 100, hy1 + 100, 2 * FH + 300), (-30, 45, 0), folder="Estate/Security")
-    cams = [c for c in (gate_cam, hall_cam, garden_cam) if c]
-    if console:
-        console.set_editor_property("linked_cameras", cams)
-    for i, cam in enumerate(cams):
-        monitor = spawn(bp("World/Interactables/Security/BP_SecurityMonitor"), (hx1 - 1300 + i * 400, hy1 - 70, FH + 200), (0, 180, 0), folder="Estate/Control")
-        if monitor:
-            monitor.set_editor_property("linked_camera", cam)
-    gatehouse_console = spawn(bp("World/Interactables/Security/BP_ControlConsole"), (ghx + 200, ghy - 200, 0), (0, 90, 0), folder="Estate/Gatehouse")
-    if gatehouse_console:
-        gatehouse_console.set_editor_property("linked_cameras", cams)
-    # Basement: breaker (house lights), the turret hack panel, the vent up to the dining room, the tunnel exit.
-    BZ = -500
-    floor((hx, hy, BZ), (hw, hd, 0), GRID_DARK, "Estate/Basement")
-    box((hx, hy, -25), (hw, hd, 50), GRID, folder="Estate/Basement")
-    for (a, b) in (((hx0, hy0), (hx1, hy0)), ((hx0, hy1), (hx1, hy1)), ((hx0, hy0), (hx0, hy1)), ((hx1, hy0), (hx1, hy1))):
-        wall(a, b, BZ, -BZ - 50, 40, [(hd * 0.5, 400, 0, 320)] if a == (hx1, hy0) else (), GRID_DARK, "Estate/Basement")
-    holes.append((hx0, hy0, hx1, hy1))  # the house slab
-    # Outside stair well down to the basement door (east wall opening); the cave tunnel opens on its landing.
-    stair_well((hx1, hy - 250, hx1 + 1600, hy + 250), BZ, "+x", 1000, holes, {"left": [(300, 400, 0, 340)]}, low_wall=False,
-               folder="Estate/BasementStairs")
-    for (lx, ly) in ((hx - 1500, hy), (hx, hy), (hx + 1500, hy)):
-        room_light(lx, ly, -70, "Estate/Basement")
-    breaker = spawn(bp("World/Interactables/Power/BP_CircuitBreaker"), (hx0 + 400, hy0 + 70, BZ), folder="Estate/Basement")
-    blackout = spawn(bp("World/Interactables/Power/BP_BlackoutVolume"), (hx, hy, FH * 1.5), folder="Estate/House")
-    if blackout:
-        blackout.set_actor_scale3d(unreal.Vector(3.6, 2.1, 2.2))
-    house_lights = [a for a in EAS.get_all_level_actors() if a.get_class().get_name().startswith("BP_LightFixture")
-                    and hx0 <= a.get_actor_location().x <= hx1 and hy0 <= a.get_actor_location().y <= hy1 and a.get_actor_location().z > 0]
-    if breaker:
-        breaker.set_editor_property("linked_lights", house_lights)
-        breaker.set_editor_property("linked_volumes", [blackout] if blackout else [])
-    panel = spawn(bp("World/Interactables/Security/BP_HackPanel"), (hx1 - 500, hy1 - 70, BZ), (0, 180, 0), folder="Estate/Basement")
-    if turret and panel:
-        panel.set_editor_property("linked_turret", turret)
-    # Gardens: formal hedges and a fountain in front, the hedge maze with a gazebo behind, the greenhouse.
-    for gx in (-2200, -1100, 1100, 2200):
-        box((hx + gx, hy0 - 1800, 70), (800, 120, 140), mi("MI_Green"), folder="Estate/FrontGarden")
-    box((hx, hy0 - 2600, 60), (900, 900, 120), mi("MI_Stone"), folder="Estate/FrontGarden", shape="cylinder")
-    maze_x, maze_y = 9200, 4200
-    hedge_maze(maze_x, maze_y, 4400, 9, "Estate/Maze")
-    box((maze_x, maze_y, 290), (700, 700, 20), mi("MI_White"), folder="Estate/Maze", shape="cylinder")
-    for ang in range(0, 360, 60):
-        box((maze_x + math.cos(math.radians(ang)) * 300, maze_y + math.sin(math.radians(ang)) * 300, 140), (30, 30, 280), mi("MI_White"), folder="Estate/Maze", shape="cylinder")
-    room_light(maze_x, maze_y, 270, "Estate/Maze")
-    gx0, gy0 = 4600, 4200
-    for (a, b, op) in (((gx0 - 1000, gy0 - 600), (gx0 + 1000, gy0 - 600), [(1000, 110, 0, 230)]), ((gx0 - 1000, gy0 + 600), (gx0 + 1000, gy0 + 600), ()),
-                       ((gx0 - 1000, gy0 - 600), (gx0 - 1000, gy0 + 600), ()), ((gx0 + 1000, gy0 - 600), (gx0 + 1000, gy0 + 600), [(600, 110, 0, 230)])):
-        wall(a, b, 0, 350, 15, op, mi("MI_Glass"), "Estate/Greenhouse")
-    box((gx0, gy0, 350), (2030, 1230, 15), mi("MI_Glass"), folder="Estate/Greenhouse")
-    for i in range(6):
-        box((gx0 - 700 + i * 280, gy0 + (200 if i % 2 else -200), 60), (160, 160, 120), mi("MI_Green"), folder="Estate/Greenhouse", shape="sphere")
-    room_light(gx0, gy0, 300, "Estate/Greenhouse")
-    spawn(bp("World/Interactables/Grass/BP_TallGrass"), (gx0 - 400, gy0 - 1200, 55), folder="Estate/Greenhouse")
-    # Garage (the tank) in the south-east corner, with a wide door.
-    grx, gry = 13300, -8300
-    for (a, b, op) in (((grx - 1300, gry - 900), (grx + 1300, gry - 900), ()), ((grx - 1300, gry + 900), (grx + 1300, gry + 900), [(1300, 800, 0, 450)]),
-                       ((grx - 1300, gry - 900), (grx - 1300, gry + 900), [(900, 110, 0, 230)]), ((grx + 1300, gry - 900), (grx + 1300, gry + 900), ())):
-        wall(a, b, 0, 550, 30, op, GRID_DARK, "Estate/Garage")
-    box((grx, gry, 550), (2650, 1850, 30), GRID, folder="Estate/Garage")
-    spawn(bp("World/Vehicles/BP_Tank"), (grx, gry, 100), (0, 90, 0), folder="Estate/Garage")
-    spawn(bp("World/Interactables/Door/BP_Door"), (grx - 1300, gry - 55, 0), (0, 90, 0), folder="Estate/Garage")
-    for lx in (-700, 700):
-        room_light(grx + lx, gry, 500, "Estate/Garage")
-    # Graveyard and its chapel in the south-west of the estate.
-    cgx, cgy = 6000, -8000
-    for i in range(5):
-        for j in range(4):
-            box((cgx - 1600 + i * 800, cgy - 900 + j * 600, 60), (60, 160, 120), mi("MI_Stone"), folder="Estate/Graveyard")
-    wall((cgx - 2100, cgy - 1300), (cgx + 1900, cgy - 1300), 0, 100, 30, [(2000, 300, 0, 100)], mi("MI_Stone"), "Estate/Graveyard")
-    building(cgx + 2900, cgy, 1400, 1000, 1, 500, door_side="N", folder="Estate/Chapel", gutter=False)
-    spawn(bp("World/Interactables/Locker/BP_Locker"), (cgx + 2600, cgy + 200, 0), (0, 0, 0), folder="Estate/Chapel")
-    for bx, by in ((ex0 + 2500, gate_y - 500), (12000, 1500), (14500, -5500)):
-        spawn(bp("World/Interactables/Barrel/BP_ExplosiveBarrel"), (bx, by, 0), folder="Estate/Props")
-
-    # ---------------- Cliffs, caves and the cove (north) ----------------
-    ridge_y = 9800
-    for i in range(16):
-        x = -2400 + i * 900
-        h = 1400 + (i % 4) * 300
-        if 2 <= i <= 3:
-            continue  # the cliff pass
-        box((x, ridge_y + (i % 2) * 200, h / 2), (1000, 1400, h), mi("MI_Mountain"), folder="Cliffs/Ridge")
-    # Cave: a rock mass with chambers and tunnels (walled corridors with a roof).
-    cvx, cvy = 3000, 12800
-    rock = mi("MI_Mountain")
-    chambers = [(cvx - 3000, cvy - 500, 2200, 1800), (cvx, cvy, 3000, 2400), (cvx + 3400, cvy + 600, 2000, 1800)]
-    for (ccx, ccy, w, d) in chambers:
-        for (a, b) in (((ccx - w / 2, ccy - d / 2), (ccx + w / 2, ccy - d / 2)), ((ccx - w / 2, ccy + d / 2), (ccx + w / 2, ccy + d / 2)),
-                       ((ccx - w / 2, ccy - d / 2), (ccx - w / 2, ccy + d / 2)), ((ccx + w / 2, ccy - d / 2), (ccx + w / 2, ccy + d / 2))):
-            horizontal = a[1] == b[1]
-            length = abs(b[0] - a[0]) if horizontal else abs(b[1] - a[1])
-            openings = [(length / 2, 600, 0, 500)]
-            wall(a, b, 0, 800, 300, openings, rock, "Cave/Chambers")
-        box((ccx, ccy, 850), (w + 300, d + 300, 100), rock, folder="Cave/Chambers")
-        for k in (0, 2):
-            box((ccx - w / 3 + k * w / 3, ccy + (k - 1) * d / 4, 140), (280, 280, 280), mi("MI_Stone"), folder="Cave/Rocks", shape="sphere")
-        for (lx, ly) in ((ccx - w / 4, ccy), (ccx + w / 4, ccy)):
-            room_light(lx, ly, 760, "Cave/Lamps")
-    for (ccx, ccy, w, d), (ncx, ncy, nw, nd) in zip(chambers[:-1], chambers[1:]):
-        x_a, x_b = ccx + w / 2, ncx - nw / 2
-        mid_y = (ccy + ncy) / 2
-        for side in (-1, 1):
-            box(((x_a + x_b) / 2, mid_y + side * 350, 300), (x_b - x_a + 300, 100, 600), rock, folder="Cave/Tunnels")
-        box(((x_a + x_b) / 2, mid_y, 650), (x_b - x_a + 300, 800, 100), rock, folder="Cave/Tunnels")
-        room_light((x_a + x_b) / 2, mid_y, 560, "Cave/Lamps")
-    box((cvx, cvy - 300, 40), (500, 300, 80), mi("MI_Wood"), folder="Cave/Den")
-    spawn(bp("World/Vehicles/BP_MountedGun"), (cvx + 600, cvy - 800, 100), (0, -90, 0), folder="Cave/Den")
-    box((cvx + 600, cvy - 800, 50), (160, 160, 100), mi("MI_Dark"), folder="Cave/Den")
-    spawn(bp("World/Interactables/Grass/BP_TallGrass"), (cvx - 3000, cvy - 1600, 55), folder="Cave/Entrance")
-    # Tunnel from a stair well in the east chamber to the landing of the basement stair well.
-    tz = BZ
-    tunnel_mouth = (cvx + 3400, cvy + 100)
-    stair_well((tunnel_mouth[0] - 250, tunnel_mouth[1], tunnel_mouth[0] + 250, tunnel_mouth[1] + 1000), tz, "+y", 1000, holes,
-               {"low": [(250, 400, 0, 340)]}, folder="Cave/StairWell")
-    tunnel([tunnel_mouth, (tunnel_mouth[0], 9000), (hx1 + 300, 9000), (hx1 + 300, hy + 250)], tz)
-    # Cove with a dock (boat retrieval) in the north-west.
-    covx, covy = -11500, 12000
-    floor((covx, covy, 2), (7000, 4000, 0), mi("MI_Sand"), "Cove")
-    box((covx, covy + 2600, 3), (9000, 1500, 6), mi("MI_Blue"), folder="Cove")
-    box((covx + 1500, covy + 2300, 15), (400, 2400, 30), mi("MI_Wood"), folder="Cove/Dock")
-    box((covx + 2100, covy + 3000, 80), (500, 1400, 160), mi("MI_White"), folder="Cove/Boat")
-    room_light(covx + 1500, covy + 1400, 400, "Cove")
-
-    # ---------------- Gameplay: VIPs, guards, loot, retrieval, starts ----------------
-    vip_spots = [(hx0 + 950, hy + 400, 0), (hx1 - 950, hy - 800, FH), (hx, hy + 700, 0), (hx0 + 950, hy - 800, 2 * FH), (hx1 - 950, hy + 800, 2 * FH),
-                 (maze_x, maze_y, 0), (gx0, gy0, 0), (cgx + 2900, cgy, 0), (px + 1300, py, 0), (-11400, -8200, 350), (-7600, 5600, 0),
-                 (chx, chy, 0), (cvx, cvy, 0), (hx1 - 600, hy1 - 600, BZ), (grx, gry + 400, 0)]
-    for loc in vip_spots:
-        npc("vip", loc, 0, folder="AI/VIPCandidates")
-    guard_routes = [
-        # Estate grounds (two loops), front garden, maze, back of the estate.
-        [(ex0 + 1500, ey0 + 1500, 100), (ex1 - 1500, ey0 + 1500, 100), (ex1 - 1500, ey1 - 1500, 100), (ex0 + 1500, ey1 - 1500, 100)],
-        [(hx0 - 1200, hy0 - 1200, 100), (hx1 + 2100, hy0 - 1200, 100), (hx1 + 2100, hy1 + 1200, 100), (hx0 - 1200, hy1 + 1200, 100)],
-        [(hx - 2500, hy0 - 2200, 100), (hx + 2500, hy0 - 2200, 100)],
-        [(maze_x - 2600, maze_y - 2600, 100), (maze_x + 2600, maze_y - 2600, 100), (maze_x + 2600, maze_y + 2600, 100)],
-        [(cgx - 2000, cgy - 1600, 100), (cgx + 2000, cgy + 1500, 100)],
-        # Inside the house: each floor and the basement.
-        [(hx0 + 600, hy0 + 400, 100), (hx - 300, hy0 + 400, 100), (hx - 300, hy1 - 400, 100), (hx1 - 600, hy1 - 400, 100)],
-        [(hx0 + 600, hy0 + 400, FH + 100), (hx1 - 600, hy0 + 400, FH + 100), (hx1 - 600, hy1 - 400, FH + 100)],
-        [(hx1 - 600, hy0 + 400, 2 * FH + 100), (hx0 + 600, hy1 - 400, 2 * FH + 100)],
-        [(hx0 + 500, hy0 + 500, BZ + 100), (hx1 - 500, hy1 - 500, BZ + 100)],
-        # Village: the street, the alleys, the plaza.
-        [(-9500, -12500, 100), (-9500, 8000, 100)],
-        [(-12500, -10000, 100), (-12500, 4000, 100), (-10400, 4000, 100)],
-        [(-6500, -10000, 100), (-6500, 7000, 100)],
-        [(px - 2000, py - 2000, 100), (px + 2000, py - 2000, 100), (px + 2000, py + 2000, 100), (px - 2000, py + 2000, 100)],
-        # Bridges, cliff path and caves.
-        [(-4400, -1500, 100), (-1000, -1500, 100), (-1000, 5500, 100), (-4400, 5500, 100)],
-        [(-6000, 9500, 100), (-1000, 11000, 100)],
-        [(cvx - 3000, cvy - 500, 100), (cvx, cvy, 100), (cvx + 4000, cvy + 600, 100)],
-    ]
-    for i, route_points in enumerate(guard_routes):
-        route = patrol(route_points, folder="AI/Routes")
-        start = route_points[0]
-        npc("guard", (start[0], start[1], start[2] - 100), 0, route=route, keycard=1 if i in (6, 10) else None, folder="AI/Guards")
-    posts = [((ex0 + 300, gate_y - 700, 0), 180, True), ((ex0 + 300, gate_y + 700, 0), 180, True), ((hx - 300, hy0 - 300, 0), 270, False),
-             ((hx1 - 300, hy1 + 300, 0), 0, False), ((ex1 - 300, ey0 + 9000, 0), 0, False), ((grx - 1500, gry, 0), 180, False),
-             ((px, py - 2200, 0), 270, False), ((-9500, -14000, 0), 90, False), ((-1000, 5500, 0), 0, False), ((cvx - 3000, cvy - 1600, 0), 270, False)]
-    for (loc, yaw, sentry) in posts:
-        npc("guard", loc, yaw, folder="AI/Guards", stationary=True, sentry=sentry)
-    npc("sniper", (tx, ty, 2215), 270, folder="AI/Snipers")
-    npc("sniper", (hx + 2300, hy0 + 300, 3 * FH + 30), 270, folder="AI/Snipers")
-    npc("sniper", (1300, ridge_y, 1400), 270, folder="AI/Snipers")
-
-    for x, y, z in ((hx + 1600, hy, 3 * FH + 25), (covx + 1500, covy + 3300, 30), (-9500, -15000, 0), (cvx + 3400, cvy + 2600, 0),
-                    (14500, -9800, 0), (-15000, 0, 0)):
-        spawn(bp("World/Spawning/BP_RetrievalPoint"), (x, y, z), folder="Gameplay/Retrieval")
-    loot_w = [(-13500, -11500, 30), (-7600, -8200, 380), (px - 1700, py - 1850, 30), (-11400, 5600, 30), (-5500, 2200, 380), (chx, chy, 30),
-              (ghx, ghy, 30), (hx0 + 950, hy - 800, 30), (hx1 - 950, hy + 800, FH + 30), (hx, hy, BZ + 30), (grx + 800, gry, 30), (gx0, gy0, 30),
-              (cvx, cvy, 30), (cvx + 4000, cvy + 900, 30), (covx, covy, 30), (-200, -9000, 30)]
-    loot_i = [(-11400, -11500, 380), (-5500, -4800, 30), (px + 1300, py + 1000, 30), (-13500, 2200, 380), (-7600, 5600, 30), (tx, ty, 30),
-              (hx0 + 950, hy + 800, FH + 30), (hx1 - 950, hy - 800, 2 * FH + 30), (hx0 + 500, hy1 - 500, BZ + 30), (maze_x, maze_y, 30),
-              (cgx, cgy, 30), (ex1 - 2000, ey1 - 2000, 30), (cvx - 3000, cvy - 500, 30), (1300, ridge_y - 1200, 30), (covx - 2000, covy, 30), (-2700, -12000, 30)]
-    for loc in loot_w:
-        spawn(bp("World/Spawning/BP_LootSpawn_Weapon"), loc, folder="Gameplay/Loot")
-    for loc in loot_i:
-        spawn(bp("World/Spawning/BP_LootSpawn_Item"), loc, folder="Gameplay/Loot")
-    # Sheltered starts along the map edge, far from guards (6 groups of 4).
-    starts = ((-14800, -14800, 45), (-1000, -14800, 90), (14800, -14800, 135), (-14800, 7000, -20), (-6000, 14600, -60), (14800, 9000, -135))
-    for (sx, sy, _) in starts:
-        box((sx + (450 if sx < 0 else -450), sy, 200), (40, 1000, 400), GRID_ALT, folder="Gameplay/Starts")
-        box((sx, sy + (450 if sy < 0 else -450), 200), (1000, 40, 400), GRID_ALT, folder="Gameplay/Starts")
-    team_starts(list(starts))
-    ground(half + 4000, holes, mi("MI_Grass"))
-    save_map()
+    """San Lazaro (0.7.0): one organic map on hills, built by hitmen_sanlazaro.py."""
+    import importlib
+    import hitmen_sanlazaro
+    importlib.reload(hitmen_sanlazaro)
+    hitmen_sanlazaro.build()
 
 
 def bake_map_textures():

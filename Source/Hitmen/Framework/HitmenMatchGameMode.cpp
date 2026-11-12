@@ -1,6 +1,8 @@
 // Hitmen — match game mode
 
 #include "Framework/HitmenMatchGameMode.h"
+#include "UObject/UnrealType.h"
+#include "Components/HitmenHealthComponent.h"
 #include "Framework/HitmenGameState.h"
 #include "Framework/HitmenPlayerState.h"
 #include "Framework/HitmenPlayerController.h"
@@ -17,6 +19,7 @@
 #include "Hitmen.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
+#include "GameFramework/SpectatorPawn.h"
 #include "Engine/World.h"
 
 AHitmenMatchGameMode::AHitmenMatchGameMode()
@@ -49,6 +52,10 @@ void AHitmenMatchGameMode::StartPlay()
 {
 	Super::StartPlay();
 	SetupMatch();
+	if (AllowsDebugCommands())
+	{
+		SnapshotNPCs();
+	}
 	if (bParachuteIntro)
 	{
 		if (AHitmenGameState* GS = GetGameState<AHitmenGameState>())
@@ -432,6 +439,17 @@ void AHitmenMatchGameMode::CheckWinConditions()
 		}
 	}
 
+	// Watchers only (watching the NPCs): the match never ends by itself.
+	bool bAnyAgent = false;
+	for (const AHitmenPlayerState* PS : GS->GetHitmenPlayers())
+	{
+		bAnyAgent |= !PS->IsWatcher();
+	}
+	if (!bAnyAgent)
+	{
+		return;
+	}
+
 	if (AlivePlayers == 0)
 	{
 		FHitmenMatchResult Result;
@@ -465,7 +483,127 @@ void AHitmenMatchGameMode::EndMatch(const FHitmenMatchResult& Result)
 		GS->SetMatchPhase(EHitmenMatchPhase::Ended);
 	}
 	Juice_OnMatchEnded(Result);
-	GetWorldTimerManager().SetTimer(EndTimer, this, &AHitmenMatchGameMode::ReturnToLobby, GetRules()->ResultsDuration, false);
+	// No return timer: after a beat on the result everyone flies free; the host sends everyone back.
+	GetWorldTimerManager().SetTimer(EndTimer, this, &AHitmenMatchGameMode::MoveEveryoneToSpectators, FMath::Max(0.01f, EndSpectateDelay), false);
+}
+
+void AHitmenMatchGameMode::MoveEveryoneToSpectators()
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		AHitmenPlayerController* PC = Cast<AHitmenPlayerController>(It->Get());
+		if (!PC)
+		{
+			continue;
+		}
+		// Watchers and dead players already spectate; they switch to free fly too. Living agents leave their body
+		// where it stands.
+		if (PC->GetPawn() && !PC->GetPawn()->IsA<ASpectatorPawn>())
+		{
+			PC->UnPossess();
+		}
+		if (!PC->IsInState(NAME_Spectating))
+		{
+			PC->ChangeState(NAME_Spectating);
+			PC->ClientGotoState(NAME_Spectating);
+		}
+		PC->Client_EnterSpectatorMode(true);
+	}
+}
+
+void AHitmenMatchGameMode::SnapshotNPCs()
+{
+	NPCSnapshots.Reset();
+	NPCSnapshotClasses.Reset();
+	for (TActorIterator<AHitmenNPC> It(GetWorld()); It; ++It)
+	{
+		AHitmenNPC* NPC = *It;
+		FNPCSnapshot& Snapshot = NPCSnapshots.AddDefaulted_GetRef();
+		Snapshot.Class = NPC->GetClass();
+		Snapshot.Transform = NPC->GetActorTransform();
+		NPCSnapshotClasses.AddUnique(NPC->GetClass());
+		// Everything a designer can set on a placed NPC (C++ and Blueprint variables), as text: behaviour, route,
+		// guard group, keycard... Object references (routes) resolve again in this world.
+		for (TFieldIterator<FProperty> PropIt(NPC->GetClass()); PropIt; ++PropIt)
+		{
+			const FProperty* Property = *PropIt;
+			const UClass* DeclaringClass = Property->GetOwnerClass();
+			if (!DeclaringClass || !DeclaringClass->IsChildOf(AHitmenNPC::StaticClass()) || !Property->HasAnyPropertyFlags(CPF_Edit)
+				|| Property->HasAnyPropertyFlags(CPF_Transient | CPF_EditConst | CPF_DisableEditOnInstance))
+			{
+				continue;
+			}
+			FString Value;
+			Property->ExportTextItem_Direct(Value, Property->ContainerPtrToValuePtr<void>(NPC), nullptr, NPC, PPF_None);
+			Snapshot.Properties.Emplace(Property->GetFName(), MoveTemp(Value));
+		}
+	}
+	UE_LOG(LogHitmen, Log, TEXT("Debug: %d NPCs recorded for respawn"), NPCSnapshots.Num());
+}
+
+void AHitmenMatchGameMode::DebugRespawnNPCs()
+{
+	// Remove every NPC (alive or not) and its controller, then place the recorded ones again.
+	for (TActorIterator<AHitmenNPC> It(GetWorld()); It; ++It)
+	{
+		if (AController* Controller = It->GetController())
+		{
+			Controller->Destroy();
+		}
+		It->Destroy();
+	}
+	for (const FNPCSnapshot& Snapshot : NPCSnapshots)
+	{
+		if (!Snapshot.Class)
+		{
+			continue;
+		}
+		AHitmenNPC* NPC = GetWorld()->SpawnActorDeferred<AHitmenNPC>(Snapshot.Class, Snapshot.Transform, nullptr, nullptr,
+			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+		if (!NPC)
+		{
+			continue;
+		}
+		for (const TPair<FName, FString>& Pair : Snapshot.Properties)
+		{
+			if (const FProperty* Property = NPC->GetClass()->FindPropertyByName(Pair.Key))
+			{
+				Property->ImportText_Direct(*Pair.Value, Property->ContainerPtrToValuePtr<void>(NPC), NPC, PPF_None);
+			}
+		}
+		NPC->FinishSpawning(Snapshot.Transform);
+		if (!NPC->GetController())
+		{
+			NPC->SpawnDefaultController();
+		}
+	}
+	UE_LOG(LogHitmen, Log, TEXT("Debug: %d NPCs respawned"), NPCSnapshots.Num());
+}
+
+void AHitmenMatchGameMode::DebugKillNPCs(AController* Killer)
+{
+	for (TActorIterator<AHitmenNPC> It(GetWorld()); It; ++It)
+	{
+		if (UHitmenHealthComponent* Health = It->GetHealth(); Health && !It->IsDead())
+		{
+			Health->Kill(Killer ? Killer->GetPawn() : nullptr, nullptr);
+		}
+	}
+}
+
+void AHitmenMatchGameMode::DebugResetMap()
+{
+	GetWorld()->ServerTravel(TEXT("?Restart"), false);
+}
+
+void AHitmenMatchGameMode::RequestReturnToLobby(APlayerController* Requester)
+{
+	// The listen-server host only, once the match is over.
+	if (!bMatchOver || !Requester || !Requester->IsLocalController() || GetWorld()->GetFirstPlayerController() != Requester)
+	{
+		return;
+	}
+	ReturnToLobby();
 }
 
 void AHitmenMatchGameMode::ReturnToLobby()

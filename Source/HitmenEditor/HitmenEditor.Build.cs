@@ -29,7 +29,10 @@ public class HitmenEditor : ModuleRules
 			"BlueprintGraph",
 			"Kismet",
 			"SlateCore",
-			"Slate"
+			"Slate",
+			// Terrain tiles (HitmenContentTools::BuildHeightfieldMesh)
+			"MeshDescription",
+			"StaticMeshDescription"
 		});
 	}
 }

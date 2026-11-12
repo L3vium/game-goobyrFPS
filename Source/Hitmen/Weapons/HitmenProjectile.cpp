@@ -5,6 +5,8 @@
 #include "GameFramework/PlayerController.h"
 #include "Characters/HitmenPlayerCharacter.h"
 #include "Data/HitmenSoundSet.h"
+#include "Weapons/HitmenCosmeticActors.h"
+#include "Core/HitmenGameSettings.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Abilities/HitmenAbilityActors.h"
 #include "Characters/HitmenCharacterBase.h"
@@ -179,9 +181,14 @@ void AHitmenProjectile::Multicast_Impact_Implementation(FVector_NetQuantize Loca
 		const FVector Scale(bExploded ? ExplosionEffectScale : 1.f);
 		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Effect, Location, FRotator::ZeroRotator, Scale);
 	}
+	if (bExploded && ExplosionFlashRadius > 0.f)
+	{
+		AHitmenFlashBurst::SpawnBurst(GetWorld(), Location, UHitmenGameSettings::Get()->FlashMaterial.LoadSynchronous(), ExplosionFlashColor,
+			ExplosionFlashRadius * 0.1f, ExplosionFlashRadius, ExplosionFlashDuration, ExplosionLightIntensity, ExplosionFlashRadius * 4.f);
+	}
 	if (Sound)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, Sound, Location);
+		UHitmenSoundLibrary::PlaySoundInSpace(this, Sound, Location, bExploded ? EHitmenSoundSpace::Gunshot : EHitmenSoundSpace::Impact);
 	}
 	else if (bExploded)
 	{

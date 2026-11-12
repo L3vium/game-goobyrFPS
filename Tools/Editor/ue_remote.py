@@ -5,10 +5,28 @@ Usage:
     python Tools/Editor/ue_remote.py --file Tools/Editor/some_script.py
 """
 import argparse
+import json
+import os
 import sys
 import time
 
-sys.path.append(r"C:\Program Files\Epic Games\UE_5.7\Engine\Plugins\Experimental\PythonScriptPlugin\Content\Python")
+
+def engine_root():
+    """UE_ROOT, else the launcher's install of UE_5.7, else the default install folder."""
+    if os.environ.get("UE_ROOT"):
+        return os.environ["UE_ROOT"]
+    manifest = r"C:\ProgramData\Epic\UnrealEngineLauncher\LauncherInstalled.dat"
+    try:
+        with open(manifest, encoding="utf-8") as handle:
+            for item in json.load(handle).get("InstallationList", []):
+                if item.get("AppName") == "UE_5.7" and os.path.isdir(item.get("InstallLocation", "")):
+                    return item["InstallLocation"]
+    except (OSError, ValueError):
+        pass
+    return r"C:\Program Files\Epic Games\UE_5.7"
+
+
+sys.path.append(os.path.join(engine_root(), "Engine", "Plugins", "Experimental", "PythonScriptPlugin", "Content", "Python"))
 import remote_execution  # noqa: E402
 
 

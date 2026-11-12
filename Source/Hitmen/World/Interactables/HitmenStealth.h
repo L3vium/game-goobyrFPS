@@ -51,6 +51,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(Units="deg"))
 	float DoorOpenAngle = 100.f;
 
+	/** Door hinged on the front-right edge (the default since 0.7.0); off = front-left. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker")
+	bool bDoorHingeOnRight = true;
+
 	/** Door opens and closes again over this time when someone gets in or out. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0.1", Units="s"))
 	float DoorCycleTime = 0.8f;
@@ -156,18 +160,48 @@ public:
 
 	virtual bool CanRemoteActivate_Implementation() const override;
 	virtual void RemoteActivate_Implementation(AActor* Activator) override;
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Distraction")
+	bool IsOn() const { return bOn; }
+
+	/** Server: turns it on or off (players with F or remotely, guards switch it off). */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Distraction")
+	void SetOn(bool bNewOn, AActor* SwitchedBy);
 
 protected:
+	/** Guards within this radius hear it (walls cut it, the nearest two come). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0", Units="cm"))
 	float NoiseRadius = 1500.f;
 
-	/** Seconds before it can be used again. */
+	/** Seconds between two uses. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0"))
-	float Cooldown = 15.f;
+	float Cooldown = 1.f;
 
-	/** It plays this long once turned on: a pulsing light, a sound every PulseInterval and a noise each time. */
+	/** Once on, it plays until someone turns it off (0) or this long. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0", Units="s"))
-	float PlayTime = 8.f;
+	float PlayTime = 0.f;
+
+	/** A guard who came to look and stands this close switches it off. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0", Units="cm"))
+	float SwitchOffRadius = 180.f;
+
+	/** What it is: sound loop, effect on each pulse, light colour (radio, TV, alarm clock...). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction|Juice")
+	TObjectPtr<USoundBase> LoopSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction|Juice")
+	TObjectPtr<class UNiagaraSystem> PulseFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction|Juice")
+	FLinearColor LightColor = FLinearColor(1.f, 0.55f, 0.15f);
+
+	UPROPERTY(ReplicatedUsing=OnRep_On)
+	bool bOn = false;
+
+	UFUNCTION()
+	void OnRep_On();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0.2", Units="s"))
 	float PulseInterval = 1.f;
@@ -189,10 +223,6 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 	virtual void OnInteracted(AActor* Interactor) override;
-	virtual void Trigger(AActor* Activator);
-
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_Triggered();
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnTriggered();

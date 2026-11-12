@@ -1,4 +1,5 @@
-// Hitmen — carry the VIP body on the back (slower), drop it, deliver it to a retrieval point
+// Hitmen — carry a body in your arms (slower, hands busy: it takes the left weapon slot), drop it, hide it in a
+// container or deliver the VIP to a retrieval point
 
 #pragma once
 
@@ -51,13 +52,18 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Carry")
 	bool bCarryEnabled = true;
 
-	/** Only the VIP can be carried (other bodies are hidden with the lighter). */
+	/** Only the VIP can be carried (off: any body, to hide it in a container). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Carry")
-	bool bOnlyVIP = true;
+	bool bOnlyVIP = false;
 
-	/** Socket of the carrier's mesh the body attaches to. */
+	/** Where the body lies in the arms, relative to the carrier (X forward, Z up; rolled to lie across). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Carry")
-	FName CarrySocket = TEXT("spine_03");
+	FTransform CarryTransform = FTransform(FRotator(0.f, 0.f, 90.f), FVector(55.f, 0.f, -5.f));
+
+public:
+	const FTransform& GetCarryTransform() const { return CarryTransform; }
+
+protected:
 
 	UPROPERTY(ReplicatedUsing=OnRep_CarriedBody)
 	TObjectPtr<AHitmenCharacterBase> CarriedBody;

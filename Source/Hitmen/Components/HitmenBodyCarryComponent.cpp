@@ -5,6 +5,7 @@
 #include "Components/HitmenHealthComponent.h"
 #include "Framework/HitmenMatchGameMode.h"
 #include "Data/HitmenMatchRules.h"
+#include "Inventory/HitmenInventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 
@@ -43,8 +44,14 @@ void UHitmenBodyCarryComponent::PickUp(AHitmenCharacterBase* Body)
 	{
 		return;
 	}
+	// The body takes the hands (the left weapon slot); the other weapon stays slung.
+	if (UHitmenInventoryComponent* Inventory = GetOwner()->FindComponentByClass<UHitmenInventoryComponent>())
+	{
+		Inventory->MakeRoomForBody();
+	}
 	CarriedBody = Body;
-	Body->SetCarriedBy(Cast<APawn>(GetOwner()), CarrySocket);
+	// NAME_None: in the arms, at CarryTransform (read on every machine from this component).
+	Body->SetCarriedBy(Cast<APawn>(GetOwner()), NAME_None);
 	OnRep_CarriedBody();
 	NotifyGameMode();
 }
@@ -59,6 +66,11 @@ void UHitmenBodyCarryComponent::Drop()
 	CarriedBody = nullptr;
 	OnRep_CarriedBody();
 	NotifyGameMode();
+	// Hands free again: the weapon you still have comes back to hand.
+	if (UHitmenInventoryComponent* Inventory = GetOwner()->FindComponentByClass<UHitmenInventoryComponent>())
+	{
+		Inventory->OnBodyDropped();
+	}
 }
 
 void UHitmenBodyCarryComponent::RequestDrop()

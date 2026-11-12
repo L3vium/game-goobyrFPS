@@ -1,6 +1,9 @@
 // Hitmen — manipulation abilities
 
 #include "Abilities/Manipulation/HitmenManipulationAbilities.h"
+#include "Core/HitmenTeamLibrary.h"
+#include "Weapons/HitmenCombatLibrary.h"
+#include "EngineUtils.h"
 #include "Abilities/HitmenAbilityActors.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Components/HitmenHealthComponent.h"
@@ -74,12 +77,27 @@ UHitmenAbility_RemoteDistraction::UHitmenAbility_RemoteDistraction()
 	Range = 3000.f;
 }
 
+namespace
+{
+	/** Every actor that can be triggered at range right now (distractions, panels, consoles, breakers). */
+	TArray<AActor*> GatherRemoteTargets(const UWorld* World)
+	{
+		TArray<AActor*> Result;
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			AActor* Actor = *It;
+			if (Actor->GetClass()->ImplementsInterface(UHitmenRemoteActivatable::StaticClass()) && IHitmenRemoteActivatable::Execute_CanRemoteActivate(Actor))
+			{
+				Result.Add(Actor);
+			}
+		}
+		return Result;
+	}
+}
+
 AActor* UHitmenAbility_RemoteDistraction::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
 {
-	FHitResult Hit;
-	AActor* Target = AimTrace(Origin, Direction, Hit, 30.f) ? Hit.GetActor() : nullptr;
-	if (Target && Target->GetClass()->ImplementsInterface(UHitmenRemoteActivatable::StaticClass())
-		&& IHitmenRemoteActivatable::Execute_CanRemoteActivate(Target))
+	if (AActor* Target = PickConeTarget(Origin, Direction, GatherRemoteTargets(GetWorld()), TargetConeAngle))
 	{
 		OutAction = NSLOCTEXT("Hitmen", "HintRemoteActivate", "Activate remotely");
 		return Target;
@@ -89,19 +107,13 @@ AActor* UHitmenAbility_RemoteDistraction::FindHintTarget(const FVector& Origin, 
 
 bool UHitmenAbility_RemoteDistraction::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
-	FHitResult Hit;
-	if (!AimTrace(AimOrigin, AimDirection, Hit, 30.f))
-	{
-		return false;
-	}
-	AActor* Target = Hit.GetActor();
-	if (!Target || !Target->GetClass()->ImplementsInterface(UHitmenRemoteActivatable::StaticClass())
-		|| !IHitmenRemoteActivatable::Execute_CanRemoteActivate(Target))
+	AActor* Target = PickConeTarget(AimOrigin, AimDirection, GatherRemoteTargets(GetWorld()), TargetConeAngle);
+	if (!Target)
 	{
 		return false;
 	}
 	IHitmenRemoteActivatable::Execute_RemoteActivate(Target, GetOwnerPawn());
-	PlayActivatedJuice(Hit.ImpactPoint);
+	PlayActivatedJuice(Target->GetActorLocation());
 	return true;
 }
 
@@ -118,7 +130,7 @@ UHitmenAbility_Charm::UHitmenAbility_Charm()
 
 AActor* UHitmenAbility_Charm::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
 {
-	if (AHitmenCharacterBase* Target = AimCharacter(Origin, Direction))
+	if (AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, false))
 	{
 		OutAction = NSLOCTEXT("Hitmen", "HintCharm", "Charm");
 		return Target;
@@ -128,7 +140,7 @@ AActor* UHitmenAbility_Charm::FindHintTarget(const FVector& Origin, const FVecto
 
 bool UHitmenAbility_Charm::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
-	AHitmenCharacterBase* Target = AimCharacter(AimOrigin, AimDirection);
+	AHitmenCharacterBase* Target = AimCharacterInCone(AimOrigin, AimDirection, false);
 	if (!Target)
 	{
 		return false;
@@ -146,17 +158,39 @@ UHitmenAbility_Lighter::UHitmenAbility_Lighter()
 {
 	Cooldown = 3.f;
 	Range = 300.f;
+	// Close range: a body you look at roughly is enough.
+	TargetConeAngle = 25.f;
+}
+
+AActor* UHitmenAbility_Lighter::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
+{
+	AHitmenCharacterBase* Body = AimCharacterInCone(Origin, Direction, true, true);
+	if (Body && !Body->IsVIP())
+	{
+		OutAction = NSLOCTEXT("Hitmen", "HintLighter", "Lighter");
+		return Body;
+	}
+	return nullptr;
 }
 
 bool UHitmenAbility_Lighter::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
-	AHitmenCharacterBase* Body = AimCharacter(AimOrigin, AimDirection, true);
+	AHitmenCharacterBase* Body = AimCharacterInCone(AimOrigin, AimDirection, true, true);
 	if (!Body || !Body->IsDiscoverableBody() || Body->IsVIP())
 	{
 		return false;
 	}
+	// Fire on the body (ActivatedFX), then it is gone.
 	PlayActivatedJuice(Body->GetActorLocation());
-	Body->VanishBody();
+	TWeakObjectPtr<AHitmenCharacterBase> WeakBody(Body);
+	FTimerHandle Burn;
+	GetWorld()->GetTimerManager().SetTimer(Burn, FTimerDelegate::CreateLambda([WeakBody]()
+	{
+		if (WeakBody.IsValid())
+		{
+			WeakBody->VanishBody();
+		}
+	}), FMath::Max(0.01f, BurnTime), false);
 	return true;
 }
 
@@ -175,20 +209,83 @@ void UHitmenAbility_MultiKill::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UHitmenAbility_MultiKill, MarkedTargets);
+	DOREPLIFETIME(UHitmenAbility_MultiKill, bMarking);
 }
 
 bool UHitmenAbility_MultiKill::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
-	AHitmenCharacterBase* Target = AimCharacter(AimOrigin, AimDirection);
-	if (!Target || MarkedTargets.Contains(Target) || MarkedTargets.Num() >= MaxMarks)
+	// Press: start marking (TickAbility marks one more every MarkInterval while held). The cooldown starts on release.
+	bMarking = true;
+	LastMarkTime = GetServerTime();
+	MarkNext();
+	return false;
+}
+
+void UHitmenAbility_MultiKill::Release(const FVector& AimOrigin, const FVector& AimDirection)
+{
+	if (!bMarking)
+	{
+		return;
+	}
+	bMarking = false;
+	if (MarkedTargets.Num() > 0)
+	{
+		CommitUse();
+	}
+}
+
+void UHitmenAbility_MultiKill::TickAbility(float DeltaTime)
+{
+	if (bMarking && GetServerTime() - LastMarkTime >= MarkInterval)
+	{
+		LastMarkTime = GetServerTime();
+		MarkNext();
+	}
+}
+
+bool UHitmenAbility_MultiKill::MarkNext()
+{
+	APawn* Pawn = GetOwnerPawn();
+	if (!Pawn || MarkedTargets.Num() >= MaxMarks)
+	{
+		return false;
+	}
+	FVector Origin, Direction;
+	UHitmenCombatLibrary::GetAimPoint(Pawn, Origin, Direction);
+	TArray<AActor*> Candidates;
+	for (TActorIterator<AHitmenCharacterBase> It(GetWorld()); It; ++It)
+	{
+		AHitmenCharacterBase* Character = *It;
+		if (Character != Pawn && !Character->IsDead() && !MarkedTargets.Contains(Character) && UHitmenTeamLibrary::AreHostile(Pawn, Character))
+		{
+			Candidates.Add(Character);
+		}
+	}
+	AHitmenCharacterBase* Target = Cast<AHitmenCharacterBase>(PickConeTarget(Origin, Direction, Candidates, MarkConeAngle));
+	if (!Target)
 	{
 		return false;
 	}
 	MarkedTargets.Add(Target);
-	Target->GetHealth()->OnDeath.AddDynamic(this, &UHitmenAbility_MultiKill::HandleMarkedDeath);
+	Target->GetHealth()->OnDeath.AddUniqueDynamic(this, &UHitmenAbility_MultiKill::HandleMarkedDeath);
 	GetWorld()->GetTimerManager().SetTimer(ExpireTimer, FTimerDelegate::CreateUObject(this, &UHitmenAbility_MultiKill::ClearMarks), Duration, false);
 	PlayActivatedJuice(Target->GetActorLocation());
 	return true;
+}
+
+AActor* UHitmenAbility_MultiKill::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
+{
+	if (bMarking || MarkedTargets.Num() >= MaxMarks)
+	{
+		return nullptr;
+	}
+	AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, false);
+	if (Target && !MarkedTargets.Contains(Target))
+	{
+		OutAction = NSLOCTEXT("Hitmen", "HintMark", "Hold to mark");
+		return Target;
+	}
+	return nullptr;
 }
 
 void UHitmenAbility_MultiKill::HandleMarkedDeath(AActor* Killer, AActor* DamageCauser, bool bHeadshot)
@@ -269,8 +366,9 @@ UHitmenAbility_WindMine::UHitmenAbility_WindMine()
 {
 	Cooldown = 12.f;
 	MaxCharges = 3;
-	Range = 600.f;
-	DeviceClass = AHitmenWindMine::StaticClass();
+	ThrowSpeed = 1400.f;
+	LobAngle = 10.f;
+	ProjectileClass = AHitmenProjectile_Wind::StaticClass();
 }
 
 // ---------------------------------------------------------------------------------------------

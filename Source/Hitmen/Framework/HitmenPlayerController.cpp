@@ -1,6 +1,9 @@
 // Hitmen — player controller
 
 #include "Framework/HitmenPlayerController.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Character.h"
+#include "World/Vehicles/HitmenVehicles.h"
 #include "Data/HitmenSoundSet.h"
 #include "Framework/HitmenPlayerState.h"
 #include "Framework/HitmenGameState.h"
@@ -8,6 +11,8 @@
 #include "Framework/HitmenGameModeBase.h"
 #include "Framework/HitmenHUD.h"
 #include "Framework/HitmenGameInstance.h"
+#include "Framework/HitmenMatchGameMode.h"
+#include "Spectator/HitmenSpectatorPawn.h"
 #include "Blueprint/UserWidget.h"
 #include "Core/HitmenInterfaces.h"
 #include "Core/HitmenUserSettings.h"
@@ -128,6 +133,55 @@ void AHitmenPlayerController::RefreshMappingContexts()
 			}
 		}
 	}
+	if (UserSettings)
+	{
+		// The spectator keys are listed (and rebindable) even while playing.
+		if (SpectatorMappingContext)
+		{
+			UserSettings->RegisterInputMappingContext(SpectatorMappingContext);
+		}
+		UserSettings->OnSettingsChanged.AddUniqueDynamic(this, &AHitmenPlayerController::HandleInputUserSettingsChanged);
+	}
+	// The subsystem rebuilds its mappings on the next tick: read the keys after that.
+	FTimerHandle LabelTimer;
+	GetWorldTimerManager().SetTimer(LabelTimer, this, &AHitmenPlayerController::RefreshKeyLabels, 0.1f, false);
+}
+
+void AHitmenPlayerController::HandleInputUserSettingsChanged(UEnhancedInputUserSettings* Settings)
+{
+	FTimerHandle LabelTimer;
+	GetWorldTimerManager().SetTimer(LabelTimer, this, &AHitmenPlayerController::RefreshKeyLabels, 0.1f, false);
+}
+
+void AHitmenPlayerController::RefreshKeyLabels()
+{
+	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
+	const UEnhancedInputLocalPlayerSubsystem* Subsystem = GetLocalPlayer() ? GetLocalPlayer()->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+	if (!UI || !Subsystem)
+	{
+		return;
+	}
+	// Same order as EHitmenKeyLabel.
+	const UInputAction* Actions[] = { InteractAction, JumpAction, MoveAbilityAction, ManipulationAbilityAction, SightroomAction, ConfirmAction };
+	static_assert(UE_ARRAY_COUNT(Actions) == static_cast<int32>(EHitmenKeyLabel::Count), "One action per key label");
+	TArray<FString> Labels;
+	for (const UInputAction* Action : Actions)
+	{
+		FString Label;
+		if (Action)
+		{
+			for (const FKey& Key : Subsystem->QueryKeysMappedToAction(Action))
+			{
+				if (!Key.IsGamepadKey())
+				{
+					Label = UHitmenUIEventSubsystem::ShortKeyName(Key);
+					break;
+				}
+			}
+		}
+		Labels.Add(Label);
+	}
+	UI->SetKeyLabels(Labels);
 }
 
 void AHitmenPlayerController::SetupInputComponent()
@@ -176,6 +230,131 @@ void AHitmenPlayerController::SetupInputComponent()
 	BindIfSet(EmoteWheelAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleEmoteWheelReleased);
 	BindIfSet(PauseAction, ETriggerEvent::Started, &AHitmenPlayerController::HandlePause);
 	BindIfSet(SpectatorModeAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorMode);
+	BindIfSet(SpectatorUpAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorUpPressed);
+	BindIfSet(SpectatorUpAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleSpectatorUpReleased);
+	BindIfSet(SpectatorDownAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorDownPressed);
+	BindIfSet(SpectatorDownAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleSpectatorDownReleased);
+	BindIfSet(SpectatorFastAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorFastPressed);
+	BindIfSet(SpectatorFastAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleSpectatorFastReleased);
+	BindIfSet(ConfirmAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleConfirm);
+
+	// Cheats (gym / dev builds): fixed F-keys, not rebindable (the engine's F1-F5 view modes are cleared in
+	// DefaultInput.ini).
+	const FKey CheatKeys[] = { EKeys::F1, EKeys::F2, EKeys::F3, EKeys::F4, EKeys::F5, EKeys::F6, EKeys::F7, EKeys::F8 };
+	for (const FKey& Key : CheatKeys)
+	{
+		InputComponent->BindKey(Key, IE_Pressed, this, &AHitmenPlayerController::HandleCheatKey);
+	}
+}
+
+void AHitmenPlayerController::HandleCheatKey(FKey Key)
+{
+	const AHitmenGameState* GS = GetWorld()->GetGameState<AHitmenGameState>();
+	const FKey CheatKeys[] = { EKeys::F1, EKeys::F2, EKeys::F3, EKeys::F4, EKeys::F5, EKeys::F6, EKeys::F7, EKeys::F8 };
+	int32 Index = INDEX_NONE;
+	for (int32 It = 0; It < UE_ARRAY_COUNT(CheatKeys); ++It)
+	{
+		Index = CheatKeys[It] == Key ? It : Index;
+	}
+	if (!GS || !GS->AreDebugCommandsAllowed() || Index == INDEX_NONE || IsGameplayInputBlocked())
+	{
+		return;
+	}
+	UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::UIClick);
+	Server_DebugCheat(static_cast<EHitmenCheat>(Index));
+}
+
+bool AHitmenPlayerController::IsCheatFlying() const
+{
+	const AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
+	const ACharacter* Flyer = Cast<ACharacter>(GetPawn());
+	return PS && PS->HasCheat(EHitmenCheat::Fly) && Flyer && Flyer->GetCharacterMovement() && Flyer->GetCharacterMovement()->MovementMode == MOVE_Flying;
+}
+
+void AHitmenPlayerController::ApplyCheatsToPawn()
+{
+	ACharacter* Flyer = Cast<ACharacter>(GetPawn());
+	UCharacterMovementComponent* Movement = Flyer ? Flyer->GetCharacterMovement() : nullptr;
+	if (!Movement)
+	{
+		return;
+	}
+	const AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
+	const bool bFly = PS && PS->HasCheat(EHitmenCheat::Fly);
+	const bool bFlying = Movement->MovementMode == MOVE_Flying && !Flyer->GetActorEnableCollision();
+	if (bFly == bFlying)
+	{
+		return;
+	}
+	// Fly: through walls, in the look direction (the controller drives it); off: fall back to the ground.
+	Flyer->SetActorEnableCollision(!bFly);
+	Movement->MaxFlySpeed = CheatFlySpeed;
+	Movement->BrakingDecelerationFlying = CheatFlySpeed * 3.f;
+	Movement->SetMovementMode(bFly ? MOVE_Flying : MOVE_Falling);
+	bFlyUpHeld = false;
+	bFlyDownHeld = false;
+}
+
+// ---- Free fly (IMC_Spectator) ----
+
+void AHitmenPlayerController::HandleSpectatorUpPressed() { bSpectatorUpHeld = true; PushSpectatorVertical(); }
+void AHitmenPlayerController::HandleSpectatorUpReleased() { bSpectatorUpHeld = false; PushSpectatorVertical(); }
+void AHitmenPlayerController::HandleSpectatorDownPressed() { bSpectatorDownHeld = true; PushSpectatorVertical(); }
+void AHitmenPlayerController::HandleSpectatorDownReleased() { bSpectatorDownHeld = false; PushSpectatorVertical(); }
+
+void AHitmenPlayerController::PushSpectatorVertical()
+{
+	if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetPawnOrSpectator()))
+	{
+		Spectator->SetVerticalInput(IsGameplayInputBlocked() ? 0.f : (bSpectatorUpHeld ? 1.f : 0.f) - (bSpectatorDownHeld ? 1.f : 0.f));
+	}
+}
+
+void AHitmenPlayerController::HandleSpectatorFastPressed()
+{
+	if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetPawnOrSpectator()))
+	{
+		Spectator->SetFast(true);
+	}
+}
+
+void AHitmenPlayerController::HandleSpectatorFastReleased()
+{
+	if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetPawnOrSpectator()))
+	{
+		Spectator->SetFast(false);
+	}
+}
+
+void AHitmenPlayerController::HandleConfirm()
+{
+	if (IsMatchOver() && !IsGameplayInputBlocked())
+	{
+		RequestReturnToLobby();
+	}
+}
+
+bool AHitmenPlayerController::IsMatchOver() const
+{
+	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
+	return GS && GS->GetMatchPhase() == EHitmenMatchPhase::Ended;
+}
+
+void AHitmenPlayerController::RequestReturnToLobby()
+{
+	if (IsHost() && IsMatchOver())
+	{
+		UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::UIConfirm);
+		Server_ReturnToLobby();
+	}
+}
+
+void AHitmenPlayerController::Server_ReturnToLobby_Implementation()
+{
+	if (AHitmenMatchGameMode* GM = GetWorld()->GetAuthGameMode<AHitmenMatchGameMode>())
+	{
+		GM->RequestReturnToLobby(this);
+	}
 }
 
 void AHitmenPlayerController::SetPawn(APawn* InPawn)
@@ -192,11 +371,15 @@ void AHitmenPlayerController::SetPawn(APawn* InPawn)
 	}
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
 	{
+		// The previous pawn can no longer reach this UI to clear its prompt (entering a vehicle left
+		// "Use" on screen): a new pawn always starts without one.
+		UI->BroadcastPrompt(FText::GetEmpty(), false);
 		UI->BroadcastPawnChanged(InPawn);
 	}
-	// A new body restarts toggles.
+	// A new body restarts toggles; a flying cheat carries over to it.
 	bCrouchToggled = false;
 	bSprintToggled = false;
+	ApplyCheatsToPawn();
 }
 
 void AHitmenPlayerController::OnPossess(APawn* InPawn)
@@ -320,6 +503,11 @@ void AHitmenPlayerController::HandleHUDInventoryChanged()
 		}
 	}
 	View.Keycards = Inventory->GetKeycards();
+	if (const UHitmenBodyCarryComponent* Carry = HUDCarry.Get(); Carry && Carry->IsCarrying())
+	{
+		View.bCarryingBody = true;
+		View.bCarryingVIP = Carry->GetCarriedBody() && Carry->GetCarriedBody()->IsVIP();
+	}
 	UI->SetInventoryView(View);
 }
 
@@ -343,8 +531,9 @@ void AHitmenPlayerController::HandleHUDCarryChanged(AHitmenCharacterBase* Body)
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
 	{
 		const UHitmenBodyCarryComponent* Carry = HUDCarry.Get();
-		UI->SetCarryingVIP(Carry && Carry->IsCarrying());
+		UI->SetCarryingVIP(Carry && Carry->IsCarrying() && Carry->GetCarriedBody() && Carry->GetCarriedBody()->IsVIP());
 	}
+	HandleHUDInventoryChanged();
 }
 
 void AHitmenPlayerController::PublishEmotes(APawn* InPawn)
@@ -465,6 +654,18 @@ bool AHitmenPlayerController::IsGameplayInputBlocked() const
 
 void AHitmenPlayerController::HandleMove(const FInputActionValue& Value)
 {
+	if (IsCheatFlying())
+	{
+		// Fly cheat: forward follows the view pitch.
+		if (APawn* P = GetPawn(); P && !IsGameplayInputBlocked())
+		{
+			const FRotator View = GetControlRotation();
+			const FVector2D Axis = Value.Get<FVector2D>();
+			P->AddMovementInput(View.Vector(), Axis.Y);
+			P->AddMovementInput(FRotationMatrix(View).GetUnitAxis(EAxis::Y), Axis.X);
+		}
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver())
 	{
 		R->Input_Move(IsGameplayInputBlocked() ? FVector2D::ZeroVector : Value.Get<FVector2D>());
@@ -494,16 +695,31 @@ void AHitmenPlayerController::HandleLook(const FInputActionValue& Value)
 
 void AHitmenPlayerController::HandleJumpPressed()
 {
+	if (IsCheatFlying())
+	{
+		bFlyUpHeld = true;
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_JumpPressed(); }
 }
 
 void AHitmenPlayerController::HandleJumpReleased()
 {
+	if (IsCheatFlying())
+	{
+		bFlyUpHeld = false;
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver()) { R->Input_JumpReleased(); }
 }
 
 void AHitmenPlayerController::HandleCrouchPressed()
 {
+	if (IsCheatFlying())
+	{
+		bFlyDownHeld = true;
+		return;
+	}
 	IHitmenInputReceiver* R = GetReceiver();
 	if (!R || IsGameplayInputBlocked())
 	{
@@ -523,6 +739,11 @@ void AHitmenPlayerController::HandleCrouchPressed()
 
 void AHitmenPlayerController::HandleCrouchReleased()
 {
+	if (IsCheatFlying())
+	{
+		bFlyDownHeld = false;
+		return;
+	}
 	const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
 	if (Settings && Settings->bToggleCrouch)
 	{
@@ -538,6 +759,7 @@ void AHitmenPlayerController::HandleSprintPressed()
 	{
 		return;
 	}
+	SprintPressTime = GetWorld()->GetTimeSeconds();
 	const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
 	if (Settings && Settings->bToggleSprint)
 	{
@@ -557,7 +779,17 @@ void AHitmenPlayerController::HandleSprintReleased()
 	{
 		return;
 	}
-	if (IHitmenInputReceiver* R = GetReceiver()) { R->Input_SprintChanged(false); }
+	IHitmenInputReceiver* R = GetReceiver();
+	if (!R)
+	{
+		return;
+	}
+	R->Input_SprintChanged(false);
+	// A quick tap of Shift dashes (when the dash is equipped); holding it sprints.
+	if (GetWorld()->GetTimeSeconds() - SprintPressTime <= SprintTapTime && !IsGameplayInputBlocked())
+	{
+		R->Input_SprintTapped();
+	}
 }
 
 void AHitmenPlayerController::HandleFirePressed()
@@ -899,6 +1131,8 @@ void AHitmenPlayerController::Client_EnterSpectatorMode_Implementation(bool bWat
 {
 	bSpectating = true;
 	bIsWatcher = bWatcher;
+	bSpectatorUpHeld = false;
+	bSpectatorDownHeld = false;
 	RefreshMappingContexts();
 	SetSpectatorMode(bWatcher ? EHitmenSpectatorMode::FreeFly : EHitmenSpectatorMode::Follow);
 }
@@ -940,6 +1174,31 @@ void AHitmenPlayerController::Server_DebugGiveKeycard_Implementation(int32 Keyca
 	if (UHitmenInventoryComponent* Inventory = GetPawn()->FindComponentByClass<UHitmenInventoryComponent>())
 	{
 		Inventory->AddKeycard(KeycardId);
+	}
+}
+
+void AHitmenPlayerController::Server_DebugCheat_Implementation(EHitmenCheat Cheat)
+{
+	AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
+	AHitmenMatchGameMode* GM = GetWorld()->GetAuthGameMode<AHitmenMatchGameMode>();
+	if (!DebugAllowed(GetWorld()) || !PS)
+	{
+		return;
+	}
+	switch (Cheat)
+	{
+	case EHitmenCheat::RespawnEnemies:
+		if (GM) { GM->DebugRespawnNPCs(); }
+		break;
+	case EHitmenCheat::KillEnemies:
+		if (GM) { GM->DebugKillNPCs(this); }
+		break;
+	case EHitmenCheat::ResetGym:
+		if (GM) { GM->DebugResetMap(); }
+		break;
+	default:
+		PS->SetCheat(Cheat, !PS->HasCheat(Cheat));
+		break;
 	}
 }
 
@@ -1180,4 +1439,38 @@ void AHitmenPlayerController::ApplySpectatorView()
 		SetViewTargetWithBlend(GetPawnOrSpectator(), 0.25f);
 	}
 	OnSpectatorTargetChanged.Broadcast(SpectatorTarget.Get());
+}
+
+void AHitmenPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+	if (IsCheatFlying() && !IsGameplayInputBlocked())
+	{
+		GetPawn()->AddMovementInput(FVector::UpVector, (bFlyUpHeld ? 1.f : 0.f) - (bFlyDownHeld ? 1.f : 0.f));
+	}
+	PushVehicleView();
+}
+
+void AHitmenPlayerController::PushVehicleView()
+{
+	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
+	if (!UI)
+	{
+		return;
+	}
+	const AHitmenVehiclePawn* Vehicle = Cast<AHitmenVehiclePawn>(GetPawn());
+	if (!Vehicle && !bVehicleViewActive)
+	{
+		return;
+	}
+	FHitmenHUDVehicleView View;
+	if (Vehicle)
+	{
+		View.bActive = true;
+		View.Name = Vehicle->DisplayName;
+		View.Health = Vehicle->GetHealthNormalized();
+		View.Reload = Vehicle->GetReloadAlpha();
+	}
+	bVehicleViewActive = View.bActive;
+	UI->SetVehicleView(View);
 }

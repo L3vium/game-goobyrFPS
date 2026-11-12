@@ -1,6 +1,7 @@
 // Hitmen — status effects
 
 #include "StatusEffects/HitmenStatusEffectComponent.h"
+#include "Framework/HitmenPlayerState.h"
 #include "Components/HitmenHealthComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Materials/MaterialInterface.h"
@@ -294,7 +295,8 @@ bool UHitmenStatusEffectComponent::CanMove() const
 
 bool UHitmenStatusEffectComponent::IsHiddenFromSight() const
 {
-	return HasStatus(EHitmenStatusEffect::Invisible) || HasStatus(EHitmenStatusEffect::Hidden) || HasStatus(EHitmenStatusEffect::Concealed);
+	return HasStatus(EHitmenStatusEffect::Invisible) || HasStatus(EHitmenStatusEffect::Hidden) || HasStatus(EHitmenStatusEffect::Concealed)
+		|| AHitmenPlayerState::ActorHasCheat(GetOwner(), EHitmenCheat::InvisibleToAI);
 }
 
 float UHitmenStatusEffectComponent::GetSpeedMultiplier() const

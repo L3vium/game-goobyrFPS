@@ -118,6 +118,11 @@ public:
 	virtual EHitmenScanCategory GetScanCategory_Implementation(const AActor* Observer) const override;
 	virtual void SetScanHighlight_Implementation(bool bEnabled, int32 StencilValue) override;
 
+	virtual void Tick(float DeltaSeconds) override;
+
+	/** Bones that count as a headshot (weapons use this list too). */
+	const TArray<FName>& GetHeadBones() const { return HeadBones; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UHitmenHealthComponent> HealthComponent;
@@ -134,6 +139,27 @@ protected:
 	/** Every animation of this character (read by ABP_ through UHitmenAnimInstance). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Animation")
 	TObjectPtr<UHitmenAnimSet> AnimSet;
+
+	/** Traversal juice: a puff and a grab sound every ClimbStepDistance on ladders / gutters, sparks and a cable
+	 *  sound on ziplines (every machine). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
+	TObjectPtr<class UNiagaraSystem> ClimbFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
+	TObjectPtr<class UNiagaraSystem> ZiplineFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="10", Units="cm"))
+	float ClimbStepDistance = 55.f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<class UNiagaraComponent> ZiplineEffect;
+
+	UPROPERTY(Transient)
+	TObjectPtr<class UAudioComponent> ZiplineAudio;
+
+	float ClimbStepAccumulator = 0.f;
+	float LastTraversalZ = 0.f;
+	void UpdateTraversalJuice(float DeltaSeconds);
 
 	/** Bones that count as a headshot. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Damage")
@@ -223,7 +249,7 @@ protected:
 
 	/** Inventory throw event (every machine): throw montage. */
 	UFUNCTION()
-	void HandleWeaponThrown(UHitmenWeaponData* Weapon);
+	virtual void HandleWeaponThrown(UHitmenWeaponData* Weapon);
 
 	/** Server: death montage index from the last hit direction. */
 	int32 ChooseDeathMontageIndex() const;

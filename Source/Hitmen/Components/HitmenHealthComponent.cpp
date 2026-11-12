@@ -1,6 +1,7 @@
 // Hitmen — health
 
 #include "Components/HitmenHealthComponent.h"
+#include "Framework/HitmenPlayerState.h"
 #include "Net/UnrealNetwork.h"
 
 UHitmenHealthComponent::UHitmenHealthComponent()
@@ -30,7 +31,7 @@ void UHitmenHealthComponent::BeginPlay()
 
 float UHitmenHealthComponent::ApplyDamage(float Amount, AActor* Instigator, AActor* DamageCauser, bool bHeadshot)
 {
-	if (!GetOwner()->HasAuthority() || bIsDead || bGodMode || Amount <= 0.f)
+	if (!GetOwner()->HasAuthority() || bIsDead || bGodMode || Amount <= 0.f || AHitmenPlayerState::ActorHasCheat(GetOwner(), EHitmenCheat::Invulnerable))
 	{
 		return 0.f;
 	}
@@ -74,7 +75,7 @@ void UHitmenHealthComponent::AddArmor(float Amount)
 
 void UHitmenHealthComponent::Kill(AActor* Instigator, AActor* DamageCauser, bool bHeadshot)
 {
-	if (!GetOwner()->HasAuthority() || bIsDead)
+	if (!GetOwner()->HasAuthority() || bIsDead || AHitmenPlayerState::ActorHasCheat(GetOwner(), EHitmenCheat::Invulnerable))
 	{
 		return;
 	}

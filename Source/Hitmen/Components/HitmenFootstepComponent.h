@@ -52,7 +52,35 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Footstep")
 	void HandleFootstep(FName FootBone = NAME_None);
 
+	/** The owner times its own steps (first-person head bob): notifies and the distance fallback stay silent. */
+	void SetExternalStepTiming(bool bExternal) { bExternalStepTiming = bExternal; }
+
+	/** A step from the external timer (same sound, noise and VFX as a notify). */
+	void HandleTimedFootstep() { HandleFootstepInternal(NAME_None); }
+
 protected:
+	/** Step volume per gait (the AI noise radius is separate, in the match rules). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0"))
+	float WalkVolume = 0.55f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0"))
+	float SprintVolume = 0.9f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0"))
+	float CrouchVolume = 0.25f;
+
+	/** Your own steps are played in 2D, scaled by this. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0"))
+	float LocalPlayerVolume = 0.6f;
+
+	/** Random pitch around 1 (+-) so repeated steps do not sound identical. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0", ClampMax="0.5"))
+	float PitchJitter = 0.06f;
+
+	bool bExternalStepTiming = false;
+
+	void HandleFootstepInternal(FName FootBone);
+
 	/** Per surface type: sound, VFX and AI noise multiplier. Missing surfaces use DefaultFeedback. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep")
 	TMap<TEnumAsByte<EPhysicalSurface>, FHitmenSurfaceFeedback> SurfaceFeedback;

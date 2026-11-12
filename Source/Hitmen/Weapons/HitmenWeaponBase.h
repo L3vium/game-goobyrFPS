@@ -119,6 +119,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	FVector GetMuzzleLocation() const;
 
+	/** Minigun barrels: 0 at rest, 1 at full speed (drives the spin animation). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
+	float GetSpinAlpha() const;
+
+	/** Seconds between shots right now (the minigun ramps up while the trigger is held). */
+	float GetCurrentFireInterval() const;
+
 	// IHitmenInteractable (dropped weapons: pick up / swap)
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
@@ -314,6 +321,42 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnDropped(bool bDropped);
 
+	/** Muzzle flash light (every weapon; lit for a few hundredths of a second per shot). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UPointLightComponent> MuzzleLight;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="s"))
+	float MuzzleFlashTime = 0.05f;
+
+	float MuzzleLightUntil = 0.f;
+
+	/** Thrown weapons fly with physics and spin; one on the head stuns a pawn this long. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw", meta=(ClampMin="0", Units="deg"))
+	float ThrowSpinSpeed = 900.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw", meta=(ClampMin="0", Units="s"))
+	float ThrowStunDuration = 3.f;
+
+	/** Lob added to a throw: upward speed as a share of the throw speed. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw", meta=(ClampMin="0"))
+	float ThrowLift = 0.15f;
+
+	/** Puff where an empty weapon vanishes after its throw. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw")
+	TObjectPtr<class UNiagaraSystem> ThrownVanishFX;
+
+	/** An empty gun is gone after its throw (whatever it hits); a loaded one stays a pickup. */
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_ThrownVanish(FVector_NetQuantize Location);
+	void VanishAfterThrow();
+
+	/** Empty (and using ammo): thrown, it vanishes. */
+	bool IsEmptyThrow() const;
+
+	/** Silenced weapons: a bullet into a body is heard this far at most. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Noise", meta=(ClampMin="0", Units="cm"))
+	float SilencedFleshNoiseRadius = 150.f;
+
 	UPROPERTY(Transient)
 	TObjectPtr<APawn> LastThrower;
 
@@ -326,6 +369,9 @@ protected:
 	bool bStateApplied = false;
 	bool bTriggerHeld = false;
 	bool bSpunUp = false;
+	/** Minigun ramp: when the barrels started turning, and when the trigger was last released. */
+	float SpinStartTime = -100.f;
+	float SpinReleaseTime = -100.f;
 	bool bPickupActive = false;
 	bool bThrowDamageDone = false;
 	bool bConsumed = false;

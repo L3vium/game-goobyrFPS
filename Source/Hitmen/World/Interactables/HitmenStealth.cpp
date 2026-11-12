@@ -1,6 +1,9 @@
 // Hitmen — stealth fixtures
 
 #include "World/Interactables/HitmenStealth.h"
+#include "Characters/HitmenNPC.h"
+#include "NiagaraFunctionLibrary.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/AudioComponent.h"
 #include "Data/HitmenSoundSet.h"
@@ -75,12 +78,13 @@ void AHitmenLocker::OnConstruction(const FTransform& Transform)
 	HitmenGeometry::SetBox(PanelRight, FVector(0.f, HalfW - T * 0.5f, Height * 0.5f), FVector(Depth, T, Height));
 	HitmenGeometry::SetBox(PanelTop, FVector(0.f, 0.f, Height - T * 0.5f), FVector(Depth, Width, T));
 	HitmenGeometry::SetBox(PanelBottom, FVector(0.f, 0.f, T * 0.5f), FVector(Depth, Width, T));
-	// Door hinged on the front-left edge, split by the eye slit.
-	DoorHinge->SetRelativeLocation(FVector(HalfD - T * 0.5f, -HalfW, 0.f));
+	// Door hinged on a front edge (right by default), split by the eye slit.
+	const float Side = bDoorHingeOnRight ? 1.f : -1.f;
+	DoorHinge->SetRelativeLocation(FVector(HalfD - T * 0.5f, Side * HalfW, 0.f));
 	const float SlitBottom = SlitHeight - SlitGap * 0.5f;
 	const float SlitTop = SlitHeight + SlitGap * 0.5f;
-	HitmenGeometry::SetBox(DoorLower, FVector(0.f, HalfW, SlitBottom * 0.5f), FVector(T, Width, SlitBottom));
-	HitmenGeometry::SetBox(DoorUpper, FVector(0.f, HalfW, (SlitTop + Height) * 0.5f), FVector(T, Width, Height - SlitTop));
+	HitmenGeometry::SetBox(DoorLower, FVector(0.f, -Side * HalfW, SlitBottom * 0.5f), FVector(T, Width, SlitBottom));
+	HitmenGeometry::SetBox(DoorUpper, FVector(0.f, -Side * HalfW, (SlitTop + Height) * 0.5f), FVector(T, Width, Height - SlitTop));
 	for (UStaticMeshComponent* Panel : { PanelLeft.Get(), PanelRight.Get(), PanelTop.Get(), PanelBottom.Get(), DoorUpper.Get(), DoorLower.Get() })
 	{
 		HitmenGeometry::InheritLook(Panel, Mesh);
@@ -164,7 +168,7 @@ void AHitmenLocker::Tick(float DeltaSeconds)
 	const float Alpha = FMath::Clamp((GetWorld()->GetTimeSeconds() - DoorCycleStart) / DoorCycleTime, 0.f, 1.f);
 	// Opens, lets the occupant through, closes again (smooth).
 	const float Open = FMath::Sin(Alpha * PI);
-	DoorHinge->SetRelativeRotation(FRotator(0.f, -DoorOpenAngle * FMath::SmoothStep(0.f, 1.f, Open), 0.f));
+	DoorHinge->SetRelativeRotation(FRotator(0.f, (bDoorHingeOnRight ? 1.f : -1.f) * DoorOpenAngle * FMath::SmoothStep(0.f, 1.f, Open), 0.f));
 	UpdateStep();
 	if (Alpha >= 1.f && !SteppingCharacter.IsValid())
 	{
@@ -248,6 +252,8 @@ void AHitmenTallGrass::UpdateOccupants()
 
 AHitmenDistraction::AHitmenDistraction()
 {
+	// Fixtures are never vaulted, climbed or hung from.
+	Tags.AddUnique(HitmenTags::NoTraversal);
 	InteractionText = NSLOCTEXT("Hitmen", "Distract", "Turn on");
 	NoiseRadius = 1000.f;
 	PrimaryActorTick.bCanEverTick = true;
@@ -257,41 +263,72 @@ AHitmenDistraction::AHitmenDistraction()
 	PlayingLight->SetRelativeLocation(FVector(0.f, 0.f, 60.f));
 	PlayingLight->SetIntensity(0.f);
 	PlayingLight->SetAttenuationRadius(350.f);
-	PlayingLight->SetLightColor(FLinearColor(1.f, 0.55f, 0.15f));
 	PlayingLight->SetCastShadows(false);
+	PlayingLight->SetVolumetricScatteringIntensity(0.f);
+}
+
+void AHitmenDistraction::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AHitmenDistraction, bOn);
+}
+
+FText AHitmenDistraction::GetInteractionText_Implementation(AActor* Interactor) const
+{
+	return bOn ? NSLOCTEXT("Hitmen", "DistractOff", "Turn off") : InteractionText;
 }
 
 void AHitmenDistraction::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	const float Now = GetWorld()->GetTimeSeconds();
-	if (Now >= PlayingUntil)
+	if (!bOn)
 	{
 		PlayingLight->SetIntensity(0.f);
-		if (PlayingAudio)
-		{
-			PlayingAudio->FadeOut(0.4f, 0.f);
-			PlayingAudio = nullptr;
-		}
 		SetActorTickEnabled(false);
 		return;
 	}
 	// Pulses with the beat while it plays.
-	const float Beat = 0.5f + 0.5f * FMath::Sin(Now * PI * 4.f);
+	const float Beat = 0.5f + 0.5f * FMath::Sin(GetWorld()->GetTimeSeconds() * PI * 4.f);
 	PlayingLight->SetIntensity(PlayingLightIntensity * (0.35f + 0.65f * Beat));
 }
 
 void AHitmenDistraction::Pulse()
 {
-	const float Now = GetWorld()->GetTimeSeconds();
-	if (Now >= PlayingUntil)
+	if (!bOn)
 	{
 		GetWorldTimerManager().ClearTimer(PulseTimer);
 		return;
 	}
-	if (HasAuthority())
+	if (GetNetMode() != NM_DedicatedServer && PulseFX)
 	{
-		UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), NoiseRadius, this, EHitmenNoiseType::Distraction);
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, PulseFX, GetActorLocation() + FVector::UpVector * 40.f, FRotator::ZeroRotator, FVector(0.35f));
+	}
+	if (!HasAuthority())
+	{
+		return;
+	}
+	if (PlayTime > 0.f && GetWorld()->GetTimeSeconds() >= PlayingUntil)
+	{
+		SetOn(false, nullptr);
+		return;
+	}
+	// Heard only by guards in range (walls cut it, the nearest come); a guard who came to look switches it off.
+	UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), NoiseRadius, this, EHitmenNoiseType::Distraction);
+	for (TActorIterator<AHitmenNPC> It(GetWorld()); It; ++It)
+	{
+		AHitmenNPC* NPC = *It;
+		const UHitmenAlertComponent* Alert = NPC->GetAlert();
+		if (NPC->IsDead() || !Alert || FVector::Dist2D(NPC->GetActorLocation(), GetActorLocation()) > SwitchOffRadius)
+		{
+			continue;
+		}
+		const EHitmenAlertState State = Alert->GetAlertState();
+		if (State == EHitmenAlertState::Investigating || State == EHitmenAlertState::Searching)
+		{
+			NPC->PlayAnimSetMontage(EHitmenAnimMontage::SearchLookAround);
+			SetOn(false, NPC);
+			return;
+		}
 	}
 }
 
@@ -304,7 +341,7 @@ void AHitmenDistraction::RemoteActivate_Implementation(AActor* Activator)
 {
 	if (HasAuthority() && CanRemoteActivate_Implementation())
 	{
-		Trigger(Activator);
+		SetOn(!bOn, Activator);
 	}
 }
 
@@ -312,30 +349,49 @@ void AHitmenDistraction::OnInteracted(AActor* Interactor)
 {
 	if (CanRemoteActivate_Implementation())
 	{
-		Trigger(Interactor);
+		SetOn(!bOn, Interactor);
 	}
 }
 
-void AHitmenDistraction::Trigger(AActor* Activator)
+void AHitmenDistraction::SetOn(bool bNewOn, AActor* SwitchedBy)
 {
+	if (!HasAuthority() || bOn == bNewOn)
+	{
+		return;
+	}
 	LastTriggerTime = GetWorld()->GetTimeSeconds();
-	// The noise comes from the device, not from the player, again on every pulse while it plays.
-	Multicast_Triggered();
+	bOn = bNewOn;
+	OnRep_On();
 }
 
-void AHitmenDistraction::Multicast_Triggered_Implementation()
+void AHitmenDistraction::OnRep_On()
 {
-	// Every machine: plays for PlayTime with a pulsing light and a sound each PulseInterval.
-	PlayingUntil = GetWorld()->GetTimeSeconds() + PlayTime;
-	SetActorTickEnabled(true);
-	if (!PlayingAudio && GetNetMode() != NM_DedicatedServer)
+	// Every machine: on = the loop, a pulsing light and an effect on each pulse; off = silence.
+	PlayingLight->SetLightColor(LightColor);
+	if (bOn)
 	{
-		if (USoundBase* Loop = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::RadioLoop))
+		PlayingUntil = GetWorld()->GetTimeSeconds() + PlayTime;
+		SetActorTickEnabled(true);
+		if (!PlayingAudio && GetNetMode() != NM_DedicatedServer)
 		{
-			PlayingAudio = UGameplayStatics::SpawnSoundAttached(Loop, Root);
+			USoundBase* Loop = LoopSound ? LoopSound.Get() : UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::RadioLoop);
+			if (Loop)
+			{
+				PlayingAudio = UGameplayStatics::SpawnSoundAttached(Loop, Root, NAME_None, FVector::ZeroVector, EAttachLocation::KeepRelativeOffset, false, 1.f, 1.f, 0.f,
+					UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World));
+			}
+		}
+		Pulse();
+		GetWorldTimerManager().SetTimer(PulseTimer, this, &AHitmenDistraction::Pulse, PulseInterval, true);
+	}
+	else
+	{
+		GetWorldTimerManager().ClearTimer(PulseTimer);
+		if (PlayingAudio)
+		{
+			PlayingAudio->FadeOut(0.3f, 0.f);
+			PlayingAudio = nullptr;
 		}
 	}
-	Pulse();
-	GetWorldTimerManager().SetTimer(PulseTimer, this, &AHitmenDistraction::Pulse, PulseInterval, true);
 	Juice_OnTriggered();
 }

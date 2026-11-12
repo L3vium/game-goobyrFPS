@@ -406,9 +406,14 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		UBehaviorTreeGraphNode* Parallel = B.Add<UBehaviorTreeGraphNode_SimpleParallel>(UBTComposite_SimpleParallel::StaticClass(), Sel, 0, 360);
 		B.KeyIsSet(Parallel, HitmenBBKeys::TargetVisible, EBTFlowAbortMode::Both);
 		B.Task(UBTTask_HitmenShoot::StaticClass(), Parallel, -150, 560, 0);
-		UBehaviorTreeGraphNode* Flank = B.Add<UBehaviorTreeGraphNode_Composite>(UBTComposite_Sequence::StaticClass(), Parallel, 150, 560, 1);
-		B.Task(UBTTask_HitmenFindFlankPosition::StaticClass(), Flank, 0, 760);
-		B.MoveTo(Flank, HitmenBBKeys::MoveLocation, 100.f, 300, 760);
+		// Background: close in only when out of range / out of sight (the task fails when the guard can
+		// shoot from where it stands); otherwise wait a moment and check again. Never backs away.
+		UBehaviorTreeGraphNode* Reposition = B.Add<UBehaviorTreeGraphNode_Composite>(UBTComposite_Selector::StaticClass(), Parallel, 150, 560, 1);
+		UBehaviorTreeGraphNode* Flank = B.Composite(UBTComposite_Sequence::StaticClass(), Reposition, 50, 760);
+		B.Task(UBTTask_HitmenFindFlankPosition::StaticClass(), Flank, -50, 960);
+		B.MoveTo(Flank, HitmenBBKeys::MoveLocation, 100.f, 200, 960);
+		UBehaviorTreeGraphNode* HoldGround = B.Task(UBTTask_Wait::StaticClass(), Reposition, 350, 760);
+		SetFloat(HoldGround->NodeInstance, TEXT("WaitTime"), 0.3f);
 
 		UBehaviorTreeGraphNode* Chase = B.Composite(UBTComposite_Sequence::StaticClass(), Sel, 600, 360);
 		B.MoveToObserved(Chase, HitmenBBKeys::LastKnownLocation, 120.f, 450, 560);

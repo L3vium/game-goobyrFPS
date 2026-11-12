@@ -57,6 +57,16 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Player")
 	int32 GetKills() const { return Kills; }
 
+	/** Cheats this player switched on (F1-F8 in the gym / dev builds). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Debug")
+	bool HasCheat(EHitmenCheat Cheat) const { return (CheatFlags & (1u << static_cast<uint32>(Cheat))) != 0; }
+
+	/** Server. */
+	void SetCheat(EHitmenCheat Cheat, bool bEnabled);
+
+	/** True when the player owning this pawn, weapon, component or ability has the cheat on. */
+	static bool ActorHasCheat(const UObject* Context, EHitmenCheat Cheat);
+
 	/** Role of this player's team (solo players attack). */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Player")
 	EHitmenTeamRole GetTeamRole() const;
@@ -95,6 +105,13 @@ protected:
 
 	UPROPERTY(Replicated)
 	int32 Kills = 0;
+
+	UPROPERTY(ReplicatedUsing=OnRep_Cheats)
+	uint8 CheatFlags = 0;
+
+	/** The owning client applies the fly cheat to its own pawn (movement mode, collision). */
+	UFUNCTION()
+	void OnRep_Cheats();
 
 	UFUNCTION()
 	void OnRep_Info();

@@ -2,6 +2,7 @@
 
 #include "Core/HitmenUserSettings.h"
 #include "Engine/Engine.h"
+#include "Hitmen.h"
 
 UHitmenUserSettings* UHitmenUserSettings::GetHitmenUserSettings()
 {
@@ -29,6 +30,19 @@ void UHitmenUserSettings::SetToDefaults()
 	MusicVolume = 0.8f;
 	SFXVolume = 1.f;
 	VoiceVolume = 1.f;
+	UIVolume = 0.8f;
+	HeadBobScale = 1.f;
+}
+
+void UHitmenUserSettings::RunAutoDetect()
+{
+	// The benchmark measures CPU and GPU for a moment, then maps the scores to scalability levels.
+	RunHardwareBenchmark();
+	ApplyHardwareBenchmarkResults();
+	bAutoDetectDone = true;
+	UE_LOG(LogHitmen, Log, TEXT("Graphics auto-detect: overall level %d"), GetOverallScalabilityLevel());
+	ApplySettings(false);
+	OnHitmenSettingsChanged.Broadcast();
 }
 
 void UHitmenUserSettings::LoadSettings(bool bForceReload)

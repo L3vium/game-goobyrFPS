@@ -38,6 +38,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Match")
 	void EndMatch(const FHitmenMatchResult& Result);
 
+	/** The host (match over) sends everyone back to the lobby. */
+	void RequestReturnToLobby(APlayerController* Requester);
+
+	bool IsMatchOver() const { return bMatchOver; }
+
+	// ---- Debug (gym / dev builds) ----
+	/** Every NPC back as it was when the map started (class, place, behaviour, route, group...). */
+	void DebugRespawnNPCs();
+	void DebugKillNPCs(AController* Killer);
+	/** Reloads the map. */
+	void DebugResetMap();
+
 protected:
 	/** Gym and test maps can disable win conditions. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match")
@@ -55,6 +67,29 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match", meta=(ClampMin="0"))
 	float DeathSpectateDelay = 3.f;
 
+	/** Match over: seconds on the result before everyone becomes a free-fly spectator (no return timer: the host
+	 *  sends everyone back to the lobby). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match", meta=(ClampMin="0", Units="s"))
+	float EndSpectateDelay = 2.f;
+
+	void MoveEveryoneToSpectators();
+
+	/** NPCs as placed, recorded at start when debug commands are allowed (for DebugRespawnNPCs). */
+	struct FNPCSnapshot
+	{
+		TSubclassOf<class AHitmenNPC> Class;
+		FTransform Transform;
+		/** Instance-editable properties as text (behaviour, route, group, keycard...). */
+		TArray<TPair<FName, FString>> Properties;
+	};
+	TArray<FNPCSnapshot> NPCSnapshots;
+
+	/** Keeps the snapshot classes loaded. */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UClass>> NPCSnapshotClasses;
+
+	void SnapshotNPCs();
+
 	/** Match start: players drop from the sky under a parachute, without control, then play. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match|Intro")
 	bool bParachuteIntro = true;
@@ -65,7 +100,7 @@ protected:
 
 	/** Intro phase length (countdown on screen; landing gives control earlier). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match|Intro", meta=(ClampMin="0", Units="s", EditCondition="bParachuteIntro"))
-	float IntroDuration = 7.f;
+	float IntroDuration = 3.f;
 
 	FTimerHandle IntroTimer;
 	void HandleIntroEnd();

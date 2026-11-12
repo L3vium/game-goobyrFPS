@@ -1,6 +1,7 @@
 // Hitmen — ability component
 
 #include "Abilities/HitmenAbilityComponent.h"
+#include "Abilities/Manipulation/HitmenManipulationAbilities.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Abilities/HitmenAbility.h"
 #include "Data/HitmenAbilityData.h"
@@ -161,7 +162,9 @@ void UHitmenAbilityComponent::UpdateTargetHint()
 		{
 			Hint.Target = Target;
 			Hint.Action = Action;
-			Hint.Key = Slot == EHitmenAbilitySlot::Manipulation ? NSLOCTEXT("Hitmen", "KeyManipulation", "A") : NSLOCTEXT("Hitmen", "KeyMove", "E");
+			const UHitmenUIEventSubsystem* KeyUI = UHitmenUIEventSubsystem::GetFromPawn(Cast<APawn>(GetOwner()));
+			const EHitmenKeyLabel KeyLabel = Slot == EHitmenAbilitySlot::Manipulation ? EHitmenKeyLabel::Manipulation : EHitmenKeyLabel::MoveAbility;
+			Hint.Key = FText::FromString(KeyUI ? KeyUI->GetKeyLabel(KeyLabel) : FString(Slot == EHitmenAbilitySlot::Manipulation ? TEXT("A") : TEXT("E")));
 			break;
 		}
 	}
@@ -263,6 +266,10 @@ void UHitmenAbilityComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		}
 	}
 	UpdateAbilityVisuals();
+	if (bLocal)
+	{
+		UpdateMarkLinks();
+	}
 }
 
 UStaticMeshComponent* UHitmenAbilityComponent::MakeVisual(UStaticMesh* Mesh, UMaterialInterface* Material, const FLinearColor& Color)
@@ -376,6 +383,7 @@ void UHitmenAbilityComponent::Multicast_AbilityActivated_Implementation(UHitmenA
 {
 	if (Ability)
 	{
+		Ability->PlayActivatedFX(Location);
 		Ability->Juice_OnActivated(Location);
 	}
 }
@@ -416,4 +424,73 @@ void UHitmenAbilityComponent::ClearFailurePrompt()
 		return;
 	}
 	UI->BroadcastPrompt(FText::GetEmpty(), false);
+}
+
+void UHitmenAbilityComponent::UpdateMarkLinks()
+{
+	// Multi-kill marks (owner only): a red glow on each marked target and a red line from one to the next.
+	TArray<AActor*> Marked;
+	if (const UHitmenAbility_MultiKill* MultiKill = Cast<UHitmenAbility_MultiKill>(GetAbility(EHitmenAbilitySlot::Manipulation)))
+	{
+		for (AHitmenCharacterBase* Target : MultiKill->GetMarkedTargets())
+		{
+			if (Target && !Target->IsDead())
+			{
+				Marked.Add(Target);
+			}
+		}
+	}
+	if (!MarkHighlightMaterial && HintOverlayMaterial)
+	{
+		MarkHighlightMaterial = UMaterialInstanceDynamic::Create(HintOverlayMaterial, this);
+		MarkHighlightMaterial->SetVectorParameterValue(TEXT("Color"), MarkColor);
+	}
+	for (int32 Index = MarkHighlighted.Num() - 1; Index >= 0; --Index)
+	{
+		AActor* Actor = MarkHighlighted[Index].Get();
+		if (!Actor || !Marked.Contains(Actor))
+		{
+			UHitmenInteractionComponent::SetActorHighlight(Actor, MarkHighlightMaterial, false);
+			MarkHighlighted.RemoveAt(Index);
+		}
+	}
+	for (AActor* Actor : Marked)
+	{
+		if (!MarkHighlighted.Contains(Actor))
+		{
+			UHitmenInteractionComponent::SetActorHighlight(Actor, MarkHighlightMaterial, true);
+			MarkHighlighted.Add(Actor);
+		}
+	}
+	const int32 Links = FMath::Max(0, Marked.Num() - 1);
+	while (MarkLinks.Num() < Links)
+	{
+		UStaticMeshComponent* Link = MakeVisual(CableMesh, CableMaterial, MarkColor);
+		if (!Link)
+		{
+			break;
+		}
+		Link->SetOnlyOwnerSee(true);
+		MarkLinks.Add(Link);
+	}
+	for (int32 Index = 0; Index < MarkLinks.Num(); ++Index)
+	{
+		UStaticMeshComponent* Link = MarkLinks[Index];
+		if (!Link)
+		{
+			continue;
+		}
+		const bool bShown = Index < Links;
+		Link->SetVisibility(bShown);
+		if (!bShown)
+		{
+			continue;
+		}
+		const FVector A = Marked[Index]->GetActorLocation() + FVector::UpVector * 40.f;
+		const FVector B = Marked[Index + 1]->GetActorLocation() + FVector::UpVector * 40.f;
+		const FVector Dir = (B - A).GetSafeNormal();
+		const float Length = FVector::Dist(A, B);
+		Link->SetWorldLocationAndRotation((A + B) * 0.5f, FRotationMatrix::MakeFromZ(Dir).Rotator());
+		Link->SetWorldScale3D(FVector(MarkLinkThickness / 100.f, MarkLinkThickness / 100.f, Length / 100.f));
+	}
 }

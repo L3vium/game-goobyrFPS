@@ -23,6 +23,57 @@ class UHitmenAnimSet;
  * Data of a weapon type. Two pickups with the same data are the same type (ammo merges).
  * Every gameplay number lives here so designers balance without code.
  */
+/** How the weapon moves in first person (procedural, per weapon). Offsets are camera space: X forward, Y right, Z up. */
+USTRUCT(BlueprintType)
+struct FHitmenFPMotion
+{
+	GENERATED_BODY()
+
+	/** Added to the character's hip offset (machine guns sit lower). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP")
+	FVector HipOffset = FVector::ZeroVector;
+
+	/** Added to the character's aim offset (the gun comes toward the centre, still low). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP")
+	FVector AimOffset = FVector::ZeroVector;
+
+	/** Coming into hand: seconds, and where it starts (below the view, tipped). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0.01", Units="s"))
+	float EquipTime = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP")
+	FVector EquipFrom = FVector(-4.f, 6.f, -26.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP")
+	FRotator EquipFromRotation = FRotator(-40.f, 10.f, -25.f);
+
+	/** Kick per shot: back (cm), up (deg), random sideways (deg); stiffness of the spring that brings it back. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="cm"))
+	float KickBack = 2.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
+	float KickUp = 3.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
+	float KickSide = 0.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="1"))
+	float KickStiffness = 220.f;
+
+	/** Scoped weapons: raise to the centre (s), then wobble before the zoom (deg, s); breathing sway while zoomed (deg). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="s"))
+	float ScopeRaiseTime = 0.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
+	float ScopeWobble = 2.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="s"))
+	float ScopeWobbleTime = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
+	float ScopeSway = 0.12f;
+};
+
 UCLASS(BlueprintType)
 class HITMEN_API UHitmenWeaponData : public UPrimaryDataAsset
 {
@@ -84,9 +135,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing", meta=(EditCondition="FireMode==EHitmenFireMode::Burst", ClampMin="1"))
 	int32 BurstCount = 3;
 
-	/** Seconds of spin-up before the first shot (minigun). */
+	/** Minigun: seconds to ramp from SpinUpStartRPM to RoundsPerMinute. It fires from the first press. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing", meta=(ClampMin="0"))
 	float SpinUpTime = 0.f;
+
+	/** Minigun: shots per minute at the start of the spin-up. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing", meta=(EditCondition="SpinUpTime>0", ClampMin="1"))
+	float SpinUpStartRPM = 450.f;
+
+	/** Minigun: releasing the trigger for less than this keeps the barrels spinning (no new ramp). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing", meta=(EditCondition="SpinUpTime>0", ClampMin="0"))
+	float SpinDownGrace = 0.4f;
 
 	/** Bow: hold to charge, release to fire. Damage/speed scale with charge. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Firing")
@@ -203,6 +262,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
 	FTransform FirstPersonAttachOffset;
 
+	/** Procedural first-person motion: hip / aim offsets, equip, kick, scope sequence. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
+	FHitmenFPMotion FPMotion;
+
 	/** Looping arms pose while this weapon is in hand (first person). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
 	TSoftObjectPtr<UAnimSequenceBase> FirstPersonPose;
@@ -238,6 +301,31 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<USoundBase> FireSound;
+
+	/** Fire sound pitch (random between X and Y) and volume: one recording gives every gun its own voice. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	FVector2D FireSoundPitch = FVector2D(0.97f, 1.03f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0"))
+	float FireSoundVolume = 1.f;
+
+	/** Share of shots drawn as a tracer (1 = every shot / pellet). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", ClampMax="1"))
+	float TracerChance = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	FLinearColor TracerColor = FLinearColor(1.f, 0.75f, 0.35f);
+
+	/** Muzzle flash light (candelas, 0 = none) and glow sphere radius (cm, 0 = none), like the mounted gun. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0"))
+	float MuzzleLightIntensity = 4000.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="cm"))
+	float MuzzleGlowRadius = 9.f;
+
+	/** Uniform scale of MuzzleFX (the toon effects are sized for big stylised characters). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0.01"))
+	float MuzzleFXScale = 0.25f;
 
 	/** Played by the owner when firing with no ammo left, just before the weapon is thrown. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")

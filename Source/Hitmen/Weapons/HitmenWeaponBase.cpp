@@ -1,6 +1,7 @@
 // Hitmen — weapon base
 
 #include "Weapons/HitmenWeaponBase.h"
+#include "Data/HitmenSoundSet.h"
 #include "Characters/HitmenNPC.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Data/HitmenWeaponData.h"
@@ -11,6 +12,12 @@
 #include "Interaction/HitmenScanRegistry.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Hitmen.h"
+#include "StatusEffects/HitmenStatusEffectComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Weapons/HitmenCosmeticActors.h"
+#include "Core/HitmenGameSettings.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -72,6 +79,14 @@ AHitmenWeaponBase::AHitmenWeaponBase()
 	AutoPickupSphere->SetGenerateOverlapEvents(true);
 	AutoPickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AutoPickupSphere->SetCanEverAffectNavigation(false);
+	// Muzzle flash light: off until a shot (no shadows, short).
+	MuzzleLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("MuzzleLight"));
+	MuzzleLight->SetupAttachment(Root);
+	MuzzleLight->SetCastShadows(false);
+	MuzzleLight->SetIntensityUnits(ELightUnits::Candelas);
+	MuzzleLight->SetAttenuationRadius(300.f);
+	MuzzleLight->SetLightColor(FLinearColor(1.f, 0.6f, 0.3f));
+	MuzzleLight->SetVisibility(false);
 }
 
 void AHitmenWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -354,25 +369,17 @@ void AHitmenWeaponBase::Drop(int32 InAmmo, const FVector& Location, const FRotat
 	ApplyWeaponState();
 
 	FVector PlaceAt = Location;
-	if (Thrower)
+	if (Thrower && !Velocity.IsNearlyZero())
 	{
-		// Thrown: no physics phase either. It lands as a floating pickup a little ahead of the thrower (in front of
-		// any wall), on the ground below.
-		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenThrowPlace), false, this);
-		Params.AddIgnoredActor(Thrower);
-		const FVector Dir = Velocity.GetSafeNormal2D().IsNearlyZero() ? Thrower->GetActorForwardVector() : Velocity.GetSafeNormal2D();
-		FVector Ahead = Location + Dir * ThrowPlaceDistance;
-		FHitResult Hit;
-		if (GetWorld()->LineTraceSingleByChannel(Hit, Location, Ahead, ECC_Visibility, Params))
-		{
-			Ahead = Hit.ImpactPoint - Dir * 40.f;
-		}
-		FHitResult Ground;
-		if (GetWorld()->LineTraceSingleByChannel(Ground, Ahead, Ahead - FVector(0.f, 0.f, 2000.f), ECC_Visibility, Params))
-		{
-			Ahead = Ground.ImpactPoint;
-		}
-		PlaceAt = Ahead;
+		// Thrown: it really flies, spinning (physics, replicated). Its first hit can stun a pawn (HandleDropHit);
+		// an empty gun then vanishes, a loaded one settles and floats as a pickup (UpdateDropped).
+		SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+		DropCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+		DropCollision->SetPhysicsLinearVelocity(Velocity + FVector::UpVector * Velocity.Size() * ThrowLift);
+		DropCollision->SetPhysicsAngularVelocityInDegrees(Rotation.RotateVector(FVector::RightVector) * ThrowSpinSpeed);
+		GetWorldTimerManager().ClearTimer(PickupActivationTimer);
+		GetWorldTimerManager().SetTimer(PickupActivationTimer, this, &AHitmenWeaponBase::ActivatePickup, FMath::Max(0.05f, ThrownPickupDelay), false);
+		return;
 	}
 	SetActorLocationAndRotation(PlaceAt, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
 	// Swapped, dropped or thrown: it becomes a floating pickup at once, no tumbling.
@@ -536,12 +543,54 @@ void AHitmenWeaponBase::HandleDropHit(UPrimitiveComponent* HitComponent, AActor*
 	{
 		return;
 	}
-	// First impact of a throw: hurt a hostile pawn once, then become a plain pickup.
+	// First impact of a throw: hurt a hostile pawn once (stun it on a head hit), then become a plain pickup
+	// - or vanish when the gun was empty.
 	bThrowDamageDone = true;
 	DropCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	if (!HasAuthority())
+	{
+		return;
+	}
 	if (WeaponData && LastThrower && Cast<APawn>(OtherActor) && UHitmenTeamLibrary::AreHostile(LastThrower, OtherActor))
 	{
 		UGameplayStatics::ApplyPointDamage(OtherActor, WeaponData->ThrowDamage, DropCollision->GetPhysicsLinearVelocity().GetSafeNormal(), Hit, LastThrower->GetController(), this, UDamageType::StaticClass());
+		if (AHitmenCharacterBase* Victim = Cast<AHitmenCharacterBase>(OtherActor); Victim && !Victim->IsDead())
+		{
+			const float HeadZ = Victim->GetActorLocation().Z + Victim->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.55f;
+			if (Hit.ImpactPoint.Z >= HeadZ)
+			{
+				Victim->GetStatusEffects()->ApplyStatus(EHitmenStatusEffect::Stunned, ThrowStunDuration, 1.f, LastThrower);
+			}
+		}
+	}
+	if (IsEmptyThrow())
+	{
+		VanishAfterThrow();
+	}
+}
+
+bool AHitmenWeaponBase::IsEmptyThrow() const
+{
+	return WeaponData && WeaponData->bUsesAmmo && DroppedAmmo <= 0;
+}
+
+void AHitmenWeaponBase::VanishAfterThrow()
+{
+	if (!HasAuthority() || bConsumed)
+	{
+		return;
+	}
+	bConsumed = true;
+	Multicast_ThrownVanish(GetActorLocation());
+	SetLifeSpan(0.05f);
+}
+
+void AHitmenWeaponBase::Multicast_ThrownVanish_Implementation(FVector_NetQuantize Location)
+{
+	SetActorHiddenInGame(true);
+	if (ThrownVanishFX && GetNetMode() != NM_DedicatedServer)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ThrownVanishFX, Location, FRotator::ZeroRotator, FVector(0.6f));
 	}
 }
 
@@ -763,6 +812,37 @@ void AHitmenWeaponBase::SetFirstPersonVisuals(bool bFirstPerson)
 	SkeletalMesh->MarkRenderStateDirty();
 }
 
+float AHitmenWeaponBase::GetSpinAlpha() const
+{
+	if (!WeaponData || WeaponData->SpinUpTime <= 0.f)
+	{
+		return 0.f;
+	}
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	if (bSpunUp)
+	{
+		return FMath::Clamp((Now - SpinStartTime) / WeaponData->SpinUpTime, 0.f, 1.f);
+	}
+	// Released: the barrels coast down over the grace time.
+	const float AtRelease = FMath::Clamp((SpinReleaseTime - SpinStartTime) / WeaponData->SpinUpTime, 0.f, 1.f);
+	const float Coast = WeaponData->SpinDownGrace > 0.f ? 1.f - (Now - SpinReleaseTime) / WeaponData->SpinDownGrace : 0.f;
+	return FMath::Clamp(AtRelease * Coast, 0.f, 1.f);
+}
+
+float AHitmenWeaponBase::GetCurrentFireInterval() const
+{
+	if (!WeaponData)
+	{
+		return 1.f;
+	}
+	if (WeaponData->SpinUpTime <= 0.f)
+	{
+		return WeaponData->GetFireInterval();
+	}
+	const float StartInterval = 60.f / FMath::Max(1.f, WeaponData->SpinUpStartRPM);
+	return FMath::Lerp(StartInterval, WeaponData->GetFireInterval(), GetSpinAlpha());
+}
+
 bool AHitmenWeaponBase::CanFireNow() const
 {
 	if (!WeaponData || !IsEquipped() || !OwnerPawn)
@@ -795,16 +875,12 @@ void AHitmenWeaponBase::StartFire()
 
 	if (WeaponData->SpinUpTime > 0.f && !bSpunUp)
 	{
+		// Minigun: fires at once and ramps up. A short release keeps the barrels turning (no new ramp).
+		const float Now = GetWorld()->GetTimeSeconds();
+		const float Kept = Now - SpinReleaseTime <= WeaponData->SpinDownGrace ? GetSpinAlpha() : 0.f;
+		SpinStartTime = Now - Kept * WeaponData->SpinUpTime;
+		bSpunUp = true;
 		Juice_OnSpinUp(true);
-		GetWorldTimerManager().SetTimer(SpinUpTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
-		{
-			bSpunUp = true;
-			if (bTriggerHeld)
-			{
-				HandleAutoFire();
-			}
-		}), WeaponData->SpinUpTime, false);
-		return;
 	}
 
 	BurstRemaining = WeaponData->FireMode == EHitmenFireMode::Burst ? WeaponData->BurstCount : 0;
@@ -824,9 +900,12 @@ void AHitmenWeaponBase::StopFire()
 	{
 		GetWorldTimerManager().ClearTimer(FireTimer);
 	}
-	if (bSpunUp || GetWorldTimerManager().IsTimerActive(SpinUpTimer))
+	if (bSpunUp)
 	{
-		GetWorldTimerManager().ClearTimer(SpinUpTimer);
+		// Remember how fast the barrels were turning when the trigger came up (SpinDownGrace).
+		const float Alpha = GetSpinAlpha();
+		SpinReleaseTime = GetWorld()->GetTimeSeconds();
+		SpinStartTime = SpinReleaseTime - Alpha * (WeaponData ? WeaponData->SpinUpTime : 0.f);
 		bSpunUp = false;
 		Juice_OnSpinUp(false);
 	}
@@ -838,7 +917,7 @@ void AHitmenWeaponBase::HandleAutoFire()
 	{
 		return;
 	}
-	const float Interval = WeaponData->GetFireInterval();
+	const float Interval = GetCurrentFireInterval();
 	const float Wait = FMath::Max(0.f, LastFireTime + Interval - GetWorld()->GetTimeSeconds());
 	if (Wait > 0.f)
 	{
@@ -873,7 +952,7 @@ void AHitmenWeaponBase::FireOnce()
 	{
 		if (USoundBase* DrySound = WeaponData->DryFireSound.LoadSynchronous())
 		{
-			UGameplayStatics::PlaySoundAtLocation(this, DrySound, GetMuzzleLocation());
+			UHitmenSoundLibrary::PlaySoundInSpace(this, DrySound, GetMuzzleLocation(), EHitmenSoundSpace::World);
 		}
 		Juice_OnDryFire();
 		if (UHitmenInventoryComponent* Inventory = OwnerPawn->FindComponentByClass<UHitmenInventoryComponent>())
@@ -898,10 +977,11 @@ void AHitmenWeaponBase::FireOnce()
 	SimulateImpacts(Origin, SpreadDirection, Seed, Impacts);
 	PlayFireEffects(GetMuzzleLocation(), Impacts, true);
 
-	// The view kicks up, then comes back down smoothly (spring on the player character).
+	// The view kicks up, then comes back down smoothly (spring on the player character); the arms kick too.
 	if (AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(OwnerPawn))
 	{
 		Player->AddRecoil(WeaponData->RecoilPitch, FMath::FRandRange(-WeaponData->RecoilYawRandom, WeaponData->RecoilYawRandom));
+		Player->OnFirstPersonFired(WeaponData);
 	}
 	if (APlayerController* PC = Cast<APlayerController>(OwnerPawn->GetController()); PC && WeaponData->FireCameraShake)
 	{
@@ -992,7 +1072,18 @@ void AHitmenWeaponBase::ReportShotNoise(const FVector& Origin, const TArray<FVec
 	// Where the bullet lands is what draws NPCs (they investigate the impact, not the shooter).
 	if (WeaponData->ImpactNoiseRadius > 0.f && Impacts.Num() > 0)
 	{
-		UHitmenAISubsystem::ReportNoise(this, Impacts[0], WeaponData->ImpactNoiseRadius, OwnerPawn, EHitmenNoiseType::Gunshot);
+		float Radius = WeaponData->ImpactNoiseRadius;
+		// A silenced bullet into a body is almost silent: only someone right there hears it.
+		if (WeaponData->bSilenced)
+		{
+			FCollisionQueryParams FleshParams(SCENE_QUERY_STAT(HitmenSilencedFlesh), false, this);
+			FleshParams.AddIgnoredActor(OwnerPawn);
+			if (GetWorld()->OverlapAnyTestByChannel(Impacts[0], FQuat::Identity, ECC_Pawn, FCollisionShape::MakeSphere(25.f), FleshParams))
+			{
+				Radius = FMath::Min(Radius, SilencedFleshNoiseRadius);
+			}
+		}
+		UHitmenAISubsystem::ReportNoise(this, Impacts[0], Radius, OwnerPawn, EHitmenNoiseType::Gunshot);
 	}
 }
 
@@ -1017,9 +1108,68 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	{
 		return;
 	}
+	// The local player's gun is drawn closer to the eye (first-person scale): its flash, glow and tracers start
+	// where the gun is drawn, not where it really is.
+	const bool bFirstPersonGun = StaticMesh->FirstPersonPrimitiveType == EFirstPersonPrimitiveType::FirstPerson
+		|| SkeletalMesh->FirstPersonPrimitiveType == EFirstPersonPrimitiveType::FirstPerson;
+	FVector DrawnMuzzle = Origin;
+	float DrawnScale = 1.f;
+	if (bFirstPersonGun)
+	{
+		const AHitmenPlayerCharacter* Shooter = Cast<AHitmenPlayerCharacter>(OwnerPawn);
+		const APlayerController* ShooterPC = Shooter ? Cast<APlayerController>(Shooter->GetController()) : nullptr;
+		if (Shooter && ShooterPC && ShooterPC->PlayerCameraManager)
+		{
+			const FVector Eye = ShooterPC->PlayerCameraManager->GetCameraLocation();
+			DrawnScale = Shooter->GetFirstPersonViewScale();
+			DrawnMuzzle = Eye + (Origin - Eye) * DrawnScale;
+		}
+	}
 	if (UNiagaraSystem* Muzzle = WeaponData->MuzzleFX.LoadSynchronous())
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Muzzle, Origin, GetActorRotation());
+		// Attached at the muzzle so it follows the gun (and is drawn with it in first person), facing out of the
+		// barrel (the guns lie along their own axis: the muzzle direction from the weapon origin).
+		const FVector LocalMuzzle = GetActorTransform().InverseTransformPosition(Origin);
+		const FRotator Facing = FVector(LocalMuzzle.X, LocalMuzzle.Y, 0.f).GetSafeNormal().Rotation();
+		if (UNiagaraComponent* Flash = UNiagaraFunctionLibrary::SpawnSystemAttached(Muzzle, Root, NAME_None, LocalMuzzle,
+			Facing, EAttachLocation::KeepRelativeOffset, true))
+		{
+			Flash->FirstPersonPrimitiveType = bFirstPersonGun ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::None;
+			Flash->SetWorldScale3D(FVector(WeaponData->MuzzleFXScale));
+		}
+	}
+	// A short burst of light and a hot glow at the muzzle, like the mounted gun.
+	if (WeaponData->MuzzleLightIntensity > 0.f)
+	{
+		MuzzleLight->SetWorldLocation(Origin);
+		MuzzleLight->SetIntensity(WeaponData->MuzzleLightIntensity);
+		MuzzleLight->SetVisibility(true);
+		MuzzleLightUntil = GetWorld()->GetTimeSeconds() + MuzzleFlashTime;
+		FTimerHandle LightOff;
+		GetWorldTimerManager().SetTimer(LightOff, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			if (GetWorld()->GetTimeSeconds() >= MuzzleLightUntil - 0.005f)
+			{
+				MuzzleLight->SetVisibility(false);
+			}
+		}), MuzzleFlashTime, false);
+	}
+	const UHitmenGameSettings* VisualSettings = UHitmenGameSettings::Get();
+	if (WeaponData->MuzzleGlowRadius > 0.f)
+	{
+		AHitmenFlashBurst::SpawnBurst(GetWorld(), DrawnMuzzle, VisualSettings->FlashMaterial.LoadSynchronous(), FLinearColor(1.f, 0.55f, 0.2f),
+			WeaponData->MuzzleGlowRadius * 0.5f * DrawnScale, WeaponData->MuzzleGlowRadius * 1.4f * DrawnScale, 0.06f, 0.f, 0.f);
+	}
+	if (WeaponData->TracerChance > 0.f)
+	{
+		UMaterialInterface* TracerMaterial = VisualSettings->TracerMaterial.LoadSynchronous();
+		for (const FVector& Impact : Impacts)
+		{
+			if (FMath::FRand() < WeaponData->TracerChance)
+			{
+				AHitmenTracer::SpawnTracer(GetWorld(), DrawnMuzzle, Impact, TracerMaterial, WeaponData->TracerColor);
+			}
+		}
 	}
 	if (UNiagaraSystem* BackBlast = WeaponData->BackBlastFX.LoadSynchronous())
 	{
@@ -1027,7 +1177,8 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	}
 	if (USoundBase* Sound = WeaponData->FireSound.LoadSynchronous())
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, Sound, Origin);
+		UHitmenSoundLibrary::PlaySoundInSpace(this, Sound, Origin, EHitmenSoundSpace::Gunshot, WeaponData->FireSoundVolume,
+			FMath::FRandRange(WeaponData->FireSoundPitch.X, WeaponData->FireSoundPitch.Y));
 	}
 	// Same cosmetic path as the FX: predicted on the shooter, multicast to everyone else.
 	// NPCs hold their weapon's aim pose between shots: the fire montages are additive and, in the same slot, they
@@ -1078,7 +1229,7 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 		}
 		if (ImpactSound)
 		{
-			UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, Impact);
+			UHitmenSoundLibrary::PlaySoundInSpace(this, ImpactSound, Impact, EHitmenSoundSpace::Impact, 1.f, FMath::FRandRange(0.92f, 1.08f));
 		}
 		Juice_OnImpact(Impact);
 	}

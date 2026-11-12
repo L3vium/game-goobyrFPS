@@ -20,7 +20,8 @@ Everything (docs, comments, commits) is in English.
   main always gets its own merge commit (never fast-forward).
 
 ## Build
-Engine: `C:\Program Files\Epic Games\UE_5.7`.
+Engine: the launcher install of UE_5.7 (now `D:\EpicGames Library\UE_5.7`); the tools read it from
+`C:\ProgramData\Epic\UnrealEngineLauncher\LauncherInstalled.dat` (`UE_ROOT` overrides).
 - **Compile C++ only through `Tools/Editor/ue_rebuild.ps1`** (`Tools/Editor/Rebuild.bat` for a
   double-click). Never close the editor or run `Build.bat` by hand: the script guarantees the
   editor ends up open again.

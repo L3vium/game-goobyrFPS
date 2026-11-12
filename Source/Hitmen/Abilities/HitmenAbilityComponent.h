@@ -111,6 +111,22 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> AimMarkerComponent;
 
+	/** Multi-kill: red links between the marked targets and a red glow on them (owner only). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")
+	FLinearColor MarkColor = FLinearColor(1.f, 0.05f, 0.05f);
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals", meta=(ClampMin="0.1", Units="cm"))
+	float MarkLinkThickness = 4.f;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UStaticMeshComponent>> MarkLinks;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> MarkHighlightMaterial;
+
+	TArray<TWeakObjectPtr<AActor>> MarkHighlighted;
+	void UpdateMarkLinks();
+
 	/** Cable (every machine) and aim marker (local player), each frame. */
 	void UpdateAbilityVisuals();
 	UStaticMeshComponent* MakeVisual(UStaticMesh* Mesh, UMaterialInterface* Material, const FLinearColor& Color);

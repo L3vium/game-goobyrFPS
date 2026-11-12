@@ -31,6 +31,10 @@ protected:
 	bool ComputeDestination(const FVector& AimOrigin, const FVector& AimDirection, FVector& OutDestination) const;
 
 	bool bAiming = false;
+
+public:
+	/** Holding E shows where you will land (the ability component draws the marker). */
+	virtual bool GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const override;
 };
 
 /** Passive: one extra jump in the air. */
@@ -46,6 +50,10 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|DoubleJump", meta=(ClampMin="2"))
 	int32 JumpCount = 2;
+
+	/** The jumps after the first go this much higher. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|DoubleJump", meta=(ClampMin="0.5"))
+	float ExtraJumpMultiplier = 1.35f;
 };
 
 /**
@@ -98,6 +106,24 @@ protected:
 
 	UPROPERTY(Replicated)
 	float Fuel = 3.f;
+
+	/** Smoke under the feet while thrusting (seen by everyone). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack")
+	TObjectPtr<class UNiagaraSystem> ThrustFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack", meta=(ClampMin="0.01"))
+	float ThrustFXScale = 0.35f;
+
+	/** Thrusting right now (server, replicated: drives the smoke on every machine). */
+	UPROPERTY(ReplicatedUsing=OnRep_Thrusting)
+	bool bThrusting = false;
+
+	UFUNCTION()
+	void OnRep_Thrusting();
+	void SetThrustEffect(bool bOn);
+
+	UPROPERTY(Transient)
+	TObjectPtr<class UNiagaraComponent> ThrustEffect;
 
 	/** Server: thrust state last tick, to fire Juice_OnEnded when the fuel runs out. */
 	bool bWasThrusting = false;
@@ -169,7 +195,7 @@ protected:
 	float PullTime = 0.f;
 };
 
-/** Swap positions with the aimed character (NPC or player). */
+/** Swap positions with the aimed character (NPC or player), alive or dead (a body is moved where you stood). */
 UCLASS(Blueprintable)
 class HITMEN_API UHitmenAbility_Transposition : public UHitmenMoveAbility
 {

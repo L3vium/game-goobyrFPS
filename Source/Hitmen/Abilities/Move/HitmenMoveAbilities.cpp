@@ -10,6 +10,8 @@
 #include "Components/CapsuleComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
 
 // ---------------------------------------------------------------------------------------------
 // Blink
@@ -49,6 +51,20 @@ bool UHitmenAbility_Blink::ComputeDestination(const FVector& AimOrigin, const FV
 		return false;
 	}
 	OutDestination = Adjusted;
+	return true;
+}
+
+bool UHitmenAbility_Blink::GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const
+{
+	// Only while E is held: the exact landing spot, on the ground under the capsule.
+	FVector Destination;
+	if (!bAiming || !ComputeDestination(Origin, Direction, Destination))
+	{
+		return false;
+	}
+	const AHitmenCharacterBase* Character = GetOwnerCharacter();
+	const float HalfHeight = Character ? Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.f;
+	OutPoint = Destination - FVector::UpVector * HalfHeight;
 	return true;
 }
 
@@ -102,6 +118,10 @@ void UHitmenAbility_DoubleJump::OnEquipped()
 	if (AHitmenCharacterBase* Character = GetOwnerCharacter())
 	{
 		Character->JumpMaxCount = JumpCount;
+		if (UHitmenCharacterMovementComponent* Movement = Character->GetHitmenMovement())
+		{
+			Movement->ExtraJumpMultiplier = ExtraJumpMultiplier;
+		}
 	}
 }
 
@@ -110,6 +130,10 @@ void UHitmenAbility_DoubleJump::OnUnequipped()
 	if (AHitmenCharacterBase* Character = GetOwnerCharacter())
 	{
 		Character->JumpMaxCount = 1;
+		if (UHitmenCharacterMovementComponent* Movement = Character->GetHitmenMovement())
+		{
+			Movement->ExtraJumpMultiplier = 1.f;
+		}
 	}
 }
 
@@ -126,6 +150,7 @@ void UHitmenAbility_Jetpack::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UHitmenAbility_Jetpack, Fuel);
+	DOREPLIFETIME(UHitmenAbility_Jetpack, bThrusting);
 }
 
 UHitmenCharacterMovementComponent* UHitmenAbility_Jetpack::GetMovement() const
@@ -191,12 +216,18 @@ void UHitmenAbility_Jetpack::TickAbility(float DeltaTime)
 		return;
 	}
 	Fuel = Movement->GetJetpackFuel();
-	const bool bThrusting = Movement->IsJetpackThrusting();
-	if (bWasThrusting && !bThrusting && Movement->WantsJetpackThrust() && Fuel <= 0.f)
+	const bool bNowThrusting = Movement->IsJetpackThrusting();
+	if (bWasThrusting && !bNowThrusting && Movement->WantsJetpackThrust() && Fuel <= 0.f)
 	{
 		Juice_OnEnded(); // Ran dry while held.
 	}
-	bWasThrusting = bThrusting;
+	bWasThrusting = bNowThrusting;
+	// Replicated to everyone for the smoke; the listen-server host shows it for remote players itself.
+	bThrusting = bNowThrusting;
+	if (const APawn* Pawn = GetOwnerPawn(); Pawn && !Pawn->IsLocallyControlled())
+	{
+		SetThrustEffect(bNowThrusting);
+	}
 }
 
 void UHitmenAbility_Jetpack::LocalTick(float DeltaTime)
@@ -205,6 +236,8 @@ void UHitmenAbility_Jetpack::LocalTick(float DeltaTime)
 	if (UHitmenCharacterMovementComponent* Movement = GetMovement())
 	{
 		Movement->ReconcileJetpackFuel(Fuel, FuelReconcileTolerance);
+		// Your own smoke follows your prediction (no wait for the server).
+		SetThrustEffect(Movement->IsJetpackThrusting());
 	}
 }
 
@@ -225,7 +258,7 @@ float UHitmenAbility_Jetpack::GetFuelNormalized() const
 
 UHitmenAbility_Dash::UHitmenAbility_Dash()
 {
-	Cooldown = 3.f;
+	Cooldown = 1.5f;
 }
 
 FVector UHitmenAbility_Dash::GetDashVelocity() const
@@ -330,6 +363,14 @@ void UHitmenAbility_Hook::Pull(float DeltaTime)
 	const FVector ToPoint = HookPoint - Character->GetActorLocation();
 	if (ToPoint.Size() < StopDistance || PullTime > MaxPullTime || Character->IsDead())
 	{
+		// At the anchor: climb the ledge there (or hang from it) instead of dropping off the wall.
+		if (!Character->IsDead() && ToPoint.Size() < StopDistance * 1.5f)
+		{
+			if (UHitmenCharacterMovementComponent* Movement = Character->GetHitmenMovement(); Movement && Movement->IsFalling())
+			{
+				Movement->TryAutoMantle(ToPoint.GetSafeNormal2D().IsNearlyZero() ? Character->GetActorForwardVector() : ToPoint.GetSafeNormal2D());
+			}
+		}
 		if (Character->HasAuthority())
 		{
 			bHooked = false;
@@ -346,7 +387,7 @@ void UHitmenAbility_Hook::Pull(float DeltaTime)
 
 AActor* UHitmenAbility_Transposition::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
 {
-	if (AHitmenCharacterBase* Target = AimCharacter(Origin, Direction))
+	if (AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, true))
 	{
 		OutAction = NSLOCTEXT("Hitmen", "HintTransposition", "Swap places");
 		return Target;
@@ -357,12 +398,27 @@ AActor* UHitmenAbility_Transposition::FindHintTarget(const FVector& Origin, cons
 bool UHitmenAbility_Transposition::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
 	AHitmenCharacterBase* Self = GetOwnerCharacter();
-	AHitmenCharacterBase* Target = AimCharacter(AimOrigin, AimDirection);
+	AHitmenCharacterBase* Target = AimCharacterInCone(AimOrigin, AimDirection, true);
 	if (!Self || !Target)
 	{
 		return false;
 	}
 	const FVector SelfLocation = Self->GetActorLocation();
+	if (Target->IsDead())
+	{
+		// A body: you take its place, the ragdoll is moved where you stood.
+		USkeletalMeshComponent* BodyMesh = Target->GetMesh();
+		const FVector BodyLocation = BodyMesh ? BodyMesh->GetBoneLocation(TEXT("pelvis")) : Target->GetActorLocation();
+		const FVector Offset = SelfLocation - BodyLocation;
+		Self->TeleportTo(BodyLocation + FVector::UpVector * Self->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), Self->GetActorRotation());
+		Target->SetActorLocation(Target->GetActorLocation() + Offset, false, nullptr, ETeleportType::TeleportPhysics);
+		if (BodyMesh && BodyMesh->IsSimulatingPhysics())
+		{
+			BodyMesh->SetWorldLocation(BodyMesh->GetComponentLocation() + Offset, false, nullptr, ETeleportType::TeleportPhysics);
+		}
+		PlayActivatedJuice(BodyLocation);
+		return true;
+	}
 	const FVector TargetLocation = Target->GetActorLocation();
 	// Move the target out of the way first so the swap never overlaps.
 	Target->SetActorLocation(TargetLocation + FVector::UpVector * 2000.f, false, nullptr, ETeleportType::TeleportPhysics);
@@ -460,4 +516,36 @@ bool UHitmenAbility_C4::Activate(const FVector& AimOrigin, const FVector& AimDir
 	PlacedCharge = Charge;
 	PlayActivatedJuice(AimOrigin);
 	return true;
+}
+
+void UHitmenAbility_Jetpack::OnRep_Thrusting()
+{
+	// The owner shows its own (predicted) smoke; everyone else follows the server.
+	const APawn* Pawn = GetOwnerPawn();
+	if (!Pawn || !Pawn->IsLocallyControlled())
+	{
+		SetThrustEffect(bThrusting);
+	}
+}
+
+void UHitmenAbility_Jetpack::SetThrustEffect(bool bOn)
+{
+	AHitmenCharacterBase* Character = GetOwnerCharacter();
+	if (!Character || !GetWorld() || GetWorld()->GetNetMode() == NM_DedicatedServer || !ThrustFX)
+	{
+		return;
+	}
+	if (bOn && !ThrustEffect)
+	{
+		// Under the feet, blowing down.
+		const float HalfHeight = Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		ThrustEffect = UNiagaraFunctionLibrary::SpawnSystemAttached(ThrustFX, Character->GetRootComponent(), NAME_None, FVector(0.f, 0.f, -HalfHeight + 10.f),
+			FRotator(180.f, 0.f, 0.f), FVector(ThrustFXScale), EAttachLocation::KeepRelativeOffset, false, ENCPoolMethod::None);
+	}
+	else if (!bOn && ThrustEffect)
+	{
+		ThrustEffect->Deactivate();
+		ThrustEffect->SetAutoDestroy(true);
+		ThrustEffect = nullptr;
+	}
 }

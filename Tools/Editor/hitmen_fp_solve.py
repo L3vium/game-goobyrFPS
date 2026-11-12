@@ -9,7 +9,7 @@ solve() applies it live and returns {weapon: (pitch, yaw, roll)}; save(results) 
 """
 import unreal
 
-WEAPONS = ("Pistol", "SMG", "AssaultRifle", "BurstRifle", "Shotgun", "Minigun", "Sniper", "Bow",
+WEAPONS = ("Pistol", "SMG", "AssaultRifle", "Shotgun", "Minigun", "Sniper", "Bow",
            "RocketLauncher", "GrenadeLauncher", "BlackHole", "Sword")
 SOCKET = "HandGrip_R"
 

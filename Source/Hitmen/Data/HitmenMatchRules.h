@@ -103,10 +103,10 @@ public:
 
 	// ---- Noise ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", Units="cm"))
-	float SprintFootstepRadius = 450.f;
+	float SprintFootstepRadius = 900.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", Units="cm"))
-	float WalkFootstepRadius = 150.f;
+	float WalkFootstepRadius = 400.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", Units="cm"))
 	float CrouchFootstepRadius = 0.f;

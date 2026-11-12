@@ -3,6 +3,7 @@
 #include "Movement/HitmenCharacterMovementComponent.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Core/HitmenInterfaces.h"
+#include "Hitmen.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
@@ -21,6 +22,8 @@ UHitmenCharacterMovementComponent::UHitmenCharacterMovementComponent()
 	JumpZVelocity = 450.f;
 	AirControl = 0.35f;
 	BrakingDecelerationFalling = 1200.f;
+	// Letting go of the keys stops you crisply (no ice-skating after a sprint).
+	BrakingDecelerationWalking = 2600.f;
 	GravityScale = 1.4f;
 	// Steps and ledges up to 55 cm are walked up without pressing anything.
 	MaxStepHeight = 55.f;
@@ -89,7 +92,8 @@ float UHitmenCharacterMovementComponent::GetMaxSpeed() const
 	case MOVE_Custom:
 		switch (static_cast<EHitmenCustomMovement>(CustomMovementMode))
 		{
-		case EHitmenCustomMovement::Slide: return SprintSpeed + SprintSlideImpulse;
+		case EHitmenCustomMovement::Slide: return FMath::Max(SlideEntrySpeed, SprintSpeed);
+		case EHitmenCustomMovement::Hang: return HangShimmyFastSpeed;
 		case EHitmenCustomMovement::Climb:
 			if (const IHitmenClimbable* Climbable = Cast<IHitmenClimbable>(ClimbTarget.Get()))
 			{
@@ -119,7 +123,7 @@ bool UHitmenCharacterMovementComponent::IsMovingOnGround() const
 
 bool UHitmenCharacterMovementComponent::CanAttemptJump() const
 {
-	if (IsClimbing() || IsMantling())
+	if (IsClimbing() || IsMantling() || IsHanging())
 	{
 		return false;
 	}
@@ -136,8 +140,13 @@ bool UHitmenCharacterMovementComponent::CanAttemptJump() const
 
 void UHitmenCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
-	// Slide starts on the crouch press while moving (before Super crouches us).
-	if (bWantsToCrouch && !IsCrouching() && CanStartSlide())
+	// Slide starts on the crouch press while moving (before Super crouches us). After a slide, Ctrl must be
+	// released before the next one: holding it never chains slides.
+	if (!bWantsToCrouch)
+	{
+		bSlideNeedsCrouchRelease = false;
+	}
+	if (bWantsToCrouch && !IsCrouching() && !bSlideNeedsCrouchRelease && !IsHanging() && CanStartSlide())
 	{
 		StartSlide();
 	}
@@ -158,7 +167,24 @@ void UHitmenCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float
 	// Space keeps counting for a short moment (a jump started just before the ledge / ladder).
 	const bool bJumpBuffered = bJumpHeld || Now - LastJumpPressTime <= JumpInputBuffer;
 
-	if (IsClimbing())
+	if (IsHanging())
+	{
+		// Space climbs (into the window above, or onto the ledge); Ctrl lets go.
+		if (bWantsToCrouch)
+		{
+			StopHang(true);
+		}
+		else if (bJumpPressedNow)
+		{
+			FHitmenMantlePlan Plan;
+			if (PlanHangClimb(Plan))
+			{
+				StartMantlePlan(Plan);
+			}
+			LastJumpPressTime = -100.f;
+		}
+	}
+	else if (IsClimbing())
 	{
 		// A press right before or after the grab is part of getting on, not a jump off.
 		const bool bInGrace = Now - ClimbStartTime < LadderJumpGraceTime;
@@ -175,6 +201,11 @@ void UHitmenCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float
 		if (bJumpBuffered && bCanTryMantle && Now - LastMantleTime > MantleCooldown)
 		{
 			if (TryStartMantle())
+			{
+				LastJumpPressTime = -100.f;
+			}
+			// No ledge to climb in the air: a thin ledge at hand height (under a window) is hung from.
+			else if (IsFalling() && Now - LastHangReleaseTime > HangRegrabCooldown && TryStartHang())
 			{
 				LastJumpPressTime = -100.f;
 			}
@@ -294,6 +325,7 @@ void UHitmenCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iterat
 	case EHitmenCustomMovement::Slide:  PhysSlide(DeltaTime, Iterations); break;
 	case EHitmenCustomMovement::Climb:  PhysClimb(DeltaTime, Iterations); break;
 	case EHitmenCustomMovement::Mantle: PhysMantle(DeltaTime, Iterations); break;
+	case EHitmenCustomMovement::Hang:   PhysHang(DeltaTime, Iterations); break;
 	default: Super::PhysCustom(DeltaTime, Iterations); break;
 	}
 }
@@ -315,12 +347,15 @@ void UHitmenCharacterMovementComponent::StartSlide()
 	const float Impulse = IsSprinting() ? SprintSlideImpulse : SlideImpulse;
 	Velocity += Velocity.GetSafeNormal2D() * Impulse;
 	SlideStartTime = GetTimeSeconds();
+	SlideElapsed = 0.f;
+	SlideEntrySpeed = Velocity.Size2D();
 	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Slide));
 }
 
 void UHitmenCharacterMovementComponent::EndSlide()
 {
 	LastSlideEndTime = GetTimeSeconds();
+	bSlideNeedsCrouchRelease = bWantsToCrouch;
 	SetMovementMode(MOVE_Walking);
 }
 
@@ -338,7 +373,8 @@ void UHitmenCharacterMovementComponent::PhysSlide(float DeltaTime, int32 Iterati
 	{
 		return;
 	}
-	if (!bWantsToCrouch || GetTimeSeconds() - SlideStartTime > SlideMaxDuration)
+	SlideElapsed += DeltaTime;
+	if (!bWantsToCrouch || SlideElapsed > SlideMaxDuration)
 	{
 		EndSlide();
 		StartNewPhysics(DeltaTime, Iterations);
@@ -355,16 +391,25 @@ void UHitmenCharacterMovementComponent::PhysSlide(float DeltaTime, int32 Iterati
 		return;
 	}
 
-	// Gravity pulls along the slope, so slides accelerate downhill.
+	// Gravity pulls along the slope, so slides speed up downhill (never past the entry speed).
 	const FVector FloorNormal = Floor.HitResult.ImpactNormal;
 	Velocity += FVector::VectorPlaneProject(FVector(0.f, 0.f, GetGravityZ()), FloorNormal) * DeltaTime;
 
-	// Only lateral steering while sliding.
-	const FVector Right = UpdatedComponent->GetRightVector();
-	Acceleration = Acceleration.ProjectOnTo(Right) * 0.5f;
+	// Left / right only bend the slide (never push it), at SlideSteerRate.
+	const FVector Flat = Velocity.GetSafeNormal2D();
+	const FVector Input = Acceleration.GetSafeNormal2D();
+	if (!Flat.IsNearlyZero() && !Input.IsNearlyZero())
+	{
+		const float Turn = FMath::Clamp(FVector::CrossProduct(Flat, Input).Z, -1.f, 1.f);
+		Velocity = Velocity.RotateAngleAxis(Turn * SlideSteerRate * DeltaTime, FVector::UpVector);
+	}
+	Acceleration = FVector::ZeroVector;
 
-	CalcVelocity(DeltaTime, SlideFriction, false, SlideBrakingDeceleration);
-	Velocity = FVector::VectorPlaneProject(Velocity, FloorNormal);
+	// Always brakes, whatever keys are held: friction (proportional) + a constant deceleration.
+	const float Speed = Velocity.Size();
+	const float Loss = (SlideFriction * Speed + SlideBrakingDeceleration) * DeltaTime;
+	Velocity = Speed > Loss ? Velocity * ((Speed - Loss) / Speed) : FVector::ZeroVector;
+	Velocity = FVector::VectorPlaneProject(Velocity, FloorNormal).GetClampedToMaxSize(FMath::Max(SlideEntrySpeed, SlideExitSpeed));
 
 	Iterations++;
 	bJustTeleported = false;
@@ -404,10 +449,12 @@ bool UHitmenCharacterMovementComponent::TryStartMantle()
 	{
 		return false;
 	}
-	// Needs forward intent: jumping in place next to a wall is a normal jump.
+	// Needs forward intent: jumping in place next to a wall is a normal jump. In the air any intent toward
+	// the wall counts (a jump at the corner of a ledge, sideways input).
 	const FVector Facing = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
 	const FVector Input = Acceleration.GetSafeNormal2D();
-	if (Input.IsNearlyZero() || FVector::DotProduct(Input, Facing) < 0.3f)
+	const float MinDot = IsFalling() ? 0.f : 0.3f;
+	if (Input.IsNearlyZero() || FVector::DotProduct(Input, Facing) < MinDot)
 	{
 		return false;
 	}
@@ -448,21 +495,33 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenMantle), false, CharacterOwner);
 	const ECollisionChannel Channel = UpdatedComponent->GetCollisionObjectType();
 
-	// 1. A wall in front, from knee height to the highest grabbable ledge.
+	// 1. A wall in front, from knee height (in the air: from below the feet) to the highest grabbable
+	//    ledge; centre first, then a little left and right so a ledge corner is caught too.
+	const bool bInAir = IsFalling();
+	const float MinLedgeHeight = bInAir ? AirMantleMinHeight : MantleMinHeight;
 	FHitResult WallHit;
 	bool bFoundWall = false;
 	const float ProbeDistance = Radius + MantleReach;
-	for (float Height = 30.f; Height <= MantleMaxHeight; Height += 30.f)
+	const FVector Side = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
+	const float SideOffsets[] = { 0.f, -MantleSideProbeOffset, MantleSideProbeOffset };
+	for (const float Offset : SideOffsets)
 	{
-		const FVector Start = Feet + FVector::UpVector * Height;
-		if (World->LineTraceSingleByChannel(WallHit, Start, Start + Forward * ProbeDistance, ECC_Visibility, Params)
-			&& FMath::Abs(WallHit.ImpactNormal.Z) < 0.3f)
+		for (float Height = bInAir ? MinLedgeHeight - 30.f : 30.f; Height <= MantleMaxHeight && !bFoundWall; Height += 30.f)
 		{
-			bFoundWall = true;
+			const FVector Start = Feet + FVector::UpVector * Height + Side * Offset;
+			if (World->LineTraceSingleByChannel(WallHit, Start, Start + Forward * ProbeDistance, ECC_Visibility, Params)
+				&& FMath::Abs(WallHit.ImpactNormal.Z) < 0.3f)
+			{
+				bFoundWall = true;
+			}
+		}
+		if (bFoundWall)
+		{
 			break;
 		}
 	}
-	if (!bFoundWall)
+	// Fixtures (barrels, hack panels, turrets, cameras, mounted guns...) are never climbed.
+	if (!bFoundWall || (WallHit.GetActor() && WallHit.GetActor()->ActorHasTag(HitmenTags::NoTraversal)))
 	{
 		return false;
 	}
@@ -475,7 +534,7 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 	for (const float Depth : MantleProbeDepths)
 	{
 		const FVector ProbeXY = WallHit.ImpactPoint + Into * Depth;
-		const float EndZ = Feet.Z + MantleMinHeight * 0.5f;
+		const float EndZ = bInAir ? Feet.Z + MinLedgeHeight - 20.f : Feet.Z + MantleMinHeight * 0.5f;
 		float StartZ = Feet.Z + MantleMaxHeight + 25.f;
 		// Start in open air: a probe column through a wall with an opening (window) starts inside the
 		// lintel; step down until out of solid geometry, then sweep down onto the sill.
@@ -494,13 +553,13 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 			break;
 		}
 	}
-	if (!bFoundTop)
+	if (!bFoundTop || (TopHit.GetActor() && TopHit.GetActor()->ActorHasTag(HitmenTags::NoTraversal)))
 	{
 		return false;
 	}
 
 	const float LedgeHeight = TopHit.ImpactPoint.Z - Feet.Z;
-	if (LedgeHeight < MantleMinHeight || LedgeHeight > MantleMaxHeight)
+	if (LedgeHeight < MinLedgeHeight || LedgeHeight > MantleMaxHeight)
 	{
 		return false;
 	}
@@ -589,6 +648,41 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 		OutPlan.Duration = ClimbOverDuration * HeightAlpha;
 		return true;
 	}
+	// Out of an upper-floor window (a sill over a drop): over the sill and hang from the ledge under it.
+	if (!bInAir && LedgeHeight <= VaultMaxHeight && TopDepth < MinStandDepth)
+	{
+		const FVector OuterProbe = FVector(WallHit.ImpactPoint.X, WallHit.ImpactPoint.Y, TopHit.ImpactPoint.Z) + Into * (TopDepth + 6.f);
+		// The way over the sill must be open (closed shutters block bodies, not sight).
+		const FVector OverStart = TopHit.ImpactPoint + FVector::UpVector * 15.f;
+		const FVector OverEnd = OuterProbe + Into * 40.f + FVector::UpVector * 15.f;
+		const FCollisionShape OverShape = FCollisionShape::MakeSphere(10.f);
+		const bool bOpen = !World->SweepTestByChannel(OverStart, OverEnd, FQuat::Identity, ECC_Visibility, OverShape, Params)
+			&& !World->SweepTestByChannel(OverStart, OverEnd, FQuat::Identity, Channel, OverShape, Params);
+		FVector Face, Normal;
+		float LedgeZ = 0.f;
+		float Edge = 0.f;
+		// The outer wall face below the sill (seen from outside: its normal points away from us, along Into).
+		if (bOpen && FindHangWall(OuterProbe + Into * 80.f, -Into, TopHit.ImpactPoint.Z - 10.f, Face, Normal)
+			&& FindHangLedge(Face, Normal, TopHit.ImpactPoint.Z - 15.f, LedgeZ, Edge)
+			&& LedgeZ < TopHit.ImpactPoint.Z - 4.f)
+		{
+			const FVector HangAt = GetHangLocation(Face, Normal, LedgeZ, Edge);
+			if (!World->OverlapBlockingTestByChannel(HangAt, FQuat::Identity, Channel, StandShape, Params))
+			{
+				OutPlan.Action = EHitmenTraversalAction::Hang;
+				OutPlan.ControlA = FVector(Location.X, Location.Y, OverTop.Z) + Into * 10.f;
+				OutPlan.ControlB = OverTop + Into * (TopDepth + 30.f);
+				OutPlan.Target = HangAt;
+				OutPlan.Duration = HangClimbDuration;
+				OutPlan.bEndsInHang = true;
+				OutPlan.HangFace = Face;
+				OutPlan.HangNormal = Normal;
+				OutPlan.HangLedgeZ = LedgeZ;
+				OutPlan.HangEdgeDistance = Edge;
+				return true;
+			}
+		}
+	}
 	return false;
 }
 
@@ -597,6 +691,11 @@ void UHitmenCharacterMovementComponent::StartMantlePlan(const FHitmenMantlePlan&
 	MantleAction = Plan.Action;
 	bMantleIsVault = Plan.Action == EHitmenTraversalAction::Vault;
 	bMantleFromClimb = false;
+	bMantleEndsInHang = Plan.bEndsInHang;
+	MantleHangFace = Plan.HangFace;
+	MantleHangNormal = Plan.HangNormal;
+	MantleHangLedgeZ = Plan.HangLedgeZ;
+	MantleHangEdge = Plan.HangEdgeDistance;
 	MantleStart = Plan.Start;
 	MantleControlA = Plan.ControlA;
 	MantleControlB = Plan.ControlB;
@@ -658,6 +757,14 @@ void UHitmenCharacterMovementComponent::PhysMantle(float DeltaTime, int32 Iterat
 
 void UHitmenCharacterMovementComponent::FinishMantle()
 {
+	if (bMantleEndsInHang)
+	{
+		bMantleEndsInHang = false;
+		MantleAction = EHitmenTraversalAction::None;
+		LastMantleTime = GetTimeSeconds();
+		StartHang(MantleHangFace, MantleHangNormal, MantleHangLedgeZ, MantleHangEdge);
+		return;
+	}
 	const FVector Forward = CharacterOwner ? CharacterOwner->GetActorForwardVector().GetSafeNormal2D() : FVector::ForwardVector;
 	const bool bKeepMomentum = MantleAction == EHitmenTraversalAction::Vault || MantleAction == EHitmenTraversalAction::ClimbOver;
 	Velocity = Forward * (bKeepMomentum ? WalkSpeed * 0.8f : WalkSpeed * 0.25f);
@@ -901,6 +1008,267 @@ void UHitmenCharacterMovementComponent::PhysClimb(float DeltaTime, int32 Iterati
 // Prediction
 // ---------------------------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------------------------
+// Jumps, hook mantle
+// ---------------------------------------------------------------------------------------------
+
+bool UHitmenCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)
+{
+	// Extra jumps (double jump) go higher than the first one.
+	const bool bExtraJump = CharacterOwner && CharacterOwner->JumpCurrentCount > 0 && IsFalling();
+	const float SavedJumpZ = JumpZVelocity;
+	if (bExtraJump)
+	{
+		JumpZVelocity *= ExtraJumpMultiplier;
+	}
+	const bool bJumped = Super::DoJump(bReplayingMoves, DeltaTime);
+	JumpZVelocity = SavedJumpZ;
+	return bJumped;
+}
+
+bool UHitmenCharacterMovementComponent::TryAutoMantle(const FVector& Forward)
+{
+	if (!CharacterOwner || !UpdatedComponent || IsMantling() || IsClimbing() || IsHanging())
+	{
+		return false;
+	}
+	FHitmenMantlePlan Plan;
+	if (PlanMantle(Forward.GetSafeNormal2D(), Plan))
+	{
+		StartMantlePlan(Plan);
+		return true;
+	}
+	return TryStartHang();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Hang (thin ledges under windows): shimmy, climb into the window, drop
+// ---------------------------------------------------------------------------------------------
+
+bool UHitmenCharacterMovementComponent::FindHangWall(const FVector& Location, const FVector& TowardWall, float LedgeZ, FVector& OutFace, FVector& OutNormal) const
+{
+	// Under the ledge (below a 15 cm band), straight at the wall.
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenHangWall), false, CharacterOwner);
+	const FVector Start(Location.X, Location.Y, LedgeZ - 45.f);
+	FHitResult Hit;
+	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, Start + TowardWall.GetSafeNormal2D() * 160.f, ECC_Visibility, Params)
+		|| FMath::Abs(Hit.ImpactNormal.Z) > 0.3f || (Hit.GetActor() && Hit.GetActor()->ActorHasTag(HitmenTags::NoTraversal)))
+	{
+		return false;
+	}
+	OutFace = Hit.ImpactPoint;
+	OutNormal = Hit.ImpactNormal.GetSafeNormal2D();
+	return true;
+}
+
+bool UHitmenCharacterMovementComponent::FindHangLedge(const FVector& WallFace, const FVector& WallNormal, float NearZ, float& OutLedgeZ, float& OutEdgeDistance) const
+{
+	// Walk out from the wall face: the ledge is a walkable top near NearZ that sticks out a little.
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenHangLedge), false, CharacterOwner);
+	const FCollisionShape Probe = FCollisionShape::MakeSphere(3.f);
+	float Found = 0.f;
+	float LedgeZ = 0.f;
+	int32 Hits = 0;
+	for (float Distance = 3.f; Distance <= 55.f; Distance += 4.f)
+	{
+		const FVector XY = WallFace + WallNormal * Distance;
+		FHitResult Top;
+		const bool bHit = GetWorld()->SweepSingleByChannel(Top, FVector(XY.X, XY.Y, NearZ + 30.f), FVector(XY.X, XY.Y, NearZ - 30.f), FQuat::Identity, ECC_Visibility, Probe, Params)
+			&& !Top.bStartPenetrating && IsWalkable(Top) && (Hits == 0 || FMath::Abs(Top.ImpactPoint.Z - LedgeZ) < 12.f);
+		if (!bHit)
+		{
+			break;
+		}
+		LedgeZ = Hits == 0 ? Top.ImpactPoint.Z : LedgeZ;
+		Found = Distance;
+		++Hits;
+	}
+	// A ledge you hang from sticks out at least a few centimetres, and is thinner than a block you stand on.
+	if (Hits < 2 || Found > 50.f)
+	{
+		return false;
+	}
+	OutLedgeZ = LedgeZ;
+	OutEdgeDistance = Found;
+	return true;
+}
+
+FVector UHitmenCharacterMovementComponent::GetHangLocation(const FVector& WallFace, const FVector& WallNormal, float LedgeZ, float EdgeDistance) const
+{
+	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
+	const float Radius = Capsule->GetScaledCapsuleRadius();
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	const FVector XY = WallFace + WallNormal * (EdgeDistance + Radius + 2.f);
+	return FVector(XY.X, XY.Y, LedgeZ - HangHeadBelowLedge - HalfHeight);
+}
+
+bool UHitmenCharacterMovementComponent::TryStartHang()
+{
+	if (!CharacterOwner || !UpdatedComponent)
+	{
+		return false;
+	}
+	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	const FVector Location = UpdatedComponent->GetComponentLocation();
+	FVector Forward = Acceleration.GetSafeNormal2D();
+	if (Forward.IsNearlyZero())
+	{
+		Forward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
+	}
+	// The hands reach the top of the capsule and a little above.
+	const float HandsZ = Location.Z + HalfHeight;
+	FVector Face, Normal;
+	for (const float Probe : { HandsZ - 10.f, HandsZ + 15.f, HandsZ + 40.f })
+	{
+		if (!FindHangWall(Location, Forward, Probe, Face, Normal) || FVector::DotProduct(Normal, Forward) > -0.3f)
+		{
+			continue;
+		}
+		float LedgeZ = 0.f;
+		float Edge = 0.f;
+		if (!FindHangLedge(Face, Normal, Probe, LedgeZ, Edge) || LedgeZ < HandsZ - 30.f || LedgeZ > HandsZ + 55.f)
+		{
+			continue;
+		}
+		// Not a ledge over open ground you could just stand under: something must drop away below it.
+		const FVector HangAt = GetHangLocation(Face, Normal, LedgeZ, Edge);
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenHangFit), false, CharacterOwner);
+		const FCollisionShape Shape = FCollisionShape::MakeCapsule(Capsule->GetScaledCapsuleRadius() * 0.95f, HalfHeight * 0.95f);
+		if (GetWorld()->OverlapBlockingTestByChannel(HangAt, FQuat::Identity, UpdatedComponent->GetCollisionObjectType(), Shape, Params))
+		{
+			continue;
+		}
+		StartHang(Face, Normal, LedgeZ, Edge);
+		return true;
+	}
+	return false;
+}
+
+void UHitmenCharacterMovementComponent::StartHang(const FVector& WallFace, const FVector& WallNormal, float LedgeZ, float EdgeDistance)
+{
+	HangNormal = WallNormal;
+	HangLedgeZ = LedgeZ;
+	HangEdgeDistance = EdgeDistance;
+	Velocity = FVector::ZeroVector;
+	UpdatedComponent->SetWorldLocation(GetHangLocation(WallFace, WallNormal, LedgeZ, EdgeDistance), false, nullptr, ETeleportType::None);
+	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Hang));
+	OnTraversalMontage.Broadcast(EHitmenAnimMontage::ClimbEnter);
+}
+
+void UHitmenCharacterMovementComponent::StopHang(bool bDrop)
+{
+	LastHangReleaseTime = GetTimeSeconds();
+	SetMovementMode(MOVE_Falling);
+	Velocity = bDrop ? HangNormal * 60.f : FVector::ZeroVector;
+}
+
+void UHitmenCharacterMovementComponent::PhysHang(float DeltaTime, int32 Iterations)
+{
+	if (DeltaTime < MIN_TICK_TIME || !CharacterOwner)
+	{
+		return;
+	}
+	// Left / right along the wall (whatever the camera does): the input projected on the wall tangent.
+	const FVector Tangent = FVector::CrossProduct(FVector::UpVector, HangNormal).GetSafeNormal();
+	const float Lateral = FVector::DotProduct(Acceleration.GetSafeNormal2D(), Tangent);
+	const FVector OldLocation = UpdatedComponent->GetComponentLocation();
+	Velocity = FVector::ZeroVector;
+	if (FMath::Abs(Lateral) > 0.2f)
+	{
+		const float Speed = (bWantsToSprint ? HangShimmyFastSpeed : HangShimmySpeed) * FMath::Sign(Lateral);
+		const FVector Candidate = OldLocation + Tangent * Speed * DeltaTime;
+		FVector Face, Normal;
+		float LedgeZ = 0.f;
+		float Edge = 0.f;
+		// Only move where the ledge (and the wall under it) goes on, at about the same height.
+		if (FindHangWall(Candidate, -HangNormal, HangLedgeZ, Face, Normal)
+			&& FVector::DotProduct(Normal, HangNormal) > 0.8f
+			&& FindHangLedge(Face, Normal, HangLedgeZ, LedgeZ, Edge)
+			&& FMath::Abs(LedgeZ - HangLedgeZ) < 15.f)
+		{
+			const FVector Target = GetHangLocation(Face, Normal, LedgeZ, Edge);
+			FHitResult Hit;
+			SafeMoveUpdatedComponent(Target - OldLocation, UpdatedComponent->GetComponentQuat(), true, Hit);
+			if (!Hit.bBlockingHit)
+			{
+				HangNormal = Normal;
+				HangLedgeZ = LedgeZ;
+				HangEdgeDistance = Edge;
+			}
+			Velocity = (UpdatedComponent->GetComponentLocation() - OldLocation) / DeltaTime;
+		}
+	}
+}
+
+bool UHitmenCharacterMovementComponent::PlanHangClimb(FHitmenMantlePlan& OutPlan) const
+{
+	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
+	const float Radius = Capsule->GetScaledCapsuleRadius();
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	const FVector Location = UpdatedComponent->GetComponentLocation();
+	const FVector Into = -HangNormal;
+	const UWorld* World = GetWorld();
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenHangClimb), false, CharacterOwner);
+	const ECollisionChannel Channel = UpdatedComponent->GetCollisionObjectType();
+	const FCollisionShape StandShape = FCollisionShape::MakeCapsule(Radius * 0.95f, HalfHeight * 0.95f);
+	const float Reach = HangEdgeDistance + Radius + 40.f;
+
+	OutPlan = FHitmenMantlePlan();
+	OutPlan.Start = Location;
+	OutPlan.Action = EHitmenTraversalAction::Climb;
+	OutPlan.Duration = HangClimbDuration;
+
+	// 1. An opening in the wall above the ledge (a window): over its sill, onto the floor inside.
+	for (float Height = HangLedgeZ + 10.f; Height <= HangLedgeZ + 150.f; Height += 10.f)
+	{
+		const FVector Start(Location.X, Location.Y, Height);
+		if (World->LineTraceTestByChannel(Start, Start + Into * Reach, ECC_Visibility, Params))
+		{
+			continue;
+		}
+		// The sill: the first solid surface below the opening, just inside the wall line.
+		const FVector SillXY = Start + Into * (HangEdgeDistance + Radius + 12.f);
+		FHitResult Sill;
+		if (!World->SweepSingleByChannel(Sill, FVector(SillXY.X, SillXY.Y, Height), FVector(SillXY.X, SillXY.Y, HangLedgeZ - 20.f), FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(4.f), Params))
+		{
+			break;
+		}
+		const FVector InsideXY = SillXY + Into * (Radius + 45.f);
+		FHitResult Floor;
+		if (World->LineTraceSingleByChannel(Floor, FVector(InsideXY.X, InsideXY.Y, Sill.ImpactPoint.Z + 40.f), FVector(InsideXY.X, InsideXY.Y, Sill.ImpactPoint.Z - 160.f), ECC_Visibility, Params)
+			&& IsWalkable(Floor))
+		{
+			const FVector Dest = Floor.ImpactPoint + FVector::UpVector * (HalfHeight + 3.f);
+			if (!World->OverlapBlockingTestByChannel(Dest, FQuat::Identity, Channel, StandShape, Params))
+			{
+				const FVector Over(SillXY.X, SillXY.Y, Sill.ImpactPoint.Z + HalfHeight + MantleClearance);
+				OutPlan.ControlA = FVector(Location.X, Location.Y, Over.Z);
+				OutPlan.ControlB = Over + Into * 20.f;
+				OutPlan.Target = Dest;
+				return true;
+			}
+		}
+		break;
+	}
+
+	// 2. Room to stand on the ledge top itself (a roof edge, a wall top).
+	const FVector TopXY = Location + Into * (Radius + HangEdgeDistance * 0.5f);
+	const FVector OnTop(TopXY.X, TopXY.Y, HangLedgeZ + HalfHeight + 3.f);
+	if (!World->OverlapBlockingTestByChannel(OnTop, FQuat::Identity, Channel, StandShape, Params))
+	{
+		FHitResult Under;
+		if (World->LineTraceSingleByChannel(Under, OnTop, OnTop - FVector::UpVector * (HalfHeight + 20.f), ECC_Visibility, Params) && IsWalkable(Under))
+		{
+			OutPlan.ControlA = FVector(Location.X, Location.Y, OnTop.Z + MantleClearance);
+			OutPlan.ControlB = OnTop + FVector::UpVector * (MantleClearance * 0.5f);
+			OutPlan.Target = OnTop;
+			return true;
+		}
+	}
+	return false;
+}
+
 FNetworkPredictionData_Client* UHitmenCharacterMovementComponent::GetPredictionData_Client() const
 {
 	if (!ClientPredictionData)
@@ -917,6 +1285,7 @@ void FSavedMove_Hitmen::Clear()
 	bSavedWantsToSprint = false;
 	bSavedWantsJetpackThrust = false;
 	SavedJetpackFuel = 0.f;
+	SavedSlideElapsed = 0.f;
 }
 
 uint8 FSavedMove_Hitmen::GetCompressedFlags() const
@@ -963,6 +1332,7 @@ void FSavedMove_Hitmen::SetMoveFor(ACharacter* C, float InDeltaTime, FVector con
 		bSavedWantsToSprint = Movement->bWantsToSprint;
 		bSavedWantsJetpackThrust = Movement->bWantsJetpackThrust;
 		SavedJetpackFuel = Movement->JetpackFuel;
+		SavedSlideElapsed = Movement->SlideElapsed;
 	}
 }
 
@@ -973,8 +1343,9 @@ void FSavedMove_Hitmen::PrepMoveFor(ACharacter* C)
 	{
 		Movement->bWantsToSprint = bSavedWantsToSprint;
 		Movement->bWantsJetpackThrust = bSavedWantsJetpackThrust;
-		// Replays start from the fuel this move started with.
+		// Replays start from the fuel (and the slide time) this move started with.
 		Movement->JetpackFuel = SavedJetpackFuel;
+		Movement->SlideElapsed = SavedSlideElapsed;
 	}
 }
 

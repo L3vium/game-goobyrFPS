@@ -15,6 +15,14 @@
 #include "Components/HitmenBodyCarryComponent.h"
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Data/HitmenAnimSet.h"
+#include "Core/HitmenGameSettings.h"
+#include "Data/HitmenSoundSet.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Weapons/HitmenWeaponBase.h"
+#include "Weapons/HitmenProjectile.h"
 #include "Hitmen.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -88,6 +96,76 @@ void AHitmenCharacterBase::NotifyControllerChanged()
 }
 
 // ---- Montages ----
+
+void AHitmenCharacterBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		UpdateTraversalJuice(DeltaSeconds);
+	}
+}
+
+void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
+{
+	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
+	const bool bZipline = Movement && Movement->IsZiplining();
+	const bool bClimbing = Movement && Movement->IsClimbing() && !bZipline;
+	const float Z = GetActorLocation().Z;
+
+	// Ladders and gutters: a grab sound and a small puff at the hands every step of the climb.
+	if (bClimbing)
+	{
+		ClimbStepAccumulator += FMath::Abs(Z - LastTraversalZ);
+		if (ClimbStepAccumulator >= ClimbStepDistance)
+		{
+			ClimbStepAccumulator = 0.f;
+			const FVector Hands = GetActorLocation() + GetActorForwardVector() * 30.f + FVector::UpVector * 60.f;
+			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::ClimbGrab, Hands);
+			if (ClimbFX)
+			{
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ClimbFX, Hands, FRotator::ZeroRotator, FVector(0.35f));
+			}
+		}
+	}
+	else if (!bZipline)
+	{
+		ClimbStepAccumulator = 0.f;
+	}
+	LastTraversalZ = Z;
+
+	// Ziplines: bursts of sparks where the hands hold the cable, and the cable sound.
+	if (bZipline && ZiplineFX)
+	{
+		ClimbStepAccumulator -= DeltaSeconds;
+		if (ClimbStepAccumulator <= 0.f)
+		{
+			ClimbStepAccumulator = 0.12f;
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ZiplineFX, GetActorLocation() + FVector::UpVector * 110.f, GetActorRotation(), FVector(0.3f));
+		}
+	}
+	if (bZipline && !ZiplineAudio)
+	{
+		if (USoundBase* Ride = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::ZiplineRide))
+		{
+			ZiplineAudio = UGameplayStatics::SpawnSoundAttached(Ride, GetRootComponent(), NAME_None, FVector::ZeroVector, EAttachLocation::KeepRelativeOffset, false, 0.8f, 1.f, 0.f,
+				UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World));
+		}
+	}
+	if (!bZipline)
+	{
+		if (ZiplineEffect)
+		{
+			ZiplineEffect->DestroyComponent();
+			ZiplineEffect = nullptr;
+		}
+		if (ZiplineAudio)
+		{
+			ZiplineAudio->FadeOut(0.2f, 0.f);
+			ZiplineAudio = nullptr;
+		}
+	}
+}
 
 void AHitmenCharacterBase::GetMontageMeshes(TArray<USkeletalMeshComponent*>& OutMeshes) const
 {
@@ -324,6 +402,19 @@ float AHitmenCharacterBase::TakeDamage(float DamageAmount, FDamageEvent const& D
 		}
 	}
 
+	// Headshot = death for bullets and arrows (explosions and fists are radial / not point hits on bones).
+	if (bHeadshot && Damage > 0.f)
+	{
+		const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+		const AHitmenCharacterBase* Shooter = Cast<AHitmenCharacterBase>(InstigatorActor);
+		const bool bFromNPC = Shooter && !Shooter->IsPlayerControlled();
+		const bool bLethalCauser = Cast<AHitmenWeaponBase>(DamageCauser) || Cast<AHitmenProjectile>(DamageCauser);
+		if (Settings->bHeadshotKills && bLethalCauser && (!bFromNPC || Settings->bHeadshotKillsFromNPCs))
+		{
+			Damage = FMath::Max(Damage, HealthComponent->GetHealth() + HealthComponent->GetArmor() + 1.f);
+		}
+	}
+
 	const float Dealt = HealthComponent->ApplyDamage(Damage, InstigatorActor, DamageCauser, bHeadshot);
 	if (Dealt <= 0.f)
 	{
@@ -486,7 +577,14 @@ void AHitmenCharacterBase::ApplyBodyState()
 		{
 			AttachParent = CarrierCharacter->GetMesh();
 		}
-		if (AttachParent)
+		if (CarrySocket.IsNone())
+		{
+			// In the arms: on the carrier's root, where its carry component says (lying across, in front).
+			const UHitmenBodyCarryComponent* CarryComponent = Carrier->FindComponentByClass<UHitmenBodyCarryComponent>();
+			AttachToComponent(Carrier->GetRootComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+			SetActorRelativeTransform(CarryComponent ? CarryComponent->GetCarryTransform() : FTransform(FVector(55.f, 0.f, 0.f)));
+		}
+		else if (AttachParent)
 		{
 			AttachToComponent(AttachParent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, CarrySocket);
 		}

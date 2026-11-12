@@ -19,7 +19,7 @@ SHOT_EV100 = -0.3  # the match maps' fixed exposure (hitmen_levels.MATCH_EV100)
 
 # Camera per map: (location, (pitch, yaw)). Oblique, high, over the playable area.
 VIEWS = {
-    "LDTest": ((-16500.0, -16000.0, 5200.0), (-24.0, 47.0)),
+    "LDTest": ((-6000.0, -13000.0, 7500.0), (-35.0, 60.0)),
     "Gym": ((-4200.0, -4200.0, 3600.0), (-35.0, 45.0)),
     "Empty_01": ((-6000.0, -6000.0, 4000.0), (-30.0, 45.0)),
     "Empty_02": ((-6000.0, -6000.0, 4000.0), (-30.0, 45.0)),

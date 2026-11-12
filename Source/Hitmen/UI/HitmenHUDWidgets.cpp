@@ -224,14 +224,7 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 		}
 	}
 
-	// Hold-to-interact (hacking): a bar under the crosshair.
-	if (UI && UI->GetInteractProgress() >= 0.f)
-	{
-		const FVector2D BarSize(140.f, 6.f);
-		const FVector2D BarPos = Center + FVector2D(-BarSize.X * 0.5f, 34.f);
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 2, AllottedGeometry, BarPos - FVector2D(2.f), BarSize + FVector2D(4.f), FLinearColor(0.f, 0.f, 0.f, 0.6f));
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, BarPos, FVector2D(BarSize.X * UI->GetInteractProgress(), BarSize.Y), HitmenUI::Text());
-	}
+	// Hold-to-interact (hacking) is a ring around the prompt's F key (UHitmenActionPromptWidget).
 
 	// Awareness arcs (Hitman-like): one arc around the crosshair per guard or camera that is noticing you,
 	// placed toward it. It fills from its middle as suspicion grows (white), then turns yellow / red.
@@ -545,6 +538,16 @@ void UHitmenHUDWidget::BuildDefaultLayout()
 	InventoryBar = WidgetTree->ConstructWidget<UHitmenInventoryBarWidget>(UHitmenInventoryBarWidget::StaticClass());
 	HitmenUI::AddToCanvas(Canvas, InventoryBar, FAnchors(0.5f, 1.f), FVector2D(0.f, -Margin), FVector2D(0.5f, 1.f), FVector2D(1100.f, 110.f));
 
+	// Vehicle health / reload and the bottom-right stack (keycards, "[F] Exit"), full screen.
+	StatusCorner = WidgetTree->ConstructWidget<UHitmenStatusCornerWidget>(UHitmenStatusCornerWidget::StaticClass());
+	StatusCorner->SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (UCanvasPanelSlot* CornerSlot = Canvas->AddChildToCanvas(StatusCorner)) { CornerSlot->SetAnchors(Full); CornerSlot->SetOffsets(FMargin(0.f)); }
+
+	// Cheats (F1-F8), right, centred vertically: shown where debug commands are allowed.
+	CheatPanel = WidgetTree->ConstructWidget<UHitmenCheatPanelWidget>(UHitmenCheatPanelWidget::StaticClass());
+	CheatPanel->SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (UCanvasPanelSlot* CheatSlot = Canvas->AddChildToCanvas(CheatPanel)) { CheatSlot->SetAnchors(Full); CheatSlot->SetOffsets(FMargin(0.f)); }
+
 	// Match intro (dropping in + countdown), over everything.
 	Intro = WidgetTree->ConstructWidget<UHitmenIntroWidget>(UHitmenIntroWidget::StaticClass());
 	if (UCanvasPanelSlot* IntroSlot = Canvas->AddChildToCanvas(Intro)) { IntroSlot->SetAnchors(Full); IntroSlot->SetOffsets(FMargin(0.f)); }
@@ -678,58 +681,56 @@ void UHitmenAlertIndicatorWidget::SetAlertView(EHitmenAlertColor InColor, float 
 	bCallingReinforcements = bInCallingReinforcements;
 }
 
+void UHitmenAlertIndicatorWidget::SetAsleep(bool bInAsleep)
+{
+	bAsleep = bInAsleep;
+}
+
 int32 UHitmenAlertIndicatorWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
+	if (bAsleep)
+	{
+		// Asleep: three Z letters drifting up and fading, bigger as they rise.
+		const float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			const float Phase = FMath::Fmod(Time * 0.6f + Index / 3.f, 1.f);
+			const FVector2D Position(6.f + Phase * 14.f + Index * 2.f, 14.f - Phase * 26.f);
+			DrawText(OutDrawElements, LayerId, AllottedGeometry, TEXT("Z"), Position, FMath::RoundToInt(9.f + Phase * 7.f),
+				FLinearColor(1.f, 1.f, 1.f, 0.9f * (1.f - Phase)));
+		}
+		return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 1, InWidgetStyle, bParentEnabled);
+	}
 	if (Color == EHitmenAlertColor::None)
 	{
 		return LayerId;
 	}
-	// A marker pointing down at the head (Hitman-like): white while suspicion builds (filling from the tip), solid
-	// yellow / red with a dark "!" once alerted; two pulsing arcs while the guard calls for backup.
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
-	const float Width = FMath::Min(Size.X, Size.Y) * 0.8f;
-	const float Height = Width * 0.95f;
-	const FVector2D TopLeft((Size.X - Width) * 0.5f, (Size.Y - Height) * 0.5f);
-	const FVector2D A = TopLeft;                                   // top left
-	const FVector2D B = TopLeft + FVector2D(Width, 0.f);           // top right
-	const FVector2D Tip = TopLeft + FVector2D(Width * 0.5f, Height); // pointing down
+	const FVector2D C = Size * 0.5f;
+	const float R = FMath::Min(Size.X, Size.Y) * 0.45f;
 	const FLinearColor Tint = HitmenAlert::ToLinearColor(Color);
-	const FLinearColor Shadow(0.f, 0.f, 0.f, 0.65f);
-	HitmenUI::PaintTriangle(OutDrawElements, LayerId, AllottedGeometry, A - FVector2D(2.5f, 2.f), B + FVector2D(2.5f, -2.f), Tip + FVector2D(0.f, 3.f), Shadow);
-	const bool bSuspicious = Color == EHitmenAlertColor::White;
-	if (bSuspicious)
+	const TArray<FVector2D> Diamond = { C + FVector2D(0, -R), C + FVector2D(R, 0), C + FVector2D(0, R), C + FVector2D(-R, 0), C + FVector2D(0, -R) };
+	FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Diamond, ESlateDrawEffect::None, Tint, true, 2.5f);
+
+	// Fill from the bottom by suspicion (white) or fully (yellow / red).
+	const float Fill = Color == EHitmenAlertColor::White ? Suspicion : 1.f;
+	const int32 Lines = 10;
+	for (int32 Index = 0; Index < Lines; ++Index)
 	{
-		// Empty triangle with a thin rim; the fill rises from the tip with suspicion.
-		HitmenUI::PaintTriangle(OutDrawElements, LayerId + 1, AllottedGeometry, A, B, Tip, FLinearColor(0.f, 0.f, 0.f, 0.35f));
-		const float Fill = FMath::Clamp(Suspicion, 0.f, 1.f);
-		if (Fill > 0.01f)
+		const float T = (Index + 0.5f) / Lines;
+		if (T > Fill)
 		{
-			const FVector2D Left = FMath::Lerp(Tip, A, Fill);
-			const FVector2D Right = FMath::Lerp(Tip, B, Fill);
-			HitmenUI::PaintTriangle(OutDrawElements, LayerId + 2, AllottedGeometry, Left, Right, Tip, Tint);
+			break;
 		}
-		HitmenUI::PaintLines(OutDrawElements, LayerId + 3, AllottedGeometry, { A, B, Tip, A }, Tint, 1.5f);
-	}
-	else
-	{
-		HitmenUI::PaintTriangle(OutDrawElements, LayerId + 1, AllottedGeometry, A, B, Tip, Tint);
-		// "!": a bar and a dot in dark ink, in the wide upper part of the triangle.
-		const float X = TopLeft.X + Width * 0.5f;
-		const float Bar = Height * 0.42f;
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 2, AllottedGeometry, FVector2D(X - 1.5f, TopLeft.Y + Height * 0.12f), FVector2D(3.f, Bar), HitmenUI::Ink());
-		HitmenUI::PaintBox(OutDrawElements, LayerId + 2, AllottedGeometry, FVector2D(X - 1.5f, TopLeft.Y + Height * 0.12f + Bar + 2.5f), FVector2D(3.f, 3.f), HitmenUI::Ink());
+		const float Y = C.Y + R - T * 2.f * R;
+		const float HalfWidth = R - FMath::Abs(Y - C.Y);
+		DrawLine(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(C.X - HalfWidth, Y), FVector2D(C.X + HalfWidth, Y), Tint * FLinearColor(1.f, 1.f, 1.f, 0.8f), 2.f);
 	}
 	if (bCallingReinforcements)
 	{
-		const float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-		const float Pulse = 0.55f + 0.45f * FMath::Sin(Time * 8.f);
-		const FVector2D Source = TopLeft + FVector2D(Width + 3.f, Height * 0.3f);
-		for (int32 Ring = 0; Ring < 2; ++Ring)
-		{
-			HitmenUI::PaintArc(OutDrawElements, LayerId + 3, AllottedGeometry, Source, 4.f + Ring * 4.f, 30.f, 150.f, Tint * FLinearColor(1.f, 1.f, 1.f, Pulse), 1.5f, 8);
-		}
+		DrawText(OutDrawElements, LayerId + 2, AllottedGeometry, TEXT("!"), FVector2D(C.X + R + 2.f, C.Y - R), 14, HitmenUI::Accent());
 	}
-	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 4, InWidgetStyle, bParentEnabled);
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 3, InWidgetStyle, bParentEnabled);
 }
 
 #undef LOCTEXT_NAMESPACE

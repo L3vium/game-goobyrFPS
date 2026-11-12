@@ -9,6 +9,7 @@
 #include "Core/HitmenTeamLibrary.h"
 #include "World/Interactables/HitmenSecurity.h"
 #include "UI/HitmenMenuKit.h"
+#include "UI/HitmenOptionsWidgets.h"
 #include "UI/HitmenUIFactory.h"
 #include "UI/HitmenUIEventSubsystem.h"
 #include "Framework/HitmenPlayerController.h"
@@ -367,7 +368,8 @@ void UHitmenPauseMenuWidget::BuildDefaultLayout()
 	const FEntry Entries[] = {
 		{ LOCTEXT("Resume", "Resume"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, Resume) },
 		{ LOCTEXT("Options", "Options"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, OpenOptions) },
-		{ LOCTEXT("Leave", "Leave match"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, LeaveMatch) } };
+		{ LOCTEXT("Leave", "Leave match"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, LeaveMatch) },
+		{ LOCTEXT("BackToLobbyEntry", "Back to the lobby"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, BackToLobby) } };
 	for (const FEntry& Entry : Entries)
 	{
 		UHitmenMenuButton* Button = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
@@ -380,6 +382,12 @@ void UHitmenPauseMenuWidget::BuildDefaultLayout()
 		ButtonSize->SetHeightOverride(92.f);
 		ButtonSize->SetContent(Button);
 		HitmenUI::AddToVBox(Column, ButtonSize, FMargin(0.f, 0.f, 0.f, 12.f), false, HAlign_Left);
+		if (Entry.Handler == GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, BackToLobby))
+		{
+			// Only the host, once the match is over (RefreshLegend runs on every open).
+			BackToLobbyEntry = ButtonSize;
+			ButtonSize->SetVisibility(ESlateVisibility::Collapsed);
+		}
 	}
 
 	// The map in the middle.
@@ -408,6 +416,11 @@ void UHitmenPauseMenuWidget::BuildDefaultLayout()
 
 void UHitmenPauseMenuWidget::RefreshLegend()
 {
+	if (BackToLobbyEntry)
+	{
+		const AHitmenPlayerController* PC = GetHitmenPC();
+		BackToLobbyEntry->SetVisibility(PC && PC->IsHost() && PC->IsMatchOver() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
 	if (!LegendBox)
 	{
 		return;
@@ -537,279 +550,23 @@ void UHitmenPauseMenuWidget::OpenOptions()
 	}
 }
 
+void UHitmenPauseMenuWidget::BackToLobby()
+{
+	if (AHitmenPlayerController* PC = GetHitmenPC())
+	{
+		PC->RequestReturnToLobby();
+	}
+	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
+	{
+		UI->SetPauseMenuOpen(false);
+	}
+}
+
 void UHitmenPauseMenuWidget::LeaveMatch()
 {
 	if (UHitmenGameInstance* GI = GetGameInstance<UHitmenGameInstance>())
 	{
 		GI->ReturnToTitle();
-	}
-}
-
-// =============================================================================================
-// Key binding row
-// =============================================================================================
-
-void UHitmenKeyBindingRow::BuildDefaultLayout()
-{
-	UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	USizeBox* NameSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	NameSize->SetWidthOverride(240.f);
-	NameText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 15, TEXT("Regular"));
-	NameSize->SetContent(NameText);
-	HitmenUI::AddToHBox(Row, NameSize);
-	UTextBlock* Label = nullptr;
-	KeyButton = HitmenUI::MakeButton(WidgetTree, FText::GetEmpty(), 15, EHitmenButtonStyle::Solid, &Label);
-	KeyText = Label;
-	USizeBox* KeySize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	KeySize->SetWidthOverride(180.f);
-	KeySize->SetContent(KeyButton);
-	HitmenUI::AddToHBox(Row, KeySize);
-	WidgetTree->RootWidget = Row;
-	KeyButton->OnClicked.AddDynamic(this, &UHitmenKeyBindingRow::HandleKeyClicked);
-	SetIsFocusable(true);
-}
-
-void UHitmenKeyBindingRow::Setup(FName InMappingName, const FText& InDisplayName, const FKey& InKey)
-{
-	MappingName = InMappingName;
-	CurrentKey = InKey;
-	if (NameText) { NameText->SetText(InDisplayName); }
-	if (KeyText) { KeyText->SetText(InKey.GetDisplayName()); }
-}
-
-void UHitmenKeyBindingRow::HandleKeyClicked()
-{
-	bListening = true;
-	if (KeyText) { KeyText->SetText(LOCTEXT("PressKey", "Press a key...")); }
-	SetKeyboardFocus();
-}
-
-FReply UHitmenKeyBindingRow::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
-{
-	if (!bListening)
-	{
-		return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
-	}
-	ApplyKey(InKeyEvent.GetKey() == EKeys::Escape ? CurrentKey : InKeyEvent.GetKey());
-	return FReply::Handled();
-}
-
-FReply UHitmenKeyBindingRow::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
-	if (!bListening)
-	{
-		return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
-	}
-	ApplyKey(InMouseEvent.GetEffectingButton());
-	return FReply::Handled();
-}
-
-void UHitmenKeyBindingRow::ApplyKey(const FKey& Key)
-{
-	bListening = false;
-	if (UEnhancedInputUserSettings* Settings = GetInputUserSettings(GetOwningPlayer()))
-	{
-		FMapPlayerKeyArgs Args;
-		Args.MappingName = MappingName;
-		Args.Slot = EPlayerMappableKeySlot::First;
-		Args.NewKey = Key;
-		FGameplayTagContainer Failure;
-		Settings->MapPlayerKey(Args, Failure);
-		Settings->SaveSettings();
-		CurrentKey = Key;
-	}
-	if (KeyText) { KeyText->SetText(CurrentKey.GetDisplayName()); }
-}
-
-// =============================================================================================
-// Options
-// =============================================================================================
-
-void UHitmenOptionsWidget::BuildDefaultLayout()
-{
-	UBorder* Dim = HitmenUI::MakePanel(WidgetTree, HitmenUI::Background(), FMargin(60.f, 50.f));
-	UScrollBox* Scroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
-	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	Scroll->AddChild(Column);
-	Dim->SetContent(Scroll);
-	WidgetTree->RootWidget = Dim;
-
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("OptionsTitle", "OPTIONS"), 54, TEXT("Black")), FMargin(0.f, 0.f, 0.f, 16.f));
-
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Controls", "CONTROLS"), 18, TEXT("Bold"), HitmenUI::TextDim()));
-	ToggleBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	HitmenUI::AddToVBox(Column, ToggleBox);
-
-	auto AddSlider = [this, Column](const FText& Label, float Min, float Max) -> USlider*
-	{
-		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-		USizeBox* LabelSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-		LabelSize->SetWidthOverride(240.f);
-		LabelSize->SetContent(HitmenUI::MakeText(WidgetTree, Label, 15, TEXT("Regular")));
-		HitmenUI::AddToHBox(Row, LabelSize);
-		USlider* Slider = WidgetTree->ConstructWidget<USlider>(USlider::StaticClass());
-		Slider->SetMinValue(Min);
-		Slider->SetMaxValue(Max);
-		USizeBox* SliderSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-		SliderSize->SetWidthOverride(300.f);
-		SliderSize->SetContent(Slider);
-		HitmenUI::AddToHBox(Row, SliderSize);
-		HitmenUI::AddToVBox(Column, Row, FMargin(0.f, 4.f), false, HAlign_Left);
-		return Slider;
-	};
-	SensitivitySlider = AddSlider(LOCTEXT("Sensitivity", "Mouse sensitivity"), 0.1f, 3.f);
-	FOVSlider = AddSlider(LOCTEXT("FOV", "Field of view"), 70.f, 110.f);
-	VolumeSlider = AddSlider(LOCTEXT("Volume", "Master volume"), 0.f, 1.f);
-
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Bindings", "KEY BINDINGS"), 18, TEXT("Bold"), HitmenUI::TextDim()), FMargin(0.f, 18.f, 0.f, 4.f));
-	BindingBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	HitmenUI::AddToVBox(Column, BindingBox);
-
-	UHorizontalBox* Buttons = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	CloseButton = HitmenUI::MakeButton(WidgetTree, LOCTEXT("Back", "BACK"), 20, EHitmenButtonStyle::Solid);
-	ResetButton = HitmenUI::MakeButton(WidgetTree, LOCTEXT("Reset", "RESET"), 20, EHitmenButtonStyle::Dashed);
-	HitmenUI::AddToHBox(Buttons, CloseButton, FMargin(0.f, 0.f, 12.f, 0.f));
-	HitmenUI::AddToHBox(Buttons, ResetButton);
-	HitmenUI::AddToVBox(Column, Buttons, FMargin(0.f, 20.f), false, HAlign_Left);
-}
-
-void UHitmenOptionsWidget::BindEvents()
-{
-	if (CloseButton) { CloseButton->OnClicked.AddUniqueDynamic(this, &UHitmenOptionsWidget::Close); }
-	if (ResetButton) { ResetButton->OnClicked.AddUniqueDynamic(this, &UHitmenOptionsWidget::ResetToDefaults); }
-	if (SensitivitySlider) { SensitivitySlider->OnValueChanged.AddUniqueDynamic(this, &UHitmenOptionsWidget::HandleSensitivityChanged); }
-	if (FOVSlider) { FOVSlider->OnValueChanged.AddUniqueDynamic(this, &UHitmenOptionsWidget::HandleFOVChanged); }
-	if (VolumeSlider) { VolumeSlider->OnValueChanged.AddUniqueDynamic(this, &UHitmenOptionsWidget::HandleMasterVolumeChanged); }
-	RefreshToggles();
-	RebuildBindings();
-}
-
-void UHitmenOptionsWidget::RefreshToggles()
-{
-	UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
-	if (!Settings || !ToggleBox)
-	{
-		return;
-	}
-	ToggleBox->ClearChildren();
-	auto OnOff = [](bool b) { return b ? LOCTEXT("On", "ON") : LOCTEXT("Off", "OFF"); };
-	const TArray<FText> Labels = {
-		FText::Format(LOCTEXT("ToggleCrouch", "Crouch toggle: {0}"), OnOff(Settings->bToggleCrouch)),
-		FText::Format(LOCTEXT("ToggleSprint", "Sprint toggle: {0}"), OnOff(Settings->bToggleSprint)),
-		FText::Format(LOCTEXT("ClimbCamera", "Ladder direction follows the camera: {0}"), OnOff(Settings->bClimbRelativeToCamera)),
-		FText::Format(LOCTEXT("InvertY", "Invert Y: {0}"), OnOff(Settings->bInvertY))
-	};
-	for (int32 Index = 0; Index < Labels.Num(); ++Index)
-	{
-		UHitmenListButton* Button = WidgetTree->ConstructWidget<UHitmenListButton>(UHitmenListButton::StaticClass());
-		Button->Setup(Labels[Index], Index, EHitmenButtonStyle::Solid, 15);
-		Button->OnItemClicked.AddUniqueDynamic(this, &UHitmenOptionsWidget::HandleToggleClicked);
-		HitmenUI::AddToVBox(ToggleBox, Button, FMargin(0.f, 2.f), false, HAlign_Left);
-	}
-	if (SensitivitySlider) { SensitivitySlider->SetValue(Settings->MouseSensitivity); }
-	if (FOVSlider) { FOVSlider->SetValue(Settings->FieldOfView); }
-	if (VolumeSlider) { VolumeSlider->SetValue(Settings->MasterVolume); }
-}
-
-void UHitmenOptionsWidget::RebuildBindings()
-{
-	UEnhancedInputUserSettings* InputSettings = GetInputUserSettings(GetOwningPlayer());
-	if (!BindingBox)
-	{
-		return;
-	}
-	BindingBox->ClearChildren();
-	const UEnhancedPlayerMappableKeyProfile* Profile = InputSettings ? InputSettings->GetActiveKeyProfile() : nullptr;
-	if (!Profile)
-	{
-		HitmenUI::AddToVBox(BindingBox, HitmenUI::MakeText(WidgetTree, LOCTEXT("NoBindings", "Key bindings are available in game."), 14, TEXT("Regular"), HitmenUI::TextDim()));
-		return;
-	}
-	for (const TPair<FName, FKeyMappingRow>& Pair : Profile->GetPlayerMappingRows())
-	{
-		for (const FPlayerKeyMapping& Mapping : Pair.Value.Mappings)
-		{
-			if (Mapping.GetSlot() != EPlayerMappableKeySlot::First)
-			{
-				continue;
-			}
-			UHitmenKeyBindingRow* Row = WidgetTree->ConstructWidget<UHitmenKeyBindingRow>(UHitmenKeyBindingRow::StaticClass());
-			Row->Setup(Mapping.GetMappingName(), Mapping.GetDisplayName(), Mapping.GetCurrentKey());
-			HitmenUI::AddToVBox(BindingBox, Row, FMargin(0.f, 2.f), false, HAlign_Left);
-		}
-	}
-}
-
-void UHitmenOptionsWidget::HandleToggleClicked(int32 Index)
-{
-	UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
-	if (!Settings)
-	{
-		return;
-	}
-	switch (Index)
-	{
-	case 0: Settings->bToggleCrouch = !Settings->bToggleCrouch; break;
-	case 1: Settings->bToggleSprint = !Settings->bToggleSprint; break;
-	case 2: Settings->bClimbRelativeToCamera = !Settings->bClimbRelativeToCamera; break;
-	case 3: Settings->bInvertY = !Settings->bInvertY; break;
-	default: break;
-	}
-	Settings->ApplyHitmenSettings();
-	RefreshToggles();
-}
-
-void UHitmenOptionsWidget::HandleSensitivityChanged(float Value)
-{
-	if (UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
-	{
-		Settings->MouseSensitivity = Value;
-		Settings->ApplyHitmenSettings();
-	}
-}
-
-void UHitmenOptionsWidget::HandleFOVChanged(float Value)
-{
-	if (UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
-	{
-		Settings->FieldOfView = Value;
-		Settings->ApplyHitmenSettings();
-	}
-}
-
-void UHitmenOptionsWidget::HandleMasterVolumeChanged(float Value)
-{
-	if (UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
-	{
-		Settings->MasterVolume = Value;
-		Settings->ApplyHitmenSettings();
-	}
-}
-
-void UHitmenOptionsWidget::ResetToDefaults()
-{
-	if (UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
-	{
-		Settings->SetToDefaults();
-		Settings->ApplyHitmenSettings();
-	}
-	if (UEnhancedInputUserSettings* InputSettings = GetInputUserSettings(GetOwningPlayer()))
-	{
-		if (UEnhancedPlayerMappableKeyProfile* Profile = InputSettings->GetActiveKeyProfile())
-		{
-			Profile->ResetToDefault();
-		}
-		InputSettings->SaveSettings();
-	}
-	RefreshToggles();
-	RebuildBindings();
-}
-
-void UHitmenOptionsWidget::Close()
-{
-	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
-	{
-		UI->SetOptionsOpen(false);
 	}
 }
 
@@ -938,6 +695,8 @@ void UHitmenSpectatorWidget::HandleModeChanged(uint8 Mode)
 			: SpectatorMode == EHitmenSpectatorMode::Follow ? LOCTEXT("Follow", "FOLLOW") : LOCTEXT("Grid", "MULTI-SCREEN");
 		const FText Hint = SpectatorMode == EHitmenSpectatorMode::Grid
 			? LOCTEXT("GridHint", "[Wheel] number of screens     [LMB/RMB] switch player     [V] change view")
+			: SpectatorMode == EHitmenSpectatorMode::FreeFly
+			? LOCTEXT("FreeFlyHint", "[ZQSD] move   [SPACE / A] up   [CTRL / E] down   [SHIFT] faster     [LMB/RMB] follow a player     [V] change view")
 			: LOCTEXT("SpectatorHint", "[LMB/RMB] switch player     [V] change view");
 		ModeText->SetText(FText::Format(LOCTEXT("SpectatorLine", "{0}     {1}"), ModeName, Hint));
 	}
@@ -988,15 +747,32 @@ void UHitmenSpectatorWidget::HandleViewsChanged(const TArray<FHitmenSpectatorVie
 
 void UHitmenResultsWidget::BuildDefaultLayout()
 {
-	UBorder* Dim = HitmenUI::MakePanel(WidgetTree, HitmenUI::Background(), FMargin(80.f));
+	// A banner at the top: the match is over but everyone keeps watching (free fly).
+	UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
+	WidgetTree->RootWidget = Canvas;
+	UBorder* Banner = HitmenUI::MakePanel(WidgetTree, FLinearColor(0.f, 0.f, 0.f, 0.72f), FMargin(56.f, 22.f, 56.f, 20.f));
+	UCanvasPanelSlot* BannerSlot = HitmenUI::AddToCanvas(Canvas, Banner, FAnchors(0.5f, 0.f), FVector2D(0.f, 48.f), FVector2D(0.5f, 0.f));
+	BannerSlot->SetAutoSize(true);
 	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	WinnerText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 72, TEXT("Black"));
+	Banner->SetContent(Column);
+	WinnerText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 58, TEXT("Bold"));
+	WinnerText->SetJustification(ETextJustify::Center);
 	ReasonText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 22, TEXT("Regular"), HitmenUI::TextDim());
-	HitmenUI::AddToVBox(Column, WinnerText);
-	HitmenUI::AddToVBox(Column, ReasonText);
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("BackToLobby", "Back to the lobby in a few seconds..."), 16, TEXT("Regular"), HitmenUI::TextDim()), FMargin(0.f, 30.f));
-	Dim->SetContent(Column);
-	WidgetTree->RootWidget = Dim;
+	ReasonText->SetJustification(ETextJustify::Center);
+	HitmenUI::AddToVBox(Column, WinnerText, FMargin(0.f), false, HAlign_Center);
+	HitmenUI::AddToVBox(Column, ReasonText, FMargin(0.f, 2.f, 0.f, 14.f), false, HAlign_Center);
+	// Host: [Enter] Back to the lobby (also in the pause menu). Others: waiting for the host.
+	BackHint = WidgetTree->ConstructWidget<UHitmenKeyHint>(UHitmenKeyHint::StaticClass());
+	BackHint->Setup(TEXT("ENTER"), LOCTEXT("BackToLobbyHint", "Back to the lobby"));
+	BackHint->OnClicked = [this]() { HandleBackClicked(); };
+	USizeBox* HintSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+	HintSize->SetHeightOverride(40.f);
+	HintSize->SetWidthOverride(330.f);
+	HintSize->SetContent(BackHint);
+	HitmenUI::AddToVBox(Column, HintSize, FMargin(0.f), false, HAlign_Center);
+	WaitText = HitmenUI::MakeText(WidgetTree, LOCTEXT("WaitingForHost", "Waiting for the host to go back to the lobby"), 19, TEXT("Italic"), HitmenUI::TextDim());
+	HitmenUI::AddToVBox(Column, WaitText, FMargin(0.f), false, HAlign_Center);
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
 void UHitmenResultsWidget::BindEvents()
@@ -1004,6 +780,8 @@ void UHitmenResultsWidget::BindEvents()
 	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
 		UI->OnMatchEnded.AddUniqueDynamic(this, &UHitmenResultsWidget::HandleMatchEnded);
+		UI->OnKeyLabelsChanged.AddUniqueDynamic(this, &UHitmenResultsWidget::HandleKeyLabelsChanged);
+		HandleKeyLabelsChanged();
 	}
 	if (const AHitmenGameState* GS = GetHitmenGameState(); GS && GS->GetMatchPhase() == EHitmenMatchPhase::Ended)
 	{
@@ -1016,6 +794,23 @@ void UHitmenResultsWidget::UnbindEvents()
 	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
 		UI->OnMatchEnded.RemoveAll(this);
+		UI->OnKeyLabelsChanged.RemoveAll(this);
+	}
+}
+
+void UHitmenResultsWidget::HandleKeyLabelsChanged()
+{
+	if (const UHitmenUIEventSubsystem* UI = GetUIEvents(); UI && BackHint)
+	{
+		BackHint->Setup(UI->GetKeyLabel(EHitmenKeyLabel::Confirm), LOCTEXT("BackToLobbyHint", "Back to the lobby"));
+	}
+}
+
+void UHitmenResultsWidget::HandleBackClicked()
+{
+	if (AHitmenPlayerController* PC = GetHitmenPC())
+	{
+		PC->RequestReturnToLobby();
 	}
 }
 
@@ -1031,6 +826,10 @@ void UHitmenResultsWidget::HandleMatchEnded(const FHitmenMatchResult& Result)
 	}
 	if (WinnerText) { WinnerText->SetText(Winner); }
 	if (ReasonText) { ReasonText->SetText(Result.Reason); }
+	const AHitmenPlayerController* PC = GetHitmenPC();
+	const bool bHost = PC && PC->IsHost();
+	if (BackHint && BackHint->GetParent()) { BackHint->GetParent()->SetVisibility(bHost ? ESlateVisibility::Visible : ESlateVisibility::Collapsed); }
+	if (WaitText) { WaitText->SetVisibility(bHost ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible); }
 }
 
 #undef LOCTEXT_NAMESPACE

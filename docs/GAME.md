@@ -35,8 +35,13 @@ If any member of a team delivers the VIP, the whole team wins.
 ### VIP
 - Up to 15 NPCs in a map are flagged as **VIP candidates**; at match start one is picked at random.
 - The VIP is shown in red in the Sightroom; once dead, its highlight turns **yellow**.
-- Killing the VIP lets a player pick the body up with `F`: it appears on the back and the
-  carrier moves slower (`CarrySpeedMultiplier`). Carrying is a per-player toggle (drop the body).
+- Any body can be picked up with `F` (the VIP too): it lies across your arms in front of you, takes the left weapon
+  slot (with both slots full, the weapon in hand is put down; the other one stays slung in the right slot), you cannot
+  shoot or punch, and you move slower (`CarrySpeedMultiplier`). `F` with nothing in focus or the mouse wheel puts it
+  down, and the remaining weapon comes back to hand. The HUD's left card reads BODY (TARGET for the VIP).
+- **Body containers** (`BP_BodyContainer`, `AHitmenBodyContainer`): carrying a body, `F` opens the lid, the body goes in
+  and the lid closes (0.8 s); a hidden body is never found. `Capacity` 2 by default; the prompt shows `(1/2)` or
+  `[Full]`; the VIP can never be hidden (it must be delivered).
 - **Sonar**: while a body is carried, a red ping appears at the carrier position, stays fixed even
   if the carrier moves, and refreshes every N seconds; the interval shortens over time
   (curve in match rules).
@@ -92,27 +97,35 @@ adaptation): every room is lit for it. Space or Escape goes back on every menu p
    click counts) level with its head, torso and legs in two columns `AgentArrowSpacing` away from its axis, and
    **Randomize** under its feet — all placed from the reference pose, so they never move with the idle animation;
    the look changes on the stage at once and is sent once the clicks pause. Right: the loadout, three
-   always-visible rows of square icon tiles (weapon, move `E`, manipulation `A`), each starting with
-   **None**; a click picks. Default: silenced pistol, no abilities. **Ready** only: when every
-   non-watcher is ready the match starts a second later (no countdown on screen; un-ready cancels it).
-5. **Match** — intro (parachute drop, "Dropping in" and the map name, no countdown), play, then results.
+   always-visible rows of square icon tiles (weapon, move `E`, manipulation `A`, keys as bound), each starting with
+   **None**; a click picks. A "3 / 8" counter under each pair of look arrows. Default: silenced pistol, no abilities.
+   **Ready** only: when every non-watcher is ready the match starts a second later (no countdown on screen; un-ready
+   cancels it). Watchers have nothing to dress: they see "Waiting for other players (n / m ready)". A watching host's
+   button reads **Start** instead of "Choose your agent"; with only watchers in the room the match starts at once.
+5. **Match** — intro (parachute drop, "Dropping in" and the map name, no countdown), play, then the end: a banner at
+   the top (winner, reason), and two seconds later everyone flies free over the map (no timer). The host sends
+   everyone back to the lobby with `Enter` (or **Back to the lobby** in the pause menu); the others see "Waiting for
+   the host". A match with only watchers never ends by itself.
 
 Spawns: maps carry many `BP_TeamStart` points. Each team (or solo player) takes a random free point
 and teammates take the nearest free points around it. During the intro (`bParachuteIntro`,
 `IntroDropHeight`, `IntroDuration` on the match game mode) everyone falls from above their point
-under a canopy, steering a little; control returns on landing. The Gym skips the intro.
+under a canopy, steering a little (falling at 15 m/s, 3 s intro); control returns on landing. The Gym skips the intro.
 
 Watchers get a spectator mode (`V` cycles): free fly, single-player view (LMB / RMB switch between
 players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players follow teammates.
+Free fly works like the Unreal editor: `ZQSD`, `Shift` x3, `Space` / `A` up, `Ctrl` / `E` down (`IMC_Spectator`, its
+own rebindable keys, above the game keys while spectating). It stays inside the map's world bounds (`DA_Map`, minus
+`BoundsMargin`), above the ground and under a ceiling `MaxHeightAboveGround` over the highest ground flown over.
 
 ## 5. Controls (defaults, AZERTY, all rebindable)
 | Action | Key |
 |---|---|
 | Move | Z Q S D |
 | Look | Mouse |
-| Jump / ledge grab / vault | Space |
+| Jump / ledge grab / vault (held in the air: jetpack) | Space |
 | Crouch (held) — a short slide when walking, a longer one when sprinting | Left Ctrl |
-| Sprint (held) | Left Shift |
+| Sprint (held) / dash (tap, when equipped) | Left Shift |
 | Fire / melee | LMB |
 | Aim | RMB |
 | Interact / stealth kill / swap / throw held item | F |
@@ -122,14 +135,29 @@ players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players 
 | Sightroom | Tab |
 | Emote wheel (hold) | R |
 | Pause (no time stop) | Esc |
+| Confirm (match over, host: back to the lobby) | Enter |
 
-Options: crouch toggle, sprint toggle, ladder direction relative to camera (off by default),
-mouse sensitivity, invert Y, audio volumes, full key rebinding.
+**Options** (title and pause; `Esc` closes them, `R` resets the tab on screen, `Q` / `E` switch tabs): a centred panel
+with tabs, one row per setting (label left, `< value >` or a slider right) and the hovered row described on the right.
+- **Gameplay**: mouse and aiming sensitivity, invert Y, crouch and sprint hold / toggle, ladder direction.
+- **Controls**: every key by section (Movement, Combat, Abilities, Interaction, Spectator, Menus); click then press a key
+  or a mouse button (`Esc` cancels); a key used twice turns red and the description names the other action. Spectator
+  keys only clash with each other. Prompts and HUD keys follow the rebinding.
+- **Graphics**: quality preset (Low / Medium / High / Epic, Custom when mixed), **Detect the best settings** (hardware
+  benchmark; runs once by itself on the first launch of a packaged build), resolution, window mode, vertical sync,
+  frame rate limit, render scale, shadows, global illumination (Low / Medium turn Lumen off), reflections, effects,
+  view distance, post-processing, textures, anti-aliasing, field of view, head bob.
+- **Audio**: master, music, effects, voice, interface.
 
 ## 6. Player
 - **Movement**: walk (480), sprint (820), crouch (240, the view lowers smoothly), slide (crouch while
-  sprinting), jump, ladders / gutters (automatic, forward = up, smooth pull-up at the top), ziplines (`F` at a
-  post: rides to the other end on its own), jump pads, lockers (you stand inside and look through the slit).
+  moving: about 0.5 s from a walk, 0.7 s from a sprint; it always brakes, left / right only bend it, and Ctrl must be
+  released before the next one), jump, ladders / gutters (automatic, forward = up, smooth pull-up at the top),
+  ziplines (`F` at a post: rides to the other end on its own at 16 m/s), jump pads, lockers (you stand inside and look
+  through the slit). Releasing the keys stops you crisply.
+- **Hang**: Space in the air in front of a thin ledge (the ledge under every window, a roof edge) hangs from it. Left /
+  right shimmy along it (Shift: faster), Space climbs into the open window above (or onto the ledge top), Ctrl lets go.
+  Vaulting out of an upper-floor window over a drop ends hanging from the ledge under it.
 - **Traversal metrics** (Space while moving into it; the action shows at the crosshair):
 
   | Obstacle | Action |
@@ -138,17 +166,32 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   | up to 120 cm, thin, floor behind | vault (also through an open window) |
   | up to 250 cm, top at least 40 cm deep | climb onto it (a block wall: walk along its top) |
   | up to 250 cm, thinner wall | climb over |
+  | window sill over a drop | climb out and hang from the ledge under it |
   | above 250 cm | out of reach (ladder, gutter, ability) |
 - The hint only shows on the ground. Space counts for 0.25 s after the press (late ledge grabs); jumping at a
-  ladder grabs it at once.
+  ladder grabs it at once. Ledges are probed at the centre and 25 cm to each side (a corner is caught), and in the air
+  down to the feet. Fixtures (barrels, hack panels, turrets, cameras, mounted guns, distractions) carry the
+  `HitmenNoTraversal` actor tag and are never climbed.
+- **First-person motion** (procedural, `FHitmenFPMotion` per weapon in its data asset): the camera bobs with every step
+  and your footstep plays on the low point of each bob (strength in Options); the arms sway with the mouse, lag when you
+  walk and tilt when you strafe. A weapon coming into hand rises from below in about 0.2 s; each shot kicks it back and
+  up on a spring (per weapon); aiming brings it toward the centre on a spring that settles, still low; the sniper first
+  rises to the eye, wobbles and steadies, then zooms, and the zoomed aim breathes a little. Punches jab one fist after
+  the other, the knife slashes right to left, a throw winds up and releases, a takedown lunges; body montages no longer
+  play on the first-person arms. Near a wall the weapon is pulled back and lowered (first-person scale 0.35, near plane
+  3 cm). Machine guns sit lower in the hand; the minigun shakes harder as it spins up; the bow arms pull back with the
+  charge.
 - **First person**: no body or arms while moving without a weapon (the body's shadow stays); the arms appear with a
-  weapon in hand (held low on the right, barrel along the view; aiming only re-centres it a little, it stays low right;
+  weapon in hand (held low on the right, barrel along the view;
   sprinting lowers and tilts it, still in view) or while punching (arms at chest height, the fists cross the view).
   Recoil kicks the view up and it recovers smoothly. On death the view leaves the head. Landings are heard (soft or
   hard, by fall speed); a hard landing dips the view.
-- **Inventory**: 2 weapon slots (mouse wheel). `F` with no interactable in focus throws the held
-  item (it lands at once as a floating pickup a little ahead, no physics): if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
-  stays. Firing with an empty magazine and no reserve throws the weapon where you look. No weapon
+- **Inventory**: 2 weapon slots (mouse wheel). A new weapon always goes to the left slot (the other one slides right;
+  with both full, the held weapon is swapped out). `F` with no interactable in focus throws the held
+  item: if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
+  stays. Firing with an empty magazine and no reserve throws the weapon where you look. Thrown weapons fly (physics,
+  spinning): the first hostile they hit takes the throw damage and is stunned 3 s on a head hit; an empty gun then
+  vanishes, a loaded one settles and floats as a pickup. No weapon
   in hand = fists (melee).
 - **Ammo**: one ammo pool per weapon (no magazine / reload). Walking over a weapon of the same
   type picks its ammo automatically and removes it; a different type shows **Swap** on `F`. The
@@ -159,19 +202,37 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   that sees you coming detects you first and fights). The attacker blends in to the strike position and the view
   turns over 0.25 s (no snap); both are held, the attack plays (body and first-person arms), the victim reacts and dies
   on the strike (1 s). Pickpocketing still needs you behind.
-- **Health**: players 300, guards 100 (guards also hit softer, difficulty damage multiplier). Players heal back
-  (30 per second) after 6 s without being hit; there is no health bar (red screen edges and heartbeat).
+- **Health**: players 150, guards 100. A bullet or an arrow in the head always kills (`bHeadshotKills` in Project
+  Settings → Hitmen; NPC shots excluded by `bHeadshotKillsFromNPCs`). Players heal back (30 per second) after 6 s
+  without being hit; there is no health bar (red screen edges and heartbeat).
 - **Intro**: the move keys steer the parachute; nobody can see a player under the canopy or for 2 s
   after landing.
-- **Sightroom (`Tab`)**: a scan sweeps the surroundings; enemies within a radius are shown in
-  white through walls, interactables in white only when in line of sight, the target in red at
-  any distance. No waypoint in normal view. Radii live on the player controller
-  (`Hitmen|Sightroom`) so a 3C swap keeps them.
+- **Sightroom (`Tab`)**: a fast scan wave (0.35 s) sweeps 25 m around you and lights up what it reaches as it
+  passes; as it ends the whole map fades into the cool scan look and every enemy on the map shows in white through
+  walls (a thin outline keeps far ones readable as dots). Interactables within 18 m show only in line of sight
+  (tested at their middle, so windows count); the target is red at any distance. Highlights are anti-aliased.
+  No waypoint in normal view. Radii live on the player controller (`Hitmen|Sightroom`) so a 3C swap keeps them.
 - **Emotes**: hold `R` for a radial wheel.
 - **Footsteps**: a sound per surface (grass, stone, sand / dirt, wood, metal; concrete elsewhere) through physical
-  materials (PM_*), for players and NPCs; the surface also scales how far NPCs hear the step.
+  materials (PM_*), for players and NPCs; the surface also scales how far NPCs hear the step. Volume per gait (walk,
+  sprint, crouch) and a small random pitch; your own steps are 2D and quieter.
+- **Sound spaces**: every 3D sound goes through one attenuation per space (`DA_SoundSet` → Attenuations:
+  `SA_Hitmen_World`, `_Footstep`, `_Gunshot`, `_Impact`), with distance falloff and occlusion: a guard's steps are
+  heard a few metres away, gunshots far and muffled.
 
 ## 7. Weapons
+**Juice (toon only, no blood)**: every gun flashes at the muzzle (Anime_Stylized `NS_Gunshot_Cast`, attached and drawn
+with the first-person gun), a short warm light and a soft glow (`M_Hitmen_FlashGlow`), and hits make a toon puff
+(`NS_Gunshot_Hit`) on walls and bodies alike. Tracers (`AHitmenTracer`, `M_Hitmen_Tracer`) show every shotgun pellet and
+sniper shot and part of the machine-gun bullets. All guns share one recording, pitched and levelled per weapon
+(`FireSoundPitch` / `FireSoundVolume`: the silenced pistol is a quiet high snap). Muzzle points are computed from each
+mesh (the Weapons_Free guns have no socket). Explosions flash (`ExplosionFlash*` on projectiles; the flashbang is a big
+white flash and light), the smoke grenade is the Smoke_Bombs toon cloud (plays 1.8x faster), the jetpack blows smoke
+under your feet, ladders and gutters puff and click at each grab, ziplines throw sparks with a cable sound, the tank's
+barrel slides back 120 cm, its hull rocks and the muzzle blasts, and the turret flashes and fires red tracers. Taking
+a hit: a red arc toward the shooter, a colour fringe and a red tint on the view, a small shake; the world greys as
+health drops, with the heartbeat below 35 %.
+
 All weapons share ammo, fire rate, spread (fixed: firing never widens it), recoil, damage, headshot
 multiplier, noise radius, silenced flag, mesh / visual transform / VFX / SFX / montage / first-person pose
 references — every value is in a `DA_Weapon_*` data asset. Weapons lying in the world float and turn. The
@@ -184,9 +245,8 @@ sniper shows a scope overlay; zoom keeps the mouse feel (sensitivity follows the
 | Pistol | Hitscan | silenced |
 | SMG | Hitscan, automatic | fast, inaccurate |
 | Assault rifle | Hitscan, automatic | balanced |
-| Burst rifle | Hitscan, burst | 3-round burst |
 | Shotgun | Hitscan, pellets | |
-| Minigun | Hitscan, automatic | spin-up |
+| Minigun | Hitscan, automatic | fires at once, ramps 450 → 1100 rpm over 1.2 s (0.4 s grace on release) |
 | Sniper | Hitscan | high damage, zoom |
 | Rocket launcher | Projectile | explosion breaks walls |
 | Grenade launcher | Projectile | bouncing, timed |
@@ -203,16 +263,27 @@ user and does not spend a charge.
 **Move**: Blink (Dishonored-like teleport), Double jump, Jetpack, Dash, Hook (grapple),
 Transposition (swap positions with an aimed NPC/player), Pill (boost damage/speed/resistance with
 a distorted view, `PP_Pill`), Invisibility, Armor, C4 (place, then detonate). The jetpack is
-client-predicted like sprint. The hook shows a small marker where it will grab while it is ready and in range, and a thin cable from the hand
+client-predicted like sprint and also runs on Space held in the air; the dash also runs on a tap of Shift (cooldown
+1.5 s); the second jump of the double jump goes 1.35x higher; holding E with the blink shows where you will land; the
+hook climbs (or hangs from) the ledge at its anchor. The hook shows a small marker where it will grab while it is ready and in range, and a thin cable from the hand
 to the anchor while it pulls (seen by everyone; `UHitmenAbilityComponent` draws both for any ability that asks).
 
-**Manipulation**: Stone (throw, noise), Remote distraction (activate a distraction at range),
-Sleep dart (one target), Charm (target becomes an ally and attacks others; a charmed player is
-driven by the NPC behavior tree, reckless), Flashbang (stuns around, blinds players with
-`PP_Blind`), Smoke grenade (blocks sight for NPCs and players; basic-shape puffs until a Niagara
-system is assigned), Lighter (vanish a body), Multi-kill (mark several targets; killing one kills all),
-Trap (NPCs stuck; players freed after a delay), Wind mine (big knockback), Poison vial (pour in a
-drink, or in a vent to poison the sealed rooms it serves).
+**Manipulation**: Stone (thrown; it rests where it lands, makes a noise with toon "sound" notes, and a guard who
+comes to look picks it up), Remote distraction (activate a distraction, a panel or a console at range), Sleep dart
+(one target goes limp in a ragdoll with "Z z z" over its head, then stands up), Charm (target becomes an ally and
+attacks others; a charmed player is driven by the NPC behavior tree, reckless), Flashbang (stuns around, blinds
+players with `PP_Blind`), Smoke grenade (blocks sight for NPCs and players), Lighter (look at a body nearby:
+`[A] Lighter`, it burns and is gone), Multi-kill (hold A: every enemy you look at is marked, up to 5; marks glow red
+and are linked by a red line; killing one kills all), Trap (catches anyone, you too once armed; NPCs stuck 30 s,
+players break free by mashing the move keys), Wind grenade (thrown, bursts on impact and blows everyone around away,
+you too), Poison vial (pour in a drink, or in a vent to poison the sealed rooms it serves).
+
+**Remote targeting**: remote abilities (remote distraction, charm, transposition, lighter, multi-kill) pick the best
+target within `TargetConeAngle` (8°) of the crosshair and in range, with a line of sight to the middle of it; the
+target glows (fresnel) and `[A] action` shows under it. Transposition also swaps with bodies. Picking up an ability
+when the slot is taken swaps them (the old one stays on the pedestal). Invisible: a cool, dark-edged, slightly warped
+view; armored: steel-blue edges that flash when the armor takes a hit. Abilities can play an `ActivatedFX` where they
+act (fire for the lighter, notes for the remote distraction, a swirl for blink and transposition).
 
 ## 9. World fixtures
 | Fixture | Behaviour |
@@ -222,20 +293,20 @@ drink, or in a vent to poison the sealed rooms it serves).
 | Ladder / gutter | Automatic climb |
 | Zipline | Automatic, up/down |
 | Jump pad | Launches high |
-| Locker | Hollow cabinet; the door opens and you step in (0.5 s, turning to face out), the door closes; look through the door slit; stepping out is the reverse |
-| Door | Open/close, swings away from whoever opens it; fills its 110 x 230 opening; optional keycard ID (`[Locked - Keycard N]` in the prompt) |
+| Locker | Hollow cabinet; the door (hinged on its right edge) opens and you step in (0.5 s, turning to face out), the door closes; look through the door slit; stepping out is the reverse |
+| Door | Open/close, swings away from whoever opens it; hinged on its +X edge (`bHingeAtPositiveEnd`, the other edge when off); fills its 110 x 230 opening; optional keycard ID (`[Locked - Keycard N]` in the prompt) |
 | Window | Frame inside the wall opening, two shutters opening 80 degrees away from the opener; vaultable when open |
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
-| Distraction (radio) | Turn on with `F` (or remotely): it plays a radio loop for 8 s with a pulsing light, and its noise (10 m) draws NPCs on every beat |
-| Turret | Red laser while locking on, then shoots players; hacked only from its panel by **holding** `F` 3 s (a bar fills under the crosshair; releasing or looking away cancels): then shoots NPCs |
-| Security camera | A shadowed spotlight aimed at the floor; an electronic ring marks exactly where the light ends (a crisp edge, a turning dashed ring, faint scanlines) and fills from the edge inward as the detection meter builds; light and ring go white → yellow → red; walls cut it; sees you only through open air; spotting calls reinforcements; a marker on the maps |
-| Security station | Desk + screen cycling through its cameras (a 90° feed, tonemapped at the match exposure); holding `F` 2 s disables / enables them ("no signal") |
-| Circuit breaker | Turns off its linked lights: NPCs cannot see (only hear), players see less |
+| Distraction | Radio, TV, alarm clock (`BP_Distraction_*`: mesh, loop sound, light colour, toon notes on every pulse are data). `F` (or the remote distraction) turns it on or off; once on it plays until switched off (`PlayTime` 0); only guards within its noise radius hear it (walls cut it, the nearest two come), and a guard who comes to look switches it off |
+| Turret | Red laser while locking on, then shoots players (muzzle flash, light, red tracers); hacked only from its panel by **holding** `F` 3 s (a ring fills around the F key; releasing or looking away cancels): then shoots NPCs |
+| Security camera | A shadowed yellow spotlight aimed at the floor: its lit zone is the camera's view, so walls and obstacles cut it; one colour (yellow) whatever happens while the detection meter fills; sees you only through open air; spotting calls reinforcements; a marker on the maps. 30 health: shot to pieces it sparks, hangs dead and its feed is lost for good |
+| Security station | Desk + screen cycling through its cameras (a 90° feed, tonemapped at the match exposure, without the zone pattern); holding `F` 2 s disables / enables them: the screen keeps the last frame, dimmed and noisy, with NO SIGNAL over it |
+| Circuit breaker | A lever thrown with sparks and a clunk turns off its linked lights (the bulbs go dark too): NPCs cannot see (only hear), players see less |
 | Vent | Crouch-size duct; its hatches are small doors (vertical hinge on the side) that swing away from the opener; poison spreads to linked rooms only if fully closed |
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
-| Mounted machine gun | Usable from any side (option), 180° arc, look speed matches the player's; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
-| Tank | Enter, third-person view; its cannon barrel follows the aim and kicks back; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle flash, view shake; server-driven from any client; damageable, driver ejected when destroyed |
+| Mounted machine gun | A free-standing tripod (no pedestal: place it anywhere), the gun high on it; usable from any side (option), 180° arc, look speed matches the player's; the view sits above the gun; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
+| Tank | Enter, third-person view; health bar at the top of the HUD, a reload ring around the crosshair (1.25 s), `[F] Exit` bottom right; its cannon barrel follows the aim, slides back 120 cm and the hull rocks on a shot; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle blast, view shake; server-driven from any client; damageable, driver ejected when destroyed |
 | Teleporter | Fixed pair: in → out |
 | Retrieval point candidate | See §2 |
 | Weapon / item spawn candidate | See §2 |
@@ -249,7 +320,11 @@ animation) and hold it ready (its aim pose) each time they stop to look around; 
 these are the Mannequin pack animations (pistol / rifle equip and ADS idle, `MM_HitReact_Front_Lgt_01`), seen on
 every machine. They fire like Hitman guards: a short raise
 (`NPCFirstShotDelay` 0.6 s), bursts of `NPCBurstShots` (3) at 2.5x the weapon's interval, a 1.2 s pause; low
-damage (difficulty multiplier Easy 0.25 / Normal 0.4 / Hard 0.6), so a fight in the open lasts.
+damage multiplier per difficulty (Easy 0.35 / Normal 0.55 / Hard 0.8).
+
+**In combat** guards hold their ground: within `ShootingRange` (15 m, on the NPC; snipers unlimited) they stand and shoot,
+farther away or out of sight they walk closer until in range, and they never back away. They turn to face their target
+(strafing while they move) instead of facing where they walk.
 
 There are no civilians: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate.
 
@@ -288,7 +363,8 @@ smoke, darkness, invisibility) drives perception, kill witnesses and body sighti
   spots out of sight; spots are claimed so NPCs split up.
 - **Last known position**: where an NPC last **saw** you. A mannequin ghost (`BP_LastKnownGhost`) is shown there while
   at least one NPC searches for you; never on your corpse. Noise never reveals your position: NPCs go to the sound.
-- **Hearing**: walking is heard within 1.5 m, running 4.5 m, crouching not at all. A gunshot report is heard close to
+- **Hearing**: walking is heard within 4 m, sprinting 9 m, crouching not at all (height within one storey does not
+  count). A silenced bullet into a body is heard 1.5 m away. A gunshot report is heard close to
   the shooter only (6-9 m, silenced: not at all); **where the bullet lands** makes the noise that draws NPCs (impact
   radius per weapon). Each wall in between cuts the radius again (x0.45 per wall, more than 3 walls: silence), and only
   the `MaxNoiseResponders` (2) nearest NPCs that would react respond, for every noise type. Hearing sends NPCs to the
@@ -313,10 +389,10 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 - **Compass** (top): N/S/E/W only (`bShowIntercardinals` off); optional VIP marker; retrieval
   directions while carrying.
 - **Inventory bar** (bottom centre): four cards of one size, in fixed places — the two weapon slots (the drawn one lit;
-  switching snaps, nothing slides), a divider, the manipulation (A) and move (E) abilities. Each card shows the item's
-  icon and full name (the font shrinks to fit), weapons their ammo as `current / max`, abilities a cooldown shade that
-  shrinks as they come back, charge pips and a fuel gauge for the jetpack. No key letters, no "ready", no health bar:
-  keycard chips sit above.
+  switching snaps, nothing slides), a 3 px divider, the manipulation (A) and move (E) abilities with their key in the
+  top-right corner (as bound). Each card shows the item's icon and full name (the font shrinks to fit), weapons their
+  ammo as `current / max`, abilities a cooldown shade that shrinks as they come back, charge pips and a fuel gauge for
+  the jetpack. No "ready", no health bar. The bar is centred on the screen.
 - **Minimap** (bottom left, square): the baked map, north up (your arrow turns, no view cone), alerted NPCs, sonar pings,
   map markers (cameras, retrieval points pinned to the frame when out of range);
   its frame takes the colour of the worst alert aimed at you and a banner opens across its top with a white flash
@@ -325,18 +401,25 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   hears); an "x" on a kill (red on a headshot);
   Hitman-like awareness arcs around it, one per guard or camera noticing you, placed toward it: the arc fills from its
   middle as suspicion grows (white), then turns yellow or red; cameras add a small camera mark.
-- **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault`; remote-ability targets
-  glow with `[A] Charm` under them.
+- **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault` (the keys as bound); remote-ability
+  targets glow with `[A] Charm` under them; holding F fills a ring around the key. Keycards are chips bottom right
+  (above `[F] Exit` while driving).
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
-- **Scope** overlay for the sniper. **Sightroom** (Tab): a scan wave, a grid on the floor, a cool world.
-- **Alert indicators** above NPCs (a small triangle pointing at the head: white and filling from the tip while
-  suspicion builds, solid yellow or red with a dark "!" once alerted, two pulsing arcs while calling for backup) and
-  around the crosshair.
-- **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match); the baked
+- **Scope** overlay for the sniper. **Sightroom** (Tab): a fast scan wave and a floor grid around you, then the whole map in a cool look;
+  highlights with a thin outline.
+- **Alert indicators** above NPCs (a hatched diamond: white and filling from the bottom while suspicion builds, solid
+  yellow or red once alerted, a red "!" beside it while calling for backup) and around the crosshair.
+- **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match; the host gets
+  **Back to the lobby** once the match is over); the baked
   schematic in the middle (north up, dimmed under the markers, wheel to zoom around you); the legend on the right
   toggles each marker type and shows its exact colours (you, teammates, VIP, guards on alert in white / yellow / red
   like the minimap, then one row per map marker kind on the map: retrieval points, cameras...). Debug tools (dev builds)
   open over the legend from a small "Debug tools" button.
+- **Cheats** (gym always, other maps in dev builds; panel on the right, centred vertically, a lit square when on):
+  `F1` invulnerable, `F2` infinite ammo, `F3` no cooldown, `F4` invisible to AI and cameras, `F5` respawn every NPC as
+  placed (class, place, behaviour, route, group, keycard: recorded at start), `F6` kill all NPCs, `F7` reload the map,
+  `F8` fly through walls (look to steer, `Space` / `Ctrl` up / down). Server-checked (`AllowsDebugCommands`); the
+  engine's F1-F5 view modes are cleared in `DefaultInput.ini`.
 - **Map markers**: anything with a `HitmenMapMarker` component shows on the minimap and the pause map, drawn and named
   by its kind (a `DA_MapMarker_*` data asset: legend name, colour, shape or icon, size, which maps, legend order).
   Recipe in `docs/Pipelines.md`.
@@ -346,8 +429,8 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 | Map | Purpose |
 |---|---|
 | `L_FrontEnd` | The whole front end in one scene: museum hall (title), briefing room (create room), agent stage (`BP_AgentPreview`, "Your agent"); one tagged camera per screen |
-| `L_Gym` | Debug gym: a compact walled hall (74 x 74 m) laid out like a mini LD — movement course with the traversal metrics, a numbered **parkour run** over rooftops (vault, gaps, mantle, jump and grab, beam, ledge grab onto the gutter tower, zipline north, step-ups, plank, an overlook above the AI pen), armoury (weapons on pedestals, containers, loot points), abilities, fixtures (a sealed room reached from the AI pen by a vent hatch and a crouch duct), and an AI pen (spline patrol, guard group, keycard guard to pickpocket, sentry, sniper, VIP, search spots, camera alarm); every station is labelled just above itself |
-| `L_LDTest` | **San Lazaro**, about 320 x 320 m playable (3x the 0.4 area), generated by `build_ldtest()`. **Village** (west): a market street with stalls and lamps on a breaker (keycard utility shed), 20 houses in blocks with alleys, back windows and gutters, rooftop planks, a plaza with the fountain, a cafe and the radio, a church with a sniper bell tower. **River** with two bridges (gate road, north road). **Mansion estate** (east): a walled estate (main gate with gatehouse, console, camera and mounted gun; a keycard side gate; a staff gate north), a three-floor house with rooms on both wings, a hall with a switchback stair, a sealed dining room (one door and a vent hatch), a keycard control room, a basement with the breaker and the turret panel reached by an outside stair well; a hedge maze (seeded, always solvable) with a gazebo, a greenhouse, a garage with the tank, a graveyard and its chapel, a helipad on the roof. **Cliffs and caves** (north): a cliff ridge with a pass, three cave chambers linked by tunnels, a stair well down to an underground tunnel that ends on the mansion basement stairs, a cove with a dock. Houses have switchback stairs; the mountains ring the square border. Every room is lit; 16 patrols, 10 posts, 3 snipers, 15 VIP spots, 6 retrieval points, 6 sheltered start groups |
+| `L_Gym` | Debug gym: a compact walled hall (74 x 74 m) laid out like a mini LD — movement course with the traversal metrics, a numbered **parkour run** over rooftops (vault, gaps, mantle, jump and grab, beam, ledge grab onto the gutter tower, zipline north with room in front of the post and a 5 x 12 m landing, step-ups, plank, an overlook above the AI pen); the ladder block's ladder is behind it, reached by a gold path on the right under a five-step stair up to the zipline tower; distractions (radio, TV, alarm clock), a free-standing mounted gun, a body container by the AI pen, armoury (weapons on pedestals, containers, loot points), abilities, fixtures (a sealed room reached from the AI pen by a vent hatch and a crouch duct), and an AI pen (spline patrol, guard group, keycard guard to pickpocket, sentry, sniper, VIP, search spots, camera alarm); every station is labelled just above itself |
+| `L_LDTest` | **San Lazaro**, one organic map on hills, about 240 x 210 m playable (`hitmen_sanlazaro.py`; the ground is a heightfield of 1 m cells, tiles tagged `HitmenTerrain`). Outside an irregular outline the ground rises into mountains (invisible walls on the outline). **Favela** (south on the minimap): five terraces up a hillside, small houses of 1 to 3 floors in rows along paved alleys, cross alleys with stairs up to the next terrace behind retaining walls, yards with low walls, roofs one floor high reached by a plank from the terrace above, planks between roofs of the same height; every facade has vaultable windows and a ledge band under them (hang and shimmy); a market with stalls and the radio, the alarm clock in an alley, a body container, street lamps on a breaker (keycard kiosk), a bell tower with a sniper. **Dry ravine** (across the middle, no water): rocks in its bed, two stone bridges arching from rim to rim, a high walkway between two watchtowers. **Mansion estate** (north) on a plateau, its grounds about 40 % smaller: the main gate with gatehouse, console, camera and a mounted gun on its tripod, a keycard side gate, a staff gate toward the ridge; the same three-floor house (rooms on both wings, a hall with the switchback stair, the sealed dining room with its vent hatch, the TV in the lounge, the keycard control room, the basement with the breaker and the turret panel down an outside stair well), a small hedge maze with a gazebo, the greenhouse, the garage with the tank, a body container, the helipad on the roof. **Ridge and cave** (east): a rocky ridge with a cave dug into its flank (an entrance under an overhang, three chambers under the rock linked by passages, lit, the den with a mounted gun), a stair well in the last chamber down to the tunnel that ends on the mansion basement stairs. Every room has two lamps (lumens; one per room casts shadows in the estate and the cave); patrols in every alley, the estate and the cave, two guard groups, posts, 3 snipers, VIP spots in the three zones, 6 retrieval points, 6 start groups near the edge |
 | `L_Empty_01`, `L_Empty_02` | Empty maps for the team |
 
 Every match map has one fixed exposure (`MatchExposure`, an unbound post process volume, EV100 -0.3): no eye

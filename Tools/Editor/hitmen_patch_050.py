@@ -50,7 +50,7 @@ if wanted("weapon_vfx"):
 
 if wanted("noise"):
     # Hearing: a gunshot is heard close to the shooter only; the bullet impact is what draws NPCs.
-    report = {"SMG": (600.0, 500.0), "AssaultRifle": (700.0, 600.0), "BurstRifle": (700.0, 600.0), "Shotgun": (800.0, 600.0),
+    report = {"SMG": (600.0, 500.0), "AssaultRifle": (700.0, 600.0), "Shotgun": (800.0, 600.0),
               "Minigun": (900.0, 700.0), "Sniper": (800.0, 700.0), "RocketLauncher": (1200.0, 0.0), "GrenadeLauncher": (1000.0, 0.0),
               "BlackHole": (500.0, 0.0), "Pistol": (0.0, 300.0)}
     for name, (radius, impact) in report.items():

@@ -143,7 +143,10 @@ void AHitmenHUD::HandleSpectatorMode(uint8 Mode)
 
 void AHitmenHUD::HandleMatchEnded(const FHitmenMatchResult& Result)
 {
-	SetShown(ResultsWidget, true);
+	if (ResultsWidget)
+	{
+		ResultsWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
 	RefreshInputMode();
 }
 
@@ -155,7 +158,7 @@ void AHitmenHUD::RefreshInputMode()
 	{
 		return;
 	}
-	const bool bResults = ResultsWidget && ResultsWidget->IsVisible();
-	const bool bOverlay = UI->IsPauseMenuOpen() || UI->IsOptionsOpen() || UI->IsEmoteWheelOpen() || bResults;
+	// The results banner leaves the game input on: everyone flies free once the match is over.
+	const bool bOverlay = UI->IsPauseMenuOpen() || UI->IsOptionsOpen() || UI->IsEmoteWheelOpen();
 	PC->SetMenuInputMode(bPrimaryIsMenu || bOverlay, bPrimaryIsMenu);
 }

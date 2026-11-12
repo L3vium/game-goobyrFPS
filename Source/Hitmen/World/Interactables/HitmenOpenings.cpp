@@ -118,8 +118,8 @@ void AHitmenDoor::BeginPlay()
 {
 	Super::BeginPlay();
 	ClosedRotation = Mesh->GetRelativeRotation();
-	// Doors swing on their left edge (local -X), like a real door.
-	CacheHinge(FVector(-1.f, 0.f, 0.f));
+	// Doors swing on one edge (local +X by default, -X when bHingeAtPositiveEnd is off).
+	CacheHinge(FVector(GetHingeSign(), 0.f, 0.f));
 	if (HasAuthority())
 	{
 		NPCTrigger->OnComponentBeginOverlap.AddDynamic(this, &AHitmenDoor::HandleNPCOverlap);
@@ -163,7 +163,8 @@ void AHitmenDoor::OnInteracted(AActor* Interactor)
 
 void AHitmenDoor::ApplyOpenAlpha(float Alpha)
 {
-	RotateAroundHinge(FRotator(0.f, OpenAngle * OpenDirection * Alpha, 0.f));
+	// The angle's sign follows the hinge edge so the door always swings away from whoever opened it.
+	RotateAroundHinge(FRotator(0.f, -GetHingeSign() * OpenAngle * OpenDirection * Alpha, 0.f));
 }
 
 void AHitmenDoor::HandleNPCOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -265,14 +266,14 @@ void AHitmenVentHatch::BeginPlay()
 {
 	Super::BeginPlay();
 	ClosedRotation = Mesh->GetRelativeRotation();
-	// A small door: the hinge is the panel's left edge (local -X), vertical, like the doors.
-	CacheHinge(FVector(-1.f, 0.f, 0.f));
+	// A small door: the hinge is one vertical edge of the panel, like the doors.
+	CacheHinge(FVector(GetHingeSign(), 0.f, 0.f));
 }
 
 void AHitmenVentHatch::ApplyOpenAlpha(float Alpha)
 {
 	// The panel lies in X-Z (thin along Y): it swings around its vertical hinge, away from the opener.
-	RotateAroundHinge(FRotator(0.f, OpenAngle * OpenDirection * Alpha, 0.f));
+	RotateAroundHinge(FRotator(0.f, -GetHingeSign() * OpenAngle * OpenDirection * Alpha, 0.f));
 }
 
 void AHitmenVentHatch::ApplyPoison_Implementation(AActor* Poisoner)

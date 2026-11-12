@@ -23,6 +23,7 @@
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Core/HitmenTeamLibrary.h"
 #include "Components/WidgetComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "UI/HitmenHUDWidgets.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Movement/HitmenCharacterMovementComponent.h"
@@ -290,7 +291,38 @@ void AHitmenNPC::PushAlertView()
 	if (UHitmenAlertIndicatorWidget* Indicator = Cast<UHitmenAlertIndicatorWidget>(AlertWidget->GetUserWidgetObject()))
 	{
 		Indicator->SetAlertView(AlertComponent->GetAlertColor(), AlertComponent->GetSuspicion(), AlertComponent->IsCallingReinforcements());
+		Indicator->SetAsleep(bSleepRagdoll && !IsDead());
 	}
+}
+
+void AHitmenNPC::SetSleepRagdoll(bool bAsleep)
+{
+	USkeletalMeshComponent* Body = GetMesh();
+	if (!Body || IsDead() || bAsleep == bSleepRagdoll)
+	{
+		return;
+	}
+	bSleepRagdoll = bAsleep;
+	if (bAsleep)
+	{
+		// Out cold: the body goes limp (every machine simulates it; the capsule stays where it fell asleep).
+		SleepMeshRelative = Body->GetRelativeTransform();
+		Body->SetCollisionProfileName(TEXT("Ragdoll"));
+		Body->SetSimulatePhysics(true);
+		Body->SetAllBodiesSimulatePhysics(true);
+		Body->WakeAllRigidBodies();
+	}
+	else
+	{
+		// Wakes up: back in the capsule, a heavy hit reaction hides the snap.
+		Body->SetSimulatePhysics(false);
+		Body->SetAllBodiesSimulatePhysics(false);
+		Body->SetCollisionProfileName(TEXT("CharacterMesh"));
+		Body->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		Body->SetRelativeTransform(SleepMeshRelative);
+		PlayAnimSetMontageLocal(EHitmenAnimMontage::HitReact);
+	}
+	PushAlertView();
 }
 
 void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState)
@@ -305,7 +337,25 @@ void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAler
 		case EHitmenAlertState::Searching:     Movement->WalkSpeed = AlertWalkSpeed; break;
 		default:                               Movement->WalkSpeed = CalmWalkSpeed; break;
 		}
+		// Fighting: face the target (controller focus), strafing while moving; otherwise face where it walks.
+		// Orient-to-movement wins over the controller rotation in the movement code, so it must be off.
+		const bool bFighting = NewState == EHitmenAlertState::Combat;
+		Movement->bOrientRotationToMovement = !bFighting;
+		Movement->bUseControllerDesiredRotation = true;
+		if (bFighting)
+		{
+			Movement->RotationRate = FRotator(0.f, CombatTurnRate, 0.f);
+		}
+		else
+		{
+			Movement->RotationRate = GetClass()->GetDefaultObject<AHitmenNPC>()->GetCharacterMovement()->RotationRate;
+		}
 	}
+}
+
+float AHitmenNPC::GetEffectiveShootingRange() const
+{
+	return IsSniper() || ShootingRange <= 0.f ? TNumericLimits<float>::Max() : ShootingRange;
 }
 
 int32 AHitmenNPC::AdvancePatrolIndex(int32 PointCount)
@@ -447,6 +497,10 @@ void AHitmenNPC::HandleDeath(AActor* Killer, AActor* DamageCauser, bool bHeadsho
 void AHitmenNPC::HandleStatusAdded(EHitmenStatusEffect Status, AActor* StatusInstigator)
 {
 	Super::HandleStatusAdded(Status, StatusInstigator);
+	if (Status == EHitmenStatusEffect::Asleep)
+	{
+		SetSleepRagdoll(true);
+	}
 	if (!HasAuthority())
 	{
 		return;
@@ -462,6 +516,10 @@ void AHitmenNPC::HandleStatusAdded(EHitmenStatusEffect Status, AActor* StatusIns
 void AHitmenNPC::HandleStatusRemoved(EHitmenStatusEffect Status, AActor* StatusInstigator)
 {
 	Super::HandleStatusRemoved(Status, StatusInstigator);
+	if (Status == EHitmenStatusEffect::Asleep)
+	{
+		SetSleepRagdoll(false);
+	}
 	if (!HasAuthority())
 	{
 		return;

@@ -20,6 +20,17 @@ class AAIController;
 class UVOIPTalker;
 class USoundAttenuation;
 
+/** Procedural first-person actions of the arms (no body montage plays on the first-person arms). */
+UENUM(BlueprintType)
+enum class EHitmenFPAction : uint8
+{
+	None,
+	Punch,
+	KnifeSlash,
+	Throw,
+	Takedown
+};
+
 UCLASS(Blueprintable)
 class HITMEN_API AHitmenPlayerCharacter : public AHitmenCharacterBase, public IHitmenInputReceiver
 {
@@ -89,6 +100,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Camera")
 	void ShowFirstPersonArms(float Duration);
 
+	/** Local: plays a procedural first-person arms action (punch, knife slash, throw, takedown). */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Camera")
+	void PlayFirstPersonAction(EHitmenFPAction Action, float Duration);
+
+	/** First-person rendering scale (cosmetics drawn next to the first-person weapon use it). */
+	float GetFirstPersonViewScale() const { return FirstPersonViewScale; }
+
+	/** Local: the held weapon fired (kick, or the knife slash for melee weapons). */
+	void OnFirstPersonFired(const class UHitmenWeaponData* Weapon);
+
+	virtual void HandleWeaponThrown(UHitmenWeaponData* Weapon) override;
+
 	/** True while the first-person arms are shown (weapon in hand or a recent action). */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
 	bool AreFirstPersonArmsVisible() const { return bArmsVisible; }
@@ -106,6 +129,7 @@ public:
 	virtual void Input_JumpReleased() override;
 	virtual void Input_CrouchChanged(bool bWantsCrouch) override;
 	virtual void Input_SprintChanged(bool bWantsSprint) override;
+	virtual void Input_SprintTapped() override;
 	virtual void Input_FirePressed() override;
 	virtual void Input_FireReleased() override;
 	virtual void Input_AimChanged(bool bWantsAim) override;
@@ -158,7 +182,7 @@ protected:
 
 	/** Fall speed under the canopy. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="50", Units="cm/s"))
-	float ParachuteFallSpeed = 520.f;
+	float ParachuteFallSpeed = 1500.f;
 
 	/** Gentle drift of the canopy while falling (cm/s). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Intro", meta=(ClampMin="0", Units="cm/s"))
@@ -222,18 +246,19 @@ protected:
 	// ---- First-person arms (shown only with a weapon in hand or while acting) ----
 	/** Arms mesh offset from the camera when firing from the hip. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
-	FVector ArmsHipOffset = FVector(8.f, 20.f, -166.f);
+	FVector ArmsHipOffset = FVector(8.f, 17.f, -165.f);
 
-	/** Arms mesh offset while aiming: the gun only moves a little toward the centre and stays low right. */
+	/** Arms mesh offset while aiming: the gun comes to the centre, still low (the view stays clear). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
-	FVector ArmsAimOffset = FVector(4.f, 11.f, -161.f);
+	FVector ArmsAimOffset = FVector(7.f, 10.f, -161.f);
 
 	/** Sprinting: the weapon is lowered and tilted (it stays in view). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
 	FVector ArmsSprintOffset = FVector(4.f, 22.f, -171.f);
 
+	/** Camera-space pitch / yaw / roll while sprinting (muzzle down, turned in, canted). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
-	FRotator ArmsSprintRotation = FRotator(-14.f, 12.f, 18.f);
+	FRotator ArmsSprintRotation = FRotator(-16.f, 10.f, 14.f);
 
 	/** Arms mesh offset with no weapon (punch, takedown): higher, so the fists swing through the view. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
@@ -264,6 +289,88 @@ protected:
 	/** Walking bob of the arms (cm at full walk speed). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
 	float ArmsBobAmount = 0.9f;
+
+	/** Arms rotations (sway, kick, actions) turn around this point in camera space (about the hands), not the feet. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
+	FVector ArmsPivot = FVector(35.f, 10.f, -22.f);
+
+	/** Hip <-> aim travel: a spring that overshoots a little and settles (the raise reads as a motion). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="1"))
+	float ArmsAimStiffness = 260.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0", ClampMax="2"))
+	float ArmsAimDamping = 0.72f;
+
+	/** Moving sideways tilts the arms (deg at walk speed); moving forward / back pushes them (cm). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
+	float ArmsStrafeTilt = 4.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
+	float ArmsMoveLag = 1.6f;
+
+	/** Near a wall the weapon is pulled back and lowered instead of going through it. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0", Units="cm"))
+	float ArmsWallCheckDistance = 75.f;
+
+	/** First-person rendering scale (UE first-person view): lower pulls the arms toward the eye, so they never
+	 *  reach into walls, without changing their size on screen. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0.01", ClampMax="1"))
+	float FirstPersonViewScale = 0.35f;
+
+	// ---- Damage feel (the camera's own post process: fringe and red tint on hits, colour drains with health) ----
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Damage", meta=(ClampMin="0"))
+	float HitFringeIntensity = 5.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Damage", meta=(ClampMin="0", ClampMax="1"))
+	float LowHealthSaturation = 0.35f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Damage", meta=(ClampMin="0"))
+	float HitShake = 0.35f;
+
+	float HitPulse = 0.f;
+	float LastHealthSeen = -1.f;
+	float LastArmorSeen = -1.f;
+	float ArmorPulse = 0.f;
+
+	// ---- Trap: mash the move keys to break free ----
+	/** Distinct move-key presses needed to break out of a trap (each press counts once; progress drains). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Movement|Trap", meta=(ClampMin="1"))
+	int32 TrapMashPresses = 8;
+
+	/** Share of the escape lost per second without a press. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Movement|Trap", meta=(ClampMin="0"))
+	float TrapEscapeDrain = 0.35f;
+
+	UFUNCTION(Server, Reliable)
+	void Server_TrapMash();
+
+	float TrapEscapeProgress = 0.f;
+	FIntPoint LastMoveKeys = FIntPoint::ZeroValue;
+	void UpdateDamageFeel(float DeltaSeconds);
+
+	// ---- Head bob (the camera; footsteps fall on the low point of each bob) ----
+	/** Bob height and sideways sway (cm) at walk; sprint and crouch scale it. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0", Units="cm"))
+	float HeadBobHeight = 1.4f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0", Units="cm"))
+	float HeadBobSide = 0.8f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0"))
+	float HeadBobSprintScale = 1.7f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0"))
+	float HeadBobCrouchScale = 0.6f;
+
+	/** Distance per step (cm) for walk, sprint and crouch: one bob (and one footstep) per step. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="10", Units="cm"))
+	float WalkStepLength = 75.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="10", Units="cm"))
+	float SprintStepLength = 105.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="10", Units="cm"))
+	float CrouchStepLength = 50.f;
 
 	// ---- Landing ----
 	/** Falls faster than this make a landing sound; faster than HardLandingSpeed a hard landing (sound + view dip). */
@@ -346,6 +453,10 @@ protected:
 	void UpdateFirstPersonArms(float DeltaSeconds);
 	void UpdateDeathCamera(float DeltaSeconds);
 	float GetTargetEyeHeight() const;
+	/** Local: camera bob from the step phase; plays your footstep at the low point of each step. */
+	void UpdateHeadBob(float DeltaSeconds);
+	/** Offset (cm) and rotation (deg, camera space) of the running procedural action. */
+	void EvaluateFirstPersonAction(FVector& OutOffset, FRotator& OutRotation) const;
 
 	float BaseFOV = 90.f;
 	float CurrentEyeHeight = 68.f;
@@ -357,6 +468,28 @@ protected:
 	float ShakeDuration = 0.f;
 	float ShakeTimeLeft = 0.f;
 	FVector CurrentArmsOffset = FVector::ZeroVector;
+	FVector ArmsOffsetVelocity = FVector::ZeroVector;
+	// Fire kick spring (camera-space offset and pitch / yaw / roll), equip, actions, scope, wall.
+	FVector KickOffset = FVector::ZeroVector;
+	FVector KickOffsetVelocity = FVector::ZeroVector;
+	FVector KickRotation = FVector::ZeroVector;
+	FVector KickRotationVelocity = FVector::ZeroVector;
+	float KickStiffness = 220.f;
+	TWeakObjectPtr<class AHitmenWeaponBase> LastArmsWeapon;
+	float EquipStartTime = -100.f;
+	EHitmenFPAction FPAction = EHitmenFPAction::None;
+	float FPActionStart = -100.f;
+	float FPActionDuration = 0.f;
+	float FPActionSide = 1.f;
+	float AimHeldTime = 0.f;
+	float WallPullAlpha = 0.f;
+	FVector2D ScopeSwayApplied = FVector2D::ZeroVector;
+	float HeadBobPhase = 0.f;
+	float HeadBobAlpha = 0.f;
+	int32 HeadBobStep = 0;
+	FVector HeadBobOffset = FVector::ZeroVector;
+	/** Smoothed walk lag (X, cm) and strafe tilt (roll, deg) of the arms. */
+	FVector2D ArmsMoveState = FVector2D::ZeroVector;
 	FRotator ArmsSway = FRotator::ZeroRotator;
 	FRotator LastControlRotation = FRotator::ZeroRotator;
 	float ArmsBobPhase = 0.f;
@@ -372,4 +505,17 @@ protected:
 	void UpdateHUDHints(float DeltaSeconds);
 	bool bWantsCrouchInput = false;
 	bool bWantsSprintInput = false;
+
+	// Jetpack on Space: holding Space in the air thrusts (E still works).
+	bool bJumpInputHeld = false;
+	float JumpInputPressTime = -100.f;
+	bool bJetpackFromSpace = false;
+
+	/** Space held this long in the air starts the jetpack (a plain jump stays a jump). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Movement", meta=(ClampMin="0", Units="s"))
+	float JetpackSpaceHoldDelay = 0.2f;
+
+	/** Move ability of this class equipped? */
+	bool HasMoveAbility(TSubclassOf<class UHitmenAbility> AbilityClass) const;
+	void UpdateJetpackFromSpace();
 };

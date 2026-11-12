@@ -690,6 +690,22 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 		HitmenUI::AddToCanvas(AgentCanvas, Button, FAnchors(0.f, 0.f), FVector2D(-1000.f, -1000.f), FVector2D(0.5f, 0.5f), FVector2D(50.f, 50.f));
 		LookArrows.Add(Button);
 	}
+	// "3 / 8" under each pair (placed every frame under the right arrow).
+	for (int32 LookIndex = 0; LookIndex < 3; ++LookIndex)
+	{
+		UTextBlock* Counter = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 17, TEXT("Medium"), HitmenUI::TextDim());
+		Counter->SetFont(HitmenUI::SpacedFont(17, TEXT("Medium"), 120));
+		Counter->SetJustification(ETextJustify::Center);
+		UCanvasPanelSlot* CounterSlot = HitmenUI::AddToCanvas(AgentCanvas, Counter, FAnchors(0.f, 0.f), FVector2D(-1000.f, -1000.f), FVector2D(0.5f, 0.f));
+		CounterSlot->SetAutoSize(true);
+		LookCounters.Add(Counter);
+	}
+	// Watchers have no agent: one line in the middle says who is ready.
+	WatcherWaitText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 34, TEXT("SemiBold"));
+	WatcherWaitText->SetJustification(ETextJustify::Center);
+	UCanvasPanelSlot* WaitSlot = HitmenUI::AddToCanvas(AgentCanvas, WatcherWaitText, FAnchors(0.5f, 0.5f), FVector2D::ZeroVector, FVector2D(0.5f, 0.5f));
+	WaitSlot->SetAutoSize(true);
+	WatcherWaitText->SetVisibility(ESlateVisibility::Collapsed);
 	// Randomize look, under the agent's feet.
 	RandomizeButton = WidgetTree->ConstructWidget<UHitmenIconButton>(UHitmenIconButton::StaticClass());
 	RandomizeButton->Setup(EHitmenIconGlyph::Dice, 40.f, true);
@@ -699,15 +715,18 @@ void UHitmenLobbyWidget::BuildDefaultLayout()
 
 	// Loadout: three rows of icon tiles, always visible on the right. A click picks.
 	UBorder* LoadoutPanel = HitmenUI::MakePanel(WidgetTree, PanelOuter, FMargin(20.f, 16.f));
+	LoadoutPanelWidget = LoadoutPanel;
 	HitmenUI::AddToCanvas(AgentCanvas, LoadoutPanel, FAnchors(1.f, 0.f), FVector2D(-90.f, 120.f), FVector2D(1.f, 0.f));
 	UVerticalBox* Loadout = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	LoadoutPanel->SetContent(Loadout);
-	const FText RowNames[3] = { LOCTEXT("WeaponRow", "WEAPON"), LOCTEXT("MoveRow", "MOVE ABILITY   [E]"), LOCTEXT("ManipulationRow", "MANIPULATION   [A]") };
+	const FText RowNames[3] = { LOCTEXT("WeaponRow", "WEAPON"), LOCTEXT("MoveRow", "MOVE ABILITY"), LOCTEXT("ManipulationRow", "MANIPULATION") };
 	const FName StripHandlers[3] = { GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleWeaponChosen),
 		GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleMoveChosen), GET_FUNCTION_NAME_CHECKED(UHitmenLobbyWidget, HandleManipulationChosen) };
 	for (int32 Row = 0; Row < 3; ++Row)
 	{
-		HitmenUI::AddToVBox(Loadout, MakeSectionLabel(WidgetTree, RowNames[Row]), FMargin(0.f, Row == 0 ? 0.f : 16.f, 0.f, 8.f));
+		UTextBlock* RowLabel = MakeSectionLabel(WidgetTree, RowNames[Row]);
+		LoadoutRowLabels.Add(RowLabel);
+		HitmenUI::AddToVBox(Loadout, RowLabel, FMargin(0.f, Row == 0 ? 0.f : 16.f, 0.f, 8.f));
 		UHitmenChoiceStrip* Strip = WidgetTree->ConstructWidget<UHitmenChoiceStrip>(UHitmenChoiceStrip::StaticClass());
 		Strip->StripIndex = Row;
 		FScriptDelegate Delegate;
@@ -751,8 +770,21 @@ void UHitmenLobbyWidget::BindEvents()
 	{
 		UI->OnLobbyChanged.AddUniqueDynamic(this, &UHitmenLobbyWidget::HandleLobbyChanged);
 		UI->OnMatchPhaseChanged.AddUniqueDynamic(this, &UHitmenLobbyWidget::HandlePhaseChanged);
+		UI->OnKeyLabelsChanged.AddUniqueDynamic(this, &UHitmenLobbyWidget::HandleKeyLabelsChanged);
 	}
+	HandleKeyLabelsChanged();
 	HandleLobbyChanged();
+}
+
+void UHitmenLobbyWidget::HandleKeyLabelsChanged()
+{
+	const UHitmenUIEventSubsystem* UI = GetUIEvents();
+	if (!UI || LoadoutRowLabels.Num() < 3)
+	{
+		return;
+	}
+	LoadoutRowLabels[1]->SetText(FText::Format(LOCTEXT("MoveRowKey", "MOVE ABILITY   [{0}]"), FText::FromString(UI->GetKeyLabel(EHitmenKeyLabel::MoveAbility))));
+	LoadoutRowLabels[2]->SetText(FText::Format(LOCTEXT("ManipulationRowKey", "MANIPULATION   [{0}]"), FText::FromString(UI->GetKeyLabel(EHitmenKeyLabel::Manipulation))));
 }
 
 void UHitmenLobbyWidget::UnbindEvents()
@@ -760,6 +792,7 @@ void UHitmenLobbyWidget::UnbindEvents()
 	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
 		UI->OnLobbyChanged.RemoveAll(this);
+		UI->OnKeyLabelsChanged.RemoveAll(this);
 		UI->OnMatchPhaseChanged.RemoveAll(this);
 	}
 }
@@ -871,7 +904,13 @@ void UHitmenLobbyWidget::RefreshLobby()
 	if (PrevDifficultyButton) { PrevDifficultyButton->SetVisibility(bHost ? ESlateVisibility::Visible : ESlateVisibility::Hidden); }
 	if (NextDifficultyButton) { NextDifficultyButton->SetVisibility(bHost ? ESlateVisibility::Visible : ESlateVisibility::Hidden); }
 	if (CreateTeamButton) { CreateTeamButton->SetVisibility(bHost ? ESlateVisibility::Visible : ESlateVisibility::Collapsed); }
-	if (StartButton) { StartButton->SetVisibility(bHost ? ESlateVisibility::Visible : ESlateVisibility::Collapsed); }
+	if (StartButton)
+	{
+		StartButton->SetVisibility(bHost ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		// A watching host has no agent to choose: the button just starts (at once when only watchers are in).
+		const AHitmenPlayerState* Self = GetLocalPlayerState();
+		StartButton->SetLabel(Self && Self->IsWatcher() ? LOCTEXT("StartWatching", "Start") : LOCTEXT("ChooseAgent", "Choose your agent"));
+	}
 	if (HostHintText) { HostHintText->SetVisibility(bHost ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible); }
 	if (PlayerCountText)
 	{
@@ -934,6 +973,21 @@ void UHitmenLobbyWidget::PreviewLocalCosmetics()
 	{
 		Preview->ShowCosmetics(LocalCosmetics);
 	}
+	RefreshLookCounters();
+}
+
+void UHitmenLobbyWidget::RefreshLookCounters()
+{
+	const UHitmenCatalog* Catalog = GetCatalog();
+	for (int32 LookIndex = 0; LookIndex < LookCounters.Num() && Catalog; ++LookIndex)
+	{
+		// Position among the items, "None" counted last (the arrows cycle through it too).
+		const TArray<UHitmenCosmeticItem*> Items = Catalog->GetCosmeticsForSlot(LookSlots[LookIndex]);
+		const int32 Count = Items.Num() + 1;
+		const int32 Index = Items.IndexOfByKey(LocalCosmetics.GetSlot(LookSlots[LookIndex]));
+		const int32 Position = Index == INDEX_NONE ? Count : Index + 1;
+		LookCounters[LookIndex]->SetText(FText::Format(LOCTEXT("LookCounter", "{0} / {1}"), FText::AsNumber(Position), FText::AsNumber(Count)));
+	}
 }
 
 void UHitmenLobbyWidget::RefreshCustomization()
@@ -985,6 +1039,21 @@ void UHitmenLobbyWidget::RefreshCustomization()
 	if (ReadyStatusText)
 	{
 		ReadyStatusText->SetText(FText::Format(LOCTEXT("ReadyCount", "{0} / {1} ready"), FText::AsNumber(ReadyCount), FText::AsNumber(Needed)));
+	}
+	// Watchers: nothing to dress or pick, only the room's progress.
+	const bool bWatcher = PS->IsWatcher();
+	const ESlateVisibility AgentVisibility = bWatcher ? ESlateVisibility::Collapsed : ESlateVisibility::Visible;
+	for (UHitmenArrowButton* Arrow : LookArrows) { Arrow->SetVisibility(AgentVisibility); }
+	for (UTextBlock* Counter : LookCounters) { Counter->SetVisibility(bWatcher ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible); }
+	if (AgentNameBox) { AgentNameBox->SetVisibility(AgentVisibility); }
+	if (RandomizeButton) { RandomizeButton->SetVisibility(AgentVisibility); }
+	if (LoadoutPanelWidget) { LoadoutPanelWidget->SetVisibility(AgentVisibility); }
+	if (ReadyButton) { ReadyButton->SetVisibility(AgentVisibility); }
+	if (ReadyStatusText) { ReadyStatusText->SetVisibility(bWatcher ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible); }
+	if (WatcherWaitText)
+	{
+		WatcherWaitText->SetVisibility(bWatcher ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		WatcherWaitText->SetText(FText::Format(LOCTEXT("WatcherWait", "WAITING FOR OTHER PLAYERS\n{0} / {1} ready"), FText::AsNumber(ReadyCount), FText::AsNumber(Needed)));
 	}
 }
 
@@ -1043,6 +1112,13 @@ void UHitmenLobbyWidget::UpdateAgentAnchors()
 			if (UCanvasPanelSlot* ArrowSlot = Cast<UCanvasPanelSlot>(LookArrows[LookIndex * 2 + Side]->Slot))
 			{
 				ArrowSlot->SetPosition(FVector2D(Center.X + (Side == 0 ? -AgentArrowSpacing : AgentArrowSpacing), Anchor.Y));
+			}
+		}
+		if (LookCounters.IsValidIndex(LookIndex))
+		{
+			if (UCanvasPanelSlot* CounterSlot = Cast<UCanvasPanelSlot>(LookCounters[LookIndex]->Slot))
+			{
+				CounterSlot->SetPosition(FVector2D(Center.X + AgentArrowSpacing, Anchor.Y + 30.f));
 			}
 		}
 	}

@@ -147,6 +147,8 @@ protected:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenDamageVignetteWidget> DamageVignette;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenScopeWidget> Scope;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenInventoryBarWidget> InventoryBar;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenStatusCornerWidget> StatusCorner;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenCheatPanelWidget> CheatPanel;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenWorldHintWidget> WorldHint;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenIntroWidget> Intro;
 
@@ -168,6 +170,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Alert")
 	void SetAlertView(EHitmenAlertColor InColor, float InSuspicion, bool bInCallingReinforcements);
 
+	/** Asleep (sleep dart): floating "Z z z" instead of the alert marker. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Alert")
+	void SetAsleep(bool bInAsleep);
+
 protected:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	virtual void BuildDefaultLayout() override;
@@ -175,4 +181,5 @@ protected:
 	EHitmenAlertColor Color = EHitmenAlertColor::None;
 	float Suspicion = 0.f;
 	bool bCallingReinforcements = false;
+	bool bAsleep = false;
 };

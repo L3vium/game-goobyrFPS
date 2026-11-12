@@ -28,7 +28,27 @@ ACTIONS = {
     "IA_EmoteWheel": ("bool", [("EmoteWheel", "Emote wheel", "R", [])]),
     "IA_Pause": ("bool", [("Pause", "Pause", "Escape", []), ("PauseAlt", "Pause (alt)", "P", [])]),
     "IA_SpectatorMode": ("bool", [("SpectatorMode", "Spectator view", "V", [])]),
+    "IA_Confirm": ("bool", [("Confirm", "Confirm / back to the lobby", "Enter", [])]),
 }
+
+# Free fly (IMC_Spectator, above the game while spectating): Unreal-like, A up / E down.
+SPECTATOR_ACTIONS = {
+    "IA_SpectatorUp": ("bool", [("SpectatorUp", "Fly up", "SpaceBar", []), ("SpectatorUpAlt", "Fly up (alt)", "A", [])]),
+    "IA_SpectatorDown": ("bool", [("SpectatorDown", "Fly down", "LeftControl", []), ("SpectatorDownAlt", "Fly down (alt)", "E", [])]),
+    "IA_SpectatorFast": ("bool", [("SpectatorFast", "Fly faster", "LeftShift", [])]),
+}
+
+# Options > Controls sections (PlayerMappableKeySettings.DisplayCategory).
+INPUT_CATEGORIES = {
+    "IA_Move": "Movement", "IA_Jump": "Movement", "IA_Crouch": "Movement", "IA_Sprint": "Movement",
+    "IA_Fire": "Combat", "IA_Aim": "Combat", "IA_SwitchSlot": "Combat",
+    "IA_MoveAbility": "Abilities", "IA_ManipulationAbility": "Abilities", "IA_Sightroom": "Abilities",
+    "IA_Interact": "Interaction", "IA_EmoteWheel": "Interaction",
+    "IA_SpectatorMode": "Spectator", "IA_SpectatorUp": "Spectator", "IA_SpectatorDown": "Spectator", "IA_SpectatorFast": "Spectator",
+    "IA_Pause": "Menus", "IA_Confirm": "Menus",
+}
+# Not rebindable (the mouse axis).
+FIXED_INPUTS = {"IA_Look"}
 
 VALUE_TYPES = {
     "bool": unreal.InputActionValueType.BOOLEAN,
@@ -37,25 +57,18 @@ VALUE_TYPES = {
 }
 
 
-def build_input():
-    folder = path("Input", "Actions")
-    actions = {}
-    for name, (value_type, _) in ACTIONS.items():
-        ia = create(name, folder, unreal.InputAction, unreal.InputAction_Factory())
-        set_props(ia, value_type=VALUE_TYPES[value_type])
-        save(ia)
-        actions[name] = ia
-
-    imc = create("IMC_Gameplay", path("Input", "Contexts"), unreal.InputMappingContext, unreal.InputMappingContext_Factory())
+def fill_mapping_context(imc, action_defs, actions):
+    """Maps every key of action_defs into imc, with modifiers and player-mappable settings (name, display name,
+    Options category)."""
     imc.unmap_all()
-    for name, (_, mappings) in ACTIONS.items():
+    for name, (_, mappings) in action_defs.items():
         for mapping_name, display, key_name, modifiers in mappings:
             imc.map_key(actions[name], key(key_name))
     # Second pass: modifiers and player-mappable settings on each mapping.
     data = imc.get_editor_property("default_key_mappings")
     mapping_list = list(data.get_editor_property("mappings"))
     lookup = {}
-    for name, (_, mappings) in ACTIONS.items():
+    for name, (_, mappings) in action_defs.items():
         for mapping_name, display, key_name, modifiers in mappings:
             lookup[(name, key_name)] = (mapping_name, display, modifiers)
     rebuilt = []
@@ -72,20 +85,36 @@ def build_input():
                 elif mod == "negate":
                     mods.append(unreal.new_object(unreal.InputModifierNegate, outer=imc))
             mapping.set_editor_property("modifiers", mods)
-            settings = unreal.new_object(unreal.PlayerMappableKeySettings, outer=imc)
-            settings.set_editor_property("name", mapping_name)
-            settings.set_editor_property("display_name", display)
-            settings.set_editor_property("display_category", "Hitmen")
-            mapping.set_editor_property("setting_behavior", unreal.PlayerMappableKeySettingBehaviors.OVERRIDE_SETTINGS)
-            mapping.set_editor_property("player_mappable_key_settings", settings)
+            if action.get_name() in FIXED_INPUTS:
+                mapping.set_editor_property("setting_behavior", unreal.PlayerMappableKeySettingBehaviors.IGNORE_SETTINGS)
+            else:
+                settings = unreal.new_object(unreal.PlayerMappableKeySettings, outer=imc)
+                settings.set_editor_property("name", mapping_name)
+                settings.set_editor_property("display_name", display)
+                settings.set_editor_property("display_category", INPUT_CATEGORIES.get(action.get_name(), "Other"))
+                mapping.set_editor_property("setting_behavior", unreal.PlayerMappableKeySettingBehaviors.OVERRIDE_SETTINGS)
+                mapping.set_editor_property("player_mappable_key_settings", settings)
         rebuilt.append(mapping)
     data.set_editor_property("mappings", rebuilt)
     imc.set_editor_property("default_key_mappings", data)
     save(imc)
+    return rebuilt
 
+
+def build_input():
+    folder = path("Input", "Actions")
+    actions = {}
+    for name, (value_type, _) in list(ACTIONS.items()) + list(SPECTATOR_ACTIONS.items()):
+        ia = create(name, folder, unreal.InputAction, unreal.InputAction_Factory())
+        set_props(ia, value_type=VALUE_TYPES[value_type])
+        save(ia)
+        actions[name] = ia
+
+    imc = create("IMC_Gameplay", path("Input", "Contexts"), unreal.InputMappingContext, unreal.InputMappingContext_Factory())
+    rebuilt = fill_mapping_context(imc, ACTIONS, actions)
     spectator = create("IMC_Spectator", path("Input", "Contexts"), unreal.InputMappingContext, unreal.InputMappingContext_Factory())
-    save(spectator)
-    log("input: actions", len(actions), "mappings", len(rebuilt))
+    spectator_rebuilt = fill_mapping_context(spectator, SPECTATOR_ACTIONS, actions)
+    log("input: actions", len(actions), "mappings", len(rebuilt), "spectator", len(spectator_rebuilt))
     return actions, imc, spectator
 
 
@@ -135,7 +164,21 @@ float inner = saturate(1.0 - abs(edge + 16.0) / 1.5) * dashes;
 float scan = inside * step(0.9, frac((P.x + P.y) / 22.0 - T * 0.6)) * 0.07;
 // Detection meter: fills from the edge toward the centre as the camera builds up.
 float fill = inside * step(1.0 - Progress, ang / max(halfAngle, 0.001)) * step(0.004, Progress) * 0.28;
-return saturate(ring * 0.95 + inner * 0.55 + scan + fill) * saturate(A * 2.5);"""
+// Walls and obstacles between the camera and this point hide the zone: march the global distance field from the
+// point toward the lens (camera-relative positions, as the distance field wants them).
+float3 toEye = EyeRel - PRel;
+float len = length(toEye);
+float3 rd = toEye / max(len, 1.0);
+float t = 25.0;
+float visible = 1.0;
+for (int i = 0; i < 48; i++)
+{
+    if (t > len - 25.0) { break; }
+    float sd = GetDistanceToNearestSurfaceGlobal(PRel + rd * t);
+    if (sd < 2.0) { visible = 0.0; break; }
+    t += max(sd, 6.0);
+}
+return saturate(ring * 0.95 + inner * 0.55 + scan + fill) * saturate(A * 2.5) * visible + DF * 0.0;"""
 
 
 def build_camera_ring():
@@ -157,15 +200,25 @@ def build_camera_ring():
     progress = param(unreal.MaterialExpressionScalarParameter, "Progress", 0.0, -700, 400)
     world = MEL.create_material_expression(ring, unreal.MaterialExpressionWorldPosition, -700, 500)
     time = MEL.create_material_expression(ring, unreal.MaterialExpressionTime, -700, 600)
+    # Camera-relative positions for the distance-field occlusion march (and a distance-field node so the material
+    # compiles with the global distance field available).
+    world_rel = MEL.create_material_expression(ring, unreal.MaterialExpressionWorldPosition, -900, 700)
+    set_props(world_rel, world_position_shader_offset=unreal.WorldPositionIncludedOffsets.WPT_CAMERA_RELATIVE)
+    cam_pos = MEL.create_material_expression(ring, unreal.MaterialExpressionCameraPositionWS, -1100, 800)
+    eye_rel = MEL.create_material_expression(ring, unreal.MaterialExpressionSubtract, -900, 850)
+    MEL.connect_material_expressions(eye, "", eye_rel, "A")
+    MEL.connect_material_expressions(cam_pos, "", eye_rel, "B")
+    df_node = MEL.create_material_expression(ring, unreal.MaterialExpressionDistanceToNearestSurface, -700, 950)
     mask = MEL.create_material_expression(ring, unreal.MaterialExpressionCustom, -300, 200)
     inputs = []
-    for input_name in ("P", "Eye", "Fwd", "CosHalf", "Progress", "T", "A"):
+    for input_name in ("P", "Eye", "Fwd", "CosHalf", "Progress", "T", "A", "PRel", "EyeRel", "DF"):
         ci = unreal.CustomInput()
         ci.set_editor_property("input_name", input_name)
         inputs.append(ci)
     set_props(mask, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, description="CameraRing", inputs=inputs, code=CAMERA_RING_HLSL)
     for node, pin, input_name in ((world, "", "P"), (eye, "", "Eye"), (forward, "", "Fwd"), (cos_half, "", "CosHalf"),
-                                  (progress, "", "Progress"), (time, "", "T"), (color, "A", "A")):
+                                  (progress, "", "Progress"), (time, "", "T"), (color, "A", "A"), (world_rel, "", "PRel"),
+                                  (eye_rel, "", "EyeRel"), (df_node, "", "DF")):
         MEL.connect_material_expressions(node, pin, mask, input_name)
     glow = MEL.create_material_expression(ring, unreal.MaterialExpressionMultiply, -300, -200)
     set_props(glow, const_b=2.0)
@@ -204,6 +257,337 @@ def build_map_markers():
             marker.set_editor_property("type", assets[kind])
             save(bp)
     return assets
+
+
+SIGHTROOM_HLSL = """// Stencil: 4 sub-pixel taps give an anti-aliased coverage (the stencil is at render resolution and point
+// sampled, so a single tap shows its pixels); 8 taps 1.5 px out draw a thin outline that keeps far enemies
+// readable as sharp dots.
+float2 taps[4] = { float2(-0.35, -0.35), float2(0.35, -0.35), float2(-0.35, 0.35), float2(0.35, 0.35) };
+float sv = round(Stencil.r);
+float cov = 0.0;
+for (int i = 0; i < 4; i++)
+{
+    float v = round(SceneTextureFetch(PPI_CustomStencil, taps[i]).r);
+    cov += step(0.5, v);
+    sv = max(sv, v);
+}
+cov *= 0.25;
+float ring = 0.0;
+for (int j = 0; j < 8; j++)
+{
+    float a = j * 0.7853982;
+    ring = max(ring, round(SceneTextureFetch(PPI_CustomStencil, float2(cos(a), sin(a)) * 1.5).r));
+}
+float s = max(sv, ring);
+float edge = step(0.5, ring) * (1.0 - cov);
+
+float3 base = Scene.rgb;
+float lum = dot(base, float3(0.3, 0.59, 0.11));
+// Same distance as the C++ (horizontal + |height| x HeightWeight) so highlights appear with the front.
+float d = length(WP.xy - Origin.xy) + abs(WP.z - Origin.z) * HeightWeight;
+// Inside the wave, then the whole map fades in over the end of the wave.
+float inside = max(saturate((Radius - d) / 250.0), smoothstep(0.55, 1.0, Progress));
+float3 cool = lum.xxx * float3(0.42, 0.5, 0.62);
+float3 c = lerp(base, lerp(base * 0.85, cool, 0.9), inside);
+float front = exp(-abs(d - Radius) / 45.0) * (1.0 - Progress * 0.85);
+float2 g = abs(frac(WP.xy / 160.0) - 0.5);
+float grid = saturate(1.0 - min(g.x, g.y) * 55.0) * saturate((Radius - d) / 250.0) * saturate(1.0 - d / 3500.0);
+float flatFloor = saturate((Origin.z + 60.0 - WP.z) / 120.0);
+c += float3(0.55, 0.78, 1.0) * (front * 0.9 + grid * 0.16 * flatFloor);
+
+// 1 enemy (white), 2 interactable (pale), 3 target (red), 4 dead target (yellow).
+float3 fillC = s < 1.5 ? float3(1.0, 1.0, 1.0) : (s < 2.5 ? float3(0.95, 0.97, 1.0) : (s < 3.5 ? float3(1.0, 0.06, 0.05) : float3(1.0, 0.78, 0.1)));
+float fillA = s < 1.5 ? 0.85 : (s < 2.5 ? 0.5 : 1.0);
+float3 edgeC = s < 1.5 ? float3(1.0, 1.0, 1.0) : (s < 2.5 ? float3(0.75, 0.9, 1.0) : fillC);
+float edgeA = s < 2.5 && s > 1.5 ? 0.75 : 1.0;
+c = lerp(c, fillC, cov * fillA * step(0.5, s));
+c = lerp(c, edgeC, edge * edgeA);
+return lerp(base, c, Fade);"""
+
+
+def build_sightroom_pp():
+    """PP_Sightroom: a fast scan wave from the player, a floor grid behind it, then the whole map in a cool look;
+    highlighted actors (custom stencil) anti-aliased with a thin outline. Driven by C++: ScanOrigin, ScanRadius,
+    ScanProgress, Fade, HeightWeight."""
+    pp = new_material("PP_Sightroom", path("Materials", "PostProcess"))
+    set_props(pp, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
+    scene = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, -200)
+    set_props(scene, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
+    stencil = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 0)
+    set_props(stencil, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
+    world_pos = MEL.create_material_expression(pp, unreal.MaterialExpressionWorldPosition, -900, 200)
+    params = {}
+    for i, (pname, kind, default) in enumerate((("ScanOrigin", "vector", None), ("ScanRadius", "scalar", 0.0),
+                                                 ("ScanProgress", "scalar", 0.0), ("Fade", "scalar", 0.0),
+                                                 ("HeightWeight", "scalar", 0.35))):
+        if kind == "vector":
+            node = MEL.create_material_expression(pp, unreal.MaterialExpressionVectorParameter, -900, 350 + i * 120)
+            set_props(node, parameter_name=pname, default_value=unreal.LinearColor(0, 0, 0, 0))
+        else:
+            node = MEL.create_material_expression(pp, unreal.MaterialExpressionScalarParameter, -900, 350 + i * 120)
+            set_props(node, parameter_name=pname, default_value=default)
+        params[pname] = node
+    custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
+    inputs = []
+    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", input_name)
+        inputs.append(ci)
+    set_props(custom, code=SIGHTROOM_HLSL, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Sightroom", inputs=inputs)
+    MEL.connect_material_expressions(scene, "Color", custom, "Scene")
+    MEL.connect_material_expressions(stencil, "Color", custom, "Stencil")
+    MEL.connect_material_expressions(world_pos, "", custom, "WP")
+    MEL.connect_material_expressions(params["ScanOrigin"], "", custom, "Origin")
+    MEL.connect_material_expressions(params["ScanRadius"], "", custom, "Radius")
+    MEL.connect_material_expressions(params["ScanProgress"], "", custom, "Progress")
+    MEL.connect_material_expressions(params["Fade"], "", custom, "Fade")
+    MEL.connect_material_expressions(params["HeightWeight"], "", custom, "HeightWeight")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(pp)
+    save(pp)
+    return pp
+
+
+TERRAIN_HLSL = """float slope = saturate(N.z);
+// Grass on the flats, earth on slopes, rock on cliffs (cave walls, terrace steps, mountains).
+float grassAmt = smoothstep(0.80, 0.92, slope);
+float rockAmt = 1.0 - smoothstep(0.50, 0.68, slope);
+float3 grass = float3(0.13, 0.25, 0.07);
+float3 dirt = float3(0.30, 0.22, 0.13);
+float3 rock = float3(0.27, 0.26, 0.25);
+float3 c = lerp(dirt, grass, grassAmt);
+c = lerp(c, rock, rockAmt);
+// Prototype grid: 1 m and 4 m lines, like the checker material of the buildings.
+float2 g1 = abs(frac(WP.xy / 100.0) - 0.5);
+float2 g4 = abs(frac(WP.xy / 400.0) - 0.5);
+float line1 = 1.0 - saturate(min(g1.x, g1.y) * 70.0);
+float line4 = 1.0 - saturate(min(g4.x, g4.y) * 200.0);
+// Height bands on steep faces read as strata.
+float strata = (1.0 - smoothstep(0.0, 0.08, abs(frac(WP.z / 120.0) - 0.5))) * rockAmt;
+float n = frac(sin(dot(floor(WP.xy / 350.0), float2(12.9898, 78.233))) * 43758.5453);
+c *= (0.9 + 0.2 * n) * (1.0 - 0.10 * line1 - 0.18 * line4 - 0.12 * strata);
+return c;"""
+
+
+def build_terrain_material(folder=None):
+    """M_Hitmen_Terrain: the heightfield tiles. Colour by slope (grass, earth, rock) with the prototype grid; grass
+    footsteps."""
+    folder = folder or path("Materials", "Master")
+    mat = new_material("M_Hitmen_Terrain", folder)
+    normal = MEL.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -700, 0)
+    world = MEL.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -700, 150)
+    custom = MEL.create_material_expression(mat, unreal.MaterialExpressionCustom, -350, 0)
+    inputs = []
+    for name in ("N", "WP"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        inputs.append(ci)
+    set_props(custom, code=TERRAIN_HLSL, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Terrain", inputs=inputs)
+    MEL.connect_material_expressions(normal, "", custom, "N")
+    MEL.connect_material_expressions(world, "", custom, "WP")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    rough = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 200)
+    set_props(rough, r=0.92)
+    MEL.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    grass = load(path("Physics", "PM_Grass"))
+    if grass:
+        set_props(mat, phys_material=grass)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
+def build_screen_material(folder):
+    """M_Hitmen_Screen: a monitor showing a render target. Scalar "Signal" 1 = live; 0 = the last frame frozen, dimmed,
+    with rolling scanlines and static (the camera is off or broken)."""
+    screen = new_material("M_Hitmen_Screen", folder)
+    set_props(screen, shading_model=unreal.MaterialShadingModel.MSM_UNLIT)
+    tex = MEL.create_material_expression(screen, unreal.MaterialExpressionTextureSampleParameter2D, -700, 0)
+    set_props(tex, parameter_name="ScreenTexture")
+    signal = MEL.create_material_expression(screen, unreal.MaterialExpressionScalarParameter, -700, 250)
+    set_props(signal, parameter_name="Signal", default_value=1.0)
+    uv = MEL.create_material_expression(screen, unreal.MaterialExpressionTextureCoordinate, -700, 380)
+    time = MEL.create_material_expression(screen, unreal.MaterialExpressionTime, -700, 480)
+    custom = MEL.create_material_expression(screen, unreal.MaterialExpressionCustom, -350, 100)
+    inputs = []
+    for name in ("Tex", "Signal", "UV", "T"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        inputs.append(ci)
+    code = ("float lost = 1.0 - saturate(Signal);\n"
+            "float scan = 0.75 + 0.25 * sin(UV.y * 420.0 + T * 18.0);\n"
+            "float n = frac(sin(dot(floor(UV * float2(320.0, 180.0)) + floor(T * 24.0), float2(12.9898, 78.233))) * 43758.5453);\n"
+            "float3 dead = Tex * 0.28 * scan + n * 0.12;\n"
+            "return lerp(Tex, dead, lost);")
+    set_props(custom, code=code, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Screen", inputs=inputs)
+    MEL.connect_material_expressions(tex, "RGB", custom, "Tex")
+    MEL.connect_material_expressions(signal, "", custom, "Signal")
+    MEL.connect_material_expressions(uv, "", custom, "UV")
+    MEL.connect_material_expressions(time, "", custom, "T")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(screen)
+    save(screen)
+    return screen
+
+
+def build_camera_projection(folder):
+    """M_Hitmen_CameraProjection (light function): the camera's zone drawn by its own light, so walls cut it like the
+    light. Bright edge ring, a turning dashed inner ring, faint scanlines; "Progress" (detection meter) fills from the
+    edge inward. "TanHalf" = tan of the cone half angle."""
+    mat = new_material("M_Hitmen_CameraProjection", folder)
+    set_props(mat, material_domain=unreal.MaterialDomain.MD_LIGHT_FUNCTION)
+    lv = MEL.create_material_expression(mat, unreal.MaterialExpressionLightVector, -800, 0)
+    progress = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -800, 150)
+    set_props(progress, parameter_name="Progress", default_value=0.0)
+    tan_half = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -800, 260)
+    set_props(tan_half, parameter_name="TanHalf", default_value=0.306)
+    time = MEL.create_material_expression(mat, unreal.MaterialExpressionTime, -800, 370)
+    custom = MEL.create_material_expression(mat, unreal.MaterialExpressionCustom, -400, 100)
+    inputs = []
+    for name in ("LV", "Progress", "TanHalf", "T"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        inputs.append(ci)
+    code = ("float3 d = normalize(LV);\n"
+            "float x = max(d.x, 0.0001);\n"
+            "float2 p = d.yz / (x * TanHalf);\n"
+            "float r = length(p);\n"
+            "float a = atan2(p.y, p.x);\n"
+            "float inside = 1.0 - smoothstep(0.97, 1.0, r);\n"
+            "float edge = smoothstep(0.86, 0.95, r) * inside;\n"
+            "float dashes = step(0.5, frac(a / 6.2831853 * 18.0 + T * 0.35)) * (1.0 - smoothstep(0.012, 0.03, abs(r - 0.8)));\n"
+            "float scan = 0.06 * step(0.5, frac(p.y * 22.0 - T * 0.8));\n"
+            "float fill = smoothstep(1.0 - Progress - 0.02, 1.0 - Progress, r) * 0.55 * step(0.001, Progress);\n"
+            "return inside * (0.42 + scan) + edge * 1.6 + dashes * 0.9 * inside + fill * inside;")
+    set_props(custom, code=code, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, description="CameraZone", inputs=inputs)
+    MEL.connect_material_expressions(lv, "", custom, "LV")
+    MEL.connect_material_expressions(progress, "", custom, "Progress")
+    MEL.connect_material_expressions(tan_half, "", custom, "TanHalf")
+    MEL.connect_material_expressions(time, "", custom, "T")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
+# Distraction variants: name -> (mesh shape, scale, material instance, loop sound, light colour)
+DISTRACTIONS = {
+    "Radio": ("cube", (0.4, 0.2, 0.25), "MI_Red", "/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_05_GLITCH/Cues/COMRadio_InsJ_Radio_Noise_Long-Wave_01-01_LOOP_Cue",
+              (1.0, 0.55, 0.15)),
+    "TV": ("cube", (0.7, 0.12, 0.45), "MI_Dark", "/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_05_GLITCH/Cues/UIGlitch_InsJ_Glitching_Digital_Data-Corruption_01-01_LOOP_Cue",
+           (0.4, 0.65, 1.0)),
+    "Alarm": ("cylinder", (0.18, 0.18, 0.12), "MI_Gold", "/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_02_CLOCKS/Cues/CLOCKTick_InsJ_Clock-01_Ticking_Single-01_Cue",
+              (1.0, 0.85, 0.2)),
+}
+
+
+def build_distractions(folder):
+    """BP_Distraction_<Name>: one data-only Blueprint per look (mesh, loop, light colour); toon notes on every pulse."""
+    notes = load("/Game/Vefects/Stylized_VFX/Skills/MagicAttacks/Sound/NS_SoundMagic_Hit")
+    result = []
+    for name, (shape, scale, material, sound, color) in DISTRACTIONS.items():
+        bp = make_blueprint("BP_Distraction_" + name, folder, unreal.HitmenDistraction)
+        d = cdo(bp)
+        height = scale[2] * 100.0 * 0.5
+        set_mesh(component(d, "mesh"), SHAPES[shape], scale, load("/Game/Hitmen/Materials/Instances/" + material), (0, 0, height))
+        set_props(d, loop_sound=load(sound), pulse_fx=notes, light_color=unreal.LinearColor(*color, 1.0), play_time=0.0, cooldown=1.0)
+        save(bp)
+        result.append(bp)
+    return result
+
+
+def glow_material(name, folder, intensity, soft=False):
+    """Unlit additive glow: emissive = Color * Opacity * intensity (tracers, muzzle glows, flashes). Soft: the edge of the
+    sphere fades out (bright core, no hard rim)."""
+    mat = new_material(name, folder)
+    set_props(mat, blend_mode=unreal.BlendMode.BLEND_ADDITIVE, shading_model=unreal.MaterialShadingModel.MSM_UNLIT, two_sided=soft is False)
+    color = MEL.create_material_expression(mat, unreal.MaterialExpressionVectorParameter, -700, 0)
+    set_props(color, parameter_name="Color", default_value=unreal.LinearColor(1.0, 0.7, 0.35, 1))
+    opacity = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -700, 200)
+    set_props(opacity, parameter_name="Opacity", default_value=1.0)
+    strength = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant, -700, 320)
+    set_props(strength, r=intensity)
+    mul1 = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -450, 100)
+    MEL.connect_material_expressions(color, "", mul1, "A")
+    MEL.connect_material_expressions(opacity, "", mul1, "B")
+    mul2 = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, 150)
+    MEL.connect_material_expressions(mul1, "", mul2, "A")
+    MEL.connect_material_expressions(strength, "", mul2, "B")
+    out = mul2
+    if soft:
+        fresnel = MEL.create_material_expression(mat, unreal.MaterialExpressionFresnel, -450, 350)
+        set_props(fresnel, exponent=1.2, base_reflect_fraction=0.0)
+        core = MEL.create_material_expression(mat, unreal.MaterialExpressionOneMinus, -300, 350)
+        MEL.connect_material_expressions(fresnel, "", core, "")
+        core2 = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -200, 350)
+        MEL.connect_material_expressions(core, "", core2, "A")
+        MEL.connect_material_expressions(core, "", core2, "B")
+        out = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -100, 200)
+        MEL.connect_material_expressions(mul2, "", out, "A")
+        MEL.connect_material_expressions(core2, "", out, "B")
+    MEL.connect_material_property(out, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
+def build_glow_materials():
+    folder = path("Materials", "FX")
+    return {"tracer": glow_material("M_Hitmen_Tracer", folder, 10.0), "flash": glow_material("M_Hitmen_FlashGlow", folder, 3.0, soft=True)}
+
+
+# Toon (3D, cel-shaded) effects only: the 2D Flipbook pack reads as comic book. No blood anywhere.
+TOON = "/Game/Vefects/Anime_Stylized_VFX/VFX/Particles/"
+GUN_SOUND = "/Game/Vefects/Flipbook_VFX/Shared/Audio/SFX_GunShot_Cue"
+DRY_SOUND = "/Game/Vefects/Anime_Stylized_VFX/Audio/WAV/SFX_Bomb_Bounce_Cue"
+# name: fire sound pitch (min, max), volume, tracer chance, muzzle light (cd), glow radius (cm)
+WEAPON_JUICE = {
+    "Pistol": ((1.55, 1.7), 0.32, 0.0, 400.0, 3.0),
+    "SMG": ((1.25, 1.35), 0.6, 0.35, 1200.0, 5.0),
+    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 1500.0, 5.5),
+    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 2500.0, 8.0),
+    "Minigun": ((1.3, 1.4), 0.55, 0.5, 1500.0, 6.0),
+    "Sniper": ((0.97, 1.03), 1.0, 1.0, 2200.0, 7.0),
+    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 3000.0, 9.0),
+    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 2000.0, 7.0),
+    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 2000.0, 7.0),
+    "Bow": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
+    "Sword": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
+}
+
+
+def weapon_juice(name):
+    """Muzzle / impact effects, sounds and light of a weapon (builder and hitmen_patch_070)."""
+    pitch, volume, tracer, light, glow = WEAPON_JUICE[name]
+    gun = name not in ("Bow", "Sword")
+    props = dict(fire_sound_pitch=unreal.Vector2D(*pitch), fire_sound_volume=volume, tracer_chance=tracer,
+                 muzzle_light_intensity=light, muzzle_glow_radius=glow,
+                 muzzle_fx=load(TOON + "NS_Gunshot_Cast") if gun else None,
+                 impact_fx=load(TOON + "NS_Gunshot_Hit") if gun else None,
+                 surface_impact_fx=None, flesh_impact_fx=None, back_blast_fx=None)
+    if gun and name not in ("RocketLauncher", "GrenadeLauncher", "BlackHole"):
+        props["fire_sound"] = load(GUN_SOUND)
+        props["dry_fire_sound"] = load(DRY_SOUND)
+    return props
+
+
+def weapon_muzzle_offset(data):
+    """Muzzle point in weapon space for meshes without a Muzzle socket. The Weapons_Free guns lie along +Y once their
+    visual transform is applied (stock at -Y): the muzzle is the +Y end, centred in X, near the top of the barrel."""
+    mesh = data.get_editor_property("static_mesh")
+    if not mesh:
+        return None
+    box = mesh.get_bounding_box()
+    visual = data.get_editor_property("visual_transform")
+    xs, ys, zs = [], [], []
+    for x in (box.min.x, box.max.x):
+        for y in (box.min.y, box.max.y):
+            for z in (box.min.z, box.max.z):
+                p = unreal.MathLibrary.transform_location(visual, unreal.Vector(x, y, z))
+                xs.append(p.x)
+                ys.append(p.y)
+                zs.append(p.z)
+    return unreal.Vector((min(xs) + max(xs)) * 0.5, max(ys) + 2.0, min(zs) + 0.7 * (max(zs) - min(zs)))
 
 
 def build_materials(physical):
@@ -285,71 +669,9 @@ def build_materials(physical):
     save(decal)
     camera_ring = build_camera_ring()
 
-    # Monitor screen showing a render target.
-    screen = new_material("M_Hitmen_Screen", folder)
-    set_props(screen, shading_model=unreal.MaterialShadingModel.MSM_UNLIT)
-    tex = MEL.create_material_expression(screen, unreal.MaterialExpressionTextureSampleParameter2D, -500, 0)
-    set_props(tex, parameter_name="ScreenTexture")
-    MEL.connect_material_property(tex, "RGB", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    MEL.recompile_material(screen)
-    save(screen)
+    screen = build_screen_material(folder)
 
-    # Sightroom post-process: an expanding scan wave from the player, a world grid on the floor
-    # behind it, a cool desaturated world, highlighted actors through walls. Driven by C++:
-    # ScanOrigin, ScanRadius, ScanProgress, Fade.
-    pp = new_material("PP_Sightroom", path("Materials", "PostProcess"))
-    set_props(pp, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
-    scene = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, -200)
-    set_props(scene, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
-    stencil = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 0)
-    set_props(stencil, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
-    world_pos = MEL.create_material_expression(pp, unreal.MaterialExpressionWorldPosition, -900, 200)
-    params = {}
-    for i, (pname, kind, default) in enumerate((("ScanOrigin", "vector", None), ("ScanRadius", "scalar", 0.0),
-                                                 ("ScanProgress", "scalar", 0.0), ("Fade", "scalar", 0.0))):
-        if kind == "vector":
-            node = MEL.create_material_expression(pp, unreal.MaterialExpressionVectorParameter, -900, 350 + i * 120)
-            set_props(node, parameter_name=pname, default_value=unreal.LinearColor(0, 0, 0, 0))
-        else:
-            node = MEL.create_material_expression(pp, unreal.MaterialExpressionScalarParameter, -900, 350 + i * 120)
-            set_props(node, parameter_name=pname, default_value=default)
-        params[pname] = node
-    custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
-    code = (
-        "float s = round(Stencil.r);\n"
-        "float3 base = Scene.rgb;\n"
-        "float lum = dot(base, float3(0.3, 0.59, 0.11));\n"
-        "float d = length(WP.xy - Origin.xy) + abs(WP.z - Origin.z) * 0.35;\n"
-        "float inside = saturate((Radius - d) / 250.0 + step(0.999, Progress));\n"
-        "float3 cool = lum.xxx * float3(0.42, 0.5, 0.62);\n"
-        "float3 c = lerp(base, lerp(base * 0.85, cool, 0.9), inside);\n"
-        "float front = exp(-abs(d - Radius) / 45.0) * (1.0 - Progress * 0.85);\n"
-        "float2 g = abs(frac(WP.xy / 160.0) - 0.5);\n"
-        "float grid = saturate(1.0 - min(g.x, g.y) * 55.0) * inside * saturate(1.0 - d / 3500.0);\n"
-        "float flatFloor = saturate((Origin.z + 60.0 - WP.z) / 120.0);\n"
-        "c += float3(0.55, 0.78, 1.0) * (front * 0.9 + grid * 0.16 * flatFloor);\n"
-        "if (s > 0.5 && s < 1.5) c = lerp(c, float3(1.0, 1.0, 1.0), 0.85);\n"
-        "if (s > 1.5 && s < 2.5) c = lerp(c, float3(0.95, 0.97, 1.0), 0.55);\n"
-        "if (s > 2.5 && s < 3.5) c = float3(1.0, 0.06, 0.05);\n"
-        "if (s > 3.5 && s < 4.5) c = float3(1.0, 0.78, 0.1);\n"
-        "return lerp(base, c, Fade);"
-    )
-    inputs = []
-    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade"):
-        ci = unreal.CustomInput()
-        ci.set_editor_property("input_name", input_name)
-        inputs.append(ci)
-    set_props(custom, code=code, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Sightroom", inputs=inputs)
-    MEL.connect_material_expressions(scene, "Color", custom, "Scene")
-    MEL.connect_material_expressions(stencil, "Color", custom, "Stencil")
-    MEL.connect_material_expressions(world_pos, "", custom, "WP")
-    MEL.connect_material_expressions(params["ScanOrigin"], "", custom, "Origin")
-    MEL.connect_material_expressions(params["ScanRadius"], "", custom, "Radius")
-    MEL.connect_material_expressions(params["ScanProgress"], "", custom, "Progress")
-    MEL.connect_material_expressions(params["Fade"], "", custom, "Fade")
-    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    MEL.recompile_material(pp)
-    save(pp)
+    pp = build_sightroom_pp()
 
     # Pill: wavy, colour-shifted view. Weight = blendable weight driven by the status component.
     pill = new_material("PP_Pill", path("Materials", "PostProcess"))
@@ -629,6 +951,33 @@ def projectile_bp(name, parent, mesh="sphere", scale=(0.1, 0.1, 0.1), material=N
     return bp
 
 
+# First-person motion per weapon (FHitmenFPMotion): hip / aim deltas (camera space cm), equip time, kick back (cm),
+# up / side (deg) and spring stiffness. Machine guns sit lower in the hand; the sniper raises to the centre.
+FP_MOTION = {
+    "Pistol": dict(equip_time=0.18, kick_back=2.2, kick_up=3.5, kick_side=0.6, kick_stiffness=260.0),
+    "SMG": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.2, kick_back=0.9, kick_up=1.2, kick_side=0.5, kick_stiffness=320.0),
+    "AssaultRifle": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.22, kick_back=1.3, kick_up=1.6, kick_side=0.5, kick_stiffness=300.0),
+    "Shotgun": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.24, kick_back=4.5, kick_up=7.0, kick_side=1.2, kick_stiffness=160.0),
+    "Minigun": dict(hip_offset=(0.0, 2.0, -6.0), equip_time=0.3, kick_back=0.6, kick_up=0.6, kick_side=0.4, kick_stiffness=380.0),
+    "Sniper": dict(hip_offset=(0.0, 0.0, -2.0), aim_offset=(0.0, -6.0, 4.0), equip_time=0.28, kick_back=5.0, kick_up=8.0, kick_side=1.0,
+                   kick_stiffness=140.0),
+    "Bow": dict(equip_time=0.2, kick_back=0.5, kick_up=0.5, kick_side=0.3, kick_stiffness=200.0),
+    "RocketLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.3, kick_back=4.0, kick_up=6.0, kick_side=1.0, kick_stiffness=150.0),
+    "GrenadeLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.28, kick_back=3.0, kick_up=4.5, kick_side=0.8, kick_stiffness=170.0),
+    "BlackHole": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.28, kick_back=3.0, kick_up=4.0, kick_side=0.8, kick_stiffness=170.0),
+    "Sword": dict(equip_time=0.15, kick_back=0.0, kick_up=0.0, kick_side=0.0),
+}
+
+
+def fp_motion(name):
+    motion = unreal.HitmenFPMotion()
+    for key, value in FP_MOTION.get(name, {}).items():
+        if isinstance(value, tuple):
+            value = unreal.Vector(*value)
+        motion.set_editor_property(key, value)
+    return motion
+
+
 def build_weapons(mats):
     mi = mats["mi"]
     folder = path("Weapons", "Blueprints")
@@ -747,13 +1096,10 @@ def build_weapons(mats):
         "AssaultRifle": ("Assault rifle", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=620.0, damage=22.0, start_ammo=90,
                          max_ammo=210, ammo_per_pickup=30, hip_spread=2.0, aim_spread=0.5, noise_radius=700.0, impact_noise_radius=600.0, recoil_pitch=0.8,
                          recoil_yaw_random=0.3, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
-        "BurstRifle": ("Burst rifle", hitscan, dict(fire_mode=A.BURST, burst_count=3, rounds_per_minute=780.0, damage=24.0, start_ammo=72,
-                       max_ammo=180, ammo_per_pickup=24, hip_spread=1.8, aim_spread=0.4, noise_radius=700.0, impact_noise_radius=600.0, recoil_pitch=0.7,
-                       recoil_yaw_random=0.25, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "Shotgun": ("Shotgun", shotgun, dict(fire_mode=A.SINGLE, rounds_per_minute=70.0, damage=12.0, pellet_count=9, range=2500.0,
                     start_ammo=16, max_ammo=40, ammo_per_pickup=6, hip_spread=1.0, aim_spread=0.6, noise_radius=800.0, impact_noise_radius=600.0,
                     recoil_pitch=3.5, recoil_yaw_random=0.6, static_mesh=shotgun_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
-        "Minigun": ("Minigun", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=1500.0, damage=9.0, spin_up_time=0.8, start_ammo=300,
+        "Minigun": ("Minigun", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=1100.0, damage=9.0, spin_up_time=1.2, spin_up_start_rpm=450.0, spin_down_grace=0.4, start_ammo=300,
                     max_ammo=600, ammo_per_pickup=150, hip_spread=3.0, aim_spread=2.0, noise_radius=900.0, impact_noise_radius=700.0, recoil_pitch=0.3,
                     recoil_yaw_random=0.4, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "Sniper": ("Sniper rifle", hitscan, dict(fire_mode=A.SINGLE, rounds_per_minute=40.0, damage=120.0, headshot_multiplier=3.0,
@@ -780,7 +1126,11 @@ def build_weapons(mats):
     datas = {}
     for name, (display, bp, props) in weapons.items():
         data = make_data("DA_Weapon_" + name, path("Data", "Weapons"), unreal.HitmenWeaponData)
-        set_props(data, display_name=display, weapon_class=gen_class(bp), pickup_class=gen_class(pickup), **props)
+        set_props(data, display_name=display, weapon_class=gen_class(bp), pickup_class=gen_class(pickup), fp_motion=fp_motion(name), **props)
+        set_props(data, **weapon_juice(name))
+        muzzle = weapon_muzzle_offset(data)
+        if muzzle:
+            set_props(data, muzzle_offset=muzzle)
         save(data)
         datas[name] = data
     log("weapons:", len(datas))
@@ -799,7 +1149,7 @@ def build_abilities(projectiles, mats):
     set_props(smoke_cdo, puff_material=mats["smoke"], puff_mesh=load(SHAPES["sphere"]))
     smoke_effect = component(smoke_cdo, "effect")
     if smoke_effect:
-        set_props(smoke_effect, asset=load("/Game/Vefects/Smoke_Bombs_VFX/Shared/Particles/NS_SmokeBomb_Classic_L"))
+        set_props(smoke_effect, asset=load("/Game/Vefects/Smoke_Bombs_VFX/Skills/Loop/NS_SmokeBomb_Classic_L"))
     save(smoke_cloud)
     trap = make_blueprint("BP_Trap", actor_folder, unreal.HitmenTrap)
     set_mesh(component(cdo(trap), "mesh"), SHAPES["cylinder"], (0.8, 0.8, 0.05), mi["MI_Metal"])
@@ -882,8 +1232,22 @@ def build_cosmetics(mats):
     return result
 
 
-def build_rules():
-    rules = make_data("DA_MatchRules_Default", path("Data", "Rules"), unreal.HitmenMatchRules)
+def build_body_container(world_folder, mi):
+    """BP_BodyContainer: a dumpster-like box (120 x 90 x 110) with a lid hinged on its back edge; holds 2 bodies."""
+    bp = make_blueprint("BP_BodyContainer", world_folder + "/Container", unreal.HitmenBodyContainer)
+    d = cdo(bp)
+    set_mesh(component(d, "mesh"), SHAPES["cube"], (1.2, 0.9, 1.1), mi["MI_Green"], (0, 0, 55))
+    set_mesh(component(d, "lid"), SHAPES["cube"], (1.24, 0.94, 0.08), mi["MI_Dark"], (60, 0, 4))
+    lid_pivot = component(d, "lid_pivot")
+    if lid_pivot:
+        lid_pivot.set_editor_property("relative_location", unreal.Vector(-60, 0, 110))
+    save(bp)
+    return bp
+
+
+def difficulty_presets():
+    """Per-difficulty values (also used by hitmen_patch_070). Guards hit harder than 0.6 (players have 150 HP and
+    regenerate): a guard that has you in the open kills you in a few bursts."""
     D = unreal.HitmenDifficulty
 
     def preset(retrieval, weapons, items, sight, suspicion, damage, aim):
@@ -892,10 +1256,14 @@ def build_rules():
                   npc_suspicion_rate_multiplier=suspicion, npc_damage_multiplier=damage, npc_aim_error_degrees=aim)
         return p
 
-    # Damage stays low (with the slow paced fire of the match rules, a fight lasts): Hitman-like.
-    set_props(rules, difficulty_presets={D.EASY: preset(4, 10, 10, 0.8, 0.7, 0.25, 7.0),
-                                         D.NORMAL: preset(3, 6, 6, 1.0, 1.0, 0.4, 4.0),
-                                         D.HARD: preset(2, 4, 4, 1.2, 1.4, 0.6, 2.5)})
+    return {D.EASY: preset(4, 10, 10, 0.8, 0.7, 0.35, 7.0),
+            D.NORMAL: preset(3, 6, 6, 1.0, 1.0, 0.55, 4.0),
+            D.HARD: preset(2, 4, 4, 1.2, 1.4, 0.8, 2.5)}
+
+
+def build_rules():
+    rules = make_data("DA_MatchRules_Default", path("Data", "Rules"), unreal.HitmenMatchRules)
+    set_props(rules, difficulty_presets=difficulty_presets())
     save(rules)
     return rules
 
@@ -967,14 +1335,47 @@ def build_sound_set():
             volumes[event] = volume
         else:
             log("WARN missing sound", asset_path)
-    set_props(data, sounds=sounds, volumes=volumes)
+    G, W, F = unreal.HitmenSoundSpace.GUNSHOT, unreal.HitmenSoundSpace.WORLD, unreal.HitmenSoundSpace.FOOTSTEP
+    spaces = {S.EXPLOSION: G, S.TANK_FIRE: G, S.MOUNTED_GUN_FIRE: G, S.LANDING: F, S.LANDING_HARD: F}
+    set_props(data, sounds=sounds, volumes=volumes, attenuations=build_attenuations(), spaces=spaces)
     save(data)
     return data
 
 
+# Sound spaces: every 3D sound goes through one of these (falloff + occlusion), so a guard's steps across
+# the map are not heard. (inner radius, falloff distance, low-pass with distance, occlusion)
+ATTENUATIONS = {
+    "World": (200.0, 1800.0, False, True),
+    "Footstep": (150.0, 1450.0, False, True),
+    "Gunshot": (600.0, 7000.0, True, True),
+    "Impact": (150.0, 2400.0, True, True),
+}
+
+
+def build_attenuations():
+    """SA_Hitmen_* attenuation assets, one per EHitmenSoundSpace; returns {space: asset} for DA_SoundSet."""
+    folder = path("Audio", "Attenuation")
+    result = {}
+    for name, (inner, falloff, lpf, occlusion) in ATTENUATIONS.items():
+        asset = create("SA_Hitmen_" + name, folder, unreal.SoundAttenuation, unreal.SoundAttenuationFactory())
+        if not asset:
+            continue
+        settings = asset.get_editor_property("attenuation")
+        set_props(settings, attenuate=True, spatialize=True, attenuation_shape=unreal.AttenuationShape.SPHERE,
+                  attenuation_shape_extents=unreal.Vector(inner, 0.0, 0.0), falloff_distance=falloff,
+                  distance_algorithm=unreal.AttenuationDistanceModel.NATURAL_SOUND, enable_occlusion=occlusion,
+                  occlusion_trace_channel=unreal.CollisionChannel.ECC_VISIBILITY, occlusion_low_pass_filter_frequency=1200.0,
+                  occlusion_volume_attenuation=0.45, occlusion_interpolation_time=0.15, attenuate_with_lpf=lpf,
+                  lpf_radius_min=inner * 2.0, lpf_radius_max=falloff, lpf_frequency_at_min=20000.0, lpf_frequency_at_max=2500.0)
+        asset.set_editor_property("attenuation", settings)
+        save(asset)
+        result[getattr(unreal.HitmenSoundSpace, name.upper())] = asset
+    log("sound: attenuations", len(result))
+    return result
+
+
 def build_catalog(weapons, move, manip, cosmetics):
     catalog = make_data("DA_Catalog", path("Data"), unreal.HitmenCatalog)
-    loadout = [weapons[n] for n in ("Pistol", "SMG", "AssaultRifle", "BurstRifle", "Shotgun", "Sniper", "Bow", "Sword")]
     set_props(catalog, weapons=list(weapons.values()), loot_weapons=[w for k, w in weapons.items() if k != "Pistol"],
               move_abilities=move, manipulation_abilities=manip, cosmetics=cosmetics)
     save(catalog)
@@ -983,7 +1384,7 @@ def build_catalog(weapons, move, manip, cosmetics):
 
 def build_maps():
     maps = []
-    for name, display, carousel, half in (("LDTest", "San Lazaro", True, 16500.0), ("Empty_01", "Empty 01", True, 10000.0),
+    for name, display, carousel, half in (("LDTest", "San Lazaro", True, 12800.0), ("Empty_01", "Empty 01", True, 10000.0),
                                           ("Empty_02", "Empty 02", True, 10000.0), ("Gym", "Debug gym", False, 3800.0)):
         data = make_data("DA_Map_" + name, path("Data", "Maps"), unreal.HitmenMapDefinition)
         level = unreal.SoftObjectPath(path("Maps", "L_" + name) + ".L_" + name)
@@ -1059,7 +1460,9 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
               aim_action=actions["IA_Aim"], interact_action=actions["IA_Interact"], move_ability_action=actions["IA_MoveAbility"],
               manipulation_ability_action=actions["IA_ManipulationAbility"], switch_slot_action=actions["IA_SwitchSlot"],
               sightroom_action=actions["IA_Sightroom"], emote_wheel_action=actions["IA_EmoteWheel"], pause_action=actions["IA_Pause"],
-              spectator_mode_action=actions["IA_SpectatorMode"], last_known_position_marker_class=gen_class(marker))
+              spectator_mode_action=actions["IA_SpectatorMode"], spectator_up_action=actions["IA_SpectatorUp"],
+              spectator_down_action=actions["IA_SpectatorDown"], spectator_fast_action=actions["IA_SpectatorFast"],
+              confirm_action=actions["IA_Confirm"], last_known_position_marker_class=gen_class(marker))
     save(pc)
 
     manny = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
@@ -1239,8 +1642,9 @@ def build_world(mats, weapons):
             {"contents_mode": unreal.HitmenContainerContents.FIXED})
     fixture("BP_Container_Random", unreal.HitmenContainer, W + "/Container", {"mesh": ("cube", (1, 1, 1), mi["MI_Wood"], None)},
             {"contents_mode": unreal.HitmenContainerContents.RANDOM})
+    build_body_container(W, mi)
     fixture("BP_TallGrass", unreal.HitmenTallGrass, W + "/Grass", {"mesh": ("cube", (6.0, 6.0, 1.1), mi["MI_Grass"], (0, 0, -5))})
-    fixture("BP_Distraction_Radio", unreal.HitmenDistraction, W + "/Distraction", {"mesh": ("cube", (0.4, 0.2, 0.25), mi["MI_Red"], (0, 0, 12))})
+    build_distractions(W + "/Distraction")
     fixture("BP_SecurityCamera", unreal.HitmenSecurityCamera, W + "/Security",
             {"body": ("cube", (0.4, 0.2, 0.2), mi["MI_White"], None), "view_cone": ("cone", (1, 1, 1), mats["cone"], None)})
     decal_comp = component(cdo(bps["BP_SecurityCamera"]), "floor_decal")

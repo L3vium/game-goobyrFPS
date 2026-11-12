@@ -93,6 +93,18 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Lobby")
 	void Server_BackToLobby();
 
+	/** Match over: the host sends everyone back to the lobby. */
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Match")
+	void Server_ReturnToLobby();
+
+	/** Results banner / pause menu / Enter: asks the server when this is the host and the match is over. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Match")
+	void RequestReturnToLobby();
+
+	/** The match on this map has ended (results banner, everyone spectating). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Match")
+	bool IsMatchOver() const;
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Lobby")
 	bool IsHost() const;
 
@@ -122,6 +134,13 @@ public:
 
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Debug")
 	void Server_DebugSetGodMode(bool bEnabled);
+
+	/** F1-F8: toggles a cheat (invulnerable, ammo, cooldowns, invisible, fly) or runs one (respawn, kill, reset). */
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Debug")
+	void Server_DebugCheat(EHitmenCheat Cheat);
+
+	/** Fly cheat on the current pawn (flying, no collision) or back to walking; server and owning client. */
+	void ApplyCheatsToPawn();
 
 	// ---- Emotes / UI ----
 	/** Called by the emote wheel when the player picks an emote. */
@@ -200,6 +219,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> EmoteWheelAction;
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> PauseAction;
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorModeAction;
+	/** Free fly (IMC_Spectator): up / down / faster, rebindable in Options > Controls > Spectator. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorUpAction;
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorDownAction;
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorFastAction;
+	/** Enter: confirm (match over: the host goes back to the lobby). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> ConfirmAction;
 
 	/** Local-only silhouette spawned where NPCs last saw this player. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Feedback")
@@ -267,6 +292,28 @@ protected:
 	void HandleEmoteWheelReleased();
 	void HandlePause();
 	void HandleSpectatorMode();
+	void HandleSpectatorUpPressed();
+	void HandleSpectatorUpReleased();
+	void HandleSpectatorDownPressed();
+	void HandleSpectatorDownReleased();
+	void HandleSpectatorFastPressed();
+	void HandleSpectatorFastReleased();
+	void HandleConfirm();
+	void HandleCheatKey(FKey Key);
+	bool bFlyUpHeld = false;
+	bool bFlyDownHeld = false;
+	bool IsCheatFlying() const;
+
+	/** Fly cheat speed. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Debug", meta=(ClampMin="0", Units="cm/s"))
+	float CheatFlySpeed = 1800.f;
+	void PushSpectatorVertical();
+	bool bSpectatorUpHeld = false;
+	bool bSpectatorDownHeld = false;
+
+	/** Pushes the current key of each prompt action to the UI hub (after rebinding too). */
+	void RefreshKeyLabels();
+	UFUNCTION() void HandleInputUserSettingsChanged(class UEnhancedInputUserSettings* Settings);
 
 	// ---- HUD publisher: binds to the pawn's components and pushes view models to the UI hub ----
 	void BindHUDSources(APawn* InPawn);
@@ -307,4 +354,15 @@ protected:
 	bool bIsWatcher = false;
 	bool bCrouchToggled = false;
 	bool bSprintToggled = false;
+
+	/** Shift released within this time of the press = a tap (dash when equipped); held = sprint. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input", meta=(ClampMin="0", Units="s"))
+	float SprintTapTime = 0.18f;
+
+	float SprintPressTime = -100.f;
+
+	virtual void PlayerTick(float DeltaTime) override;
+	/** Vehicle HUD (health, reload, exit): pushed every frame while driving. */
+	void PushVehicleView();
+	bool bVehicleViewActive = false;
 };

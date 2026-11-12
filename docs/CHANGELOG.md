@@ -3,7 +3,121 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
-## [Unreleased]
+## [0.7.0] - 2026-11-12
+
+### Added
+- San Lazaro rebuilt as one organic map on hills (about 240 x 210 m): a favela on five terraces (houses of 1 to 3
+  floors, alleys, stairs, yards, roofs reached from the terrace above), a dry ravine with two arched bridges and a high
+  walkway, the mansion on a plateau with grounds about 40 % smaller, and a real cave dug into a ridge with a tunnel
+  to the mansion basement. The ground is a heightfield (`UHitmenContentTools::BuildHeightfieldMesh`).
+- Every facade of a generated building has vaultable windows and a ledge band under them from the first floor up.
+- `hitmen_check_patrols.py`: every patrolling guard has a route (or a group leader) and walks.
+- Cheats on F1-F8 with a panel on the right (gym always, dev builds elsewhere): invulnerable, infinite ammo, no
+  cooldown, invisible to AI, respawn NPCs as placed, kill all, reload the map, fly.
+- Gym: ladder behind the ladder block with a path on the right and a stair up to the zipline tower; room in front of
+  the zipline start and a 5 x 12 m landing; TV and alarm distractions, a body container; the mounted gun on its tripod.
+- Options rebuilt: a centred panel with Gameplay / Controls / Graphics / Audio tabs, a description column, `[Esc] Back`
+  and `[R] Defaults`; Escape closes them from the title too. Controls by section with conflicts in red; graphics
+  presets, auto-detect (also on the first launch), resolution, window mode, vsync, frame cap, render scale and every
+  quality; an Interface volume.
+- Match end without a timer: a result banner, everyone flies free, the host goes back to the lobby with Enter (or the
+  pause menu); the others wait for the host.
+- Free fly like the Unreal editor (ZQSD, Shift faster, Space / A up, Ctrl / E down) with its own rebindable keys,
+  kept inside the map bounds and under a ceiling.
+- Watchers: a watching host gets Start; alone, the match starts at once; in "Your agent" they see who is ready.
+- "3 / 8" counters under the agent's look arrows.
+- Vehicle HUD: health bar at the top, reload ring around the crosshair, `[F] Exit` bottom right; keycards moved bottom
+  right above it.
+- Security cameras can be shot to pieces (30 health): sparks, the head drops, the feed is lost for good.
+- Distraction variants (radio, TV, alarm clock) as data-only Blueprints with toon notes on every pulse.
+- Carry any body in your arms (it takes the left weapon slot; no shooting while carrying; F or the wheel puts it
+  down); hide bodies in a body container (BP_BodyContainer, 2 per container by default; never the VIP).
+- Remote abilities target the best candidate in an 8° cone with a line of sight (fresnel + `[A] action`): the remote
+  distraction works at range again; transposition swaps with bodies too.
+- Lighter: `[A] Lighter` on a body you look at nearby; it burns (toon fire) and is gone.
+- Multi-kill: hold A to mark up to 5 enemies in view one after another (red glow, red links); release confirms.
+- Stone rests where it lands with a toon "noise" effect; a guard who comes to look picks it up.
+- Wind grenade (the wind mine, now thrown): bursts on impact and blows everyone away, the thrower too.
+- Trap catches anyone, you too once armed; players mash the move keys to break free.
+- Sleep dart: the target goes limp (ragdoll) with "Z z z" over its head, then stands up.
+- Picking up an ability with the slot taken swaps them; screen effects while invisible and armored.
+- Toon weapon juice (no blood): muzzle flash (Anime_Stylized), muzzle light and soft glow, toon impacts on walls and
+  bodies, tracers (AHitmenTracer) for shotgun pellets, sniper shots and part of the machine-gun bullets, explosion
+  flashes (AHitmenFlashBurst; the flashbang is a big white flash), jetpack smoke, ladder / gutter puffs and grab
+  sounds, zipline sparks and cable sound, tank muzzle blast / hull rock / 120 cm barrel recoil, turret flash and
+  red tracers.
+- Taking a hit: a red arc toward the shooter, a colour fringe and red tint, a small shake; the view greys with low
+  health.
+- First-person motion, procedural and per weapon (`FHitmenFPMotion` in DA_Weapon_*): camera head bob with the
+  footstep on each low point, mouse sway, walk lag and strafe tilt, a fast equip from below, a spring kick per shot,
+  a spring hip <-> aim travel toward the centre, the sniper's raise / wobble / zoom sequence with a breathing aim,
+  alternating punch jabs, knife slash, throw wind-up, takedown lunge, minigun shake, bow draw, and a pull-back near
+  walls. Body montages no longer play on the first-person arms (no torso in view when punching).
+- Thrown weapons really fly and spin; a head hit stuns 3 s; an empty gun vanishes after its throw.
+- UHitmenDebugLibrary: Start / Stop / Inject Enhanced Input actions from editor scripts (QA).
+- Hang: thin ledges (the ledge under every window, roof edges) can be hung from with Space in the air; shimmy left /
+  right (Shift faster), Space climbs into the window above or onto the ledge, Ctrl lets go. Vaulting out of an upper
+  window over a drop hangs from the ledge under it.
+- `HitmenNoTraversal` actor tag: barrels, hack panels, turrets, cameras, mounted guns, the tank and distractions are
+  never vaulted or climbed.
+- Sound spaces: every 3D sound goes through an attenuation per space (SA_Hitmen_World, _Footstep, _Gunshot, _Impact
+  in DA_SoundSet), with falloff and occlusion. Guards' steps across the map are no longer heard; gunshots carry far
+  and are muffled with distance.
+- Headshots always kill (bullets and arrows), Project Settings -> Hitmen -> Combat (`bHeadshotKills`; NPC shots are
+  excluded by `bHeadshotKillsFromNPCs`).
+- NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
+
+### Changed
+- Rendering: room for 32 shadowed lights per pixel in the virtual shadow map projection (the default 16 overflowed with an
+  on-screen warning); Lumen in software by default (hardware ray tracing stays available).
+- Packaged builds (Shipping and Dev) never print engine messages on screen.
+- Room lamps in lumens, two per room; only one per room casts shadows (estate and cave), fixtures cast none by default.
+- The map bake cuts roofs at a height above the terrain under each point; the reach check's "ladder only" is relative to
+  the ground.
+- HUD: the ability cards show their key (A / E as bound), a stronger divider, the bar is centred (it was 12 px off);
+  prompt keys (F, SPACE, Exit) follow the rebinding.
+- Sightroom: the wave takes 0.35 s (0.8) and highlights follow it every frame (no 0.15 s steps); when it ends the whole
+  map turns to the scan look and every enemy on the map shows; highlights are anti-aliased with a thin outline (no more
+  pixel blocks); line of sight aims at an interactable's middle, so windows light up.
+- Doors, vent hatches and lockers hinge on the other edge.
+- Cameras: one colour (yellow); the zone is the camera's shadowed spotlight (walls cut it), much brighter; the floor ring
+  decal tests the global distance field so walls hide it too; the monitor keeps the last frame (dimmed, NO SIGNAL).
+- Distractions stay on until a guard who comes to look switches them off (or you, with F or remotely).
+- Hacking: a ring fills around the F key (the bar under the crosshair overlapped the prompt).
+- Circuit breaker lever with sparks; bulbs go dark with the power; room lamps never glow in volumetric fog.
+- Mounted gun: free-standing tripod, gun higher, view above it. Tank reload 1.25 s (2.5).
+- Gun sounds: one recording pitched and levelled per weapon (FireSoundPitch / FireSoundVolume); the silenced pistol is
+  a quiet high snap (it played a dust puff); dry fire is a metal click instead of a clock tick.
+- The smoke grenade shows the Smoke_Bombs toon cloud (its path was wrong: grey spheres were drawn) and plays 1.8x faster.
+- First-person scale 0.35 (0.6) with a 3 cm near plane, so the arms stay clear of walls; machine guns sit lower.
+- Slides always brake (friction + deceleration), left / right only bend them, they last about 0.5 s from a walk and
+  0.7 s from a sprint, and Ctrl must be released before the next one: no more endless sideways slides or chained
+  sprint slides. Releasing the keys after a sprint stops you crisply.
+- Ledge grab: probes the centre and 25 cm to each side, reaches further (76 cm) and, in the air, catches ledges down to
+  the feet with any input toward the wall: jumping at the edge of a ledge grabs it.
+- Dash on a tap of Shift (cooldown 1.5 s); jetpack on Space held in the air; the second jump goes 1.35x higher;
+  holding E with the blink shows the landing spot; the hook climbs the ledge at its anchor.
+- Ziplines ride at 16 m/s (9) and reach full speed in 0.25 s; the parachute drop falls at 15 m/s (5.2) in a 3 s intro.
+- Guards hold their ground in a fight: they stand and shoot while in range, close in when out of range or sight, and
+  never back away (they used to retreat to a flank point 7 m from the player every 1.5 s). They turn to face their
+  target while shooting (strafing when they move).
+- Hearing: steps are heard 4 m away walking and 9 m sprinting (1.5 / 4.5), and a height difference within one storey
+  no longer counts (a step right behind a guard was 1.5 m below its ear and never heard).
+- Players have 150 health (300); guards hit harder (difficulty multipliers 0.35 / 0.55 / 0.8).
+- Picked-up weapons always go to the left slot; the other weapon slides right.
+- Minigun: fires at once at 450 rpm and ramps to 1100 rpm over 1.2 s (0.4 s grace on release) instead of 0.8 s of
+  silence then 1500 rpm.
+- A silenced bullet into a body is only heard 1.5 m away.
+- Footsteps: volume per gait and a random pitch; your own steps are quieter.
+- The overhead alert marker is the hatched diamond again.
+- Tools find the engine through the Epic launcher's install list (UE_ROOT still wins).
+
+### Removed
+- Every Flipbook (comic book) effect on weapons: blood, dust and muzzle smoke.
+- The burst rifle (data asset, catalog, gym pedestal).
+
+### Fixed
+- After entering a vehicle the "F Use" prompt stayed on screen: a new pawn always starts without a prompt.
 
 ## [0.6.1] - 2026-11-11
 

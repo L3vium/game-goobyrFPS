@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "Weapons/HitmenProjectile.h"
 #include "Interaction/HitmenInteractableBase.h"
+#include "Weapons/HitmenProjectile.h"
 #include "HitmenAbilityActors.generated.h"
 
 class USphereComponent;
@@ -46,6 +47,14 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke", meta=(ClampMin="0", Units="s"))
 	float Lifetime = 12.f;
+
+	/** The smoke effect plays this much faster (it fills the radius quicker). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke", meta=(ClampMin="0.1"))
+	float EffectTimeScale = 1.8f;
+
+	/** Uniform scale of the smoke effect so it covers Radius. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke", meta=(ClampMin="0.01"))
+	float EffectScale = 1.f;
 
 	// ---- Fallback puffs (shown while no Niagara system is assigned) ----
 	/** Hide the puffs when the Effect component has a Niagara system. */
@@ -127,8 +136,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Trap", meta=(ClampMin="0"))
 	float NPCTrapDuration = 30.f;
 
+	/** A trapped player breaks free by mashing the move keys (or after this long at most). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Trap", meta=(ClampMin="0"))
-	float PlayerTrapDuration = 4.f;
+	float PlayerTrapDuration = 10.f;
+
+	/** Nobody is caught for this long after it is placed (the one who placed it walks away). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Trap", meta=(ClampMin="0", Units="s"))
+	float ArmDelay = 1.f;
+
+	float ArmTime = 0.f;
 
 	UFUNCTION()
 	void HandleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -191,6 +207,59 @@ class HITMEN_API AHitmenC4Charge : public AHitmenProjectile
 
 public:
 	AHitmenC4Charge();
+};
+
+/** Stone: lands, rests and makes a noise (with a toon "sound" effect); a guard who comes to look picks it up. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenStone : public AHitmenProjectile
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenStone();
+	virtual void Tick(float DeltaSeconds) override;
+
+protected:
+	/** Toon "noise" effect played where it lands. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Stone")
+	TObjectPtr<class UNiagaraSystem> NoiseFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Stone")
+	TObjectPtr<USoundBase> LandSound;
+
+	/** A searching / investigating guard this close picks it up (it is gone). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Stone", meta=(ClampMin="0", Units="cm"))
+	float PickupRadius = 160.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Stone", meta=(ClampMin="1", Units="s"))
+	float RestLifetime = 60.f;
+
+	virtual bool OnImpact(const FHitResult& Hit) override;
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_StoneNoise(FVector_NetQuantize Location);
+
+	bool bNoiseMade = false;
+	float NextPickupCheck = 0.f;
+};
+
+/** Wind grenade: bursts on impact and blows every character and loose object around away (the thrower too). */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenProjectile_Wind : public AHitmenProjectile
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenProjectile_Wind();
+
+protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Wind", meta=(ClampMin="0", Units="cm"))
+	float BlastRadius = 600.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Wind", meta=(ClampMin="0"))
+	float KnockbackSpeed = 1800.f;
+
+	virtual void OnExplode(const FVector& Origin) override;
 };
 
 /** World pickup that equips an ability in its slot. */

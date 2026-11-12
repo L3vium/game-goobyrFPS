@@ -16,6 +16,11 @@
 void UHitmenGameInstance::Init()
 {
 	Super::Init();
+	// Packaged builds (Shipping and Dev) never print engine messages on screen (shadow map warnings and the like).
+	if (!GIsEditor)
+	{
+		GAreScreenMessagesEnabled = false;
+	}
 	if (GEngine)
 	{
 		GEngine->OnNetworkFailure().AddUObject(this, &UHitmenGameInstance::HandleNetworkFailure);
@@ -24,6 +29,11 @@ void UHitmenGameInstance::Init()
 	if (UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
 	{
 		Settings->OnHitmenSettingsChanged.AddUniqueDynamic(this, &UHitmenGameInstance::ApplyAudioSettings);
+		// First launch of a packaged game: pick the graphics preset for this machine (Options can run it again).
+		if (!GIsEditor && !Settings->bAutoDetectDone)
+		{
+			Settings->RunAutoDetect();
+		}
 	}
 	// Sound mixes live in the world's audio device: push the volumes again after each map load.
 	FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &UHitmenGameInstance::HandlePostLoadMap);

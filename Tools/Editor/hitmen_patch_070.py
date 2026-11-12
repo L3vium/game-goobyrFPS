@@ -218,6 +218,12 @@ if wanted("abilities"):
         save(data)
     log("abilities: stone, wind grenade, activation effects")
 
+if wanted("bodies"):
+    # The body container (hide carried bodies, 2 by default).
+    mi = {name: load("/Game/Hitmen/Materials/Instances/" + name) for name in ("MI_Green", "MI_Dark")}
+    hitmen_content.build_body_container("/Game/Hitmen/World/Interactables", mi)
+    log("bodies: BP_BodyContainer")
+
 if wanted("sound"):
     # Attenuation per sound space (steps, gunshots, impacts, world) and the space of each sound-set entry.
     hitmen_content.build_sound_set()

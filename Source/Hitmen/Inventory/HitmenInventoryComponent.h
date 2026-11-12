@@ -62,6 +62,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Inventory")
 	const TArray<FHitmenInventorySlot>& GetSlots() const { return Slots; }
 
+	/** Server: picking up a body. Both slots full: the held weapon is dropped. The remaining weapon goes to the
+	 *  right slot and nothing is in hand (the body is in the arms). */
+	void MakeRoomForBody();
+
+	/** Server: the body was put down; the weapon you still carry comes to hand. */
+	void OnBodyDropped();
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Inventory")
 	int32 GetActiveSlot() const { return ActiveSlot; }
 

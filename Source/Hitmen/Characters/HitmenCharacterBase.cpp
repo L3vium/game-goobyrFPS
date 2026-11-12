@@ -577,7 +577,14 @@ void AHitmenCharacterBase::ApplyBodyState()
 		{
 			AttachParent = CarrierCharacter->GetMesh();
 		}
-		if (AttachParent)
+		if (CarrySocket.IsNone())
+		{
+			// In the arms: on the carrier's root, where its carry component says (lying across, in front).
+			const UHitmenBodyCarryComponent* CarryComponent = Carrier->FindComponentByClass<UHitmenBodyCarryComponent>();
+			AttachToComponent(Carrier->GetRootComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+			SetActorRelativeTransform(CarryComponent ? CarryComponent->GetCarryTransform() : FTransform(FVector(55.f, 0.f, 0.f)));
+		}
+		else if (AttachParent)
 		{
 			AttachToComponent(AttachParent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, CarrySocket);
 		}

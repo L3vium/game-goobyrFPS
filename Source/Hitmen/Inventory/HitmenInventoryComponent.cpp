@@ -120,6 +120,39 @@ namespace
 	}
 }
 
+void UHitmenInventoryComponent::MakeRoomForBody()
+{
+	if (!GetOwner()->HasAuthority() || Slots.Num() < 2)
+	{
+		return;
+	}
+	if (!Slots[0].IsEmpty() && !Slots[1].IsEmpty())
+	{
+		// The weapon in hand is put down where you stand.
+		FVector Origin, Direction;
+		UHitmenCombatLibrary::GetAimPoint(Cast<APawn>(GetOwner()), Origin, Direction);
+		DropSlot(Slots.IsValidIndex(ActiveSlot) ? ActiveSlot : 0, Origin + Direction * ThrowSpawnDistance, Direction.Rotation(), Direction * ReplaceDropSpeed, nullptr);
+	}
+	if (!Slots[0].IsEmpty() && Slots[1].IsEmpty())
+	{
+		Slots[1] = Slots[0];
+		Slots[0] = FHitmenInventorySlot();
+	}
+	SetActiveSlotInternal(INDEX_NONE);
+	OnRep_Slots();
+}
+
+void UHitmenInventoryComponent::OnBodyDropped()
+{
+	if (!GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	const int32 Remaining = Slots.IndexOfByPredicate([](const FHitmenInventorySlot& S) { return !S.IsEmpty(); });
+	SetActiveSlotInternal(Remaining);
+	OnRep_Slots();
+}
+
 bool UHitmenInventoryComponent::GiveWeapon(UHitmenWeaponData* Weapon, int32 Ammo, bool bForceReplace)
 {
 	if (!GetOwner()->HasAuthority() || !Weapon)

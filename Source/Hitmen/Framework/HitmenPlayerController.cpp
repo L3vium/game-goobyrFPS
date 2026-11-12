@@ -323,6 +323,11 @@ void AHitmenPlayerController::HandleHUDInventoryChanged()
 		}
 	}
 	View.Keycards = Inventory->GetKeycards();
+	if (const UHitmenBodyCarryComponent* Carry = HUDCarry.Get(); Carry && Carry->IsCarrying())
+	{
+		View.bCarryingBody = true;
+		View.bCarryingVIP = Carry->GetCarriedBody() && Carry->GetCarriedBody()->IsVIP();
+	}
 	UI->SetInventoryView(View);
 }
 
@@ -346,8 +351,9 @@ void AHitmenPlayerController::HandleHUDCarryChanged(AHitmenCharacterBase* Body)
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
 	{
 		const UHitmenBodyCarryComponent* Carry = HUDCarry.Get();
-		UI->SetCarryingVIP(Carry && Carry->IsCarrying());
+		UI->SetCarryingVIP(Carry && Carry->IsCarrying() && Carry->GetCarriedBody() && Carry->GetCarriedBody()->IsVIP());
 	}
+	HandleHUDInventoryChanged();
 }
 
 void AHitmenPlayerController::PublishEmotes(APawn* InPawn)

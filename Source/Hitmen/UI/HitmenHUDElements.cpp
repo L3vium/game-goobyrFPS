@@ -437,6 +437,13 @@ int32 UHitmenInventoryBarWidget::NativePaint(const FPaintArgs& Args, const FGeom
 		FString Name = View ? View->Name.ToString().ToUpper() : (SlotIndex == 0 ? FString(TEXT("FISTS")) : FString(TEXT("EMPTY")));
 		FString Sub;
 		FLinearColor SubColor = HitmenUI::TextDim();
+		if (SlotIndex == 0 && Inventory.bCarryingBody)
+		{
+			// The body fills the left slot while it is in your arms.
+			PaintCard(StartX, true, 1.f, nullptr, Inventory.bCarryingVIP ? FString(TEXT("TARGET")) : FString(TEXT("BODY")),
+				TEXT("F / wheel: put down"), HitmenUI::TextDim());
+			continue;
+		}
 		if (View && View->Ammo >= 0)
 		{
 			Sub = View->MaxAmmo > 0 ? FString::Printf(TEXT("%d / %d"), View->Ammo, View->MaxAmmo) : FString::FromInt(View->Ammo);

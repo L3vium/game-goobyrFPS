@@ -35,8 +35,13 @@ If any member of a team delivers the VIP, the whole team wins.
 ### VIP
 - Up to 15 NPCs in a map are flagged as **VIP candidates**; at match start one is picked at random.
 - The VIP is shown in red in the Sightroom; once dead, its highlight turns **yellow**.
-- Killing the VIP lets a player pick the body up with `F`: it appears on the back and the
-  carrier moves slower (`CarrySpeedMultiplier`). Carrying is a per-player toggle (drop the body).
+- Any body can be picked up with `F` (the VIP too): it lies across your arms in front of you, takes the left weapon
+  slot (with both slots full, the weapon in hand is put down; the other one stays slung in the right slot), you cannot
+  shoot or punch, and you move slower (`CarrySpeedMultiplier`). `F` with nothing in focus or the mouse wheel puts it
+  down, and the remaining weapon comes back to hand. The HUD's left card reads BODY (TARGET for the VIP).
+- **Body containers** (`BP_BodyContainer`, `AHitmenBodyContainer`): carrying a body, `F` opens the lid, the body goes in
+  and the lid closes (0.8 s); a hidden body is never found. `Capacity` 2 by default; the prompt shows `(1/2)` or
+  `[Full]`; the VIP can never be hidden (it must be delivered).
 - **Sonar**: while a body is carried, a red ping appears at the carrier position, stays fixed even
   if the carrier moves, and refreshes every N seconds; the interval shortens over time
   (curve in match rules).

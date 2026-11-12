@@ -1046,7 +1046,8 @@ void AHitmenPlayerCharacter::Input_SprintChanged(bool bWantsSprint)
 
 void AHitmenPlayerCharacter::Input_FirePressed()
 {
-	if (!CanAct())
+	// A body in the arms: no weapon, no punch (put it down first).
+	if (!CanAct() || BodyCarryComponent->IsCarrying())
 	{
 		return;
 	}
@@ -1136,6 +1137,12 @@ void AHitmenPlayerCharacter::Input_ManipulationAbilityReleased()
 
 void AHitmenPlayerCharacter::Input_SwitchSlot(float Direction)
 {
+	// Carrying: the wheel puts the body down (the other weapon then comes to hand).
+	if (CanAct() && BodyCarryComponent->IsCarrying())
+	{
+		BodyCarryComponent->RequestDrop();
+		return;
+	}
 	if (CanAct()) { InventoryComponent->CycleSlot(Direction); }
 }
 

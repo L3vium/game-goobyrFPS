@@ -37,6 +37,9 @@ struct FHitmenHUDInventoryView
 
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") TArray<FHitmenHUDSlotView> Slots;
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") TArray<int32> Keycards;
+	/** A body is in the arms: it fills the left card ("BODY" / "TARGET"). */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bCarryingBody = false;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bCarryingVIP = false;
 };
 
 /** One ability (E move / A manipulation) as the HUD shows it. */

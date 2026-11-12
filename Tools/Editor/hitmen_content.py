@@ -1004,6 +1004,19 @@ def build_cosmetics(mats):
     return result
 
 
+def build_body_container(world_folder, mi):
+    """BP_BodyContainer: a dumpster-like box (120 x 90 x 110) with a lid hinged on its back edge; holds 2 bodies."""
+    bp = make_blueprint("BP_BodyContainer", world_folder + "/Container", unreal.HitmenBodyContainer)
+    d = cdo(bp)
+    set_mesh(component(d, "mesh"), SHAPES["cube"], (1.2, 0.9, 1.1), mi["MI_Green"], (0, 0, 55))
+    set_mesh(component(d, "lid"), SHAPES["cube"], (1.24, 0.94, 0.08), mi["MI_Dark"], (60, 0, 4))
+    lid_pivot = component(d, "lid_pivot")
+    if lid_pivot:
+        lid_pivot.set_editor_property("relative_location", unreal.Vector(-60, 0, 110))
+    save(bp)
+    return bp
+
+
 def difficulty_presets():
     """Per-difficulty values (also used by hitmen_patch_070). Guards hit harder than 0.6 (players have 150 HP and
     regenerate): a guard that has you in the open kills you in a few bursts."""
@@ -1399,6 +1412,7 @@ def build_world(mats, weapons):
             {"contents_mode": unreal.HitmenContainerContents.FIXED})
     fixture("BP_Container_Random", unreal.HitmenContainer, W + "/Container", {"mesh": ("cube", (1, 1, 1), mi["MI_Wood"], None)},
             {"contents_mode": unreal.HitmenContainerContents.RANDOM})
+    build_body_container(W, mi)
     fixture("BP_TallGrass", unreal.HitmenTallGrass, W + "/Grass", {"mesh": ("cube", (6.0, 6.0, 1.1), mi["MI_Grass"], (0, 0, -5))})
     fixture("BP_Distraction_Radio", unreal.HitmenDistraction, W + "/Distraction", {"mesh": ("cube", (0.4, 0.2, 0.25), mi["MI_Red"], (0, 0, 12))})
     fixture("BP_SecurityCamera", unreal.HitmenSecurityCamera, W + "/Security",

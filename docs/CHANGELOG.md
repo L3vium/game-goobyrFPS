@@ -6,6 +6,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ## [Unreleased]
 
 ### Added
+- Carry any body in your arms (it takes the left weapon slot; no shooting while carrying; F or the wheel puts it
+  down); hide bodies in a body container (BP_BodyContainer, 2 per container by default; never the VIP).
 - Remote abilities target the best candidate in an 8° cone with a line of sight (fresnel + `[A] action`): the remote
   distraction works at range again; transposition swaps with bodies too.
 - Lighter: `[A] Lighter` on a body you look at nearby; it burns (toon fire) and is gone.

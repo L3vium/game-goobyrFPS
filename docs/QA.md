@@ -68,6 +68,12 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Health comes back after 6 s without being hit; no health bar
 - [ ] Mouse sensitivity default 0.25 feels right
 
+## Bodies
+- [x] Picking up a body with two weapons: the held one is put down, the other moves right, hands empty (PIE script,
+  0.7.0); [x] the body lies across the arms in view (PIE screenshot, 0.7.0)
+- [ ] No firing while carrying; F / wheel puts it down and the weapon comes back
+- [ ] Container: hide 2 bodies, the third says [Full]; the VIP says it can't be hidden; guards never find them
+
 ## Abilities
 - [x] Stone rests on the ground after the throw (PIE script, 0.7.0); [ ] a guard who comes picks it up; notes on landing
 - [x] Multi-kill: holding A marks 5 guards in view (PIE script, 0.7.0); [ ] red links and glow; one dies, all die

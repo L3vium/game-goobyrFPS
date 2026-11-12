@@ -149,15 +149,26 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   ladder grabs it at once. Ledges are probed at the centre and 25 cm to each side (a corner is caught), and in the air
   down to the feet. Fixtures (barrels, hack panels, turrets, cameras, mounted guns, distractions) carry the
   `HitmenNoTraversal` actor tag and are never climbed.
+- **First-person motion** (procedural, `FHitmenFPMotion` per weapon in its data asset): the camera bobs with every step
+  and your footstep plays on the low point of each bob (strength in Options); the arms sway with the mouse, lag when you
+  walk and tilt when you strafe. A weapon coming into hand rises from below in about 0.2 s; each shot kicks it back and
+  up on a spring (per weapon); aiming brings it toward the centre on a spring that settles, still low; the sniper first
+  rises to the eye, wobbles and steadies, then zooms, and the zoomed aim breathes a little. Punches jab one fist after
+  the other, the knife slashes right to left, a throw winds up and releases, a takedown lunges; body montages no longer
+  play on the first-person arms. Near a wall the weapon is pulled back and lowered (first-person scale 0.35, near plane
+  3 cm). Machine guns sit lower in the hand; the minigun shakes harder as it spins up; the bow arms pull back with the
+  charge.
 - **First person**: no body or arms while moving without a weapon (the body's shadow stays); the arms appear with a
-  weapon in hand (held low on the right, barrel along the view; aiming only re-centres it a little, it stays low right;
+  weapon in hand (held low on the right, barrel along the view;
   sprinting lowers and tilts it, still in view) or while punching (arms at chest height, the fists cross the view).
   Recoil kicks the view up and it recovers smoothly. On death the view leaves the head. Landings are heard (soft or
   hard, by fall speed); a hard landing dips the view.
 - **Inventory**: 2 weapon slots (mouse wheel). A new weapon always goes to the left slot (the other one slides right;
   with both full, the held weapon is swapped out). `F` with no interactable in focus throws the held
-  item (it lands at once as a floating pickup a little ahead, no physics): if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
-  stays. Firing with an empty magazine and no reserve throws the weapon where you look. No weapon
+  item: if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
+  stays. Firing with an empty magazine and no reserve throws the weapon where you look. Thrown weapons fly (physics,
+  spinning): the first hostile they hit takes the throw damage and is stunned 3 s on a head hit; an empty gun then
+  vanishes, a loaded one settles and floats as a pickup. No weapon
   in hand = fists (melee).
 - **Ammo**: one ammo pool per weapon (no magazine / reload). Walking over a weapon of the same
   type picks its ammo automatically and removes it; a different type shows **Swap** on `F`. The

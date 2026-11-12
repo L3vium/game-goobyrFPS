@@ -37,6 +37,15 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] No brightness drift on arrival (fixed exposure on every match map)
 
 ## Player
+- [x] Pistol and rifle at the hip with both hands, low right (PIE screenshots, 0.7.0); [ ] aim: toward the centre, hands
+  in view, settles with a small overshoot
+- [ ] Head bob on, a footstep on each dip; Options head bob 0 removes it
+- [ ] Switching weapons: the new one rises from below in ~0.2 s
+- [ ] Every gun kicks per shot (shotgun / sniper hard, SMG light); the minigun shakes more as it spins up
+- [ ] Sniper: raise, wobble, then zoom; the zoomed aim breathes
+- [ ] Punch alternates fists, no torso in view; knife slashes; takedown lunges; throwing winds up
+- [ ] Thrown empty pistol to a guard's head stuns it and vanishes; a loaded weapon lands as a pickup
+- [ ] Facing a wall at 30 cm the gun pulls back instead of going through
 - [x] A sprint slide with no input brakes and ends near 220 cm/s (PIE recording, 0.7.0); [ ] sideways input only bends it
 - [ ] Holding Ctrl after a slide does not slide again; release and press slides
 - [ ] Jumping at the corner of a crate grabs it; no vault onto a barrel or the hack panel

@@ -6,6 +6,13 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ## [Unreleased]
 
 ### Added
+- First-person motion, procedural and per weapon (`FHitmenFPMotion` in DA_Weapon_*): camera head bob with the
+  footstep on each low point, mouse sway, walk lag and strafe tilt, a fast equip from below, a spring kick per shot,
+  a spring hip <-> aim travel toward the centre, the sniper's raise / wobble / zoom sequence with a breathing aim,
+  alternating punch jabs, knife slash, throw wind-up, takedown lunge, minigun shake, bow draw, and a pull-back near
+  walls. Body montages no longer play on the first-person arms (no torso in view when punching).
+- Thrown weapons really fly and spin; a head hit stuns 3 s; an empty gun vanishes after its throw.
+- UHitmenDebugLibrary: Start / Stop / Inject Enhanced Input actions from editor scripts (QA).
 - Hang: thin ledges (the ledge under every window, roof edges) can be hung from with Space in the air; shimmy left /
   right (Shift faster), Space climbs into the window above or onto the ledge, Ctrl lets go. Vaulting out of an upper
   window over a drop hangs from the ledge under it.
@@ -19,6 +26,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
 
 ### Changed
+- First-person scale 0.35 (0.6) with a 3 cm near plane, so the arms stay clear of walls; machine guns sit lower.
 - Slides always brake (friction + deceleration), left / right only bend them, they last about 0.5 s from a walk and
   0.7 s from a sprint, and Ctrl must be released before the next one: no more endless sideways slides or chained
   sprint slides. Releasing the keys after a sprint stops you crisply.

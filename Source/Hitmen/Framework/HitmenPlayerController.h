@@ -93,6 +93,18 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Lobby")
 	void Server_BackToLobby();
 
+	/** Match over: the host sends everyone back to the lobby. */
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Match")
+	void Server_ReturnToLobby();
+
+	/** Results banner / pause menu / Enter: asks the server when this is the host and the match is over. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Match")
+	void RequestReturnToLobby();
+
+	/** The match on this map has ended (results banner, everyone spectating). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Match")
+	bool IsMatchOver() const;
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Lobby")
 	bool IsHost() const;
 
@@ -200,6 +212,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> EmoteWheelAction;
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> PauseAction;
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorModeAction;
+	/** Free fly (IMC_Spectator): up / down / faster, rebindable in Options > Controls > Spectator. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorUpAction;
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorDownAction;
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorFastAction;
+	/** Enter: confirm (match over: the host goes back to the lobby). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> ConfirmAction;
 
 	/** Local-only silhouette spawned where NPCs last saw this player. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Feedback")
@@ -267,6 +285,20 @@ protected:
 	void HandleEmoteWheelReleased();
 	void HandlePause();
 	void HandleSpectatorMode();
+	void HandleSpectatorUpPressed();
+	void HandleSpectatorUpReleased();
+	void HandleSpectatorDownPressed();
+	void HandleSpectatorDownReleased();
+	void HandleSpectatorFastPressed();
+	void HandleSpectatorFastReleased();
+	void HandleConfirm();
+	void PushSpectatorVertical();
+	bool bSpectatorUpHeld = false;
+	bool bSpectatorDownHeld = false;
+
+	/** Pushes the current key of each prompt action to the UI hub (after rebinding too). */
+	void RefreshKeyLabels();
+	UFUNCTION() void HandleInputUserSettingsChanged(class UEnhancedInputUserSettings* Settings);
 
 	// ---- HUD publisher: binds to the pawn's components and pushes view models to the UI hub ----
 	void BindHUDSources(APawn* InPawn);

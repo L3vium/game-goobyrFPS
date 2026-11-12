@@ -28,7 +28,27 @@ ACTIONS = {
     "IA_EmoteWheel": ("bool", [("EmoteWheel", "Emote wheel", "R", [])]),
     "IA_Pause": ("bool", [("Pause", "Pause", "Escape", []), ("PauseAlt", "Pause (alt)", "P", [])]),
     "IA_SpectatorMode": ("bool", [("SpectatorMode", "Spectator view", "V", [])]),
+    "IA_Confirm": ("bool", [("Confirm", "Confirm / back to the lobby", "Enter", [])]),
 }
+
+# Free fly (IMC_Spectator, above the game while spectating): Unreal-like, A up / E down.
+SPECTATOR_ACTIONS = {
+    "IA_SpectatorUp": ("bool", [("SpectatorUp", "Fly up", "SpaceBar", []), ("SpectatorUpAlt", "Fly up (alt)", "A", [])]),
+    "IA_SpectatorDown": ("bool", [("SpectatorDown", "Fly down", "LeftControl", []), ("SpectatorDownAlt", "Fly down (alt)", "E", [])]),
+    "IA_SpectatorFast": ("bool", [("SpectatorFast", "Fly faster", "LeftShift", [])]),
+}
+
+# Options > Controls sections (PlayerMappableKeySettings.DisplayCategory).
+INPUT_CATEGORIES = {
+    "IA_Move": "Movement", "IA_Jump": "Movement", "IA_Crouch": "Movement", "IA_Sprint": "Movement",
+    "IA_Fire": "Combat", "IA_Aim": "Combat", "IA_SwitchSlot": "Combat",
+    "IA_MoveAbility": "Abilities", "IA_ManipulationAbility": "Abilities", "IA_Sightroom": "Abilities",
+    "IA_Interact": "Interaction", "IA_EmoteWheel": "Interaction",
+    "IA_SpectatorMode": "Spectator", "IA_SpectatorUp": "Spectator", "IA_SpectatorDown": "Spectator", "IA_SpectatorFast": "Spectator",
+    "IA_Pause": "Menus", "IA_Confirm": "Menus",
+}
+# Not rebindable (the mouse axis).
+FIXED_INPUTS = {"IA_Look"}
 
 VALUE_TYPES = {
     "bool": unreal.InputActionValueType.BOOLEAN,
@@ -37,25 +57,18 @@ VALUE_TYPES = {
 }
 
 
-def build_input():
-    folder = path("Input", "Actions")
-    actions = {}
-    for name, (value_type, _) in ACTIONS.items():
-        ia = create(name, folder, unreal.InputAction, unreal.InputAction_Factory())
-        set_props(ia, value_type=VALUE_TYPES[value_type])
-        save(ia)
-        actions[name] = ia
-
-    imc = create("IMC_Gameplay", path("Input", "Contexts"), unreal.InputMappingContext, unreal.InputMappingContext_Factory())
+def fill_mapping_context(imc, action_defs, actions):
+    """Maps every key of action_defs into imc, with modifiers and player-mappable settings (name, display name,
+    Options category)."""
     imc.unmap_all()
-    for name, (_, mappings) in ACTIONS.items():
+    for name, (_, mappings) in action_defs.items():
         for mapping_name, display, key_name, modifiers in mappings:
             imc.map_key(actions[name], key(key_name))
     # Second pass: modifiers and player-mappable settings on each mapping.
     data = imc.get_editor_property("default_key_mappings")
     mapping_list = list(data.get_editor_property("mappings"))
     lookup = {}
-    for name, (_, mappings) in ACTIONS.items():
+    for name, (_, mappings) in action_defs.items():
         for mapping_name, display, key_name, modifiers in mappings:
             lookup[(name, key_name)] = (mapping_name, display, modifiers)
     rebuilt = []
@@ -72,20 +85,36 @@ def build_input():
                 elif mod == "negate":
                     mods.append(unreal.new_object(unreal.InputModifierNegate, outer=imc))
             mapping.set_editor_property("modifiers", mods)
-            settings = unreal.new_object(unreal.PlayerMappableKeySettings, outer=imc)
-            settings.set_editor_property("name", mapping_name)
-            settings.set_editor_property("display_name", display)
-            settings.set_editor_property("display_category", "Hitmen")
-            mapping.set_editor_property("setting_behavior", unreal.PlayerMappableKeySettingBehaviors.OVERRIDE_SETTINGS)
-            mapping.set_editor_property("player_mappable_key_settings", settings)
+            if action.get_name() in FIXED_INPUTS:
+                mapping.set_editor_property("setting_behavior", unreal.PlayerMappableKeySettingBehaviors.IGNORE_SETTINGS)
+            else:
+                settings = unreal.new_object(unreal.PlayerMappableKeySettings, outer=imc)
+                settings.set_editor_property("name", mapping_name)
+                settings.set_editor_property("display_name", display)
+                settings.set_editor_property("display_category", INPUT_CATEGORIES.get(action.get_name(), "Other"))
+                mapping.set_editor_property("setting_behavior", unreal.PlayerMappableKeySettingBehaviors.OVERRIDE_SETTINGS)
+                mapping.set_editor_property("player_mappable_key_settings", settings)
         rebuilt.append(mapping)
     data.set_editor_property("mappings", rebuilt)
     imc.set_editor_property("default_key_mappings", data)
     save(imc)
+    return rebuilt
 
+
+def build_input():
+    folder = path("Input", "Actions")
+    actions = {}
+    for name, (value_type, _) in list(ACTIONS.items()) + list(SPECTATOR_ACTIONS.items()):
+        ia = create(name, folder, unreal.InputAction, unreal.InputAction_Factory())
+        set_props(ia, value_type=VALUE_TYPES[value_type])
+        save(ia)
+        actions[name] = ia
+
+    imc = create("IMC_Gameplay", path("Input", "Contexts"), unreal.InputMappingContext, unreal.InputMappingContext_Factory())
+    rebuilt = fill_mapping_context(imc, ACTIONS, actions)
     spectator = create("IMC_Spectator", path("Input", "Contexts"), unreal.InputMappingContext, unreal.InputMappingContext_Factory())
-    save(spectator)
-    log("input: actions", len(actions), "mappings", len(rebuilt))
+    spectator_rebuilt = fill_mapping_context(spectator, SPECTATOR_ACTIONS, actions)
+    log("input: actions", len(actions), "mappings", len(rebuilt), "spectator", len(spectator_rebuilt))
     return actions, imc, spectator
 
 
@@ -1382,7 +1411,9 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
               aim_action=actions["IA_Aim"], interact_action=actions["IA_Interact"], move_ability_action=actions["IA_MoveAbility"],
               manipulation_ability_action=actions["IA_ManipulationAbility"], switch_slot_action=actions["IA_SwitchSlot"],
               sightroom_action=actions["IA_Sightroom"], emote_wheel_action=actions["IA_EmoteWheel"], pause_action=actions["IA_Pause"],
-              spectator_mode_action=actions["IA_SpectatorMode"], last_known_position_marker_class=gen_class(marker))
+              spectator_mode_action=actions["IA_SpectatorMode"], spectator_up_action=actions["IA_SpectatorUp"],
+              spectator_down_action=actions["IA_SpectatorDown"], spectator_fast_action=actions["IA_SpectatorFast"],
+              confirm_action=actions["IA_Confirm"], last_known_position_marker_class=gen_class(marker))
     save(pc)
 
     manny = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")

@@ -146,6 +146,19 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenTextChanged, const FText&, 
  * Local-player event hub. Gameplay code calls the Broadcast* helpers; widgets bind in
  * NativeConstruct. Lives on the local player, so it survives level travel and pawn changes.
  */
+/** Keys shown in prompts and on the HUD; they follow the player's rebinding. */
+UENUM(BlueprintType)
+enum class EHitmenKeyLabel : uint8
+{
+	Interact,
+	Jump,
+	MoveAbility,
+	Manipulation,
+	Sightroom,
+	Confirm,
+	Count UMETA(Hidden)
+};
+
 UCLASS()
 class HITMEN_API UHitmenUIEventSubsystem : public ULocalPlayerSubsystem
 {
@@ -197,6 +210,20 @@ public:
 	/** Lobby data (teams, players, options) changed: lobby widgets refresh. */
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
 	FOnHitmenSimpleEvent OnLobbyChanged;
+
+	/** A key was rebound: prompts and cards repaint with the new letters. */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenSimpleEvent OnKeyLabelsChanged;
+
+	/** Short label of the key bound to an action ("F", "SPACE", "A"); the default layout until the controller
+	 *  pushes the real bindings. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI")
+	FString GetKeyLabel(EHitmenKeyLabel Label) const;
+
+	void SetKeyLabels(const TArray<FString>& InLabels);
+
+	/** "SPACE", "SHIFT", "LMB", "F"...: the short name drawn in key caps. */
+	static FString ShortKeyName(const FKey& Key);
 
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
 	FOnHitmenSpectatorMode OnSpectatorModeChanged;
@@ -320,6 +347,7 @@ private:
 	UPROPERTY(Transient) TArray<FText> EmoteNames;
 	UPROPERTY(Transient) TArray<FHitmenSpectatorView> SpectatorViews;
 	UPROPERTY(Transient) TArray<FHitmenHUDAlertBlip> AlertBlips;
+	TArray<FString> KeyLabels;
 	float CrosshairSpread = 1.f;
 	bool bCarryingVIP = false;
 	bool bPauseMenuOpen = false;

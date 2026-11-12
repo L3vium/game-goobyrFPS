@@ -9,6 +9,8 @@
 #include "Framework/HitmenGameModeBase.h"
 #include "Framework/HitmenHUD.h"
 #include "Framework/HitmenGameInstance.h"
+#include "Framework/HitmenMatchGameMode.h"
+#include "Spectator/HitmenSpectatorPawn.h"
 #include "Blueprint/UserWidget.h"
 #include "Core/HitmenInterfaces.h"
 #include "Core/HitmenUserSettings.h"
@@ -129,6 +131,55 @@ void AHitmenPlayerController::RefreshMappingContexts()
 			}
 		}
 	}
+	if (UserSettings)
+	{
+		// The spectator keys are listed (and rebindable) even while playing.
+		if (SpectatorMappingContext)
+		{
+			UserSettings->RegisterInputMappingContext(SpectatorMappingContext);
+		}
+		UserSettings->OnSettingsChanged.AddUniqueDynamic(this, &AHitmenPlayerController::HandleInputUserSettingsChanged);
+	}
+	// The subsystem rebuilds its mappings on the next tick: read the keys after that.
+	FTimerHandle LabelTimer;
+	GetWorldTimerManager().SetTimer(LabelTimer, this, &AHitmenPlayerController::RefreshKeyLabels, 0.1f, false);
+}
+
+void AHitmenPlayerController::HandleInputUserSettingsChanged(UEnhancedInputUserSettings* Settings)
+{
+	FTimerHandle LabelTimer;
+	GetWorldTimerManager().SetTimer(LabelTimer, this, &AHitmenPlayerController::RefreshKeyLabels, 0.1f, false);
+}
+
+void AHitmenPlayerController::RefreshKeyLabels()
+{
+	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
+	const UEnhancedInputLocalPlayerSubsystem* Subsystem = GetLocalPlayer() ? GetLocalPlayer()->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+	if (!UI || !Subsystem)
+	{
+		return;
+	}
+	// Same order as EHitmenKeyLabel.
+	const UInputAction* Actions[] = { InteractAction, JumpAction, MoveAbilityAction, ManipulationAbilityAction, SightroomAction, ConfirmAction };
+	static_assert(UE_ARRAY_COUNT(Actions) == static_cast<int32>(EHitmenKeyLabel::Count), "One action per key label");
+	TArray<FString> Labels;
+	for (const UInputAction* Action : Actions)
+	{
+		FString Label;
+		if (Action)
+		{
+			for (const FKey& Key : Subsystem->QueryKeysMappedToAction(Action))
+			{
+				if (!Key.IsGamepadKey())
+				{
+					Label = UHitmenUIEventSubsystem::ShortKeyName(Key);
+					break;
+				}
+			}
+		}
+		Labels.Add(Label);
+	}
+	UI->SetKeyLabels(Labels);
 }
 
 void AHitmenPlayerController::SetupInputComponent()
@@ -177,6 +228,75 @@ void AHitmenPlayerController::SetupInputComponent()
 	BindIfSet(EmoteWheelAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleEmoteWheelReleased);
 	BindIfSet(PauseAction, ETriggerEvent::Started, &AHitmenPlayerController::HandlePause);
 	BindIfSet(SpectatorModeAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorMode);
+	BindIfSet(SpectatorUpAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorUpPressed);
+	BindIfSet(SpectatorUpAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleSpectatorUpReleased);
+	BindIfSet(SpectatorDownAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorDownPressed);
+	BindIfSet(SpectatorDownAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleSpectatorDownReleased);
+	BindIfSet(SpectatorFastAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorFastPressed);
+	BindIfSet(SpectatorFastAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleSpectatorFastReleased);
+	BindIfSet(ConfirmAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleConfirm);
+}
+
+// ---- Free fly (IMC_Spectator) ----
+
+void AHitmenPlayerController::HandleSpectatorUpPressed() { bSpectatorUpHeld = true; PushSpectatorVertical(); }
+void AHitmenPlayerController::HandleSpectatorUpReleased() { bSpectatorUpHeld = false; PushSpectatorVertical(); }
+void AHitmenPlayerController::HandleSpectatorDownPressed() { bSpectatorDownHeld = true; PushSpectatorVertical(); }
+void AHitmenPlayerController::HandleSpectatorDownReleased() { bSpectatorDownHeld = false; PushSpectatorVertical(); }
+
+void AHitmenPlayerController::PushSpectatorVertical()
+{
+	if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetPawnOrSpectator()))
+	{
+		Spectator->SetVerticalInput(IsGameplayInputBlocked() ? 0.f : (bSpectatorUpHeld ? 1.f : 0.f) - (bSpectatorDownHeld ? 1.f : 0.f));
+	}
+}
+
+void AHitmenPlayerController::HandleSpectatorFastPressed()
+{
+	if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetPawnOrSpectator()))
+	{
+		Spectator->SetFast(true);
+	}
+}
+
+void AHitmenPlayerController::HandleSpectatorFastReleased()
+{
+	if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetPawnOrSpectator()))
+	{
+		Spectator->SetFast(false);
+	}
+}
+
+void AHitmenPlayerController::HandleConfirm()
+{
+	if (IsMatchOver() && !IsGameplayInputBlocked())
+	{
+		RequestReturnToLobby();
+	}
+}
+
+bool AHitmenPlayerController::IsMatchOver() const
+{
+	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
+	return GS && GS->GetMatchPhase() == EHitmenMatchPhase::Ended;
+}
+
+void AHitmenPlayerController::RequestReturnToLobby()
+{
+	if (IsHost() && IsMatchOver())
+	{
+		UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::UIConfirm);
+		Server_ReturnToLobby();
+	}
+}
+
+void AHitmenPlayerController::Server_ReturnToLobby_Implementation()
+{
+	if (AHitmenMatchGameMode* GM = GetWorld()->GetAuthGameMode<AHitmenMatchGameMode>())
+	{
+		GM->RequestReturnToLobby(this);
+	}
 }
 
 void AHitmenPlayerController::SetPawn(APawn* InPawn)
@@ -920,6 +1040,8 @@ void AHitmenPlayerController::Client_EnterSpectatorMode_Implementation(bool bWat
 {
 	bSpectating = true;
 	bIsWatcher = bWatcher;
+	bSpectatorUpHeld = false;
+	bSpectatorDownHeld = false;
 	RefreshMappingContexts();
 	SetSpectatorMode(bWatcher ? EHitmenSpectatorMode::FreeFly : EHitmenSpectatorMode::Follow);
 }

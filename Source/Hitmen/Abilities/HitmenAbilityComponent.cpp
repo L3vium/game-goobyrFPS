@@ -162,7 +162,9 @@ void UHitmenAbilityComponent::UpdateTargetHint()
 		{
 			Hint.Target = Target;
 			Hint.Action = Action;
-			Hint.Key = Slot == EHitmenAbilitySlot::Manipulation ? NSLOCTEXT("Hitmen", "KeyManipulation", "A") : NSLOCTEXT("Hitmen", "KeyMove", "E");
+			const UHitmenUIEventSubsystem* KeyUI = UHitmenUIEventSubsystem::GetFromPawn(Cast<APawn>(GetOwner()));
+			const EHitmenKeyLabel KeyLabel = Slot == EHitmenAbilitySlot::Manipulation ? EHitmenKeyLabel::Manipulation : EHitmenKeyLabel::MoveAbility;
+			Hint.Key = FText::FromString(KeyUI ? KeyUI->GetKeyLabel(KeyLabel) : FString(Slot == EHitmenAbilitySlot::Manipulation ? TEXT("A") : TEXT("E")));
 			break;
 		}
 	}

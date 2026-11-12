@@ -212,6 +212,13 @@ protected:
 	UPROPERTY(Transient) TObjectPtr<UEditableTextBox> AgentNameEdit;
 	UPROPERTY(Transient) TObjectPtr<UHitmenIconButton> RandomizeButton;
 	UPROPERTY(Transient) TArray<TObjectPtr<UHitmenArrowButton>> LookArrows;
+	/** "3 / 8" under each pair of look arrows (head, torso, legs). */
+	UPROPERTY(Transient) TArray<TObjectPtr<UTextBlock>> LookCounters;
+	/** Watchers in "Your agent": no agent to dress, only who is ready. */
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> WatcherWaitText;
+	UPROPERTY(Transient) TObjectPtr<UWidget> LoadoutPanelWidget;
+	/** WEAPON / MOVE ABILITY [E] / MANIPULATION [A] (keys follow the rebinding). */
+	UPROPERTY(Transient) TArray<TObjectPtr<UTextBlock>> LoadoutRowLabels;
 	UPROPERTY(Transient) TArray<TObjectPtr<UHitmenChoiceStrip>> LoadoutStrips;
 	UPROPERTY(Transient) TObjectPtr<UHitmenMenuButton> ReadyButton;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> ReadyStatusText;
@@ -242,6 +249,8 @@ protected:
 	void ApplyLoadoutChoice(int32 CardIndex, int32 ChoiceIndex);
 	void RefreshLoadoutStrips();
 	void UpdateAgentAnchors();
+	void RefreshLookCounters();
+	UFUNCTION() void HandleKeyLabelsChanged();
 	/** Shows the local look on the stage at once; the server gets it once clicks pause. */
 	void PreviewLocalCosmetics();
 	TArray<struct FHitmenChoiceItem> GetLoadoutChoices(int32 CardIndex, int32& OutSelected) const;

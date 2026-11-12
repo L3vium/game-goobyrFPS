@@ -38,6 +38,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Match")
 	void EndMatch(const FHitmenMatchResult& Result);
 
+	/** The host (match over) sends everyone back to the lobby. */
+	void RequestReturnToLobby(APlayerController* Requester);
+
+	bool IsMatchOver() const { return bMatchOver; }
+
 protected:
 	/** Gym and test maps can disable win conditions. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match")
@@ -54,6 +59,13 @@ protected:
 	/** Seconds after death before a dead player switches to spectating teammates. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match", meta=(ClampMin="0"))
 	float DeathSpectateDelay = 3.f;
+
+	/** Match over: seconds on the result before everyone becomes a free-fly spectator (no return timer: the host
+	 *  sends everyone back to the lobby). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match", meta=(ClampMin="0", Units="s"))
+	float EndSpectateDelay = 2.f;
+
+	void MoveEveryoneToSpectators();
 
 	/** Match start: players drop from the sky under a parachute, without control, then play. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match|Intro")

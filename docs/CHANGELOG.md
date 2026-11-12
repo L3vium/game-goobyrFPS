@@ -6,6 +6,16 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ## [Unreleased]
 
 ### Added
+- Options rebuilt: a centred panel with Gameplay / Controls / Graphics / Audio tabs, a description column, `[Esc] Back`
+  and `[R] Defaults`; Escape closes them from the title too. Controls by section with conflicts in red; graphics
+  presets, auto-detect (also on the first launch), resolution, window mode, vsync, frame cap, render scale and every
+  quality; an Interface volume.
+- Match end without a timer: a result banner, everyone flies free, the host goes back to the lobby with Enter (or the
+  pause menu); the others wait for the host.
+- Free fly like the Unreal editor (ZQSD, Shift faster, Space / A up, Ctrl / E down) with its own rebindable keys,
+  kept inside the map bounds and under a ceiling.
+- Watchers: a watching host gets Start; alone, the match starts at once; in "Your agent" they see who is ready.
+- "3 / 8" counters under the agent's look arrows.
 - Vehicle HUD: health bar at the top, reload ring around the crosshair, `[F] Exit` bottom right; keycards moved bottom
   right above it.
 - Security cameras can be shot to pieces (30 health): sparks, the head drops, the feed is lost for good.
@@ -48,6 +58,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
 
 ### Changed
+- HUD: the ability cards show their key (A / E as bound), a stronger divider, the bar is centred (it was 12 px off);
+  prompt keys (F, SPACE, Exit) follow the rebinding.
 - Sightroom: the wave takes 0.35 s (0.8) and highlights follow it every frame (no 0.15 s steps); when it ends the whole
   map turns to the scan look and every enemy on the map shows; highlights are anti-aliased with a thin outline (no more
   pixel blocks); line of sight aims at an interactable's middle, so windows light up.

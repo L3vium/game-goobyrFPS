@@ -2,6 +2,7 @@
 
 #include "Data/HitmenSoundSet.h"
 #include "Core/HitmenGameSettings.h"
+#include "Core/HitmenUserSettings.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "Sound/SoundAttenuation.h"
@@ -63,7 +64,17 @@ void UHitmenSoundLibrary::PlayHitmenSound2D(const UObject* WorldContextObject, E
 	}
 	if (USoundBase* Asset = Set->GetSound(Sound))
 	{
-		UGameplayStatics::PlaySound2D(WorldContextObject, Asset, Set->GetVolume(Sound));
+		// Menu sounds follow Options > Audio > Interface.
+		float Volume = Set->GetVolume(Sound);
+		if (Sound == EHitmenSound::UIHover || Sound == EHitmenSound::UIClick || Sound == EHitmenSound::UIBack || Sound == EHitmenSound::UIConfirm)
+		{
+			const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
+			Volume *= Settings ? FMath::Clamp(Settings->UIVolume, 0.f, 1.f) : 1.f;
+		}
+		if (Volume > 0.f)
+		{
+			UGameplayStatics::PlaySound2D(WorldContextObject, Asset, Volume);
+		}
 	}
 }
 

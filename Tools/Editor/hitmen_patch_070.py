@@ -270,6 +270,19 @@ if wanted("fixtures"):
         save(mounted)
     log("fixtures: cameras, monitors, breaker, lamps, distractions, mounted gun")
 
+if wanted("input"):
+    # Options categories, Enter (confirm), free-fly keys in IMC_Spectator; the controller gets the new actions.
+    actions, imc, spectator_imc = hitmen_content.build_input()
+    pc_bp = load("/Game/Hitmen/Core/BP_PlayerController")
+    if pc_bp:
+        d = unreal.get_default_object(pc_bp.generated_class())
+        hitmen_content.set_props(d, spectator_mapping_context=spectator_imc, spectator_up_action=actions["IA_SpectatorUp"],
+                                 spectator_down_action=actions["IA_SpectatorDown"], spectator_fast_action=actions["IA_SpectatorFast"],
+                                 confirm_action=actions["IA_Confirm"])
+        unreal.BlueprintEditorLibrary.compile_blueprint(pc_bp)
+        save(pc_bp)
+    log("input: categories, confirm, spectator keys")
+
 if wanted("sightroom"):
     # Sightroom: anti-aliased stencil with an outline, map-wide look at the end of the wave.
     hitmen_content.build_sightroom_pp()

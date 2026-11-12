@@ -58,6 +58,18 @@ public:
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Audio")
 	float VoiceVolume = 1.f;
 
+	/** Menu sounds (hover, click, back, confirm). */
+	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Audio")
+	float UIVolume = 0.8f;
+
+	/** The hardware benchmark picked the graphics preset once (first launch of a packaged build). */
+	UPROPERTY(Config)
+	bool bAutoDetectDone = false;
+
+	/** Runs the hardware benchmark and applies its scalability levels (Options > Graphics > Auto-detect). */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Settings")
+	void RunAutoDetect();
+
 	/** Name typed by the player; empty = Steam name or a random one. */
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Profile")
 	FString PreferredName;

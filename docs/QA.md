@@ -127,6 +127,14 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] In the dark, a guard that hears you within 2.5 m attacks
 
 ## HUD
+- [x] Options: four tabs, rows, description, key hints; Controls by section in play order (screenshots, 0.7.0);
+  [ ] Esc closes from the title, R resets the tab, a rebound key changes the HUD letter and the prompt
+- [x] HUD: A / E key caps on the ability cards, divider, centred bar (screenshot, 0.7.0)
+- [x] Watcher: waiting text in Your agent; alone, Start goes straight to the map in free fly (PIE with
+  `net.AllowPIESeamlessTravel 1`, 0.7.0); free fly up and the bounds clamp (PIE script)
+- [x] Match end: banner, everyone spectates, Enter (host) back to the lobby (PIE, 0.7.0); [ ] two players: the client
+  sees "Waiting for the host"
+- [x] Agent look counters "n / m" (screenshot, 0.7.0)
 - [x] Sightroom: whole map tinted after the wave, far enemies sharp white dots, target red, window and gutter
   highlighted with smooth edges (PIE screenshots, 0.7.0); [ ] the wave reveals guards as it passes them
 - [x] Inventory: four equal cards with icons, ammo x / max, no key letters, jetpack gauge (screenshot, 0.5.0)

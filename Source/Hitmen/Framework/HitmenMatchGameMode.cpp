@@ -17,6 +17,7 @@
 #include "Hitmen.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
+#include "GameFramework/SpectatorPawn.h"
 #include "Engine/World.h"
 
 AHitmenMatchGameMode::AHitmenMatchGameMode()
@@ -432,6 +433,17 @@ void AHitmenMatchGameMode::CheckWinConditions()
 		}
 	}
 
+	// Watchers only (watching the NPCs): the match never ends by itself.
+	bool bAnyAgent = false;
+	for (const AHitmenPlayerState* PS : GS->GetHitmenPlayers())
+	{
+		bAnyAgent |= !PS->IsWatcher();
+	}
+	if (!bAnyAgent)
+	{
+		return;
+	}
+
 	if (AlivePlayers == 0)
 	{
 		FHitmenMatchResult Result;
@@ -465,7 +477,42 @@ void AHitmenMatchGameMode::EndMatch(const FHitmenMatchResult& Result)
 		GS->SetMatchPhase(EHitmenMatchPhase::Ended);
 	}
 	Juice_OnMatchEnded(Result);
-	GetWorldTimerManager().SetTimer(EndTimer, this, &AHitmenMatchGameMode::ReturnToLobby, GetRules()->ResultsDuration, false);
+	// No return timer: after a beat on the result everyone flies free; the host sends everyone back.
+	GetWorldTimerManager().SetTimer(EndTimer, this, &AHitmenMatchGameMode::MoveEveryoneToSpectators, FMath::Max(0.01f, EndSpectateDelay), false);
+}
+
+void AHitmenMatchGameMode::MoveEveryoneToSpectators()
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		AHitmenPlayerController* PC = Cast<AHitmenPlayerController>(It->Get());
+		if (!PC)
+		{
+			continue;
+		}
+		// Watchers and dead players already spectate; they switch to free fly too. Living agents leave their body
+		// where it stands.
+		if (PC->GetPawn() && !PC->GetPawn()->IsA<ASpectatorPawn>())
+		{
+			PC->UnPossess();
+		}
+		if (!PC->IsInState(NAME_Spectating))
+		{
+			PC->ChangeState(NAME_Spectating);
+			PC->ClientGotoState(NAME_Spectating);
+		}
+		PC->Client_EnterSpectatorMode(true);
+	}
+}
+
+void AHitmenMatchGameMode::RequestReturnToLobby(APlayerController* Requester)
+{
+	// The listen-server host only, once the match is over.
+	if (!bMatchOver || !Requester || !Requester->IsLocalController() || GetWorld()->GetFirstPlayerController() != Requester)
+	{
+		return;
+	}
+	ReturnToLobby();
 }
 
 void AHitmenMatchGameMode::ReturnToLobby()

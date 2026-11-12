@@ -130,9 +130,17 @@ void AHitmenLobbyGameMode::RequestStart(AHitmenPlayerController* Requester)
 	UE_LOG(LogHitmen, Log, TEXT("Lobby: start requested (host: %s)"), IsHost(Requester) ? TEXT("yes") : TEXT("no"));
 	if (AHitmenGameState* GS = GetGameState<AHitmenGameState>(); GS && IsHost(Requester))
 	{
+		bool bAnyAgent = false;
 		for (AHitmenPlayerState* PS : GS->GetHitmenPlayers())
 		{
 			PS->SetReady(false);
+			bAnyAgent |= !PS->IsWatcher();
+		}
+		// Only watchers in the room: nobody has an agent to choose, the match starts at once.
+		if (!bAnyAgent)
+		{
+			RequestLaunch(Requester);
+			return;
 		}
 		GS->SetMatchPhase(EHitmenMatchPhase::Customization);
 	}

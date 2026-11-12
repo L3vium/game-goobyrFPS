@@ -97,10 +97,15 @@ adaptation): every room is lit for it. Space or Escape goes back on every menu p
    click counts) level with its head, torso and legs in two columns `AgentArrowSpacing` away from its axis, and
    **Randomize** under its feet — all placed from the reference pose, so they never move with the idle animation;
    the look changes on the stage at once and is sent once the clicks pause. Right: the loadout, three
-   always-visible rows of square icon tiles (weapon, move `E`, manipulation `A`), each starting with
-   **None**; a click picks. Default: silenced pistol, no abilities. **Ready** only: when every
-   non-watcher is ready the match starts a second later (no countdown on screen; un-ready cancels it).
-5. **Match** — intro (parachute drop, "Dropping in" and the map name, no countdown), play, then results.
+   always-visible rows of square icon tiles (weapon, move `E`, manipulation `A`, keys as bound), each starting with
+   **None**; a click picks. A "3 / 8" counter under each pair of look arrows. Default: silenced pistol, no abilities.
+   **Ready** only: when every non-watcher is ready the match starts a second later (no countdown on screen; un-ready
+   cancels it). Watchers have nothing to dress: they see "Waiting for other players (n / m ready)". A watching host's
+   button reads **Start** instead of "Choose your agent"; with only watchers in the room the match starts at once.
+5. **Match** — intro (parachute drop, "Dropping in" and the map name, no countdown), play, then the end: a banner at
+   the top (winner, reason), and two seconds later everyone flies free over the map (no timer). The host sends
+   everyone back to the lobby with `Enter` (or **Back to the lobby** in the pause menu); the others see "Waiting for
+   the host". A match with only watchers never ends by itself.
 
 Spawns: maps carry many `BP_TeamStart` points. Each team (or solo player) takes a random free point
 and teammates take the nearest free points around it. During the intro (`bParachuteIntro`,
@@ -109,6 +114,9 @@ under a canopy, steering a little (falling at 15 m/s, 3 s intro); control return
 
 Watchers get a spectator mode (`V` cycles): free fly, single-player view (LMB / RMB switch between
 players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players follow teammates.
+Free fly works like the Unreal editor: `ZQSD`, `Shift` x3, `Space` / `A` up, `Ctrl` / `E` down (`IMC_Spectator`, its
+own rebindable keys, above the game keys while spectating). It stays inside the map's world bounds (`DA_Map`, minus
+`BoundsMargin`), above the ground and under a ceiling `MaxHeightAboveGround` over the highest ground flown over.
 
 ## 5. Controls (defaults, AZERTY, all rebindable)
 | Action | Key |
@@ -127,9 +135,19 @@ players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players 
 | Sightroom | Tab |
 | Emote wheel (hold) | R |
 | Pause (no time stop) | Esc |
+| Confirm (match over, host: back to the lobby) | Enter |
 
-Options: crouch toggle, sprint toggle, ladder direction relative to camera (off by default),
-mouse sensitivity, invert Y, audio volumes, full key rebinding.
+**Options** (title and pause; `Esc` closes them, `R` resets the tab on screen, `Q` / `E` switch tabs): a centred panel
+with tabs, one row per setting (label left, `< value >` or a slider right) and the hovered row described on the right.
+- **Gameplay**: mouse and aiming sensitivity, invert Y, crouch and sprint hold / toggle, ladder direction.
+- **Controls**: every key by section (Movement, Combat, Abilities, Interaction, Spectator, Menus); click then press a key
+  or a mouse button (`Esc` cancels); a key used twice turns red and the description names the other action. Spectator
+  keys only clash with each other. Prompts and HUD keys follow the rebinding.
+- **Graphics**: quality preset (Low / Medium / High / Epic, Custom when mixed), **Detect the best settings** (hardware
+  benchmark; runs once by itself on the first launch of a packaged build), resolution, window mode, vertical sync,
+  frame rate limit, render scale, shadows, global illumination (Low / Medium turn Lumen off), reflections, effects,
+  view distance, post-processing, textures, anti-aliasing, field of view, head bob.
+- **Audio**: master, music, effects, voice, interface.
 
 ## 6. Player
 - **Movement**: walk (480), sprint (820), crouch (240, the view lowers smoothly), slide (crouch while
@@ -371,10 +389,10 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 - **Compass** (top): N/S/E/W only (`bShowIntercardinals` off); optional VIP marker; retrieval
   directions while carrying.
 - **Inventory bar** (bottom centre): four cards of one size, in fixed places — the two weapon slots (the drawn one lit;
-  switching snaps, nothing slides), a divider, the manipulation (A) and move (E) abilities. Each card shows the item's
-  icon and full name (the font shrinks to fit), weapons their ammo as `current / max`, abilities a cooldown shade that
-  shrinks as they come back, charge pips and a fuel gauge for the jetpack. No key letters, no "ready", no health bar:
-  keycard chips sit above.
+  switching snaps, nothing slides), a 3 px divider, the manipulation (A) and move (E) abilities with their key in the
+  top-right corner (as bound). Each card shows the item's icon and full name (the font shrinks to fit), weapons their
+  ammo as `current / max`, abilities a cooldown shade that shrinks as they come back, charge pips and a fuel gauge for
+  the jetpack. No "ready", no health bar. The bar is centred on the screen.
 - **Minimap** (bottom left, square): the baked map, north up (your arrow turns, no view cone), alerted NPCs, sonar pings,
   map markers (cameras, retrieval points pinned to the frame when out of range);
   its frame takes the colour of the worst alert aimed at you and a banner opens across its top with a white flash
@@ -383,13 +401,16 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   hears); an "x" on a kill (red on a headshot);
   Hitman-like awareness arcs around it, one per guard or camera noticing you, placed toward it: the arc fills from its
   middle as suspicion grows (white), then turns yellow or red; cameras add a small camera mark.
-- **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault`; remote-ability targets glow with `[A] Charm` under them; holding F fills a ring around the key. Keycards are chips bottom right (above `[F] Exit` while driving).
+- **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault` (the keys as bound); remote-ability
+  targets glow with `[A] Charm` under them; holding F fills a ring around the key. Keycards are chips bottom right
+  (above `[F] Exit` while driving).
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
 - **Scope** overlay for the sniper. **Sightroom** (Tab): a fast scan wave and a floor grid around you, then the whole map in a cool look;
   highlights with a thin outline.
 - **Alert indicators** above NPCs (a hatched diamond: white and filling from the bottom while suspicion builds, solid
   yellow or red once alerted, a red "!" beside it while calling for backup) and around the crosshair.
-- **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match); the baked
+- **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match; the host gets
+  **Back to the lobby** once the match is over); the baked
   schematic in the middle (north up, dimmed under the markers, wheel to zoom around you); the legend on the right
   toggles each marker type and shows its exact colours (you, teammates, VIP, guards on alert in white / yellow / red
   like the minimap, then one row per map marker kind on the map: retrieval points, cameras...). Debug tools (dev builds)

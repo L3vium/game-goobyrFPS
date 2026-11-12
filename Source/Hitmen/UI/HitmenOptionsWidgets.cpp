@@ -29,7 +29,7 @@
 
 namespace
 {
-	UEnhancedInputUserSettings* GetInputUserSettings(const APlayerController* PC)
+	UEnhancedInputUserSettings* OptionsInputSettings(const APlayerController* PC)
 	{
 		const ULocalPlayer* LP = PC ? PC->GetLocalPlayer() : nullptr;
 		const UEnhancedInputLocalPlayerSubsystem* Subsystem = LP ? LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
@@ -803,7 +803,7 @@ void UHitmenOptionsWidget::BuildGameplay()
 
 void UHitmenOptionsWidget::BuildControls()
 {
-	UEnhancedInputUserSettings* InputSettings = GetInputUserSettings(GetOwningPlayer());
+	UEnhancedInputUserSettings* InputSettings = OptionsInputSettings(GetOwningPlayer());
 	const UEnhancedPlayerMappableKeyProfile* Profile = InputSettings ? InputSettings->GetActiveKeyProfile() : nullptr;
 	if (!Profile)
 	{
@@ -917,7 +917,7 @@ void UHitmenOptionsWidget::RefreshKeyConflicts()
 
 void UHitmenOptionsWidget::HandleKeyChosen(UHitmenOptionRow* Row, const FKey& Key)
 {
-	UEnhancedInputUserSettings* InputSettings = GetInputUserSettings(GetOwningPlayer());
+	UEnhancedInputUserSettings* InputSettings = OptionsInputSettings(GetOwningPlayer());
 	if (!Row || !InputSettings || !Key.IsValid())
 	{
 		return;
@@ -1084,7 +1084,7 @@ void UHitmenOptionsWidget::ResetToDefaults()
 		}
 		break;
 	case EHitmenOptionsTab::Controls:
-		if (UEnhancedInputUserSettings* InputSettings = GetInputUserSettings(GetOwningPlayer()))
+		if (UEnhancedInputUserSettings* InputSettings = OptionsInputSettings(GetOwningPlayer()))
 		{
 			if (UEnhancedPlayerMappableKeyProfile* Profile = InputSettings->GetActiveKeyProfile())
 			{

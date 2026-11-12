@@ -6,6 +6,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ## [Unreleased]
 
 ### Added
+- Cheats on F1-F8 with a panel on the right (gym always, dev builds elsewhere): invulnerable, infinite ammo, no
+  cooldown, invisible to AI, respawn NPCs as placed, kill all, reload the map, fly.
+- Gym: ladder behind the ladder block with a path on the right and a stair up to the zipline tower; room in front of
+  the zipline start and a 5 x 12 m landing; TV and alarm distractions, a body container; the mounted gun on its tripod.
 - Options rebuilt: a centred panel with Gameplay / Controls / Graphics / Audio tabs, a description column, `[Esc] Back`
   and `[R] Defaults`; Escape closes them from the title too. Controls by section with conflicts in red; graphics
   presets, auto-detect (also on the first launch), resolution, window mode, vsync, frame cap, render scale and every

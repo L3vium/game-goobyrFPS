@@ -1,6 +1,7 @@
 // Hitmen — ability base
 
 #include "Abilities/HitmenAbility.h"
+#include "Framework/HitmenPlayerState.h"
 #include "TimerManager.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
@@ -71,6 +72,11 @@ float UHitmenAbility::GetCooldownNormalized() const
 
 void UHitmenAbility::CommitUse()
 {
+	if (AHitmenPlayerState::ActorHasCheat(this, EHitmenCheat::NoCooldown))
+	{
+		CooldownEndTime = 0.f;
+		return;
+	}
 	if (MaxCharges > 0)
 	{
 		Charges = FMath::Max(0, Charges - 1);

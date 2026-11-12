@@ -1,6 +1,8 @@
 // Hitmen — player controller
 
 #include "Framework/HitmenPlayerController.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Character.h"
 #include "World/Vehicles/HitmenVehicles.h"
 #include "Data/HitmenSoundSet.h"
 #include "Framework/HitmenPlayerState.h"
@@ -235,6 +237,62 @@ void AHitmenPlayerController::SetupInputComponent()
 	BindIfSet(SpectatorFastAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorFastPressed);
 	BindIfSet(SpectatorFastAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleSpectatorFastReleased);
 	BindIfSet(ConfirmAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleConfirm);
+
+	// Cheats (gym / dev builds): fixed F-keys, not rebindable (the engine's F1-F5 view modes are cleared in
+	// DefaultInput.ini).
+	const FKey CheatKeys[] = { EKeys::F1, EKeys::F2, EKeys::F3, EKeys::F4, EKeys::F5, EKeys::F6, EKeys::F7, EKeys::F8 };
+	for (const FKey& Key : CheatKeys)
+	{
+		InputComponent->BindKey(Key, IE_Pressed, this, &AHitmenPlayerController::HandleCheatKey);
+	}
+}
+
+void AHitmenPlayerController::HandleCheatKey(FKey Key)
+{
+	const AHitmenGameState* GS = GetWorld()->GetGameState<AHitmenGameState>();
+	const FKey CheatKeys[] = { EKeys::F1, EKeys::F2, EKeys::F3, EKeys::F4, EKeys::F5, EKeys::F6, EKeys::F7, EKeys::F8 };
+	int32 Index = INDEX_NONE;
+	for (int32 It = 0; It < UE_ARRAY_COUNT(CheatKeys); ++It)
+	{
+		Index = CheatKeys[It] == Key ? It : Index;
+	}
+	if (!GS || !GS->AreDebugCommandsAllowed() || Index == INDEX_NONE || IsGameplayInputBlocked())
+	{
+		return;
+	}
+	UHitmenSoundLibrary::PlayHitmenSound2D(this, EHitmenSound::UIClick);
+	Server_DebugCheat(static_cast<EHitmenCheat>(Index));
+}
+
+bool AHitmenPlayerController::IsCheatFlying() const
+{
+	const AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
+	const ACharacter* Flyer = Cast<ACharacter>(GetPawn());
+	return PS && PS->HasCheat(EHitmenCheat::Fly) && Flyer && Flyer->GetCharacterMovement() && Flyer->GetCharacterMovement()->MovementMode == MOVE_Flying;
+}
+
+void AHitmenPlayerController::ApplyCheatsToPawn()
+{
+	ACharacter* Flyer = Cast<ACharacter>(GetPawn());
+	UCharacterMovementComponent* Movement = Flyer ? Flyer->GetCharacterMovement() : nullptr;
+	if (!Movement)
+	{
+		return;
+	}
+	const AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
+	const bool bFly = PS && PS->HasCheat(EHitmenCheat::Fly);
+	const bool bFlying = Movement->MovementMode == MOVE_Flying && !Flyer->GetActorEnableCollision();
+	if (bFly == bFlying)
+	{
+		return;
+	}
+	// Fly: through walls, in the look direction (the controller drives it); off: fall back to the ground.
+	Flyer->SetActorEnableCollision(!bFly);
+	Movement->MaxFlySpeed = CheatFlySpeed;
+	Movement->BrakingDecelerationFlying = CheatFlySpeed * 3.f;
+	Movement->SetMovementMode(bFly ? MOVE_Flying : MOVE_Falling);
+	bFlyUpHeld = false;
+	bFlyDownHeld = false;
 }
 
 // ---- Free fly (IMC_Spectator) ----
@@ -318,9 +376,10 @@ void AHitmenPlayerController::SetPawn(APawn* InPawn)
 		UI->BroadcastPrompt(FText::GetEmpty(), false);
 		UI->BroadcastPawnChanged(InPawn);
 	}
-	// A new body restarts toggles.
+	// A new body restarts toggles; a flying cheat carries over to it.
 	bCrouchToggled = false;
 	bSprintToggled = false;
+	ApplyCheatsToPawn();
 }
 
 void AHitmenPlayerController::OnPossess(APawn* InPawn)
@@ -595,6 +654,18 @@ bool AHitmenPlayerController::IsGameplayInputBlocked() const
 
 void AHitmenPlayerController::HandleMove(const FInputActionValue& Value)
 {
+	if (IsCheatFlying())
+	{
+		// Fly cheat: forward follows the view pitch.
+		if (APawn* P = GetPawn(); P && !IsGameplayInputBlocked())
+		{
+			const FRotator View = GetControlRotation();
+			const FVector2D Axis = Value.Get<FVector2D>();
+			P->AddMovementInput(View.Vector(), Axis.Y);
+			P->AddMovementInput(FRotationMatrix(View).GetUnitAxis(EAxis::Y), Axis.X);
+		}
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver())
 	{
 		R->Input_Move(IsGameplayInputBlocked() ? FVector2D::ZeroVector : Value.Get<FVector2D>());
@@ -624,16 +695,31 @@ void AHitmenPlayerController::HandleLook(const FInputActionValue& Value)
 
 void AHitmenPlayerController::HandleJumpPressed()
 {
+	if (IsCheatFlying())
+	{
+		bFlyUpHeld = true;
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_JumpPressed(); }
 }
 
 void AHitmenPlayerController::HandleJumpReleased()
 {
+	if (IsCheatFlying())
+	{
+		bFlyUpHeld = false;
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver()) { R->Input_JumpReleased(); }
 }
 
 void AHitmenPlayerController::HandleCrouchPressed()
 {
+	if (IsCheatFlying())
+	{
+		bFlyDownHeld = true;
+		return;
+	}
 	IHitmenInputReceiver* R = GetReceiver();
 	if (!R || IsGameplayInputBlocked())
 	{
@@ -653,6 +739,11 @@ void AHitmenPlayerController::HandleCrouchPressed()
 
 void AHitmenPlayerController::HandleCrouchReleased()
 {
+	if (IsCheatFlying())
+	{
+		bFlyDownHeld = false;
+		return;
+	}
 	const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
 	if (Settings && Settings->bToggleCrouch)
 	{
@@ -1086,6 +1177,31 @@ void AHitmenPlayerController::Server_DebugGiveKeycard_Implementation(int32 Keyca
 	}
 }
 
+void AHitmenPlayerController::Server_DebugCheat_Implementation(EHitmenCheat Cheat)
+{
+	AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
+	AHitmenMatchGameMode* GM = GetWorld()->GetAuthGameMode<AHitmenMatchGameMode>();
+	if (!DebugAllowed(GetWorld()) || !PS)
+	{
+		return;
+	}
+	switch (Cheat)
+	{
+	case EHitmenCheat::RespawnEnemies:
+		if (GM) { GM->DebugRespawnNPCs(); }
+		break;
+	case EHitmenCheat::KillEnemies:
+		if (GM) { GM->DebugKillNPCs(this); }
+		break;
+	case EHitmenCheat::ResetGym:
+		if (GM) { GM->DebugResetMap(); }
+		break;
+	default:
+		PS->SetCheat(Cheat, !PS->HasCheat(Cheat));
+		break;
+	}
+}
+
 void AHitmenPlayerController::Server_DebugSetGodMode_Implementation(bool bEnabled)
 {
 	if (!DebugAllowed(GetWorld()) || !GetPawn()) { return; }
@@ -1328,6 +1444,10 @@ void AHitmenPlayerController::ApplySpectatorView()
 void AHitmenPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+	if (IsCheatFlying() && !IsGameplayInputBlocked())
+	{
+		GetPawn()->AddMovementInput(FVector::UpVector, (bFlyUpHeld ? 1.f : 0.f) - (bFlyDownHeld ? 1.f : 0.f));
+	}
 	PushVehicleView();
 }
 

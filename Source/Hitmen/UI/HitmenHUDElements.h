@@ -120,6 +120,16 @@ protected:
 	TArray<int32> Keycards;
 };
 
+/** Right, centred vertically: the F1-F8 cheats and which are on (gym always, other maps in dev builds). */
+UCLASS()
+class HITMEN_API UHitmenCheatPanelWidget : public UHitmenUserWidget
+{
+	GENERATED_BODY()
+
+protected:
+	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+};
+
 UCLASS()
 class HITMEN_API UHitmenInventoryBarWidget : public UHitmenUserWidget
 {

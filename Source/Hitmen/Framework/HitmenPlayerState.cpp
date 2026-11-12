@@ -1,6 +1,8 @@
 // Hitmen — player state
 
 #include "Framework/HitmenPlayerState.h"
+#include "GameFramework/Pawn.h"
+#include "Framework/HitmenPlayerController.h"
 #include "Framework/HitmenGameState.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
@@ -21,6 +23,58 @@ void AHitmenPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AHitmenPlayerState, bIsAlive);
 	DOREPLIFETIME(AHitmenPlayerState, bIsReady);
 	DOREPLIFETIME(AHitmenPlayerState, Kills);
+	DOREPLIFETIME(AHitmenPlayerState, CheatFlags);
+}
+
+void AHitmenPlayerState::SetCheat(EHitmenCheat Cheat, bool bEnabled)
+{
+	const uint8 Bit = static_cast<uint8>(1u << static_cast<uint32>(Cheat));
+	const uint8 NewFlags = bEnabled ? (CheatFlags | Bit) : (CheatFlags & ~Bit);
+	if (NewFlags != CheatFlags)
+	{
+		CheatFlags = NewFlags;
+		ForceNetUpdate();
+		OnRep_Cheats();
+	}
+}
+
+void AHitmenPlayerState::OnRep_Cheats()
+{
+	if (AHitmenPlayerController* PC = Cast<AHitmenPlayerController>(GetOwningController()))
+	{
+		PC->ApplyCheatsToPawn();
+	}
+}
+
+bool AHitmenPlayerState::ActorHasCheat(const UObject* Context, EHitmenCheat Cheat)
+{
+	// Pawn, weapon (owned by its pawn), component or ability (outer): walk up to the pawn or controller.
+	const AActor* Actor = Cast<AActor>(Context);
+	if (!Actor)
+	{
+		if (const UActorComponent* Component = Cast<UActorComponent>(Context))
+		{
+			Actor = Component->GetOwner();
+		}
+		else if (Context)
+		{
+			Actor = Context->GetTypedOuter<AActor>();
+		}
+	}
+	while (Actor && !Actor->IsA<APawn>() && !Actor->IsA<AController>())
+	{
+		Actor = Actor->GetOwner();
+	}
+	const AHitmenPlayerState* PS = nullptr;
+	if (const APawn* Pawn = Cast<APawn>(Actor))
+	{
+		PS = Pawn->GetPlayerState<AHitmenPlayerState>();
+	}
+	else if (const AController* Controller = Cast<AController>(Actor))
+	{
+		PS = Controller->GetPlayerState<AHitmenPlayerState>();
+	}
+	return PS && PS->HasCheat(Cheat);
 }
 
 void AHitmenPlayerState::CopyProperties(APlayerState* PlayerState)
@@ -33,6 +87,8 @@ void AHitmenPlayerState::CopyProperties(APlayerState* PlayerState)
 		Target->IconIndex = IconIndex;
 		Target->Cosmetics = Cosmetics;
 		Target->Loadout = Loadout;
+		// Cheats survive the gym reset (F7 reloads the map).
+		Target->CheatFlags = CheatFlags;
 		// Fresh match: alive, not ready, no kills.
 		Target->bIsAlive = true;
 		Target->bIsReady = false;

@@ -83,6 +83,10 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Ability pickup with the slot taken: swap, the old one stays
 
 ## World
+- [x] Gym cheats: F1 / F8 / F6 / F5 / F7 from a PIE script (invulnerable, fly up 47 m, 9 killed, 9 respawned with
+  their routes, map reloaded); panel screenshot (0.7.0); [ ] F2 / F3 / F4 by hand; [ ] F1-F8 in the Dev build
+- [x] Gym zipline: tower to landing, the rider ends on the platform (PIE script, 0.7.0); reach check `problems 0`
+- [ ] Gym door opens on its other edge
 - [x] Camera zone: yellow, lit from above, cut by a wall (PIE screenshot, 0.7.0); [ ] shooting a camera breaks it
 - [ ] Doors and lockers open on the other hinge, away from you
 - [ ] Hold F on the turret panel: a ring fills around F

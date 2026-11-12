@@ -10,6 +10,21 @@ class UHitmenAbilityData;
 class UHitmenCosmeticItem;
 
 /** Role of a team in a match. */
+/** Gym / development cheats (F1-F8, shown in the cheats panel on the right). */
+UENUM(BlueprintType)
+enum class EHitmenCheat : uint8
+{
+	Invulnerable,
+	InfiniteAmmo,
+	NoCooldown,
+	InvisibleToAI,
+	RespawnEnemies,
+	KillEnemies,
+	ResetGym,
+	Fly,
+	Count UMETA(Hidden)
+};
+
 UENUM(BlueprintType)
 enum class EHitmenTeamRole : uint8
 {

@@ -1,6 +1,8 @@
 // Hitmen — HUD elements
 
 #include "UI/HitmenHUDElements.h"
+#include "GameFramework/SpectatorPawn.h"
+#include "Framework/HitmenPlayerState.h"
 #include "Engine/Texture2D.h"
 #include "Data/HitmenMapDefinition.h"
 #include "Framework/HitmenGameState.h"
@@ -534,6 +536,67 @@ int32 UHitmenInventoryBarWidget::NativePaint(const FPaintArgs& Args, const FGeom
 
 	// Keycards are drawn bottom right (UHitmenStatusCornerWidget).
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 6, InWidgetStyle, bParentEnabled);
+}
+
+// =============================================================================================
+// Cheat panel
+// =============================================================================================
+
+int32 UHitmenCheatPanelWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
+{
+	const AHitmenGameState* GS = GetHitmenGameState();
+	const APlayerController* PC = GetOwningPlayer();
+	const AHitmenPlayerState* PS = PC ? PC->GetPlayerState<AHitmenPlayerState>() : nullptr;
+	if (!GS || !GS->AreDebugCommandsAllowed() || !PS || !PC->GetPawn() || PC->GetPawn()->IsA<ASpectatorPawn>())
+	{
+		return LayerId;
+	}
+	struct FRow { const TCHAR* Key; const TCHAR* Label; EHitmenCheat Cheat; bool bToggle; };
+	static const FRow Rows[] = {
+		{ TEXT("F1"), TEXT("Invulnerable"), EHitmenCheat::Invulnerable, true },
+		{ TEXT("F2"), TEXT("Infinite ammo"), EHitmenCheat::InfiniteAmmo, true },
+		{ TEXT("F3"), TEXT("No cooldown"), EHitmenCheat::NoCooldown, true },
+		{ TEXT("F4"), TEXT("Invisible to AI"), EHitmenCheat::InvisibleToAI, true },
+		{ TEXT("F5"), TEXT("Respawn enemies"), EHitmenCheat::RespawnEnemies, false },
+		{ TEXT("F6"), TEXT("Kill all enemies"), EHitmenCheat::KillEnemies, false },
+		{ TEXT("F7"), TEXT("Reset the map"), EHitmenCheat::ResetGym, false },
+		{ TEXT("F8"), TEXT("Fly (no collision)"), EHitmenCheat::Fly, true },
+	};
+	const FVector2D Size = AllottedGeometry.GetLocalSize();
+	const float Width = 250.f;
+	const float RowHeight = 27.f;
+	const float TitleHeight = 28.f;
+	const float Height = TitleHeight + RowHeight * UE_ARRAY_COUNT(Rows) + 8.f;
+	const FVector2D Origin(Size.X - 24.f - Width, (Size.Y - Height) * 0.5f);
+	HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, Origin - FVector2D(30.f, 0.f), FVector2D(Width + 54.f, Height),
+		FLinearColor(0.f, 0.f, 0.f, 0.f), FLinearColor(0.f, 0.f, 0.f, 0.5f), true);
+	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, TEXT("CHEATS"), Origin + FVector2D(0.f, 2.f), HitmenUI::SpacedFont(14, TEXT("SemiBold"), 240), HitmenUI::TextDim());
+	const FSlateFontInfo LabelFont = HitmenUI::Font(16, TEXT("SemiBold"));
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Rows); ++Index)
+	{
+		const FRow& Row = Rows[Index];
+		const bool bOn = Row.bToggle && PS->HasCheat(Row.Cheat);
+		const float Y = Origin.Y + TitleHeight + Index * RowHeight;
+		const float Alpha = bOn ? 1.f : 0.62f;
+		const FVector2D KeySize = HitmenUI::PaintKey(OutDrawElements, LayerId + 1, AllottedGeometry, Row.Key, FVector2D(Origin.X, Y), 12, Alpha);
+		const FVector2D LabelSize = HitmenUI::MeasureText(Row.Label, LabelFont);
+		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Row.Label, FVector2D(Origin.X + KeySize.X + 10.f, Y + (KeySize.Y - LabelSize.Y) * 0.5f), LabelFont,
+			FLinearColor(1.f, 1.f, 1.f, Alpha));
+		if (Row.bToggle)
+		{
+			// A lit square when on, a hollow one when off.
+			const FVector2D Box(Origin.X + Width - 14.f, Y + (KeySize.Y - 12.f) * 0.5f);
+			if (bOn)
+			{
+				HitmenUI::PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, Box, FVector2D(12.f), HitmenUI::Warning());
+			}
+			else
+			{
+				HitmenUI::PaintFrame(OutDrawElements, LayerId + 1, AllottedGeometry, Box, FVector2D(12.f), FLinearColor(1.f, 1.f, 1.f, 0.45f), 1.f);
+			}
+		}
+	}
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
 }
 
 // =============================================================================================

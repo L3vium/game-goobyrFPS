@@ -135,6 +135,13 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Debug")
 	void Server_DebugSetGodMode(bool bEnabled);
 
+	/** F1-F8: toggles a cheat (invulnerable, ammo, cooldowns, invisible, fly) or runs one (respawn, kill, reset). */
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Debug")
+	void Server_DebugCheat(EHitmenCheat Cheat);
+
+	/** Fly cheat on the current pawn (flying, no collision) or back to walking; server and owning client. */
+	void ApplyCheatsToPawn();
+
 	// ---- Emotes / UI ----
 	/** Called by the emote wheel when the player picks an emote. */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|UI")
@@ -292,6 +299,14 @@ protected:
 	void HandleSpectatorFastPressed();
 	void HandleSpectatorFastReleased();
 	void HandleConfirm();
+	void HandleCheatKey(FKey Key);
+	bool bFlyUpHeld = false;
+	bool bFlyDownHeld = false;
+	bool IsCheatFlying() const;
+
+	/** Fly cheat speed. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Debug", meta=(ClampMin="0", Units="cm/s"))
+	float CheatFlySpeed = 1800.f;
 	void PushSpectatorVertical();
 	bool bSpectatorUpHeld = false;
 	bool bSpectatorDownHeld = false;

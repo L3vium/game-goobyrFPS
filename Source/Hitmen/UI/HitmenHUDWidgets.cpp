@@ -543,6 +543,11 @@ void UHitmenHUDWidget::BuildDefaultLayout()
 	StatusCorner->SetVisibility(ESlateVisibility::HitTestInvisible);
 	if (UCanvasPanelSlot* CornerSlot = Canvas->AddChildToCanvas(StatusCorner)) { CornerSlot->SetAnchors(Full); CornerSlot->SetOffsets(FMargin(0.f)); }
 
+	// Cheats (F1-F8), right, centred vertically: shown where debug commands are allowed.
+	CheatPanel = WidgetTree->ConstructWidget<UHitmenCheatPanelWidget>(UHitmenCheatPanelWidget::StaticClass());
+	CheatPanel->SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (UCanvasPanelSlot* CheatSlot = Canvas->AddChildToCanvas(CheatPanel)) { CheatSlot->SetAnchors(Full); CheatSlot->SetOffsets(FMargin(0.f)); }
+
 	// Match intro (dropping in + countdown), over everything.
 	Intro = WidgetTree->ConstructWidget<UHitmenIntroWidget>(UHitmenIntroWidget::StaticClass());
 	if (UCanvasPanelSlot* IntroSlot = Canvas->AddChildToCanvas(Intro)) { IntroSlot->SetAnchors(Full); IntroSlot->SetOffsets(FMargin(0.f)); }

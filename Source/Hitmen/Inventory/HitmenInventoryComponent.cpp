@@ -1,6 +1,7 @@
 // Hitmen — inventory
 
 #include "Inventory/HitmenInventoryComponent.h"
+#include "Framework/HitmenPlayerState.h"
 #include "Weapons/HitmenWeaponBase.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Data/HitmenWeaponData.h"
@@ -265,7 +266,7 @@ bool UHitmenInventoryComponent::ConsumeActiveAmmo(int32 Amount)
 		return false;
 	}
 	FHitmenInventorySlot& Slot = Slots[ActiveSlot];
-	if (!Slot.Weapon->bUsesAmmo)
+	if (!Slot.Weapon->bUsesAmmo || AHitmenPlayerState::ActorHasCheat(GetOwner(), EHitmenCheat::InfiniteAmmo))
 	{
 		return true;
 	}

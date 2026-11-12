@@ -270,6 +270,11 @@ if wanted("fixtures"):
         save(mounted)
     log("fixtures: cameras, monitors, breaker, lamps, distractions, mounted gun")
 
+if wanted("sightroom"):
+    # Sightroom: anti-aliased stencil with an outline, map-wide look at the end of the wave.
+    hitmen_content.build_sightroom_pp()
+    log("sightroom: PP_Sightroom rebuilt")
+
 if wanted("sound"):
     # Attenuation per sound space (steps, gunshots, impacts, world) and the space of each sound-set entry.
     hitmen_content.build_sound_set()

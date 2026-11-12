@@ -76,12 +76,24 @@ void UHitmenSightroomComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 		}
 		return;
 	}
+	// Every frame while the wave travels, so a highlight appears the moment the front reaches it.
 	RefreshAccumulator += DeltaTime;
-	if (RefreshAccumulator >= RefreshInterval)
+	if (ScanProgress < 1.f || RefreshAccumulator >= RefreshInterval)
 	{
 		RefreshAccumulator = 0.f;
 		Refresh();
 	}
+}
+
+float UHitmenSightroomComponent::GetWaveRadius() const
+{
+	// Ease-out cubic, the same curve the post-process draws.
+	return EnemyRadius * (1.f - FMath::Pow(1.f - ScanProgress, 3.f));
+}
+
+float UHitmenSightroomComponent::GetWaveDistance(const FVector& Origin, const FVector& Location) const
+{
+	return FVector::Dist2D(Origin, Location) + FMath::Abs(Location.Z - Origin.Z) * WaveHeightWeight;
 }
 
 void UHitmenSightroomComponent::ApplyPostProcess()
@@ -91,9 +103,10 @@ void UHitmenSightroomComponent::ApplyPostProcess()
 		return;
 	}
 	// The wave keeps travelling to the edge of the scan; the grid and the cool tint fade with FadeAlpha.
-	const float Eased = 1.f - FMath::Pow(1.f - ScanProgress, 3.f);
+	const float Eased = GetWaveRadius() / FMath::Max(EnemyRadius, 1.f);
 	PostProcessInstance->SetScalarParameterValue(TEXT("ScanProgress"), ScanProgress);
 	PostProcessInstance->SetScalarParameterValue(TEXT("ScanRadius"), EnemyRadius * Eased);
+	PostProcessInstance->SetScalarParameterValue(TEXT("HeightWeight"), WaveHeightWeight);
 	PostProcessInstance->SetScalarParameterValue(TEXT("Fade"), FadeAlpha);
 	PostProcessInstance->SetVectorParameterValue(TEXT("ScanOrigin"), GetOwner()->GetActorLocation());
 	if (UCameraComponent* Camera = GetCamera())
@@ -104,13 +117,20 @@ void UHitmenSightroomComponent::ApplyPostProcess()
 
 bool UHitmenSightroomComponent::HasLineOfSight(const FVector& From, const AActor* Target) const
 {
+	// Aim at the middle of what you see (a window's origin sits on the sill, inside the wall), then its top.
+	FVector Center;
+	FVector Extent;
+	Target->GetActorBounds(false, Center, Extent);
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenSightroom), false, GetOwner());
-	FHitResult Hit;
-	if (!GetWorld()->LineTraceSingleByChannel(Hit, From, Target->GetActorLocation(), ECC_Visibility, Params))
+	for (const FVector& Point : { Center, Center + FVector(0.f, 0.f, Extent.Z * 0.8f) })
 	{
-		return true;
+		FHitResult Hit;
+		if (!GetWorld()->LineTraceSingleByChannel(Hit, From, Point, ECC_Visibility, Params) || Hit.GetActor() == Target)
+		{
+			return true;
+		}
 	}
-	return Hit.GetActor() == Target;
+	return false;
 }
 
 void UHitmenSightroomComponent::Refresh()
@@ -124,9 +144,10 @@ void UHitmenSightroomComponent::Refresh()
 	const FVector Origin = Observer->GetActorLocation();
 	const UCameraComponent* Camera = GetCamera();
 	const FVector Eye = Camera ? Camera->GetComponentLocation() : Origin;
-	const float WaveRadius = EnemyRadius * ScanProgress;
+	const float WaveRadius = GetWaveRadius();
+	const bool bWaveDone = ScanProgress >= 1.f;
 
-	TArray<TWeakObjectPtr<AActor>> NewHighlights;
+	TMap<TWeakObjectPtr<AActor>, int32> NewHighlights;
 	for (const TWeakObjectPtr<AActor>& Weak : Registry->GetScannables())
 	{
 		AActor* Actor = Weak.Get();
@@ -135,7 +156,7 @@ void UHitmenSightroomComponent::Refresh()
 			continue;
 		}
 		const EHitmenScanCategory Category = IHitmenScannable::Execute_GetScanCategory(Actor, Observer);
-		const float Distance = FVector::Dist(Origin, Actor->GetActorLocation());
+		const float WaveDistance = GetWaveDistance(Origin, Actor->GetActorLocation());
 		int32 Stencil = 0;
 		switch (Category)
 		{
@@ -146,24 +167,29 @@ void UHitmenSightroomComponent::Refresh()
 			break;
 		}
 		case EHitmenScanCategory::Enemy:
-			Stencil = Distance <= WaveRadius ? HitmenStencil::Enemy : 0;
+			Stencil = (WaveDistance <= WaveRadius || (bWaveDone && bEnemiesMapWide)) ? HitmenStencil::Enemy : 0;
 			break;
 		case EHitmenScanCategory::Interactable:
-			Stencil = (Distance <= FMath::Min(WaveRadius, InteractableRadius) && HasLineOfSight(Eye, Actor)) ? HitmenStencil::Interactable : 0;
+			Stencil = (WaveDistance <= WaveRadius && FVector::Dist(Origin, Actor->GetActorLocation()) <= InteractableRadius && HasLineOfSight(Eye, Actor))
+				? HitmenStencil::Interactable : 0;
 			break;
 		default:
 			break;
 		}
 		if (Stencil != 0)
 		{
-			IHitmenScannable::Execute_SetScanHighlight(Actor, true, Stencil);
-			NewHighlights.Add(Actor);
+			const int32* Previous = Highlighted.Find(Actor);
+			if (!Previous || *Previous != Stencil)
+			{
+				IHitmenScannable::Execute_SetScanHighlight(Actor, true, Stencil);
+			}
+			NewHighlights.Add(Actor, Stencil);
 		}
 	}
 
-	for (const TWeakObjectPtr<AActor>& Old : Highlighted)
+	for (const TPair<TWeakObjectPtr<AActor>, int32>& Old : Highlighted)
 	{
-		if (AActor* Actor = Old.Get(); Actor && !NewHighlights.Contains(Old))
+		if (AActor* Actor = Old.Key.Get(); Actor && !NewHighlights.Contains(Old.Key))
 		{
 			IHitmenScannable::Execute_SetScanHighlight(Actor, false, 0);
 		}
@@ -173,9 +199,9 @@ void UHitmenSightroomComponent::Refresh()
 
 void UHitmenSightroomComponent::ClearHighlights()
 {
-	for (const TWeakObjectPtr<AActor>& Weak : Highlighted)
+	for (const TPair<TWeakObjectPtr<AActor>, int32>& Pair : Highlighted)
 	{
-		if (AActor* Actor = Weak.Get())
+		if (AActor* Actor = Pair.Key.Get())
 		{
 			IHitmenScannable::Execute_SetScanHighlight(Actor, false, 0);
 		}

@@ -230,6 +230,95 @@ def build_map_markers():
     return assets
 
 
+SIGHTROOM_HLSL = """// Stencil: 4 sub-pixel taps give an anti-aliased coverage (the stencil is at render resolution and point
+// sampled, so a single tap shows its pixels); 8 taps 1.5 px out draw a thin outline that keeps far enemies
+// readable as sharp dots.
+float2 taps[4] = { float2(-0.35, -0.35), float2(0.35, -0.35), float2(-0.35, 0.35), float2(0.35, 0.35) };
+float sv = round(Stencil.r);
+float cov = 0.0;
+for (int i = 0; i < 4; i++)
+{
+    float v = round(SceneTextureFetch(PPI_CustomStencil, taps[i]).r);
+    cov += step(0.5, v);
+    sv = max(sv, v);
+}
+cov *= 0.25;
+float ring = 0.0;
+for (int j = 0; j < 8; j++)
+{
+    float a = j * 0.7853982;
+    ring = max(ring, round(SceneTextureFetch(PPI_CustomStencil, float2(cos(a), sin(a)) * 1.5).r));
+}
+float s = max(sv, ring);
+float edge = step(0.5, ring) * (1.0 - cov);
+
+float3 base = Scene.rgb;
+float lum = dot(base, float3(0.3, 0.59, 0.11));
+// Same distance as the C++ (horizontal + |height| x HeightWeight) so highlights appear with the front.
+float d = length(WP.xy - Origin.xy) + abs(WP.z - Origin.z) * HeightWeight;
+// Inside the wave, then the whole map fades in over the end of the wave.
+float inside = max(saturate((Radius - d) / 250.0), smoothstep(0.55, 1.0, Progress));
+float3 cool = lum.xxx * float3(0.42, 0.5, 0.62);
+float3 c = lerp(base, lerp(base * 0.85, cool, 0.9), inside);
+float front = exp(-abs(d - Radius) / 45.0) * (1.0 - Progress * 0.85);
+float2 g = abs(frac(WP.xy / 160.0) - 0.5);
+float grid = saturate(1.0 - min(g.x, g.y) * 55.0) * saturate((Radius - d) / 250.0) * saturate(1.0 - d / 3500.0);
+float flatFloor = saturate((Origin.z + 60.0 - WP.z) / 120.0);
+c += float3(0.55, 0.78, 1.0) * (front * 0.9 + grid * 0.16 * flatFloor);
+
+// 1 enemy (white), 2 interactable (pale), 3 target (red), 4 dead target (yellow).
+float3 fillC = s < 1.5 ? float3(1.0, 1.0, 1.0) : (s < 2.5 ? float3(0.95, 0.97, 1.0) : (s < 3.5 ? float3(1.0, 0.06, 0.05) : float3(1.0, 0.78, 0.1)));
+float fillA = s < 1.5 ? 0.85 : (s < 2.5 ? 0.5 : 1.0);
+float3 edgeC = s < 1.5 ? float3(1.0, 1.0, 1.0) : (s < 2.5 ? float3(0.75, 0.9, 1.0) : fillC);
+float edgeA = s < 2.5 && s > 1.5 ? 0.75 : 1.0;
+c = lerp(c, fillC, cov * fillA * step(0.5, s));
+c = lerp(c, edgeC, edge * edgeA);
+return lerp(base, c, Fade);"""
+
+
+def build_sightroom_pp():
+    """PP_Sightroom: a fast scan wave from the player, a floor grid behind it, then the whole map in a cool look;
+    highlighted actors (custom stencil) anti-aliased with a thin outline. Driven by C++: ScanOrigin, ScanRadius,
+    ScanProgress, Fade, HeightWeight."""
+    pp = new_material("PP_Sightroom", path("Materials", "PostProcess"))
+    set_props(pp, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
+    scene = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, -200)
+    set_props(scene, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
+    stencil = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 0)
+    set_props(stencil, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
+    world_pos = MEL.create_material_expression(pp, unreal.MaterialExpressionWorldPosition, -900, 200)
+    params = {}
+    for i, (pname, kind, default) in enumerate((("ScanOrigin", "vector", None), ("ScanRadius", "scalar", 0.0),
+                                                 ("ScanProgress", "scalar", 0.0), ("Fade", "scalar", 0.0),
+                                                 ("HeightWeight", "scalar", 0.35))):
+        if kind == "vector":
+            node = MEL.create_material_expression(pp, unreal.MaterialExpressionVectorParameter, -900, 350 + i * 120)
+            set_props(node, parameter_name=pname, default_value=unreal.LinearColor(0, 0, 0, 0))
+        else:
+            node = MEL.create_material_expression(pp, unreal.MaterialExpressionScalarParameter, -900, 350 + i * 120)
+            set_props(node, parameter_name=pname, default_value=default)
+        params[pname] = node
+    custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
+    inputs = []
+    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", input_name)
+        inputs.append(ci)
+    set_props(custom, code=SIGHTROOM_HLSL, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Sightroom", inputs=inputs)
+    MEL.connect_material_expressions(scene, "Color", custom, "Scene")
+    MEL.connect_material_expressions(stencil, "Color", custom, "Stencil")
+    MEL.connect_material_expressions(world_pos, "", custom, "WP")
+    MEL.connect_material_expressions(params["ScanOrigin"], "", custom, "Origin")
+    MEL.connect_material_expressions(params["ScanRadius"], "", custom, "Radius")
+    MEL.connect_material_expressions(params["ScanProgress"], "", custom, "Progress")
+    MEL.connect_material_expressions(params["Fade"], "", custom, "Fade")
+    MEL.connect_material_expressions(params["HeightWeight"], "", custom, "HeightWeight")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(pp)
+    save(pp)
+    return pp
+
+
 def build_screen_material(folder):
     """M_Hitmen_Screen: a monitor showing a render target. Scalar "Signal" 1 = live; 0 = the last frame frozen, dimmed,
     with rolling scanlines and static (the camera is off or broken)."""
@@ -504,62 +593,7 @@ def build_materials(physical):
 
     screen = build_screen_material(folder)
 
-    # Sightroom post-process: an expanding scan wave from the player, a world grid on the floor
-    # behind it, a cool desaturated world, highlighted actors through walls. Driven by C++:
-    # ScanOrigin, ScanRadius, ScanProgress, Fade.
-    pp = new_material("PP_Sightroom", path("Materials", "PostProcess"))
-    set_props(pp, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
-    scene = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, -200)
-    set_props(scene, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
-    stencil = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 0)
-    set_props(stencil, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
-    world_pos = MEL.create_material_expression(pp, unreal.MaterialExpressionWorldPosition, -900, 200)
-    params = {}
-    for i, (pname, kind, default) in enumerate((("ScanOrigin", "vector", None), ("ScanRadius", "scalar", 0.0),
-                                                 ("ScanProgress", "scalar", 0.0), ("Fade", "scalar", 0.0))):
-        if kind == "vector":
-            node = MEL.create_material_expression(pp, unreal.MaterialExpressionVectorParameter, -900, 350 + i * 120)
-            set_props(node, parameter_name=pname, default_value=unreal.LinearColor(0, 0, 0, 0))
-        else:
-            node = MEL.create_material_expression(pp, unreal.MaterialExpressionScalarParameter, -900, 350 + i * 120)
-            set_props(node, parameter_name=pname, default_value=default)
-        params[pname] = node
-    custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
-    code = (
-        "float s = round(Stencil.r);\n"
-        "float3 base = Scene.rgb;\n"
-        "float lum = dot(base, float3(0.3, 0.59, 0.11));\n"
-        "float d = length(WP.xy - Origin.xy) + abs(WP.z - Origin.z) * 0.35;\n"
-        "float inside = saturate((Radius - d) / 250.0 + step(0.999, Progress));\n"
-        "float3 cool = lum.xxx * float3(0.42, 0.5, 0.62);\n"
-        "float3 c = lerp(base, lerp(base * 0.85, cool, 0.9), inside);\n"
-        "float front = exp(-abs(d - Radius) / 45.0) * (1.0 - Progress * 0.85);\n"
-        "float2 g = abs(frac(WP.xy / 160.0) - 0.5);\n"
-        "float grid = saturate(1.0 - min(g.x, g.y) * 55.0) * inside * saturate(1.0 - d / 3500.0);\n"
-        "float flatFloor = saturate((Origin.z + 60.0 - WP.z) / 120.0);\n"
-        "c += float3(0.55, 0.78, 1.0) * (front * 0.9 + grid * 0.16 * flatFloor);\n"
-        "if (s > 0.5 && s < 1.5) c = lerp(c, float3(1.0, 1.0, 1.0), 0.85);\n"
-        "if (s > 1.5 && s < 2.5) c = lerp(c, float3(0.95, 0.97, 1.0), 0.55);\n"
-        "if (s > 2.5 && s < 3.5) c = float3(1.0, 0.06, 0.05);\n"
-        "if (s > 3.5 && s < 4.5) c = float3(1.0, 0.78, 0.1);\n"
-        "return lerp(base, c, Fade);"
-    )
-    inputs = []
-    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade"):
-        ci = unreal.CustomInput()
-        ci.set_editor_property("input_name", input_name)
-        inputs.append(ci)
-    set_props(custom, code=code, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Sightroom", inputs=inputs)
-    MEL.connect_material_expressions(scene, "Color", custom, "Scene")
-    MEL.connect_material_expressions(stencil, "Color", custom, "Stencil")
-    MEL.connect_material_expressions(world_pos, "", custom, "WP")
-    MEL.connect_material_expressions(params["ScanOrigin"], "", custom, "Origin")
-    MEL.connect_material_expressions(params["ScanRadius"], "", custom, "Radius")
-    MEL.connect_material_expressions(params["ScanProgress"], "", custom, "Progress")
-    MEL.connect_material_expressions(params["Fade"], "", custom, "Fade")
-    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    MEL.recompile_material(pp)
-    save(pp)
+    pp = build_sightroom_pp()
 
     # Pill: wavy, colour-shifted view. Weight = blendable weight driven by the status component.
     pill = new_material("PP_Pill", path("Materials", "PostProcess"))

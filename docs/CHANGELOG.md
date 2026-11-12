@@ -48,6 +48,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
 
 ### Changed
+- Sightroom: the wave takes 0.35 s (0.8) and highlights follow it every frame (no 0.15 s steps); when it ends the whole
+  map turns to the scan look and every enemy on the map shows; highlights are anti-aliased with a thin outline (no more
+  pixel blocks); line of sight aims at an interactable's middle, so windows light up.
 - Doors, vent hatches and lockers hinge on the other edge.
 - Cameras: one colour (yellow); the zone is the camera's shadowed spotlight (walls cut it), much brighter; the floor ring
   decal tests the global distance field so walls hide it too; the monitor keeps the last frame (dimmed, NO SIGNAL).

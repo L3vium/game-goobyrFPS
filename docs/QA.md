@@ -127,6 +127,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] In the dark, a guard that hears you within 2.5 m attacks
 
 ## HUD
+- [x] Sightroom: whole map tinted after the wave, far enemies sharp white dots, target red, window and gutter
+  highlighted with smooth edges (PIE screenshots, 0.7.0); [ ] the wave reveals guards as it passes them
 - [x] Inventory: four equal cards with icons, ammo x / max, no key letters, jetpack gauge (screenshot, 0.5.0)
 - [x] Awareness arcs toward guards noticing you; minimap Under fire banner (screenshot, 0.5.0)
 - [ ] Headshot hit ticks are red and a metallic hit sound plays (shooter only)

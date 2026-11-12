@@ -189,10 +189,11 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   without being hit; there is no health bar (red screen edges and heartbeat).
 - **Intro**: the move keys steer the parachute; nobody can see a player under the canopy or for 2 s
   after landing.
-- **Sightroom (`Tab`)**: a scan sweeps the surroundings; enemies within a radius are shown in
-  white through walls, interactables in white only when in line of sight, the target in red at
-  any distance. No waypoint in normal view. Radii live on the player controller
-  (`Hitmen|Sightroom`) so a 3C swap keeps them.
+- **Sightroom (`Tab`)**: a fast scan wave (0.35 s) sweeps 25 m around you and lights up what it reaches as it
+  passes; as it ends the whole map fades into the cool scan look and every enemy on the map shows in white through
+  walls (a thin outline keeps far ones readable as dots). Interactables within 18 m show only in line of sight
+  (tested at their middle, so windows count); the target is red at any distance. Highlights are anti-aliased.
+  No waypoint in normal view. Radii live on the player controller (`Hitmen|Sightroom`) so a 3C swap keeps them.
 - **Emotes**: hold `R` for a radial wheel.
 - **Footsteps**: a sound per surface (grass, stone, sand / dirt, wood, metal; concrete elsewhere) through physical
   materials (PM_*), for players and NPCs; the surface also scales how far NPCs hear the step. Volume per gait (walk,
@@ -383,9 +384,9 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   Hitman-like awareness arcs around it, one per guard or camera noticing you, placed toward it: the arc fills from its
   middle as suspicion grows (white), then turns yellow or red; cameras add a small camera mark.
 - **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault`; remote-ability targets glow with `[A] Charm` under them; holding F fills a ring around the key. Keycards are chips bottom right (above `[F] Exit` while driving).
-  glow with `[A] Charm` under them.
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
-- **Scope** overlay for the sniper. **Sightroom** (Tab): a scan wave, a grid on the floor, a cool world.
+- **Scope** overlay for the sniper. **Sightroom** (Tab): a fast scan wave and a floor grid around you, then the whole map in a cool look;
+  highlights with a thin outline.
 - **Alert indicators** above NPCs (a hatched diamond: white and filling from the bottom while suspicion builds, solid
   yellow or red once alerted, a red "!" beside it while calling for backup) and around the crosshair.
 - **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match); the baked

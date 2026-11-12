@@ -108,6 +108,60 @@ if wanted("fp_motion"):
             save(data)
     log("fp motion: weapons", len(hitmen_content.FP_MOTION))
 
+if wanted("vfx"):
+    # Toon effects only (no Flipbook comic sheets, no blood): muzzle flash + light + glow, toon impacts, tracers,
+    # per-weapon gun voices; flash bursts on explosions; smoke grenade Niagara; jetpack smoke; traversal juice.
+    TOON = hitmen_content.TOON
+    mats = hitmen_content.build_glow_materials()
+    for name in hitmen_content.WEAPON_JUICE:
+        data = load(WEAPONS + "DA_Weapon_" + name)
+        if not data:
+            continue
+        for field, value in hitmen_content.weapon_juice(name).items():
+            data.set_editor_property(field, value)
+        muzzle = hitmen_content.weapon_muzzle_offset(data)
+        if muzzle:
+            data.set_editor_property("muzzle_offset", muzzle)
+        save(data)
+
+    def bp_defaults(bp_path, **props):
+        bp = load(bp_path)
+        if not bp:
+            log("WARN missing", bp_path)
+            return None
+        default = unreal.get_default_object(bp.generated_class())
+        for field, value in props.items():
+            try:
+                default.set_editor_property(field, value)
+            except Exception as error:
+                log("WARN", bp_path, field, error)
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        save(bp)
+        return default
+
+    vanish = load(TOON + "NS_Pickup_Cast")
+    for bp_name in ("BP_Weapon_Hitscan", "BP_Weapon_Projectile", "BP_Weapon_Melee", "BP_Weapon_Shotgun"):
+        bp_defaults("/Game/Hitmen/Weapons/Blueprints/" + bp_name, thrown_vanish_fx=vanish)
+    proj = "/Game/Hitmen/Weapons/Projectiles/"
+    bp_defaults(proj + "BP_Projectile_Flashbang", explosion_effect=None, explosion_flash_radius=650.0,
+                explosion_flash_color=unreal.LinearColor(1.0, 1.0, 1.0, 1.0), explosion_flash_duration=0.45, explosion_light_intensity=400000.0)
+    for name in ("BP_Projectile_Rocket", "BP_Projectile_Grenade", "BP_Projectile_C4", "BP_Projectile_TankShell"):
+        bp_defaults(proj + name, explosion_flash_radius=320.0, explosion_flash_color=unreal.LinearColor(1.0, 0.55, 0.2, 1.0),
+                    explosion_flash_duration=0.25, explosion_light_intensity=150000.0)
+    smoke = load("/Game/Hitmen/Abilities/Actors/BP_SmokeCloud")
+    if smoke:
+        default = unreal.get_default_object(smoke.generated_class())
+        effect = default.get_editor_property("effect")
+        effect.set_editor_property("asset", load("/Game/Vefects/Smoke_Bombs_VFX/Skills/Loop/NS_SmokeBomb_Classic_L"))
+        default.set_editor_property("effect_time_scale", 1.8)
+        unreal.BlueprintEditorLibrary.compile_blueprint(smoke)
+        save(smoke)
+    bp_defaults("/Game/Hitmen/Abilities/Move/Jetpack/BP_Ability_Jetpack", thrust_fx=load("/Game/Vefects/Free_Fire/Shared/Particles/NS_Fire_Small_Smoke"))
+    bp_defaults("/Game/Hitmen/Characters/Player/BP_PlayerCharacter", climb_fx=load(TOON + "NS_Gunshot_Hit"), zipline_fx=load(TOON + "NS_Gunshot_Cast"))
+    bp_defaults("/Game/Hitmen/World/Vehicles/BP_Tank", muzzle_blast_fx=load(TOON + "NS_Explosion_Fire_Omni"), hull_dust_fx=load(TOON + "NS_Gunshot_Hit"))
+    bp_defaults("/Game/Hitmen/World/Interactables/Security/BP_Turret", muzzle_fx=load(TOON + "NS_Gunshot_Cast"), impact_fx=load(TOON + "NS_Gunshot_Hit"))
+    log("vfx: toon weapons, flashes, smoke, jetpack, traversal, tank, turret")
+
 if wanted("sound"):
     # Attenuation per sound space (steps, gunshots, impacts, world) and the space of each sound-set entry.
     hitmen_content.build_sound_set()

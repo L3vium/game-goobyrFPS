@@ -1,6 +1,9 @@
 // Hitmen — vehicles
 
 #include "World/Vehicles/HitmenVehicles.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Core/HitmenGameSettings.h"
+#include "Weapons/HitmenCosmeticActors.h"
 #include "Data/HitmenSoundSet.h"
 #include "Characters/HitmenPlayerCharacter.h"
 #include "Components/PointLightComponent.h"
@@ -615,7 +618,16 @@ void AHitmenTank::Tick(float DeltaSeconds)
 	const float ViewPitch = FMath::Clamp(IsLocallyControlled() ? FRotator::NormalizeAxis(GetControlRotation().Pitch) : AimRotation.Pitch, MinAimPitch, MaxAimPitch);
 	BarrelKick = FMath::FInterpTo(BarrelKick, 0.f, DeltaSeconds, 6.f);
 	const FRotator BarrelRotation(ViewPitch, 0.f, 0.f);
-	Barrel->SetRelativeLocationAndRotation(BarrelRotation.RotateVector(FVector(MuzzleOffset * 0.5f - 60.f * BarrelKick, 0.f, 0.f)) + FVector(0.f, 0.f, 10.f), BarrelRotation + FRotator(-90.f, 0.f, 0.f));
+	Barrel->SetRelativeLocationAndRotation(BarrelRotation.RotateVector(FVector(MuzzleOffset * 0.5f - BarrelKickDistance * BarrelKick, 0.f, 0.f)) + FVector(0.f, 0.f, 10.f), BarrelRotation + FRotator(-90.f, 0.f, 0.f));
+	// The hull rocks back on a shot and settles.
+	if (!bHullRestSet)
+	{
+		HullRestRotation = Mesh->GetRelativeRotation();
+		bHullRestSet = true;
+	}
+	HullKick = FMath::FInterpTo(HullKick, 0.f, DeltaSeconds, 5.f);
+	const float Rock = FMath::Sin(HullKick * PI) * HullKickPitch;
+	Mesh->SetRelativeRotation(HullRestRotation + FRotator(Rock, 0.f, 0.f));
 	MuzzleLight->SetRelativeLocation(BarrelRotation.RotateVector(FVector(MuzzleOffset + 20.f, 0.f, 0.f)) + FVector(0.f, 0.f, 10.f));
 	MuzzleLight->SetIntensity(GetWorld()->GetTimeSeconds() < MuzzleFlashUntil ? 200000.f : 0.f);
 }
@@ -707,6 +719,17 @@ void AHitmenTank::Multicast_TankFired_Implementation()
 	UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::TankFire, Turret->GetComponentLocation());
 	MuzzleFlashUntil = GetWorld()->GetTimeSeconds() + 0.08f;
 	BarrelKick = 1.f;
+	HullKick = 1.f;
+	const FVector Muzzle = MuzzleLight->GetComponentLocation();
+	if (MuzzleBlastFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, MuzzleBlastFX, Muzzle, Turret->GetComponentRotation(), FVector(0.6f));
+	}
+	if (HullDustFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, HullDustFX, GetActorLocation() - FVector(0.f, 0.f, 60.f), FRotator::ZeroRotator, FVector(1.2f));
+	}
+	AHitmenFlashBurst::SpawnBurst(GetWorld(), Muzzle, UHitmenGameSettings::Get()->FlashMaterial.LoadSynchronous(), FLinearColor(1.f, 0.6f, 0.25f), 20.f, 90.f, 0.1f, 0.f, 0.f);
 	if (AHitmenPlayerCharacter* Gunner = Cast<AHitmenPlayerCharacter>(Driver); Gunner && IsLocallyControlled())
 	{
 		Gunner->AddCameraShake(FireShake, 0.35f);

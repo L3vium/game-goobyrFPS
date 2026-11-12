@@ -1,6 +1,8 @@
 // Hitmen — security fixtures
 
 #include "World/Interactables/HitmenSecurity.h"
+#include "Core/HitmenGameSettings.h"
+#include "Weapons/HitmenCosmeticActors.h"
 #include "Components/HitmenMapMarkerComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Characters/HitmenPlayerCharacter.h"
@@ -675,6 +677,10 @@ void AHitmenTurret::Multicast_Fire_Implementation(FVector_NetQuantize Impact)
 		{
 			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, MuzzleFX, Muzzle, Head->GetComponentRotation());
 		}
+		// Muzzle glow with a burst of light, and a red tracer to the impact.
+		const UHitmenGameSettings* Visuals = UHitmenGameSettings::Get();
+		AHitmenFlashBurst::SpawnBurst(GetWorld(), Muzzle, Visuals->FlashMaterial.LoadSynchronous(), FLinearColor(1.f, 0.45f, 0.2f), 6.f, 22.f, 0.06f, 6000.f, 500.f);
+		AHitmenTracer::SpawnTracer(GetWorld(), Muzzle, Impact, Visuals->TracerMaterial.LoadSynchronous(), TracerColor);
 		if (ImpactFX)
 		{
 			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ImpactFX, Impact);

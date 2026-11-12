@@ -206,6 +206,100 @@ def build_map_markers():
     return assets
 
 
+def glow_material(name, folder, intensity, soft=False):
+    """Unlit additive glow: emissive = Color * Opacity * intensity (tracers, muzzle glows, flashes). Soft: the edge of the
+    sphere fades out (bright core, no hard rim)."""
+    mat = new_material(name, folder)
+    set_props(mat, blend_mode=unreal.BlendMode.BLEND_ADDITIVE, shading_model=unreal.MaterialShadingModel.MSM_UNLIT, two_sided=soft is False)
+    color = MEL.create_material_expression(mat, unreal.MaterialExpressionVectorParameter, -700, 0)
+    set_props(color, parameter_name="Color", default_value=unreal.LinearColor(1.0, 0.7, 0.35, 1))
+    opacity = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -700, 200)
+    set_props(opacity, parameter_name="Opacity", default_value=1.0)
+    strength = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant, -700, 320)
+    set_props(strength, r=intensity)
+    mul1 = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -450, 100)
+    MEL.connect_material_expressions(color, "", mul1, "A")
+    MEL.connect_material_expressions(opacity, "", mul1, "B")
+    mul2 = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, 150)
+    MEL.connect_material_expressions(mul1, "", mul2, "A")
+    MEL.connect_material_expressions(strength, "", mul2, "B")
+    out = mul2
+    if soft:
+        fresnel = MEL.create_material_expression(mat, unreal.MaterialExpressionFresnel, -450, 350)
+        set_props(fresnel, exponent=1.2, base_reflect_fraction=0.0)
+        core = MEL.create_material_expression(mat, unreal.MaterialExpressionOneMinus, -300, 350)
+        MEL.connect_material_expressions(fresnel, "", core, "")
+        core2 = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -200, 350)
+        MEL.connect_material_expressions(core, "", core2, "A")
+        MEL.connect_material_expressions(core, "", core2, "B")
+        out = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -100, 200)
+        MEL.connect_material_expressions(mul2, "", out, "A")
+        MEL.connect_material_expressions(core2, "", out, "B")
+    MEL.connect_material_property(out, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
+def build_glow_materials():
+    folder = path("Materials", "FX")
+    return {"tracer": glow_material("M_Hitmen_Tracer", folder, 10.0), "flash": glow_material("M_Hitmen_FlashGlow", folder, 3.0, soft=True)}
+
+
+# Toon (3D, cel-shaded) effects only: the 2D Flipbook pack reads as comic book. No blood anywhere.
+TOON = "/Game/Vefects/Anime_Stylized_VFX/VFX/Particles/"
+GUN_SOUND = "/Game/Vefects/Flipbook_VFX/Shared/Audio/SFX_GunShot_Cue"
+DRY_SOUND = "/Game/Vefects/Anime_Stylized_VFX/Audio/WAV/SFX_Bomb_Bounce_Cue"
+# name: fire sound pitch (min, max), volume, tracer chance, muzzle light (cd), glow radius (cm)
+WEAPON_JUICE = {
+    "Pistol": ((1.55, 1.7), 0.32, 0.0, 400.0, 3.0),
+    "SMG": ((1.25, 1.35), 0.6, 0.35, 1200.0, 5.0),
+    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 1500.0, 5.5),
+    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 2500.0, 8.0),
+    "Minigun": ((1.3, 1.4), 0.55, 0.5, 1500.0, 6.0),
+    "Sniper": ((0.97, 1.03), 1.0, 1.0, 2200.0, 7.0),
+    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 3000.0, 9.0),
+    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 2000.0, 7.0),
+    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 2000.0, 7.0),
+    "Bow": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
+    "Sword": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
+}
+
+
+def weapon_juice(name):
+    """Muzzle / impact effects, sounds and light of a weapon (builder and hitmen_patch_070)."""
+    pitch, volume, tracer, light, glow = WEAPON_JUICE[name]
+    gun = name not in ("Bow", "Sword")
+    props = dict(fire_sound_pitch=unreal.Vector2D(*pitch), fire_sound_volume=volume, tracer_chance=tracer,
+                 muzzle_light_intensity=light, muzzle_glow_radius=glow,
+                 muzzle_fx=load(TOON + "NS_Gunshot_Cast") if gun else None,
+                 impact_fx=load(TOON + "NS_Gunshot_Hit") if gun else None,
+                 surface_impact_fx=None, flesh_impact_fx=None, back_blast_fx=None)
+    if gun and name not in ("RocketLauncher", "GrenadeLauncher", "BlackHole"):
+        props["fire_sound"] = load(GUN_SOUND)
+        props["dry_fire_sound"] = load(DRY_SOUND)
+    return props
+
+
+def weapon_muzzle_offset(data):
+    """Muzzle point in weapon space for meshes without a Muzzle socket. The Weapons_Free guns lie along +Y once their
+    visual transform is applied (stock at -Y): the muzzle is the +Y end, centred in X, near the top of the barrel."""
+    mesh = data.get_editor_property("static_mesh")
+    if not mesh:
+        return None
+    box = mesh.get_bounding_box()
+    visual = data.get_editor_property("visual_transform")
+    xs, ys, zs = [], [], []
+    for x in (box.min.x, box.max.x):
+        for y in (box.min.y, box.max.y):
+            for z in (box.min.z, box.max.z):
+                p = unreal.MathLibrary.transform_location(visual, unreal.Vector(x, y, z))
+                xs.append(p.x)
+                ys.append(p.y)
+                zs.append(p.z)
+    return unreal.Vector((min(xs) + max(xs)) * 0.5, max(ys) + 2.0, min(zs) + 0.7 * (max(zs) - min(zs)))
+
+
 def build_materials(physical):
     folder = path("Materials", "Master")
     inst_folder = path("Materials", "Instances")
@@ -805,6 +899,10 @@ def build_weapons(mats):
     for name, (display, bp, props) in weapons.items():
         data = make_data("DA_Weapon_" + name, path("Data", "Weapons"), unreal.HitmenWeaponData)
         set_props(data, display_name=display, weapon_class=gen_class(bp), pickup_class=gen_class(pickup), fp_motion=fp_motion(name), **props)
+        set_props(data, **weapon_juice(name))
+        muzzle = weapon_muzzle_offset(data)
+        if muzzle:
+            set_props(data, muzzle_offset=muzzle)
         save(data)
         datas[name] = data
     log("weapons:", len(datas))
@@ -823,7 +921,7 @@ def build_abilities(projectiles, mats):
     set_props(smoke_cdo, puff_material=mats["smoke"], puff_mesh=load(SHAPES["sphere"]))
     smoke_effect = component(smoke_cdo, "effect")
     if smoke_effect:
-        set_props(smoke_effect, asset=load("/Game/Vefects/Smoke_Bombs_VFX/Shared/Particles/NS_SmokeBomb_Classic_L"))
+        set_props(smoke_effect, asset=load("/Game/Vefects/Smoke_Bombs_VFX/Skills/Loop/NS_SmokeBomb_Classic_L"))
     save(smoke_cloud)
     trap = make_blueprint("BP_Trap", actor_folder, unreal.HitmenTrap)
     set_mesh(component(cdo(trap), "mesh"), SHAPES["cylinder"], (0.8, 0.8, 0.05), mi["MI_Metal"])

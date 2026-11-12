@@ -11,6 +11,7 @@ class UHitmenMapDefinition;
 class UHitmenCatalog;
 class UHitmenSoundSet;
 class UBehaviorTree;
+class UMaterialInterface;
 
 /**
  * Project-wide defaults editable from Project Settings. Gameplay code reads these through
@@ -48,6 +49,15 @@ public:
 	 *  bare C++ controller). NPC controller Blueprints set their own tree. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="AI")
 	TSoftObjectPtr<UBehaviorTree> DefaultBehaviorTree;
+
+	// ---- Visuals ----
+	/** Unlit additive material for bullet tracers (vector "Color", scalar "Opacity"). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Visuals")
+	TSoftObjectPtr<UMaterialInterface> TracerMaterial;
+
+	/** Unlit additive material for muzzle glows and flashes (vector "Color", scalar "Opacity"). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Visuals")
+	TSoftObjectPtr<UMaterialInterface> FlashMaterial;
 
 	// ---- Combat ----
 	/** A bullet or arrow in the head always kills (the multiplier no longer matters). */

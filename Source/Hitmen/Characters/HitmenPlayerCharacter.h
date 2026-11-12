@@ -104,6 +104,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Camera")
 	void PlayFirstPersonAction(EHitmenFPAction Action, float Duration);
 
+	/** First-person rendering scale (cosmetics drawn next to the first-person weapon use it). */
+	float GetFirstPersonViewScale() const { return FirstPersonViewScale; }
+
 	/** Local: the held weapon fired (kick, or the knife slash for melee weapons). */
 	void OnFirstPersonFired(const class UHitmenWeaponData* Weapon);
 
@@ -313,6 +316,20 @@ protected:
 	 *  reach into walls, without changing their size on screen. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0.01", ClampMax="1"))
 	float FirstPersonViewScale = 0.35f;
+
+	// ---- Damage feel (the camera's own post process: fringe and red tint on hits, colour drains with health) ----
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Damage", meta=(ClampMin="0"))
+	float HitFringeIntensity = 5.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Damage", meta=(ClampMin="0", ClampMax="1"))
+	float LowHealthSaturation = 0.35f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Damage", meta=(ClampMin="0"))
+	float HitShake = 0.35f;
+
+	float HitPulse = 0.f;
+	float LastHealthSeen = -1.f;
+	void UpdateDamageFeel(float DeltaSeconds);
 
 	// ---- Head bob (the camera; footsteps fall on the low point of each bob) ----
 	/** Bob height and sideways sway (cm) at walk; sprint and crouch scale it. */

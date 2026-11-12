@@ -14,6 +14,10 @@
 #include "Hitmen.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Weapons/HitmenCosmeticActors.h"
+#include "Core/HitmenGameSettings.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/BoxComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -75,6 +79,14 @@ AHitmenWeaponBase::AHitmenWeaponBase()
 	AutoPickupSphere->SetGenerateOverlapEvents(true);
 	AutoPickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	AutoPickupSphere->SetCanEverAffectNavigation(false);
+	// Muzzle flash light: off until a shot (no shadows, short).
+	MuzzleLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("MuzzleLight"));
+	MuzzleLight->SetupAttachment(Root);
+	MuzzleLight->SetCastShadows(false);
+	MuzzleLight->SetIntensityUnits(ELightUnits::Candelas);
+	MuzzleLight->SetAttenuationRadius(300.f);
+	MuzzleLight->SetLightColor(FLinearColor(1.f, 0.6f, 0.3f));
+	MuzzleLight->SetVisibility(false);
 }
 
 void AHitmenWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -1096,9 +1108,67 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	{
 		return;
 	}
+	// The local player's gun is drawn closer to the eye (first-person scale): its flash, glow and tracers start
+	// where the gun is drawn, not where it really is.
+	const bool bFirstPersonGun = StaticMesh->FirstPersonPrimitiveType == EFirstPersonPrimitiveType::FirstPerson
+		|| SkeletalMesh->FirstPersonPrimitiveType == EFirstPersonPrimitiveType::FirstPerson;
+	FVector DrawnMuzzle = Origin;
+	float DrawnScale = 1.f;
+	if (bFirstPersonGun)
+	{
+		const AHitmenPlayerCharacter* Shooter = Cast<AHitmenPlayerCharacter>(OwnerPawn);
+		const APlayerController* ShooterPC = Shooter ? Cast<APlayerController>(Shooter->GetController()) : nullptr;
+		if (Shooter && ShooterPC && ShooterPC->PlayerCameraManager)
+		{
+			const FVector Eye = ShooterPC->PlayerCameraManager->GetCameraLocation();
+			DrawnScale = Shooter->GetFirstPersonViewScale();
+			DrawnMuzzle = Eye + (Origin - Eye) * DrawnScale;
+		}
+	}
 	if (UNiagaraSystem* Muzzle = WeaponData->MuzzleFX.LoadSynchronous())
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Muzzle, Origin, GetActorRotation());
+		// Attached at the muzzle so it follows the gun (and is drawn with it in first person), facing out of the
+		// barrel (the guns lie along their own axis: the muzzle direction from the weapon origin).
+		const FVector LocalMuzzle = GetActorTransform().InverseTransformPosition(Origin);
+		const FRotator Facing = FVector(LocalMuzzle.X, LocalMuzzle.Y, 0.f).GetSafeNormal().Rotation();
+		if (UNiagaraComponent* Flash = UNiagaraFunctionLibrary::SpawnSystemAttached(Muzzle, Root, NAME_None, LocalMuzzle,
+			Facing, EAttachLocation::KeepRelativeOffset, true))
+		{
+			Flash->FirstPersonPrimitiveType = bFirstPersonGun ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::None;
+		}
+	}
+	// A short burst of light and a hot glow at the muzzle, like the mounted gun.
+	if (WeaponData->MuzzleLightIntensity > 0.f)
+	{
+		MuzzleLight->SetWorldLocation(Origin);
+		MuzzleLight->SetIntensity(WeaponData->MuzzleLightIntensity);
+		MuzzleLight->SetVisibility(true);
+		MuzzleLightUntil = GetWorld()->GetTimeSeconds() + MuzzleFlashTime;
+		FTimerHandle LightOff;
+		GetWorldTimerManager().SetTimer(LightOff, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			if (GetWorld()->GetTimeSeconds() >= MuzzleLightUntil - 0.005f)
+			{
+				MuzzleLight->SetVisibility(false);
+			}
+		}), MuzzleFlashTime, false);
+	}
+	const UHitmenGameSettings* VisualSettings = UHitmenGameSettings::Get();
+	if (WeaponData->MuzzleGlowRadius > 0.f)
+	{
+		AHitmenFlashBurst::SpawnBurst(GetWorld(), DrawnMuzzle, VisualSettings->FlashMaterial.LoadSynchronous(), FLinearColor(1.f, 0.55f, 0.2f),
+			WeaponData->MuzzleGlowRadius * 0.5f * DrawnScale, WeaponData->MuzzleGlowRadius * 1.4f * DrawnScale, 0.06f, 0.f, 0.f);
+	}
+	if (WeaponData->TracerChance > 0.f)
+	{
+		UMaterialInterface* TracerMaterial = VisualSettings->TracerMaterial.LoadSynchronous();
+		for (const FVector& Impact : Impacts)
+		{
+			if (FMath::FRand() < WeaponData->TracerChance)
+			{
+				AHitmenTracer::SpawnTracer(GetWorld(), DrawnMuzzle, Impact, TracerMaterial, WeaponData->TracerColor);
+			}
+		}
 	}
 	if (UNiagaraSystem* BackBlast = WeaponData->BackBlastFX.LoadSynchronous())
 	{
@@ -1106,7 +1176,8 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	}
 	if (USoundBase* Sound = WeaponData->FireSound.LoadSynchronous())
 	{
-		UHitmenSoundLibrary::PlaySoundInSpace(this, Sound, Origin, EHitmenSoundSpace::Gunshot, 1.f, FMath::FRandRange(0.97f, 1.03f));
+		UHitmenSoundLibrary::PlaySoundInSpace(this, Sound, Origin, EHitmenSoundSpace::Gunshot, WeaponData->FireSoundVolume,
+			FMath::FRandRange(WeaponData->FireSoundPitch.X, WeaponData->FireSoundPitch.Y));
 	}
 	// Same cosmetic path as the FX: predicted on the shooter, multicast to everyone else.
 	// NPCs hold their weapon's aim pose between shots: the fire montages are additive and, in the same slot, they

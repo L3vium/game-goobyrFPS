@@ -302,6 +302,27 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<USoundBase> FireSound;
 
+	/** Fire sound pitch (random between X and Y) and volume: one recording gives every gun its own voice. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	FVector2D FireSoundPitch = FVector2D(0.97f, 1.03f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0"))
+	float FireSoundVolume = 1.f;
+
+	/** Share of shots drawn as a tracer (1 = every shot / pellet). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", ClampMax="1"))
+	float TracerChance = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	FLinearColor TracerColor = FLinearColor(1.f, 0.75f, 0.35f);
+
+	/** Muzzle flash light (candelas, 0 = none) and glow sphere radius (cm, 0 = none), like the mounted gun. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0"))
+	float MuzzleLightIntensity = 4000.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="cm"))
+	float MuzzleGlowRadius = 9.f;
+
 	/** Played by the owner when firing with no ammo left, just before the weapon is thrown. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSoftObjectPtr<USoundBase> DryFireSound;

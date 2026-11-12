@@ -107,6 +107,24 @@ protected:
 	UPROPERTY(Replicated)
 	float Fuel = 3.f;
 
+	/** Smoke under the feet while thrusting (seen by everyone). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack")
+	TObjectPtr<class UNiagaraSystem> ThrustFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Jetpack", meta=(ClampMin="0.01"))
+	float ThrustFXScale = 0.35f;
+
+	/** Thrusting right now (server, replicated: drives the smoke on every machine). */
+	UPROPERTY(ReplicatedUsing=OnRep_Thrusting)
+	bool bThrusting = false;
+
+	UFUNCTION()
+	void OnRep_Thrusting();
+	void SetThrustEffect(bool bOn);
+
+	UPROPERTY(Transient)
+	TObjectPtr<class UNiagaraComponent> ThrustEffect;
+
 	/** Server: thrust state last tick, to fire Juice_OnEnded when the fuel runs out. */
 	bool bWasThrusting = false;
 };

@@ -321,6 +321,15 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnDropped(bool bDropped);
 
+	/** Muzzle flash light (every weapon; lit for a few hundredths of a second per shot). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UPointLightComponent> MuzzleLight;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="s"))
+	float MuzzleFlashTime = 0.05f;
+
+	float MuzzleLightUntil = 0.f;
+
 	/** Thrown weapons fly with physics and spin; one on the head stuns a pawn this long. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw", meta=(ClampMin="0", Units="deg"))
 	float ThrowSpinSpeed = 900.f;

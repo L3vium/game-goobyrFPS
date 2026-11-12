@@ -47,6 +47,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke", meta=(ClampMin="0", Units="s"))
 	float Lifetime = 12.f;
 
+	/** The smoke effect plays this much faster (it fills the radius quicker). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke", meta=(ClampMin="0.1"))
+	float EffectTimeScale = 1.8f;
+
+	/** Uniform scale of the smoke effect so it covers Radius. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke", meta=(ClampMin="0.01"))
+	float EffectScale = 1.f;
+
 	// ---- Fallback puffs (shown while no Niagara system is assigned) ----
 	/** Hide the puffs when the Effect component has a Niagara system. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Smoke|Fallback")

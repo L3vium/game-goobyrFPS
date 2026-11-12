@@ -41,6 +41,12 @@ void AHitmenSmokeCloud::BeginPlay()
 	SpawnTime = GetWorld()->GetTimeSeconds();
 
 	const bool bHasNiagara = Effect && Effect->GetAsset() != nullptr;
+	if (bHasNiagara)
+	{
+		// The cloud fills its radius quickly (the sight block is there at once).
+		Effect->SetCustomTimeDilation(EffectTimeScale);
+		Effect->SetRelativeScale3D(FVector(EffectScale));
+	}
 	if (GetNetMode() != NM_DedicatedServer && PuffCount > 0 && !(bHasNiagara && bHidePuffsWhenNiagaraAssigned))
 	{
 		BuildPuffs();

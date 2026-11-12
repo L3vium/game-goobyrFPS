@@ -6,6 +6,13 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ## [Unreleased]
 
 ### Added
+- Toon weapon juice (no blood): muzzle flash (Anime_Stylized), muzzle light and soft glow, toon impacts on walls and
+  bodies, tracers (AHitmenTracer) for shotgun pellets, sniper shots and part of the machine-gun bullets, explosion
+  flashes (AHitmenFlashBurst; the flashbang is a big white flash), jetpack smoke, ladder / gutter puffs and grab
+  sounds, zipline sparks and cable sound, tank muzzle blast / hull rock / 120 cm barrel recoil, turret flash and
+  red tracers.
+- Taking a hit: a red arc toward the shooter, a colour fringe and red tint, a small shake; the view greys with low
+  health.
 - First-person motion, procedural and per weapon (`FHitmenFPMotion` in DA_Weapon_*): camera head bob with the
   footstep on each low point, mouse sway, walk lag and strafe tilt, a fast equip from below, a spring kick per shot,
   a spring hip <-> aim travel toward the centre, the sniper's raise / wobble / zoom sequence with a breathing aim,
@@ -26,6 +33,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - NPC `ShootingRange` (15 m): guards only shoot within it and walk closer when farther.
 
 ### Changed
+- Gun sounds: one recording pitched and levelled per weapon (FireSoundPitch / FireSoundVolume); the silenced pistol is
+  a quiet high snap (it played a dust puff); dry fire is a metal click instead of a clock tick.
+- The smoke grenade shows the Smoke_Bombs toon cloud (its path was wrong: grey spheres were drawn) and plays 1.8x faster.
 - First-person scale 0.35 (0.6) with a 3 cm near plane, so the arms stay clear of walls; machine guns sit lower.
 - Slides always brake (friction + deceleration), left / right only bend them, they last about 0.5 s from a walk and
   0.7 s from a sprint, and Ctrl must be released before the next one: no more endless sideways slides or chained
@@ -50,6 +60,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Tools find the engine through the Epic launcher's install list (UE_ROOT still wins).
 
 ### Removed
+- Every Flipbook (comic book) effect on weapons: blood, dust and muzzle smoke.
 - The burst rifle (data asset, catalog, gym pedestal).
 
 ### Fixed

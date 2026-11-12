@@ -283,6 +283,24 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank|Juice", meta=(ClampMin="0"))
 	float FireShake = 2.5f;
 
+	/** How far the barrel slides back on a shot (cm) and how much the hull rocks back (deg). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank|Juice", meta=(ClampMin="0", Units="cm"))
+	float BarrelKickDistance = 120.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank|Juice", meta=(ClampMin="0", Units="deg"))
+	float HullKickPitch = 4.f;
+
+	/** Blast at the muzzle and dust around the hull on a shot. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank|Juice")
+	TObjectPtr<class UNiagaraSystem> MuzzleBlastFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank|Juice")
+	TObjectPtr<class UNiagaraSystem> HullDustFX;
+
+	float HullKick = 0.f;
+	FRotator HullRestRotation = FRotator::ZeroRotator;
+	bool bHullRestSet = false;
+
 	float MuzzleFlashUntil = 0.f;
 	float BarrelKick = 0.f;
 

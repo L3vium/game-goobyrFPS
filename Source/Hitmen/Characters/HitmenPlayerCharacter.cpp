@@ -329,6 +329,7 @@ void AHitmenPlayerCharacter::Tick(float DeltaSeconds)
 	}
 	UpdateHeadBob(DeltaSeconds);
 	UpdateEyeHeight(DeltaSeconds);
+	UpdateDamageFeel(DeltaSeconds);
 	UpdateRecoil(DeltaSeconds);
 	UpdateFirstPersonArms(DeltaSeconds);
 	UpdateHUDHints(DeltaSeconds);
@@ -446,6 +447,35 @@ void AHitmenPlayerCharacter::UpdateHeadBob(float DeltaSeconds)
 	HeadBobOffset = FVector(0.f,
 		FMath::Sin(HeadBobPhase * 0.5f) * HeadBobSide * Scale,
 		(FMath::Abs(FMath::Sin(HeadBobPhase)) - 0.5f) * HeadBobHeight * Scale);
+}
+
+void AHitmenPlayerCharacter::UpdateDamageFeel(float DeltaSeconds)
+{
+	// Each hit: a colour fringe, a red tint and a small shake; the lower the health, the greyer the world.
+	const UHitmenHealthComponent* Health = GetHealth();
+	if (!Health)
+	{
+		return;
+	}
+	const float Current = Health->GetHealth();
+	if (LastHealthSeen >= 0.f && Current < LastHealthSeen - 0.5f && !IsDead())
+	{
+		HitPulse = 1.f;
+		AddCameraShake(HitShake, 0.2f);
+	}
+	LastHealthSeen = Current;
+	HitPulse = FMath::Max(0.f, HitPulse - DeltaSeconds * 3.f);
+	const float Ratio = Health->GetMaxHealth() > 0.f ? Current / Health->GetMaxHealth() : 1.f;
+	const float Low = IsDead() ? 0.f : FMath::Clamp(1.f - Ratio / 0.6f, 0.f, 1.f);
+	FPostProcessSettings& Post = FirstPersonCamera->PostProcessSettings;
+	FirstPersonCamera->PostProcessBlendWeight = 1.f;
+	Post.bOverride_SceneFringeIntensity = HitPulse > 0.f;
+	Post.SceneFringeIntensity = HitPulse * HitFringeIntensity;
+	Post.bOverride_SceneColorTint = HitPulse > 0.f;
+	Post.SceneColorTint = FMath::Lerp(FLinearColor::White, FLinearColor(1.f, 0.6f, 0.6f), HitPulse * 0.6f);
+	Post.bOverride_ColorSaturation = Low > 0.f;
+	const float Saturation = FMath::Lerp(1.f, LowHealthSaturation, Low);
+	Post.ColorSaturation = FVector4(Saturation, Saturation, Saturation, 1.f);
 }
 
 void AHitmenPlayerCharacter::PlayFirstPersonAction(EHitmenFPAction Action, float Duration)

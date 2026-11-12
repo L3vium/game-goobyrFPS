@@ -16,6 +16,11 @@
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Data/HitmenAnimSet.h"
 #include "Core/HitmenGameSettings.h"
+#include "Data/HitmenSoundSet.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Weapons/HitmenWeaponBase.h"
 #include "Weapons/HitmenProjectile.h"
 #include "Hitmen.h"
@@ -91,6 +96,76 @@ void AHitmenCharacterBase::NotifyControllerChanged()
 }
 
 // ---- Montages ----
+
+void AHitmenCharacterBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		UpdateTraversalJuice(DeltaSeconds);
+	}
+}
+
+void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
+{
+	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
+	const bool bZipline = Movement && Movement->IsZiplining();
+	const bool bClimbing = Movement && Movement->IsClimbing() && !bZipline;
+	const float Z = GetActorLocation().Z;
+
+	// Ladders and gutters: a grab sound and a small puff at the hands every step of the climb.
+	if (bClimbing)
+	{
+		ClimbStepAccumulator += FMath::Abs(Z - LastTraversalZ);
+		if (ClimbStepAccumulator >= ClimbStepDistance)
+		{
+			ClimbStepAccumulator = 0.f;
+			const FVector Hands = GetActorLocation() + GetActorForwardVector() * 30.f + FVector::UpVector * 60.f;
+			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::ClimbGrab, Hands);
+			if (ClimbFX)
+			{
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ClimbFX, Hands, FRotator::ZeroRotator, FVector(0.35f));
+			}
+		}
+	}
+	else if (!bZipline)
+	{
+		ClimbStepAccumulator = 0.f;
+	}
+	LastTraversalZ = Z;
+
+	// Ziplines: bursts of sparks where the hands hold the cable, and the cable sound.
+	if (bZipline && ZiplineFX)
+	{
+		ClimbStepAccumulator -= DeltaSeconds;
+		if (ClimbStepAccumulator <= 0.f)
+		{
+			ClimbStepAccumulator = 0.12f;
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ZiplineFX, GetActorLocation() + FVector::UpVector * 110.f, GetActorRotation(), FVector(0.3f));
+		}
+	}
+	if (bZipline && !ZiplineAudio)
+	{
+		if (USoundBase* Ride = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::ZiplineRide))
+		{
+			ZiplineAudio = UGameplayStatics::SpawnSoundAttached(Ride, GetRootComponent(), NAME_None, FVector::ZeroVector, EAttachLocation::KeepRelativeOffset, false, 0.8f, 1.f, 0.f,
+				UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World));
+		}
+	}
+	if (!bZipline)
+	{
+		if (ZiplineEffect)
+		{
+			ZiplineEffect->DestroyComponent();
+			ZiplineEffect = nullptr;
+		}
+		if (ZiplineAudio)
+		{
+			ZiplineAudio->FadeOut(0.2f, 0.f);
+			ZiplineAudio = nullptr;
+		}
+	}
+}
 
 void AHitmenCharacterBase::GetMontageMeshes(TArray<USkeletalMeshComponent*>& OutMeshes) const
 {

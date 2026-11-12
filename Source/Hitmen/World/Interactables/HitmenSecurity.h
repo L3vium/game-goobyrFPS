@@ -354,6 +354,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0.02"))
 	float FireInterval = 0.3f;
 
+	/** Barrels spin up while the turret fires; a tracer per shot; a light flash at the muzzle. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Turret|Juice")
+	FLinearColor TracerColor = FLinearColor(1.f, 0.3f, 0.2f);
+
+	float BarrelSpin = 0.f;
+	float BarrelSpinSpeed = 0.f;
+
 	/** Seconds the laser is on a new target before the first shot (time to react). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0", Units="s"))
 	float LockOnTime = 0.8f;

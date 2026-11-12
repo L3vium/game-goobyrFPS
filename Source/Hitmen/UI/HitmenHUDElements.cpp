@@ -211,6 +211,14 @@ int32 UHitmenDamageVignetteWidget::NativePaint(const FPaintArgs& Args, const FGe
 	{
 		return HiddenAlpha > 0.01f ? Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled) : LayerId;
 	}
+	// Where the hit came from: a red arc around the crosshair toward the shooter (0 = ahead, clockwise).
+	if (Pulse > 0.02f)
+	{
+		const FVector2D Center = Size * 0.5f;
+		const float Radius = FMath::Min(Size.X, Size.Y) * 0.22f;
+		HitmenUI::PaintArcFill(OutDrawElements, LayerId + 2, AllottedGeometry, Center, Radius, Radius + 10.f, LastDamageYaw - 22.f, LastDamageYaw + 22.f,
+			FLinearColor(0.95f, 0.05f, 0.05f, 0.9f * Pulse), 16);
+	}
 	const FLinearColor Red(0.55f, 0.f, 0.f, 0.85f * Strength);
 	const FLinearColor Clear(0.55f, 0.f, 0.f, 0.f);
 	const float EdgeX = Size.X * (0.18f + 0.1f * Strength);

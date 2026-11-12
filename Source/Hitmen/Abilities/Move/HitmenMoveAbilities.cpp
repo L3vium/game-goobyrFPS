@@ -10,6 +10,8 @@
 #include "Components/CapsuleComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
 
 // ---------------------------------------------------------------------------------------------
 // Blink
@@ -148,6 +150,7 @@ void UHitmenAbility_Jetpack::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UHitmenAbility_Jetpack, Fuel);
+	DOREPLIFETIME(UHitmenAbility_Jetpack, bThrusting);
 }
 
 UHitmenCharacterMovementComponent* UHitmenAbility_Jetpack::GetMovement() const
@@ -213,12 +216,18 @@ void UHitmenAbility_Jetpack::TickAbility(float DeltaTime)
 		return;
 	}
 	Fuel = Movement->GetJetpackFuel();
-	const bool bThrusting = Movement->IsJetpackThrusting();
-	if (bWasThrusting && !bThrusting && Movement->WantsJetpackThrust() && Fuel <= 0.f)
+	const bool bNowThrusting = Movement->IsJetpackThrusting();
+	if (bWasThrusting && !bNowThrusting && Movement->WantsJetpackThrust() && Fuel <= 0.f)
 	{
 		Juice_OnEnded(); // Ran dry while held.
 	}
-	bWasThrusting = bThrusting;
+	bWasThrusting = bNowThrusting;
+	// Replicated to everyone for the smoke; the listen-server host shows it for remote players itself.
+	bThrusting = bNowThrusting;
+	if (const APawn* Pawn = GetOwnerPawn(); Pawn && !Pawn->IsLocallyControlled())
+	{
+		SetThrustEffect(bNowThrusting);
+	}
 }
 
 void UHitmenAbility_Jetpack::LocalTick(float DeltaTime)
@@ -227,6 +236,8 @@ void UHitmenAbility_Jetpack::LocalTick(float DeltaTime)
 	if (UHitmenCharacterMovementComponent* Movement = GetMovement())
 	{
 		Movement->ReconcileJetpackFuel(Fuel, FuelReconcileTolerance);
+		// Your own smoke follows your prediction (no wait for the server).
+		SetThrustEffect(Movement->IsJetpackThrusting());
 	}
 }
 
@@ -490,4 +501,36 @@ bool UHitmenAbility_C4::Activate(const FVector& AimOrigin, const FVector& AimDir
 	PlacedCharge = Charge;
 	PlayActivatedJuice(AimOrigin);
 	return true;
+}
+
+void UHitmenAbility_Jetpack::OnRep_Thrusting()
+{
+	// The owner shows its own (predicted) smoke; everyone else follows the server.
+	const APawn* Pawn = GetOwnerPawn();
+	if (!Pawn || !Pawn->IsLocallyControlled())
+	{
+		SetThrustEffect(bThrusting);
+	}
+}
+
+void UHitmenAbility_Jetpack::SetThrustEffect(bool bOn)
+{
+	AHitmenCharacterBase* Character = GetOwnerCharacter();
+	if (!Character || !GetWorld() || GetWorld()->GetNetMode() == NM_DedicatedServer || !ThrustFX)
+	{
+		return;
+	}
+	if (bOn && !ThrustEffect)
+	{
+		// Under the feet, blowing down.
+		const float HalfHeight = Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		ThrustEffect = UNiagaraFunctionLibrary::SpawnSystemAttached(ThrustFX, Character->GetRootComponent(), NAME_None, FVector(0.f, 0.f, -HalfHeight + 10.f),
+			FRotator(180.f, 0.f, 0.f), FVector(ThrustFXScale), EAttachLocation::KeepRelativeOffset, false, ENCPoolMethod::None);
+	}
+	else if (!bOn && ThrustEffect)
+	{
+		ThrustEffect->Deactivate();
+		ThrustEffect->SetAutoDestroy(true);
+		ThrustEffect = nullptr;
+	}
 }

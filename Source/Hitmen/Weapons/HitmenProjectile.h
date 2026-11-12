@@ -109,6 +109,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice", meta=(ClampMin="0"))
 	float ExplosionEffectScale = 1.f;
 
+	/** A glowing sphere and light at the explosion (flashbang: big and white). Radius 0 = none. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice", meta=(ClampMin="0", Units="cm"))
+	float ExplosionFlashRadius = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice")
+	FLinearColor ExplosionFlashColor = FLinearColor(1.f, 0.6f, 0.25f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice", meta=(ClampMin="0.02", Units="s"))
+	float ExplosionFlashDuration = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice", meta=(ClampMin="0"))
+	float ExplosionLightIntensity = 0.f;
+
 	/** Local players within this radius get a view shake (strength falls off with distance). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Juice", meta=(ClampMin="0", Units="cm"))
 	float ExplosionShakeRadius = 2200.f;

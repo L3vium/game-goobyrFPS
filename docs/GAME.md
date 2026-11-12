@@ -197,6 +197,18 @@ mouse sensitivity, invert Y, audio volumes, full key rebinding.
   heard a few metres away, gunshots far and muffled.
 
 ## 7. Weapons
+**Juice (toon only, no blood)**: every gun flashes at the muzzle (Anime_Stylized `NS_Gunshot_Cast`, attached and drawn
+with the first-person gun), a short warm light and a soft glow (`M_Hitmen_FlashGlow`), and hits make a toon puff
+(`NS_Gunshot_Hit`) on walls and bodies alike. Tracers (`AHitmenTracer`, `M_Hitmen_Tracer`) show every shotgun pellet and
+sniper shot and part of the machine-gun bullets. All guns share one recording, pitched and levelled per weapon
+(`FireSoundPitch` / `FireSoundVolume`: the silenced pistol is a quiet high snap). Muzzle points are computed from each
+mesh (the Weapons_Free guns have no socket). Explosions flash (`ExplosionFlash*` on projectiles; the flashbang is a big
+white flash and light), the smoke grenade is the Smoke_Bombs toon cloud (plays 1.8x faster), the jetpack blows smoke
+under your feet, ladders and gutters puff and click at each grab, ziplines throw sparks with a cable sound, the tank's
+barrel slides back 120 cm, its hull rocks and the muzzle blasts, and the turret flashes and fires red tracers. Taking
+a hit: a red arc toward the shooter, a colour fringe and a red tint on the view, a small shake; the world greys as
+health drops, with the heartbeat below 35 %.
+
 All weapons share ammo, fire rate, spread (fixed: firing never widens it), recoil, damage, headshot
 multiplier, noise radius, silenced flag, mesh / visual transform / VFX / SFX / montage / first-person pose
 references — every value is in a `DA_Weapon_*` data asset. Weapons lying in the world float and turn. The

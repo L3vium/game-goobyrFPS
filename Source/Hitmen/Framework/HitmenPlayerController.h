@@ -240,7 +240,7 @@ protected:
 	// ---- Sightroom (Tab) ----
 	/** Enemies inside this radius are shown through walls while the Sightroom is on. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0", Units="cm"))
-	float SightroomEnemyRadius = 2500.f;
+	float SightroomEnemyRadius = 2000.f;
 
 	/** Interactables inside this radius are highlighted when directly visible. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0", Units="cm"))

@@ -51,6 +51,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")
 	UHitmenCharacterMovementComponent* GetHitmenMovement() const;
 
+	/**
+	 * The ledge being climbed, found by a trace in front (every machine, so other players' hands land on it too):
+	 * the top point at the wall edge and the wall normal (pointing back at the character).
+	 */
+	bool FindLedgeInFront(FVector& OutPoint, FVector& OutNormal) const;
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")
 	UHitmenAnimSet* GetAnimSet() const { return AnimSet; }
 
@@ -150,6 +156,25 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="10", Units="cm"))
 	float ClimbStepDistance = 55.f;
+
+	/** Dust where the hands land on a ledge, under the feet when a vault lands, along a slide (every machine). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
+	TObjectPtr<class UNiagaraSystem> TraversalDustFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="0"))
+	float TraversalDustScale = 0.5f;
+
+	/** Seconds between dust puffs along a slide. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="0.02", Units="s"))
+	float SlideDustInterval = 0.12f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<class UAudioComponent> SlideAudio;
+
+	bool bWasSlidingJuice = false;
+	bool bWasMantlingJuice = false;
+	float SlideDustAccumulator = 0.f;
+	void SpawnTraversalDust(const FVector& Location, float Scale) const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<class UNiagaraComponent> ZiplineEffect;

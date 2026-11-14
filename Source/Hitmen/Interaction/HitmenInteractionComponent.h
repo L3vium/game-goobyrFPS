@@ -59,6 +59,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Interaction", meta=(ClampMin="0", Units="cm"))
 	float ServerDistanceTolerance = 150.f;
 
+	/** Distance from a point to the nearest colliding part of an actor (its origin when it has none). */
+	static float GetDistanceToTarget(const FVector& From, const AActor* Target);
+
 	/** Fresnel overlay on the focused actor (M_FocusFresnel). Empty = no highlight. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Interaction")
 	TObjectPtr<UMaterialInterface> FocusOverlayMaterial;

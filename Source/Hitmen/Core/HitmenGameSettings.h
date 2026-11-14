@@ -10,6 +10,7 @@ class UHitmenMatchRules;
 class UHitmenMapDefinition;
 class UHitmenCatalog;
 class UHitmenSoundSet;
+class UHitmenBarkSet;
 class UBehaviorTree;
 class UMaterialInterface;
 
@@ -49,6 +50,10 @@ public:
 	 *  bare C++ controller). NPC controller Blueprints set their own tree. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="AI")
 	TSoftObjectPtr<UBehaviorTree> DefaultBehaviorTree;
+
+	/** What NPCs say when their awareness changes (subtitles for nearby players, optional voices). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="AI")
+	TSoftObjectPtr<UHitmenBarkSet> BarkSet;
 
 	// ---- Visuals ----
 	/** Unlit additive material for bullet tracers (vector "Color", scalar "Opacity"). */

@@ -3,6 +3,93 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
+## [0.8.0] - 2026-11-14
+
+### Added
+- `UHitmenEditorTools::SetBackgroundThrottling`: PIE recordings from scripts run at full rate while the editor is in
+  the background.
+- Procedural body layer `FAnimNode_HitmenBodyIK` (in a new UncookedOnly module `HitmenUncooked` for its graph node)
+  in the body and first-person anim blueprints: crouched and sliding bodies (your shadow too) are really crouched
+  with planted feet, climbing bodies put their hands on the ledge, the first-person arms punch and climb by IK.
+  `UHitmenAnimGraphTools::AddBodyIKNode` inserts it.
+- First-person punch: a guard with closed fists and jabs driven to the crosshair (the arms used to hang and the
+  whole mesh was shoved). First-person climb: the hands land on the ledge and the view dips toward it.
+- Traversal juice: dust where the hands land on a ledge (seen by others), on vault landings and along slides, a
+  slide scrape sound (`EHitmenSound::Slide`).
+- `UHitmenEditorTools::SetPIENetMode` (QA: listen server + clients in one process from scripts).
+- Sniper trail: the whole shot appears at once and fades in 0.12 s, with debris thrown out of the surface it hits
+  (`FHitmenTracerStyle`, `ImpactBurstFX` in the weapon data); misses make no impact effect.
+- Hitman-like AI (all NPCs stay hostile): graded vision (focal cone at full rate, peripheral vision slower, partial
+  cover slower; crouch-walking, sliding, climbing and hanging in view are alarming), "Hm?" then a walk over to what
+  was glimpsed (the investigation timer starts on arrival), shared knowledge in `UHitmenAISubsystem` (bodies and
+  sleepers reported once map-wide, the latest sighting of a target shared every second), on-edge routine after an
+  alert (faster suspicion, brisk walk, gun ready, look-around at each patrol point), sleepers woken, weapons left
+  lying around confiscated.
+- Guards take cover near their target (`UBTTask_HitmenFindCover`) and duck behind it between bursts.
+- VIP evacuation: an unarmed VIP in danger runs to the nearest `AHitmenVIPSafeSpot` (new marker for LD; fallback:
+  far from the threat, out of its sight) with its two nearest guards as escorts.
+- Barks: every change of awareness is said out loud (`DA_Barks`, `UHitmenBarkSet` in Project Settings -> Hitmen ->
+  AI; optional voices; `Juice_OnBark`), subtitles bottom centre for players within 15 m (`UHitmenSubtitlesWidget`),
+  derived from replicated state (no RPC).
+
+### Changed
+- Momentum crouch and slides rebuilt on the common FPS rules: crouching while moving keeps your direction and brakes
+  down to crouch speed (a 0.35 s lunge from a walk, a 0.75 s / 3.9 m slide from a sprint, 4.4 m before); crouch +
+  Shift slides at once from any pace; the view widens and rolls with the slide. Client-predicted (slide state in the
+  saved moves).
+- Walk 420 (480), sprint 720 (820), crouch 210 (240).
+- Head bob and sway: two steps a second walking (the steps were three times too fast), 3.2 cm bob, 2.4 cm left /
+  right sway with a 0.7 degree roll (the sway ran at half speed), stronger arms sway, bob, strafe tilt and walk lag;
+  low ledges are climbed without the view dip.
+- Footsteps and landings: Kenney Impact Sounds (CC0) with five takes per surface played at random without repeats
+  (the jogging takes sounded wrong); landings play the step of the surface you land on plus a body thump, through
+  the same surface query as the steps (they used a fixed stone sound); San Lazaro's terrain sounds like grass, earth
+  or rock by slope, like its colour; rocks and mountains are stone.
+- Aiming is faster: the view zooms at 22 (14), the gun leaves the hip at once on a stiffer spring (settled in about
+  0.15 s), and the sniper scope sequence takes about 0.2 s (raise 0.08 s, the zoom no longer waits for the wobble)
+  instead of 0.8 s.
+- Ladders and gutters puff soft dust (they used the gunshot puff), never in your own first-person view.
+- Weapon light: the warm full-screen wash on every shot came from the toon muzzle flash drawn in first person: your
+  own gun now shows only a small glow (others still see the toon flash). The muzzle light is ~100x weaker (5-35 cd
+  instead of 400-3000), direct only (no Lumen bounce or volumetric scattering), 0.035 s and at most once every 0.09
+  s.
+- Sightroom works like Hitman's Instinct: the scan look covers the whole map, enemies show through walls only within
+  20 m (they were map-wide), the target anywhere, usable objects only where they are really in view (depth-tested,
+  never through walls); stencils are cleared when the pawn goes away. Strictly local.
+- Pause map: the wheel zooms toward the cursor (it zoomed onto the player), a left drag pans, markers and labels
+  stay inside the map square; security cameras are no longer on the pause map or its legend (the minimap keeps
+  them).
+- Gym: the HITMEN GYM title floats high over the middle of the hall, facing the spawn (it stood like a sign against
+  the south wall).
+- Open patrol routes are walked back and forth; an interrupted patrol resumes the point it was heading to.
+- Server checks: `Server_Fire` refuses dead or stunned shooters, shots starting away from the shooter's eye
+  (`MaxFireOriginError`) or going away from where the server sees it look (`MaxFireAngleError`); loadouts and
+  cosmetics must come from `DA_Catalog`.
+- Network: cheat flags replicate to their owner only; mounted gun and tank aim sent at most 20 times a second and
+  only when it moved (a final send when the mouse stops, a forced one on fire); projectile impacts are a reliable
+  multicast (the blast could be lost before the destroy).
+- Mounted gun and tank muzzle lights: candelas (40 / 150 cd, `MuzzleLightIntensity`) without bounce light or fog,
+  instead of 30000 / 200000 units.
+
+### Fixed
+- Jumping while walking or running no longer turns into a slow climb onto the floor, a curb or a step (the air ledge
+  grab caught the next floor tile): the jump is instant, rising ledge grabs need a ledge at least 45 cm above the
+  feet, and the view lifts on takeoff instead of dipping.
+- After death the third-person death camera shows your body (it was hidden: the engine always hides a first-person
+  world-space body from its owner).
+- Crouching showed a standing body and shadow (there is no crouch animation).
+- The tank damaged itself (and its driver) with its own shells: a vehicle now ignores damage from itself, its driver
+  and its own projectiles.
+- A driven tank or mounted gun was Neutral (the stowed driver lost its player state): it now takes its driver's
+  team, so other players can damage it.
+- Ziplines only worked from the start post: the server measured the interaction range from the actor origin (the
+  start post). Range is now measured to the nearest colliding part, so F at the bottom post rides up. Held
+  interactions (hacking) also check that range.
+- Radio calls sent responders to a stale or world-origin position: they now go where the caller knows something
+  happened. Guard groups shared the target's real position and turned a footstep into a group search.
+- The unarmed VIP threw punches from 15 m (unarmed NPCs now fight within `UnarmedReach`).
+- Bodies are seen where the ragdoll lies, not where the character died.
+
 ## [0.7.0] - 2026-11-12
 
 ### Added

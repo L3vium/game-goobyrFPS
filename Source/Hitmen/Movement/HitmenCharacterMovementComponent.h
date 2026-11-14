@@ -84,10 +84,10 @@ public:
 
 	// ---- Speeds ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="0", Units="cm/s"))
-	float WalkSpeed = 480.f;
+	float WalkSpeed = 420.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="0", Units="cm/s"))
-	float SprintSpeed = 820.f;
+	float SprintSpeed = 720.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="0", ClampMax="1"))
 	float AimSpeedMultiplier = 0.65f;
@@ -96,37 +96,41 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="-1", ClampMax="1"))
 	float SprintMinForwardDot = 0.5f;
 
-	// ---- Slide ----
-	/** Crouching while moving at least this fast starts a slide: a short one from a walk, a long one from a sprint. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
-	float SlideMinStartSpeed = 380.f;
+	// ---- Slide (momentum crouch) ----
+	// Crouching while moving keeps the momentum in the direction you were going and brakes it down to crouch speed:
+	// a short lunge from a walk, a slide from a sprint. Crouch + Shift slides at once from any pace (no ramp-up).
 
-	/** When set, only a sprint slides (crouch-walking just crouches). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide")
-	bool bSlideRequiresSprint = false;
-
+	/** Crouching while moving faster than crouch speed plus this carries the momentum (lunge / slide). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
-	float SlideImpulse = 250.f;
+	float SlideMinSpeedAboveCrouch = 40.f;
 
-	/** Impulse when the slide starts from a sprint (slides further). */
+	/** Boost along the velocity when crouching from a walk (a short lunge). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
-	float SprintSlideImpulse = 300.f;
+	float CrouchLungeImpulse = 110.f;
+
+	/** Boost along the velocity when crouching from a sprint. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
+	float SprintSlideImpulse = 160.f;
+
+	/** Crouch + Shift: the slide starts at least this fast, in the move direction, whatever the pace before. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
+	float CrouchSprintSlideSpeed = 820.f;
 
 	/** Speed lost per second, proportional to speed (on top of SlideBrakingDeceleration). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0"))
-	float SlideFriction = 1.2f;
+	float SlideFriction = 0.3f;
 
+	/** Constant part of the braking: with SlideFriction it gives ~0.35 s from a walk, ~0.7 s / 3.8 m from a sprint. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0"))
-	float SlideBrakingDeceleration = 500.f;
+	float SlideBrakingDeceleration = 780.f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="cm/s"))
-	float SlideExitSpeed = 220.f;
-
+	/** Safety stop (the braking normally ends the slide well before). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="s"))
-	float SlideMaxDuration = 0.9f;
+	float SlideMaxDuration = 1.5f;
 
+	/** No new boost (lunge, slide, crouch + Shift) for this long after one: a crouch then only carries momentum. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="s"))
-	float SlideCooldown = 1.f;
+	float SlideBoostCooldown = 0.9f;
 
 	/** Left / right only bend the slide this fast; they never push it (no endless sideways slides). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Slide", meta=(ClampMin="0", Units="deg"))
@@ -170,9 +174,18 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
 	float MantleSideProbeOffset = 25.f;
 
-	/** In the air a ledge down to this height above the feet is still grabbed (near the top of a jump). */
+	/** Falling, a ledge down to this height above the feet is still grabbed (near the top of a jump). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(Units="cm"))
 	float AirMantleMinHeight = -10.f;
+
+	/** Rising (a jump just started), only a ledge at least this high above the feet is grabbed: a jump is never
+	 *  turned into a climb onto a curb, a step or the floor it started from. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(Units="cm"))
+	float AirMantleRisingMinHeight = 45.f;
+
+	/** Ledges lower than this are climbed without the eye dip (a quick step-up keeps the view level). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
+	float MantleNoDipHeight = 70.f;
 
 	/** Probe depths past the wall face; several so thin walls (30 cm) and sills are found. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle")
@@ -257,6 +270,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
 	bool IsSliding() const { return IsCustomMode(EHitmenCustomMovement::Slide); }
+
+	/** 0..1 strength of the current slide (its entry speed against a crouch + Shift slide); 0 when not sliding. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
+	float GetSlideStrength() const;
+
+	/** Height above the feet of the ledge being climbed (0 when not mantling). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
+	float GetMantleLedgeHeight() const { return IsMantling() ? MantleLedgeHeight : 0.f; }
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
 	bool IsClimbing() const { return IsCustomMode(EHitmenCustomMovement::Climb); }
@@ -363,8 +384,9 @@ protected:
 	/** Space while hanging: into an open window above the ledge, else onto the ledge top if there is room. */
 	bool PlanHangClimb(FHitmenMantlePlan& OutPlan) const;
 
-	bool CanStartSlide() const;
-	void StartSlide();
+	/** Momentum crouch / crouch + Shift slide, run before Super crouches (owning client and server). */
+	void UpdateSlideStart(float DeltaSeconds);
+	void StartSlide(const FVector& Direction, float EntrySpeed);
 	void EndSlide();
 	bool GetSlideSurface(FHitResult& OutHit) const;
 
@@ -400,13 +422,15 @@ protected:
 	float JetpackLiftSpeed = 0.f;
 	float JetpackLiftInterpSpeed = 0.f;
 
-	// Slide state
-	float SlideStartTime = -100.f;
-	float LastSlideEndTime = -100.f;
-	/** Seconds into the current slide (saved with moves so replays end it at the same point). */
+	// Slide state (saved with moves: replays and the server reach the same slide)
+	/** Seconds into the current slide. */
 	float SlideElapsed = 0.f;
-	/** A slide ended: crouch must be released before the next one (no chained slides with Ctrl held). */
+	/** A slide ended: crouch must be released before the next crouch slide (no chained slides with Ctrl held). */
 	bool bSlideNeedsCrouchRelease = false;
+	/** A crouch + Shift slide started: Shift must be released before the next one. */
+	bool bSprintSlideNeedsRelease = false;
+	/** Seconds before the next boost (counted down per move, so client and server agree). */
+	float SlideBoostCooldownLeft = 0.f;
 	/** Speed when the slide started: slopes never push it faster. */
 	float SlideEntrySpeed = 0.f;
 
@@ -425,6 +449,7 @@ protected:
 	bool bMantleFromClimb = false;
 	float MantleElapsed = 0.f;
 	float MantleTotal = 0.f;
+	float MantleLedgeHeight = 0.f;
 	bool bMantleIsVault = false;
 	float LastMantleTime = -100.f;
 	/** The running mantle ends hanging (vault out of a window). */
@@ -460,6 +485,10 @@ public:
 	uint8 bSavedWantsJetpackThrust : 1;
 	float SavedJetpackFuel = 0.f;
 	float SavedSlideElapsed = 0.f;
+	float SavedSlideEntrySpeed = 0.f;
+	float SavedSlideBoostCooldownLeft = 0.f;
+	uint8 bSavedSlideNeedsCrouchRelease : 1;
+	uint8 bSavedSprintSlideNeedsRelease : 1;
 
 	virtual void Clear() override;
 	virtual uint8 GetCompressedFlags() const override;

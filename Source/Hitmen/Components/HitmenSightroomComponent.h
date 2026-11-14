@@ -41,15 +41,21 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Sightroom")
 	float GetScanProgress() const { return ScanProgress; }
 
-protected:
-	/** Reach of the scan wave drawn around you. Enemies inside it light up as the wave passes them; when it ends,
-	 *  the whole map fades into the scan look and every enemy lights up (bEnemiesMapWide). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0", Units="cm"))
-	float EnemyRadius = 2500.f;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	/** When the wave ends, enemies anywhere on the map are shown (otherwise only those inside EnemyRadius). */
+protected:
+	/** Like Hitman's Instinct: enemies are seen through walls only this close (they light up as the wave passes
+	 *  them). The target is seen at any distance. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0", Units="cm"))
+	float EnemyRadius = 2000.f;
+
+	/** Enemies anywhere on the map once the wave ends (off: only those inside EnemyRadius). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom")
-	bool bEnemiesMapWide = true;
+	bool bEnemiesMapWide = false;
+
+	/** How far the drawn wave travels; behind it, and everywhere once it ends, the map takes the cool scan look. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0", Units="cm"))
+	float ScanVisualRadius = 9000.f;
 
 	/** Height counts this much in the wave distance (horizontal distance + |height| x this), in C++ and in
 	 *  PP_Sightroom ("HeightWeight"), so a highlight appears exactly when the wave front reaches it. */
@@ -62,7 +68,7 @@ protected:
 
 	/** Seconds for the scan wave to reach full radius. Highlights follow the wave every frame meanwhile. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0.05", Units="s"))
-	float ScanDuration = 0.35f;
+	float ScanDuration = 0.5f;
 
 	/** Seconds between highlight refreshes once the wave is done (moving enemies, line of sight). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0.02", Units="s"))

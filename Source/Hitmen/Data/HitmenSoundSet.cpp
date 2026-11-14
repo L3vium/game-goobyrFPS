@@ -54,6 +54,12 @@ USoundBase* UHitmenSoundLibrary::GetHitmenSound(EHitmenSound Sound)
 	return Set ? Set->GetSound(Sound) : nullptr;
 }
 
+float UHitmenSoundLibrary::GetHitmenSoundVolume(EHitmenSound Sound)
+{
+	const UHitmenSoundSet* Set = UHitmenGameSettings::Get()->SoundSet.LoadSynchronous();
+	return Set ? Set->GetVolume(Sound) : 1.f;
+}
+
 void UHitmenSoundLibrary::PlayHitmenSound2D(const UObject* WorldContextObject, EHitmenSound Sound)
 {
 	const UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;

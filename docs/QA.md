@@ -31,6 +31,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Ready with two players (PIE listen server + client joining by room code): nobody leaves while one is not
   ready, both travel ~1 s after the last Ready, no 5-4-3-2-1 (PIE script, 0.6.1); [ ] two machines over Steam
 - [x] Pause: PAUSE, three big blocks, legend on the right with the real colours, debug tools behind a button (screenshot, 0.5.0)
+- [x] Pause map: no cameras on the map or in the legend, labels clipped to the map (screenshot, 0.8.0); [ ] the wheel zooms
+  toward the cursor, a left drag pans
 - [ ] Space and Escape go back on every page; Space never re-presses the last clicked button
 - [ ] Create Room: watcher eye shows only when hovering a player without team; a click toggles it
 - [x] Create Room on one grid: map tile and players panel aligned, full player name, join hint (screenshot, 0.6.1)
@@ -41,17 +43,31 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] No brightness drift on arrival (fixed exposure on every match map)
 
 ## Player
+- [x] Sightroom: scan look everywhere, the VIP red through a wall at 28 m (PIE screenshot, 0.8.0); [ ] guards beyond 20 m
+  never lit, objects behind a wall never lit, a second client sees nothing when the first holds Tab
 - [x] Pistol and rifle at the hip with both hands, low right (PIE screenshots, 0.7.0); [ ] aim: toward the centre, hands
   in view, settles with a small overshoot
 - [ ] Head bob on, a footstep on each dip; Options head bob 0 removes it
 - [ ] Switching weapons: the new one rises from below in ~0.2 s
 - [ ] Every gun kicks per shot (shotgun / sniper hard, SMG light); the minigun shakes more as it spins up
+- [x] Sniper: a brief trail to the impact and debris there; no warm full-screen wash on your own shots (PIE screenshots,
+  0.8.0); [ ] SMG / minigun bursts in a dark room never look like a light left on
 - [ ] Sniper: raise, wobble, then zoom; the zoomed aim breathes
-- [ ] Punch alternates fists, no torso in view; knife slashes; takedown lunges; throwing winds up
+- [x] Punch: a guard with closed fists in the lower corners, jabs reach the crosshair (PIE screenshots, 0.8.0);
+  [ ] alternating fists by hand; knife slashes; takedown lunges; throwing winds up
+- [x] Crouched body (another character, the shadow): pelvis down, knees bent, feet planted (PIE screenshot, 0.8.0)
+- [x] Death camera shows your body falling (PIE screenshot, 0.8.0)
+- [ ] Ledge climb in first person: the hands land on the ledge and the view dips toward it; others see hands on the
+  ledge and dust; ladders puff dust only for others
 - [ ] Thrown empty pistol to a guard's head stuns it and vanishes; a loaded weapon lands as a pickup
 - [ ] Facing a wall at 30 cm the gun pulls back instead of going through
-- [x] A sprint slide with no input brakes and ends near 220 cm/s (PIE recording, 0.7.0); [ ] sideways input only bends it
-- [ ] Holding Ctrl after a slide does not slide again; release and press slides
+- [x] Walk lunge ~0.38 s / 1.4 m, sprint slide ~0.75 s / 3.9 m, crouch + Shift from a crouch-walk starts at 820,
+  releasing the keys mid-slide keeps the momentum (PIE recordings at 60 fps, 0.8.0); [ ] sideways input only bends it
+- [x] Jump while walking / sprinting on the gym floor and next to the 50 cm step: rising the next frame, speed kept,
+  view lifts (PIE recording, 0.8.0); a buffered Space at the 120 cm block still vaults (0.8.0)
+- [ ] Holding Ctrl after a slide does not slide again; release and press slides; Shift likewise for crouch + Shift
+- [x] Listen server + client, 100 ms lag: sprint slide and crouch + Shift show no movement corrections (PIE script with
+  p.NetShowCorrections, 0.8.0)
 - [ ] Jumping at the corner of a crate grabs it; no vault onto a barrel or the hack panel
 - [ ] Hang under a window: shimmy both ways, Space enters the window, Ctrl drops
 - [ ] Shift tap dashes (dash equipped), Shift held sprints; Space held in the air flies (jetpack equipped)
@@ -66,9 +82,9 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Thrown weapon is a floating pickup at once, no physics (PIE script, 0.5.0)
 - [x] Hook ready: a small marker where it will grab, only in range (PIE screenshot, 0.6.0); [ ] E: a thin cable from
   the hand to the anchor while pulling, seen by others too (not triggered by script: check by hand)
-- [ ] Short slide when crouching while walking; long slide from a sprint
 - [ ] Space right after grabbing a ladder does not jump off
-- [ ] Landing sounds (soft / hard) and footsteps per surface
+- [ ] Landing sounds (soft / hard) and footsteps per surface: the landing sounds like the steps on the same ground
+  (grass, earth and rock on the San Lazaro terrain, stone on rocks, wood, metal, concrete); no step repeats twice
 - [ ] Health comes back after 6 s without being hit; no health bar
 - [ ] Mouse sensitivity default 0.25 feels right
 
@@ -102,7 +118,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Shotgun pellets and sniper shots draw tracers; the turret fires red tracers
 - [ ] Flashbang: a big white flash; smoke grenade: the beige toon cloud fills quickly
 - [ ] Jetpack smoke under the feet (seen by another player); zipline sparks and sound; ladder grab clicks
-- [ ] Tank shot: barrel slides back, hull rocks, muzzle blast
+- [ ] Tank shot: barrel slides back, hull rocks, muzzle blast; a shell bursting right in front does not hurt the tank
+- [x] Zipline from the bottom post rides up (PIE script on the host, 0.8.0); [ ] from a client
 - [ ] Hit: red arc toward the shooter, fringe, tint; low health greys the view
 - [x] Doors open away from you from both sides and fill their opening (PIE script, 0.5.0)
 - [x] Vent hatch swings on a side hinge like a small door, away from you (PIE screenshot, 0.6.0)
@@ -126,12 +143,28 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] San Lazaro by hand: climb the terraces by their stairs, hang and shimmy along a ledge band, cross both bridges
   and the walkway, enter the cave through the trench, take the tunnel to the basement, the tank out of the garage
 
+## Network
+- [x] Client shots accepted by the server checks at 100 ms lag, standing, moving and crouched (PIE listen server +
+  client script, 0.8.0); [ ] a mounted gun and the tank aim smoothly from a client
+
 ## AI
 - [x] Guards in range hold their ground, face you and shoot; nobody backs away (PIE script, gym AI pen, 0.7.0)
 - [x] A step right behind an unaware guard is heard: it turns and engages (PIE script, 0.7.0)
 - [ ] Guards beyond 15 m walk closer before shooting
+- [x] A guard glimpsing you barks (subtitle), turns, then walks over to exactly where it saw you, not where you went
+  (PIE script, 0.8.0); [ ] the subtitle only within 15 m
+- [x] A guard in view takes cover behind a crate nearby, ducks between bursts and stands to shoot (PIE script, 0.8.0)
+- [ ] A body is called in once: the finder radios, responders come to the body (not to your position)
+- [ ] After a search, guards walk briskly with the gun ready and look around at each patrol point for a minute
+- [ ] A thrown / dropped pistol is picked up by a guard; spawned loot is left alone
+- [ ] A darted guard is woken by a colleague who sees it
+- [x] The unarmed VIP in danger runs away (PIE script, 0.8.0); [ ] to a placed safe spot, two guards follow; no punches from afar
+- [ ] An open patrol route is walked back and forth; an interrupted patrol resumes its point
 - [x] Attack chain: an armed player in view gets shot, damage arrives slowly (~9 HP/s), guard holds the aim pose (PIE script, 0.5.0)
 - [x] Attack chain on San Lazaro: shot after 6-9 s in a guard's view, ~9 HP/s (PIE script, 0.6.0)
+- [x] Attack chain in the gym, 0.8.0 AI: white bark at 0.2 s, red at 2 s at 9 m armed, shot within seconds; no bark when
+  the target dies (PIE script, 0.8.0)
+- [x] Bark subtitles bottom centre, speaker in its alert colour, two lines (PIE screenshot, 0.8.0)
 - [x] A searching guard draws its pistol, then holds it ready each time it stops to look around (PIE log and
   screenshot, 0.6.1); [ ] the hit reaction on a shot guard; [ ] both seen from a client
 - [ ] A gunshot 15 m away behind a wall is not heard; a bullet impact draws the nearest guard to the impact

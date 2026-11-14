@@ -17,6 +17,8 @@ namespace HitmenTags
 {
 	/** Never vaulted, climbed or hung from (barrels, hack panels, turrets, cameras, mounted guns...). */
 	inline const FName NoTraversal(TEXT("HitmenNoTraversal"));
+	/** Heightfield ground tiles (one material): their surface is read from the slope, like their colour. */
+	inline const FName Terrain(TEXT("HitmenTerrain"));
 }
 
 namespace HitmenStencil

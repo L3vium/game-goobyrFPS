@@ -35,7 +35,8 @@ AHitmenTracer::AHitmenTracer()
 	}
 }
 
-void AHitmenTracer::SpawnTracer(UWorld* World, const FVector& Start, const FVector& End, UMaterialInterface* Material, const FLinearColor& Color)
+void AHitmenTracer::SpawnTracer(UWorld* World, const FVector& Start, const FVector& End, UMaterialInterface* Material, const FLinearColor& Color,
+	const FHitmenTracerStyle& Style)
 {
 	if (!World || World->GetNetMode() == NM_DedicatedServer || FVector::DistSquared(Start, End) < 100.f)
 	{
@@ -47,12 +48,13 @@ void AHitmenTracer::SpawnTracer(UWorld* World, const FVector& Start, const FVect
 	{
 		Tracer->Start = Start;
 		Tracer->End = End;
+		Tracer->Style = Style;
 		if (Material)
 		{
-			UMaterialInstanceDynamic* Instance = UMaterialInstanceDynamic::Create(Material, Tracer);
-			Instance->SetVectorParameterValue(ColorParameter, Color);
-			Instance->SetScalarParameterValue(OpacityParameter, 1.f);
-			Tracer->Mesh->SetMaterial(0, Instance);
+			Tracer->Instance = UMaterialInstanceDynamic::Create(Material, Tracer);
+			Tracer->Instance->SetVectorParameterValue(ColorParameter, Color);
+			Tracer->Instance->SetScalarParameterValue(OpacityParameter, 1.f);
+			Tracer->Mesh->SetMaterial(0, Tracer->Instance);
 		}
 		Tracer->SetLifeSpan(2.f);
 		Tracer->Tick(0.f);
@@ -64,9 +66,28 @@ void AHitmenTracer::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const FVector Direction = (End - Start).GetSafeNormal();
 	const float Total = FVector::Dist(Start, End);
-	Travelled += Speed * DeltaSeconds;
+	if (Style.Speed <= 0.f)
+	{
+		// Trail: the whole line at once, thinning and fading out.
+		Age += DeltaSeconds;
+		const float Life = FMath::Clamp(1.f - Age / FMath::Max(Style.FadeTime, 0.01f), 0.f, 1.f);
+		if (Life <= 0.f)
+		{
+			Destroy();
+			return;
+		}
+		if (Instance)
+		{
+			Instance->SetScalarParameterValue(OpacityParameter, Life);
+		}
+		const float Width = Style.Thickness * (0.4f + 0.6f * Life);
+		SetActorLocationAndRotation(Start + Direction * Total * 0.5f, FRotationMatrix::MakeFromZ(Direction).Rotator());
+		SetActorScale3D(FVector(Width / 100.f, Width / 100.f, FMath::Max(Total, 1.f) / 100.f));
+		return;
+	}
+	Travelled += Style.Speed * DeltaSeconds;
 	const float Head = FMath::Min(Travelled, Total);
-	const float Tail = FMath::Clamp(Travelled - Length, 0.f, Total);
+	const float Tail = FMath::Clamp(Travelled - Style.Length, 0.f, Total);
 	if (Tail >= Total)
 	{
 		Destroy();
@@ -75,7 +96,7 @@ void AHitmenTracer::Tick(float DeltaSeconds)
 	// The basic cylinder is 100 cm tall along Z: lay it along the shot, from tail to head.
 	const float Segment = FMath::Max(Head - Tail, 1.f);
 	SetActorLocationAndRotation(Start + Direction * (Tail + Segment * 0.5f), FRotationMatrix::MakeFromZ(Direction).Rotator());
-	SetActorScale3D(FVector(Thickness / 100.f, Thickness / 100.f, Segment / 100.f));
+	SetActorScale3D(FVector(Style.Thickness / 100.f, Style.Thickness / 100.f, Segment / 100.f));
 }
 
 // ---------------------------------------------------------------------------------------------

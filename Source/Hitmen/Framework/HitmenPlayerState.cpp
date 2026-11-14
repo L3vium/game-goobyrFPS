@@ -23,7 +23,8 @@ void AHitmenPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AHitmenPlayerState, bIsAlive);
 	DOREPLIFETIME(AHitmenPlayerState, bIsReady);
 	DOREPLIFETIME(AHitmenPlayerState, Kills);
-	DOREPLIFETIME(AHitmenPlayerState, CheatFlags);
+	// Read by the server (damage, ammo, AI) and the owner (fly, the cheat panel) only.
+	DOREPLIFETIME_CONDITION(AHitmenPlayerState, CheatFlags, COND_OwnerOnly);
 }
 
 void AHitmenPlayerState::SetCheat(EHitmenCheat Cheat, bool bEnabled)

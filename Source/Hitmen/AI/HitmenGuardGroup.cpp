@@ -78,7 +78,8 @@ void AHitmenGuardGroup::HandleMemberAlert(EHitmenAlertState OldState, EHitmenAle
 	{
 		return;
 	}
-	// Find who raised it, then pull the others to the same place.
+	// Find who raised it, then pull the others to what it knows (never the target's real position). A footstep or a
+	// distraction stays that guard's business: only real threats are shared.
 	const AHitmenNPC* Source = nullptr;
 	for (const AHitmenNPC* Member : Members)
 	{
@@ -88,12 +89,12 @@ void AHitmenGuardGroup::HandleMemberAlert(EHitmenAlertState OldState, EHitmenAle
 			break;
 		}
 	}
-	if (!Source)
+	if (!Source || (NewState == EHitmenAlertState::Investigating && !Source->GetAlert()->IsThreatInvestigation()))
 	{
 		return;
 	}
 	TGuardValue<bool> Guard(bSharing, true);
-	const FVector Where = Source->GetAlert()->GetTarget() ? Source->GetAlert()->GetTarget()->GetActorLocation() : Source->GetActorLocation();
+	const FVector Where = Source->GetAlert()->GetCallLocation();
 	for (AHitmenNPC* Member : Members)
 	{
 		if (Member && Member != Source && !Member->IsDead() && Member->GetAlert())

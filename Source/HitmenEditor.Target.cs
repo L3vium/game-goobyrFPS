@@ -12,5 +12,6 @@ public class HitmenEditorTarget : TargetRules
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
 		ExtraModuleNames.Add("Hitmen");
 		ExtraModuleNames.Add("HitmenEditor");
+		ExtraModuleNames.Add("HitmenUncooked");
 	}
 }

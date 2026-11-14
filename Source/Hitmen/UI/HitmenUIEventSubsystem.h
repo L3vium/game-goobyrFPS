@@ -125,6 +125,19 @@ struct FHitmenSpectatorView
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Spectator") FText PlayerName;
 };
 
+/** A line an NPC said near the local player (subtitles). */
+USTRUCT(BlueprintType)
+struct FHitmenBarkView
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FText Speaker;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FText Line;
+	/** The speaker's alert colour. */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") FLinearColor Color = FLinearColor::White;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Duration = 3.f;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenPromptChanged, const FText&, Prompt, bool, bVisible);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenHitMarker, bool, bKill, bool, bHeadshot);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenToggle, bool, bOpen);
@@ -141,6 +154,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenVitals, const FHitmenHUDVit
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenSpectatorViews, const TArray<FHitmenSpectatorView>&, Views);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenWorldHint, const FHitmenWorldHint&, Hint);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenTextChanged, const FText&, Text);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenBark, const FHitmenBarkView&, Bark);
 
 /**
  * Local-player event hub. Gameplay code calls the Broadcast* helpers; widgets bind in
@@ -264,6 +278,12 @@ public:
 	/** What Space does in front of the player ("Vault", "Climb"...), empty = nothing. */
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
 	FOnHitmenTextChanged OnTraversalHintChanged;
+
+	/** An NPC nearby said something (subtitles bottom centre). */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenBark OnBark;
+
+	void PushBark(const FHitmenBarkView& View) { OnBark.Broadcast(View); }
 
 	/** Scoped aiming (sniper overlay). */
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")

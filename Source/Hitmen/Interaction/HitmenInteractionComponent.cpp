@@ -216,6 +216,19 @@ bool UHitmenInteractionComponent::TryInteract()
 	return false;
 }
 
+float UHitmenInteractionComponent::GetDistanceToTarget(const FVector& From, const AActor* Target)
+{
+	float Best = TNumericLimits<float>::Max();
+	Target->ForEachComponent<UPrimitiveComponent>(false, [&](const UPrimitiveComponent* Primitive)
+	{
+		if (Primitive->IsCollisionEnabled() && Primitive->IsRegistered())
+		{
+			Best = FMath::Min(Best, FMath::Sqrt(Primitive->Bounds.GetBox().ComputeSquaredDistanceToPoint(From)));
+		}
+	});
+	return Best < TNumericLimits<float>::Max() ? Best : FVector::Dist(From, Target->GetActorLocation());
+}
+
 void UHitmenInteractionComponent::Server_Interact_Implementation(AActor* Target)
 {
 	APawn* Pawn = Cast<APawn>(GetOwner());
@@ -223,7 +236,8 @@ void UHitmenInteractionComponent::Server_Interact_Implementation(AActor* Target)
 	{
 		return;
 	}
-	if (FVector::Dist(Pawn->GetActorLocation(), Target->GetActorLocation()) > TraceDistance + ServerDistanceTolerance + Target->GetSimpleCollisionRadius())
+	// Range to the nearest colliding part of the target, not its origin (a zipline's origin is its start post).
+	if (GetDistanceToTarget(Pawn->GetActorLocation(), Target) > TraceDistance + ServerDistanceTolerance)
 	{
 		return;
 	}
@@ -306,6 +320,13 @@ void UHitmenInteractionComponent::ReleaseInteract()
 
 void UHitmenInteractionComponent::Server_BeginHold_Implementation(AActor* Target)
 {
+	// Only a hold on something in reach starts the server clock.
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	if (!Pawn || !Target || GetDistanceToTarget(Pawn->GetActorLocation(), Target) > TraceDistance + ServerDistanceTolerance)
+	{
+		ServerHoldTarget.Reset();
+		return;
+	}
 	ServerHoldTarget = Target;
 	ServerHoldStartTime = GetWorld()->GetTimeSeconds();
 }

@@ -1,4 +1,4 @@
-// Hitmen — editor tools exposed to Python (Tools/Editor/*.py): behavior tree / blackboard builder
+// Hitmen — editor tools exposed to Python (Tools/Editor/*.py): behavior tree / blackboard builder, QA helpers
 
 #pragma once
 
@@ -22,4 +22,18 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
 	static bool BuildNPCBehaviorTrees(const FString& Folder);
+
+	/**
+	 * QA (PIE recordings from scripts): keeps the editor ticking at full rate while another window has the focus
+	 * ("Use Less CPU when in Background" off for this editor session only; nothing is saved to the config).
+	 */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
+	static void SetBackgroundThrottling(bool bThrottle);
+
+	/**
+	 * QA: the next PIE session runs as a listen server with NumPlayers - 1 clients in one process (1 = standalone).
+	 * Editor session only (the play settings are not saved).
+	 */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
+	static void SetPIENetMode(int32 NumPlayers);
 };

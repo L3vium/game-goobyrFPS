@@ -10,6 +10,7 @@
 class UAnimBlueprint;
 class UHitmenAnimSet;
 class UAnimSequenceBase;
+class UAnimSequence;
 
 UCLASS()
 class HITMENEDITOR_API UHitmenAnimGraphTools : public UBlueprintFunctionLibrary
@@ -53,4 +54,12 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
 	static bool BuildPoseSlotGraph(UAnimBlueprint* AnimBlueprint, UAnimSequenceBase* PreviewPose, FName PoseVariable, bool bCompile = true);
+
+	/**
+	 * Inserts the Hitmen Body IK node (procedural crouch / slide pose, hand IK, fists) right before the Output Pose,
+	 * after the montage slot, with the local / component space conversions. Idempotent: an existing node only gets
+	 * its fist pose updated. Returns true when the node is in the graph afterwards.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
+	static bool AddBodyIKNode(UAnimBlueprint* AnimBlueprint, UAnimSequence* FistPose, float FistPoseTime = 0.3f, bool bCompile = true);
 };

@@ -88,6 +88,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	bool IsDropped() const { return WeaponState == EHitmenWeaponState::Dropped; }
 
+	/** Server: lying around after someone carried it (thrown, dropped, a dead guard's): guards pick it up. Spawned
+	 *  loot is not evidence. */
+	bool IsEvidence() const { return bEvidence && IsDropped() && !bHovering; }
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	EHitmenWeaponState GetWeaponState() const { return WeaponState; }
 
@@ -245,6 +249,14 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void Server_Fire(FVector_NetQuantize Origin, FVector_NetQuantizeNormal Direction, int32 Seed, float Charge);
 
+	/** Server_Fire checks (anti-cheat, generous for lag): the shot starts this close to the shooter's eye... */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Network", meta=(ClampMin="0", Units="cm"))
+	float MaxFireOriginError = 150.f;
+
+	/** ...and goes this close to where the server sees the shooter look (spread, recoil and lag included). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Network", meta=(ClampMin="0", ClampMax="180", Units="deg"))
+	float MaxFireAngleError = 30.f;
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_FireEffects(FVector_NetQuantize Origin, const TArray<FVector_NetQuantize>& Impacts);
 
@@ -326,7 +338,15 @@ protected:
 	TObjectPtr<class UPointLightComponent> MuzzleLight;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="s"))
-	float MuzzleFlashTime = 0.05f;
+	float MuzzleFlashTime = 0.035f;
+
+	/** The muzzle light flashes at most this often: fast automatic fire never reads as a light left on. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="s"))
+	float MuzzleLightMinInterval = 0.09f;
+
+	float LastMuzzleLightTime = -100.f;
+
+	bool bEvidence = false;
 
 	float MuzzleLightUntil = 0.f;
 

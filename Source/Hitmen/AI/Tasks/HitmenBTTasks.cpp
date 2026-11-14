@@ -6,6 +6,8 @@
 #include "AI/HitmenAISubsystem.h"
 #include "AI/HitmenPatrolRoute.h"
 #include "AI/HitmenGuardGroup.h"
+#include "AI/HitmenVIPSafeSpot.h"
+#include "EngineUtils.h"
 #include "Characters/HitmenNPC.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Inventory/HitmenInventoryComponent.h"
@@ -115,7 +117,11 @@ EBTNodeResult::Type UBTTask_HitmenFindPatrolPoint::ExecuteTask(UBehaviorTreeComp
 	const AHitmenPatrolRoute* Route = NPC->GetBehavior() == EHitmenNPCBehavior::Patrol ? NPC->GetPatrolRoute() : nullptr;
 	if (Route && Route->GetPointCount() > 0)
 	{
-		const int32 Index = NPC->AdvancePatrolIndex(Route->GetPointCount());
+		// An interrupted walk (an alert, a chase) resumes the point it was heading to.
+		const int32 Current = NPC->GetPatrolIndex();
+		const bool bResume = Current != INDEX_NONE && Current < Route->GetPointCount()
+			&& FVector::Dist2D(NPC->GetActorLocation(), Route->GetPointWorldLocation(Current)) > ResumeDistance && NPC->TryResumePatrol();
+		const int32 Index = bResume ? Current : NPC->AdvancePatrolIndex(Route->GetPointCount(), Route->IsClosedLoop());
 		const FHitmenPatrolPoint* Point = Route->GetPoint(Index);
 		BB->SetValueAsVector(HitmenBBKeys::MoveLocation, Route->GetPointWorldLocation(Index));
 		BB->SetValueAsFloat(HitmenBBKeys::WaitTime, Point ? Point->WaitTime : DefaultWaitTime);
@@ -216,6 +222,201 @@ void UBTTask_HitmenShoot::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 	}
 }
 
+void UBTTask_HitmenShoot::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
+{
+	// Never left crouched behind cover once the shooting stops.
+	if (AHitmenNPC* NPC = Cast<AHitmenNPC>(OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr); NPC && NPC->bIsCrouched)
+	{
+		NPC->UnCrouch();
+	}
+	Super::OnTaskFinished(OwnerComp, NodeMemory, TaskResult);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Cover
+// ---------------------------------------------------------------------------------------------
+
+UBTTask_HitmenFindCover::UBTTask_HitmenFindCover()
+{
+	NodeName = TEXT("Find Cover");
+}
+
+bool UBTTask_HitmenFindCover::IsCoverFrom(const UWorld* World, const FVector& ThreatEye, const FVector& Floor, const AActor* Threat, const AActor* Self) const
+{
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenCover), false, Threat);
+	Params.AddIgnoredActor(Self);
+	const bool bLowHidden = World->LineTraceTestByChannel(ThreatEye, Floor + FVector(0.f, 0.f, CrouchedHeight), ECC_Visibility, Params);
+	const bool bHighClear = !World->LineTraceTestByChannel(ThreatEye, Floor + FVector(0.f, 0.f, StandingHeight), ECC_Visibility, Params);
+	return bLowHidden && bHighClear;
+}
+
+EBTNodeResult::Type UBTTask_HitmenFindCover::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+	AHitmenNPC* NPC = Cast<AHitmenNPC>(OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr);
+	const AActor* Target = BB ? Cast<AActor>(BB->GetValueAsObject(HitmenBBKeys::TargetActor)) : nullptr;
+	UNavigationSystemV1* Nav = NPC ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(NPC->GetWorld()) : nullptr;
+	if (!NPC || !Target || !Nav || !NPC->GetWeapon() || NPC->IsSniper() || NPC->HoldsPosition() || !BB->GetValueAsBool(HitmenBBKeys::TargetVisible))
+	{
+		return EBTNodeResult::Failed;
+	}
+	FVector ThreatEye;
+	FRotator ThreatView;
+	Target->GetActorEyesViewPoint(ThreatEye, ThreatView);
+	const float HalfHeight = NPC->GetCapsuleComponent() ? NPC->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.f;
+	// Already behind good cover: stay.
+	if (NPC->HasCover())
+	{
+		const FVector CoverFloor = NPC->GetCoverLocation();
+		if (IsCoverFrom(NPC->GetWorld(), ThreatEye, CoverFloor, Target, NPC))
+		{
+			return EBTNodeResult::Failed;
+		}
+		NPC->ClearCover();
+	}
+	const float Range = NPC->GetEffectiveShootingRange();
+	const FVector Origin = NPC->GetActorLocation();
+	float BestScore = TNumericLimits<float>::Max();
+	FVector Best = FVector::ZeroVector;
+	const FVector Feet = Origin - FVector(0.f, 0.f, HalfHeight);
+	FCollisionQueryParams RayParams(SCENE_QUERY_STAT(HitmenCoverRay), false, Target);
+	RayParams.AddIgnoredActor(NPC);
+	for (int32 Index = 0; Index < CandidateCount; ++Index)
+	{
+		// Rays from the threat's eye at crouch height around the guard: what they hit is an obstacle, the spot just
+		// behind it (away from the threat) is a cover candidate. Random reachable points only when nothing was hit.
+		const FVector2D Disk = FMath::RandPointInCircle(SearchRadius);
+		const FVector Probe = Feet + FVector(Disk.X, Disk.Y, CrouchedHeight);
+		FHitResult Hit;
+		FNavLocation Candidate;
+		if (NPC->GetWorld()->LineTraceSingleByChannel(Hit, ThreatEye, Probe, ECC_Visibility, RayParams)
+			&& FVector::Dist2D(Hit.ImpactPoint, Feet) <= SearchRadius)
+		{
+			const FVector Behind = Hit.ImpactPoint + (Probe - ThreatEye).GetSafeNormal2D() * CoverStandOff;
+			if (!Nav->ProjectPointToNavigation(Behind, Candidate, FVector(60.f, 60.f, 250.f)))
+			{
+				continue;
+			}
+		}
+		else if (!Nav->GetRandomReachablePointInRadius(Origin, SearchRadius, Candidate))
+		{
+			continue;
+		}
+		// Nav points sit on the floor (a few cm above it).
+		const FVector Floor = Candidate.Location;
+		const float TargetDistance = FVector::Dist(Floor, Target->GetActorLocation());
+		if (TargetDistance > Range || TargetDistance < MinTargetDistance || !IsCoverFrom(NPC->GetWorld(), ThreatEye, Floor, Target, NPC))
+		{
+			continue;
+		}
+		const float Score = FVector::Dist(Feet, Floor);
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			Best = Floor;
+		}
+	}
+	if (BestScore == TNumericLimits<float>::Max())
+	{
+		return EBTNodeResult::Failed;
+	}
+	NPC->SetCoverLocation(Best);
+	BB->SetValueAsVector(HitmenBBKeys::MoveLocation, Best);
+	return EBTNodeResult::Succeeded;
+}
+
+// ---------------------------------------------------------------------------------------------
+// VIP evacuation
+// ---------------------------------------------------------------------------------------------
+
+UBTTask_HitmenFindSafeSpot::UBTTask_HitmenFindSafeSpot()
+{
+	NodeName = TEXT("Find Safe Spot");
+}
+
+EBTNodeResult::Type UBTTask_HitmenFindSafeSpot::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+	AHitmenNPC* NPC = Cast<AHitmenNPC>(OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr);
+	UHitmenAlertComponent* Alert = NPC ? NPC->GetAlert() : nullptr;
+	UWorld* World = NPC ? NPC->GetWorld() : nullptr;
+	if (!BB || !NPC || !Alert || !World)
+	{
+		return EBTNodeResult::Failed;
+	}
+	AActor* Threat = Alert->GetTarget();
+	const FVector ThreatLocation = Threat ? Threat->GetActorLocation() : Alert->GetCallLocation();
+	const FVector Origin = NPC->GetActorLocation();
+	UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+
+	// Placed safe spots first: the nearest one, not toward the threat.
+	float BestScore = TNumericLimits<float>::Max();
+	FVector Best = Origin;
+	for (TActorIterator<AHitmenVIPSafeSpot> It(World); It; ++It)
+	{
+		FNavLocation OnNav;
+		const FVector Spot = Nav && Nav->ProjectPointToNavigation(It->GetActorLocation(), OnNav, FVector(200.f, 200.f, 300.f)) ? OnNav.Location : It->GetActorLocation();
+		const float Score = FVector::Dist(Origin, Spot) - 0.5f * FVector::Dist(ThreatLocation, Spot);
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			Best = Spot;
+		}
+	}
+	// None placed: far from the threat and out of its sight.
+	if (BestScore == TNumericLimits<float>::Max() && Nav)
+	{
+		const FVector ThreatEye = ThreatLocation + FVector(0.f, 0.f, 70.f);
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenFlee), false, NPC);
+		if (Threat)
+		{
+			Params.AddIgnoredActor(Threat);
+		}
+		float BestFlee = -1.f;
+		for (int32 Index = 0; Index < FleeCandidateCount; ++Index)
+		{
+			FNavLocation Candidate;
+			if (!Nav->GetRandomReachablePointInRadius(Origin, FleeRadius, Candidate))
+			{
+				continue;
+			}
+			const bool bHidden = World->LineTraceTestByChannel(ThreatEye, Candidate.Location + FVector(0.f, 0.f, 100.f), ECC_Visibility, Params);
+			const float Score = FVector::Dist(ThreatLocation, Candidate.Location) + (bHidden ? FleeRadius : 0.f);
+			if (Score > BestFlee)
+			{
+				BestFlee = Score;
+				Best = Candidate.Location;
+			}
+		}
+	}
+	BB->SetValueAsVector(HitmenBBKeys::MoveLocation, Best);
+
+	// Bodyguards: the nearest armed guards head to the spot (they search around it).
+	const float Now = World->GetTimeSeconds();
+	if (EscortCount > 0 && Now - NPC->LastEscortCallTime >= EscortCallInterval)
+	{
+		NPC->LastEscortCallTime = Now;
+		TArray<TPair<float, AHitmenNPC*>> Guards;
+		for (TActorIterator<AHitmenNPC> It(World); It; ++It)
+		{
+			AHitmenNPC* Guard = *It;
+			UHitmenAlertComponent* GuardAlert = Guard ? Guard->GetAlert() : nullptr;
+			const float Distance = Guard ? FVector::Dist(Guard->GetActorLocation(), Origin) : 0.f;
+			if (Guard && Guard != NPC && !Guard->IsDead() && Guard->GetWeapon() && GuardAlert && Distance <= EscortRadius
+				&& !(GuardAlert->GetAlertState() == EHitmenAlertState::Combat && GuardAlert->IsTargetVisible()))
+			{
+				Guards.Emplace(Distance, Guard);
+			}
+		}
+		Guards.Sort([](const TPair<float, AHitmenNPC*>& A, const TPair<float, AHitmenNPC*>& B) { return A.Key < B.Key; });
+		for (int32 Index = 0; Index < FMath::Min(EscortCount, Guards.Num()); ++Index)
+		{
+			Guards[Index].Value->GetAlert()->ReceiveReinforcementCall(Best, Threat);
+		}
+	}
+	return EBTNodeResult::Succeeded;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Flank
 // ---------------------------------------------------------------------------------------------
@@ -251,7 +452,9 @@ EBTNodeResult::Type UBTTask_HitmenFindFlankPosition::ExecuteTask(UBehaviorTreeCo
 		return EBTNodeResult::Failed;
 	}
 	const float Wanted = FMath::Min(Distance - 100.f, FMath::Min(Range, 100000.f) * ApproachRangeFraction);
-	BB->SetValueAsVector(HitmenBBKeys::MoveLocation, AI->GetFlankLocation(Pawn, Target, FMath::Max(MinApproachDistance, Wanted)));
+	// Unarmed: the reach is tiny, close in all the way.
+	const float MinDistance = FMath::Min(MinApproachDistance, Range * ApproachRangeFraction);
+	BB->SetValueAsVector(HitmenBBKeys::MoveLocation, AI->GetFlankLocation(Pawn, Target, FMath::Max(MinDistance, Wanted)));
 	return EBTNodeResult::Succeeded;
 }
 
@@ -433,7 +636,7 @@ void UBTTask_HitmenCallReinforcements::TickTask(UBehaviorTreeComponent& OwnerCom
 		Alert->SetCallingReinforcements(false);
 		if (UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(Alert))
 		{
-			AI->CallReinforcements(Alert->GetOwner(), Alert->GetLastKnownLocation(), Alert->GetTarget());
+			AI->CallReinforcements(Alert->GetOwner(), Alert->GetCallLocation(), Alert->GetTarget());
 		}
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 	}

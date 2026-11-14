@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
+#include "Characters/HitmenAnimNodes.h"
 #include "HitmenFirstPersonAnimInstance.generated.h"
 
 class UAnimSequenceBase;
@@ -21,6 +22,9 @@ class HITMEN_API UHitmenFirstPersonAnimInstance : public UAnimInstance
 public:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
+	/** Hands on a ledge while climbing, guard and jabs while punching, closed fists (from the player). */
+	const FHitmenBodyIKState& GetBodyIKState() const { return BodyIK; }
+
 protected:
 	/** Shown when the weapon has no first-person pose of its own (editor preview too). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Anim")
@@ -29,4 +33,6 @@ protected:
 	/** Pose currently held (graph binds the sequence player to it). */
 	UPROPERTY(Transient, BlueprintReadOnly, Category="Hitmen|Anim")
 	TObjectPtr<UAnimSequenceBase> HoldPose;
+
+	FHitmenBodyIKState BodyIK;
 };

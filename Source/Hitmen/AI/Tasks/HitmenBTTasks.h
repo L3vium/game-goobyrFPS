@@ -25,6 +25,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0"))
 	float DefaultWaitTime = 4.f;
+
+	/** Farther than this from the point it was heading to, an interrupted patroller resumes that point. */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
+	float ResumeDistance = 200.f;
 };
 
 /** Turns a stationary NPC back to the direction it was placed facing. */
@@ -57,6 +61,7 @@ public:
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 	virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
 	virtual uint16 GetInstanceMemorySize() const override { return sizeof(float); }
+	virtual void OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult) override;
 
 protected:
 	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0"))
@@ -169,6 +174,77 @@ protected:
 	/** Random spread so several searchers do not walk the same pattern. */
 	UPROPERTY(EditAnywhere, Category="Hitmen|Search|Weights", meta=(ClampMin="0"))
 	float RandomWeight = 0.25f;
+};
+
+/**
+ * Cover (Hitman): a reachable point near the guard, inside its shooting range, that hides a crouched guard from the
+ * target but lets it shoot standing. Fails (the guard stays) when it is already in good cover or none is found.
+ */
+UCLASS(meta=(DisplayName="Hitmen Find Cover"))
+class HITMEN_API UBTTask_HitmenFindCover : public UBTTaskNode
+{
+	GENERATED_BODY()
+
+public:
+	UBTTask_HitmenFindCover();
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+
+protected:
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
+	float SearchRadius = 800.f;
+
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="1", ClampMax="64"))
+	int32 CandidateCount = 16;
+
+	/** Above the floor: must be hidden from the target (a crouched guard's head). */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
+	float CrouchedHeight = 105.f;
+
+	/** Above the floor: must see the target (a standing guard's eyes). */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
+	float StandingHeight = 165.f;
+
+	/** Never take cover closer than this to the target. */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
+	float MinTargetDistance = 400.f;
+
+	/** A ray from the target that hits an obstacle near the guard gives a candidate this far behind the hit. */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
+	float CoverStandOff = 70.f;
+
+	bool IsCoverFrom(const UWorld* World, const FVector& ThreatEye, const FVector& Floor, const AActor* Threat, const AActor* Self) const;
+};
+
+/**
+ * VIP evacuation (Hitman): the nearest AHitmenVIPSafeSpot away from the threat, or (none placed) a reachable point far
+ * from the threat and out of its sight, into MoveLocation. The nearest armed guards are sent to the spot as escorts.
+ */
+UCLASS(meta=(DisplayName="Hitmen Find Safe Spot"))
+class HITMEN_API UBTTask_HitmenFindSafeSpot : public UBTTaskNode
+{
+	GENERATED_BODY()
+
+public:
+	UBTTask_HitmenFindSafeSpot();
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+
+protected:
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
+	float FleeRadius = 2500.f;
+
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="1", ClampMax="64"))
+	int32 FleeCandidateCount = 16;
+
+	/** Guards sent along with the VIP. */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0"))
+	int32 EscortCount = 2;
+
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
+	float EscortRadius = 3000.f;
+
+	/** Escorts are not called again before this. */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="s"))
+	float EscortCallInterval = 20.f;
 };
 
 /** Channels a reinforcement call; interrupted if the NPC takes damage. */

@@ -85,4 +85,45 @@ void UHitmenAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bIsCarryingBody = Carry && Carry->IsCarrying();
 	bIsStunned = HitmenCharacter->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Stunned);
 	bIsAsleep = HitmenCharacter->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Asleep);
+	UpdateProceduralLayer(DeltaSeconds);
+}
+
+void UHitmenAnimInstance::UpdateProceduralLayer(float DeltaSeconds)
+{
+	// Crouch / slide pose (everyone sees it, your own shadow too).
+	const bool bProcedural = bProceduralCrouch && !(AnimSet && AnimSet->CrouchIdle) && !bIsDead;
+	CrouchBlend = FMath::FInterpTo(CrouchBlend, bProcedural && (bIsCrouching || bIsSliding) ? 1.f : 0.f, DeltaSeconds, PoseBlendSpeed);
+	SlideBlend = FMath::FInterpTo(SlideBlend, bProcedural && bIsSliding ? 1.f : 0.f, DeltaSeconds, PoseBlendSpeed);
+
+	// Ledge climbs: the hands reach the ledge top, push while the body rises, let go; the legs tuck mid-climb.
+	if (bIsMantling && !bWasMantling)
+	{
+		MantleElapsed = 0.f;
+		bLedgeValid = HitmenCharacter->FindLedgeInFront(LedgePoint, LedgeNormal);
+	}
+	bWasMantling = bIsMantling;
+	float Tuck = 0.f;
+	float Reach = 0.f;
+	if (bIsMantling)
+	{
+		MantleElapsed += DeltaSeconds;
+		const float Owned = HitmenMovement->GetMantleAlpha();
+		const float Alpha = Owned > 0.f ? Owned : FMath::Clamp(MantleElapsed / 0.5f, 0.f, 1.f);
+		Tuck = FMath::Sin(Alpha * PI) * MantleTuck;
+		Reach = bLedgeValid ? FMath::SmoothStep(0.f, 0.15f, Alpha) * (1.f - FMath::SmoothStep(0.7f, 0.95f, Alpha)) : 0.f;
+	}
+
+	BodyIK.CrouchAlpha = FMath::Max(CrouchBlend, Tuck);
+	BodyIK.PelvisDrop = FMath::Lerp(CrouchPelvisDrop, SlidePelvisDrop, SlideBlend);
+	BodyIK.SpineLean = FMath::Lerp(CrouchSpineLean, SlideSpineLean, SlideBlend);
+	BodyIK.FeetForward = SlideFeetForward * SlideBlend;
+	const FVector Along = FVector::CrossProduct(FVector::UpVector, LedgeNormal).GetSafeNormal();
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		const float Sign = Side == 0 ? -1.f : 1.f;
+		BodyIK.HandAlpha[Side] = Reach;
+		BodyIK.HandTarget[Side] = LedgePoint - LedgeNormal * 8.f + Along * (LedgeHandSpacing * Sign) + FVector::UpVector * 3.f;
+		BodyIK.ElbowPole[Side] = LedgeNormal * 40.f + Along * (30.f * Sign) - FVector::UpVector * 20.f;
+	}
+	BodyIK.FistAlpha = 0.f;
 }

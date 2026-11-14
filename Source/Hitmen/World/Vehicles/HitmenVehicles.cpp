@@ -18,6 +18,7 @@
 #include "GameFramework/FloatingPawnMovement.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/PlayerState.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -92,6 +93,11 @@ void AHitmenVehiclePawn::Interact_Implementation(AActor* Interactor)
 
 int32 AHitmenVehiclePawn::GetHitmenTeamId_Implementation() const
 {
+	// While driven the vehicle owns the player state (the stowed driver lost it): read the team there.
+	if (const APlayerState* PS = GetPlayerState())
+	{
+		return UHitmenTeamLibrary::GetTeamId(PS);
+	}
 	return Driver ? UHitmenTeamLibrary::GetTeamId(Driver) : HitmenTeams::Neutral;
 }
 
@@ -210,6 +216,18 @@ void AHitmenVehiclePawn::Input_Look(const FVector2D& Axis)
 	AddControllerPitchInput(-Axis.Y);
 }
 
+bool AHitmenVehiclePawn::ShouldSendAim(const FRotator& Aim, bool bForce)
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (!bForce && (Now - LastAimSendTime < AimSendInterval || Aim.Equals(LastSentAim, 0.1f)))
+	{
+		return false;
+	}
+	LastSentAim = Aim;
+	LastAimSendTime = Now;
+	return true;
+}
+
 void AHitmenVehiclePawn::Input_Interact()
 {
 	Server_Exit();
@@ -248,6 +266,11 @@ float AHitmenVehiclePawn::TakeDamage(float DamageAmount, FDamageEvent const& Dam
 		return 0.f;
 	}
 	AActor* InstigatorActor = EventInstigator ? EventInstigator->GetPawn() : DamageCauser;
+	// A vehicle never hurts itself or its driver with its own shots (a shell bursting in front of the tank).
+	if (InstigatorActor == this || (Driver && InstigatorActor == Driver) || (DamageCauser && DamageCauser->GetInstigator() == this))
+	{
+		return 0.f;
+	}
 	if (Driver)
 	{
 		const AHitmenGameModeBase* GM = GetWorld()->GetAuthGameMode<AHitmenGameModeBase>();
@@ -355,10 +378,13 @@ AHitmenMountedGun::AHitmenMountedGun()
 	MuzzleLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("MuzzleLight"));
 	MuzzleLight->SetupAttachment(GunPivot);
 	MuzzleLight->SetRelativeLocation(FVector(150.f, 0.f, 0.f));
+	MuzzleLight->SetIntensityUnits(ELightUnits::Candelas);
 	MuzzleLight->SetIntensity(0.f);
 	MuzzleLight->SetAttenuationRadius(500.f);
 	MuzzleLight->SetLightColor(FLinearColor(1.f, 0.7f, 0.35f));
 	MuzzleLight->SetCastShadows(false);
+	MuzzleLight->SetIndirectLightingIntensity(0.f);
+	MuzzleLight->SetVolumetricScatteringIntensity(0.f);
 	Shield->SetCollisionResponseToChannel(ECC_GameTraceChannel3, ECR_Block);
 
 	// The gunner stands exposed behind the gun; the gun itself shrugs off most bullets.
@@ -402,7 +428,10 @@ void AHitmenMountedGun::Input_Look(const FVector2D& Axis)
 {
 	AimRotation.Yaw = FMath::Clamp(AimRotation.Yaw + Axis.X * LookSensitivity, -MaxYaw, MaxYaw);
 	AimRotation.Pitch = FMath::Clamp(AimRotation.Pitch + Axis.Y * LookSensitivity, MinPitch, MaxPitch);
-	Server_SetAim(AimRotation);
+	if (HasAuthority() || ShouldSendAim(AimRotation))
+	{
+		Server_SetAim(AimRotation);
+	}
 }
 
 void AHitmenMountedGun::Server_SetAim_Implementation(FRotator NewAim)
@@ -414,7 +443,12 @@ void AHitmenMountedGun::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	GunPivot->SetRelativeRotation(AimRotation);
-	MuzzleLight->SetIntensity(GetWorld()->GetTimeSeconds() < MuzzleFlashUntil ? 30000.f : 0.f);
+	MuzzleLight->SetIntensity(GetWorld()->GetTimeSeconds() < MuzzleFlashUntil ? MuzzleLightIntensity : 0.f);
+	// The last aim change of a throttled burst still reaches the server.
+	if (!HasAuthority() && IsLocallyControlled() && ShouldSendAim(AimRotation))
+	{
+		Server_SetAim(AimRotation);
+	}
 	if (HasAuthority() && bFiring && !bVehicleDestroyed && GetWorld()->GetTimeSeconds() - LastFireTime >= FireInterval)
 	{
 		FireServer();
@@ -477,10 +511,13 @@ AHitmenTank::AHitmenTank()
 	Barrel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MuzzleLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("MuzzleLight"));
 	MuzzleLight->SetupAttachment(Turret);
+	MuzzleLight->SetIntensityUnits(ELightUnits::Candelas);
 	MuzzleLight->SetIntensity(0.f);
 	MuzzleLight->SetAttenuationRadius(1500.f);
 	MuzzleLight->SetLightColor(FLinearColor(1.f, 0.6f, 0.25f));
 	MuzzleLight->SetCastShadows(false);
+	MuzzleLight->SetIndirectLightingIntensity(0.f);
+	MuzzleLight->SetVolumetricScatteringIntensity(0.f);
 	Turret->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
 
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
@@ -556,7 +593,7 @@ void AHitmenTank::Server_SetDriveInput_Implementation(FVector2D Axis)
 void AHitmenTank::Input_Look(const FVector2D& Axis)
 {
 	Super::Input_Look(Axis);
-	if (!HasAuthority())
+	if (!HasAuthority() && ShouldSendAim(ClampAim(GetControlRotation())))
 	{
 		Server_SetAim(ClampAim(GetControlRotation()));
 	}
@@ -565,7 +602,7 @@ void AHitmenTank::Input_Look(const FVector2D& Axis)
 void AHitmenTank::Input_FirePressed()
 {
 	// Make sure the server shoots where the driver looks.
-	if (!HasAuthority())
+	if (!HasAuthority() && ShouldSendAim(ClampAim(GetControlRotation()), true))
 	{
 		Server_SetAim(ClampAim(GetControlRotation()));
 	}
@@ -597,7 +634,12 @@ void AHitmenTank::Tick(float DeltaSeconds)
 		DriverStateLocation = GetActorLocation();
 		DriverStateYaw = GetActorRotation().Yaw;
 	}
-	else if (IsLocallyControlled() && bHasDriverState)
+	else if (IsLocallyControlled() && ShouldSendAim(ClampAim(GetControlRotation())))
+	{
+		// The last aim change of a throttled burst still reaches the server.
+		Server_SetAim(ClampAim(GetControlRotation()));
+	}
+	if (!HasAuthority() && IsLocallyControlled() && bHasDriverState)
 	{
 		// The driving client does not receive replicated movement: follow the server transform.
 		const FVector Target = DriverStateLocation;
@@ -631,7 +673,7 @@ void AHitmenTank::Tick(float DeltaSeconds)
 	const float Rock = FMath::Sin(HullKick * PI) * HullKickPitch;
 	Mesh->SetRelativeRotation(HullRestRotation + FRotator(Rock, 0.f, 0.f));
 	MuzzleLight->SetRelativeLocation(BarrelRotation.RotateVector(FVector(MuzzleOffset + 20.f, 0.f, 0.f)) + FVector(0.f, 0.f, 10.f));
-	MuzzleLight->SetIntensity(GetWorld()->GetTimeSeconds() < MuzzleFlashUntil ? 200000.f : 0.f);
+	MuzzleLight->SetIntensity(GetWorld()->GetTimeSeconds() < MuzzleFlashUntil ? MuzzleLightIntensity : 0.f);
 }
 
 void AHitmenTank::SimulateDrive(float DeltaSeconds)

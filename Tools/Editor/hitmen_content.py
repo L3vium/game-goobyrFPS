@@ -241,7 +241,7 @@ def build_map_markers():
                                clamp_to_minimap_edge=True, show_on_pause_map=True, show_in_legend=True, legend_order=10),
         "Camera": dict(display_name=unreal.Text("Cameras"), color=unreal.LinearColor(0.75, 0.75, 0.8, 1.0),
                        shape=unreal.HitmenMapMarkerShape.DIAMOND, size=11.0, minimap_scale=0.8, show_on_minimap=True,
-                       clamp_to_minimap_edge=False, show_on_pause_map=True, show_in_legend=True, legend_order=20),
+                       clamp_to_minimap_edge=False, show_on_pause_map=False, show_in_legend=False, legend_order=20),
     }
     assets = {}
     for name, props in kinds.items():
@@ -280,6 +280,11 @@ for (int j = 0; j < 8; j++)
 }
 float s = max(sv, ring);
 float edge = step(0.5, ring) * (1.0 - cov);
+// Usable objects (2) only where they are really in view: their custom depth must be the nearest surface.
+float seen = step(CustomDepth.r, SceneDepth.r + 2.0 + SceneDepth.r * 0.002);
+float objectMask = (s > 1.5 && s < 2.5) ? seen : 1.0;
+cov *= objectMask;
+edge *= objectMask;
 
 float3 base = Scene.rgb;
 float lum = dot(base, float3(0.3, 0.59, 0.11));
@@ -316,6 +321,10 @@ def build_sightroom_pp():
     stencil = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 0)
     set_props(stencil, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
     world_pos = MEL.create_material_expression(pp, unreal.MaterialExpressionWorldPosition, -900, 200)
+    custom_depth = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -1150, 0)
+    set_props(custom_depth, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_DEPTH)
+    scene_depth = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -1150, 200)
+    set_props(scene_depth, scene_texture_id=unreal.SceneTextureId.PPI_SCENE_DEPTH)
     params = {}
     for i, (pname, kind, default) in enumerate((("ScanOrigin", "vector", None), ("ScanRadius", "scalar", 0.0),
                                                  ("ScanProgress", "scalar", 0.0), ("Fade", "scalar", 0.0),
@@ -329,7 +338,7 @@ def build_sightroom_pp():
         params[pname] = node
     custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
     inputs = []
-    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight"):
+    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight", "CustomDepth", "SceneDepth"):
         ci = unreal.CustomInput()
         ci.set_editor_property("input_name", input_name)
         inputs.append(ci)
@@ -342,6 +351,8 @@ def build_sightroom_pp():
     MEL.connect_material_expressions(params["ScanProgress"], "", custom, "Progress")
     MEL.connect_material_expressions(params["Fade"], "", custom, "Fade")
     MEL.connect_material_expressions(params["HeightWeight"], "", custom, "HeightWeight")
+    MEL.connect_material_expressions(custom_depth, "Color", custom, "CustomDepth")
+    MEL.connect_material_expressions(scene_depth, "Color", custom, "SceneDepth")
     MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     MEL.recompile_material(pp)
     save(pp)
@@ -367,6 +378,11 @@ float strata = (1.0 - smoothstep(0.0, 0.08, abs(frac(WP.z / 120.0) - 0.5))) * ro
 float n = frac(sin(dot(floor(WP.xy / 350.0), float2(12.9898, 78.233))) * 43758.5453);
 c *= (0.9 + 0.2 * n) * (1.0 - 0.10 * line1 - 0.18 * line4 - 0.12 * strata);
 return c;"""
+
+
+# Physical surface (footsteps, landings) of each coloured material: what you see is what you hear.
+MATERIAL_SURFACES = {"MI_Grass": "PM_Grass", "MI_Sand": "PM_Sand", "MI_Wood": "PM_Wood", "MI_Metal": "PM_Metal",
+                     "MI_Stone": "PM_Stone", "MI_Mountain": "PM_Stone"}
 
 
 def build_terrain_material(folder=None):
@@ -541,16 +557,18 @@ TOON = "/Game/Vefects/Anime_Stylized_VFX/VFX/Particles/"
 GUN_SOUND = "/Game/Vefects/Flipbook_VFX/Shared/Audio/SFX_GunShot_Cue"
 DRY_SOUND = "/Game/Vefects/Anime_Stylized_VFX/Audio/WAV/SFX_Bomb_Bounce_Cue"
 # name: fire sound pitch (min, max), volume, tracer chance, muzzle light (cd), glow radius (cm)
+# (fire pitch, fire volume, tracer chance, muzzle light candelas, muzzle glow cm). A room lamp is ~8 cd: the flash
+# stays a small warm pop (it was 400-3000 cd, a light left on during automatic fire).
 WEAPON_JUICE = {
-    "Pistol": ((1.55, 1.7), 0.32, 0.0, 400.0, 3.0),
-    "SMG": ((1.25, 1.35), 0.6, 0.35, 1200.0, 5.0),
-    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 1500.0, 5.5),
-    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 2500.0, 8.0),
-    "Minigun": ((1.3, 1.4), 0.55, 0.5, 1500.0, 6.0),
-    "Sniper": ((0.97, 1.03), 1.0, 1.0, 2200.0, 7.0),
-    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 3000.0, 9.0),
-    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 2000.0, 7.0),
-    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 2000.0, 7.0),
+    "Pistol": ((1.55, 1.7), 0.32, 0.0, 5.0, 2.0),
+    "SMG": ((1.25, 1.35), 0.6, 0.35, 12.0, 3.5),
+    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 15.0, 4.0),
+    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 25.0, 5.5),
+    "Minigun": ((1.3, 1.4), 0.55, 0.5, 15.0, 4.0),
+    "Sniper": ((0.97, 1.03), 1.0, 1.0, 22.0, 5.0),
+    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 30.0, 6.0),
+    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 20.0, 5.0),
+    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 20.0, 5.0),
     "Bow": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
     "Sword": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
 }
@@ -568,6 +586,14 @@ def weapon_juice(name):
     if gun and name not in ("RocketLauncher", "GrenadeLauncher", "BlackHole"):
         props["fire_sound"] = load(GUN_SOUND)
         props["dry_fire_sound"] = load(DRY_SOUND)
+    style = unreal.HitmenTracerStyle()
+    if name == "Sniper":
+        # A brief trail over the whole shot (it appears at once and fades in 0.12 s) and debris where it lands.
+        for key, value in (("speed", 0.0), ("thickness", 0.9), ("fade_time", 0.12)):
+            style.set_editor_property(key, value)
+        props["impact_burst_fx"] = load(TOON + "NS_Arrow_Hit")
+        props["impact_burst_scale"] = 0.5
+    props["tracer_style"] = style
     return props
 
 
@@ -617,7 +643,7 @@ def build_materials(physical):
         mi = create(name, inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
         set_props(mi, parent=color)
         MEL.set_material_instance_vector_parameter_value(mi, "Color", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
-        surface = {"MI_Grass": "PM_Grass", "MI_Sand": "PM_Sand", "MI_Wood": "PM_Wood", "MI_Metal": "PM_Metal", "MI_Stone": "PM_Stone"}.get(name)
+        surface = MATERIAL_SURFACES.get(name)
         if surface:
             set_props(mi, phys_material=physical[surface])
         save(mi)
@@ -819,28 +845,69 @@ def montage(name, source):
 
 
 
+FOOTSTEP_SURFACES = ("Concrete", "Stone", "Grass", "Sand", "Wood", "Metal")
+
+
+def import_footstep_sounds():
+    """Kenney Impact Sounds (CC0, Tools/Audio/Footsteps): five takes per surface and the landing thumps, imported once
+    into Audio/SFX/Footsteps. Returns {name: [SoundWave...]} for Step_<Surface>, Land_Soft and Land_Heavy."""
+    folder = path("Audio", "SFX", "Footsteps")
+    ensure_folder(folder)
+    source = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), "Tools", "Audio", "Footsteps")
+    groups = ["Step_" + s for s in FOOTSTEP_SURFACES] + ["Land_Soft", "Land_Heavy"]
+    tasks = []
+    for group in groups:
+        for i in range(5):
+            name = "SW_%s_%02d" % (group, i)
+            wav = os.path.join(source, name + ".wav")
+            if EAL.does_asset_exist(folder + "/" + name) or not os.path.exists(wav):
+                continue
+            task = unreal.AssetImportTask()
+            task.set_editor_property("filename", wav)
+            task.set_editor_property("destination_path", folder)
+            task.set_editor_property("destination_name", name)
+            task.set_editor_property("automated", True)
+            task.set_editor_property("replace_existing", True)
+            task.set_editor_property("save", True)
+            tasks.append(task)
+    if tasks:
+        AT.import_asset_tasks(tasks)
+    return {group: [w for w in (load(folder + "/SW_%s_%02d" % (group, i)) for i in range(5)) if w] for group in groups}
+
+
+# Soft dust for traversal (hands on a ledge, slides, ladders, vault landings).
+TRAVERSAL_DUST = "/Game/Vefects/Flipbook_VFX/Shared/Particles/Dust/NS_Dust_Directional_Small_01"
+SLIDE_SOUND = ("/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_20_FOOTSTEPS_02/Cues/"
+               "FEETHmn_InsJ_Footsteps_Ice_Sliding_Long_01-01_Cue")
+
+
+def set_traversal_fx(character_cdo, dust):
+    """Traversal dust (ledge hands, slides, vault landings) and the ladder / gutter puff."""
+    set_props(character_cdo, traversal_dust_fx=dust, climb_fx=dust, traversal_dust_scale=0.15)
+
+
 def set_footstep_sounds(character_cdo):
-    """Footstep sounds per physical surface (PM_Grass / Stone / Sand / Wood / Metal) and a default."""
-    steps1 = ESS + "SFX_Essentials_11_FOOTSTEPS_01/Cues/FEETHmn_InsJ_Footsteps_"
-    steps2 = ESS + "SFX_Essentials_20_FOOTSTEPS_02/Cues/FEETHmn_InsJ_Footsteps_"
+    """Footstep variations per physical surface (PM_Grass / Stone / Sand / Wood / Metal, concrete by default) and the
+    landing thumps. Terrain tiles map their slope to grass / sand (earth) / stone (rock) in C++."""
+    sounds = import_footstep_sounds()
     P = unreal.PhysicalSurface
-    table = {P.SURFACE_TYPE1: (steps1 + "Grass_Running_Trainers_01-01_Single-01_Cue", 0.8),
-             P.SURFACE_TYPE2: (steps2 + "Stones_Running_Trainers_01-01_Single-01_Cue", 1.0),
-             P.SURFACE_TYPE3: (steps2 + "Dirt_Running_Trainers_01-01_Single-01_Cue", 0.6),
-             P.SURFACE_TYPE4: (steps2 + "Wood_Jogging_Trainers_02-01_Single_01_Cue", 1.1),
-             P.SURFACE_TYPE5: (steps2 + "Glass_Running_Trainers_03-01_Single-01_Cue", 1.4)}
+    table = {P.SURFACE_TYPE1: ("Grass", 0.8), P.SURFACE_TYPE2: ("Stone", 1.0), P.SURFACE_TYPE3: ("Sand", 0.6),
+             P.SURFACE_TYPE4: ("Wood", 1.1), P.SURFACE_TYPE5: ("Metal", 1.4)}
     comp = component(character_cdo, "footstep_component")
     if not comp:
         return
     feedback = {}
-    for surface, (sound_path, noise) in table.items():
+    for surface, (name, noise) in table.items():
         f = unreal.HitmenSurfaceFeedback()
-        f.set_editor_property("sound", load(sound_path))
+        f.set_editor_property("sounds", sounds["Step_" + name])
+        f.set_editor_property("sound", None)
         f.set_editor_property("noise_multiplier", noise)
         feedback[surface] = f
     default = unreal.HitmenSurfaceFeedback()
-    default.set_editor_property("sound", load(steps1 + "Concrete_Jogging_Trainers_01-01_Single-01_Cue"))
-    set_props(comp, surface_feedback=feedback, default_feedback=default)
+    default.set_editor_property("sounds", sounds["Step_Concrete"])
+    default.set_editor_property("sound", None)
+    set_props(comp, surface_feedback=feedback, default_feedback=default, land_thumps=sounds["Land_Soft"],
+              hard_land_thumps=sounds["Land_Heavy"])
 
 def build_animation():
     folder = path("Characters", "Shared", "Anims")
@@ -852,6 +919,8 @@ def build_animation():
     if abp:
         unreal.BlueprintEditorLibrary.reparent_blueprint(abp, unreal.HitmenAnimInstance.static_class())
     if abp:
+        # Procedural layer: crouch / slide pose with planted feet, hands on ledges (no such animations in the project).
+        unreal.HitmenAnimGraphTools.add_body_ik_node(abp, load(ANIMS + "/Unarmed/Attack/MM_Attack_01"), 0.3, True)
         unreal.BlueprintEditorLibrary.compile_blueprint(abp)
         save(abp)
 
@@ -959,8 +1028,9 @@ FP_MOTION = {
     "AssaultRifle": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.22, kick_back=1.3, kick_up=1.6, kick_side=0.5, kick_stiffness=300.0),
     "Shotgun": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.24, kick_back=4.5, kick_up=7.0, kick_side=1.2, kick_stiffness=160.0),
     "Minigun": dict(hip_offset=(0.0, 2.0, -6.0), equip_time=0.3, kick_back=0.6, kick_up=0.6, kick_side=0.4, kick_stiffness=380.0),
+    # The scope comes up almost at once: a 0.08 s raise, the zoom starts right away, a short wobble on top of it.
     "Sniper": dict(hip_offset=(0.0, 0.0, -2.0), aim_offset=(0.0, -6.0, 4.0), equip_time=0.28, kick_back=5.0, kick_up=8.0, kick_side=1.0,
-                   kick_stiffness=140.0),
+                   kick_stiffness=140.0, scope_raise_time=0.08, scope_wobble=0.8, scope_wobble_time=0.0),
     "Bow": dict(equip_time=0.2, kick_back=0.5, kick_up=0.5, kick_side=0.3, kick_stiffness=200.0),
     "RocketLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.3, kick_back=4.0, kick_up=6.0, kick_side=1.0, kick_stiffness=150.0),
     "GrenadeLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.28, kick_back=3.0, kick_up=4.5, kick_side=0.8, kick_stiffness=170.0),
@@ -1318,13 +1388,13 @@ def build_sound_set():
         S.CAMERA_ALARM: (hb + "Futuristic/Cue/AICorePulse1_Cue", 0.7), S.BREAKER_SWITCH: (machine, 0.8),
         S.HACK: (hb + "Futuristic/Cue/Cybernetic1_Cue", 0.6), S.PICKPOCKET: (whoosh, 0.4),
         S.SIGHTROOM_ON: (hb + "Ambient/Cue/ReversedEcho1_Cue", 0.6), S.SIGHTROOM_OFF: (hb + "Ambient/Cue/ReversedEcho2_Cue", 0.4),
-        S.LANDING: (steps + "Stones_Running_Trainers_01-01_Single-01_Cue", 0.8), S.PARACHUTE: (whoosh, 0.6),
+        S.LANDING: (path("Audio", "SFX", "Footsteps") + "/SW_Land_Soft_00", 0.6), S.PARACHUTE: (whoosh, 0.6),
         S.DEATH: (hb + "Action/Cue/Slowdown1_Cue", 0.8), S.TURRET_LOCK_ON: (hb + "Futuristic/Cue/NeonPulse1_Cue", 0.6),
         S.HEADSHOT_HIT: (hb + "FX_Heartbeats/Cue/MetalHeartbeat1_Cue", 0.6), S.HACK_LOOP: (hb + "Futuristic/Cue/Cybernetic1_Cue", 0.45),
         S.HACK_COMPLETE: ("/Game/Vefects/Item_Pickup_VFX/Audio/SND_Item_Rare_L_Cue", 0.55),
         S.RADIO_LOOP: (ESS + "SFX_Essentials_05_GLITCH/Cues/COMRadio_InsJ_Radio_Noise_Long-Wave_01-01_LOOP_Cue", 0.7),
         S.MOUNTED_GUN_FIRE: (SFX + "SFX_GunShot_Cue", 0.8), S.TANK_FIRE: (SFX + "SFX_ExplosionClassic", 1.0),
-        S.LANDING_HARD: (steps + "Stones_Running_Trainers_01-01_Single-01_Cue", 1.0),
+        S.LANDING_HARD: (path("Audio", "SFX", "Footsteps") + "/SW_Land_Heavy_00", 0.9), S.SLIDE: (SLIDE_SOUND, 0.45),
     }
     data = make_data("DA_SoundSet", path("Data"), unreal.HitmenSoundSet)
     sounds, volumes = {}, {}
@@ -1339,6 +1409,41 @@ def build_sound_set():
     spaces = {S.EXPLOSION: G, S.TANK_FIRE: G, S.MOUNTED_GUN_FIRE: G, S.LANDING: F, S.LANDING_HARD: F}
     set_props(data, sounds=sounds, volumes=volumes, attenuations=build_attenuations(), spaces=spaces)
     save(data)
+    return data
+
+
+# NPC barks per alert reason (Hitman-style: every change of awareness is said out loud). Subtitles only until the
+# team records voices (DA_Barks Voices, same index as the line).
+BARKS = {
+    "GLIMPSE": ("Hm?", "What was that?", "Someone there?", "Did something just move?"),
+    "APPROACH": ("I'm going to check that out.", "Who's there? Show yourself.", "Hold on, let me take a look."),
+    "NOISE": ("What was that noise?", "Did you hear that?", "Something's off over there."),
+    "GUNFIRE": ("Shots fired!", "Gunfire! Over there!", "That was a gunshot!"),
+    "BODY": ("Man down! We've got a body!", "Body here! Call it in!", "Oh no... Lock this place down!"),
+    "SLEEPER": ("Hey! Wake up!", "Sleeping on duty? Get up!", "Come on, on your feet."),
+    "EVIDENCE": ("Who left a weapon lying here?", "That shouldn't be here. I'll take it."),
+    "DAMAGE": ("I'm hit!", "Taking fire!", "Where's that coming from?"),
+    "CALL": ("Copy, on my way!", "Heading there now!", "Understood, moving in."),
+    "SPOTTED": ("Intruder!", "There! Hostile spotted!", "Stop right there!"),
+    "LOST_TARGET": ("Lost visual!", "Where did they go?", "Spread out, find them!"),
+    "SEARCH_OVER": ("Nothing. Stay sharp.", "They're gone... for now.", "Back to positions, eyes open."),
+    "ALL_CLEAR": ("Must have been nothing.", "All clear.", "Guess I'm hearing things."),
+}
+
+
+def build_barks():
+    """DA_Barks (Project Settings > Hitmen > AI > Bark Set). Lines are only written while the asset has none, so the
+    team's edits survive a re-run."""
+    data = make_data("DA_Barks", path("Data"), unreal.HitmenBarkSet)
+    if data and not data.get_editor_property("lines"):
+        lines = {}
+        for reason, texts in BARKS.items():
+            entry = unreal.HitmenBarkLines()
+            entry.set_editor_property("lines", [unreal.Text(t) for t in texts])
+            lines[getattr(unreal.HitmenAlertReason, reason)] = entry
+        data.set_editor_property("lines", lines)
+        save(data)
+        log("barks:", len(lines), "reasons")
     return data
 
 
@@ -1479,6 +1584,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
         set_props(fp, skeletal_mesh_asset=manny, anim_class=gen_class(fp_abp) if fp_abp else gen_class(abp))
     set_props(pcdo, anim_set=anim_set)
     set_footstep_sounds(pcdo)
+    set_traversal_fx(pcdo, load(TRAVERSAL_DUST))
     interaction = component(pcdo, "interaction_component")
     if interaction:
         set_props(interaction, focus_overlay_material=mats["focus"])
@@ -1579,6 +1685,8 @@ def build_first_person_abp(manny):
         return None
     preview = load(ANIMS + "/Pistol/MF_Pistol_Idle_ADS")
     unreal.HitmenAnimGraphTools.build_pose_slot_graph(abp, preview, "HoldPose", True)
+    # Procedural layer: hands on ledges, guard and jabs, closed fists.
+    unreal.HitmenAnimGraphTools.add_body_ik_node(abp, load(ANIMS + "/Unarmed/Attack/MM_Attack_01"), 0.3, True)
     try:
         unreal.get_default_object(abp.generated_class()).set_editor_property("default_hold_pose", preview)
     except Exception as error:
@@ -1705,6 +1813,7 @@ def run():
     cosmetics = build_cosmetics(mats)
     rules = build_rules()
     build_sound_set()
+    build_barks()
     build_fonts()
     catalog = build_catalog(weapons, move, manip, cosmetics)
     maps = build_maps()

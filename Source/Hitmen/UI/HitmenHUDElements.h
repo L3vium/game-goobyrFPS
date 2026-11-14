@@ -77,6 +77,40 @@ protected:
 	float LastDamageYaw = 0.f;
 };
 
+/** Bottom centre: what nearby NPCs say (Hitman-style subtitles), the newest line at the bottom. */
+UCLASS()
+class HITMEN_API UHitmenSubtitlesWidget : public UHitmenUserWidget
+{
+	GENERATED_BODY()
+
+protected:
+	virtual void BindEvents() override;
+	virtual void UnbindEvents() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+
+	UFUNCTION() void HandleBark(const FHitmenBarkView& Bark);
+
+	UPROPERTY(EditAnywhere, Category="Hitmen|Subtitles", meta=(ClampMin="1"))
+	int32 MaxLines = 2;
+
+	UPROPERTY(EditAnywhere, Category="Hitmen|Subtitles", meta=(ClampMin="0.01", Units="s"))
+	float FadeTime = 0.25f;
+
+	UPROPERTY(EditAnywhere, Category="Hitmen|Subtitles", meta=(ClampMin="8"))
+	int32 FontSize = 19;
+
+	struct FSubtitleLine
+	{
+		FString Speaker;
+		FString Text;
+		FLinearColor Color = FLinearColor::White;
+		float Age = 0.f;
+		float Duration = 3.f;
+	};
+	TArray<FSubtitleLine> Lines;
+};
+
 /** Full-screen sniper scope (circle, reticle, vignette) while scoped. */
 UCLASS()
 class HITMEN_API UHitmenScopeWidget : public UHitmenUserWidget

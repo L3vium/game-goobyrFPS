@@ -15,6 +15,11 @@ struct FHitmenSurfaceFeedback
 {
 	GENERATED_BODY()
 
+	/** Step variations: one is picked at random each step (never the same twice in a row). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Footstep")
+	TArray<TObjectPtr<USoundBase>> Sounds;
+
+	/** Single step sound, used when Sounds is empty. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Footstep")
 	TObjectPtr<USoundBase> Sound = nullptr;
 
@@ -58,20 +63,62 @@ public:
 	/** A step from the external timer (same sound, noise and VFX as a notify). */
 	void HandleTimedFootstep() { HandleFootstepInternal(NAME_None); }
 
+	/**
+	 * The ground under From (complex trace, physical material). Terrain tiles report grass / earth / rock from their
+	 * slope, like their colour. Steps, landings and slides all read the surface here, so they always agree.
+	 */
+	bool QuerySurface(const FVector& From, FHitResult& OutHit, EPhysicalSurface& OutSurface) const;
+
+	/** A landing on the surface under the feet: that surface's step plus a body thump (hard: heavier, louder). */
+	void PlayLanding(float FallSpeed, bool bHard);
+
 protected:
 	/** Step volume per gait (the AI noise radius is separate, in the match rules). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0"))
-	float WalkVolume = 0.55f;
+	float WalkVolume = 0.5f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0"))
-	float SprintVolume = 0.9f;
+	float SprintVolume = 0.8f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0"))
-	float CrouchVolume = 0.25f;
+	float CrouchVolume = 0.22f;
 
 	/** Your own steps are played in 2D, scaled by this. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0"))
-	float LocalPlayerVolume = 0.6f;
+	float LocalPlayerVolume = 0.55f;
+
+	/** Landings: body thumps (one picked at random) under the surface's step. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Landing")
+	TArray<TObjectPtr<USoundBase>> LandThumps;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Landing")
+	TArray<TObjectPtr<USoundBase>> HardLandThumps;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Landing", meta=(ClampMin="0"))
+	float LandStepVolume = 0.9f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Landing", meta=(ClampMin="0"))
+	float LandThumpVolume = 0.55f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Landing", meta=(ClampMin="0"))
+	float HardLandThumpVolume = 0.85f;
+
+	/** Terrain tiles (HitmenTerrain tag): grass above this normal Z, rock below TerrainRockMaxNormalZ, earth between
+	 *  (the terrain material's colour bands). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Terrain", meta=(ClampMin="0", ClampMax="1"))
+	float TerrainGrassMinNormalZ = 0.86f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Terrain", meta=(ClampMin="0", ClampMax="1"))
+	float TerrainRockMaxNormalZ = 0.59f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Terrain")
+	TEnumAsByte<EPhysicalSurface> TerrainGrassSurface = SurfaceType1;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Terrain")
+	TEnumAsByte<EPhysicalSurface> TerrainEarthSurface = SurfaceType3;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Terrain")
+	TEnumAsByte<EPhysicalSurface> TerrainRockSurface = SurfaceType2;
 
 	/** Random pitch around 1 (+-) so repeated steps do not sound identical. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep|Audio", meta=(ClampMin="0", ClampMax="0.5"))
@@ -93,13 +140,13 @@ protected:
 	bool bUseDistanceFallback = true;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep", meta=(ClampMin="10", Units="cm"))
-	float WalkStrideLength = 140.f;
+	float WalkStrideLength = 380.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep", meta=(ClampMin="10", Units="cm"))
-	float SprintStrideLength = 190.f;
+	float SprintStrideLength = 500.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep", meta=(ClampMin="10", Units="cm"))
-	float CrouchStrideLength = 90.f;
+	float CrouchStrideLength = 240.f;
 
 	/** Seconds after an anim notify step during which the distance fallback stays silent. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep", meta=(ClampMin="0", Units="s"))
@@ -119,6 +166,12 @@ protected:
 	float DistanceAccumulator = 0.f;
 	float LastNotifyTime = -100.f;
 	FVector LastLocation = FVector::ZeroVector;
+	int32 LastVariation = INDEX_NONE;
 
 	float ComputeNoiseRadius(float SurfaceMultiplier) const;
+	const FHitmenSurfaceFeedback& GetFeedback(EPhysicalSurface Surface) const;
+	/** A random variation of the surface's step (never the last one played). */
+	USoundBase* PickStepSound(const FHitmenSurfaceFeedback& Feedback);
+	/** Your own sounds in 2D, everyone else's in the footstep sound space. */
+	void PlayStepSound(USoundBase* Sound, const FVector& Location, float Volume, float Pitch) const;
 };

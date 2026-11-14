@@ -71,6 +71,20 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
 	float GetLastDamageTime() const { return LastDamageTime; }
 
+	/** Why the state last changed (barks). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
+	EHitmenAlertReason GetAlertReason() const { return AlertReason; }
+
+	/** Back to routine after a search or a real threat, still nervous for OnEdgeDuration (Hitman's alerted routine). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
+	bool IsOnEdge() const { return bOnEdge; }
+
+	/** The current investigation comes from a real threat (gunfire, a body, a sighting), not a footstep. */
+	bool IsThreatInvestigation() const { return bThreatInvestigation; }
+
+	/** Where to send others when this NPC radios: the target's last seen spot, or what it investigates. */
+	FVector GetCallLocation() const;
+
 	// ---- Server queries ----
 	/** Would react to a noise now (not deaf, not asleep, not busy shooting a visible target). */
 	bool WouldReactToNoise() const;
@@ -87,10 +101,15 @@ public:
 
 	// ---- Stimuli (server) ----
 	/** A hostile is visible this frame (called repeatedly while seen). */
-	void SeeHostile(AActor* Seen, float DeltaTime, bool bAlarming);
+	/** RateScale: focal / peripheral vision and how much of the body is visible (1 = in full view, in front). */
+	void SeeHostile(AActor* Seen, float DeltaTime, bool bAlarming, float RateScale = 1.f);
 	void LoseSightOf(AActor* Seen);
 	void HearNoise(const FVector& Location, EHitmenNoiseType Type, AActor* NoiseInstigator, float Distance);
 	void SeeBody(AHitmenCharacterBase* Body);
+	/** A colleague asleep (sleep dart): walk over and wake it. */
+	void SeeSleeper(AHitmenCharacterBase* Sleeper);
+	/** A weapon lying around: walk over and pick it up. */
+	void SeeEvidence(AActor* Evidence);
 	void WitnessKill(AActor* Killer);
 	void OnDamagedBy(AActor* DamageInstigator);
 	void ReceiveReinforcementCall(const FVector& Location, AActor* CallTarget);
@@ -119,6 +138,10 @@ public:
 	/** Stops reacting (death, sleep). */
 	void SetSuppressed(bool bSuppressed);
 
+	/** Every machine, when the NPC barks (voices, a head turn...). Line is the subtitle shown to nearby players. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnBark(EHitmenAlertReason Reason, const FText& Line);
+
 protected:
 	// ---- Tuning ----
 	/** Suspicion per second at point-blank range; scales down with distance. */
@@ -140,10 +163,34 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="1"))
 	float AlarmingMultiplier = 2.5f;
 
-	/** White fill reached when sight is lost that turns white into yellow (investigate the last seen
-	 *  spot). Below it, the glimpse just cools down. 0 = any glimpse investigates; 1 = never. */
+	/** White fill reached when sight is lost that sends the NPC to check the last seen spot (Hitman: "Hm?" then a walk
+	 *  over). Below it, the glimpse just cools down. 0 = any glimpse investigates; 1 = never. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", ClampMax="1"))
-	float InvestigateSuspicionThreshold = 0.35f;
+	float InvestigateSuspicionThreshold = 0.15f;
+
+	/** An investigation's timer only starts once the NPC is this close to the point (far noises no longer time out
+	 *  on the way); it gives up after InvestigateTravelTimeout seconds of walking. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="cm"))
+	float InvestigateArrivalRadius = 250.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="s"))
+	float InvestigateTravelTimeout = 30.f;
+
+	/** After a search or a real threat the NPC stays on edge this long: it notices you faster, walks briskly and keeps
+	 *  its gun ready. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="s"))
+	float OnEdgeDuration = 60.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="1"))
+	float OnEdgeSuspicionMultiplier = 1.5f;
+
+	/** Searching / fighting NPCs read the shared last known position (any colleague's latest sighting) this often. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0.1", Units="s"))
+	float SharedKnowledgeInterval = 1.f;
+
+	/** Reaching a sleeper or a weapon this close wakes / picks it up. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="cm"))
+	float HandleReach = 160.f;
 
 	/** Seconds without seeing the hostile before a white NPC counts it as lost. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="s"))
@@ -171,9 +218,25 @@ protected:
 	UPROPERTY(Replicated)
 	TObjectPtr<AActor> Target;
 
-	FVector LastKnownLocation = FVector::ZeroVector;
-	FVector InvestigateLocation = FVector::ZeroVector;
+	/** Replicated: client prompts (takedowns, pickpocket) read it like the server does. */
+	UPROPERTY(Replicated)
 	bool bTargetVisible = false;
+
+	UPROPERTY(Replicated)
+	EHitmenAlertReason AlertReason = EHitmenAlertReason::None;
+
+	UPROPERTY(Replicated)
+	bool bOnEdge = false;
+
+	FVector LastKnownLocation = FVector::ZeroVector;
+	/** Where the target was last really seen (the last-known ghost never follows a noise). */
+	FVector LastSeenLocation = FVector::ZeroVector;
+	FVector InvestigateLocation = FVector::ZeroVector;
+	bool bInvestigateArrived = false;
+	float OnEdgeUntil = -1.f;
+	float SharedKnowledgeAccumulator = 0.f;
+	TWeakObjectPtr<AHitmenCharacterBase> WakeTarget;
+	TWeakObjectPtr<AActor> EvidenceTarget;
 	bool bSuppressed = false;
 	bool bReactsToNoises = true;
 	bool bReactsToBodies = true;
@@ -198,7 +261,12 @@ protected:
 	/** Server: writes Suspicion and fires OnSuspicionChanged when it moved. */
 	void SetSuspicionValue(float NewSuspicion);
 
-	void SetInvestigate(const FVector& Location, bool bThreat);
+	void SetInvestigate(const FVector& Location, bool bThreat, EHitmenAlertReason Reason);
+	/** Sets the state with the reason every machine barks from. */
+	void SetAlertStateWithReason(EHitmenAlertState NewState, EHitmenAlertReason Reason);
+	void EnterOnEdge();
+	/** Arrived next to a sleeper / a weapon being investigated: wake it / take it. */
+	void HandleInvestigateTarget();
 	float GetRuleLoseTime() const;
 	float GetRuleSearchTime() const;
 	float GetRuleInvestigateTime() const;

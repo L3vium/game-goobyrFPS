@@ -11,6 +11,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "Engine/World.h"
+#include "Hitmen.h"
 
 UHitmenFootstepComponent::UHitmenFootstepComponent()
 {
@@ -90,6 +91,87 @@ void UHitmenFootstepComponent::HandleFootstep(FName FootBone)
 	HandleFootstepInternal(FootBone);
 }
 
+const FHitmenSurfaceFeedback& UHitmenFootstepComponent::GetFeedback(EPhysicalSurface Surface) const
+{
+	const FHitmenSurfaceFeedback* Found = SurfaceFeedback.Find(Surface);
+	return Found ? *Found : DefaultFeedback;
+}
+
+bool UHitmenFootstepComponent::QuerySurface(const FVector& From, FHitResult& OutHit, EPhysicalSurface& OutSurface) const
+{
+	OutSurface = SurfaceType_Default;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenFootstep), true, GetOwner());
+	Params.bReturnPhysicalMaterial = true;
+	if (!GetWorld()->LineTraceSingleByChannel(OutHit, From, From - FVector::UpVector * TraceLength, ECC_Visibility, Params))
+	{
+		return false;
+	}
+	OutSurface = UPhysicalMaterial::DetermineSurfaceType(OutHit.PhysMaterial.Get());
+	if (const AActor* Ground = OutHit.GetActor(); Ground && Ground->ActorHasTag(HitmenTags::Terrain))
+	{
+		const float Up = OutHit.ImpactNormal.Z;
+		OutSurface = Up >= TerrainGrassMinNormalZ ? TerrainGrassSurface.GetValue() : (Up <= TerrainRockMaxNormalZ ? TerrainRockSurface.GetValue() : TerrainEarthSurface.GetValue());
+	}
+	return true;
+}
+
+USoundBase* UHitmenFootstepComponent::PickStepSound(const FHitmenSurfaceFeedback& Feedback)
+{
+	const int32 Count = Feedback.Sounds.Num();
+	if (Count == 0)
+	{
+		return Feedback.Sound;
+	}
+	int32 Index = FMath::RandRange(0, Count - 1);
+	if (Count > 1 && Index == LastVariation)
+	{
+		Index = (Index + 1 + FMath::RandRange(0, Count - 2)) % Count;
+	}
+	LastVariation = Index;
+	return Feedback.Sounds[Index];
+}
+
+void UHitmenFootstepComponent::PlayStepSound(USoundBase* Sound, const FVector& Location, float Volume, float Pitch) const
+{
+	if (!Sound || GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	if (Pawn && Pawn->IsLocallyControlled() && Pawn->IsPlayerControlled())
+	{
+		// Your own steps: close and centred, quieter than everyone else's.
+		UGameplayStatics::PlaySound2D(this, Sound, Volume * LocalPlayerVolume, Pitch);
+	}
+	else
+	{
+		// Everyone else's steps carry a few metres only (attenuation + occlusion).
+		UHitmenSoundLibrary::PlaySoundInSpace(this, Sound, Location, EHitmenSoundSpace::Footstep, Volume, Pitch);
+	}
+}
+
+void UHitmenFootstepComponent::PlayLanding(float FallSpeed, bool bHard)
+{
+	FHitResult Hit;
+	EPhysicalSurface Surface;
+	if (!QuerySurface(GetOwner()->GetActorLocation(), Hit, Surface))
+	{
+		return;
+	}
+	const FHitmenSurfaceFeedback& Feedback = GetFeedback(Surface);
+	const float Pitch = 1.f + FMath::FRandRange(-PitchJitter, PitchJitter);
+	PlayStepSound(PickStepSound(Feedback), Hit.ImpactPoint, LandStepVolume, Pitch * 0.94f);
+	const TArray<TObjectPtr<USoundBase>>& Thumps = bHard && HardLandThumps.Num() > 0 ? HardLandThumps : LandThumps;
+	if (Thumps.Num() > 0)
+	{
+		PlayStepSound(Thumps[FMath::RandRange(0, Thumps.Num() - 1)], Hit.ImpactPoint, bHard ? HardLandThumpVolume : LandThumpVolume, Pitch);
+	}
+	if (Feedback.Effect)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Feedback.Effect, Hit.ImpactPoint);
+	}
+}
+
 void UHitmenFootstepComponent::HandleFootstepInternal(FName FootBone)
 {
 	LastNotifyTime = GetWorld()->GetTimeSeconds();
@@ -102,18 +184,13 @@ void UHitmenFootstepComponent::HandleFootstepInternal(FName FootBone)
 	}
 
 	FHitResult Hit;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenFootstep), false, Owner);
-	Params.bReturnPhysicalMaterial = true;
-	if (!GetWorld()->LineTraceSingleByChannel(Hit, Origin, Origin - FVector::UpVector * TraceLength, ECC_Visibility, Params))
+	EPhysicalSurface Surface;
+	if (!QuerySurface(Origin, Hit, Surface))
 	{
 		return;
 	}
-
-	const EPhysicalSurface Surface = UPhysicalMaterial::DetermineSurfaceType(Hit.PhysMaterial.Get());
-	const FHitmenSurfaceFeedback* Found = SurfaceFeedback.Find(Surface);
-	const FHitmenSurfaceFeedback& Feedback = Found ? *Found : DefaultFeedback;
-
-	if (Feedback.Sound && GetNetMode() != NM_DedicatedServer)
+	const FHitmenSurfaceFeedback& Feedback = GetFeedback(Surface);
+	if (GetNetMode() != NM_DedicatedServer)
 	{
 		const ACharacter* Character = Cast<ACharacter>(Owner);
 		const UHitmenCharacterMovementComponent* Movement = Character ? Cast<UHitmenCharacterMovementComponent>(Character->GetCharacterMovement()) : nullptr;
@@ -126,18 +203,7 @@ void UHitmenFootstepComponent::HandleFootstepInternal(FName FootBone)
 		{
 			Volume = SprintVolume;
 		}
-		const float Pitch = 1.f + FMath::FRandRange(-PitchJitter, PitchJitter);
-		const APawn* Pawn = Cast<APawn>(Owner);
-		if (Pawn && Pawn->IsLocallyControlled() && Pawn->IsPlayerControlled())
-		{
-			// Your own steps: close and centred, quieter than everyone else's.
-			UGameplayStatics::PlaySound2D(this, Feedback.Sound, Volume * LocalPlayerVolume, Pitch);
-		}
-		else
-		{
-			// Everyone else's steps carry a few metres only (attenuation + occlusion).
-			UHitmenSoundLibrary::PlaySoundInSpace(this, Feedback.Sound, Hit.ImpactPoint, EHitmenSoundSpace::Footstep, Volume, Pitch);
-		}
+		PlayStepSound(PickStepSound(Feedback), Hit.ImpactPoint, Volume, 1.f + FMath::FRandRange(-PitchJitter, PitchJitter));
 	}
 	if (Feedback.Effect)
 	{

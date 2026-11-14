@@ -16,7 +16,7 @@ namespace
 UHitmenCharacterMovementComponent::UHitmenCharacterMovementComponent()
 {
 	MaxWalkSpeed = WalkSpeed;
-	MaxWalkSpeedCrouched = 240.f;
+	MaxWalkSpeedCrouched = 210.f;
 	NavAgentProps.bCanCrouch = true;
 	bCanWalkOffLedgesWhenCrouching = true;
 	JumpZVelocity = 450.f;
@@ -140,16 +140,8 @@ bool UHitmenCharacterMovementComponent::CanAttemptJump() const
 
 void UHitmenCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
-	// Slide starts on the crouch press while moving (before Super crouches us). After a slide, Ctrl must be
-	// released before the next one: holding it never chains slides.
-	if (!bWantsToCrouch)
-	{
-		bSlideNeedsCrouchRelease = false;
-	}
-	if (bWantsToCrouch && !IsCrouching() && !bSlideNeedsCrouchRelease && !IsHanging() && CanStartSlide())
-	{
-		StartSlide();
-	}
+	// Momentum crouch / slide starts on the crouch press while moving (before Super crouches us).
+	UpdateSlideStart(DeltaSeconds);
 
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
 
@@ -334,27 +326,65 @@ void UHitmenCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iterat
 // Slide
 // ---------------------------------------------------------------------------------------------
 
-bool UHitmenCharacterMovementComponent::CanStartSlide() const
+float UHitmenCharacterMovementComponent::GetSlideStrength() const
 {
-	return Super::IsMovingOnGround()
-		&& (!bSlideRequiresSprint || bWantsToSprint)
-		&& Velocity.Size2D() >= SlideMinStartSpeed
-		&& GetTimeSeconds() - LastSlideEndTime > SlideCooldown;
+	return IsSliding() ? FMath::Clamp(SlideEntrySpeed / FMath::Max(CrouchSprintSlideSpeed, 1.f), 0.f, 1.f) : 0.f;
 }
 
-void UHitmenCharacterMovementComponent::StartSlide()
+void UHitmenCharacterMovementComponent::UpdateSlideStart(float DeltaSeconds)
 {
-	const float Impulse = IsSprinting() ? SprintSlideImpulse : SlideImpulse;
-	Velocity += Velocity.GetSafeNormal2D() * Impulse;
-	SlideStartTime = GetTimeSeconds();
+	// Ctrl / Shift must be let go before the next slide of the same kind: holding them never chains slides.
+	if (!bWantsToCrouch)
+	{
+		bSlideNeedsCrouchRelease = false;
+	}
+	if (!bWantsToSprint)
+	{
+		bSprintSlideNeedsRelease = false;
+	}
+	SlideBoostCooldownLeft = FMath::Max(0.f, SlideBoostCooldownLeft - DeltaSeconds);
+	if (!bWantsToCrouch || IsSliding() || IsHanging() || IsClimbing() || IsMantling() || !Super::IsMovingOnGround())
+	{
+		return;
+	}
+
+	const FVector Flat = FVector(Velocity.X, Velocity.Y, 0.f);
+	const float Speed = Flat.Size();
+	const FVector Input = Acceleration.GetSafeNormal2D();
+	const bool bBoostReady = SlideBoostCooldownLeft <= 0.f;
+
+	// Crouch + Shift (crouched already, or both pressed): an immediate full slide in the move direction.
+	if (bWantsToSprint && !bSprintSlideNeedsRelease && bBoostReady && !Input.IsNearlyZero())
+	{
+		// Already fast: keep the direction you were going (input only bends it); slow: go where the keys point.
+		const FVector Direction = Speed > MaxWalkSpeedCrouched ? Flat / Speed : Input;
+		const float Boosted = Speed > WalkSpeed * 1.05f ? Speed + SprintSlideImpulse : Speed;
+		bSprintSlideNeedsRelease = true;
+		StartSlide(Direction, FMath::Max(Boosted, CrouchSprintSlideSpeed * GetOwnerSpeedMultiplier()));
+		return;
+	}
+
+	// The crouch press while moving: the momentum carries on and brakes down (a lunge from a walk, a slide from
+	// a sprint). Within the boost cooldown it only carries what you had.
+	if (!IsCrouching() && !bSlideNeedsCrouchRelease && Speed > MaxWalkSpeedCrouched + SlideMinSpeedAboveCrouch)
+	{
+		const bool bFromSprint = Speed > WalkSpeed * 1.05f;
+		const float Boost = bBoostReady ? (bFromSprint ? SprintSlideImpulse : CrouchLungeImpulse) : 0.f;
+		StartSlide(Flat / Speed, Speed + Boost);
+	}
+}
+
+void UHitmenCharacterMovementComponent::StartSlide(const FVector& Direction, float EntrySpeed)
+{
+	Velocity = Direction.GetSafeNormal2D() * EntrySpeed + FVector(0.f, 0.f, Velocity.Z);
 	SlideElapsed = 0.f;
-	SlideEntrySpeed = Velocity.Size2D();
+	SlideEntrySpeed = EntrySpeed;
+	SlideBoostCooldownLeft = SlideBoostCooldown;
 	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Slide));
 }
 
 void UHitmenCharacterMovementComponent::EndSlide()
 {
-	LastSlideEndTime = GetTimeSeconds();
 	bSlideNeedsCrouchRelease = bWantsToCrouch;
 	SetMovementMode(MOVE_Walking);
 }
@@ -374,6 +404,7 @@ void UHitmenCharacterMovementComponent::PhysSlide(float DeltaTime, int32 Iterati
 		return;
 	}
 	SlideElapsed += DeltaTime;
+	// Releasing Ctrl stands up and keeps the speed (walking then brakes it to the walk / sprint pace).
 	if (!bWantsToCrouch || SlideElapsed > SlideMaxDuration)
 	{
 		EndSlide();
@@ -385,7 +416,6 @@ void UHitmenCharacterMovementComponent::PhysSlide(float DeltaTime, int32 Iterati
 	FindFloor(UpdatedComponent->GetComponentLocation(), Floor, false);
 	if (!Floor.IsWalkableFloor())
 	{
-		LastSlideEndTime = GetTimeSeconds();
 		SetMovementMode(MOVE_Falling);
 		StartNewPhysics(DeltaTime, Iterations);
 		return;
@@ -406,10 +436,11 @@ void UHitmenCharacterMovementComponent::PhysSlide(float DeltaTime, int32 Iterati
 	Acceleration = FVector::ZeroVector;
 
 	// Always brakes, whatever keys are held: friction (proportional) + a constant deceleration.
+	const float CrouchSpeed = MaxWalkSpeedCrouched * GetOwnerSpeedMultiplier();
 	const float Speed = Velocity.Size();
 	const float Loss = (SlideFriction * Speed + SlideBrakingDeceleration) * DeltaTime;
 	Velocity = Speed > Loss ? Velocity * ((Speed - Loss) / Speed) : FVector::ZeroVector;
-	Velocity = FVector::VectorPlaneProject(Velocity, FloorNormal).GetClampedToMaxSize(FMath::Max(SlideEntrySpeed, SlideExitSpeed));
+	Velocity = FVector::VectorPlaneProject(Velocity, FloorNormal).GetClampedToMaxSize(FMath::Max(SlideEntrySpeed, CrouchSpeed));
 
 	Iterations++;
 	bJustTeleported = false;
@@ -433,7 +464,8 @@ void UHitmenCharacterMovementComponent::PhysSlide(float DeltaTime, int32 Iterati
 	{
 		Velocity = (UpdatedComponent->GetComponentLocation() - OldLocation) / DeltaTime;
 	}
-	if (Velocity.Size2D() < SlideExitSpeed)
+	// Down to crouch speed: crouch-walk on from there (no snap).
+	if (Velocity.Size2D() <= CrouchSpeed)
 	{
 		EndSlide();
 	}
@@ -497,8 +529,9 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 
 	// 1. A wall in front, from knee height (in the air: from below the feet) to the highest grabbable
 	//    ledge; centre first, then a little left and right so a ledge corner is caught too.
+	// In the air: rising (a jump just started) only grabs real ledges; falling also catches one at the feet.
 	const bool bInAir = IsFalling();
-	const float MinLedgeHeight = bInAir ? AirMantleMinHeight : MantleMinHeight;
+	const float MinLedgeHeight = !bInAir ? MantleMinHeight : (Velocity.Z > 0.f ? AirMantleRisingMinHeight : AirMantleMinHeight);
 	FHitResult WallHit;
 	bool bFoundWall = false;
 	const float ProbeDistance = Radius + MantleReach;
@@ -509,6 +542,11 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 		for (float Height = bInAir ? MinLedgeHeight - 30.f : 30.f; Height <= MantleMaxHeight && !bFoundWall; Height += 30.f)
 		{
 			const FVector Start = Feet + FVector::UpVector * Height + Side * Offset;
+			// A probe starting inside the floor (below the feet) would hit the next floor tile's side.
+			if (Height < 0.f && World->OverlapBlockingTestByChannel(Start, FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(2.f), Params))
+			{
+				continue;
+			}
 			if (World->LineTraceSingleByChannel(WallHit, Start, Start + Forward * ProbeDistance, ECC_Visibility, Params)
 				&& FMath::Abs(WallHit.ImpactNormal.Z) < 0.3f)
 			{
@@ -562,6 +600,17 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 	if (LedgeHeight < MinLedgeHeight || LedgeHeight > MantleMaxHeight)
 	{
 		return false;
+	}
+	// In the air, a top no higher than a step above the floor right under you is just floor (the landing and the
+	// step-up handle it): never climb onto it.
+	if (bInAir)
+	{
+		FHitResult Below;
+		if (World->LineTraceSingleByChannel(Below, Location, Feet - FVector::UpVector * (MaxStepHeight + 40.f), ECC_Visibility, Params)
+			&& TopHit.ImpactPoint.Z <= Below.ImpactPoint.Z + MaxStepHeight)
+		{
+			return false;
+		}
 	}
 	const FCollisionShape StandShape = FCollisionShape::MakeCapsule(Radius * 0.95f, HalfHeight * 0.95f);
 	const FVector OverTop = TopHit.ImpactPoint + FVector::UpVector * (HalfHeight + MantleClearance);
@@ -702,6 +751,7 @@ void UHitmenCharacterMovementComponent::StartMantlePlan(const FHitmenMantlePlan&
 	MantleTarget = Plan.Target;
 	MantleElapsed = 0.f;
 	MantleTotal = Plan.Duration;
+	MantleLedgeHeight = Plan.LedgeHeight;
 	LastMantleTime = GetTimeSeconds();
 	Velocity = FVector::ZeroVector;
 	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Mantle));
@@ -857,10 +907,6 @@ void UHitmenCharacterMovementComponent::StartClimb(AActor* ClimbableActor, bool 
 	{
 		return;
 	}
-	if (IsSliding())
-	{
-		LastSlideEndTime = GetTimeSeconds();
-	}
 	ClimbTarget = ClimbableActor;
 	ClimbStartTime = GetTimeSeconds();
 	ClimbAlpha = bFromTop ? 0.97f : ProjectOnClimbAxis(UpdatedComponent->GetComponentLocation(), *Climbable);
@@ -875,10 +921,6 @@ void UHitmenCharacterMovementComponent::StartZiplineRide(AActor* ZiplineActor, f
 	if (!Climbable || Climbable->GetClimbType() != EHitmenClimbType::Zipline || IsClimbing() || IsMantling() || !UpdatedComponent)
 	{
 		return;
-	}
-	if (IsSliding())
-	{
-		LastSlideEndTime = GetTimeSeconds();
 	}
 	ClimbTarget = ZiplineActor;
 	ClimbAlpha = ProjectOnClimbAxis(UpdatedComponent->GetComponentLocation(), *Climbable);
@@ -1286,6 +1328,10 @@ void FSavedMove_Hitmen::Clear()
 	bSavedWantsJetpackThrust = false;
 	SavedJetpackFuel = 0.f;
 	SavedSlideElapsed = 0.f;
+	SavedSlideEntrySpeed = 0.f;
+	SavedSlideBoostCooldownLeft = 0.f;
+	bSavedSlideNeedsCrouchRelease = false;
+	bSavedSprintSlideNeedsRelease = false;
 }
 
 uint8 FSavedMove_Hitmen::GetCompressedFlags() const
@@ -1305,7 +1351,9 @@ uint8 FSavedMove_Hitmen::GetCompressedFlags() const
 bool FSavedMove_Hitmen::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
 {
 	const FSavedMove_Hitmen* Other = static_cast<FSavedMove_Hitmen*>(NewMove.Get());
-	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || bSavedWantsJetpackThrust != Other->bSavedWantsJetpackThrust)
+	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || bSavedWantsJetpackThrust != Other->bSavedWantsJetpackThrust
+		|| bSavedSlideNeedsCrouchRelease != Other->bSavedSlideNeedsCrouchRelease || bSavedSprintSlideNeedsRelease != Other->bSavedSprintSlideNeedsRelease
+		|| (SavedSlideBoostCooldownLeft > 0.f) != (Other->SavedSlideBoostCooldownLeft > 0.f))
 	{
 		return false;
 	}
@@ -1333,6 +1381,10 @@ void FSavedMove_Hitmen::SetMoveFor(ACharacter* C, float InDeltaTime, FVector con
 		bSavedWantsJetpackThrust = Movement->bWantsJetpackThrust;
 		SavedJetpackFuel = Movement->JetpackFuel;
 		SavedSlideElapsed = Movement->SlideElapsed;
+		SavedSlideEntrySpeed = Movement->SlideEntrySpeed;
+		SavedSlideBoostCooldownLeft = Movement->SlideBoostCooldownLeft;
+		bSavedSlideNeedsCrouchRelease = Movement->bSlideNeedsCrouchRelease;
+		bSavedSprintSlideNeedsRelease = Movement->bSprintSlideNeedsRelease;
 	}
 }
 
@@ -1346,6 +1398,10 @@ void FSavedMove_Hitmen::PrepMoveFor(ACharacter* C)
 		// Replays start from the fuel (and the slide time) this move started with.
 		Movement->JetpackFuel = SavedJetpackFuel;
 		Movement->SlideElapsed = SavedSlideElapsed;
+		Movement->SlideEntrySpeed = SavedSlideEntrySpeed;
+		Movement->SlideBoostCooldownLeft = SavedSlideBoostCooldownLeft;
+		Movement->bSlideNeedsCrouchRelease = bSavedSlideNeedsCrouchRelease;
+		Movement->bSprintSlideNeedsRelease = bSavedSprintSlideNeedsRelease;
 	}
 }
 

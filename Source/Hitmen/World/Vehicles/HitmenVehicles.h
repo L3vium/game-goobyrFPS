@@ -124,6 +124,15 @@ protected:
 	/** Server: called while the trigger is held (auto weapons) or once (cannons). */
 	virtual void FireServer() {}
 
+	/** Clients send their aim to the server at most this often, and only when it moved. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Vehicle|Network", meta=(ClampMin="0", Units="s"))
+	float AimSendInterval = 0.05f;
+
+	/** True when the aim is due to be sent (throttled, changed by more than a tenth of a degree, or forced). */
+	bool ShouldSendAim(const FRotator& Aim, bool bForce = false);
+	FRotator LastSentAim = FRotator(1000.f, 0.f, 0.f);
+	float LastAimSendTime = -100.f;
+
 	/** Server: the vehicle's health reached zero. */
 	virtual void OnVehicleDestroyed();
 
@@ -203,6 +212,10 @@ protected:
 	/** View shake per shot for the gunner. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun|Juice", meta=(ClampMin="0"))
 	float FireShake = 0.35f;
+
+	/** Muzzle flash light while firing (candelas; no bounce light, no fog). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun|Juice", meta=(ClampMin="0", Units="cd"))
+	float MuzzleLightIntensity = 40.f;
 
 	float MuzzleFlashUntil = 0.f;
 
@@ -293,6 +306,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank|Juice", meta=(ClampMin="0"))
 	float FireShake = 2.5f;
+
+	/** Cannon flash light (candelas; no bounce light, no fog). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank|Juice", meta=(ClampMin="0", Units="cd"))
+	float MuzzleLightIntensity = 150.f;
 
 	/** How far the barrel slides back on a shot (cm) and how much the hull rocks back (deg). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Tank|Juice", meta=(ClampMin="0", Units="cm"))

@@ -27,7 +27,8 @@ public class Hitmen : ModuleRules
 			"DeveloperSettings",
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
-			"AnimGraphRuntime"
+			"AnimGraphRuntime",
+			"AnimationCore"
 		});
 
 		PublicIncludePaths.Add(ModuleDirectory);

@@ -17,6 +17,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Traversal juice: dust where the hands land on a ledge (seen by others), on vault landings and along slides, a
   slide scrape sound (`EHitmenSound::Slide`).
 - `UHitmenEditorTools::SetPIENetMode` (QA: listen server + clients in one process from scripts).
+- Sniper trail: the whole shot appears at once and fades in 0.12 s, with debris thrown out of the surface it hits
+  (`FHitmenTracerStyle`, `ImpactBurstFX` in the weapon data); misses make no impact effect.
 
 ### Changed
 - Momentum crouch and slides rebuilt on the common FPS rules: crouching while moving keeps your direction and brakes
@@ -35,6 +37,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   0.15 s), and the sniper scope sequence takes about 0.2 s (raise 0.08 s, the zoom no longer waits for the wobble)
   instead of 0.8 s.
 - Ladders and gutters puff soft dust (they used the gunshot puff), never in your own first-person view.
+- Weapon light: the warm full-screen wash on every shot came from the toon muzzle flash drawn in first person: your
+  own gun now shows only a small glow (others still see the toon flash). The muzzle light is ~100x weaker (5-35 cd
+  instead of 400-3000), direct only (no Lumen bounce or volumetric scattering), 0.035 s and at most once every 0.09
+  s.
 
 ### Fixed
 - Jumping while walking or running no longer turns into a slow climb onto the floor, a curb or a step (the air ledge

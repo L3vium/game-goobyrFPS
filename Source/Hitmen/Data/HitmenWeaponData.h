@@ -25,6 +25,27 @@ class UHitmenAnimSet;
  */
 /** How the weapon moves in first person (procedural, per weapon). Offsets are camera space: X forward, Y right, Z up. */
 USTRUCT(BlueprintType)
+struct FHitmenTracerStyle
+{
+	GENERATED_BODY()
+
+	/** cm/s of the streak (0 = the whole line appears at once: a trail from the muzzle to the impact). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Weapon|Tracer", meta=(ClampMin="0", Units="cm/s"))
+	float Speed = 28000.f;
+
+	/** Length of a moving streak (cm; ignored for a trail). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Weapon|Tracer", meta=(ClampMin="1", Units="cm"))
+	float Length = 220.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Weapon|Tracer", meta=(ClampMin="0.1", Units="cm"))
+	float Thickness = 1.4f;
+
+	/** A trail fades out over this time (s). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Weapon|Tracer", meta=(ClampMin="0.01", Units="s"))
+	float FadeTime = 0.12f;
+};
+
+USTRUCT(BlueprintType)
 struct FHitmenFPMotion
 {
 	GENERATED_BODY()
@@ -62,13 +83,13 @@ struct FHitmenFPMotion
 
 	/** Scoped weapons: raise to the centre (s), then wobble before the zoom (deg, s); breathing sway while zoomed (deg). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="s"))
-	float ScopeRaiseTime = 0.25f;
+	float ScopeRaiseTime = 0.08f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
-	float ScopeWobble = 2.2f;
+	float ScopeWobble = 0.8f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="s"))
-	float ScopeWobbleTime = 0.3f;
+	float ScopeWobbleTime = 0.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|FP", meta=(ClampMin="0", Units="deg"))
 	float ScopeSway = 0.12f;
@@ -316,9 +337,21 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	FLinearColor TracerColor = FLinearColor(1.f, 0.75f, 0.35f);
 
-	/** Muzzle flash light (candelas, 0 = none) and glow sphere radius (cm, 0 = none), like the mounted gun. */
+	/** How the tracer is drawn: a fast streak (machine guns, pellets) or a brief trail (sniper: Speed 0). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	FHitmenTracerStyle TracerStyle;
+
+	/** Extra burst where the bullet lands, facing out of the surface (sniper: debris); scaled by ImpactBurstScale. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
+	TSoftObjectPtr<UNiagaraSystem> ImpactBurstFX;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0.01"))
+	float ImpactBurstScale = 1.f;
+
+	/** Muzzle flash light (candelas, 0 = none) and glow sphere radius (cm, 0 = none). A room lamp is ~8 cd: keep the
+	 *  flash small; it lights only one shot in a burst of fast fire (MuzzleLightMinInterval on the weapon). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0"))
-	float MuzzleLightIntensity = 4000.f;
+	float MuzzleLightIntensity = 20.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="cm"))
 	float MuzzleGlowRadius = 9.f;

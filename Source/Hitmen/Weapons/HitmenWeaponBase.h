@@ -326,7 +326,13 @@ protected:
 	TObjectPtr<class UPointLightComponent> MuzzleLight;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="s"))
-	float MuzzleFlashTime = 0.05f;
+	float MuzzleFlashTime = 0.035f;
+
+	/** The muzzle light flashes at most this often: fast automatic fire never reads as a light left on. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="s"))
+	float MuzzleLightMinInterval = 0.09f;
+
+	float LastMuzzleLightTime = -100.f;
 
 	float MuzzleLightUntil = 0.f;
 

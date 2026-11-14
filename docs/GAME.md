@@ -239,10 +239,14 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
   heard a few metres away, gunshots far and muffled.
 
 ## 7. Weapons
-**Juice (toon only, no blood)**: every gun flashes at the muzzle (Anime_Stylized `NS_Gunshot_Cast`, attached and drawn
-with the first-person gun), a short warm light and a soft glow (`M_Hitmen_FlashGlow`), and hits make a toon puff
-(`NS_Gunshot_Hit`) on walls and bodies alike. Tracers (`AHitmenTracer`, `M_Hitmen_Tracer`) show every shotgun pellet and
-sniper shot and part of the machine-gun bullets. All guns share one recording, pitched and levelled per weapon
+**Juice (toon only, no blood)**: other players' and guards' guns flash at the muzzle (Anime_Stylized `NS_Gunshot_Cast`);
+your own first-person gun shows a small soft glow (`M_Hitmen_FlashGlow`) instead, because the toon flash washed the whole
+view warm on every shot. The muzzle light is weak (5-35 cd, a room lamp is ~8), direct only (no Lumen bounce or fog),
+0.035 s, and at most once every 0.09 s, so automatic fire never reads as a light left on. Hits make a toon puff
+(`NS_Gunshot_Hit`) on walls and bodies alike; a miss (the shot's range ends in the air) makes none. Tracers
+(`AHitmenTracer`, `M_Hitmen_Tracer`, style per weapon in `FHitmenTracerStyle`) show every shotgun pellet and part of the
+machine-gun bullets as fast streaks; the sniper draws a brief trail over the whole shot (it fades in 0.12 s) and throws
+debris out of the surface it hits (`ImpactBurstFX`). All guns share one recording, pitched and levelled per weapon
 (`FireSoundPitch` / `FireSoundVolume`: the silenced pistol is a quiet high snap). Muzzle points are computed from each
 mesh (the Weapons_Free guns have no socket). Explosions flash (`ExplosionFlash*` on projectiles; the flashbang is a big
 white flash and light), the smoke grenade is the Smoke_Bombs toon cloud (plays 1.8x faster), the jetpack blows smoke

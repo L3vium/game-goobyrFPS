@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Data/HitmenWeaponData.h"
 #include "HitmenCosmeticActors.generated.h"
 
 class UStaticMeshComponent;
@@ -23,20 +24,22 @@ class HITMEN_API AHitmenTracer : public AActor
 public:
 	AHitmenTracer();
 
-	/** Local cosmetic: a tracer from Start to End (nothing on a dedicated server). */
-	static void SpawnTracer(UWorld* World, const FVector& Start, const FVector& End, UMaterialInterface* Material, const FLinearColor& Color);
+	/** Local cosmetic: a tracer from Start to End (nothing on a dedicated server): a moving streak, or with Speed 0 a
+	 *  trail over the whole line that fades out. */
+	static void SpawnTracer(UWorld* World, const FVector& Start, const FVector& End, UMaterialInterface* Material, const FLinearColor& Color,
+		const FHitmenTracerStyle& Style = FHitmenTracerStyle());
 
 	virtual void Tick(float DeltaSeconds) override;
 
 	UPROPERTY(VisibleAnywhere, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> Mesh;
 
-	/** cm/s of the streak, its length and thickness (cm). */
-	float Speed = 28000.f;
-	float Length = 220.f;
-	float Thickness = 1.4f;
+	FHitmenTracerStyle Style;
 
 private:
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> Instance;
+	float Age = 0.f;
 	FVector Start = FVector::ZeroVector;
 	FVector End = FVector::ZeroVector;
 	float Travelled = 0.f;

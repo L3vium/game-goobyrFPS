@@ -84,8 +84,11 @@ AHitmenWeaponBase::AHitmenWeaponBase()
 	MuzzleLight->SetupAttachment(Root);
 	MuzzleLight->SetCastShadows(false);
 	MuzzleLight->SetIntensityUnits(ELightUnits::Candelas);
-	MuzzleLight->SetAttenuationRadius(300.f);
+	MuzzleLight->SetAttenuationRadius(250.f);
 	MuzzleLight->SetLightColor(FLinearColor(1.f, 0.6f, 0.3f));
+	// Direct light only: Lumen's bounce and volumetric fog would keep a fading glow after the flash.
+	MuzzleLight->SetIndirectLightingIntensity(0.f);
+	MuzzleLight->SetVolumetricScatteringIntensity(0.f);
 	MuzzleLight->SetVisibility(false);
 }
 
@@ -1125,22 +1128,26 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 			DrawnMuzzle = Eye + (Origin - Eye) * DrawnScale;
 		}
 	}
-	if (UNiagaraSystem* Muzzle = WeaponData->MuzzleFX.LoadSynchronous())
+	// Your own first-person gun shows only the small glow below: the toon cast effect has a screen-sized flash that
+	// washed the whole view warm on every shot (read as a light left on during automatic fire). Everyone else sees it.
+	UNiagaraSystem* Muzzle = bFirstPersonGun ? nullptr : WeaponData->MuzzleFX.LoadSynchronous();
+	if (Muzzle)
 	{
-		// Attached at the muzzle so it follows the gun (and is drawn with it in first person), facing out of the
-		// barrel (the guns lie along their own axis: the muzzle direction from the weapon origin).
+		// Attached at the muzzle so it follows the gun, facing out of the barrel (the guns lie along their own axis:
+		// the muzzle direction from the weapon origin).
 		const FVector LocalMuzzle = GetActorTransform().InverseTransformPosition(Origin);
 		const FRotator Facing = FVector(LocalMuzzle.X, LocalMuzzle.Y, 0.f).GetSafeNormal().Rotation();
 		if (UNiagaraComponent* Flash = UNiagaraFunctionLibrary::SpawnSystemAttached(Muzzle, Root, NAME_None, LocalMuzzle,
 			Facing, EAttachLocation::KeepRelativeOffset, true))
 		{
-			Flash->FirstPersonPrimitiveType = bFirstPersonGun ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::None;
 			Flash->SetWorldScale3D(FVector(WeaponData->MuzzleFXScale));
 		}
 	}
-	// A short burst of light and a hot glow at the muzzle, like the mounted gun.
-	if (WeaponData->MuzzleLightIntensity > 0.f)
+	// A short burst of light and a hot glow at the muzzle; fast fire lights only one shot in a few.
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (WeaponData->MuzzleLightIntensity > 0.f && Now - LastMuzzleLightTime >= MuzzleLightMinInterval)
 	{
+		LastMuzzleLightTime = Now;
 		MuzzleLight->SetWorldLocation(Origin);
 		MuzzleLight->SetIntensity(WeaponData->MuzzleLightIntensity);
 		MuzzleLight->SetVisibility(true);
@@ -1167,7 +1174,7 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 		{
 			if (FMath::FRand() < WeaponData->TracerChance)
 			{
-				AHitmenTracer::SpawnTracer(GetWorld(), DrawnMuzzle, Impact, TracerMaterial, WeaponData->TracerColor);
+				AHitmenTracer::SpawnTracer(GetWorld(), DrawnMuzzle, Impact, TracerMaterial, WeaponData->TracerColor, WeaponData->TracerStyle);
 			}
 		}
 	}
@@ -1191,11 +1198,17 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	UNiagaraSystem* ImpactFX = WeaponData->ImpactFX.LoadSynchronous();
 	UNiagaraSystem* SurfaceFX = WeaponData->SurfaceImpactFX.LoadSynchronous();
 	UNiagaraSystem* FleshFX = WeaponData->FleshImpactFX.LoadSynchronous();
+	UNiagaraSystem* BurstFX = WeaponData->ImpactBurstFX.LoadSynchronous();
 	USoundBase* ImpactSound = WeaponData->ImpactSound.LoadSynchronous();
 	FCollisionQueryParams FleshParams(SCENE_QUERY_STAT(HitmenImpactFlesh), false, this);
 	FleshParams.AddIgnoredActor(OwnerPawn);
 	for (const FVector& Impact : Impacts)
 	{
+		// A miss ends at the weapon's range in the air: no impact there.
+		if (FVector::DistSquared(Origin, Impact) >= FMath::Square(WeaponData->Range * 0.98f))
+		{
+			continue;
+		}
 		// Cosmetic: a character right at the impact point bleeds, anything else throws dust and sparks.
 		const bool bFlesh = FleshFX && GetWorld()->OverlapAnyTestByChannel(Impact, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeSphere(12.f), FleshParams);
 		const FRotator BackToShooter = (Origin - Impact).GetSafeNormal().Rotation();
@@ -1226,6 +1239,17 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 		if (ImpactFX)
 		{
 			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ImpactFX, Impact);
+		}
+		if (BurstFX)
+		{
+			// Debris thrown out of the surface (its normal found locally: impacts travel as points).
+			FHitResult Surface;
+			const FVector Along = (Impact - Origin).GetSafeNormal();
+			FCollisionQueryParams SurfaceParams(SCENE_QUERY_STAT(HitmenImpactSurface), true, OwnerPawn);
+			SurfaceParams.AddIgnoredActor(this);
+			const FVector Normal = GetWorld()->LineTraceSingleByChannel(Surface, Impact - Along * 20.f, Impact + Along * 20.f, ECC_Visibility, SurfaceParams)
+				? FVector(Surface.ImpactNormal) : -Along;
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, BurstFX, Impact, Normal.Rotation(), FVector(WeaponData->ImpactBurstScale));
 		}
 		if (ImpactSound)
 		{

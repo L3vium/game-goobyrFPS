@@ -546,16 +546,18 @@ TOON = "/Game/Vefects/Anime_Stylized_VFX/VFX/Particles/"
 GUN_SOUND = "/Game/Vefects/Flipbook_VFX/Shared/Audio/SFX_GunShot_Cue"
 DRY_SOUND = "/Game/Vefects/Anime_Stylized_VFX/Audio/WAV/SFX_Bomb_Bounce_Cue"
 # name: fire sound pitch (min, max), volume, tracer chance, muzzle light (cd), glow radius (cm)
+# (fire pitch, fire volume, tracer chance, muzzle light candelas, muzzle glow cm). A room lamp is ~8 cd: the flash
+# stays a small warm pop (it was 400-3000 cd, a light left on during automatic fire).
 WEAPON_JUICE = {
-    "Pistol": ((1.55, 1.7), 0.32, 0.0, 400.0, 3.0),
-    "SMG": ((1.25, 1.35), 0.6, 0.35, 1200.0, 5.0),
-    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 1500.0, 5.5),
-    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 2500.0, 8.0),
-    "Minigun": ((1.3, 1.4), 0.55, 0.5, 1500.0, 6.0),
-    "Sniper": ((0.97, 1.03), 1.0, 1.0, 2200.0, 7.0),
-    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 3000.0, 9.0),
-    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 2000.0, 7.0),
-    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 2000.0, 7.0),
+    "Pistol": ((1.55, 1.7), 0.32, 0.0, 5.0, 2.0),
+    "SMG": ((1.25, 1.35), 0.6, 0.35, 12.0, 3.5),
+    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 15.0, 4.0),
+    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 25.0, 5.5),
+    "Minigun": ((1.3, 1.4), 0.55, 0.5, 15.0, 4.0),
+    "Sniper": ((0.97, 1.03), 1.0, 1.0, 22.0, 5.0),
+    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 30.0, 6.0),
+    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 20.0, 5.0),
+    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 20.0, 5.0),
     "Bow": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
     "Sword": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
 }
@@ -573,6 +575,14 @@ def weapon_juice(name):
     if gun and name not in ("RocketLauncher", "GrenadeLauncher", "BlackHole"):
         props["fire_sound"] = load(GUN_SOUND)
         props["dry_fire_sound"] = load(DRY_SOUND)
+    style = unreal.HitmenTracerStyle()
+    if name == "Sniper":
+        # A brief trail over the whole shot (it appears at once and fades in 0.12 s) and debris where it lands.
+        for key, value in (("speed", 0.0), ("thickness", 0.9), ("fade_time", 0.12)):
+            style.set_editor_property(key, value)
+        props["impact_burst_fx"] = load(TOON + "NS_Arrow_Hit")
+        props["impact_burst_scale"] = 0.5
+    props["tracer_style"] = style
     return props
 
 

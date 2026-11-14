@@ -29,4 +29,11 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
 	static void SetBackgroundThrottling(bool bThrottle);
+
+	/**
+	 * QA: the next PIE session runs as a listen server with NumPlayers - 1 clients in one process (1 = standalone).
+	 * Editor session only (the play settings are not saved).
+	 */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
+	static void SetPIENetMode(int32 NumPlayers);
 };

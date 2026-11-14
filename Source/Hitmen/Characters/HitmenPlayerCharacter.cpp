@@ -1,6 +1,7 @@
 // Hitmen — player character
 
 #include "Characters/HitmenPlayerCharacter.h"
+#include "Characters/HitmenAnimNodes.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
@@ -491,8 +492,21 @@ void AHitmenPlayerCharacter::UpdateViewFeel(float DeltaSeconds)
 	}
 	SlideFOVCurrent = FMath::FInterpTo(SlideFOVCurrent, SlideFOVKick * Strength, DeltaSeconds, Strength > SlideFOVCurrent / FMath::Max(SlideFOVKick, 0.01f) ? 18.f : 6.f);
 	SlideRollCurrent = FMath::FInterpTo(SlideRollCurrent, SteerRoll, DeltaSeconds, 8.f);
+
+	// Climbing a ledge below the eye: the view dips toward it while the hands are on it, so you see them land.
+	float ClimbLook = 0.f;
+	if (Movement && Movement->IsMantling() && bFPLedgeValid)
+	{
+		const float Alpha = Movement->GetMantleAlpha();
+		const float Reach = FMath::SmoothStep(0.f, 0.18f, Alpha) * (1.f - FMath::SmoothStep(0.72f, 0.95f, Alpha));
+		const FVector Eye = FirstPersonCamera->GetComponentLocation();
+		const FVector ToLedge = FPLedgePoint - Eye;
+		const float Down = FMath::RadiansToDegrees(FMath::Atan2(ToLedge.Z, FMath::Max(ToLedge.Size2D(), 1.f))) - GetControlRotation().GetNormalized().Pitch;
+		ClimbLook = FMath::Clamp(Down + 12.f, -ClimbLookMaxPitch, 0.f) * Reach;
+	}
+	ClimbLookCurrent = FMath::FInterpTo(ClimbLookCurrent, ClimbLook, DeltaSeconds, 12.f);
 	FirstPersonCamera->ClearAdditiveOffset();
-	FirstPersonCamera->AddAdditiveOffset(FTransform(FRotator(0.f, 0.f, HeadBobRollCurrent + SlideRollCurrent)), SlideFOVCurrent);
+	FirstPersonCamera->AddAdditiveOffset(FTransform(FRotator(ClimbLookCurrent, 0.f, HeadBobRollCurrent + SlideRollCurrent)), SlideFOVCurrent);
 }
 
 void AHitmenPlayerCharacter::Server_TrapMash_Implementation()
@@ -632,8 +646,9 @@ void AHitmenPlayerCharacter::EvaluateFirstPersonAction(FVector& OutOffset, FRota
 	switch (FPAction)
 	{
 	case EHitmenFPAction::Punch:
+		// The fist itself travels by IK (GetFirstPersonBodyIK); the arms only lean into the punch.
 		Keys = { { 0.f, FVector::ZeroVector, FRotator::ZeroRotator },
-				 { 0.3f, FVector(26.f, -7.f * S, 5.f), FRotator(4.f, -10.f * S, 14.f * S) },
+				 { 0.25f, FVector(6.f, -2.f * S, 1.f), FRotator(1.f, -3.f * S, 4.f * S) },
 				 { 1.f, FVector::ZeroVector, FRotator::ZeroRotator } };
 		break;
 	case EHitmenFPAction::KnifeSlash:
@@ -670,6 +685,89 @@ void AHitmenPlayerCharacter::EvaluateFirstPersonAction(FVector& OutOffset, FRota
 				FMath::Lerp(A.Rotation.Roll, B.Rotation.Roll, Alpha));
 			return;
 		}
+	}
+}
+
+FVector AHitmenPlayerCharacter::FirstPersonViewToWorld(const FVector& ViewPoint) const
+{
+	float Spread = 1.f;
+	if (FirstPersonCamera->bEnableFirstPersonFieldOfView && FirstPersonCamera->FirstPersonFieldOfView > 1.f)
+	{
+		Spread = FMath::Tan(FMath::DegreesToRadians(FirstPersonCamera->FieldOfView * 0.5f)) / FMath::Tan(FMath::DegreesToRadians(FirstPersonCamera->FirstPersonFieldOfView * 0.5f));
+	}
+	const float Inverse = 1.f / FMath::Max(Spread, KINDA_SMALL_NUMBER);
+	FVector Local(ViewPoint.X, ViewPoint.Y * Inverse, ViewPoint.Z * Inverse);
+	// Along the view ray it still shows at the same place, but never close enough to be clipped.
+	if (Local.X > 1.f && Local.X < FirstPersonMinHandDepth)
+	{
+		Local *= FirstPersonMinHandDepth / Local.X;
+	}
+	return GetFirstPersonViewTransform().TransformPosition(Local);
+}
+
+FTransform AHitmenPlayerCharacter::GetFirstPersonViewTransform() const
+{
+	return FTransform(FRotator(ClimbLookCurrent, 0.f, HeadBobRollCurrent + SlideRollCurrent)) * FirstPersonCamera->GetComponentTransform();
+}
+
+void AHitmenPlayerCharacter::GetFirstPersonBodyIK(FHitmenBodyIKState& Out) const
+{
+	if (!bArmsVisible || !FirstPersonCamera)
+	{
+		return;
+	}
+	const FTransform Camera = GetFirstPersonViewTransform();
+	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
+	const bool bArmed = InventoryComponent && InventoryComponent->GetActiveWeapon() != nullptr;
+
+	// Climbing: reach the ledge, keep the hands planted while the view rises over it, let go at the top.
+	if (Movement && Movement->IsMantling() && bFPLedgeValid)
+	{
+		const float Alpha = Movement->GetMantleAlpha();
+		const float Reach = FMath::SmoothStep(0.f, 0.18f, Alpha) * (1.f - FMath::SmoothStep(0.72f, 0.95f, Alpha));
+		const FVector Along = FVector::CrossProduct(FVector::UpVector, FPLedgeNormal).GetSafeNormal();
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			if (bArmed && Side == 1)
+			{
+				continue; // The gun stays in the right hand.
+			}
+			const float Sign = Side == 0 ? -1.f : 1.f;
+			Out.HandAlpha[Side] = Reach;
+			// Drawn over the ledge on screen (the arms use their own field of view).
+			const FVector OnLedge = FPLedgePoint - FPLedgeNormal * 8.f + Along * (ClimbHandSpacing * Sign) + FVector::UpVector * 3.f;
+			Out.HandTarget[Side] = FirstPersonViewToWorld(Camera.InverseTransformPosition(OnLedge));
+			Out.ElbowPole[Side] = Camera.TransformVector(FVector(0.f, 40.f * Sign, -50.f));
+		}
+		return;
+	}
+
+	// Unarmed: a guard with closed fists; a punch drives one fist out toward the crosshair and back.
+	if (bArmed)
+	{
+		return;
+	}
+	Out.FistAlpha = 1.f;
+	const float Elapsed = GetWorld()->GetTimeSeconds() - FPActionStart;
+	const bool bPunching = FPAction == EHitmenFPAction::Punch && Elapsed >= 0.f && Elapsed <= FPActionDuration;
+	const int32 PunchingSide = FPActionSide > 0.f ? 1 : 0;
+	float Extension = 0.f;
+	if (bPunching)
+	{
+		const float T = FMath::Clamp(Elapsed / FMath::Max(FPActionDuration, KINDA_SMALL_NUMBER), 0.f, 1.f);
+		const float BackStart = PunchOutShare + PunchHoldShare;
+		Extension = T < PunchOutShare ? FMath::InterpEaseOut(0.f, 1.f, T / PunchOutShare, 2.f)
+			: (T < BackStart ? 1.f : 1.f - FMath::SmoothStep(0.f, 1.f, (T - BackStart) / FMath::Max(1.f - BackStart, KINDA_SMALL_NUMBER)));
+	}
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		const float Sign = Side == 0 ? -1.f : 1.f;
+		const FVector Guard(PunchGuardOffset.X, PunchGuardOffset.Y * Sign, PunchGuardOffset.Z);
+		const FVector Jab(PunchJabOffset.X, PunchJabOffset.Y * Sign, PunchJabOffset.Z);
+		const FVector Local = Side == PunchingSide ? FMath::Lerp(Guard, Jab, Extension) : Guard;
+		Out.HandAlpha[Side] = 1.f;
+		Out.HandTarget[Side] = FirstPersonViewToWorld(Local);
+		Out.ElbowPole[Side] = Camera.TransformVector(FVector(5.f, 35.f * Sign, -60.f));
 	}
 }
 
@@ -739,7 +837,14 @@ void AHitmenPlayerCharacter::UpdateFirstPersonArms(float DeltaSeconds)
 	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
 	const bool bBusy = Movement && (Movement->IsClimbing() || Movement->IsHanging());
 	const bool bActing = FPAction != EHitmenFPAction::None && Now < FPActionStart + FPActionDuration;
-	const bool bWantArms = !IsDead() && !bScoped && !bBusy && (Weapon != nullptr || Now < ArmsVisibleUntil || bActing);
+	// Climbing a ledge: the hands come into view and land on it.
+	const bool bMantling = Movement && Movement->IsMantling();
+	if (bMantling && !bFPWasMantling)
+	{
+		bFPLedgeValid = FindLedgeInFront(FPLedgePoint, FPLedgeNormal);
+	}
+	bFPWasMantling = bMantling;
+	const bool bWantArms = !IsDead() && !bScoped && !bBusy && (Weapon != nullptr || Now < ArmsVisibleUntil || bActing || (bMantling && bFPLedgeValid));
 	if (bWantArms != bArmsVisible || !bArmsInitialised)
 	{
 		bArmsVisible = bWantArms;

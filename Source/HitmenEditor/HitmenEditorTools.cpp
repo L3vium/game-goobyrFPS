@@ -39,6 +39,7 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "GameFramework/Actor.h"
 #include "Editor/EditorPerformanceSettings.h"
+#include "Settings/LevelEditorPlaySettings.h"
 #include "UObject/Package.h"
 
 namespace
@@ -469,4 +470,12 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 void UHitmenEditorTools::SetBackgroundThrottling(bool bThrottle)
 {
 	GetMutableDefault<UEditorPerformanceSettings>()->bThrottleCPUWhenNotForeground = bThrottle;
+}
+
+void UHitmenEditorTools::SetPIENetMode(int32 NumPlayers)
+{
+	ULevelEditorPlaySettings* Settings = GetMutableDefault<ULevelEditorPlaySettings>();
+	Settings->SetPlayNetMode(NumPlayers > 1 ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
+	Settings->SetPlayNumberOfClients(FMath::Max(1, NumPlayers));
+	Settings->SetRunUnderOneProcess(true);
 }

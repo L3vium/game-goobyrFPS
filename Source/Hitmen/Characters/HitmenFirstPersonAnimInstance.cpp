@@ -12,8 +12,10 @@ void UHitmenFirstPersonAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Super::NativeUpdateAnimation(DeltaSeconds);
 
 	UAnimSequenceBase* Pose = nullptr;
+	BodyIK = FHitmenBodyIKState();
 	if (const AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(TryGetPawnOwner()))
 	{
+		Player->GetFirstPersonBodyIK(BodyIK);
 		if (const UHitmenWeaponData* Data = Player->GetInventory() ? Player->GetInventory()->GetActiveWeaponData() : nullptr)
 		{
 			Pose = Data->FirstPersonPose.LoadSynchronous();

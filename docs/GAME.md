@@ -189,9 +189,16 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
   play on the first-person arms. Near a wall the weapon is pulled back and lowered (first-person scale 0.35, near plane
   3 cm). Machine guns sit lower in the hand; the minigun shakes harder as it spins up; the bow arms pull back with the
   charge.
-- **First person**: no body or arms while moving without a weapon (the body's shadow stays); the arms appear with a
-  weapon in hand (held low on the right, barrel along the view;
-  sprinting lowers and tilts it, still in view) or while punching (arms at chest height, the fists cross the view).
+- **First person**: no body or arms while moving without a weapon (the body's shadow stays, crouched when you
+  crouch); the arms appear with a weapon in hand (held low on the right, barrel along the view; sprinting lowers and
+  tilts it, still in view), while punching (a guard with closed fists low in the corners, each jab driven to the
+  crosshair by IK) or climbing a ledge (the hands land on it, push while the view rises and let go; with a gun only the
+  left hand, and the view dips toward a ledge below the eye). First-person hand targets sit at least 50 cm out along
+  their view ray (the first-person scale clips nearer geometry) and undo the arms' own field of view.
+- **Body pose** (no crouch, slide or climb animation in the project: a procedural layer, `FAnimNode_HitmenBodyIK` in
+  both anim blueprints): crouched, the pelvis drops 38 cm, the spine leans and the feet stay planted (knees bend);
+  sliding is lower, leaning back with the feet in front; climbing a ledge, the hands reach its top (found by a trace on
+  every machine, so other players see it) and the legs tuck. An anim set with crouch animations turns it off.
   Recoil kicks the view up and it recovers smoothly. On death the view leaves the head and orbits your body as it falls (third person). Landings are heard on the
   surface you land on (soft or hard, by fall speed); every landing dips the view a little, a hard one shakes it.
 - **Inventory**: 2 weapon slots (mouse wheel). A new weapon always goes to the left slot (the other one slides right;
@@ -239,7 +246,9 @@ sniper shot and part of the machine-gun bullets. All guns share one recording, p
 (`FireSoundPitch` / `FireSoundVolume`: the silenced pistol is a quiet high snap). Muzzle points are computed from each
 mesh (the Weapons_Free guns have no socket). Explosions flash (`ExplosionFlash*` on projectiles; the flashbang is a big
 white flash and light), the smoke grenade is the Smoke_Bombs toon cloud (plays 1.8x faster), the jetpack blows smoke
-under your feet, ladders and gutters puff and click at each grab, ziplines throw sparks with a cable sound, the tank's
+under your feet, ladders and gutters puff and click at each grab (soft dust, never in your own first-person view),
+hands landing on a ledge throw dust and a grab sound, slides scrape and leave dust, vault landings puff, ziplines throw
+sparks with a cable sound, the tank's
 barrel slides back 120 cm, its hull rocks and the muzzle blasts, and the turret flashes and fires red tracers. Taking
 a hit: a red arc toward the shooter, a colour fringe and a red tint on the view, a small shake; the world greys as
 health drops, with the heartbeat below 35 %.

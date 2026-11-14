@@ -12,7 +12,8 @@ public class HitmenEditor : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
-			"Hitmen"
+			"Hitmen",
+			"HitmenUncooked"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {

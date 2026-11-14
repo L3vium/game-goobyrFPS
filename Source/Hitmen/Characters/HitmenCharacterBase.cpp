@@ -113,6 +113,9 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 	const bool bClimbing = Movement && Movement->IsClimbing() && !bZipline;
 	const float Z = GetActorLocation().Z;
 
+	// Hand-level dust stays out of your own first-person view (it would fill the screen); everyone else sees it.
+	const bool bFirstPersonViewer = IsLocallyControlled() && IsPlayerControlled();
+
 	// Ladders and gutters: a grab sound and a small puff at the hands every step of the climb.
 	if (bClimbing)
 	{
@@ -122,7 +125,7 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 			ClimbStepAccumulator = 0.f;
 			const FVector Hands = GetActorLocation() + GetActorForwardVector() * 30.f + FVector::UpVector * 60.f;
 			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::ClimbGrab, Hands);
-			if (ClimbFX)
+			if (ClimbFX && !bFirstPersonViewer)
 			{
 				UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ClimbFX, Hands, FRotator::ZeroRotator, FVector(0.35f));
 			}
@@ -133,6 +136,56 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 		ClimbStepAccumulator = 0.f;
 	}
 	LastTraversalZ = Z;
+
+	// Ledge climbs: dust and a grab sound where the hands land; a vault or climb ends with dust under the feet.
+	const bool bMantling = Movement && Movement->IsMantling();
+	if (bMantling && !bWasMantlingJuice)
+	{
+		FVector Ledge, Normal;
+		if (FindLedgeInFront(Ledge, Normal))
+		{
+			const FVector Along = FVector::CrossProduct(FVector::UpVector, Normal).GetSafeNormal();
+			if (!bFirstPersonViewer)
+			{
+				SpawnTraversalDust(Ledge - Normal * 8.f + Along * 22.f, TraversalDustScale);
+				SpawnTraversalDust(Ledge - Normal * 8.f - Along * 22.f, TraversalDustScale);
+			}
+			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::ClimbGrab, Ledge);
+		}
+	}
+	else if (!bMantling && bWasMantlingJuice)
+	{
+		SpawnTraversalDust(GetActorLocation() - FVector::UpVector * GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), TraversalDustScale);
+	}
+	bWasMantlingJuice = bMantling;
+
+	// Slides: a scrape sound and dust along the way.
+	const bool bSliding = Movement && Movement->IsSliding();
+	const FVector Feet = GetActorLocation() - FVector::UpVector * GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	if (bSliding && !bWasSlidingJuice)
+	{
+		SlideDustAccumulator = 0.f;
+		if (USoundBase* Scrape = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::Slide))
+		{
+			SlideAudio = UGameplayStatics::SpawnSoundAttached(Scrape, GetRootComponent(), NAME_None, FVector(0.f, 0.f, -60.f), EAttachLocation::KeepRelativeOffset,
+				true, UHitmenSoundLibrary::GetHitmenSoundVolume(EHitmenSound::Slide), 1.f, 0.f, UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::Footstep));
+		}
+	}
+	if (bSliding)
+	{
+		SlideDustAccumulator -= DeltaSeconds;
+		if (SlideDustAccumulator <= 0.f)
+		{
+			SlideDustAccumulator = SlideDustInterval;
+			SpawnTraversalDust(Feet, TraversalDustScale * 0.7f);
+		}
+	}
+	else if (bWasSlidingJuice && SlideAudio)
+	{
+		SlideAudio->FadeOut(0.15f, 0.f);
+		SlideAudio = nullptr;
+	}
+	bWasSlidingJuice = bSliding;
 
 	// Ziplines: bursts of sparks where the hands hold the cable, and the cable sound.
 	if (bZipline && ZiplineFX)
@@ -165,6 +218,47 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 			ZiplineAudio = nullptr;
 		}
 	}
+}
+
+void AHitmenCharacterBase::SpawnTraversalDust(const FVector& Location, float Scale) const
+{
+	if (TraversalDustFX && GetNetMode() != NM_DedicatedServer)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, TraversalDustFX, Location, FRotator::ZeroRotator, FVector(Scale));
+	}
+}
+
+bool AHitmenCharacterBase::FindLedgeInFront(FVector& OutPoint, FVector& OutNormal) const
+{
+	const UWorld* World = GetWorld();
+	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FVector Feet = GetActorLocation() - FVector::UpVector * HalfHeight;
+	const FVector Forward = GetActorForwardVector().GetSafeNormal2D();
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenLedge), false, this);
+	// The wall face: from knee to above the head, the first hit straight ahead.
+	FHitResult Wall;
+	bool bWall = false;
+	for (float Height = 40.f; Height <= 260.f && !bWall; Height += 40.f)
+	{
+		const FVector Start = Feet + FVector::UpVector * Height;
+		bWall = World->LineTraceSingleByChannel(Wall, Start, Start + Forward * 130.f, ECC_Visibility, Params) && FMath::Abs(Wall.ImpactNormal.Z) < 0.3f;
+	}
+	if (!bWall)
+	{
+		return false;
+	}
+	// The top just past the face.
+	const FVector Into = -Wall.ImpactNormal.GetSafeNormal2D();
+	const FVector Column = Wall.ImpactPoint + Into * 12.f;
+	FHitResult Top;
+	if (!World->LineTraceSingleByChannel(Top, FVector(Column.X, Column.Y, Feet.Z + 300.f), FVector(Column.X, Column.Y, Wall.ImpactPoint.Z - 10.f), ECC_Visibility, Params)
+		|| Top.bStartPenetrating || Top.ImpactNormal.Z < 0.6f)
+	{
+		return false;
+	}
+	OutPoint = FVector(Wall.ImpactPoint.X, Wall.ImpactPoint.Y, Top.ImpactPoint.Z);
+	OutNormal = Wall.ImpactNormal.GetSafeNormal2D();
+	return true;
 }
 
 void AHitmenCharacterBase::GetMontageMeshes(TArray<USkeletalMeshComponent*>& OutMeshes) const

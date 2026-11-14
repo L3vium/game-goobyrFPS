@@ -104,6 +104,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Camera")
 	void PlayFirstPersonAction(EHitmenFPAction Action, float Duration);
 
+	/**
+	 * First-person arms layer (UHitmenFirstPersonAnimInstance): both hands planted on the ledge while climbing (only
+	 * the left one with a gun in hand), a guard and alternating jabs with closed fists when unarmed.
+	 */
+	void GetFirstPersonBodyIK(struct FHitmenBodyIKState& Out) const;
+
+	/**
+	 * World point where a first-person primitive must be for the view to show it at ViewPoint (camera space: X
+	 * forward, Y right, Z up): first-person primitives are drawn with their own field of view, which spreads them
+	 * away from the centre, so their sideways offsets are shrunk by that ratio.
+	 */
+	FVector FirstPersonViewToWorld(const FVector& ViewPoint) const;
+
+	/** The rendered view: the camera with its additive offset (bob roll, slide roll, climb dip). */
+	FTransform GetFirstPersonViewTransform() const;
+
 	/** First-person rendering scale (cosmetics drawn next to the first-person weapon use it). */
 	float GetFirstPersonViewScale() const { return FirstPersonViewScale; }
 
@@ -267,9 +283,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
 	FRotator ArmsSprintRotation = FRotator(-16.f, 10.f, 14.f);
 
-	/** Arms mesh offset with no weapon (punch, takedown): higher, so the fists swing through the view. */
+	/** Arms mesh offset with no weapon (punch, climb): the shoulders at the eye, the fists placed by IK. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
-	FVector ArmsUnarmedOffset = FVector(20.f, 6.f, -150.f);
+	FVector ArmsUnarmedOffset = FVector(-6.f, 0.f, -150.f);
 
 	/** Yaw of the arms mesh relative to the camera (mannequin forward is +Y). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
@@ -277,6 +293,41 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="1"))
 	float ArmsOffsetInterpSpeed = 14.f;
+
+	/** Unarmed guard: each fist's wrist as seen in the first-person view (cm; X forward, Y right for the right hand,
+	 *  Z up). The first-person FOV is undone, so the fists sit there on screen whatever the Options FOV. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms|Punch")
+	FVector PunchGuardOffset = FVector(55.f, 14.f, -12.f);
+
+	/** A jab's wrist at full extension (first-person view space, the right hand; mirrored for the left). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms|Punch")
+	FVector PunchJabOffset = FVector(62.f, 2.f, -3.f);
+
+	/** Share of the punch spent going out, then held at full extension; the rest is the way back. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms|Punch", meta=(ClampMin="0.05", ClampMax="0.9"))
+	float PunchOutShare = 0.22f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms|Punch", meta=(ClampMin="0", ClampMax="0.5"))
+	float PunchHoldShare = 0.12f;
+
+	/** Climbing: the view dips toward a ledge below the eye while the hands are on it (camera only, deg max). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms|Climb", meta=(ClampMin="0", Units="deg"))
+	float ClimbLookMaxPitch = 22.f;
+
+	/** First-person hand targets nearer than this to the eye are pushed out along their view ray (same place on
+	 *  screen): with the first-person scale, geometry much closer is clipped by the near plane. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="1", Units="cm"))
+	float FirstPersonMinHandDepth = 50.f;
+
+	/** Climbing: the hands land this far apart on the ledge top (cm). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms|Climb", meta=(ClampMin="0", Units="cm"))
+	float ClimbHandSpacing = 22.f;
+
+	/** Ledge being climbed (found at the start of the climb). */
+	FVector FPLedgePoint = FVector::ZeroVector;
+	FVector FPLedgeNormal = FVector::ZeroVector;
+	bool bFPLedgeValid = false;
+	bool bFPWasMantling = false;
 
 	/** Seconds the arms stay visible after a punch / throw with no weapon in hand. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0", Units="s"))
@@ -519,6 +570,7 @@ protected:
 	bool bWasGroundedForBob = true;
 	float SlideFOVCurrent = 0.f;
 	float SlideRollCurrent = 0.f;
+	float ClimbLookCurrent = 0.f;
 	/** Hip / aim target of the arms last frame: a new target launches the spring at once. */
 	FVector LastArmsTargetOffset = FVector::ZeroVector;
 	/** Smoothed walk lag (X, cm) and strafe tilt (roll, deg) of the arms. */

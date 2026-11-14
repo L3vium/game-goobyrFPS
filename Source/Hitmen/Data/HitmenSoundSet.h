@@ -65,7 +65,9 @@ enum class EHitmenSound : uint8
 	RadioLoop,
 	MountedGunFire,
 	TankFire,
-	LandingHard
+	LandingHard,
+	/** Loop while sliding (stopped when the slide ends). */
+	Slide
 };
 
 UCLASS(BlueprintType)
@@ -110,6 +112,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Sound")
 	static USoundBase* GetHitmenSound(EHitmenSound Sound);
+
+	/** The sound-set volume of an entry (1 when missing). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Sound")
+	static float GetHitmenSoundVolume(EHitmenSound Sound);
 
 	/** Plays any sound at a location with the attenuation of its space (no attenuation = heard everywhere). */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Sound", meta=(WorldContext="WorldContextObject"))

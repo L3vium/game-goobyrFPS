@@ -47,7 +47,12 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Switching weapons: the new one rises from below in ~0.2 s
 - [ ] Every gun kicks per shot (shotgun / sniper hard, SMG light); the minigun shakes more as it spins up
 - [ ] Sniper: raise, wobble, then zoom; the zoomed aim breathes
-- [ ] Punch alternates fists, no torso in view; knife slashes; takedown lunges; throwing winds up
+- [x] Punch: a guard with closed fists in the lower corners, jabs reach the crosshair (PIE screenshots, 0.8.0);
+  [ ] alternating fists by hand; knife slashes; takedown lunges; throwing winds up
+- [x] Crouched body (another character, the shadow): pelvis down, knees bent, feet planted (PIE screenshot, 0.8.0)
+- [x] Death camera shows your body falling (PIE screenshot, 0.8.0)
+- [ ] Ledge climb in first person: the hands land on the ledge and the view dips toward it; others see hands on the
+  ledge and dust; ladders puff dust only for others
 - [ ] Thrown empty pistol to a guard's head stuns it and vanishes; a loaded weapon lands as a pickup
 - [ ] Facing a wall at 30 cm the gun pulls back instead of going through
 - [x] Walk lunge ~0.38 s / 1.4 m, sprint slide ~0.75 s / 3.9 m, crouch + Shift from a crouch-walk starts at 820,

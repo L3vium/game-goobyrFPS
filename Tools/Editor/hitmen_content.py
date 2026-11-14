@@ -854,6 +854,17 @@ def import_footstep_sounds():
     return {group: [w for w in (load(folder + "/SW_%s_%02d" % (group, i)) for i in range(5)) if w] for group in groups}
 
 
+# Soft dust for traversal (hands on a ledge, slides, ladders, vault landings).
+TRAVERSAL_DUST = "/Game/Vefects/Flipbook_VFX/Shared/Particles/Dust/NS_Dust_Directional_Small_01"
+SLIDE_SOUND = ("/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_20_FOOTSTEPS_02/Cues/"
+               "FEETHmn_InsJ_Footsteps_Ice_Sliding_Long_01-01_Cue")
+
+
+def set_traversal_fx(character_cdo, dust):
+    """Traversal dust (ledge hands, slides, vault landings) and the ladder / gutter puff."""
+    set_props(character_cdo, traversal_dust_fx=dust, climb_fx=dust, traversal_dust_scale=0.15)
+
+
 def set_footstep_sounds(character_cdo):
     """Footstep variations per physical surface (PM_Grass / Stone / Sand / Wood / Metal, concrete by default) and the
     landing thumps. Terrain tiles map their slope to grass / sand (earth) / stone (rock) in C++."""
@@ -887,6 +898,8 @@ def build_animation():
     if abp:
         unreal.BlueprintEditorLibrary.reparent_blueprint(abp, unreal.HitmenAnimInstance.static_class())
     if abp:
+        # Procedural layer: crouch / slide pose with planted feet, hands on ledges (no such animations in the project).
+        unreal.HitmenAnimGraphTools.add_body_ik_node(abp, load(ANIMS + "/Unarmed/Attack/MM_Attack_01"), 0.3, True)
         unreal.BlueprintEditorLibrary.compile_blueprint(abp)
         save(abp)
 
@@ -1360,7 +1373,7 @@ def build_sound_set():
         S.HACK_COMPLETE: ("/Game/Vefects/Item_Pickup_VFX/Audio/SND_Item_Rare_L_Cue", 0.55),
         S.RADIO_LOOP: (ESS + "SFX_Essentials_05_GLITCH/Cues/COMRadio_InsJ_Radio_Noise_Long-Wave_01-01_LOOP_Cue", 0.7),
         S.MOUNTED_GUN_FIRE: (SFX + "SFX_GunShot_Cue", 0.8), S.TANK_FIRE: (SFX + "SFX_ExplosionClassic", 1.0),
-        S.LANDING_HARD: (path("Audio", "SFX", "Footsteps") + "/SW_Land_Heavy_00", 0.9),
+        S.LANDING_HARD: (path("Audio", "SFX", "Footsteps") + "/SW_Land_Heavy_00", 0.9), S.SLIDE: (SLIDE_SOUND, 0.45),
     }
     data = make_data("DA_SoundSet", path("Data"), unreal.HitmenSoundSet)
     sounds, volumes = {}, {}
@@ -1515,6 +1528,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
         set_props(fp, skeletal_mesh_asset=manny, anim_class=gen_class(fp_abp) if fp_abp else gen_class(abp))
     set_props(pcdo, anim_set=anim_set)
     set_footstep_sounds(pcdo)
+    set_traversal_fx(pcdo, load(TRAVERSAL_DUST))
     interaction = component(pcdo, "interaction_component")
     if interaction:
         set_props(interaction, focus_overlay_material=mats["focus"])
@@ -1615,6 +1629,8 @@ def build_first_person_abp(manny):
         return None
     preview = load(ANIMS + "/Pistol/MF_Pistol_Idle_ADS")
     unreal.HitmenAnimGraphTools.build_pose_slot_graph(abp, preview, "HoldPose", True)
+    # Procedural layer: hands on ledges, guard and jabs, closed fists.
+    unreal.HitmenAnimGraphTools.add_body_ik_node(abp, load(ANIMS + "/Unarmed/Attack/MM_Attack_01"), 0.3, True)
     try:
         unreal.get_default_object(abp.generated_class()).set_editor_property("default_hold_pose", preview)
     except Exception as error:

@@ -8,6 +8,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 ### Added
 - `UHitmenEditorTools::SetBackgroundThrottling`: PIE recordings from scripts run at full rate while the editor is in
   the background.
+- Procedural body layer `FAnimNode_HitmenBodyIK` (in a new UncookedOnly module `HitmenUncooked` for its graph node)
+  in the body and first-person anim blueprints: crouched and sliding bodies (your shadow too) are really crouched
+  with planted feet, climbing bodies put their hands on the ledge, the first-person arms punch and climb by IK.
+  `UHitmenAnimGraphTools::AddBodyIKNode` inserts it.
+- First-person punch: a guard with closed fists and jabs driven to the crosshair (the arms used to hang and the
+  whole mesh was shoved). First-person climb: the hands land on the ledge and the view dips toward it.
+- Traversal juice: dust where the hands land on a ledge (seen by others), on vault landings and along slides, a
+  slide scrape sound (`EHitmenSound::Slide`).
+- `UHitmenEditorTools::SetPIENetMode` (QA: listen server + clients in one process from scripts).
 
 ### Changed
 - Momentum crouch and slides rebuilt on the common FPS rules: crouching while moving keeps your direction and brakes
@@ -25,6 +34,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Aiming is faster: the view zooms at 22 (14), the gun leaves the hip at once on a stiffer spring (settled in about
   0.15 s), and the sniper scope sequence takes about 0.2 s (raise 0.08 s, the zoom no longer waits for the wobble)
   instead of 0.8 s.
+- Ladders and gutters puff soft dust (they used the gunshot puff), never in your own first-person view.
 
 ### Fixed
 - Jumping while walking or running no longer turns into a slow climb onto the floor, a curb or a step (the air ledge
@@ -32,6 +42,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   feet, and the view lifts on takeoff instead of dipping.
 - After death the third-person death camera shows your body (it was hidden: the engine always hides a first-person
   world-space body from its owner).
+- Crouching showed a standing body and shadow (there is no crouch animation).
 
 ## [0.7.0] - 2026-11-12
 

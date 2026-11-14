@@ -12,6 +12,8 @@
 #include "AnimGraphNode_Root.h"
 #include "AnimGraphNode_Slot.h"
 #include "AnimGraphNode_SequencePlayer.h"
+#include "AnimGraphNode_HitmenBodyIK.h"
+#include "Animation/AnimSequence.h"
 #include "Animation/Skeleton.h"
 #include "EdGraphSchema_K2.h"
 #include "AnimationGraphSchema.h"
@@ -413,4 +415,102 @@ bool UHitmenAnimGraphTools::BuildPoseSlotGraph(UAnimBlueprint* AnimBlueprint, UA
 	BindAssetPinsToVariables(AnimBlueprint, Map, bCompile);
 	AnimBlueprint->MarkPackageDirty();
 	return bLinked;
+}
+
+bool UHitmenAnimGraphTools::AddBodyIKNode(UAnimBlueprint* AnimBlueprint, UAnimSequence* FistPose, float FistPoseTime, bool bCompile)
+{
+	using namespace HitmenAnimGraph;
+
+	if (!AnimBlueprint)
+	{
+		return false;
+	}
+	UEdGraph* AnimGraph = nullptr;
+	for (UEdGraph* Graph : AnimBlueprint->FunctionGraphs)
+	{
+		if (Graph && Graph->GetFName() == UEdGraphSchema_K2::GN_AnimGraph)
+		{
+			AnimGraph = Graph;
+			break;
+		}
+	}
+	if (!AnimGraph || !AnimGraph->GetSchema())
+	{
+		UE_LOG(LogHitmenAnimGraph, Warning, TEXT("AddBodyIKNode: %s has no AnimGraph."), *AnimBlueprint->GetName());
+		return false;
+	}
+	UAnimGraphNode_Root* Root = nullptr;
+	for (UEdGraphNode* Node : AnimGraph->Nodes)
+	{
+		if (UAnimGraphNode_HitmenBodyIK* Existing = Cast<UAnimGraphNode_HitmenBodyIK>(Node))
+		{
+			Existing->Modify();
+			Existing->Node.FistPose = FistPose;
+			Existing->Node.FistPoseTime = FistPoseTime;
+			FBlueprintEditorUtils::MarkBlueprintAsModified(AnimBlueprint);
+			if (bCompile)
+			{
+				FKismetEditorUtilities::CompileBlueprint(AnimBlueprint);
+			}
+			AnimBlueprint->MarkPackageDirty();
+			return true;
+		}
+		Root = Root ? Root : Cast<UAnimGraphNode_Root>(Node);
+	}
+	if (!Root)
+	{
+		UE_LOG(LogHitmenAnimGraph, Warning, TEXT("AddBodyIKNode: %s has no Output Pose node."), *AnimBlueprint->GetName());
+		return false;
+	}
+	auto FirstPin = [](UEdGraphNode* Node, EEdGraphPinDirection Direction) -> UEdGraphPin*
+	{
+		for (UEdGraphPin* Pin : Node->Pins)
+		{
+			if (Pin && Pin->Direction == Direction && !Pin->bHidden && Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Struct)
+			{
+				return Pin;
+			}
+		}
+		return nullptr;
+	};
+	UEdGraphPin* RootInput = FirstPin(Root, EGPD_Input);
+	if (!RootInput)
+	{
+		return false;
+	}
+	UEdGraphPin* Previous = RootInput->LinkedTo.Num() > 0 ? RootInput->LinkedTo[0] : nullptr;
+
+	AnimGraph->Modify();
+	FGraphNodeCreator<UAnimGraphNode_HitmenBodyIK> Creator(*AnimGraph);
+	UAnimGraphNode_HitmenBodyIK* BodyIK = Creator.CreateNode(false);
+	BodyIK->Node.FistPose = FistPose;
+	BodyIK->Node.FistPoseTime = FistPoseTime;
+	BodyIK->NodePosX = Root->NodePosX - GetNodeOffsetX;
+	BodyIK->NodePosY = Root->NodePosY + 160;
+	Creator.Finalize();
+
+	UEdGraphPin* Input = FirstPin(BodyIK, EGPD_Input);
+	UEdGraphPin* Output = FirstPin(BodyIK, EGPD_Output);
+	const UEdGraphSchema* Schema = AnimGraph->GetSchema();
+	if (!Input || !Output)
+	{
+		AnimGraph->RemoveNode(BodyIK);
+		return false;
+	}
+	// Local <-> component space conversion nodes are created by the schema.
+	if (Previous)
+	{
+		Schema->BreakSinglePinLink(Previous, RootInput);
+		Schema->TryCreateConnection(Previous, Input);
+	}
+	Schema->TryCreateConnection(Output, RootInput);
+	UE_LOG(LogHitmenAnimGraph, Log, TEXT("%s: inserted Hitmen Body IK before the Output Pose."), *AnimBlueprint->GetName());
+
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(AnimBlueprint);
+	if (bCompile)
+	{
+		FKismetEditorUtilities::CompileBlueprint(AnimBlueprint);
+	}
+	AnimBlueprint->MarkPackageDirty();
+	return true;
 }

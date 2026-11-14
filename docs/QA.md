@@ -66,7 +66,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Jump while walking / sprinting on the gym floor and next to the 50 cm step: rising the next frame, speed kept,
   view lifts (PIE recording, 0.8.0); a buffered Space at the 120 cm block still vaults (0.8.0)
 - [ ] Holding Ctrl after a slide does not slide again; release and press slides; Shift likewise for crouch + Shift
-- [ ] Two players with 100 ms lag: slides and crouch + Shift show no corrections
+- [x] Listen server + client, 100 ms lag: sprint slide and crouch + Shift show no movement corrections (PIE script with
+  p.NetShowCorrections, 0.8.0)
 - [ ] Jumping at the corner of a crate grabs it; no vault onto a barrel or the hack panel
 - [ ] Hang under a window: shimmy both ways, Space enters the window, Ctrl drops
 - [ ] Shift tap dashes (dash equipped), Shift held sprints; Space held in the air flies (jetpack equipped)

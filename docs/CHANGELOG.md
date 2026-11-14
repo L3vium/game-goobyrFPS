@@ -5,11 +5,33 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+### Added
+- `UHitmenEditorTools::SetBackgroundThrottling`: PIE recordings from scripts run at full rate while the editor is in
+  the background.
+
 ### Changed
+- Momentum crouch and slides rebuilt on the common FPS rules: crouching while moving keeps your direction and brakes
+  down to crouch speed (a 0.35 s lunge from a walk, a 0.75 s / 3.9 m slide from a sprint, 4.4 m before); crouch +
+  Shift slides at once from any pace; the view widens and rolls with the slide. Client-predicted (slide state in the
+  saved moves).
+- Walk 420 (480), sprint 720 (820), crouch 210 (240).
+- Head bob and sway: two steps a second walking (the steps were three times too fast), 3.2 cm bob, 2.4 cm left /
+  right sway with a 0.7 degree roll (the sway ran at half speed), stronger arms sway, bob, strafe tilt and walk lag;
+  low ledges are climbed without the view dip.
 - Footsteps and landings: Kenney Impact Sounds (CC0) with five takes per surface played at random without repeats
   (the jogging takes sounded wrong); landings play the step of the surface you land on plus a body thump, through
   the same surface query as the steps (they used a fixed stone sound); San Lazaro's terrain sounds like grass, earth
   or rock by slope, like its colour; rocks and mountains are stone.
+- Aiming is faster: the view zooms at 22 (14), the gun leaves the hip at once on a stiffer spring (settled in about
+  0.15 s), and the sniper scope sequence takes about 0.2 s (raise 0.08 s, the zoom no longer waits for the wobble)
+  instead of 0.8 s.
+
+### Fixed
+- Jumping while walking or running no longer turns into a slow climb onto the floor, a curb or a step (the air ledge
+  grab caught the next floor tile): the jump is instant, rising ledge grabs need a ledge at least 45 cm above the
+  feet, and the view lifts on takeoff instead of dipping.
+- After death the third-person death camera shows your body (it was hidden: the engine always hides a first-person
+  world-space body from its owner).
 
 ## [0.7.0] - 2026-11-12
 

@@ -994,8 +994,9 @@ FP_MOTION = {
     "AssaultRifle": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.22, kick_back=1.3, kick_up=1.6, kick_side=0.5, kick_stiffness=300.0),
     "Shotgun": dict(hip_offset=(0.0, 1.0, -4.0), equip_time=0.24, kick_back=4.5, kick_up=7.0, kick_side=1.2, kick_stiffness=160.0),
     "Minigun": dict(hip_offset=(0.0, 2.0, -6.0), equip_time=0.3, kick_back=0.6, kick_up=0.6, kick_side=0.4, kick_stiffness=380.0),
+    # The scope comes up almost at once: a 0.08 s raise, the zoom starts right away, a short wobble on top of it.
     "Sniper": dict(hip_offset=(0.0, 0.0, -2.0), aim_offset=(0.0, -6.0, 4.0), equip_time=0.28, kick_back=5.0, kick_up=8.0, kick_side=1.0,
-                   kick_stiffness=140.0),
+                   kick_stiffness=140.0, scope_raise_time=0.08, scope_wobble=0.8, scope_wobble_time=0.0),
     "Bow": dict(equip_time=0.2, kick_back=0.5, kick_up=0.5, kick_side=0.3, kick_stiffness=200.0),
     "RocketLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.3, kick_back=4.0, kick_up=6.0, kick_side=1.0, kick_stiffness=150.0),
     "GrenadeLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.28, kick_back=3.0, kick_up=4.5, kick_side=0.8, kick_stiffness=170.0),

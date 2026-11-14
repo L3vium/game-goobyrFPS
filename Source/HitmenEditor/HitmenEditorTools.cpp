@@ -38,6 +38,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "GameFramework/Actor.h"
+#include "Editor/EditorPerformanceSettings.h"
 #include "UObject/Package.h"
 
 namespace
@@ -463,4 +464,9 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		B.Finish();
 	}
 	return true;
+}
+
+void UHitmenEditorTools::SetBackgroundThrottling(bool bThrottle)
+{
+	GetMutableDefault<UEditorPerformanceSettings>()->bThrottleCPUWhenNotForeground = bThrottle;
 }

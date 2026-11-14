@@ -213,7 +213,14 @@ protected:
 
 	// ---- Camera ----
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera", meta=(ClampMin="1"))
-	float AimInterpSpeed = 14.f;
+	float AimInterpSpeed = 22.f;
+
+	/** Sliding widens the view a little (deg at full slide strength) and rolls it toward the steering (deg). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Slide", meta=(ClampMin="0"))
+	float SlideFOVKick = 4.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Slide", meta=(ClampMin="0"))
+	float SlideRoll = 2.f;
 
 	/** Eye height above the capsule centre while standing. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera", meta=(Units="cm"))
@@ -281,14 +288,14 @@ protected:
 
 	/** Arms sway: degrees of lag per degree/s of view rotation. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
-	float ArmsSwayAmount = 0.012f;
+	float ArmsSwayAmount = 0.02f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
-	float ArmsSwayMax = 3.5f;
+	float ArmsSwayMax = 5.f;
 
 	/** Walking bob of the arms (cm at full walk speed). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
-	float ArmsBobAmount = 0.9f;
+	float ArmsBobAmount = 1.8f;
 
 	/** Arms rotations (sway, kick, actions) turn around this point in camera space (about the hands), not the feet. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms")
@@ -296,17 +303,22 @@ protected:
 
 	/** Hip <-> aim travel: a spring that overshoots a little and settles (the raise reads as a motion). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="1"))
-	float ArmsAimStiffness = 260.f;
+	float ArmsAimStiffness = 520.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0", ClampMax="2"))
-	float ArmsAimDamping = 0.72f;
+	float ArmsAimDamping = 0.85f;
+
+	/** Share of the hip <-> aim distance given as an instant start speed (per second): the gun leaves at once
+	 *  instead of easing out of rest. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
+	float ArmsAimLaunch = 6.f;
 
 	/** Moving sideways tilts the arms (deg at walk speed); moving forward / back pushes them (cm). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
-	float ArmsStrafeTilt = 4.f;
+	float ArmsStrafeTilt = 6.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0"))
-	float ArmsMoveLag = 1.6f;
+	float ArmsMoveLag = 2.5f;
 
 	/** Near a wall the weapon is pulled back and lowered instead of going through it. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Arms", meta=(ClampMin="0", Units="cm"))
@@ -349,28 +361,39 @@ protected:
 	void UpdateDamageFeel(float DeltaSeconds);
 
 	// ---- Head bob (the camera; footsteps fall on the low point of each bob) ----
-	/** Bob height and sideways sway (cm) at walk; sprint and crouch scale it. */
+	/** Bob height and sideways sway (cm) at walk; sprint and crouch scale it. The sway goes left on one step and
+	 *  right on the next; the view rolls with it. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0", Units="cm"))
-	float HeadBobHeight = 1.4f;
+	float HeadBobHeight = 3.2f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0", Units="cm"))
-	float HeadBobSide = 0.8f;
+	float HeadBobSide = 2.4f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0", Units="deg"))
+	float HeadBobRoll = 0.7f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0"))
-	float HeadBobSprintScale = 1.7f;
+	float HeadBobSprintScale = 1.6f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0"))
 	float HeadBobCrouchScale = 0.6f;
 
 	/** Distance per step (cm) for walk, sprint and crouch: one bob (and one footstep) per step. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="10", Units="cm"))
-	float WalkStepLength = 75.f;
+	float WalkStepLength = 190.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="10", Units="cm"))
-	float SprintStepLength = 105.f;
+	float SprintStepLength = 250.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="10", Units="cm"))
-	float CrouchStepLength = 50.f;
+	float CrouchStepLength = 120.f;
+
+	/** A jump lifts the view this much at once (cm), easing back; a landing dips it by fall speed (cm per 1000 cm/s). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0", Units="cm"))
+	float JumpViewLift = 2.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|HeadBob", meta=(ClampMin="0", Units="cm"))
+	float LandingViewDip = 4.f;
 
 	// ---- Landing ----
 	/** Falls faster than this make a landing sound; faster than HardLandingSpeed a hard landing (sound + view dip). */
@@ -455,6 +478,8 @@ protected:
 	float GetTargetEyeHeight() const;
 	/** Local: camera bob from the step phase; plays your footstep at the low point of each step. */
 	void UpdateHeadBob(float DeltaSeconds);
+	/** Local: slide FOV kick and roll, head-bob roll (camera additive offset; the aim never moves). */
+	void UpdateViewFeel(float DeltaSeconds);
 	/** Offset (cm) and rotation (deg, camera space) of the running procedural action. */
 	void EvaluateFirstPersonAction(FVector& OutOffset, FRotator& OutRotation) const;
 
@@ -488,6 +513,14 @@ protected:
 	float HeadBobAlpha = 0.f;
 	int32 HeadBobStep = 0;
 	FVector HeadBobOffset = FVector::ZeroVector;
+	float HeadBobRollCurrent = 0.f;
+	/** Jump lift (+) / landing dip (-) of the view, easing back to 0. */
+	float ViewBounce = 0.f;
+	bool bWasGroundedForBob = true;
+	float SlideFOVCurrent = 0.f;
+	float SlideRollCurrent = 0.f;
+	/** Hip / aim target of the arms last frame: a new target launches the spring at once. */
+	FVector LastArmsTargetOffset = FVector::ZeroVector;
 	/** Smoothed walk lag (X, cm) and strafe tilt (roll, deg) of the arms. */
 	FVector2D ArmsMoveState = FVector2D::ZeroVector;
 	FRotator ArmsSway = FRotator::ZeroRotator;

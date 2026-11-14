@@ -240,10 +240,23 @@ void AHitmenPlayerCharacter::Landed(const FHitResult& Hit)
 	{
 		// Every landing is heard (soft or hard); a hard one dips the view.
 		const bool bHard = FallSpeed >= HardLandingSpeed;
-		UHitmenSoundLibrary::PlayHitmenSoundAt(this, bHard ? EHitmenSound::LandingHard : EHitmenSound::Landing, GetActorLocation());
-		if (bHard && IsLocallyControlled())
+		// The surface you land on (the same query as your steps), plus a body thump.
+		if (FootstepComponent)
 		{
-			AddCameraShake(FMath::GetMappedRangeValueClamped(FVector2D(HardLandingSpeed, HardLandingSpeed * 2.f), FVector2D(0.8f, 2.f), FallSpeed), 0.3f);
+			FootstepComponent->PlayLanding(FallSpeed, bHard);
+		}
+		else
+		{
+			UHitmenSoundLibrary::PlayHitmenSoundAt(this, bHard ? EHitmenSound::LandingHard : EHitmenSound::Landing, GetActorLocation());
+		}
+		if (IsLocallyControlled())
+		{
+			// Every landing dips the view a little (more from higher); a hard one also shakes it.
+			ViewBounce = FMath::Min(ViewBounce, -LandingViewDip * FMath::Min(FallSpeed / 1000.f, 2.f));
+			if (bHard)
+			{
+				AddCameraShake(FMath::GetMappedRangeValueClamped(FVector2D(HardLandingSpeed, HardLandingSpeed * 2.f), FVector2D(0.8f, 2.f), FallSpeed), 0.3f);
+			}
 		}
 	}
 	if (bParachuting)
@@ -329,6 +342,7 @@ void AHitmenPlayerCharacter::Tick(float DeltaSeconds)
 	}
 	UpdateHeadBob(DeltaSeconds);
 	UpdateEyeHeight(DeltaSeconds);
+	UpdateViewFeel(DeltaSeconds);
 	UpdateDamageFeel(DeltaSeconds);
 	UpdateRecoil(DeltaSeconds);
 	UpdateFirstPersonArms(DeltaSeconds);
@@ -380,9 +394,11 @@ float AHitmenPlayerCharacter::GetTargetEyeHeight() const
 		}
 		if (Movement->IsMantling())
 		{
-			// Dip in the middle of the pull-up, back up when landing.
+			// Dip in the middle of the pull-up, back up when landing; a low ledge is a quick step-up with a level view.
 			const float Alpha = Movement->GetMantleAlpha();
-			return FMath::Lerp(StandingViewHeight, CrouchedViewHeight, FMath::Sin(Alpha * PI) * 0.8f);
+			const float DipScale = FMath::GetMappedRangeValueClamped(FVector2D(Movement->MantleNoDipHeight, Movement->MantleNoDipHeight + 80.f),
+				FVector2D(0.f, 0.8f), Movement->GetMantleLedgeHeight());
+			return FMath::Lerp(StandingViewHeight, CrouchedViewHeight, FMath::Sin(Alpha * PI) * DipScale);
 		}
 	}
 	return bIsCrouched ? CrouchedViewHeight : StandingViewHeight;
@@ -406,7 +422,8 @@ void AHitmenPlayerCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHal
 void AHitmenPlayerCharacter::UpdateEyeHeight(float DeltaSeconds)
 {
 	CurrentEyeHeight = FMath::FInterpTo(CurrentEyeHeight, GetTargetEyeHeight(), DeltaSeconds, EyeHeightInterpSpeed);
-	FirstPersonCamera->SetRelativeLocation(FVector(0.f, HeadBobOffset.Y, CurrentEyeHeight + HeadBobOffset.Z));
+	ViewBounce = FMath::FInterpTo(ViewBounce, 0.f, DeltaSeconds, 7.f);
+	FirstPersonCamera->SetRelativeLocation(FVector(0.f, HeadBobOffset.Y, CurrentEyeHeight + HeadBobOffset.Z + ViewBounce));
 }
 
 void AHitmenPlayerCharacter::UpdateHeadBob(float DeltaSeconds)
@@ -417,7 +434,16 @@ void AHitmenPlayerCharacter::UpdateHeadBob(float DeltaSeconds)
 	const bool bSprint = Movement && Movement->IsSprinting();
 	const bool bCrouch = bIsCrouched;
 	const bool bWalking = bGrounded && Speed > 40.f;
-	HeadBobAlpha = FMath::FInterpTo(HeadBobAlpha, bWalking ? 1.f : 0.f, DeltaSeconds, 8.f);
+
+	// Takeoff: the view lifts at once (no dip toward the next step), and the bob fades out in the air.
+	const bool bAirborne = Movement && Movement->IsFalling();
+	if (bAirborne && bWasGroundedForBob && GetVelocity().Z > 0.f)
+	{
+		ViewBounce = FMath::Max(ViewBounce, JumpViewLift);
+	}
+	bWasGroundedForBob = !bAirborne;
+
+	HeadBobAlpha = FMath::FInterpTo(HeadBobAlpha, bWalking ? 1.f : 0.f, DeltaSeconds, bAirborne ? 12.f : 8.f);
 	if (bWalking)
 	{
 		// One step per half turn of the phase: the view is lowest (the foot lands) at every multiple of PI.
@@ -433,7 +459,7 @@ void AHitmenPlayerCharacter::UpdateHeadBob(float DeltaSeconds)
 			}
 		}
 	}
-	else
+	else if (!bAirborne)
 	{
 		// Standing still: settle on the next low point so the first step starts there.
 		const float Rest = FMath::CeilToFloat(HeadBobPhase / PI) * PI;
@@ -444,9 +470,29 @@ void AHitmenPlayerCharacter::UpdateHeadBob(float DeltaSeconds)
 	const float UserScale = Settings ? FMath::Clamp(Settings->HeadBobScale, 0.f, 2.f) : 1.f;
 	const float GaitScale = bSprint ? HeadBobSprintScale : (bCrouch ? HeadBobCrouchScale : 1.f);
 	const float Scale = UserScale * GaitScale * HeadBobAlpha * (bIsAiming ? 0.3f : 1.f);
-	HeadBobOffset = FVector(0.f,
-		FMath::Sin(HeadBobPhase * 0.5f) * HeadBobSide * Scale,
-		(FMath::Abs(FMath::Sin(HeadBobPhase)) - 0.5f) * HeadBobHeight * Scale);
+	// Vertical: low on each footfall, high mid-stride. Sideways: over the left foot, then the right (one cycle every
+	// two steps), with the view rolling along.
+	const float Side = FMath::Sin(HeadBobPhase);
+	HeadBobOffset = FVector(0.f, Side * HeadBobSide * Scale, (FMath::Abs(FMath::Sin(HeadBobPhase)) - 0.5f) * HeadBobHeight * Scale);
+	HeadBobRollCurrent = Side * HeadBobRoll * Scale;
+}
+
+void AHitmenPlayerCharacter::UpdateViewFeel(float DeltaSeconds)
+{
+	// Slides widen the view and roll it toward the steering; the head bob rolls it with the sway. Applied as the
+	// camera's additive offset: the aim (control rotation) never moves.
+	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
+	const float Strength = Movement ? Movement->GetSlideStrength() : 0.f;
+	float SteerRoll = 0.f;
+	if (Strength > 0.f)
+	{
+		const FVector Local = FRotator(0.f, GetControlRotation().Yaw, 0.f).UnrotateVector(GetVelocity());
+		SteerRoll = FMath::Clamp(Local.Y / FMath::Max(Local.Size2D(), 1.f), -1.f, 1.f) * SlideRoll;
+	}
+	SlideFOVCurrent = FMath::FInterpTo(SlideFOVCurrent, SlideFOVKick * Strength, DeltaSeconds, Strength > SlideFOVCurrent / FMath::Max(SlideFOVKick, 0.01f) ? 18.f : 6.f);
+	SlideRollCurrent = FMath::FInterpTo(SlideRollCurrent, SteerRoll, DeltaSeconds, 8.f);
+	FirstPersonCamera->ClearAdditiveOffset();
+	FirstPersonCamera->AddAdditiveOffset(FTransform(FRotator(0.f, 0.f, HeadBobRollCurrent + SlideRollCurrent)), SlideFOVCurrent);
 }
 
 void AHitmenPlayerCharacter::Server_TrapMash_Implementation()
@@ -729,6 +775,12 @@ void AHitmenPlayerCharacter::UpdateFirstPersonArms(float DeltaSeconds)
 		CurrentArmsOffset = TargetArmsOffset;
 		ArmsOffsetVelocity = FVector::ZeroVector;
 	}
+	else if (!TargetArmsOffset.Equals(LastArmsTargetOffset, 0.01f))
+	{
+		// A new target (aim pressed / released): the gun leaves at once instead of easing out of rest.
+		ArmsOffsetVelocity += (TargetArmsOffset - CurrentArmsOffset) * ArmsAimLaunch;
+	}
+	LastArmsTargetOffset = TargetArmsOffset;
 	const float AimDampingC = 2.f * FMath::Sqrt(ArmsAimStiffness) * ArmsAimDamping;
 	const float KickDampingC = 2.f * FMath::Sqrt(KickStiffness) * 0.6f;
 	for (int32 Step = 0; Step < Steps; ++Step)
@@ -764,7 +816,7 @@ void AHitmenPlayerCharacter::UpdateFirstPersonArms(float DeltaSeconds)
 	const float Speed = GetVelocity().Size2D();
 	const bool bGrounded = Movement && Movement->IsMovingOnGround();
 	const float BobAlpha = HeadBobAlpha * FMath::Clamp(Speed / WalkSpeed, 0.f, 1.6f) * (bIsAiming ? 0.25f : 1.f);
-	const FVector Bob(0.f, FMath::Sin(HeadBobPhase * 0.5f) * ArmsBobAmount * BobAlpha, -FMath::Abs(FMath::Sin(HeadBobPhase)) * ArmsBobAmount * BobAlpha);
+	const FVector Bob(0.f, FMath::Sin(HeadBobPhase) * ArmsBobAmount * BobAlpha, -FMath::Abs(FMath::Sin(HeadBobPhase)) * ArmsBobAmount * BobAlpha);
 
 	// Sprinting with a weapon: lowered and tilted, still in view.
 	const bool bSprinting = Movement && Movement->IsSprinting() && bGrounded && Speed > WalkSpeed * 1.05f && !bIsAiming && Weapon;
@@ -1268,7 +1320,21 @@ void AHitmenPlayerCharacter::HandleDeath(AActor* Killer, AActor* DamageCauser, b
 		bDeathCameraActive = true;
 		DeathCameraYaw = GetControlRotation().Yaw;
 		FirstPersonMesh->SetVisibility(false, true);
+		// The body (and its cosmetics) is a first-person "world space representation", which the engine always hides
+		// from its owner: make it a normal mesh so the death camera shows you falling.
+		GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::None;
 		GetMesh()->SetOwnerNoSee(false);
+		GetMesh()->MarkRenderStateDirty();
+		if (CosmeticComponent)
+		{
+			for (UPrimitiveComponent* Cosmetic : CosmeticComponent->GetCosmeticPrimitives())
+			{
+				Cosmetic->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::None;
+				Cosmetic->SetOwnerNoSee(false);
+				Cosmetic->MarkRenderStateDirty();
+			}
+		}
+		FirstPersonCamera->ClearAdditiveOffset();
 		FirstPersonCamera->bUsePawnControlRotation = false;
 		FirstPersonCamera->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 		SetActorTickEnabled(true);

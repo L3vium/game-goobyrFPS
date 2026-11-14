@@ -50,8 +50,12 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Punch alternates fists, no torso in view; knife slashes; takedown lunges; throwing winds up
 - [ ] Thrown empty pistol to a guard's head stuns it and vanishes; a loaded weapon lands as a pickup
 - [ ] Facing a wall at 30 cm the gun pulls back instead of going through
-- [x] A sprint slide with no input brakes and ends near 220 cm/s (PIE recording, 0.7.0); [ ] sideways input only bends it
-- [ ] Holding Ctrl after a slide does not slide again; release and press slides
+- [x] Walk lunge ~0.38 s / 1.4 m, sprint slide ~0.75 s / 3.9 m, crouch + Shift from a crouch-walk starts at 820,
+  releasing the keys mid-slide keeps the momentum (PIE recordings at 60 fps, 0.8.0); [ ] sideways input only bends it
+- [x] Jump while walking / sprinting on the gym floor and next to the 50 cm step: rising the next frame, speed kept,
+  view lifts (PIE recording, 0.8.0); a buffered Space at the 120 cm block still vaults (0.8.0)
+- [ ] Holding Ctrl after a slide does not slide again; release and press slides; Shift likewise for crouch + Shift
+- [ ] Two players with 100 ms lag: slides and crouch + Shift show no corrections
 - [ ] Jumping at the corner of a crate grabs it; no vault onto a barrel or the hack panel
 - [ ] Hang under a window: shimmy both ways, Space enters the window, Ctrl drops
 - [ ] Shift tap dashes (dash equipped), Shift held sprints; Space held in the air flies (jetpack equipped)
@@ -66,7 +70,6 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Thrown weapon is a floating pickup at once, no physics (PIE script, 0.5.0)
 - [x] Hook ready: a small marker where it will grab, only in range (PIE screenshot, 0.6.0); [ ] E: a thin cable from
   the hand to the anchor while pulling, seen by others too (not triggered by script: check by hand)
-- [ ] Short slide when crouching while walking; long slide from a sprint
 - [ ] Space right after grabbing a ladder does not jump off
 - [ ] Landing sounds (soft / hard) and footsteps per surface: the landing sounds like the steps on the same ground
   (grass, earth and rock on the San Lazaro terrain, stone on rocks, wood, metal, concrete); no step repeats twice

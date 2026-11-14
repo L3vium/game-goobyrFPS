@@ -184,8 +184,8 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
 - **First person**: no body or arms while moving without a weapon (the body's shadow stays); the arms appear with a
   weapon in hand (held low on the right, barrel along the view;
   sprinting lowers and tilts it, still in view) or while punching (arms at chest height, the fists cross the view).
-  Recoil kicks the view up and it recovers smoothly. On death the view leaves the head. Landings are heard (soft or
-  hard, by fall speed); a hard landing dips the view.
+  Recoil kicks the view up and it recovers smoothly. On death the view leaves the head. Landings are heard on the
+  surface you land on (soft or hard, by fall speed); a hard landing dips the view.
 - **Inventory**: 2 weapon slots (mouse wheel). A new weapon always goes to the left slot (the other one slides right;
   with both full, the held weapon is swapped out). `F` with no interactable in focus throws the held
   item: if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
@@ -213,9 +213,12 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
   (tested at their middle, so windows count); the target is red at any distance. Highlights are anti-aliased.
   No waypoint in normal view. Radii live on the player controller (`Hitmen|Sightroom`) so a 3C swap keeps them.
 - **Emotes**: hold `R` for a radial wheel.
-- **Footsteps**: a sound per surface (grass, stone, sand / dirt, wood, metal; concrete elsewhere) through physical
-  materials (PM_*), for players and NPCs; the surface also scales how far NPCs hear the step. Volume per gait (walk,
-  sprint, crouch) and a small random pitch; your own steps are 2D and quieter.
+- **Footsteps**: five takes per surface (grass, stone, sand / dirt, wood, metal; concrete elsewhere; Kenney Impact
+  Sounds, CC0, sources in `Tools/Audio/Footsteps`), one picked at random and never twice in a row, for players and NPCs;
+  the surface comes from the physical material under the feet (PM_*; rocks and mountains are stone) and terrain tiles
+  read it from their slope like their colour (grass on the flats, earth on slopes, rock on cliffs); it also scales how
+  far NPCs hear the step. Volume per gait (walk, sprint, crouch) and a small random pitch; your own steps are 2D and
+  quieter. **Landings** use the same surface query: that surface's step plus a body thump (heavier on a hard landing).
 - **Sound spaces**: every 3D sound goes through one attenuation per space (`DA_SoundSet` → Attenuations:
   `SA_Hitmen_World`, `_Footstep`, `_Gunshot`, `_Impact`), with distance falloff and occlusion: a guard's steps are
   heard a few metres away, gunshots far and muffled.

@@ -3,6 +3,14 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
+## [Unreleased]
+
+### Changed
+- Footsteps and landings: Kenney Impact Sounds (CC0) with five takes per surface played at random without repeats
+  (the jogging takes sounded wrong); landings play the step of the surface you land on plus a body thump, through
+  the same surface query as the steps (they used a fixed stone sound); San Lazaro's terrain sounds like grass, earth
+  or rock by slope, like its colour; rocks and mountains are stone.
+
 ## [0.7.0] - 2026-11-12
 
 ### Added

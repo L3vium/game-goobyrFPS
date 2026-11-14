@@ -68,7 +68,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
   the hand to the anchor while pulling, seen by others too (not triggered by script: check by hand)
 - [ ] Short slide when crouching while walking; long slide from a sprint
 - [ ] Space right after grabbing a ladder does not jump off
-- [ ] Landing sounds (soft / hard) and footsteps per surface
+- [ ] Landing sounds (soft / hard) and footsteps per surface: the landing sounds like the steps on the same ground
+  (grass, earth and rock on the San Lazaro terrain, stone on rocks, wood, metal, concrete); no step repeats twice
 - [ ] Health comes back after 6 s without being hit; no health bar
 - [ ] Mouse sensitivity default 0.25 feels right
 

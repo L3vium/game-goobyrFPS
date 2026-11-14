@@ -369,6 +369,11 @@ c *= (0.9 + 0.2 * n) * (1.0 - 0.10 * line1 - 0.18 * line4 - 0.12 * strata);
 return c;"""
 
 
+# Physical surface (footsteps, landings) of each coloured material: what you see is what you hear.
+MATERIAL_SURFACES = {"MI_Grass": "PM_Grass", "MI_Sand": "PM_Sand", "MI_Wood": "PM_Wood", "MI_Metal": "PM_Metal",
+                     "MI_Stone": "PM_Stone", "MI_Mountain": "PM_Stone"}
+
+
 def build_terrain_material(folder=None):
     """M_Hitmen_Terrain: the heightfield tiles. Colour by slope (grass, earth, rock) with the prototype grid; grass
     footsteps."""
@@ -617,7 +622,7 @@ def build_materials(physical):
         mi = create(name, inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
         set_props(mi, parent=color)
         MEL.set_material_instance_vector_parameter_value(mi, "Color", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
-        surface = {"MI_Grass": "PM_Grass", "MI_Sand": "PM_Sand", "MI_Wood": "PM_Wood", "MI_Metal": "PM_Metal", "MI_Stone": "PM_Stone"}.get(name)
+        surface = MATERIAL_SURFACES.get(name)
         if surface:
             set_props(mi, phys_material=physical[surface])
         save(mi)
@@ -819,28 +824,58 @@ def montage(name, source):
 
 
 
+FOOTSTEP_SURFACES = ("Concrete", "Stone", "Grass", "Sand", "Wood", "Metal")
+
+
+def import_footstep_sounds():
+    """Kenney Impact Sounds (CC0, Tools/Audio/Footsteps): five takes per surface and the landing thumps, imported once
+    into Audio/SFX/Footsteps. Returns {name: [SoundWave...]} for Step_<Surface>, Land_Soft and Land_Heavy."""
+    folder = path("Audio", "SFX", "Footsteps")
+    ensure_folder(folder)
+    source = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()), "Tools", "Audio", "Footsteps")
+    groups = ["Step_" + s for s in FOOTSTEP_SURFACES] + ["Land_Soft", "Land_Heavy"]
+    tasks = []
+    for group in groups:
+        for i in range(5):
+            name = "SW_%s_%02d" % (group, i)
+            wav = os.path.join(source, name + ".wav")
+            if EAL.does_asset_exist(folder + "/" + name) or not os.path.exists(wav):
+                continue
+            task = unreal.AssetImportTask()
+            task.set_editor_property("filename", wav)
+            task.set_editor_property("destination_path", folder)
+            task.set_editor_property("destination_name", name)
+            task.set_editor_property("automated", True)
+            task.set_editor_property("replace_existing", True)
+            task.set_editor_property("save", True)
+            tasks.append(task)
+    if tasks:
+        AT.import_asset_tasks(tasks)
+    return {group: [w for w in (load(folder + "/SW_%s_%02d" % (group, i)) for i in range(5)) if w] for group in groups}
+
+
 def set_footstep_sounds(character_cdo):
-    """Footstep sounds per physical surface (PM_Grass / Stone / Sand / Wood / Metal) and a default."""
-    steps1 = ESS + "SFX_Essentials_11_FOOTSTEPS_01/Cues/FEETHmn_InsJ_Footsteps_"
-    steps2 = ESS + "SFX_Essentials_20_FOOTSTEPS_02/Cues/FEETHmn_InsJ_Footsteps_"
+    """Footstep variations per physical surface (PM_Grass / Stone / Sand / Wood / Metal, concrete by default) and the
+    landing thumps. Terrain tiles map their slope to grass / sand (earth) / stone (rock) in C++."""
+    sounds = import_footstep_sounds()
     P = unreal.PhysicalSurface
-    table = {P.SURFACE_TYPE1: (steps1 + "Grass_Running_Trainers_01-01_Single-01_Cue", 0.8),
-             P.SURFACE_TYPE2: (steps2 + "Stones_Running_Trainers_01-01_Single-01_Cue", 1.0),
-             P.SURFACE_TYPE3: (steps2 + "Dirt_Running_Trainers_01-01_Single-01_Cue", 0.6),
-             P.SURFACE_TYPE4: (steps2 + "Wood_Jogging_Trainers_02-01_Single_01_Cue", 1.1),
-             P.SURFACE_TYPE5: (steps2 + "Glass_Running_Trainers_03-01_Single-01_Cue", 1.4)}
+    table = {P.SURFACE_TYPE1: ("Grass", 0.8), P.SURFACE_TYPE2: ("Stone", 1.0), P.SURFACE_TYPE3: ("Sand", 0.6),
+             P.SURFACE_TYPE4: ("Wood", 1.1), P.SURFACE_TYPE5: ("Metal", 1.4)}
     comp = component(character_cdo, "footstep_component")
     if not comp:
         return
     feedback = {}
-    for surface, (sound_path, noise) in table.items():
+    for surface, (name, noise) in table.items():
         f = unreal.HitmenSurfaceFeedback()
-        f.set_editor_property("sound", load(sound_path))
+        f.set_editor_property("sounds", sounds["Step_" + name])
+        f.set_editor_property("sound", None)
         f.set_editor_property("noise_multiplier", noise)
         feedback[surface] = f
     default = unreal.HitmenSurfaceFeedback()
-    default.set_editor_property("sound", load(steps1 + "Concrete_Jogging_Trainers_01-01_Single-01_Cue"))
-    set_props(comp, surface_feedback=feedback, default_feedback=default)
+    default.set_editor_property("sounds", sounds["Step_Concrete"])
+    default.set_editor_property("sound", None)
+    set_props(comp, surface_feedback=feedback, default_feedback=default, land_thumps=sounds["Land_Soft"],
+              hard_land_thumps=sounds["Land_Heavy"])
 
 def build_animation():
     folder = path("Characters", "Shared", "Anims")
@@ -1318,13 +1353,13 @@ def build_sound_set():
         S.CAMERA_ALARM: (hb + "Futuristic/Cue/AICorePulse1_Cue", 0.7), S.BREAKER_SWITCH: (machine, 0.8),
         S.HACK: (hb + "Futuristic/Cue/Cybernetic1_Cue", 0.6), S.PICKPOCKET: (whoosh, 0.4),
         S.SIGHTROOM_ON: (hb + "Ambient/Cue/ReversedEcho1_Cue", 0.6), S.SIGHTROOM_OFF: (hb + "Ambient/Cue/ReversedEcho2_Cue", 0.4),
-        S.LANDING: (steps + "Stones_Running_Trainers_01-01_Single-01_Cue", 0.8), S.PARACHUTE: (whoosh, 0.6),
+        S.LANDING: (path("Audio", "SFX", "Footsteps") + "/SW_Land_Soft_00", 0.6), S.PARACHUTE: (whoosh, 0.6),
         S.DEATH: (hb + "Action/Cue/Slowdown1_Cue", 0.8), S.TURRET_LOCK_ON: (hb + "Futuristic/Cue/NeonPulse1_Cue", 0.6),
         S.HEADSHOT_HIT: (hb + "FX_Heartbeats/Cue/MetalHeartbeat1_Cue", 0.6), S.HACK_LOOP: (hb + "Futuristic/Cue/Cybernetic1_Cue", 0.45),
         S.HACK_COMPLETE: ("/Game/Vefects/Item_Pickup_VFX/Audio/SND_Item_Rare_L_Cue", 0.55),
         S.RADIO_LOOP: (ESS + "SFX_Essentials_05_GLITCH/Cues/COMRadio_InsJ_Radio_Noise_Long-Wave_01-01_LOOP_Cue", 0.7),
         S.MOUNTED_GUN_FIRE: (SFX + "SFX_GunShot_Cue", 0.8), S.TANK_FIRE: (SFX + "SFX_ExplosionClassic", 1.0),
-        S.LANDING_HARD: (steps + "Stones_Running_Trainers_01-01_Single-01_Cue", 1.0),
+        S.LANDING_HARD: (path("Audio", "SFX", "Footsteps") + "/SW_Land_Heavy_00", 0.9),
     }
     data = make_data("DA_SoundSet", path("Data"), unreal.HitmenSoundSet)
     sounds, volumes = {}, {}

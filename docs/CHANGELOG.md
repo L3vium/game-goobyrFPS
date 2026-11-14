@@ -3,7 +3,7 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
-## [Unreleased]
+## [0.8.0] - 2026-11-14
 
 ### Added
 - `UHitmenEditorTools::SetBackgroundThrottling`: PIE recordings from scripts run at full rate while the editor is in

@@ -1412,6 +1412,41 @@ def build_sound_set():
     return data
 
 
+# NPC barks per alert reason (Hitman-style: every change of awareness is said out loud). Subtitles only until the
+# team records voices (DA_Barks Voices, same index as the line).
+BARKS = {
+    "GLIMPSE": ("Hm?", "What was that?", "Someone there?", "Did something just move?"),
+    "APPROACH": ("I'm going to check that out.", "Who's there? Show yourself.", "Hold on, let me take a look."),
+    "NOISE": ("What was that noise?", "Did you hear that?", "Something's off over there."),
+    "GUNFIRE": ("Shots fired!", "Gunfire! Over there!", "That was a gunshot!"),
+    "BODY": ("Man down! We've got a body!", "Body here! Call it in!", "Oh no... Lock this place down!"),
+    "SLEEPER": ("Hey! Wake up!", "Sleeping on duty? Get up!", "Come on, on your feet."),
+    "EVIDENCE": ("Who left a weapon lying here?", "That shouldn't be here. I'll take it."),
+    "DAMAGE": ("I'm hit!", "Taking fire!", "Where's that coming from?"),
+    "CALL": ("Copy, on my way!", "Heading there now!", "Understood, moving in."),
+    "SPOTTED": ("Intruder!", "There! Hostile spotted!", "Stop right there!"),
+    "LOST_TARGET": ("Lost visual!", "Where did they go?", "Spread out, find them!"),
+    "SEARCH_OVER": ("Nothing. Stay sharp.", "They're gone... for now.", "Back to positions, eyes open."),
+    "ALL_CLEAR": ("Must have been nothing.", "All clear.", "Guess I'm hearing things."),
+}
+
+
+def build_barks():
+    """DA_Barks (Project Settings > Hitmen > AI > Bark Set). Lines are only written while the asset has none, so the
+    team's edits survive a re-run."""
+    data = make_data("DA_Barks", path("Data"), unreal.HitmenBarkSet)
+    if data and not data.get_editor_property("lines"):
+        lines = {}
+        for reason, texts in BARKS.items():
+            entry = unreal.HitmenBarkLines()
+            entry.set_editor_property("lines", [unreal.Text(t) for t in texts])
+            lines[getattr(unreal.HitmenAlertReason, reason)] = entry
+        data.set_editor_property("lines", lines)
+        save(data)
+        log("barks:", len(lines), "reasons")
+    return data
+
+
 # Sound spaces: every 3D sound goes through one of these (falloff + occlusion), so a guard's steps across
 # the map are not heard. (inner radius, falloff distance, low-pass with distance, occlusion)
 ATTENUATIONS = {
@@ -1778,6 +1813,7 @@ def run():
     cosmetics = build_cosmetics(mats)
     rules = build_rules()
     build_sound_set()
+    build_barks()
     build_fonts()
     catalog = build_catalog(weapons, move, manip, cosmetics)
     maps = build_maps()

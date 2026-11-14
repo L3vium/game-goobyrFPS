@@ -291,6 +291,8 @@ namespace
 		AddKey(HitmenBBKeys::IsStationary, NewObject<UBlackboardKeyType_Bool>(Blackboard));
 		AddKey(HitmenBBKeys::HoldPosition, NewObject<UBlackboardKeyType_Bool>(Blackboard));
 		AddKey(HitmenBBKeys::UseActor, ObjectKey(AActor::StaticClass()));
+		AddKey(HitmenBBKeys::IsOnEdge, NewObject<UBlackboardKeyType_Bool>(Blackboard));
+		AddKey(HitmenBBKeys::Evacuate, NewObject<UBlackboardKeyType_Bool>(Blackboard));
 		Blackboard->MarkPackageDirty();
 		return Blackboard;
 	}
@@ -308,7 +310,12 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		B.Task(UBTTask_HitmenFindPatrolPoint::StaticClass(), Seq, -450, 320);
 		B.MoveTo(Seq, HitmenBBKeys::MoveLocation, 80.f, -150, 320);
 		B.Task(UBTTask_HitmenUseActor::StaticClass(), Seq, 150, 320);
-		UBehaviorTreeGraphNode* Wait = B.Task(UBTTask_WaitBlackboardTime::StaticClass(), Seq, 450, 320);
+		// On edge after an alert (Hitman): a look around at each point instead of the idle wait.
+		UBehaviorTreeGraphNode* Pause = B.Composite(UBTComposite_Selector::StaticClass(), Seq, 500, 320);
+		UBehaviorTreeGraphNode* EdgeLook = B.Task(UBTTask_HitmenLookAround::StaticClass(), Pause, 400, 520);
+		B.KeyIsSet(EdgeLook, HitmenBBKeys::IsOnEdge);
+		SetFloat(EdgeLook->NodeInstance, TEXT("Duration"), 2.5f);
+		UBehaviorTreeGraphNode* Wait = B.Task(UBTTask_WaitBlackboardTime::StaticClass(), Pause, 650, 520);
 		SetKey(Wait->NodeInstance, TEXT("BlackboardKey"), HitmenBBKeys::WaitTime);
 		B.Finish();
 	}
@@ -410,11 +417,15 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		B.Task(UBTTask_HitmenShoot::StaticClass(), Parallel, -150, 560, 0);
 		// Background: close in only when out of range / out of sight (the task fails when the guard can
 		// shoot from where it stands); otherwise wait a moment and check again. Never backs away.
+		// Cover first (Hitman): a spot nearby that hides a crouched guard and still lets it shoot standing.
 		UBehaviorTreeGraphNode* Reposition = B.Add<UBehaviorTreeGraphNode_Composite>(UBTComposite_Selector::StaticClass(), Parallel, 150, 560, 1);
-		UBehaviorTreeGraphNode* Flank = B.Composite(UBTComposite_Sequence::StaticClass(), Reposition, 50, 760);
-		B.Task(UBTTask_HitmenFindFlankPosition::StaticClass(), Flank, -50, 960);
-		B.MoveTo(Flank, HitmenBBKeys::MoveLocation, 100.f, 200, 960);
-		UBehaviorTreeGraphNode* HoldGround = B.Task(UBTTask_Wait::StaticClass(), Reposition, 350, 760);
+		UBehaviorTreeGraphNode* Cover = B.Composite(UBTComposite_Sequence::StaticClass(), Reposition, -200, 760);
+		B.Task(UBTTask_HitmenFindCover::StaticClass(), Cover, -300, 960);
+		B.MoveTo(Cover, HitmenBBKeys::MoveLocation, 40.f, -100, 960);
+		UBehaviorTreeGraphNode* Flank = B.Composite(UBTComposite_Sequence::StaticClass(), Reposition, 100, 760);
+		B.Task(UBTTask_HitmenFindFlankPosition::StaticClass(), Flank, 50, 960);
+		B.MoveTo(Flank, HitmenBBKeys::MoveLocation, 100.f, 250, 960);
+		UBehaviorTreeGraphNode* HoldGround = B.Task(UBTTask_Wait::StaticClass(), Reposition, 400, 760);
 		SetFloat(HoldGround->NodeInstance, TEXT("WaitTime"), 0.3f);
 
 		UBehaviorTreeGraphNode* Chase = B.Composite(UBTComposite_Sequence::StaticClass(), Sel, 600, 360);
@@ -428,6 +439,14 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 	{
 		FTreeBuilder B(Root, Blackboard);
 		UBehaviorTreeGraphNode* Sel = B.Composite(UBTComposite_Selector::StaticClass(), B.Root, 0, 150);
+
+		// VIP evacuation (Hitman): an unarmed VIP in danger runs to a safe spot and stays there, looking around.
+		UBehaviorTreeGraphNode* Evacuate = B.Composite(UBTComposite_Sequence::StaticClass(), Sel, -2300, 360);
+		B.KeyIsSet(Evacuate, HitmenBBKeys::Evacuate, EBTFlowAbortMode::Both);
+		B.Task(UBTTask_HitmenFindSafeSpot::StaticClass(), Evacuate, -2500, 560);
+		B.MoveTo(Evacuate, HitmenBBKeys::MoveLocation, 120.f, -2300, 560);
+		UBehaviorTreeGraphNode* Hide = B.Task(UBTTask_HitmenLookAround::StaticClass(), Evacuate, -2100, 560);
+		SetFloat(Hide->NodeInstance, TEXT("Duration"), 4.f);
 
 		// Radio call: any alerted NPC that is not fighting (C++ computes CanCallReinforcements:
 		// cooldown, min alert time, no relays). Both: starts as soon as allowed, aborts the moment

@@ -18,6 +18,12 @@
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 #include "EngineUtils.h"
+#include "Data/HitmenBarkSet.h"
+#include "Core/HitmenGameSettings.h"
+#include "UI/HitmenUIEventSubsystem.h"
+#include "Data/HitmenSoundSet.h"
+#include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Engine/World.h"
 
 const FName UHitmenAISubsystem::HidingSpotTag = TEXT("HitmenHidingSpot");
@@ -397,6 +403,102 @@ bool UHitmenAISubsystem::IsLocationDark(const FVector& Location) const
 	return false;
 }
 
+bool UHitmenAISubsystem::TryReportBody(const AActor* Body)
+{
+	if (!Body || ReportedBodies.Contains(Body))
+	{
+		return false;
+	}
+	ReportedBodies.Add(Body);
+	return true;
+}
+
+bool UHitmenAISubsystem::TryClaimEvidence(const AActor* Evidence, const AActor* Claimer)
+{
+	if (!Evidence)
+	{
+		return false;
+	}
+	if (const TWeakObjectPtr<const AActor>* Owner = EvidenceClaims.Find(Evidence); Owner && Owner->IsValid() && Owner->Get() != Claimer)
+	{
+		const AHitmenCharacterBase* Holder = Cast<AHitmenCharacterBase>(Owner->Get());
+		if (Holder && !Holder->IsDead())
+		{
+			return false;
+		}
+	}
+	EvidenceClaims.Add(Evidence, Claimer);
+	return true;
+}
+
+void UHitmenAISubsystem::ReportSighting(const AActor* Target, const FVector& Location)
+{
+	if (Target)
+	{
+		FSharedSighting& Sighting = SharedSightings.FindOrAdd(Target);
+		Sighting.Location = Location;
+		Sighting.Time = GetWorld()->GetTimeSeconds();
+	}
+}
+
+bool UHitmenAISubsystem::GetSharedSighting(const AActor* Target, FVector& OutLocation, float& OutTime) const
+{
+	if (const FSharedSighting* Sighting = Target ? SharedSightings.Find(Target) : nullptr)
+	{
+		OutLocation = Sighting->Location;
+		OutTime = Sighting->Time;
+		return true;
+	}
+	return false;
+}
+
+void UHitmenAISubsystem::PlayBark(UHitmenAlertComponent* Alert)
+{
+	const AActor* Speaker = Alert ? Alert->GetOwner() : nullptr;
+	const UWorld* World = Speaker ? Speaker->GetWorld() : nullptr;
+	if (!World || World->GetNetMode() == NM_DedicatedServer || Alert->GetAlertReason() == EHitmenAlertReason::None)
+	{
+		return;
+	}
+	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+	const UHitmenBarkSet* Barks = Settings->BarkSet.LoadSynchronous();
+	const FHitmenBarkLines* Lines = Barks ? Barks->Lines.Find(Alert->GetAlertReason()) : nullptr;
+	if (!Lines || Lines->Lines.Num() == 0)
+	{
+		return;
+	}
+	const int32 Index = FMath::RandRange(0, Lines->Lines.Num() - 1);
+	FHitmenBarkView View;
+	const AHitmenCharacterBase* SpeakerCharacter = Cast<AHitmenCharacterBase>(Speaker);
+	View.Speaker = SpeakerCharacter && SpeakerCharacter->IsVIP() ? Barks->VIPSpeakerName : Barks->SpeakerName;
+	View.Line = Lines->Lines[Index];
+	View.Color = Alert->GetAlertColor() == EHitmenAlertColor::None ? Barks->CalmColor : HitmenAlert::ToLinearColor(Alert->GetAlertColor());
+	View.Duration = Barks->SubtitleDuration;
+	Alert->Juice_OnBark(Alert->GetAlertReason(), View.Line);
+	if (Lines->Voices.IsValidIndex(Index) && Lines->Voices[Index])
+	{
+		UHitmenSoundLibrary::PlaySoundInSpace(Speaker, Lines->Voices[Index], Speaker->GetActorLocation() + FVector(0.f, 0.f, 70.f), EHitmenSoundSpace::World, 1.f, 1.f);
+	}
+	// Subtitles only for local players close enough to hear it (Hitman: nearby voices only).
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PC = It->Get();
+		if (!PC || !PC->IsLocalController())
+		{
+			continue;
+		}
+		const APawn* Listener = PC->GetPawn();
+		const FVector Ear = Listener ? Listener->GetActorLocation() : (PC->PlayerCameraManager ? PC->PlayerCameraManager->GetCameraLocation() : FVector::ZeroVector);
+		if (FVector::Dist(Ear, Speaker->GetActorLocation()) <= Barks->HearingDistance)
+		{
+			if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(PC))
+			{
+				UI->PushBark(View);
+			}
+		}
+	}
+}
+
 bool UHitmenAISubsystem::CanObserverSee(const APawn* Observer, const AActor* Target, float MaxRange, float HalfAngleDegrees, bool bTraceOcclusion) const
 {
 	if (!Observer || !Target)
@@ -411,7 +513,12 @@ bool UHitmenAISubsystem::CanObserverSee(const APawn* Observer, const AActor* Tar
 	FVector Eye;
 	FRotator ViewRotation;
 	Observer->GetActorEyesViewPoint(Eye, ViewRotation);
-	const FVector Point = Target->GetActorLocation();
+	// A body is where its ragdoll lies (its actor stayed where it died).
+	FVector Point = Target->GetActorLocation();
+	if (const AHitmenCharacterBase* Body = Cast<AHitmenCharacterBase>(Target); Body && Body->IsDead() && Body->GetMesh())
+	{
+		Point = Body->GetMesh()->GetBoneLocation(TEXT("pelvis"));
+	}
 	const FVector ToTarget = Point - Eye;
 	if (MaxRange > 0.f && ToTarget.SizeSquared() > FMath::Square(MaxRange))
 	{

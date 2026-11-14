@@ -538,6 +538,10 @@ void UHitmenHUDWidget::BuildDefaultLayout()
 	InventoryBar = WidgetTree->ConstructWidget<UHitmenInventoryBarWidget>(UHitmenInventoryBarWidget::StaticClass());
 	HitmenUI::AddToCanvas(Canvas, InventoryBar, FAnchors(0.5f, 1.f), FVector2D(0.f, -Margin), FVector2D(0.5f, 1.f), FVector2D(1100.f, 110.f));
 
+	// NPC barks, above the inventory bar.
+	Subtitles = WidgetTree->ConstructWidget<UHitmenSubtitlesWidget>(UHitmenSubtitlesWidget::StaticClass());
+	HitmenUI::AddToCanvas(Canvas, Subtitles, FAnchors(0.5f, 1.f), FVector2D(0.f, -Margin - 150.f), FVector2D(0.5f, 1.f), FVector2D(1400.f, 80.f));
+
 	// Vehicle health / reload and the bottom-right stack (keycards, "[F] Exit"), full screen.
 	StatusCorner = WidgetTree->ConstructWidget<UHitmenStatusCornerWidget>(UHitmenStatusCornerWidget::StaticClass());
 	StatusCorner->SetVisibility(ESlateVisibility::HitTestInvisible);

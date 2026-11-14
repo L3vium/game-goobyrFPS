@@ -29,6 +29,8 @@ namespace HitmenBBKeys
 	extern HITMEN_API const FName CanCallReinforcements;
 	extern HITMEN_API const FName IsStationary;
 	extern HITMEN_API const FName HoldPosition;
+	extern HITMEN_API const FName IsOnEdge;
+	extern HITMEN_API const FName Evacuate;
 }
 
 UCLASS(Blueprintable)
@@ -79,6 +81,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", ClampMax="180", Units="deg"))
 	float PeripheralVisionHalfAngle = 65.f;
 
+	/** Hitman-like vision: full rate inside this cone, slower in the peripheral vision up to PeripheralVisionHalfAngle. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", ClampMax="180", Units="deg"))
+	float FocalVisionHalfAngle = 30.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", ClampMax="1"))
+	float PeripheralRateMultiplier = 0.35f;
+
+	/** Only part of the body in view (head, chest and pelvis are tested) fills the meter slower: this at one in three. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", ClampMax="1"))
+	float PartialCoverRateMultiplier = 0.4f;
+
+	/** Weapons left lying around are noticed this far (they are smaller than a person). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", Units="cm"))
+	float EvidenceSightRadius = 1200.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0.1", Units="s"))
+	float EvidenceCheckInterval = 0.5f;
+
 	/** How often visible actors are evaluated (seconds). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0.02"))
 	float SightEvaluationInterval = 0.1f;
@@ -98,6 +118,11 @@ protected:
 	void EvaluateSight();
 	bool CanReallySee(const AActor* Actor) const;
 	bool IsAlarming(const AActor* Actor) const;
+	/** 0..1 how fast the meter fills for this actor: focal or peripheral vision, how much of the body is visible. */
+	float GetSightRateScale(const AActor* Actor) const;
+	/** Weapons lying around in view (evidence to pick up). */
+	void EvaluateEvidence();
+	float EvidenceAccumulator = 0.f;
 	bool IsPawnCharmed() const;
 
 	/** Applies the sight values and the difficulty multiplier to the sight sense. */

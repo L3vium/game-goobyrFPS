@@ -19,6 +19,8 @@
 #include "BrainComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "Weapons/HitmenWeaponBase.h"
+#include "EngineUtils.h"
 
 namespace HitmenBBKeys
 {
@@ -35,6 +37,8 @@ namespace HitmenBBKeys
 	const FName CanCallReinforcements = TEXT("CanCallReinforcements");
 	const FName IsStationary = TEXT("IsStationary");
 	const FName HoldPosition = TEXT("HoldPosition");
+	const FName IsOnEdge(TEXT("IsOnEdge"));
+	const FName Evacuate(TEXT("Evacuate"));
 }
 
 AHitmenAIController::AHitmenAIController()
@@ -197,9 +201,12 @@ void AHitmenAIController::HandleTargetPerceptionUpdated(AActor* Actor, FAIStimul
 
 bool AHitmenAIController::CanReallySee(const AActor* Actor) const
 {
-	// Perception already did range, cone and walls: smoke, darkness and hidden status remain.
+	// Perception runs on its own timer and lags: a target that just left sight (or teleported away) would still read as
+	// seen, at its new position. Range (the lose-sight radius), cone and walls are checked again here, with smoke,
+	// darkness and hidden status.
 	const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
-	return AI && AI->CanObserverSee(GetPawn(), Actor, 0.f, 180.f, false);
+	const float LoseRadius = SightConfig ? SightConfig->LoseSightRadius : LoseSightRadius;
+	return AI && AI->CanObserverSee(GetPawn(), Actor, LoseRadius, PeripheralVisionHalfAngle, true);
 }
 
 bool AHitmenAIController::CanSeeActorNow(const AActor* Actor) const
@@ -225,8 +232,64 @@ bool AHitmenAIController::IsAlarming(const AActor* Actor) const
 	{
 		return true;
 	}
+	// Illegal-looking actions in view (Hitman): running, climbing, vaulting, hanging, sneaking (crouch-walking), sliding.
 	const UHitmenCharacterMovementComponent* Movement = HitmenCharacter->GetHitmenMovement();
-	return Movement && (Movement->IsSprinting() || Movement->IsClimbing() || Movement->IsMantling());
+	return Movement && (Movement->IsSprinting() || Movement->IsClimbing() || Movement->IsMantling() || Movement->IsHanging() || Movement->IsSliding()
+		|| (Movement->IsCrouching() && HitmenCharacter->GetVelocity().Size2D() > 50.f));
+}
+
+float AHitmenAIController::GetSightRateScale(const AActor* Actor) const
+{
+	const APawn* Self = GetPawn();
+	if (!Self || !Actor)
+	{
+		return 1.f;
+	}
+	FVector Eye;
+	FRotator View;
+	Self->GetActorEyesViewPoint(Eye, View);
+	// Focal vision fills at full rate, the edge of the view slower.
+	const FVector ToActor = (Actor->GetActorLocation() - Eye).GetSafeNormal();
+	const float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(View.Vector(), ToActor), -1.f, 1.f)));
+	const float AngleScale = Angle <= FocalVisionHalfAngle ? 1.f
+		: FMath::GetMappedRangeValueClamped(FVector2D(FocalVisionHalfAngle, FMath::Max(PeripheralVisionHalfAngle, FocalVisionHalfAngle + 1.f)), FVector2D(1.f, PeripheralRateMultiplier), Angle);
+	// How much of the body is in view: head, chest and pelvis.
+	float Visible = 1.f;
+	if (const ACharacter* SeenCharacter = Cast<ACharacter>(Actor); SeenCharacter && SeenCharacter->GetMesh())
+	{
+		int32 Seen = 0;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenSightParts), false, Self);
+		Params.AddIgnoredActor(Actor);
+		for (const FName Bone : { FName(TEXT("head")), FName(TEXT("spine_03")), FName(TEXT("pelvis")) })
+		{
+			if (!GetWorld()->LineTraceTestByChannel(Eye, SeenCharacter->GetMesh()->GetBoneLocation(Bone), ECC_Visibility, Params))
+			{
+				++Seen;
+			}
+		}
+		Visible = Seen >= 3 ? 1.f : FMath::Lerp(PartialCoverRateMultiplier, 1.f, FMath::Max(0, Seen - 1) / 2.f);
+	}
+	return AngleScale * Visible;
+}
+
+void AHitmenAIController::EvaluateEvidence()
+{
+	const APawn* Self = GetPawn();
+	const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
+	if (!Self || !AI || !Alert || Alert->GetAlertState() != EHitmenAlertState::Unaware)
+	{
+		return;
+	}
+	for (TActorIterator<AHitmenWeaponBase> It(GetWorld()); It; ++It)
+	{
+		AHitmenWeaponBase* Weapon = *It;
+		if (Weapon && Weapon->IsEvidence() && FVector::DistSquared(Self->GetActorLocation(), Weapon->GetActorLocation()) <= FMath::Square(EvidenceSightRadius)
+			&& AI->CanObserverSee(Self, Weapon, EvidenceSightRadius, PeripheralVisionHalfAngle, true))
+		{
+			Alert->SeeEvidence(Weapon);
+			return;
+		}
+	}
 }
 
 void AHitmenAIController::EvaluateSight()
@@ -269,6 +332,13 @@ void AHitmenAIController::EvaluateSight()
 				}
 				continue;
 			}
+			// A colleague knocked out (sleep dart): go and wake it.
+			if (!UHitmenTeamLibrary::AreHostile(Self, HitmenCharacter) && HitmenCharacter->GetStatusEffects()
+				&& HitmenCharacter->GetStatusEffects()->HasStatus(EHitmenStatusEffect::Asleep))
+			{
+				Alert->SeeSleeper(HitmenCharacter);
+				continue;
+			}
 		}
 		if (UHitmenTeamLibrary::AreHostile(Self, Actor) && Cast<APawn>(Actor))
 		{
@@ -286,7 +356,13 @@ void AHitmenAIController::EvaluateSight()
 	}
 	if (AActor* Seen = bCurrentTargetVisible ? CurrentTarget : NearestHostile)
 	{
-		Alert->SeeHostile(Seen, SightEvaluationInterval, IsAlarming(Seen));
+		Alert->SeeHostile(Seen, SightEvaluationInterval, IsAlarming(Seen), GetSightRateScale(Seen));
+	}
+	EvidenceAccumulator += SightEvaluationInterval;
+	if (EvidenceAccumulator >= EvidenceCheckInterval)
+	{
+		EvidenceAccumulator = 0.f;
+		EvaluateEvidence();
 	}
 	SyncBlackboard();
 }
@@ -309,4 +385,11 @@ void AHitmenAIController::SyncBlackboard()
 	Blackboard->SetValueAsBool(HitmenBBKeys::TargetVisible, Alert->IsTargetVisible());
 	// An NPC fighting cannot call; one that is alerted but not engaged can (charmed pawns never call).
 	Blackboard->SetValueAsBool(HitmenBBKeys::CanCallReinforcements, !IsPawnCharmed() && Alert->CanCallReinforcementsNow());
+	Blackboard->SetValueAsBool(HitmenBBKeys::IsOnEdge, Alert->IsOnEdge());
+	// An unarmed VIP runs to safety from real danger (Hitman's evacuation), not from a footstep.
+	const AHitmenNPC* NPC = Cast<AHitmenNPC>(GetPawn());
+	const EHitmenAlertState State = Alert->GetAlertState();
+	const bool bDanger = State == EHitmenAlertState::Combat || State == EHitmenAlertState::Searching
+		|| (State == EHitmenAlertState::Investigating && Alert->IsThreatInvestigation());
+	Blackboard->SetValueAsBool(HitmenBBKeys::Evacuate, NPC && NPC->IsVIP() && !NPC->GetWeapon() && bDanger);
 }

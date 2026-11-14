@@ -354,6 +354,8 @@ void AHitmenWeaponBase::Drop(int32 InAmmo, const FVector& Location, const FRotat
 		return;
 	}
 	StopFire();
+	// Someone carried it: lying around, it is evidence for the guards.
+	bEvidence = OwnerPawn != nullptr || Thrower != nullptr;
 	DroppedAmmo = InAmmo;
 	LastThrower = Thrower;
 	bThrowDamageDone = Thrower == nullptr;

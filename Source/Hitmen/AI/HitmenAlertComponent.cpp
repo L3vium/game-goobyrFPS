@@ -7,6 +7,7 @@
 #include "Framework/HitmenGameState.h"
 #include "Data/HitmenMatchRules.h"
 #include "Core/HitmenTeamLibrary.h"
+#include "Weapons/HitmenWeaponBase.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 
@@ -39,6 +40,9 @@ void UHitmenAlertComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(UHitmenAlertComponent, Suspicion);
 	DOREPLIFETIME(UHitmenAlertComponent, bCallingReinforcements);
 	DOREPLIFETIME(UHitmenAlertComponent, Target);
+	DOREPLIFETIME(UHitmenAlertComponent, bTargetVisible);
+	DOREPLIFETIME(UHitmenAlertComponent, AlertReason);
+	DOREPLIFETIME(UHitmenAlertComponent, bOnEdge);
 }
 
 void UHitmenAlertComponent::BeginPlay()
@@ -127,7 +131,37 @@ bool UHitmenAlertComponent::CanCallReinforcementsNow() const
 	}
 }
 
+FVector UHitmenAlertComponent::GetCallLocation() const
+{
+	// A radio call sends others where this NPC has real knowledge: the target's last seen spot when it saw one, the
+	// body / noise it investigates otherwise (never a stale or empty last known position).
+	if (Target && LastSeenTime > 0.f && (AlertState == EHitmenAlertState::Combat || AlertState == EHitmenAlertState::Searching))
+	{
+		return LastKnownLocation;
+	}
+	return AlertState == EHitmenAlertState::Investigating ? InvestigateLocation : (LastSeenTime > 0.f ? LastKnownLocation : GetOwner()->GetActorLocation());
+}
+
 // ---- State ----
+
+void UHitmenAlertComponent::SetAlertStateWithReason(EHitmenAlertState NewState, EHitmenAlertReason Reason)
+{
+	if (!GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	if (AlertState != NewState)
+	{
+		AlertReason = Reason;
+	}
+	SetAlertState(NewState);
+}
+
+void UHitmenAlertComponent::EnterOnEdge()
+{
+	OnEdgeUntil = GetWorld()->GetTimeSeconds() + OnEdgeDuration;
+	bOnEdge = OnEdgeDuration > 0.f;
+}
 
 void UHitmenAlertComponent::SetAlertState(EHitmenAlertState NewState)
 {
@@ -171,6 +205,7 @@ void UHitmenAlertComponent::OnRep_AlertState()
 	PreviousRepState = AlertState;
 	Juice_OnAlertStateChanged(Old, AlertState);
 	OnAlertStateChanged.Broadcast(Old, AlertState);
+	UHitmenAISubsystem::PlayBark(this);
 	if (UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this))
 	{
 		AI->NotifyAlertChanged(this);
@@ -224,7 +259,7 @@ void UHitmenAlertComponent::SetSuppressed(bool bInSuppressed)
 	RefreshSearchMarker();
 }
 
-void UHitmenAlertComponent::SetInvestigate(const FVector& Location, bool bThreat)
+void UHitmenAlertComponent::SetInvestigate(const FVector& Location, bool bThreat, EHitmenAlertReason Reason)
 {
 	InvestigateLocation = Location;
 	if (AlertState == EHitmenAlertState::Combat)
@@ -232,8 +267,10 @@ void UHitmenAlertComponent::SetInvestigate(const FVector& Location, bool bThreat
 		return;
 	}
 	const bool bAlreadyInvestigating = AlertState == EHitmenAlertState::Investigating;
-	SetAlertState(EHitmenAlertState::Investigating);
+	SetAlertStateWithReason(EHitmenAlertState::Investigating, Reason);
 	bThreatInvestigation = (bAlreadyInvestigating && bThreatInvestigation) || bThreat;
+	// The timer starts on arrival (see TickComponent): the walk there does not count.
+	bInvestigateArrived = false;
 	StateEnterTime = GetWorld()->GetTimeSeconds();
 }
 
@@ -245,10 +282,11 @@ void UHitmenAlertComponent::EngageTarget(AActor* NewTarget)
 	}
 	Target = NewTarget;
 	LastKnownLocation = NewTarget->GetActorLocation();
+	LastSeenLocation = LastKnownLocation;
 	LastSeenTime = GetWorld()->GetTimeSeconds();
 	bTargetVisible = true;
 	bAlertedByCall = false;
-	SetAlertState(EHitmenAlertState::Combat);
+	SetAlertStateWithReason(EHitmenAlertState::Combat, EHitmenAlertReason::Spotted);
 }
 
 void UHitmenAlertComponent::StartSearchAround(const FVector& Location)
@@ -260,7 +298,7 @@ void UHitmenAlertComponent::StartSearchAround(const FVector& Location)
 	Target = nullptr;
 	bTargetVisible = false;
 	LastKnownLocation = Location;
-	SetAlertState(EHitmenAlertState::Searching);
+	SetAlertStateWithReason(EHitmenAlertState::Searching, EHitmenAlertReason::LostTarget);
 	StateEnterTime = GetWorld()->GetTimeSeconds();
 	RefreshSearchMarker();
 }
@@ -273,14 +311,15 @@ void UHitmenAlertComponent::RefreshSearchMarker()
 	}
 	if (UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this))
 	{
+		// The ghost marks where the target was last seen (never a noise it went to check).
 		AActor* Searched = AlertState == EHitmenAlertState::Searching && !bSuppressed && !IsDeadActor(Target) ? Target.Get() : nullptr;
-		AI->UpdateSearcher(this, Searched, LastKnownLocation);
+		AI->UpdateSearcher(this, Searched, LastSeenTime > 0.f ? LastSeenLocation : LastKnownLocation);
 	}
 }
 
 // ---- Stimuli ----
 
-void UHitmenAlertComponent::SeeHostile(AActor* Seen, float DeltaTime, bool bAlarming)
+void UHitmenAlertComponent::SeeHostile(AActor* Seen, float DeltaTime, bool bAlarming, float RateScale)
 {
 	if (bSuppressed || !Seen)
 	{
@@ -290,7 +329,13 @@ void UHitmenAlertComponent::SeeHostile(AActor* Seen, float DeltaTime, bool bAlar
 	const float Distance = FVector::Dist(GetOwner()->GetActorLocation(), Seen->GetActorLocation());
 	LastSeenTime = Now;
 	LastKnownLocation = Seen->GetActorLocation();
+	LastSeenLocation = LastKnownLocation;
 	bAlertedByCall = false;
+	// The "Hitman service": everyone hunting this target learns where it was just seen.
+	if (UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this); AI && (AlertState == EHitmenAlertState::Combat || AlertState == EHitmenAlertState::Searching))
+	{
+		AI->ReportSighting(Seen, LastKnownLocation);
+	}
 
 	// Already red, or searching for you (found you), or point blank: red.
 	if (AlertState == EHitmenAlertState::Combat || AlertState == EHitmenAlertState::Searching
@@ -298,24 +343,26 @@ void UHitmenAlertComponent::SeeHostile(AActor* Seen, float DeltaTime, bool bAlar
 	{
 		Target = Seen;
 		bTargetVisible = true;
-		SetAlertState(EHitmenAlertState::Combat);
+		SetAlertStateWithReason(EHitmenAlertState::Combat, EHitmenAlertReason::Spotted);
 		return;
 	}
 
-	// Gradual detection: the white fill must complete while seeing you to turn red.
+	// Gradual detection: the white fill must complete while seeing you to turn red. Peripheral vision and partial
+	// cover fill it slower (RateScale); an NPC on edge or investigating fills it faster.
 	const float DistanceAlpha = 1.f - FMath::Clamp(Distance / SuspicionFalloffDistance, 0.f, 0.85f);
-	const float AlertedMultiplier = AlertState == EHitmenAlertState::Investigating ? AlertedSuspicionMultiplier : 1.f;
-	const float Rate = SuspicionRiseRate * DistanceAlpha * (bAlarming ? AlarmingMultiplier : 1.f) * AlertedMultiplier * GetDifficultySuspicionMultiplier();
+	const float AlertedMultiplier = AlertState == EHitmenAlertState::Investigating ? AlertedSuspicionMultiplier : (bOnEdge ? OnEdgeSuspicionMultiplier : 1.f);
+	const float Rate = SuspicionRiseRate * DistanceAlpha * (bAlarming ? AlarmingMultiplier : 1.f) * AlertedMultiplier * GetDifficultySuspicionMultiplier()
+		* FMath::Clamp(RateScale, 0.f, 1.f);
 	SetSuspicionValue(FMath::Clamp(Suspicion + Rate * DeltaTime, 0.f, 1.f));
 	Target = Seen;
 	bTargetVisible = true;
 	if (Suspicion >= 1.f)
 	{
-		SetAlertState(EHitmenAlertState::Combat);
+		SetAlertStateWithReason(EHitmenAlertState::Combat, EHitmenAlertReason::Spotted);
 	}
 	else if (AlertState == EHitmenAlertState::Unaware)
 	{
-		SetAlertState(EHitmenAlertState::Suspicious);
+		SetAlertStateWithReason(EHitmenAlertState::Suspicious, EHitmenAlertReason::Glimpse);
 	}
 	else if (AlertState == EHitmenAlertState::Investigating)
 	{
@@ -371,7 +418,7 @@ void UHitmenAlertComponent::HearNoise(const FVector& Location, EHitmenNoiseType 
 	}
 	// Gunfire, explosions and fighting are threats; footsteps and distractions are only curiosities.
 	const bool bThreat = bLoud || Type == EHitmenNoiseType::Combat;
-	SetInvestigate(Location, bThreat);
+	SetInvestigate(Location, bThreat, bThreat ? EHitmenAlertReason::Gunfire : EHitmenAlertReason::Noise);
 }
 
 void UHitmenAlertComponent::SeeBody(AHitmenCharacterBase* Body)
@@ -381,9 +428,75 @@ void UHitmenAlertComponent::SeeBody(AHitmenCharacterBase* Body)
 		return;
 	}
 	KnownBodies.Add(Body);
+	// Like Hitman's dead-body service: a body is reported once; whoever finds it first calls it in, the others already
+	// know (they come because of the call, not each on their own).
+	UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
+	if (AI && !AI->TryReportBody(Body))
+	{
+		return;
+	}
 	if (AlertState != EHitmenAlertState::Combat)
 	{
-		SetInvestigate(Body->GetActorLocation(), true);
+		SetInvestigate(Body->GetActorLocation(), true, EHitmenAlertReason::Body);
+	}
+}
+
+void UHitmenAlertComponent::SeeSleeper(AHitmenCharacterBase* Sleeper)
+{
+	if (bSuppressed || !Sleeper || AlertState == EHitmenAlertState::Combat || AlertState == EHitmenAlertState::Searching || WakeTarget.IsValid())
+	{
+		return;
+	}
+	UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
+	if (AI && !AI->TryReportBody(Sleeper))
+	{
+		return;
+	}
+	WakeTarget = Sleeper;
+	SetInvestigate(Sleeper->GetActorLocation(), true, EHitmenAlertReason::Sleeper);
+}
+
+void UHitmenAlertComponent::SeeEvidence(AActor* Evidence)
+{
+	if (bSuppressed || !Evidence || AlertState != EHitmenAlertState::Unaware || EvidenceTarget.IsValid())
+	{
+		return;
+	}
+	UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
+	if (AI && !AI->TryClaimEvidence(Evidence, GetOwner()))
+	{
+		return;
+	}
+	EvidenceTarget = Evidence;
+	SetInvestigate(Evidence->GetActorLocation(), false, EHitmenAlertReason::Evidence);
+}
+
+void UHitmenAlertComponent::HandleInvestigateTarget()
+{
+	const FVector Here = GetOwner()->GetActorLocation();
+	if (AHitmenCharacterBase* Sleeper = WakeTarget.Get(); Sleeper && FVector::Dist2D(Here, Sleeper->GetActorLocation()) <= HandleReach)
+	{
+		if (UHitmenStatusEffectComponent* Status = Sleeper->GetStatusEffects())
+		{
+			Status->RemoveStatus(EHitmenStatusEffect::Asleep);
+		}
+		// Darted again later, it can be found again.
+		if (UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this))
+		{
+			AI->ForgetBody(Sleeper);
+		}
+		WakeTarget.Reset();
+	}
+	// Someone picked it up on the way: nothing to confiscate.
+	if (const AHitmenWeaponBase* Weapon = Cast<AHitmenWeaponBase>(EvidenceTarget.Get()); Weapon && !Weapon->IsEvidence())
+	{
+		EvidenceTarget.Reset();
+	}
+	if (AActor* Evidence = EvidenceTarget.Get(); Evidence && FVector::Dist2D(Here, Evidence->GetActorLocation()) <= HandleReach)
+	{
+		// Confiscated: a weapon left lying around is taken away (Hitman's guards bag evidence).
+		Evidence->Destroy();
+		EvidenceTarget.Reset();
 	}
 }
 
@@ -421,13 +534,13 @@ void UHitmenAlertComponent::OnDamagedBy(AActor* DamageInstigator)
 			bAlertedByCall = false;
 			LastKnownLocation = Here + Toward * UnseenAttackerSearchDistance;
 			LastSeenTime = GetWorld()->GetTimeSeconds();
-			SetAlertState(EHitmenAlertState::Combat);
+			SetAlertStateWithReason(EHitmenAlertState::Combat, EHitmenAlertReason::Damage);
 		}
 	}
 	else if (AlertState != EHitmenAlertState::Combat)
 	{
 		bAlertedByCall = false;
-		SetInvestigate(GetOwner()->GetActorLocation(), true);
+		SetInvestigate(GetOwner()->GetActorLocation(), true, EHitmenAlertReason::Damage);
 	}
 }
 
@@ -448,12 +561,12 @@ void UHitmenAlertComponent::ReceiveReinforcementCall(const FVector& Location, AA
 		LastKnownLocation = Location;
 		bTargetVisible = false;
 		LastSeenTime = GetWorld()->GetTimeSeconds();
-		SetAlertState(EHitmenAlertState::Searching);
+		SetAlertStateWithReason(EHitmenAlertState::Searching, EHitmenAlertReason::Call);
 		StateEnterTime = GetWorld()->GetTimeSeconds();
 		RefreshSearchMarker();
 		return;
 	}
-	SetInvestigate(Location, true);
+	SetInvestigate(Location, true, EHitmenAlertReason::Call);
 }
 
 // ---- Timers ----
@@ -474,13 +587,39 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		bTargetVisible = false;
 		if (AlertState == EHitmenAlertState::Combat)
 		{
-			SetAlertState(EHitmenAlertState::Searching);
+			// No bark: the threat is gone.
+			SetAlertStateWithReason(EHitmenAlertState::Searching, EHitmenAlertReason::None);
 		}
 		else if (AlertState == EHitmenAlertState::Suspicious)
 		{
-			SetAlertState(EHitmenAlertState::Unaware);
+			SetAlertStateWithReason(EHitmenAlertState::Unaware, EHitmenAlertReason::None);
 		}
 		RefreshSearchMarker();
+	}
+
+	if (bOnEdge && Now > OnEdgeUntil)
+	{
+		bOnEdge = false;
+	}
+	// Shared knowledge: pull the latest sighting of the hunted target (a colleague may have seen it since).
+	SharedKnowledgeAccumulator += DeltaTime;
+	if (SharedKnowledgeAccumulator >= SharedKnowledgeInterval && Target && !bTargetVisible
+		&& (AlertState == EHitmenAlertState::Searching || AlertState == EHitmenAlertState::Combat))
+	{
+		SharedKnowledgeAccumulator = 0.f;
+		FVector Shared;
+		float SharedTime = 0.f;
+		if (const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this); AI && AI->GetSharedSighting(Target, Shared, SharedTime) && SharedTime > LastSeenTime)
+		{
+			LastKnownLocation = Shared;
+			LastSeenLocation = Shared;
+			LastSeenTime = SharedTime;
+			if (AlertState == EHitmenAlertState::Searching)
+			{
+				StateEnterTime = Now;
+			}
+			RefreshSearchMarker();
+		}
 	}
 
 	const bool bLostSight = Now - LastSeenTime > LoseSightGraceTime;
@@ -491,15 +630,15 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		{
 			if (Target && Suspicion >= InvestigateSuspicionThreshold)
 			{
-				// Looked long enough: white turns yellow and comes to check the last seen spot.
-				SetInvestigate(LastKnownLocation, true);
+				// "Hm?": it walks over to check the spot it glimpsed (yellow).
+				SetInvestigate(LastKnownLocation, Suspicion >= 0.5f, EHitmenAlertReason::Approach);
 			}
 			else
 			{
 				SetSuspicionValue(FMath::Max(0.f, Suspicion - SuspicionDecayRate * DeltaTime));
 				if (Suspicion <= 0.f)
 				{
-					SetAlertState(EHitmenAlertState::Unaware);
+					SetAlertStateWithReason(EHitmenAlertState::Unaware, EHitmenAlertReason::AllClear);
 				}
 			}
 		}
@@ -507,7 +646,7 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	case EHitmenAlertState::Combat:
 		if (!bTargetVisible && Now - LastSeenTime > GetRuleLoseTime())
 		{
-			SetAlertState(EHitmenAlertState::Searching);
+			SetAlertStateWithReason(EHitmenAlertState::Searching, EHitmenAlertReason::LostTarget);
 		}
 		break;
 	case EHitmenAlertState::Searching:
@@ -520,20 +659,42 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 			}
 			else
 			{
-				SetAlertState(EHitmenAlertState::Unaware);
+				// Nothing found: back to routine, on edge for a while.
+				EnterOnEdge();
+				SetAlertStateWithReason(EHitmenAlertState::Unaware, EHitmenAlertReason::SearchOver);
 			}
 		}
 		break;
 	case EHitmenAlertState::Investigating:
+	{
 		if (bLostSight)
 		{
 			SetSuspicionValue(FMath::Max(0.f, Suspicion - SuspicionDecayRate * DeltaTime));
 		}
-		if (Now - StateEnterTime > GetRuleInvestigateTime())
+		// The look-around timer starts on arrival; a walk that never arrives gives up after a while.
+		if (!bInvestigateArrived && FVector::Dist2D(GetOwner()->GetActorLocation(), InvestigateLocation) <= InvestigateArrivalRadius)
 		{
-			SetAlertState(EHitmenAlertState::Unaware);
+			bInvestigateArrived = true;
+			StateEnterTime = Now;
+		}
+		if (bInvestigateArrived)
+		{
+			HandleInvestigateTarget();
+		}
+		const float Limit = bInvestigateArrived ? GetRuleInvestigateTime() : InvestigateTravelTimeout;
+		if (Now - StateEnterTime > Limit)
+		{
+			const bool bWasThreat = bThreatInvestigation;
+			WakeTarget.Reset();
+			EvidenceTarget.Reset();
+			if (bWasThreat)
+			{
+				EnterOnEdge();
+			}
+			SetAlertStateWithReason(EHitmenAlertState::Unaware, EHitmenAlertReason::AllClear);
 		}
 		break;
+	}
 	default:
 		break;
 	}

@@ -330,15 +330,16 @@ act (fire for the lighter, notes for the remote distraction, a swirl for blink a
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
 | Mounted machine gun | A free-standing tripod (no pedestal: place it anywhere), the gun high on it; usable from any side (option), 180° arc, look speed matches the player's; the view sits above the gun; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
-| Tank | Enter, third-person view; health bar at the top of the HUD, a reload ring around the crosshair (1.25 s), `[F] Exit` bottom right; its cannon barrel follows the aim, slides back 120 cm and the hull rocks on a shot; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle blast, view shake; server-driven from any client; damageable (a driven tank belongs to its driver's team; its own shells never hurt it or
-its driver), driver ejected when destroyed |
+| Tank | Enter, third-person view; health bar at the top of the HUD, a reload ring around the crosshair (1.25 s), `[F] Exit` bottom right; its cannon barrel follows the aim, slides back 120 cm and the hull rocks on a shot; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle blast, view shake; server-driven from any client; damageable (a driven tank belongs to its driver's team; its own shells never hurt it or its driver), driver ejected when destroyed |
 | Teleporter | Fixed pair: in → out |
 | Retrieval point candidate | See §2 |
 | Weapon / item spawn candidate | See §2 |
 | Keycard pickup | Grants keycard ID |
 
 ## 10. AI
-All NPCs are hostile. Sight takes priority over hearing. Sight range 1950 cm (lose at 2250), times the
+All NPCs are hostile: the whole map is what Hitman calls a hostile area (no disguises, no civilians). Within that, the
+NPCs behave like Hitman's: graded vision, "Hm?" then a walk over, shared knowledge, bodies called in once, evidence
+confiscated, on-edge guards after an alert, cover, VIP evacuation and barks for every change of awareness. Sight takes priority over hearing. Sight range 1950 cm (lose at 2250), times the
 difficulty multiplier; suspicion fills slower with distance (falloff 1600 cm). Guards in combat hold their
 weapon's aim pose and play its fire montage on each shot. Searching guards draw their gun (the weapon's equip
 animation) and hold it ready (its aim pose) each time they stop to look around; a hit plays a hit reaction. All of
@@ -349,12 +350,21 @@ damage multiplier per difficulty (Easy 0.35 / Normal 0.55 / Hard 0.8).
 
 **In combat** guards hold their ground: within `ShootingRange` (15 m, on the NPC; snipers unlimited) they stand and shoot,
 farther away or out of sight they walk closer until in range, and they never back away. They turn to face their target
-(strafing while they move) instead of facing where they walk.
+(strafing while they move) instead of facing where they walk. With you in sight they take **cover** when they find some
+(`UBTTask_HitmenFindCover`: a reachable point within 8 m and inside their range that hides a crouched guard from you but
+lets it shoot standing), duck behind it during the pause between bursts and stand up 0.35 s before the next one.
+Unarmed NPCs only fight within `UnarmedReach` (1.6 m).
 
 There are no civilians: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate.
 
+**VIP evacuation**: an unarmed VIP in danger (combat, a search, or a real threat being investigated: gunfire, a body)
+runs to the nearest `AHitmenVIPSafeSpot` (placed by LD; with none placed, a reachable point far from the threat and out
+of its sight) and waits there, looking around, until the alert ends. Its 2 nearest armed guards are sent to the spot as
+escorts (at most every 20 s).
+
 **Two NPC types** (`Behavior` on the NPC, "Hitmen|NPC|Behavior"):
-- **Patrol**: walks its `PatrolRoute` (stands at its post if it has none). Routes can be **curved**
+- **Patrol**: walks its `PatrolRoute` (stands at its post if it has none); an open route (`bClosedLoop` off) is walked
+  back and forth, and a walk interrupted by an alert resumes the point it was heading to. Routes can be **curved**
   (spline through the points). A **guard group** (`BP_GuardGroup`) makes followers walk in formation behind
   the first member and shares alerts inside the group.
 - **Keycards** hang on the carrier's hip; from behind an unaware carrier, `F` pickpockets it (before any kill).
@@ -369,7 +379,13 @@ Options on any NPC:
 - Stationary + React To Noises off + Hold Position = a **sentry** (manor gate in LDTest, gym pen).
 
 Whoever sees: one shared sight test (`UHitmenAISubsystem::CanObserverSee`: range, cone, walls,
-smoke, darkness, invisibility) drives perception, kill witnesses and body sightings.
+smoke, darkness, invisibility) drives perception, kill witnesses and body sightings (a body is seen where its ragdoll
+lies).
+
+**Vision** (`AHitmenAIController`, "Hitmen|AI|Sight"): the white fill rises at full rate in the focal cone (±30°) and at
+0.35x at the edge of the view (65°); head, chest and pelvis are traced, so a body half hidden behind cover fills slower
+(0.4x with one part in view). Alarming in view (2.5x): a weapon in hand, sprinting, climbing, vaulting, hanging,
+sliding, crouch-walking.
 
 | State | Meaning | Indicator |
 |---|---|---|
@@ -379,10 +395,11 @@ smoke, darkness, invisibility) drives perception, kill witnesses and body sighti
 | Red | Found you, attacks | red |
 | Yellow (search) | Lost you, searches likely spots | yellow |
 
-- **White → yellow**: a white NPC that loses you after its fill passed `InvestigateSuspicionThreshold`
-  goes yellow and walks to where it saw you; below it, it cools down. Red when the fill completes
-  while it sees you, when shot, when it witnesses a kill, hears close gunfire, or was already
-  searching for you.
+- **White → yellow** (Hitman's "Hm?"): a white NPC stops and turns toward you; if it loses you after its fill passed
+  `InvestigateSuspicionThreshold` (0.15) it goes yellow and walks over to where it saw you; below it, it cools down.
+  An investigation's timer starts on arrival (within 2.5 m), a walk that never arrives gives up after 30 s. Red when
+  the fill completes while it sees you, when shot, when it witnesses a kill, or was already searching for you; gunfire
+  heard sends it (yellow, gun drawn) to where the bullet landed.
 - Losing sight for a while → search state: C++ scoring of hiding spots (lockers, tall grass,
   actors tagged `HitmenHidingSpot`), the last known position and reachable nav points, favouring
   spots out of sight; spots are claimed so NPCs split up.
@@ -397,15 +414,29 @@ smoke, darkness, invisibility) drives perception, kill witnesses and body sighti
 - **Shot by an unseen shooter**: the NPC goes on alert toward where the shot came from and searches there; it never
   learns the shooter's real position without seeing them.
 - **Bodies, distractions, weapons** are investigated. Only sentries ignore bodies.
+- **Shared knowledge** (Hitman's "services", `UHitmenAISubsystem`): a body (or a sleeper) is reported once map-wide,
+  the finder calls it in and the others come because of the call; searching and fighting NPCs read their target's
+  latest sighting by any colleague every second; a guard group shares what the member that raised it knows (never your
+  real position) and only for real threats (a footstep stays that guard's business). Radio calls send the responders to
+  where the caller knows something happened (your last seen spot, or the body / noise it investigates).
+- **On edge**: after a search or a real threat, NPCs go back to their routine nervous for 60 s: they notice you 1.5x
+  faster, walk briskly (240 cm/s), keep the gun ready and look around at each patrol point instead of idling.
+- **Sleepers**: a colleague asleep (sleep dart) is walked to and woken.
+- **Evidence**: a weapon lying around after someone carried it (thrown, dropped, a dead guard's; spawned loot is not)
+  is noticed within 12 m by a calm NPC, which walks over and takes it away (one guard per weapon; nothing to take if a
+  player picked it up first).
+- **Barks**: every change of awareness is said out loud (`DA_Barks`: lines per reason, optional voices per line;
+  `Juice_OnBark` on the alert component). Every machine derives it from the replicated state and reason (no RPC);
+  local players within 15 m get a subtitle bottom centre, the speaker in its alert colour, at most 2 lines.
 - **Squad tactics**: alerted NPCs take slots around the player; when the fight spans floors one
   flanker takes another floor / the stairs while another pushes directly; snipers keep far, high
   slots.
 - **Reinforcement call**: an alerted NPC that is not shooting at a visible target calls (icon
   above its head); if not interrupted by damage before the timer ends, NPCs in a radius are
   alerted. NPCs alerted by a call do not relay it (`bReinforcementCallsRelay`). Cameras call too.
-- Behavior Tree with subtrees: `BT_NPC` → `BT_CallReinforcements` (top, aborts on sight),
-  `BT_Combat` (→ `BT_Sniper`, hold-position branch), `BT_Search`, `BT_Investigate`, `BT_Guard`
-  (stationary), `BT_Patrol`. "Target visible" decorators abort lower branches immediately.
+- Behavior Tree with subtrees: `BT_NPC` → VIP evacuation (top, `Evacuate` key), `BT_CallReinforcements` (aborts on
+  sight), `BT_Combat` (→ `BT_Sniper`, hold-position branch, cover then flank), `BT_Search`, `BT_Investigate`,
+  `BT_Guard` (stationary), `BT_Patrol` (on edge: a look around at each point). "Target visible" decorators abort lower branches immediately.
   Charmed pawns (players included) reuse the search/combat branches. Trees are generated by
   `Tools/Editor/hitmen_build_ai.py` (headless, see CLAUDE.md).
 

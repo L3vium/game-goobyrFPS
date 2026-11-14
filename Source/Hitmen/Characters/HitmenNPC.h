@@ -57,8 +57,25 @@ public:
 
 	virtual void PostInitializeComponents() override;
 
-	/** Next patrol index (owned by the NPC so routes can be shared). */
-	int32 AdvancePatrolIndex(int32 PointCount);
+	/** Next patrol index (owned by the NPC so routes can be shared); open routes go back and forth. */
+	int32 AdvancePatrolIndex(int32 PointCount, bool bClosedLoop = true);
+	int32 GetPatrolIndex() const { return PatrolIndex; }
+	/** Re-targeting the point an interrupted walk was heading to (gives up after a few tries: unreachable point). */
+	bool TryResumePatrol() { return ++PatrolResumeCount <= MaxPatrolResumes; }
+	void ResetPatrolResume() { PatrolResumeCount = 0; }
+
+	// ---- Cover (server) ----
+	void SetCoverLocation(const FVector& Location) { CoverLocation = Location; bHasCover = true; }
+	void ClearCover() { bHasCover = false; }
+	bool HasCover() const { return bHasCover; }
+	FVector GetCoverLocation() const { return CoverLocation; }
+	/** Standing at its cover point: crouches behind it between bursts. */
+	bool IsInCover() const;
+
+	/** VIP evacuation: when its escorts were last called (server). */
+	float LastEscortCallTime = -1000.f;
+	/** Crouched in cover it still watches over it (it peeks between bursts). */
+	virtual FVector GetPawnViewLocation() const override;
 
 	/** Server: shoot toward a point (aim error from difficulty), paced by the match rules: a raise delay,
 	 *  short bursts at NPCFireIntervalMultiplier x the weapon interval, pauses between bursts. */
@@ -187,6 +204,28 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Movement", meta=(ClampMin="0", Units="cm/s"))
 	float CombatWalkSpeed = 480.f;
 
+	/** Back to routine but on edge after an alert: brisker than the calm stroll. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Movement", meta=(ClampMin="0", Units="cm/s"))
+	float OnEdgeWalkSpeed = 240.f;
+
+	/** Without a gun the NPC fights only this close (it used to swing punches from its shooting range). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Combat", meta=(ClampMin="0", Units="cm"))
+	float UnarmedReach = 160.f;
+
+	/** Counts as in cover this close to its cover point. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Combat", meta=(ClampMin="0", Units="cm"))
+	float CoverArrivalRadius = 90.f;
+
+	/** In cover, stands up this long before the next burst (the crouch pose blends back first). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Combat", meta=(ClampMin="0", Units="s"))
+	float CoverRiseLead = 0.35f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Patrol", meta=(ClampMin="0"))
+	int32 MaxPatrolResumes = 2;
+
+	/** Walk speed from the alert state (and on edge). */
+	void RefreshWalkSpeed();
+
 	UFUNCTION()
 	void HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState);
 
@@ -207,6 +246,12 @@ protected:
 	TObjectPtr<AHitmenWeaponBase> Weapon;
 
 	int32 PatrolIndex = INDEX_NONE;
+	int32 PatrolDirection = 1;
+	int32 PatrolResumeCount = 0;
+	FVector CoverLocation = FVector::ZeroVector;
+	bool bHasCover = false;
+	bool bInBurstPause = false;
+	bool bWasOnEdge = false;
 
 	virtual void OnDamaged(float Damage, AActor* InstigatorActor, bool bHeadshot) override;
 	virtual void HandleDeath(AActor* Killer, AActor* DamageCauser, bool bHeadshot) override;

@@ -105,7 +105,8 @@ void AHitmenNPC::UpdateAimPose()
 	const bool bArmed = !IsDead() && Weapon && Weapon->GetWeaponData();
 	const bool bFighting = bArmed && Target && State == EHitmenAlertState::Combat;
 	// Searching: the gun stays ready while the guard stops to look around (alert state replicates: every machine).
-	const bool bReady = bFighting || (bArmed && bReadyGunWhileSearching && State == EHitmenAlertState::Searching);
+	const bool bOnEdge = AlertComponent && AlertComponent->IsOnEdge() && State == EHitmenAlertState::Unaware;
+	const bool bReady = bFighting || (bArmed && bReadyGunWhileSearching && (State == EHitmenAlertState::Searching || bOnEdge));
 	if (bReady && !bGunReady && !AnimInstance->IsAnyMontagePlaying())
 	{
 		// Draw first: the weapon's equip animation, then the aim pose takes over.
@@ -139,6 +140,12 @@ void AHitmenNPC::Tick(float DeltaSeconds)
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		UpdateAimPose();
+	}
+	// On edge ends without a state change: back to the calm stroll.
+	if (HasAuthority() && AlertComponent && AlertComponent->IsOnEdge() != bWasOnEdge)
+	{
+		bWasOnEdge = AlertComponent->IsOnEdge();
+		RefreshWalkSpeed();
 	}
 	// Snipers: a thin red line from the weapon to the target while aiming (every machine).
 	if (!bIsSniper || GetNetMode() == NM_DedicatedServer)
@@ -328,15 +335,17 @@ void AHitmenNPC::SetSleepRagdoll(bool bAsleep)
 void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState)
 {
 	PushAlertView();
+	RefreshWalkSpeed();
+	if (NewState != EHitmenAlertState::Combat)
+	{
+		ClearCover();
+		if (bIsCrouched)
+		{
+			UnCrouch();
+		}
+	}
 	if (UHitmenCharacterMovementComponent* Movement = GetHitmenMovement())
 	{
-		switch (NewState)
-		{
-		case EHitmenAlertState::Combat:        Movement->WalkSpeed = CombatWalkSpeed; break;
-		case EHitmenAlertState::Investigating:
-		case EHitmenAlertState::Searching:     Movement->WalkSpeed = AlertWalkSpeed; break;
-		default:                               Movement->WalkSpeed = CalmWalkSpeed; break;
-		}
 		// Fighting: face the target (controller focus), strafing while moving; otherwise face where it walks.
 		// Orient-to-movement wins over the controller rotation in the movement code, so it must be off.
 		const bool bFighting = NewState == EHitmenAlertState::Combat;
@@ -353,18 +362,74 @@ void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAler
 	}
 }
 
+void AHitmenNPC::RefreshWalkSpeed()
+{
+	UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
+	if (!Movement || !AlertComponent)
+	{
+		return;
+	}
+	const EHitmenAlertState State = AlertComponent->GetAlertState();
+	// An unarmed VIP in danger runs to safety.
+	if (IsVIP() && !Weapon && (State == EHitmenAlertState::Combat || State == EHitmenAlertState::Searching
+		|| (State == EHitmenAlertState::Investigating && AlertComponent->IsThreatInvestigation())))
+	{
+		Movement->WalkSpeed = CombatWalkSpeed;
+		return;
+	}
+	switch (State)
+	{
+	case EHitmenAlertState::Combat:        Movement->WalkSpeed = CombatWalkSpeed; break;
+	case EHitmenAlertState::Investigating:
+	case EHitmenAlertState::Searching:     Movement->WalkSpeed = AlertWalkSpeed; break;
+	default:                               Movement->WalkSpeed = AlertComponent->IsOnEdge() ? OnEdgeWalkSpeed : CalmWalkSpeed; break;
+	}
+}
+
 float AHitmenNPC::GetEffectiveShootingRange() const
 {
+	if (!Weapon)
+	{
+		return UnarmedReach;
+	}
 	return IsSniper() || ShootingRange <= 0.f ? TNumericLimits<float>::Max() : ShootingRange;
 }
 
-int32 AHitmenNPC::AdvancePatrolIndex(int32 PointCount)
+bool AHitmenNPC::IsInCover() const
 {
+	return bHasCover && FVector::Dist2D(GetActorLocation(), CoverLocation) <= CoverArrivalRadius;
+}
+
+FVector AHitmenNPC::GetPawnViewLocation() const
+{
+	if (bIsCrouched && IsInCover())
+	{
+		const ACharacter* Default = GetClass()->GetDefaultObject<ACharacter>();
+		const float StandOffset = Default->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() - GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+		return GetActorLocation() + FVector(0.f, 0.f, StandOffset + Default->BaseEyeHeight);
+	}
+	return Super::GetPawnViewLocation();
+}
+
+int32 AHitmenNPC::AdvancePatrolIndex(int32 PointCount, bool bClosedLoop)
+{
+	PatrolResumeCount = 0;
 	if (PointCount <= 0)
 	{
 		return INDEX_NONE;
 	}
-	PatrolIndex = (PatrolIndex + 1) % PointCount;
+	if (bClosedLoop || PointCount == 1 || PatrolIndex == INDEX_NONE)
+	{
+		PatrolDirection = 1;
+		PatrolIndex = (PatrolIndex + 1) % PointCount;
+		return PatrolIndex;
+	}
+	// Open route: back and forth.
+	if (PatrolIndex + PatrolDirection < 0 || PatrolIndex + PatrolDirection >= PointCount)
+	{
+		PatrolDirection = -PatrolDirection;
+	}
+	PatrolIndex = FMath::Clamp(PatrolIndex + PatrolDirection, 0, PointCount - 1);
 	return PatrolIndex;
 }
 
@@ -390,10 +455,24 @@ void AHitmenNPC::FireAt(const FVector& Location)
 		ShotsLeftInBurst = Rules.NPCBurstShots;
 	}
 	LastShotRequestTime = Now;
+	// In cover (Hitman): duck behind it during the pause between bursts, stand a moment before the next one.
+	if (bInBurstPause && IsInCover() && Now < NextShotTime - CoverRiseLead)
+	{
+		if (!bIsCrouched)
+		{
+			Crouch();
+		}
+		return;
+	}
+	if (bIsCrouched)
+	{
+		UnCrouch();
+	}
 	if (Now < NextShotTime)
 	{
 		return;
 	}
+	bInBurstPause = false;
 	Weapon->FireAt(Location, AimError);
 	const float Interval = Weapon->GetWeaponData() ? Weapon->GetWeaponData()->GetFireInterval() : 0.3f;
 	NextShotTime = Now + Interval * Rules.NPCFireIntervalMultiplier;
@@ -401,6 +480,7 @@ void AHitmenNPC::FireAt(const FVector& Location)
 	{
 		ShotsLeftInBurst = Rules.NPCBurstShots;
 		NextShotTime = Now + Rules.NPCBurstPause;
+		bInBurstPause = true;
 	}
 }
 

@@ -151,6 +151,7 @@ protected:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenCheatPanelWidget> CheatPanel;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenWorldHintWidget> WorldHint;
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenIntroWidget> Intro;
+	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenSubtitlesWidget> Subtitles;
 
 	UFUNCTION() void HandlePawnChanged(APawn* NewPawn);
 	UFUNCTION() void HandlePrompt(const FText& Prompt, bool bVisible);

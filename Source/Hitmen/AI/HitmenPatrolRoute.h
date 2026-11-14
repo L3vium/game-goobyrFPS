@@ -45,6 +45,9 @@ public:
 
 	const FHitmenPatrolPoint* GetPoint(int32 Index) const { return GetPath().IsValidIndex(Index) ? &GetPath()[Index] : nullptr; }
 
+	/** Open routes are walked back and forth. */
+	bool IsClosedLoop() const { return bClosedLoop; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, Category="Hitmen|Components")
 	TObjectPtr<UBillboardComponent> Billboard;

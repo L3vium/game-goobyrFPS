@@ -59,6 +59,40 @@ enum class EHitmenAlertState : uint8
 	Searching
 };
 
+/** Why an NPC's alert state last changed (replicated: every machine derives its bark from it, like Hitman's voice
+ *  lines: "Hm?", "Did you hear that?", "Hostile!", "Lost visual"...). */
+UENUM(BlueprintType)
+enum class EHitmenAlertReason : uint8
+{
+	None,
+	/** Saw something (white). */
+	Glimpse,
+	/** Walking over to check what it glimpsed. */
+	Approach,
+	/** A footstep, a distraction, a thrown object. */
+	Noise,
+	/** Gunfire, an explosion, a fight heard. */
+	Gunfire,
+	/** Found a body. */
+	Body,
+	/** Found a sleeping colleague (wakes it). */
+	Sleeper,
+	/** Found a weapon lying around. */
+	Evidence,
+	/** Hit by something. */
+	Damage,
+	/** Answering a radio call. */
+	Call,
+	/** Found the intruder (red). */
+	Spotted,
+	/** Lost sight of the intruder: searching. */
+	LostTarget,
+	/** The search found nothing: back to routine, on edge. */
+	SearchOver,
+	/** The investigation found nothing. */
+	AllClear
+};
+
 /** Colour group of an alert state (white / yellow / red). */
 UENUM(BlueprintType)
 enum class EHitmenAlertColor : uint8

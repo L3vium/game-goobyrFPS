@@ -88,6 +88,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	bool IsDropped() const { return WeaponState == EHitmenWeaponState::Dropped; }
 
+	/** Server: lying around after someone carried it (thrown, dropped, a dead guard's): guards pick it up. Spawned
+	 *  loot is not evidence. */
+	bool IsEvidence() const { return bEvidence && IsDropped() && !bHovering; }
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
 	EHitmenWeaponState GetWeaponState() const { return WeaponState; }
 
@@ -333,6 +337,8 @@ protected:
 	float MuzzleLightMinInterval = 0.09f;
 
 	float LastMuzzleLightTime = -100.f;
+
+	bool bEvidence = false;
 
 	float MuzzleLightUntil = 0.f;
 

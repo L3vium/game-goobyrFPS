@@ -2,7 +2,7 @@
 must reach assets that already exist are applied here. Idempotent; run in the open editor (PIE stopped):
     python Tools/Editor/ue_remote.py --file Tools/Editor/hitmen_patch_080.py
 Every step is safe to re-run. To run some steps only:
-    python Tools/Editor/ue_remote.py "PATCH_STEPS = ['footsteps']; exec(open(r'Tools/Editor/hitmen_patch_080.py').read())"
+    python Tools/Editor/ue_remote.py "import unreal; PATCH_STEPS = ['footsteps']; exec(open(unreal.Paths.project_dir() + 'Tools/Editor/hitmen_patch_080.py').read())"
 """
 import importlib
 import os
@@ -164,5 +164,10 @@ if wanted("gym_title"):
         placed += 1
     les.save_current_level()
     log("gym_title: placed", placed)
+
+if wanted("barks"):
+    # NPC barks (subtitles for nearby players): DA_Barks with lines for every alert reason.
+    hitmen_content.build_barks()
+    log("barks: DA_Barks")
 
 print("\n".join(LOG))

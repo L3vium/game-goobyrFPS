@@ -19,6 +19,18 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - `UHitmenEditorTools::SetPIENetMode` (QA: listen server + clients in one process from scripts).
 - Sniper trail: the whole shot appears at once and fades in 0.12 s, with debris thrown out of the surface it hits
   (`FHitmenTracerStyle`, `ImpactBurstFX` in the weapon data); misses make no impact effect.
+- Hitman-like AI (all NPCs stay hostile): graded vision (focal cone at full rate, peripheral vision slower, partial
+  cover slower; crouch-walking, sliding, climbing and hanging in view are alarming), "Hm?" then a walk over to what
+  was glimpsed (the investigation timer starts on arrival), shared knowledge in `UHitmenAISubsystem` (bodies and
+  sleepers reported once map-wide, the latest sighting of a target shared every second), on-edge routine after an
+  alert (faster suspicion, brisk walk, gun ready, look-around at each patrol point), sleepers woken, weapons left
+  lying around confiscated.
+- Guards take cover near their target (`UBTTask_HitmenFindCover`) and duck behind it between bursts.
+- VIP evacuation: an unarmed VIP in danger runs to the nearest `AHitmenVIPSafeSpot` (new marker for LD; fallback:
+  far from the threat, out of its sight) with its two nearest guards as escorts.
+- Barks: every change of awareness is said out loud (`DA_Barks`, `UHitmenBarkSet` in Project Settings -> Hitmen ->
+  AI; optional voices; `Juice_OnBark`), subtitles bottom centre for players within 15 m (`UHitmenSubtitlesWidget`),
+  derived from replicated state (no RPC).
 
 ### Changed
 - Momentum crouch and slides rebuilt on the common FPS rules: crouching while moving keeps your direction and brakes
@@ -49,6 +61,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   them).
 - Gym: the HITMEN GYM title floats high over the middle of the hall, facing the spawn (it stood like a sign against
   the south wall).
+- Open patrol routes are walked back and forth; an interrupted patrol resumes the point it was heading to.
 
 ### Fixed
 - Jumping while walking or running no longer turns into a slow climb onto the floor, a curb or a step (the air ledge
@@ -64,6 +77,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Ziplines only worked from the start post: the server measured the interaction range from the actor origin (the
   start post). Range is now measured to the nearest colliding part, so F at the bottom post rides up. Held
   interactions (hacking) also check that range.
+- Radio calls sent responders to a stale or world-origin position: they now go where the caller knows something
+  happened. Guard groups shared the target's real position and turned a footstep into a group search.
+- The unarmed VIP threw punches from 15 m (unarmed NPCs now fight within `UnarmedReach`).
+- Bodies are seen where the ragdoll lies, not where the character died.
 
 ## [0.7.0] - 2026-11-12
 

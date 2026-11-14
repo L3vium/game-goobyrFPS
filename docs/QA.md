@@ -146,8 +146,20 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Guards in range hold their ground, face you and shoot; nobody backs away (PIE script, gym AI pen, 0.7.0)
 - [x] A step right behind an unaware guard is heard: it turns and engages (PIE script, 0.7.0)
 - [ ] Guards beyond 15 m walk closer before shooting
+- [x] A guard glimpsing you barks (subtitle), turns, then walks over to exactly where it saw you, not where you went
+  (PIE script, 0.8.0); [ ] the subtitle only within 15 m
+- [x] A guard in view takes cover behind a crate nearby, ducks between bursts and stands to shoot (PIE script, 0.8.0)
+- [ ] A body is called in once: the finder radios, responders come to the body (not to your position)
+- [ ] After a search, guards walk briskly with the gun ready and look around at each patrol point for a minute
+- [ ] A thrown / dropped pistol is picked up by a guard; spawned loot is left alone
+- [ ] A darted guard is woken by a colleague who sees it
+- [x] The unarmed VIP in danger runs away (PIE script, 0.8.0); [ ] to a placed safe spot, two guards follow; no punches from afar
+- [ ] An open patrol route is walked back and forth; an interrupted patrol resumes its point
 - [x] Attack chain: an armed player in view gets shot, damage arrives slowly (~9 HP/s), guard holds the aim pose (PIE script, 0.5.0)
 - [x] Attack chain on San Lazaro: shot after 6-9 s in a guard's view, ~9 HP/s (PIE script, 0.6.0)
+- [x] Attack chain in the gym, 0.8.0 AI: white bark at 0.2 s, red at 2 s at 9 m armed, shot within seconds; no bark when
+  the target dies (PIE script, 0.8.0)
+- [x] Bark subtitles bottom centre, speaker in its alert colour, two lines (PIE screenshot, 0.8.0)
 - [x] A searching guard draws its pistol, then holds it ready each time it stops to look around (PIE log and
   screenshot, 0.6.1); [ ] the hit reaction on a shot guard; [ ] both seen from a client
 - [ ] A gunshot 15 m away behind a wall is not heard; a bullet impact draws the nearest guard to the impact

@@ -148,6 +148,22 @@ public:
 	/** True when a claim (any NPC, Claimer included = already visited) lies within SearchSpotClaimRadius. */
 	bool IsSearchSpotClaimed(const FVector& Location) const;
 
+	// ---- Shared knowledge (server): Hitman's "services" ----
+	/** First report of a body (or a sleeper) map-wide: true once, false for everyone after (one finder calls it in). */
+	bool TryReportBody(const AActor* Body);
+	/** A woken sleeper can be reported again if it is put to sleep again. */
+	void ForgetBody(const AActor* Body) { ReportedBodies.Remove(Body); }
+
+	/** A weapon lying around is claimed by one guard (the others leave it to them). */
+	bool TryClaimEvidence(const AActor* Evidence, const AActor* Claimer);
+
+	/** Latest sighting of a hunted target, shared by everyone hunting it. */
+	void ReportSighting(const AActor* Target, const FVector& Location);
+	bool GetSharedSighting(const AActor* Target, FVector& OutLocation, float& OutTime) const;
+
+	/** Every machine: shows the NPC's bark (subtitle, optional voice) to local players within hearing distance. */
+	static void PlayBark(UHitmenAlertComponent* Alert);
+
 	// ---- Last known position marker (server) ----
 	/** Alert reports which target it is searching (null = none). The target's marker is shown while
 	 *  at least one NPC searches it, hidden at zero, never for dead targets. */
@@ -177,6 +193,15 @@ private:
 	mutable TArray<FSearchClaim> SearchClaims;
 	TMap<TWeakObjectPtr<AActor>, FSearchMarker> SearchMarkers;
 	TMap<TWeakObjectPtr<UHitmenAlertComponent>, TWeakObjectPtr<AActor>> SearcherTargets;
+
+	struct FSharedSighting
+	{
+		FVector Location = FVector::ZeroVector;
+		float Time = 0.f;
+	};
+	TSet<TWeakObjectPtr<const AActor>> ReportedBodies;
+	TMap<TWeakObjectPtr<const AActor>, TWeakObjectPtr<const AActor>> EvidenceClaims;
+	TMap<TWeakObjectPtr<const AActor>, FSharedSighting> SharedSightings;
 
 	bool HasLineOfSight(const FVector& From, const FVector& To, const AActor* IgnoreA, const AActor* IgnoreB) const;
 	/** Walls between two points (up to MaxWalls), for hearing occlusion. */

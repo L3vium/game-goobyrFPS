@@ -256,6 +256,88 @@ int32 UHitmenDamageVignetteWidget::NativePaint(const FPaintArgs& Args, const FGe
 }
 
 // =============================================================================================
+// Subtitles
+// =============================================================================================
+
+void UHitmenSubtitlesWidget::BindEvents()
+{
+	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
+	{
+		UI->OnBark.AddUniqueDynamic(this, &UHitmenSubtitlesWidget::HandleBark);
+	}
+	SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void UHitmenSubtitlesWidget::UnbindEvents()
+{
+	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
+	{
+		UI->OnBark.RemoveAll(this);
+	}
+}
+
+void UHitmenSubtitlesWidget::HandleBark(const FHitmenBarkView& Bark)
+{
+	const FString Text = Bark.Line.ToString();
+	if (Text.IsEmpty())
+	{
+		return;
+	}
+	// Two guards reacting to the same thing say it once.
+	for (const FSubtitleLine& Line : Lines)
+	{
+		if (Line.Text == Text && Line.Age < 1.f)
+		{
+			return;
+		}
+	}
+	FSubtitleLine& New = Lines.AddDefaulted_GetRef();
+	New.Speaker = Bark.Speaker.ToString();
+	New.Text = Text;
+	New.Color = Bark.Color;
+	New.Duration = Bark.Duration;
+	while (Lines.Num() > MaxLines)
+	{
+		Lines.RemoveAt(0);
+	}
+}
+
+void UHitmenSubtitlesWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	for (FSubtitleLine& Line : Lines)
+	{
+		Line.Age += InDeltaTime;
+	}
+	Lines.RemoveAll([this](const FSubtitleLine& Line) { return Line.Age > Line.Duration + FadeTime; });
+}
+
+int32 UHitmenSubtitlesWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
+{
+	const FVector2D Size = AllottedGeometry.GetLocalSize();
+	const FSlateFontInfo SpeakerFont = HitmenUI::Font(FontSize, TEXT("SemiBold"));
+	const FSlateFontInfo LineFont = HitmenUI::Font(FontSize, TEXT("Medium"));
+	const float RowHeight = FontSize * 1.8f;
+	for (int32 Index = 0; Index < Lines.Num(); ++Index)
+	{
+		const FSubtitleLine& Line = Lines[Index];
+		const float Alpha = FMath::Clamp(FMath::Min(Line.Age, Line.Duration + FadeTime - Line.Age) / FadeTime, 0.f, 1.f);
+		const FString Speaker = Line.Speaker.IsEmpty() ? FString() : Line.Speaker + TEXT(":  ");
+		const FVector2D SpeakerSize = HitmenUI::MeasureText(Speaker, SpeakerFont);
+		const FVector2D TextSize = HitmenUI::MeasureText(Line.Text, LineFont);
+		const float Total = SpeakerSize.X + TextSize.X;
+		const float Y = Size.Y - (Lines.Num() - Index) * RowHeight;
+		const float X = (Size.X - Total) * 0.5f;
+		// Soft backing so the line reads on bright scenes.
+		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D(X - 60.f, Y - 5.f), FVector2D(Total * 0.5f + 60.f, RowHeight - 2.f), FLinearColor(0, 0, 0, 0), FLinearColor(0, 0, 0, 0.5f * Alpha), true);
+		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D(X + Total * 0.5f, Y - 5.f), FVector2D(Total * 0.5f + 60.f, RowHeight - 2.f), FLinearColor(0, 0, 0, 0.5f * Alpha), FLinearColor(0, 0, 0, 0), true);
+		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Speaker, FVector2D(X, Y), SpeakerFont, Line.Color * FLinearColor(1.f, 1.f, 1.f, Alpha));
+		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Line.Text, FVector2D(X + SpeakerSize.X, Y), LineFont, HitmenUI::Text() * FLinearColor(1.f, 1.f, 1.f, Alpha));
+	}
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 1, InWidgetStyle, bParentEnabled);
+}
+
+// =============================================================================================
 // Scope
 // =============================================================================================
 

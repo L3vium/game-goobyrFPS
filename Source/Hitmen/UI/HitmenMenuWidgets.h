@@ -42,6 +42,9 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 	/** UPROPERTY so GC keeps the map texture. */
 	UPROPERTY(Transient)
@@ -54,8 +57,20 @@ protected:
 	/** Marker kinds switched off in the legend. */
 	UPROPERTY(Transient)
 	TSet<TObjectPtr<UHitmenMapMarkerType>> HiddenMarkerTypes;
-	/** 1 = whole map; zooms around the player with the wheel. */
+	/** 1 = whole map; the wheel zooms toward the point under the cursor, a left drag pans. */
 	float Zoom = 1.f;
+	/** World XY at the centre of the view (the map centre at zoom 1). */
+	FVector2D ViewCenter = FVector2D::ZeroVector;
+	bool bViewCenterSet = false;
+	bool bDragging = false;
+	FVector2D LastDragPosition = FVector2D::ZeroVector;
+
+	/** The square the map is drawn in (local space) for a widget of this size. */
+	static void GetMapSquare(const FVector2D& Area, FVector2D& OutOrigin, float& OutSide);
+	FVector2D GetViewCenter() const;
+	float GetWorldSide() const;
+	/** Keeps the view inside the map at the current zoom. */
+	void ClampViewCenter();
 };
 
 /** Gym / development panel: grant every weapon, ability and keycard. */

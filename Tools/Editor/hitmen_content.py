@@ -241,7 +241,7 @@ def build_map_markers():
                                clamp_to_minimap_edge=True, show_on_pause_map=True, show_in_legend=True, legend_order=10),
         "Camera": dict(display_name=unreal.Text("Cameras"), color=unreal.LinearColor(0.75, 0.75, 0.8, 1.0),
                        shape=unreal.HitmenMapMarkerShape.DIAMOND, size=11.0, minimap_scale=0.8, show_on_minimap=True,
-                       clamp_to_minimap_edge=False, show_on_pause_map=True, show_in_legend=True, legend_order=20),
+                       clamp_to_minimap_edge=False, show_on_pause_map=False, show_in_legend=False, legend_order=20),
     }
     assets = {}
     for name, props in kinds.items():

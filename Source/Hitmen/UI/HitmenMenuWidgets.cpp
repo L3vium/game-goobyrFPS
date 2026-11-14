@@ -125,35 +125,113 @@ void UHitmenPauseMapWidget::NativeConstruct()
 	SetVisibility(ESlateVisibility::Visible);
 }
 
+void UHitmenPauseMapWidget::GetMapSquare(const FVector2D& Area, FVector2D& OutOrigin, float& OutSide)
+{
+	OutSide = FMath::Min(Area.X, Area.Y);
+	OutOrigin = (Area - FVector2D(OutSide)) * 0.5f;
+}
+
+FVector2D UHitmenPauseMapWidget::GetViewCenter() const
+{
+	return bViewCenterSet ? ViewCenter : Bounds.GetCenter();
+}
+
+float UHitmenPauseMapWidget::GetWorldSide() const
+{
+	const FVector2D Extent = Bounds.GetSize();
+	return FMath::Max(Extent.X, Extent.Y) / FMath::Max(Zoom, 1.f);
+}
+
+void UHitmenPauseMapWidget::ClampViewCenter()
+{
+	const FVector2D Center = Bounds.GetCenter();
+	const FVector2D Extent = Bounds.GetSize();
+	const float Full = FMath::Max(Extent.X, Extent.Y);
+	const float Slack = FMath::Max(0.f, (Full - GetWorldSide()) * 0.5f);
+	ViewCenter = FVector2D(FMath::Clamp(GetViewCenter().X, Center.X - Slack, Center.X + Slack), FMath::Clamp(GetViewCenter().Y, Center.Y - Slack, Center.Y + Slack));
+	bViewCenterSet = true;
+}
+
 FReply UHitmenPauseMapWidget::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
+	// Zoom toward the point under the cursor: it stays under the cursor (north up: screen X is world Y, screen Y is
+	// world -X).
+	FVector2D Origin;
+	float Side = 0.f;
+	GetMapSquare(InGeometry.GetLocalSize(), Origin, Side);
+	const FVector2D Local = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition());
+	const FVector2D Alpha = (Local - Origin) / FMath::Max(Side, 1.f) - FVector2D(0.5f);
+	const FVector2D Center = GetViewCenter();
+	const float OldSide = GetWorldSide();
+	const FVector2D Under(Center.X - Alpha.Y * OldSide, Center.Y + Alpha.X * OldSide);
 	Zoom = FMath::Clamp(Zoom * (InMouseEvent.GetWheelDelta() > 0.f ? 1.25f : 0.8f), 1.f, 5.f);
+	const float NewSide = GetWorldSide();
+	ViewCenter = FVector2D(Under.X + Alpha.Y * NewSide, Under.Y - Alpha.X * NewSide);
+	bViewCenterSet = true;
+	ClampViewCenter();
+	return FReply::Handled();
+}
+
+FReply UHitmenPauseMapWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && Zoom > 1.f)
+	{
+		bDragging = true;
+		LastDragPosition = InMouseEvent.GetScreenSpacePosition();
+		return FReply::Handled().CaptureMouse(TakeWidget());
+	}
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+FReply UHitmenPauseMapWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (bDragging && InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		bDragging = false;
+		return FReply::Handled().ReleaseMouseCapture();
+	}
+	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+FReply UHitmenPauseMapWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (!bDragging)
+	{
+		return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+	}
+	FVector2D Origin;
+	float Side = 0.f;
+	GetMapSquare(InGeometry.GetLocalSize(), Origin, Side);
+	// Screen pixels to local units, then to world: the map follows the cursor.
+	const FVector2D Delta = InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition()) - InGeometry.AbsoluteToLocal(LastDragPosition);
+	LastDragPosition = InMouseEvent.GetScreenSpacePosition();
+	const float WorldPerUnit = GetWorldSide() / FMath::Max(Side, 1.f);
+	const FVector2D Center = GetViewCenter();
+	ViewCenter = FVector2D(Center.X + Delta.Y * WorldPerUnit, Center.Y - Delta.X * WorldPerUnit);
+	bViewCenterSet = true;
+	ClampViewCenter();
 	return FReply::Handled();
 }
 
 int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-	const FVector2D Area = AllottedGeometry.GetLocalSize();
-	const float Side = FMath::Min(Area.X, Area.Y);
-	const FVector2D Origin = (Area - FVector2D(Side)) * 0.5f;
+	FVector2D Origin;
+	float Side = 0.f;
+	GetMapSquare(AllottedGeometry.GetLocalSize(), Origin, Side);
 	HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, Origin, FVector2D(Side), FLinearColor(0.03f, 0.035f, 0.04f, 0.95f));
 
-	const FVector2D Extent = Bounds.GetSize();
 	const APawn* Pawn = GetOwningPlayerPawn();
-	// Zoom keeps the player in view; north (+X) up.
-	FVector2D Focus = Bounds.GetCenter();
-	if (Pawn && Zoom > 1.f)
-	{
-		Focus = FVector2D(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
-	}
-	const float WorldSide = FMath::Max(Extent.X, Extent.Y) / Zoom;
+	// North (+X) up; the view centre follows the wheel (zoom toward the cursor) and left drags.
+	const FVector2D Focus = Zoom > 1.f ? GetViewCenter() : Bounds.GetCenter();
+	const float WorldSide = GetWorldSide();
 	const FVector2D ViewMin(Focus.X - WorldSide * 0.5f, Focus.Y - WorldSide * 0.5f);
 	auto ToMap = [&](const FVector& World)
 	{
 		const FVector2D Alpha((World.Y - ViewMin.Y) / WorldSide, 1.f - (World.X - ViewMin.X) / WorldSide);
 		return Origin + Alpha * Side;
 	};
-	OutDrawElements.PushClip(FSlateClippingZone(AllottedGeometry));
+	// Everything stays inside the map square (never over the legend or the menu).
+	OutDrawElements.PushClip(FSlateClippingZone(AllottedGeometry.ToPaintGeometry(FVector2f(Side, Side), FSlateLayoutTransform(FVector2f(Origin)))));
 	if (bHasMap)
 	{
 		const FVector2D TopLeft = ToMap(FVector(Bounds.Max.X, Bounds.Min.Y, 0.f));
@@ -197,7 +275,8 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	{
 		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
 		{
-			if (Blip.Color != EHitmenAlertColor::None && bCategoryVisible[AlertedCategory])
+			// Security cameras are not shown on the pause map (only on the minimap).
+			if (Blip.Color != EHitmenAlertColor::None && !Blip.bIsCamera && bCategoryVisible[AlertedCategory])
 			{
 				// Same colours as the minimap: white (suspicious), yellow (alerted / searching), red (combat).
 				const FVector2D P = ToMap(Blip.Location);
@@ -241,7 +320,8 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	HitmenUI::PaintFrame(OutDrawElements, LayerId + 7, AllottedGeometry, Origin, FVector2D(Side), HitmenUI::Hairline(), 1.f);
 	HitmenUI::PaintText(OutDrawElements, LayerId + 7, AllottedGeometry, MapName.ToString().ToUpper(), Origin + FVector2D(18.f, 14.f), HitmenUI::SpacedFont(26, TEXT("Bold"), 60), HitmenUI::Text());
 	HitmenUI::PaintText(OutDrawElements, LayerId + 7, AllottedGeometry, TEXT("N"), Origin + FVector2D(Side * 0.5f - 6.f, 8.f), HitmenUI::Font(20, TEXT("Bold")), HitmenUI::Accent());
-	const FString ZoomText = FString::Printf(TEXT("WHEEL TO ZOOM  -  x%.1f"), Zoom);
+	const FString ZoomText = Zoom > 1.f ? FString::Printf(TEXT("WHEEL: ZOOM AT THE CURSOR  -  DRAG: MOVE  -  x%.1f"), Zoom)
+		: FString(TEXT("WHEEL: ZOOM AT THE CURSOR"));
 	HitmenUI::PaintText(OutDrawElements, LayerId + 7, AllottedGeometry, ZoomText, Origin + FVector2D(18.f, Side - 30.f), HitmenUI::SpacedFont(13, TEXT("Medium"), 160), HitmenUI::TextDim());
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 8, InWidgetStyle, bParentEnabled);
 }

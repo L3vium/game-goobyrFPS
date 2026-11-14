@@ -44,6 +44,11 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Sightroom works like Hitman's Instinct: the scan look covers the whole map, enemies show through walls only within
   20 m (they were map-wide), the target anywhere, usable objects only where they are really in view (depth-tested,
   never through walls); stencils are cleared when the pawn goes away. Strictly local.
+- Pause map: the wheel zooms toward the cursor (it zoomed onto the player), a left drag pans, markers and labels
+  stay inside the map square; security cameras are no longer on the pause map or its legend (the minimap keeps
+  them).
+- Gym: the HITMEN GYM title floats high over the middle of the hall, facing the spawn (it stood like a sign against
+  the south wall).
 
 ### Fixed
 - Jumping while walking or running no longer turns into a slow climb onto the floor, a curb or a step (the air ledge

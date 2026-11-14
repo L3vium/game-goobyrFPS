@@ -31,6 +31,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Ready with two players (PIE listen server + client joining by room code): nobody leaves while one is not
   ready, both travel ~1 s after the last Ready, no 5-4-3-2-1 (PIE script, 0.6.1); [ ] two machines over Steam
 - [x] Pause: PAUSE, three big blocks, legend on the right with the real colours, debug tools behind a button (screenshot, 0.5.0)
+- [x] Pause map: no cameras on the map or in the legend, labels clipped to the map (screenshot, 0.8.0); [ ] the wheel zooms
+  toward the cursor, a left drag pans
 - [ ] Space and Escape go back on every page; Space never re-presses the last clicked button
 - [ ] Create Room: watcher eye shows only when hovering a player without team; a click toggles it
 - [x] Create Room on one grid: map tile and players panel aligned, full player name, join hint (screenshot, 0.6.1)

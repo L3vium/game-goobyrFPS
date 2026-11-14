@@ -526,8 +526,9 @@ def build_gym():
     nav_bounds((0, 0, 0), (H + 200, H + 200, 1500))
     # Spawn: south-west, facing north toward the movement course.
     team_starts([(-2300, -3150, 90)])
-    text((-1300, -3450, 260), "HITMEN GYM", 120)
-    text((-1300, -3450, 190), "Esc: debug panel - weapons, abilities, keycards, god mode", 34)
+    # The title floats high over the middle of the hall, facing the spawn (south-west).
+    text((0, 0, 1150), "HITMEN GYM", 320, yaw=-126.0)
+    text((0, 0, 1050), "Esc: debug panel - weapons, abilities, keycards, god mode", 70, yaw=-126.0)
 
     # =========================== A. MOVEMENT (west, a loop going north) ===========================
     X = -2400

@@ -152,7 +152,7 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
 ## 6. Player
 - **Movement**: walk (420), sprint (720), crouch (210, the view lowers smoothly), jump (instant, never turned into a
   climb onto a curb, a step or the floor), ladders / gutters (automatic, forward = up, smooth pull-up at the top),
-  ziplines (`F` at a post: rides to the other end on its own at 16 m/s), jump pads, lockers (you stand inside and look
+  ziplines (`F` at either post: rides to the other end on its own at 16 m/s, up or down), jump pads, lockers (you stand inside and look
   through the slit). Releasing the keys stops you crisply.
 - **Momentum crouch / slide** (the common FPS rules: CoD, Apex / Titanfall, Halo, Battlefield): crouching while moving
   keeps going the way you were going and brakes down to crouch speed — from a walk a short lunge (+110, about 0.35 s /
@@ -330,7 +330,8 @@ act (fire for the lighter, notes for the remote distraction, a swirl for blink a
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
 | Mounted machine gun | A free-standing tripod (no pedestal: place it anywhere), the gun high on it; usable from any side (option), 180° arc, look speed matches the player's; the view sits above the gun; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
-| Tank | Enter, third-person view; health bar at the top of the HUD, a reload ring around the crosshair (1.25 s), `[F] Exit` bottom right; its cannon barrel follows the aim, slides back 120 cm and the hull rocks on a shot; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle blast, view shake; server-driven from any client; damageable, driver ejected when destroyed |
+| Tank | Enter, third-person view; health bar at the top of the HUD, a reload ring around the crosshair (1.25 s), `[F] Exit` bottom right; its cannon barrel follows the aim, slides back 120 cm and the hull rocks on a shot; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle blast, view shake; server-driven from any client; damageable (a driven tank belongs to its driver's team; its own shells never hurt it or
+its driver), driver ejected when destroyed |
 | Teleporter | Fixed pair: in → out |
 | Retrieval point candidate | See §2 |
 | Weapon / item spawn candidate | See §2 |

@@ -57,6 +57,13 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - After death the third-person death camera shows your body (it was hidden: the engine always hides a first-person
   world-space body from its owner).
 - Crouching showed a standing body and shadow (there is no crouch animation).
+- The tank damaged itself (and its driver) with its own shells: a vehicle now ignores damage from itself, its driver
+  and its own projectiles.
+- A driven tank or mounted gun was Neutral (the stowed driver lost its player state): it now takes its driver's
+  team, so other players can damage it.
+- Ziplines only worked from the start post: the server measured the interaction range from the actor origin (the
+  start post). Range is now measured to the nearest colliding part, so F at the bottom post rides up. Held
+  interactions (hacking) also check that range.
 
 ## [0.7.0] - 2026-11-12
 

@@ -117,7 +117,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Shotgun pellets and sniper shots draw tracers; the turret fires red tracers
 - [ ] Flashbang: a big white flash; smoke grenade: the beige toon cloud fills quickly
 - [ ] Jetpack smoke under the feet (seen by another player); zipline sparks and sound; ladder grab clicks
-- [ ] Tank shot: barrel slides back, hull rocks, muzzle blast
+- [ ] Tank shot: barrel slides back, hull rocks, muzzle blast; a shell bursting right in front does not hurt the tank
+- [x] Zipline from the bottom post rides up (PIE script on the host, 0.8.0); [ ] from a client
 - [ ] Hit: red arc toward the shooter, fringe, tint; low health greys the view
 - [x] Doors open away from you from both sides and fill their opening (PIE script, 0.5.0)
 - [x] Vent hatch swings on a side hinge like a small door, away from you (PIE screenshot, 0.6.0)

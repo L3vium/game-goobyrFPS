@@ -18,6 +18,7 @@
 #include "GameFramework/FloatingPawnMovement.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/PlayerState.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -92,6 +93,11 @@ void AHitmenVehiclePawn::Interact_Implementation(AActor* Interactor)
 
 int32 AHitmenVehiclePawn::GetHitmenTeamId_Implementation() const
 {
+	// While driven the vehicle owns the player state (the stowed driver lost it): read the team there.
+	if (const APlayerState* PS = GetPlayerState())
+	{
+		return UHitmenTeamLibrary::GetTeamId(PS);
+	}
 	return Driver ? UHitmenTeamLibrary::GetTeamId(Driver) : HitmenTeams::Neutral;
 }
 
@@ -248,6 +254,11 @@ float AHitmenVehiclePawn::TakeDamage(float DamageAmount, FDamageEvent const& Dam
 		return 0.f;
 	}
 	AActor* InstigatorActor = EventInstigator ? EventInstigator->GetPawn() : DamageCauser;
+	// A vehicle never hurts itself or its driver with its own shots (a shell bursting in front of the tank).
+	if (InstigatorActor == this || (Driver && InstigatorActor == Driver) || (DamageCauser && DamageCauser->GetInstigator() == this))
+	{
+		return 0.f;
+	}
 	if (Driver)
 	{
 		const AHitmenGameModeBase* GM = GetWorld()->GetAuthGameMode<AHitmenGameModeBase>();

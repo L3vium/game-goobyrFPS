@@ -511,6 +511,11 @@ adaptation, so the image never drifts when you land, enter a room or leave a cav
   `AHitmenPlayerController`; the pawn only exposes functions, so the 3C Blueprint can be swapped.
 - **Server-authoritative.** Listen server; the server owns damage, AI, match state, pickups and
   spawns. Character movement is client-predicted through `UHitmenCharacterMovementComponent`.
+  Client requests are checked: a shot must start within `MaxFireOriginError` (150 cm + lag) of the shooter's eye and
+  go within `MaxFireAngleError` (30°) of where the server sees it look, never from a dead or stunned shooter; loadouts
+  and cosmetics must come from `DA_Catalog`; interactions are range-checked. Cheat flags replicate to their owner
+  only; vehicle aim is sent at most 20 times a second and only when it moved; projectile impacts and blasts are a
+  reliable multicast (the projectile is destroyed right after).
 - **Data-driven tuning (GD tools).** `Project Settings → Hitmen` (`UHitmenGameSettings`) and
   data assets (`DA_MatchRules_*`, `DA_Weapon_*`, `DA_Ability_*`, `DA_Map_*`, `DA_AnimSet_*`).
 - **Framework Blueprints.** `BP_GameInstance` (Options volume mix), `BP_GameState`,

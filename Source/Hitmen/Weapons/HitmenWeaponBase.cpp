@@ -1008,8 +1008,19 @@ void AHitmenWeaponBase::Server_Fire_Implementation(FVector_NetQuantize Origin, F
 	{
 		return;
 	}
-	// Origin must be near the shooter.
-	if (FVector::Dist(Origin, OwnerPawn->GetActorLocation()) > 400.f)
+	// Dead, stunned or asleep shooters do not shoot; the shot must start at the shooter's eye and go where the server
+	// sees it look (a little behind with lag: the margins are generous, they stop shots from elsewhere or backwards).
+	if (const AHitmenCharacterBase* Shooter = Cast<AHitmenCharacterBase>(OwnerPawn))
+	{
+		if (Shooter->IsDead() || (Shooter->GetStatusEffects() && Shooter->GetStatusEffects()->IsIncapacitated()))
+		{
+			return;
+		}
+	}
+	const FVector Eye = OwnerPawn->GetPawnViewLocation();
+	const float OriginSlack = MaxFireOriginError + OwnerPawn->GetVelocity().Size() * 0.25f;
+	const float CosLimit = FMath::Cos(FMath::DegreesToRadians(MaxFireAngleError));
+	if (FVector::Dist(Origin, Eye) > OriginSlack || FVector::DotProduct(Direction, OwnerPawn->GetBaseAimRotation().Vector()) < CosLimit)
 	{
 		return;
 	}

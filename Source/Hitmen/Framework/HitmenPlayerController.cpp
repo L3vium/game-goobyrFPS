@@ -24,6 +24,9 @@
 #include "Abilities/HitmenAbilityComponent.h"
 #include "Data/HitmenAbilityData.h"
 #include "Data/HitmenWeaponData.h"
+#include "Data/HitmenCatalog.h"
+#include "Data/HitmenCosmeticItem.h"
+#include "Core/HitmenGameSettings.h"
 #include "Data/HitmenAnimSet.h"
 #include "Abilities/HitmenAbility.h"
 #include "Interaction/HitmenInteractionComponent.h"
@@ -1001,8 +1004,46 @@ void AHitmenPlayerController::Server_SetIcon_Implementation(int32 IconIndex)
 	if (AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>()) { PS->SetIconIndex(IconIndex); }
 }
 
+namespace
+{
+	/** Only what DA_Catalog offers (a modified client could send any weapon or ability asset). */
+	bool IsLoadoutAllowed(const FHitmenLoadout& Loadout)
+	{
+		const UHitmenCatalog* Catalog = UHitmenGameSettings::Get()->LoadCatalog();
+		if (!Catalog)
+		{
+			return true;
+		}
+		return (!Loadout.Weapon || Catalog->Weapons.Contains(Loadout.Weapon))
+			&& (!Loadout.MoveAbility || Catalog->MoveAbilities.Contains(Loadout.MoveAbility))
+			&& (!Loadout.ManipulationAbility || Catalog->ManipulationAbilities.Contains(Loadout.ManipulationAbility));
+	}
+
+	bool IsCosmeticsAllowed(const FHitmenCosmeticLoadout& Cosmetics)
+	{
+		const UHitmenCatalog* Catalog = UHitmenGameSettings::Get()->LoadCatalog();
+		if (!Catalog)
+		{
+			return true;
+		}
+		for (const EHitmenCosmeticSlot Slot : { EHitmenCosmeticSlot::Head, EHitmenCosmeticSlot::Body, EHitmenCosmeticSlot::Legs })
+		{
+			const UHitmenCosmeticItem* Item = Cosmetics.GetSlot(Slot);
+			if (Item && (!Catalog->Cosmetics.Contains(Item) || Item->Slot != Slot))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
 void AHitmenPlayerController::Server_SetCosmetics_Implementation(const FHitmenCosmeticLoadout& Cosmetics)
 {
+	if (!IsCosmeticsAllowed(Cosmetics))
+	{
+		return;
+	}
 	if (AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>()) { PS->SetCosmetics(Cosmetics); }
 	if (AHitmenPlayerCharacter* Agent = Cast<AHitmenPlayerCharacter>(GetPawn()))
 	{
@@ -1013,7 +1054,7 @@ void AHitmenPlayerController::Server_SetCosmetics_Implementation(const FHitmenCo
 void AHitmenPlayerController::Server_SetLoadout_Implementation(const FHitmenLoadout& Loadout)
 {
 	AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
-	if (!PS)
+	if (!PS || !IsLoadoutAllowed(Loadout))
 	{
 		return;
 	}

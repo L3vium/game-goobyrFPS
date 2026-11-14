@@ -138,7 +138,8 @@ protected:
 	/** Server: explosion behaviour (default radial damage). */
 	virtual void OnExplode(const FVector& Origin);
 
-	UFUNCTION(NetMulticast, Unreliable)
+	/** Reliable: the projectile is destroyed right after, an unreliable blast could be lost. */
+	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_Impact(FVector_NetQuantize Location, bool bExploded);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")

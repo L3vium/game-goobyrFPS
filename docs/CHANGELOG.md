@@ -62,6 +62,14 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Gym: the HITMEN GYM title floats high over the middle of the hall, facing the spawn (it stood like a sign against
   the south wall).
 - Open patrol routes are walked back and forth; an interrupted patrol resumes the point it was heading to.
+- Server checks: `Server_Fire` refuses dead or stunned shooters, shots starting away from the shooter's eye
+  (`MaxFireOriginError`) or going away from where the server sees it look (`MaxFireAngleError`); loadouts and
+  cosmetics must come from `DA_Catalog`.
+- Network: cheat flags replicate to their owner only; mounted gun and tank aim sent at most 20 times a second and
+  only when it moved (a final send when the mouse stops, a forced one on fire); projectile impacts are a reliable
+  multicast (the blast could be lost before the destroy).
+- Mounted gun and tank muzzle lights: candelas (40 / 150 cd, `MuzzleLightIntensity`) without bounce light or fog,
+  instead of 30000 / 200000 units.
 
 ### Fixed
 - Jumping while walking or running no longer turns into a slow climb onto the floor, a curb or a step (the air ledge

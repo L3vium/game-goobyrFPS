@@ -249,6 +249,14 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void Server_Fire(FVector_NetQuantize Origin, FVector_NetQuantizeNormal Direction, int32 Seed, float Charge);
 
+	/** Server_Fire checks (anti-cheat, generous for lag): the shot starts this close to the shooter's eye... */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Network", meta=(ClampMin="0", Units="cm"))
+	float MaxFireOriginError = 150.f;
+
+	/** ...and goes this close to where the server sees the shooter look (spread, recoil and lag included). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Network", meta=(ClampMin="0", ClampMax="180", Units="deg"))
+	float MaxFireAngleError = 30.f;
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_FireEffects(FVector_NetQuantize Origin, const TArray<FVector_NetQuantize>& Impacts);
 

@@ -142,6 +142,10 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] San Lazaro by hand: climb the terraces by their stairs, hang and shimmy along a ledge band, cross both bridges
   and the walkway, enter the cave through the trench, take the tunnel to the basement, the tank out of the garage
 
+## Network
+- [x] Client shots accepted by the server checks at 100 ms lag, standing, moving and crouched (PIE listen server +
+  client script, 0.8.0); [ ] a mounted gun and the tank aim smoothly from a client
+
 ## AI
 - [x] Guards in range hold their ground, face you and shoot; nobody backs away (PIE script, gym AI pen, 0.7.0)
 - [x] A step right behind an unaware guard is heard: it turns and engages (PIE script, 0.7.0)

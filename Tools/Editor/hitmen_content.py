@@ -280,6 +280,11 @@ for (int j = 0; j < 8; j++)
 }
 float s = max(sv, ring);
 float edge = step(0.5, ring) * (1.0 - cov);
+// Usable objects (2) only where they are really in view: their custom depth must be the nearest surface.
+float seen = step(CustomDepth.r, SceneDepth.r + 2.0 + SceneDepth.r * 0.002);
+float objectMask = (s > 1.5 && s < 2.5) ? seen : 1.0;
+cov *= objectMask;
+edge *= objectMask;
 
 float3 base = Scene.rgb;
 float lum = dot(base, float3(0.3, 0.59, 0.11));
@@ -316,6 +321,10 @@ def build_sightroom_pp():
     stencil = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 0)
     set_props(stencil, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
     world_pos = MEL.create_material_expression(pp, unreal.MaterialExpressionWorldPosition, -900, 200)
+    custom_depth = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -1150, 0)
+    set_props(custom_depth, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_DEPTH)
+    scene_depth = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -1150, 200)
+    set_props(scene_depth, scene_texture_id=unreal.SceneTextureId.PPI_SCENE_DEPTH)
     params = {}
     for i, (pname, kind, default) in enumerate((("ScanOrigin", "vector", None), ("ScanRadius", "scalar", 0.0),
                                                  ("ScanProgress", "scalar", 0.0), ("Fade", "scalar", 0.0),
@@ -329,7 +338,7 @@ def build_sightroom_pp():
         params[pname] = node
     custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
     inputs = []
-    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight"):
+    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight", "CustomDepth", "SceneDepth"):
         ci = unreal.CustomInput()
         ci.set_editor_property("input_name", input_name)
         inputs.append(ci)
@@ -342,6 +351,8 @@ def build_sightroom_pp():
     MEL.connect_material_expressions(params["ScanProgress"], "", custom, "Progress")
     MEL.connect_material_expressions(params["Fade"], "", custom, "Fade")
     MEL.connect_material_expressions(params["HeightWeight"], "", custom, "HeightWeight")
+    MEL.connect_material_expressions(custom_depth, "Color", custom, "CustomDepth")
+    MEL.connect_material_expressions(scene_depth, "Color", custom, "SceneDepth")
     MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     MEL.recompile_material(pp)
     save(pp)

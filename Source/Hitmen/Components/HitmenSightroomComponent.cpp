@@ -30,6 +30,13 @@ void UHitmenSightroomComponent::BeginPlay()
 	}
 }
 
+void UHitmenSightroomComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// Local render state only: never leave stencils on other actors when this pawn goes away.
+	ClearHighlights();
+	Super::EndPlay(EndPlayReason);
+}
+
 UCameraComponent* UHitmenSightroomComponent::GetCamera() const
 {
 	return GetOwner()->FindComponentByClass<UCameraComponent>();
@@ -88,7 +95,7 @@ void UHitmenSightroomComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 float UHitmenSightroomComponent::GetWaveRadius() const
 {
 	// Ease-out cubic, the same curve the post-process draws.
-	return EnemyRadius * (1.f - FMath::Pow(1.f - ScanProgress, 3.f));
+	return ScanVisualRadius * (1.f - FMath::Pow(1.f - ScanProgress, 3.f));
 }
 
 float UHitmenSightroomComponent::GetWaveDistance(const FVector& Origin, const FVector& Location) const
@@ -103,9 +110,8 @@ void UHitmenSightroomComponent::ApplyPostProcess()
 		return;
 	}
 	// The wave keeps travelling to the edge of the scan; the grid and the cool tint fade with FadeAlpha.
-	const float Eased = GetWaveRadius() / FMath::Max(EnemyRadius, 1.f);
 	PostProcessInstance->SetScalarParameterValue(TEXT("ScanProgress"), ScanProgress);
-	PostProcessInstance->SetScalarParameterValue(TEXT("ScanRadius"), EnemyRadius * Eased);
+	PostProcessInstance->SetScalarParameterValue(TEXT("ScanRadius"), GetWaveRadius());
 	PostProcessInstance->SetScalarParameterValue(TEXT("HeightWeight"), WaveHeightWeight);
 	PostProcessInstance->SetScalarParameterValue(TEXT("Fade"), FadeAlpha);
 	PostProcessInstance->SetVectorParameterValue(TEXT("ScanOrigin"), GetOwner()->GetActorLocation());
@@ -167,7 +173,8 @@ void UHitmenSightroomComponent::Refresh()
 			break;
 		}
 		case EHitmenScanCategory::Enemy:
-			Stencil = (WaveDistance <= WaveRadius || (bWaveDone && bEnemiesMapWide)) ? HitmenStencil::Enemy : 0;
+			// Through walls, but only near you (or anywhere with bEnemiesMapWide once the wave is done).
+			Stencil = ((WaveDistance <= WaveRadius && WaveDistance <= EnemyRadius) || (bWaveDone && bEnemiesMapWide)) ? HitmenStencil::Enemy : 0;
 			break;
 		case EHitmenScanCategory::Interactable:
 			Stencil = (WaveDistance <= WaveRadius && FVector::Dist(Origin, Actor->GetActorLocation()) <= InteractableRadius && HasLineOfSight(Eye, Actor))

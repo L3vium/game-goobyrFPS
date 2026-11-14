@@ -41,6 +41,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   own gun now shows only a small glow (others still see the toon flash). The muzzle light is ~100x weaker (5-35 cd
   instead of 400-3000), direct only (no Lumen bounce or volumetric scattering), 0.035 s and at most once every 0.09
   s.
+- Sightroom works like Hitman's Instinct: the scan look covers the whole map, enemies show through walls only within
+  20 m (they were map-wide), the target anywhere, usable objects only where they are really in view (depth-tested,
+  never through walls); stencils are cleared when the pawn goes away. Strictly local.
 
 ### Fixed
 - Jumping while walking or running no longer turns into a slow climb onto the floor, a curb or a step (the air ledge

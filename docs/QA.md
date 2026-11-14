@@ -41,6 +41,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] No brightness drift on arrival (fixed exposure on every match map)
 
 ## Player
+- [x] Sightroom: scan look everywhere, the VIP red through a wall at 28 m (PIE screenshot, 0.8.0); [ ] guards beyond 20 m
+  never lit, objects behind a wall never lit, a second client sees nothing when the first holds Tab
 - [x] Pistol and rifle at the hip with both hands, low right (PIE screenshots, 0.7.0); [ ] aim: toward the centre, hands
   in view, settles with a small overshoot
 - [ ] Head bob on, a footstep on each dip; Options head bob 0 removes it

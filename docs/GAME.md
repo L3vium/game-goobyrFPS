@@ -222,11 +222,11 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
   without being hit; there is no health bar (red screen edges and heartbeat).
 - **Intro**: the move keys steer the parachute; nobody can see a player under the canopy or for 2 s
   after landing.
-- **Sightroom (`Tab`)**: a fast scan wave (0.35 s) sweeps 25 m around you and lights up what it reaches as it
-  passes; as it ends the whole map fades into the cool scan look and every enemy on the map shows in white through
-  walls (a thin outline keeps far ones readable as dots). Interactables within 18 m show only in line of sight
-  (tested at their middle, so windows count); the target is red at any distance. Highlights are anti-aliased.
-  No waypoint in normal view. Radii live on the player controller (`Hitmen|Sightroom`) so a 3C swap keeps them.
+- **Sightroom (`Tab`)**, like Hitman's Instinct, only for you (local render state, never replicated): a fast scan wave
+  (0.5 s) sweeps 90 m out from you and the whole map takes the cool scan look. Enemies light up in white through walls
+  only within 20 m (`SightroomEnemyRadius` on the player controller, as the wave passes them); the target is red at any
+  distance. Usable objects within 18 m light up only where you can really see them (depth-tested in `PP_Sightroom`, never
+  through a wall). Highlights are anti-aliased with a thin outline. No waypoint in normal view.
 - **Emotes**: hold `R` for a radial wheel.
 - **Footsteps**: five takes per surface (grass, stone, sand / dirt, wood, metal; concrete elsewhere; Kenney Impact
   Sounds, CC0, sources in `Tools/Audio/Footsteps`), one picked at random and never twice in a row, for players and NPCs;

@@ -1,0 +1,407 @@
+﻿Key;en;fr
+_LanguageName;English;Français
+Asset.Ability.Armor;Armor;Armure
+Asset.Ability.Blink;Blink;Clignement
+Asset.Ability.C4;C4;C4
+Asset.Ability.Charm;Charm;Charme
+Asset.Ability.Dash;Dash;Ruée
+Asset.Ability.DoubleJump;Double Jump;Double saut
+Asset.Ability.Flashbang;Flashbang;Grenade flash
+Asset.Ability.Hook;Hook;Grappin
+Asset.Ability.Invisibility;Invisibility;Invisibilité
+Asset.Ability.Jetpack;Jetpack;Jetpack
+Asset.Ability.Lighter;Lighter;Briquet
+Asset.Ability.MultiKill;Multi Kill;Multi-élimination
+Asset.Ability.Pill;Pill;Pilule
+Asset.Ability.PoisonVial;Poison Vial;Fiole de poison
+Asset.Ability.RemoteDistraction;Remote Distraction;Distraction à distance
+Asset.Ability.SleepDart;Sleep Dart;Fléchette soporifique
+Asset.Ability.SmokeGrenade;Smoke Grenade;Fumigène
+Asset.Ability.Stone;Stone;Caillou
+Asset.Ability.Transposition;Transposition;Transposition
+Asset.Ability.Trap;Trap;Piège
+Asset.Ability.WindMine;Wind grenade;Grenade à vent
+Asset.Backpack;Backpack;Sac à dos
+Asset.Beanie;Beanie;Bonnet
+Asset.Belt;Belt;Ceinture
+Asset.Cameras;Cameras;Caméras
+Asset.Cap;Cap;Casquette
+Asset.Car;Car;Voiture
+Asset.Containers;Containers;Conteneurs
+Asset.Distractions;Distractions;Distractions
+Asset.Empty01;Empty 01;Vide 01
+Asset.Empty02;Empty 02;Vide 02
+Asset.Fedora;Fedora;Fédora
+Asset.Glasses;Glasses;Lunettes
+Asset.Guest;Guest;Invité
+Asset.Hazards;Hazards;Dangers
+Asset.Helicopter;Helicopter;Hélicoptère
+Asset.Hidingspots;Hiding spots;Cachettes
+Asset.Holster;Holster;Holster
+Asset.Hop;Hop;Sautiller
+Asset.Keycards;Keycards;Badges
+Asset.KneePad;KneePad;Genouillère
+Asset.Moustache;Moustache;Moustache
+Asset.Retrievalpoints;Retrieval points;Points d'extraction
+Asset.SanLazaro;San Lazaro;San Lazaro
+Asset.Scarf;Scarf;Écharpe
+Asset.Securitydevices;Security devices;Sécurité
+Asset.Sniper;Sniper;Sniper
+Asset.Supplycrate;Supply crate;Caisse de ravitaillement
+Asset.Taunt;Taunt;Provoquer
+Asset.Vest;Vest;Gilet
+Asset.Weapon.AssaultRifle;Assault rifle;Fusil d'assaut
+Asset.Weapon.BlackHole;Black hole gun;Pistolet trou noir
+Asset.Weapon.Bow;Bow;Arc
+Asset.Weapon.Goobyr;Goobyr gun;Goobyr
+Asset.Weapon.GrenadeLauncher;Grenade launcher;Lance-grenades
+Asset.Weapon.Minigun;Minigun;Minigun
+Asset.Weapon.Pistol;Silenced pistol;Pistolet silencieux
+Asset.Weapon.RocketLauncher;Rocket launcher;Lance-roquettes
+Asset.Weapon.SMG;SMG;Mitraillette
+Asset.Weapon.Shotgun;Shotgun;Fusil à pompe
+Asset.Weapon.Sniper;Sniper rifle;Fusil de précision
+Asset.Weapon.Sword;Knife;Couteau
+Asset.Weaponchest;Weapon chest;Coffre d'armes
+Cheat.Fly;Fly (no collision);Voler (sans collision)
+Cheat.InfiniteAmmo;Infinite ammo;Munitions infinies
+Cheat.InvisibleToAI;Invisible to AI;Invisible pour l'IA
+Cheat.Invulnerable;Invulnerable;Invulnérable
+Cheat.KillEnemies;Kill all enemies;Tuer tous les ennemis
+Cheat.NoCooldown;No cooldown;Sans recharge
+Cheat.ResetMap;Reset the map;Réinitialiser la carte
+Cheat.RespawnEnemies;Respawn enemies;Réapparition des ennemis
+Cheat.Title;CHEATS;TRICHES
+Hitmen.BarkSpeakerGuard;Guard;Garde
+Hitmen.BarkSpeakerVIP;Target;Cible
+Hitmen.BodyContainer;Body container;Benne à corps
+Hitmen.CarryBody;Carry body;Porter le corps
+Hitmen.Close;Close;Fermer
+Hitmen.CloseContainer;Close;Fermer
+Hitmen.CloseVent;Close vent;Fermer la ventilation
+Hitmen.CloseWindow;Close window;Fermer la fenêtre
+Hitmen.CutPower;Cut the power;Couper le courant
+Hitmen.DisableCameras;Disable cameras;Désactiver les caméras
+Hitmen.Distract;Turn on;Allumer
+Hitmen.DistractOff;Turn off;Éteindre
+Hitmen.Draw;No agent survived;Aucun agent n'a survécu
+Hitmen.DropBody;Drop body;Lâcher le corps
+Hitmen.Eliminate;Eliminate;Éliminer
+Hitmen.EnableCameras;Enable cameras;Activer les caméras
+Hitmen.EventCameraFeed;Camera;Caméra
+Hitmen.EventDistraction;Distraction;Distraction
+Hitmen.EventTargetDown;Target down;Cible à terre
+Hitmen.ExtractTarget;Extract the target;Extraire la cible
+Hitmen.HackTurret;Hack turret;Pirater la tourelle
+Hitmen.Hide;Hide;Se cacher
+Hitmen.HideBody;Hide body;Cacher le corps
+Hitmen.HidingSpot;Hiding spot;Cachette
+Hitmen.HintCharm;Charm;Charmer
+Hitmen.HintClimb;Climb;Grimper
+Hitmen.HintClimbOver;Climb over;Passer par-dessus
+Hitmen.HintHang;Climb out;Sortir
+Hitmen.HintLighter;Lighter;Briquet
+Hitmen.HintMark;Hold to mark;Maintenir pour marquer
+Hitmen.HintRemoteActivate;Activate remotely;Activer à distance
+Hitmen.HintTransposition;Swap places;Échanger de place
+Hitmen.HintTrapMash;Mash Z Q S D to break free;Martelez Z Q S D pour vous libérer
+Hitmen.HintVault;Vault;Sauter
+Hitmen.LeaveHidingSpot;Get out;Sortir
+Hitmen.LightOff;Light  -  Off;Lumière  -  éteinte
+Hitmen.LightOn;Light  -  On;Lumière  -  allumée
+Hitmen.LightSwitch;Light switch;Interrupteur
+Hitmen.LightSwitchInfo;{0}  -  {1};{0}  -  {1}
+Hitmen.LockedDoor;{0}  [Locked - Keycard {1}];{0}  [Verrouillée - Badge {1}]
+Hitmen.Locker;Locker;Casier
+Hitmen.MountedGun;Mounted gun;Mitrailleuse
+Hitmen.NPCGuard;Guard;Garde
+Hitmen.NPCInfoKeycard;{0}  -  Keycard {1};{0}  -  Badge {1}
+Hitmen.NPCInfoWeapon;{0}  -  {1};{0}  -  {1}
+Hitmen.NPCTarget;Target;Cible
+Hitmen.NearHidingTest;In front of a hiding spot;Devant une cachette
+Hitmen.NoSignal;NO SIGNAL;PAS DE SIGNAL
+Hitmen.Off;Off;Éteint
+Hitmen.On;On;Allumé
+Hitmen.Open;Open;Ouvrir
+Hitmen.OpenContainer;Open;Ouvrir
+Hitmen.OpenVent;Open vent;Ouvrir la ventilation
+Hitmen.OpenWindow;Open window;Ouvrir la fenêtre
+Hitmen.PickUpWeapon;Pick up {0};Ramasser : {0}
+Hitmen.Pickpocket;Pickpocket keycard {0};Voler le badge {0}
+Hitmen.RestorePower;Restore power;Rétablir le courant
+Hitmen.RetrievalBring;{0}  -  bring the target's body here;{0}  -  apportez le corps de la cible ici
+Hitmen.RetrievalPoint;Retrieval point;Point d'extraction
+Hitmen.RideZipline;Ride zipline;Prendre la tyrolienne
+Hitmen.RoomNotSealed;Room not sealed;La pièce n'est pas fermée
+Hitmen.SearchFreeTest;Not claimed by another searching guard;Pas pris par un autre garde qui fouille
+Hitmen.SearchSpotsGen;Hitmen search spots around the search center;Points de fouille autour du centre de recherche
+Hitmen.SpotBodies;{0} / {1} {1}|plural(one=body,other=bodies);{0} / {1} {1}|plural(one=corps,other=corps)
+Hitmen.SpotFull;full;pleine
+Hitmen.SpotInfo;{0}  -  {1};{0}  -  {1}
+Hitmen.SpotInfoFull;{0}  -  {1}  -  {2};{0}  -  {1}  -  {2}
+Hitmen.SpotInfoState;{0}  -  {1};{0}  -  {1}
+Hitmen.SpotNoRoom;no room to hide;pas de place pour se cacher
+Hitmen.SpotTaken;someone is inside;quelqu'un est dedans
+Hitmen.SpotTarget;the target can't be hidden;la cible ne peut pas être cachée
+Hitmen.SwapAbility;Swap for {0};Échanger contre {0}
+Hitmen.SwapWeapon;Swap for {0};Échanger contre {0}
+Hitmen.SwitchOff;Switch off;Éteindre
+Hitmen.SwitchOn;Switch on;Allumer
+Hitmen.TakeAbility;Take {0};Prendre : {0}
+Hitmen.TakeKeycard;Take keycard {0};Prendre le badge {0}
+Hitmen.Tank;Tank;Tank
+Hitmen.TargetEliminated;Target eliminated;Cible éliminée
+Hitmen.TargetEliminatedSub;"Its body shows in yellow; the retrieval points in gold";"Son corps apparaît en jaune ; les points d'extraction en or"
+Hitmen.TeamName;Team {0};Équipe {0}
+Hitmen.ThrowHint;{0}  Throw;{0}  Lancer
+Hitmen.Use;Use;Utiliser
+Hitmen.UseFromBehind;Use from behind;Utiliser par l'arrière
+Hitmen.UseMountedGun;Use mounted gun;Utiliser la mitrailleuse
+Hitmen.UseVehicle;Use;Monter
+Hitmen.Vehicle;Vehicle;Véhicule
+Hitmen.WinDelivered;The VIP was extracted;Le VIP a été extrait
+Hitmen.WinProtect;Every intruder was eliminated;Tous les intrus ont été éliminés
+Hitmen.ZiplineOneWay;Ride zipline  [Other end only];Prendre la tyrolienne  [Seulement depuis l'autre bout]
+HitmenHUD.EmptySlot;{0}  -;{0}  -
+HitmenHUD.Prompt;[F]  {0};[F]  {0}
+HitmenHUD.Slot;{0}{1}  {2}  {3};{0}{1}  {2}  {3}
+HitmenLobby.Attack;Attack;Attaque
+HitmenLobby.BackToRoom;Back;Retour
+HitmenLobby.ChooseAgent;Choose your agent;Choisissez votre agent
+HitmenLobby.CodeLabel;ROOM CODE;CODE DU SALON
+HitmenLobby.CreateRoom;CREATE ROOM;CRÉER UN SALON
+HitmenLobby.CreateTeam;+  Create team;+  Créer une équipe
+HitmenLobby.Difficulty;DIFFICULTY;DIFFICULTÉ
+HitmenLobby.DropHere;Drag players here;Glissez des joueurs ici
+HitmenLobby.Easy;EASY;FACILE
+HitmenLobby.Empty;Empty;Vide
+HitmenLobby.FistsChoice;None;Aucune
+HitmenLobby.Hard;HARD;DIFFICILE
+HitmenLobby.JoinHint;Friends join with the room code: Join room on the title screen.;Vos amis rejoignent avec le code du salon : Rejoindre un salon sur l'écran titre.
+HitmenLobby.LeaveRoom;Leave room;Quitter le salon
+HitmenLobby.LookCounter;{0} / {1};{0} / {1}
+HitmenLobby.ManipulationRow;MANIPULATION;MANIPULATION
+HitmenLobby.ManipulationRowKey;MANIPULATION   [{0}];MANIPULATION   [{0}]
+HitmenLobby.MoveRow;MOVE ABILITY;DÉPLACEMENT
+HitmenLobby.MoveRowKey;MOVE ABILITY   [{0}];DÉPLACEMENT   [{0}]
+HitmenLobby.NameHint;Codename;Nom de code
+HitmenLobby.NoneChoice;None;Aucune
+HitmenLobby.Normal;NORMAL;NORMAL
+HitmenLobby.NotReady;Not ready;Pas prêt
+HitmenLobby.OptionsHeader;OPTIONS;OPTIONS
+HitmenLobby.PlayerCount;{0} / {1};{0} / {1}
+HitmenLobby.Players;PLAYERS;JOUEURS
+HitmenLobby.Protect;Protect;Défense
+HitmenLobby.ProximityChat;Proximity voice chat;Chat vocal de proximité
+HitmenLobby.Randomize;Randomize;Au hasard
+HitmenLobby.Ready;Ready;Prêt
+HitmenLobby.ReadyCount;{0} / {1} ready;{0} / {1} prêts
+HitmenLobby.StartWatching;Start;Commencer
+HitmenLobby.Unassigned;NO TEAM;SANS ÉQUIPE
+HitmenLobby.WaitingHost;Waiting for the host...;En attente de l'hôte...
+HitmenLobby.WatcherWait;"WAITING FOR OTHER PLAYERS
+{0} / {1} ready";"EN ATTENTE DES AUTRES JOUEURS
+{0} / {1} prêts"
+HitmenLobby.WeaponRow;WEAPON;ARME
+HitmenLobby.YourAgent;YOUR AGENT;VOTRE AGENT
+HitmenMenus.Abilities;ABILITIES;CAPACITÉS
+HitmenMenus.BackToLobbyEntry;Back to the lobby;Retour au salon
+HitmenMenus.BackToLobbyHint;Back to the lobby;Retour au salon
+HitmenMenus.Bow;Bow;Révérence
+HitmenMenus.Dance;Dance;Danse
+HitmenMenus.Debug;DEBUG;DÉBOGAGE
+HitmenMenus.DebugTools;Debug tools;Outils de débogage
+HitmenMenus.Draw;DRAW;ÉGALITÉ
+HitmenMenus.God;Toggle god mode;Activer / désactiver le mode dieu
+HitmenMenus.Keycard;Keycard {0};Badge {0}
+HitmenMenus.Keycards;KEYCARDS;BADGES
+HitmenMenus.Leave;Leave match;Quitter la partie
+HitmenMenus.Legend;MAP LEGEND;LÉGENDE
+HitmenMenus.LegendNPCs;Guards;Gardes
+HitmenMenus.LegendTeam;Teammates;Coéquipiers
+HitmenMenus.LegendVIP;Target (VIP);Cible (VIP)
+HitmenMenus.LegendYou;You;Vous
+HitmenMenus.ManipEntry;[A] {0};[A] {0}
+HitmenMenus.MoveEntry;[E] {0};[E] {0}
+HitmenMenus.Options;Options;Options
+HitmenMenus.Paused;PAUSE;PAUSE
+HitmenMenus.PlayerWins;{0} WINS;{0} GAGNE
+HitmenMenus.Point;Point;Pointer
+HitmenMenus.Resume;Resume;Reprendre
+HitmenMenus.TeamWins;{0} WINS;{0} GAGNE
+HitmenMenus.WaitingForHost;Waiting for the host to go back to the lobby;En attente du retour au salon par l'hôte
+HitmenMenus.Wave;Wave;Saluer
+HitmenMenus.Weapons;WEAPONS;ARMES
+HitmenOptions.AimSensitivity;Aiming sensitivity;Sensibilité en visée
+HitmenOptions.AimSensitivityDesc;Multiplies the sensitivity while aiming. The zoom is already compensated: 1.00 feels the same as the hip.;Multiplie la sensibilité en visée. Le zoom est déjà compensé : 1,00 donne la même sensation qu'à la hanche.
+HitmenOptions.AntiAliasing;Anti-aliasing;Anticrénelage
+HitmenOptions.AntiAliasingDesc;Smooths edges (TSR quality).;Adoucit les contours (qualité TSR).
+HitmenOptions.AutoDetect;Detect the best settings;Détecter les meilleurs réglages
+HitmenOptions.AutoDetectDesc;Measures this computer (a second or two) and picks the qualities. It runs once by itself on the first launch.;Mesure cet ordinateur (une ou deux secondes) et choisit les qualités. Se lance tout seul au premier démarrage.
+HitmenOptions.Back;Back;Retour
+HitmenOptions.Borderless;Borderless;Fenêtré sans bordure
+HitmenOptions.Camera;Camera;Caméra
+HitmenOptions.ClimbMode;Ladders and gutters;Échelles et gouttières
+HitmenOptions.ClimbModeDesc;Forward climbs toward where you look (facing the ladder: up, facing away: down), or forward is always up.;Avancer grimpe vers où vous regardez (face à l'échelle : monter, dos à elle : descendre), ou avancer monte toujours.
+HitmenOptions.ConflictDesc;"{0}
+
+This key is also used by {1}.";"{0}
+
+Cette touche sert aussi à {1}."
+HitmenOptions.CrouchMode;Crouch;S'accroupir
+HitmenOptions.CrouchModeDesc;Hold the key to stay crouched, or press it once to switch.;Maintenir la touche pour rester accroupi, ou appuyer une fois pour basculer.
+HitmenOptions.Custom;Custom;Personnalisé
+HitmenOptions.Defaults;Defaults;Par défaut
+HitmenOptions.Details;Details;Détails
+HitmenOptions.Display;Display;Affichage
+HitmenOptions.Effects;Effects;Effets
+HitmenOptions.EffectsDesc;Particles, smoke and fire.;Particules, fumée et feu.
+HitmenOptions.Epic;Epic;Épique
+HitmenOptions.FOV;Field of view;Champ de vision
+HitmenOptions.FOVDesc;Horizontal field of view of the first-person camera.;Champ de vision horizontal de la caméra à la première personne.
+HitmenOptions.FollowCamera;Follow the camera;Suivre la caméra
+HitmenOptions.ForwardUp;Forward is up;Avancer monte
+HitmenOptions.FrameLimit;Frame rate limit;Limite d'images
+HitmenOptions.FrameLimitDesc;Caps the frames per second (less heat and noise).;Plafonne les images par seconde (moins de chaleur et de bruit).
+HitmenOptions.Fullscreen;Fullscreen;Plein écran
+HitmenOptions.GI;Global illumination;Illumination globale
+HitmenOptions.GIDesc;Light bouncing in rooms (Lumen). Low and Medium turn Lumen off: much faster, flatter rooms.;La lumière rebondit dans les pièces (Lumen). Bas et Moyen désactivent Lumen : bien plus rapide, pièces plus plates.
+HitmenOptions.HeadBob;Head bob;Balancement de la tête
+HitmenOptions.HeadBobDesc;How much the view bobs with your steps. 0 % keeps it still.;À quel point la vue oscille à chaque pas. 0 % la garde immobile.
+HitmenOptions.High;High;Élevé
+HitmenOptions.Hold;Hold;Maintenir
+HitmenOptions.InvertY;Invert vertical look;Inverser l'axe vertical
+HitmenOptions.InvertYDesc;Moving the mouse forward looks down.;Pousser la souris vers l'avant fait regarder vers le bas.
+HitmenOptions.KeyDesc;Click, then press a key or a mouse button. Escape cancels.;Cliquez, puis appuyez sur une touche ou un bouton de la souris. Échap annule.
+HitmenOptions.Language;Language;Langue
+HitmenOptions.LanguageAuto;Auto (system);Auto (système)
+HitmenOptions.LanguageDesc;Every text of the game. The translations are in Content/Hitmen/Localization/HitmenText.csv.;Tous les textes du jeu. Les traductions sont dans Content/Hitmen/Localization/HitmenText.csv.
+HitmenOptions.LanguageHeader;Language;Langue
+HitmenOptions.Low;Low;Bas
+HitmenOptions.Master;Master;Général
+HitmenOptions.MasterDesc;Everything.;Tout.
+HitmenOptions.Medium;Medium;Moyen
+HitmenOptions.Mouse;Mouse;Souris
+HitmenOptions.Movement;Movement;Déplacements
+HitmenOptions.Music;Music;Musique
+HitmenOptions.MusicDesc;Menus and match music.;Musique des menus et des parties.
+HitmenOptions.NoBindings;Key bindings are not available yet;Les touches ne sont pas encore disponibles
+HitmenOptions.Off;Off;Non
+HitmenOptions.On;On;Oui
+HitmenOptions.OptionsTitle;OPTIONS;OPTIONS
+HitmenOptions.PostProcess;Post-processing;Post-traitement
+HitmenOptions.PostProcessDesc;Bloom, ambient occlusion and other screen effects.;Flou lumineux, occlusion ambiante et autres effets d'écran.
+HitmenOptions.Preset;Quality preset;Qualité globale
+HitmenOptions.PresetDesc;Sets every quality below at once. Changing one of them makes the preset Custom.;Règle toutes les qualités ci-dessous d'un coup. En changer une passe la qualité globale en Personnalisé.
+HitmenOptions.PressKey;PRESS A KEY  (ESC CANCELS);APPUYEZ SUR UNE TOUCHE  (ÉCHAP ANNULE)
+HitmenOptions.Quality;Quality;Qualité
+HitmenOptions.Reflections;Reflections;Reflets
+HitmenOptions.ReflectionsDesc;Reflections on floors, glass and metal.;Reflets sur les sols, le verre et le métal.
+HitmenOptions.RenderScale;Render scale;Échelle de rendu
+HitmenOptions.RenderScaleDesc;Renders fewer pixels and upscales them (TSR). Lower is faster and softer.;Calcule moins de pixels et les agrandit (TSR). Plus bas : plus rapide et plus flou.
+HitmenOptions.Resolution;Resolution;Résolution
+HitmenOptions.ResolutionDesc;Size of the game image on screen.;Taille de l'image du jeu à l'écran.
+HitmenOptions.Run;Run;Courir
+HitmenOptions.SFX;Effects;Effets
+HitmenOptions.SFXDesc;Shots, steps, doors, abilities.;Tirs, pas, portes, capacités.
+HitmenOptions.Sensitivity;Mouse sensitivity;Sensibilité de la souris
+HitmenOptions.SensitivityDesc;How fast the view turns with the mouse.;Vitesse à laquelle la vue tourne avec la souris.
+HitmenOptions.Shadows;Shadows;Ombres
+HitmenOptions.ShadowsDesc;Sharpness and reach of the shadows.;Netteté et portée des ombres.
+HitmenOptions.SpectatorKeyDesc;Free fly while you watch or after the match. Only used while spectating, so it may share keys with the game.;Vol libre quand vous regardez ou après la partie. Utilisées seulement en spectateur : elles peuvent partager des touches avec le jeu.
+HitmenOptions.SprintMode;Sprint;Sprint
+HitmenOptions.SprintModeDesc;Hold the key to sprint, or press it once to switch. A quick tap dashes when you have the dash.;Maintenir la touche pour sprinter, ou appuyer une fois pour basculer. Un appui bref fait une ruée si vous l'avez.
+HitmenOptions.TabAudio;Audio;Audio
+HitmenOptions.TabControls;Controls;Commandes
+HitmenOptions.TabGameplay;Gameplay;Jeu
+HitmenOptions.TabGraphics;Graphics;Graphismes
+HitmenOptions.Textures;Textures;Textures
+HitmenOptions.TexturesDesc;Texture resolution (video memory).;Résolution des textures (mémoire vidéo).
+HitmenOptions.Toggle;Toggle;Basculer
+HitmenOptions.UIVolume;Interface;Interface
+HitmenOptions.UIVolumeDesc;Menu clicks and hovers.;Clics et survols des menus.
+HitmenOptions.Unlimited;Unlimited;Illimitée
+HitmenOptions.VSync;Vertical sync;Synchronisation verticale
+HitmenOptions.VSyncDesc;"Removes tearing; adds a little input latency.";"Supprime le déchirement ; ajoute un peu de latence."
+HitmenOptions.ViewDistance;View distance;Distance d'affichage
+HitmenOptions.ViewDistanceDesc;How far small objects and details are drawn.;Jusqu'où les petits objets et les détails sont dessinés.
+HitmenOptions.Voice;Voice;Voix
+HitmenOptions.VoiceDesc;Voices and proximity chat.;Voix et chat de proximité.
+HitmenOptions.Volume;Volume;Volume
+HitmenOptions.WindowMode;Window;Fenêtre
+HitmenOptions.WindowModeDesc;Fullscreen, a borderless window over the desktop, or a normal window.;Plein écran, fenêtre sans bordure sur le bureau, ou fenêtre normale.
+HitmenOptions.Windowed;Windowed;Fenêtré
+HitmenTitle.Back;Back;Retour
+HitmenTitle.CodeHeader;ROOM CODE;CODE DU SALON
+HitmenTitle.CodeHint;ABC123;ABC123
+HitmenTitle.CodeLength;A room code has 6 characters.;Un code de salon a 6 caractères.
+HitmenTitle.CodeNotFound;No room with this code.;Aucun salon avec ce code.
+HitmenTitle.CodeSearching;Looking for the room...;Recherche du salon...
+HitmenTitle.CreateFailed;Could not create the room.;Impossible de créer le salon.
+HitmenTitle.CreateRoom;Create room;Créer un salon
+HitmenTitle.Creating;Opening the room...;Ouverture du salon...
+HitmenTitle.DebugGym;Debug gym;Gymnase de débogage
+HitmenTitle.FriendInRoom;In a room  -  click to join;Dans un salon  -  cliquez pour rejoindre
+HitmenTitle.FriendOffline;Offline;Hors ligne
+HitmenTitle.FriendOnline;Online;En ligne
+HitmenTitle.FriendPlaying;Playing Hitmen;Joue à Hitmen
+HitmenTitle.FriendTag;  -  friend;  -  ami
+HitmenTitle.Friends;STEAM FRIENDS;AMIS STEAM
+HitmenTitle.Join;Join room;Rejoindre un salon
+HitmenTitle.JoinCode;Join;Rejoindre
+HitmenTitle.JoinFailed;Could not join the room.;Impossible de rejoindre le salon.
+HitmenTitle.JoinTitle;JOIN A ROOM;REJOINDRE UN SALON
+HitmenTitle.Joining;Joining...;Connexion...
+HitmenTitle.Logo;HITMEN;HITMEN
+HitmenTitle.NoFriends;No friends to show.;Aucun ami à afficher.
+HitmenTitle.NoRooms;No room found.;Aucun salon trouvé.
+HitmenTitle.NoSteam;Steam is not running.;Steam n'est pas lancé.
+HitmenTitle.Options;Options;Options
+HitmenTitle.Quit;Quit;Quitter
+HitmenTitle.RoomInfo;{0} / {1} players  -  {2} ms{3};{0} / {1} joueurs  -  {2} ms{3}
+HitmenTitle.Rooms;ROOMS;SALONS
+HitmenTitle.SearchFailed;Search failed.;La recherche a échoué.
+HitmenTitle.Searching;Searching...;Recherche...
+HitmenTitle.SearchingRooms;Searching for rooms...;Recherche de salons...
+Hud.Alerted;ALERTED;EN ALERTE
+Hud.BodyCard;BODY;CORPS
+Hud.DroppingIn;DROPPING IN;LARGAGE
+Hud.Empty;EMPTY;VIDE
+Hud.Exit;EXIT;SORTIR
+Hud.Fists;FISTS;POINGS
+Hud.Keycard;KEYCARD {0};BADGE {0}
+Hud.NoAbility;NONE;AUCUNE
+Hud.PutDown;{0} / wheel: put down;{0} / molette : poser
+Hud.Searching;SEARCHING;RECHERCHE
+Hud.Spotted;SPOTTED;REPÉRÉ
+Hud.Suspicious;SUSPICIOUS;SUSPECT
+Hud.TargetCard;TARGET;CIBLE
+Hud.Throw;Throw;Lancer
+Hud.UnderFire;UNDER FIRE;SOUS LE FEU
+Lobby.Choosing;CHOOSING;EN CHOIX
+Lobby.HostTag;HOST;HÔTE
+Lobby.ReadyTag;READY;PRÊT
+Lobby.You;YOU;VOUS
+Map.Target;TARGET;CIBLE
+Tags.Watching;WATCHING;SPECTATEUR
+Watch.Down;[CTRL] down;[CTRL] descendre
+Watch.Faster;[SHIFT] faster;[MAJ] plus vite
+Watch.FlySpeed;FLY SPEED  x{0};VITESSE DE VOL  x{0}
+Watch.FreeFly;FREE FLY;VOL LIBRE
+Watch.Key1;[1] player view;[1] vue joueur
+Watch.Key2;[2] split screen;[2] écran partagé
+Watch.Key3;[3] free fly;[3] vol libre
+Watch.Move;move;se déplacer
+Watch.Person;[V] first / third person;[V] première / troisième personne
+Watch.PlayerView;PLAYER VIEW;VUE JOUEUR
+Watch.PlayerViewOf;PLAYER VIEW  -  {0};VUE JOUEUR  -  {0}
+Watch.PlayersOff;[N] players off;[N] joueurs masqués
+Watch.PlayersOn;[N] players on;[N] joueurs affichés
+Watch.Scan;[TAB] scan;[TAB] scanner
+Watch.Speed;[WHEEL] speed;[MOLETTE] vitesse
+Watch.SplitNobody;SPLIT SCREEN  -  NOBODY TO WATCH;ÉCRAN PARTAGÉ  -  PERSONNE À REGARDER
+Watch.SplitScreen;SPLIT SCREEN;ÉCRAN PARTAGÉ
+Watch.SwitchPlayer;[LMB / RMB] switch player;[CLIC G / CLIC D] changer de joueur
+Watch.Up;[SPACE] up;[ESPACE] monter
+Watch.WatchersOff;[B] watchers off;[B] spectateurs masqués
+Watch.WatchersOn;[B] watchers on;[B] spectateurs affichés

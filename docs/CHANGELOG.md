@@ -5,6 +5,8 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-15
+
 ### Added
 - Juice switches `bMantleHandsFX` and `bMantleLandFX` (off): no particles on climbs and vaults by default.
 - Sound-set events MeleeHit, KnifeWhoosh, WallBreak, BodyBurn, HamsterSqueak, HamsterBite, Dash, BlinkArrive; a
@@ -57,15 +59,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Ladders: `bAllowTopEntry` / `TopEntryReach` (a shaft ladder catches whoever steps or drops in from above).
 - Keyboard layout: on a QWERTY keyboard (from the Windows layout) the AZERTY defaults move to the same places (W A S
   D, Q) unless rebound; `KeyboardLayoutOverride` in Project Settings -> Hitmen -> Input.
-
-
-
-
-
-
-
-
-
 
 ### Changed
 - A gunshot (report and impact alike) draws guards to where the bullet landed: they turn to the impact, never to the
@@ -447,7 +440,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Lobby log lines (LogHitmen): who asked to start and how many players are ready, to diagnose Ready in player
   builds.
 
-
 ### Changed
 - Create Room on one 8 px grid: 112 px side margins, a fixed title band, the map tile and the players panel start on
   the same line and the panel ends on the same edge as Choose your agent; the player name has room again; a dim line
@@ -498,9 +490,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - hitmen_check_reach.py also checks pickups: each needs a reachable standing spot within grabbing range (a pedestal
   top is a navmesh island of its own).
 
-
-
-
 ### Fixed
 - Generated buildings: door openings match the door (110 x 230), stairs leave room to step on and switch back on
   three-floor houses (upper floors were unreachable); the ground has holes for stair wells instead of covering them.
@@ -519,16 +508,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   turret panel takes 3 s and the security console 2 s; a bar fills under the crosshair with a hacking sound;
   releasing F or looking away cancels; the server times the hold too.
 - Landing sounds on every landing by fall speed (soft / hard), a view dip on hard landings.
-
-
-
-
-
-
-
-
-
-
 
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
@@ -587,10 +566,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   data.
 - Last-known-position ghost: a faint white silhouette (15 % opacity, was 35 %), Hitman-like.
 
-
-
-
-
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -623,7 +598,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Footsteps were silent (the per-surface sound slots were empty): players and NPCs now play a footstep per surface
   (grass, stone, dirt, wood, metal, concrete by default).
 - Gym: the armor and C4 pickups sat inside blocks (they could not be picked up): they now rest on top.
-
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):

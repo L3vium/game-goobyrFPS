@@ -1,6 +1,7 @@
 // Hitmen — weapon base
 
 #include "Weapons/HitmenWeaponBase.h"
+#include "Core/HitmenText.h"
 #include "Data/HitmenSoundSet.h"
 #include "Characters/HitmenNPC.h"
 #include "Weapons/HitmenCombatLibrary.h"
@@ -638,9 +639,9 @@ FText AHitmenWeaponBase::GetInteractionText_Implementation(AActor* Interactor) c
 	const UHitmenInventoryComponent* Inventory = Interactor ? Interactor->FindComponentByClass<UHitmenInventoryComponent>() : nullptr;
 	if (Inventory && !Inventory->HasFreeSlot() && !Inventory->HasWeaponType(WeaponData))
 	{
-		return FText::Format(NSLOCTEXT("Hitmen", "SwapWeapon", "Swap for {0}"), WeaponData->DisplayName);
+		return FText::Format(HITMEN_TEXT("Hitmen.SwapWeapon", "Swap for {0}"), UHitmenTextSubsystem::Translate(WeaponData->DisplayName));
 	}
-	return FText::Format(NSLOCTEXT("Hitmen", "PickUpWeapon", "Pick up {0}"), WeaponData->DisplayName);
+	return FText::Format(HITMEN_TEXT("Hitmen.PickUpWeapon", "Pick up {0}"), UHitmenTextSubsystem::Translate(WeaponData->DisplayName));
 }
 
 void AHitmenWeaponBase::Interact_Implementation(AActor* Interactor)

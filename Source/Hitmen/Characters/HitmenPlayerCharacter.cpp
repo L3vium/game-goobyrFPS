@@ -1,6 +1,7 @@
 // Hitmen — player character
 
 #include "Characters/HitmenPlayerCharacter.h"
+#include "Core/HitmenText.h"
 #include "Characters/HitmenAnimNodes.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -371,10 +372,10 @@ void AHitmenPlayerCharacter::UpdateHUDHints(float DeltaSeconds)
 	{
 		switch (Movement->QueryTraversalAction())
 		{
-		case EHitmenTraversalAction::Vault:     Hint = NSLOCTEXT("Hitmen", "HintVault", "Vault"); break;
-		case EHitmenTraversalAction::Climb:     Hint = NSLOCTEXT("Hitmen", "HintClimb", "Climb"); break;
-		case EHitmenTraversalAction::ClimbOver: Hint = NSLOCTEXT("Hitmen", "HintClimbOver", "Climb over"); break;
-		case EHitmenTraversalAction::Hang:      Hint = NSLOCTEXT("Hitmen", "HintHang", "Climb out"); break;
+		case EHitmenTraversalAction::Vault:     Hint = HITMEN_TEXT("Hitmen.HintVault", "Vault"); break;
+		case EHitmenTraversalAction::Climb:     Hint = HITMEN_TEXT("Hitmen.HintClimb", "Climb"); break;
+		case EHitmenTraversalAction::ClimbOver: Hint = HITMEN_TEXT("Hitmen.HintClimbOver", "Climb over"); break;
+		case EHitmenTraversalAction::Hang:      Hint = HITMEN_TEXT("Hitmen.HintHang", "Climb out"); break;
 		default: break;
 		}
 	}
@@ -595,7 +596,7 @@ void AHitmenPlayerCharacter::UpdateDamageFeel(float DeltaSeconds)
 	{
 		if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(this))
 		{
-			UI->SetTraversalHint(NSLOCTEXT("Hitmen", "HintTrapMash", "Mash Z Q S D to break free"));
+			UI->SetTraversalHint(HITMEN_TEXT("Hitmen.HintTrapMash", "Mash Z Q S D to break free"));
 		}
 	}
 }

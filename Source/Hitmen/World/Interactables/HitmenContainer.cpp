@@ -1,6 +1,7 @@
 // Hitmen — container
 
 #include "World/Interactables/HitmenContainer.h"
+#include "Core/HitmenText.h"
 #include "World/HitmenGeometry.h"
 #include "Weapons/HitmenWeaponBase.h"
 #include "Abilities/HitmenAbilityActors.h"
@@ -14,8 +15,8 @@
 
 AHitmenContainer::AHitmenContainer()
 {
-	OpenText = NSLOCTEXT("Hitmen", "OpenContainer", "Open");
-	CloseText = NSLOCTEXT("Hitmen", "CloseContainer", "Close");
+	OpenText = HITMEN_TEXT("Hitmen.OpenContainer", "Open");
+	CloseText = HITMEN_TEXT("Hitmen.CloseContainer", "Close");
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(HitmenGeometry::CubePath);
 	auto MakePanel = [this](const TCHAR* Name, USceneComponent* Parent)

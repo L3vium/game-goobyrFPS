@@ -1,6 +1,7 @@
 // Hitmen — match HUD
 
 #include "UI/HitmenHUDWidgets.h"
+#include "Core/HitmenText.h"
 #include "Components/HitmenMapMarkerComponent.h"
 #include "Data/HitmenMapMarkerType.h"
 #include "Core/HitmenGameSettings.h"
@@ -472,22 +473,22 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 	FLinearColor StatusColor = HitmenUI::Text();
 	if (bTargeted)
 	{
-		Status = TEXT("UNDER FIRE");
+		Status = HITMEN_TEXT("Hud.UnderFire", "UNDER FIRE").ToString();
 		StatusColor = HitmenAlert::ToLinearColor(EHitmenAlertColor::Red);
 	}
 	else if (Worst == EHitmenAlertColor::Red)
 	{
-		Status = TEXT("SPOTTED");
+		Status = HITMEN_TEXT("Hud.Spotted", "SPOTTED").ToString();
 		StatusColor = HitmenAlert::ToLinearColor(EHitmenAlertColor::Red);
 	}
 	else if (Worst == EHitmenAlertColor::Yellow || bSearching)
 	{
-		Status = bSearching ? TEXT("SEARCHING") : TEXT("ALERTED");
+		Status = bSearching ? HITMEN_TEXT("Hud.Searching", "SEARCHING").ToString() : HITMEN_TEXT("Hud.Alerted", "ALERTED").ToString();
 		StatusColor = HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow);
 	}
 	else if (Worst == EHitmenAlertColor::White)
 	{
-		Status = TEXT("SUSPICIOUS");
+		Status = HITMEN_TEXT("Hud.Suspicious", "SUSPICIOUS").ToString();
 	}
 	if (Status != ShownStatus)
 	{
@@ -633,7 +634,7 @@ void UHitmenHUDWidget::HandlePrompt(const FText& Prompt, bool bVisible)
 {
 	if (PromptText)
 	{
-		PromptText->SetText(bVisible ? FText::Format(LOCTEXT("Prompt", "[F]  {0}"), Prompt) : FText::GetEmpty());
+		PromptText->SetText(bVisible ? FText::Format(HITMEN_TEXT("HitmenHUD.Prompt", "[F]  {0}"), Prompt) : FText::GetEmpty());
 	}
 	// The default layout shows prompts through ActionPrompt (it binds the same event).
 }
@@ -644,12 +645,12 @@ void UHitmenHUDWidget::HandleInventoryView(const FHitmenHUDInventoryView& View)
 	{
 		if (!View.Slots.IsValidIndex(Index) || View.Slots[Index].bEmpty)
 		{
-			return FText::Format(LOCTEXT("EmptySlot", "{0}  -"), FText::AsNumber(Index + 1));
+			return FText::Format(HITMEN_TEXT("HitmenHUD.EmptySlot", "{0}  -"), FText::AsNumber(Index + 1));
 		}
 		const FHitmenHUDSlotView& SlotView = View.Slots[Index];
 		const FText Ammo = SlotView.Ammo >= 0 ? FText::AsNumber(SlotView.Ammo) : FText::FromString(TEXT("-"));
 		const FText Marker = SlotView.bActive ? FText::FromString(TEXT("> ")) : FText::GetEmpty();
-		return FText::Format(LOCTEXT("Slot", "{0}{1}  {2}  {3}"), Marker, FText::AsNumber(Index + 1), SlotView.Name, Ammo);
+		return FText::Format(HITMEN_TEXT("HitmenHUD.Slot", "{0}{1}  {2}  {3}"), Marker, FText::AsNumber(Index + 1), SlotView.Name, Ammo);
 	};
 	if (SlotOneText) { SlotOneText->SetText(SlotLabel(0)); }
 	if (SlotTwoText) { SlotTwoText->SetText(SlotLabel(1)); }

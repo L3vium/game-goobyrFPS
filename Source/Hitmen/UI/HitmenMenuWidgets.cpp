@@ -1,6 +1,7 @@
 // Hitmen — overlays
 
 #include "UI/HitmenMenuWidgets.h"
+#include "Core/HitmenText.h"
 #include "Data/HitmenMapMarkerType.h"
 #include "Components/HitmenMapMarkerComponent.h"
 #include "GameFramework/PlayerState.h"
@@ -78,10 +79,10 @@ FText UHitmenPauseMapWidget::GetCategoryName(int32 Category)
 {
 	switch (Category)
 	{
-	case 0: return LOCTEXT("LegendYou", "You");
-	case 1: return LOCTEXT("LegendTeam", "Teammates");
-	case 2: return LOCTEXT("LegendVIP", "Target (VIP)");
-	default: return LOCTEXT("LegendNPCs", "Guards");
+	case 0: return HITMEN_TEXT("HitmenMenus.LegendYou", "You");
+	case 1: return HITMEN_TEXT("HitmenMenus.LegendTeam", "Teammates");
+	case 2: return HITMEN_TEXT("HitmenMenus.LegendVIP", "Target (VIP)");
+	default: return HITMEN_TEXT("HitmenMenus.LegendNPCs", "Guards");
 	}
 }
 
@@ -293,7 +294,7 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	{
 		if (const AActor* VIP = GS->GetVIP())
 		{
-			Marker(2, VIP->GetActorLocation(), TEXT("TARGET"), 14.f);
+			Marker(2, VIP->GetActorLocation(), HITMEN_TEXT("Map.Target", "TARGET").ToString(), 14.f);
 		}
 		const int32 MyTeam = Pawn ? UHitmenTeamLibrary::GetTeamId(Pawn) : HitmenTeams::Neutral;
 		for (const APlayerState* PS : GS->PlayerArray)
@@ -381,7 +382,7 @@ void UHitmenDebugPanelWidget::BuildDefaultLayout()
 	Panel->SetContent(Scroll);
 	WidgetTree->RootWidget = Panel;
 
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Debug", "DEBUG"), 22, TEXT("Black")));
+	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenMenus.Debug", "DEBUG"), 22, TEXT("Black")));
 	const UHitmenCatalog* Catalog = UHitmenGameSettings::Get()->LoadCatalog();
 	// 0 weapon, 1 ability, 2 keycard, 3 god mode.
 	auto AddButton = [this, Column](const FText& Label, int32 Index, int32 Kind)
@@ -399,29 +400,29 @@ void UHitmenDebugPanelWidget::BuildDefaultLayout()
 	};
 	if (Catalog)
 	{
-		HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Weapons", "WEAPONS"), 14, TEXT("Bold"), HitmenUI::TextDim()), FMargin(0.f, 8.f, 0.f, 2.f));
+		HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenMenus.Weapons", "WEAPONS"), 14, TEXT("Bold"), HitmenUI::TextDim()), FMargin(0.f, 8.f, 0.f, 2.f));
 		for (int32 Index = 0; Index < Catalog->Weapons.Num(); ++Index)
 		{
 			if (Catalog->Weapons[Index]) { AddButton(Catalog->Weapons[Index]->DisplayName, Index, 0); }
 		}
-		HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Abilities", "ABILITIES"), 14, TEXT("Bold"), HitmenUI::TextDim()), FMargin(0.f, 8.f, 0.f, 2.f));
+		HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenMenus.Abilities", "ABILITIES"), 14, TEXT("Bold"), HitmenUI::TextDim()), FMargin(0.f, 8.f, 0.f, 2.f));
 		const TArray<UHitmenAbilityData*> Move = Catalog->GetAbilities(EHitmenAbilitySlot::Move);
 		const TArray<UHitmenAbilityData*> Manip = Catalog->GetAbilities(EHitmenAbilitySlot::Manipulation);
 		for (int32 Index = 0; Index < Move.Num(); ++Index)
 		{
-			AddButton(FText::Format(LOCTEXT("MoveEntry", "[E] {0}"), Move[Index]->DisplayName), Index, 1);
+			AddButton(FText::Format(HITMEN_TEXT("HitmenMenus.MoveEntry", "[E] {0}"), Move[Index]->DisplayName), Index, 1);
 		}
 		for (int32 Index = 0; Index < Manip.Num(); ++Index)
 		{
-			AddButton(FText::Format(LOCTEXT("ManipEntry", "[A] {0}"), Manip[Index]->DisplayName), 1000 + Index, 1);
+			AddButton(FText::Format(HITMEN_TEXT("HitmenMenus.ManipEntry", "[A] {0}"), Manip[Index]->DisplayName), 1000 + Index, 1);
 		}
 	}
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Keycards", "KEYCARDS"), 14, TEXT("Bold"), HitmenUI::TextDim()), FMargin(0.f, 8.f, 0.f, 2.f));
+	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenMenus.Keycards", "KEYCARDS"), 14, TEXT("Bold"), HitmenUI::TextDim()), FMargin(0.f, 8.f, 0.f, 2.f));
 	for (int32 Card = 0; Card < 4; ++Card)
 	{
-		AddButton(FText::Format(LOCTEXT("Keycard", "Keycard {0}"), FText::AsNumber(Card)), Card, 2);
+		AddButton(FText::Format(HITMEN_TEXT("HitmenMenus.Keycard", "Keycard {0}"), FText::AsNumber(Card)), Card, 2);
 	}
-	AddButton(LOCTEXT("God", "Toggle god mode"), 0, 3);
+	AddButton(HITMEN_TEXT("HitmenMenus.God", "Toggle god mode"), 0, 3);
 }
 
 void UHitmenDebugPanelWidget::HandleWeaponClicked(int32 Index)
@@ -485,13 +486,13 @@ void UHitmenPauseMenuWidget::BuildDefaultLayout()
 	// Left: PAUSE and three big square blocks.
 	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	HitmenUI::AddToCanvas(Canvas, Column, FAnchors(0.f, 0.f), FVector2D(96.f, 84.f), FVector2D::ZeroVector);
-	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, LOCTEXT("Paused", "PAUSE"), 84, TEXT("Bold")), FMargin(0.f, 0.f, 0.f, 28.f));
+	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenMenus.Paused", "PAUSE"), 84, TEXT("Bold")), FMargin(0.f, 0.f, 0.f, 28.f));
 	struct FEntry { FText Label; FName Handler; };
 	const FEntry Entries[] = {
-		{ LOCTEXT("Resume", "Resume"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, Resume) },
-		{ LOCTEXT("Options", "Options"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, OpenOptions) },
-		{ LOCTEXT("Leave", "Leave match"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, LeaveMatch) },
-		{ LOCTEXT("BackToLobbyEntry", "Back to the lobby"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, BackToLobby) } };
+		{ HITMEN_TEXT("HitmenMenus.Resume", "Resume"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, Resume) },
+		{ HITMEN_TEXT("HitmenMenus.Options", "Options"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, OpenOptions) },
+		{ HITMEN_TEXT("HitmenMenus.Leave", "Leave match"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, LeaveMatch) },
+		{ HITMEN_TEXT("HitmenMenus.BackToLobbyEntry", "Back to the lobby"), GET_FUNCTION_NAME_CHECKED(UHitmenPauseMenuWidget, BackToLobby) } };
 	for (const FEntry& Entry : Entries)
 	{
 		UHitmenMenuButton* Button = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
@@ -529,7 +530,7 @@ void UHitmenPauseMenuWidget::BuildDefaultLayout()
 	DebugSlot->SetOffsets(FMargin(-360.f, 64.f, 360.f, 120.f));
 	DebugSlot->SetZOrder(10);
 	DebugToggleButton = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
-	DebugToggleButton->Setup(LOCTEXT("DebugTools", "Debug tools"), EHitmenMenuButtonKind::Chip);
+	DebugToggleButton->Setup(HITMEN_TEXT("HitmenMenus.DebugTools", "Debug tools"), EHitmenMenuButtonKind::Chip);
 	DebugToggleButton->OnClicked.AddDynamic(this, &UHitmenPauseMenuWidget::ToggleDebugPanel);
 	UCanvasPanelSlot* ToggleSlot = HitmenUI::AddToCanvas(Canvas, DebugToggleButton, FAnchors(1.f, 1.f), FVector2D(-64.f, -48.f), FVector2D(1.f, 1.f));
 	ToggleSlot->SetAutoSize(true);
@@ -588,7 +589,7 @@ void UHitmenPauseMenuWidget::RefreshLegend()
 		}
 	}
 	UVerticalBox* Legend = LegendBox;
-	UTextBlock* LegendTitle = HitmenUI::MakeText(WidgetTree, LOCTEXT("Legend", "MAP LEGEND"), 15, TEXT("Medium"), HitmenUI::TextDim());
+	UTextBlock* LegendTitle = HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenMenus.Legend", "MAP LEGEND"), 15, TEXT("Medium"), HitmenUI::TextDim());
 	LegendTitle->SetFont(HitmenUI::SpacedFont(15, TEXT("Medium"), 260));
 	HitmenUI::AddToVBox(Legend, LegendTitle, FMargin(0.f, 0.f, 0.f, 12.f));
 	const int32 RowCount = LegendCategories.Num() + LegendMarkerTypes.Num();
@@ -733,7 +734,7 @@ TArray<FText> UHitmenEmoteWheelWidget::GetEmoteNames() const
 	}
 	if (Names.IsEmpty())
 	{
-		Names = { LOCTEXT("Wave", "Wave"), LOCTEXT("Point", "Point"), LOCTEXT("Bow", "Bow"), LOCTEXT("Dance", "Dance") };
+		Names = { HITMEN_TEXT("HitmenMenus.Wave", "Wave"), HITMEN_TEXT("HitmenMenus.Point", "Point"), HITMEN_TEXT("HitmenMenus.Bow", "Bow"), HITMEN_TEXT("HitmenMenus.Dance", "Dance") };
 	}
 	return Names;
 }
@@ -843,7 +844,7 @@ void UHitmenSpectatorWidget::HandleWatcherSpeed(float SpeedScale)
 {
 	if (SpeedText && GetWorld())
 	{
-		SpeedText->SetText(FText::FromString(FString::Printf(TEXT("FLY SPEED  x%.2g"), SpeedScale)));
+		SpeedText->SetText(FText::Format(HITMEN_TEXT("Watch.FlySpeed", "FLY SPEED  x{0}"), FText::FromString(FString::Printf(TEXT("%.2g"), SpeedScale))));
 		SpeedShownAt = GetWorld()->GetRealTimeSeconds();
 	}
 }
@@ -886,14 +887,14 @@ void UHitmenSpectatorWidget::HandleModeChanged(uint8 Mode)
 		case EHitmenSpectatorMode::Follow:
 		{
 			const FString Name = UI ? UI->GetSpectatorTargetName().ToString().ToUpper() : FString();
-			Line = Name.IsEmpty() ? FString(TEXT("PLAYER VIEW")) : FString::Printf(TEXT("PLAYER VIEW  -  %s"), *Name);
+			Line = Name.IsEmpty() ? HITMEN_TEXT("Watch.PlayerView", "PLAYER VIEW").ToString() : FText::Format(HITMEN_TEXT("Watch.PlayerViewOf", "PLAYER VIEW  -  {0}"), FText::FromString(Name)).ToString();
 			break;
 		}
 		case EHitmenSpectatorMode::Grid:
-			Line = ViewCount > 0 ? FString(TEXT("SPLIT SCREEN")) : FString(TEXT("SPLIT SCREEN  -  NOBODY TO WATCH"));
+			Line = ViewCount > 0 ? HITMEN_TEXT("Watch.SplitScreen", "SPLIT SCREEN").ToString() : HITMEN_TEXT("Watch.SplitNobody", "SPLIT SCREEN  -  NOBODY TO WATCH").ToString();
 			break;
 		default:
-			Line = TEXT("FREE FLY");
+			Line = HITMEN_TEXT("Watch.FreeFly", "FREE FLY").ToString();
 			break;
 		}
 		ModeText->SetText(FText::FromString(Line));
@@ -902,35 +903,35 @@ void UHitmenSpectatorWidget::HandleModeChanged(uint8 Mode)
 	{
 		// The views first (leftmost), then the view's own keys and the switches this server allows.
 		TArray<FString> Keys;
-		Keys.Add(TEXT("[1] player view"));
-		Keys.Add(TEXT("[2] split screen"));
+		Keys.Add(HITMEN_TEXT("Watch.Key1", "[1] player view").ToString());
+		Keys.Add(HITMEN_TEXT("Watch.Key2", "[2] split screen").ToString());
 		if (bCanFreeFly)
 		{
-			Keys.Add(TEXT("[3] free fly"));
+			Keys.Add(HITMEN_TEXT("Watch.Key3", "[3] free fly").ToString());
 		}
 		switch (SpectatorMode)
 		{
 		case EHitmenSpectatorMode::Follow:
-			Keys.Append({ TEXT("[LMB / RMB] switch player"), TEXT("[V] first / third person") });
+			Keys.Append({ HITMEN_TEXT("Watch.SwitchPlayer", "[LMB / RMB] switch player").ToString(), HITMEN_TEXT("Watch.Person", "[V] first / third person").ToString() });
 			break;
 		case EHitmenSpectatorMode::Grid:
-			Keys.Add(TEXT("[LMB / RMB] switch player"));
+			Keys.Add(HITMEN_TEXT("Watch.SwitchPlayer", "[LMB / RMB] switch player").ToString());
 			break;
 		default:
-			Keys.Append({ HitmenUI::MoveKeysLabel(TEXT("move")), TEXT("[SPACE] up"), TEXT("[CTRL] down"), TEXT("[SHIFT] faster"), TEXT("[WHEEL] speed") });
+			Keys.Append({ HitmenUI::MoveKeysLabel(HITMEN_TEXT("Watch.Move", "move").ToString()), HITMEN_TEXT("Watch.Up", "[SPACE] up").ToString(), HITMEN_TEXT("Watch.Down", "[CTRL] down").ToString(), HITMEN_TEXT("Watch.Faster", "[SHIFT] faster").ToString(), HITMEN_TEXT("Watch.Speed", "[WHEEL] speed").ToString() });
 			break;
 		}
 		if (bWatcher && Settings->WatcherSeePlayers == EHitmenWatcherVisibility::ShownToggleable)
 		{
-			Keys.Add(FString::Printf(TEXT("[N] players %s"), UI && UI->AreWatcherPlayersShown() ? TEXT("on") : TEXT("off")));
+			Keys.Add(UI && UI->AreWatcherPlayersShown() ? HITMEN_TEXT("Watch.PlayersOn", "[N] players on").ToString() : HITMEN_TEXT("Watch.PlayersOff", "[N] players off").ToString());
 		}
 		if (bWatcher && Settings->WatcherSeeWatchers == EHitmenWatcherVisibility::ShownToggleable)
 		{
-			Keys.Add(FString::Printf(TEXT("[B] watchers %s"), UI && UI->AreWatcherWatchersShown() ? TEXT("on") : TEXT("off")));
+			Keys.Add(UI && UI->AreWatcherWatchersShown() ? HITMEN_TEXT("Watch.WatchersOn", "[B] watchers on").ToString() : HITMEN_TEXT("Watch.WatchersOff", "[B] watchers off").ToString());
 		}
 		if (Settings->bWatchersCanScan && SpectatorMode != EHitmenSpectatorMode::Grid)
 		{
-			Keys.Add(TEXT("[TAB] scan"));
+			Keys.Add(HITMEN_TEXT("Watch.Scan", "[TAB] scan").ToString());
 		}
 		KeysText->SetText(FText::FromString(FString::Join(Keys, TEXT("     "))));
 	}
@@ -1013,14 +1014,14 @@ void UHitmenResultsWidget::BuildDefaultLayout()
 	UCanvasPanelSlot* CornerSlot = HitmenUI::AddToCanvas(Canvas, Corner, FAnchors(1.f, 1.f), FVector2D(-40.f, -36.f), FVector2D(1.f, 1.f));
 	CornerSlot->SetAutoSize(true);
 	BackHint = WidgetTree->ConstructWidget<UHitmenKeyHint>(UHitmenKeyHint::StaticClass());
-	BackHint->Setup(TEXT("ENTER"), LOCTEXT("BackToLobbyHint", "Back to the lobby"));
+	BackHint->Setup(TEXT("ENTER"), HITMEN_TEXT("HitmenMenus.BackToLobbyHint", "Back to the lobby"));
 	BackHint->OnClicked = [this]() { HandleBackClicked(); };
 	USizeBox* HintSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
 	HintSize->SetHeightOverride(40.f);
 	HintSize->SetWidthOverride(330.f);
 	HintSize->SetContent(BackHint);
 	HitmenUI::AddToVBox(Corner, HintSize, FMargin(0.f), false, HAlign_Right);
-	WaitText = HitmenUI::MakeText(WidgetTree, LOCTEXT("WaitingForHost", "Waiting for the host to go back to the lobby"), 19, TEXT("Italic"), HitmenUI::TextDim());
+	WaitText = HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenMenus.WaitingForHost", "Waiting for the host to go back to the lobby"), 19, TEXT("Italic"), HitmenUI::TextDim());
 	HitmenUI::AddToVBox(Corner, WaitText, FMargin(0.f), false, HAlign_Right);
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
@@ -1052,7 +1053,7 @@ void UHitmenResultsWidget::HandleKeyLabelsChanged()
 {
 	if (const UHitmenUIEventSubsystem* UI = GetUIEvents(); UI && BackHint)
 	{
-		BackHint->Setup(UI->GetKeyLabel(EHitmenKeyLabel::Confirm), LOCTEXT("BackToLobbyHint", "Back to the lobby"));
+		BackHint->Setup(UI->GetKeyLabel(EHitmenKeyLabel::Confirm), HITMEN_TEXT("HitmenMenus.BackToLobbyHint", "Back to the lobby"));
 	}
 }
 
@@ -1067,12 +1068,12 @@ void UHitmenResultsWidget::HandleBackClicked()
 void UHitmenResultsWidget::HandleMatchEnded(const FHitmenMatchResult& Result)
 {
 	const AHitmenGameState* GS = GetHitmenGameState();
-	FText Winner = LOCTEXT("Draw", "DRAW");
+	FText Winner = HITMEN_TEXT("HitmenMenus.Draw", "DRAW");
 	if (!Result.bIsDraw)
 	{
 		const FHitmenTeam* Team = GS ? GS->FindTeam(Result.WinningTeamId) : nullptr;
-		Winner = Team ? FText::Format(LOCTEXT("TeamWins", "{0} WINS"), Team->DisplayName)
-			: FText::Format(LOCTEXT("PlayerWins", "{0} WINS"), FText::FromString(Result.WinningPlayerName.ToUpper()));
+		Winner = Team ? FText::Format(HITMEN_TEXT("HitmenMenus.TeamWins", "{0} WINS"), Team->DisplayName)
+			: FText::Format(HITMEN_TEXT("HitmenMenus.PlayerWins", "{0} WINS"), FText::FromString(Result.WinningPlayerName.ToUpper()));
 	}
 	if (WinnerText) { WinnerText->SetText(Winner); }
 	if (ReasonText) { ReasonText->SetText(Result.Reason); }

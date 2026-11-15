@@ -2,6 +2,24 @@
 
 Short recipes for the team: where things live and how to change them without touching code.
 
+## Texts and languages (translation sheet)
+
+Every text the player reads lives in `Content/Hitmen/Localization/HitmenText.csv`: one row per text, the columns
+`Key ; en ; fr ; ...`. Open it in Excel, edit the cells, save as **CSV UTF-8** (French Excel writes `;`, others `,`;
+the game reads both). The file ships beside the game (not an asset), so a packaged build reads the sheet it was
+built with.
+
+- **Fix a translation**: edit its cell. In PIE, `HitmenText.Reload` in the console reads the sheet again.
+- **Add a language**: add a column named by its two-letter code (`de`, `es`...) and fill it; the `_LanguageName` row
+  gives the name shown in Options -> Gameplay -> Language. An empty cell falls back to English.
+- **Try a language**: Options -> Gameplay -> Language, or `HitmenText.Language fr` (empty = system language).
+- **Weapon, ability, NPC and fixture names** set in data assets and Blueprints are rows whose key starts with
+  `Asset.`: the game finds them by their English, so a renamed asset needs its `en` cell changed too.
+- **Code** (programmers): write `HITMEN_TEXT("Hud.MyText", "My text")`, then
+  `python Tools/Localization/hitmen_extract_text.py` adds the new keys to the sheet (existing cells are kept; a key
+  whose English changed gets the new English, check its other cells). `--check` lists the empty cells per language.
+  `Tools/Localization/hitmen_text_fr.py` holds the first French pass and only fills empty French cells.
+
 ## Icons (loadout tiles, HUD inventory cards)
 
 Every weapon and ability shows the texture set in its data asset's **Icon** field.

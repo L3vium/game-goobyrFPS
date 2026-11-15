@@ -1,6 +1,7 @@
 // Hitmen — move abilities
 
 #include "Abilities/Move/HitmenMoveAbilities.h"
+#include "Core/HitmenText.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Abilities/HitmenAbilityActors.h"
 #include "Characters/HitmenCharacterBase.h"
@@ -445,7 +446,7 @@ AActor* UHitmenAbility_Transposition::FindHintTarget(const FVector& Origin, cons
 {
 	if (AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, true))
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintTransposition", "Swap places");
+		OutAction = HITMEN_TEXT("Hitmen.HintTransposition", "Swap places");
 		return Target;
 	}
 	return nullptr;

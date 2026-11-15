@@ -1,6 +1,7 @@
 // Hitmen — stealth fixtures
 
 #include "World/Interactables/HitmenStealth.h"
+#include "Core/HitmenText.h"
 #include "Characters/HitmenNPC.h"
 #include "NiagaraFunctionLibrary.h"
 #include "EngineUtils.h"
@@ -30,7 +31,7 @@
 
 AHitmenLocker::AHitmenLocker()
 {
-	DisplayName = NSLOCTEXT("Hitmen", "Locker", "Locker");
+	DisplayName = HITMEN_TEXT("Hitmen.Locker", "Locker");
 	BodyCapacity = 1;
 	// The body stands in the back of the locker.
 	BodySlots = { FTransform(FRotator::ZeroRotator, FVector(-8.f, 0.f, 100.f)) };
@@ -140,7 +141,7 @@ AHitmenDistraction::AHitmenDistraction()
 {
 	// Fixtures are never vaulted, climbed or hung from.
 	Tags.AddUnique(HitmenTags::NoTraversal);
-	InteractionText = NSLOCTEXT("Hitmen", "Distract", "Turn on");
+	InteractionText = HITMEN_TEXT("Hitmen.Distract", "Turn on");
 	NoiseRadius = 1000.f;
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
@@ -161,7 +162,7 @@ void AHitmenDistraction::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 FText AHitmenDistraction::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return bOn ? NSLOCTEXT("Hitmen", "DistractOff", "Turn off") : InteractionText;
+	return bOn ? HITMEN_TEXT("Hitmen.DistractOff", "Turn off") : InteractionText;
 }
 
 void AHitmenDistraction::Tick(float DeltaSeconds)

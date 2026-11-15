@@ -1,6 +1,7 @@
 // Hitmen — ability actors
 
 #include "Abilities/HitmenAbilityActors.h"
+#include "Core/HitmenText.h"
 #include "Abilities/HitmenAbility.h"
 #include "Data/HitmenSoundSet.h"
 #include "AI/HitmenAlertComponent.h"
@@ -312,9 +313,9 @@ FText AHitmenAbilityPickup::GetInteractionText_Implementation(AActor* Interactor
 	const UHitmenAbility* Current = Abilities ? Abilities->GetAbility(Ability->Slot) : nullptr;
 	if (Current && Current->GetData() && Current->GetData() != Ability)
 	{
-		return FText::Format(NSLOCTEXT("Hitmen", "SwapAbility", "Swap for {0}"), Ability->DisplayName);
+		return FText::Format(HITMEN_TEXT("Hitmen.SwapAbility", "Swap for {0}"), UHitmenTextSubsystem::Translate(Ability->DisplayName));
 	}
-	return FText::Format(NSLOCTEXT("Hitmen", "TakeAbility", "Take {0}"), Ability->DisplayName);
+	return FText::Format(HITMEN_TEXT("Hitmen.TakeAbility", "Take {0}"), UHitmenTextSubsystem::Translate(Ability->DisplayName));
 }
 
 void AHitmenAbilityPickup::OnInteracted(AActor* Interactor)

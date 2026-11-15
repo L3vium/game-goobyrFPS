@@ -1,6 +1,7 @@
 // Hitmen — security fixtures
 
 #include "World/Interactables/HitmenSecurity.h"
+#include "Core/HitmenText.h"
 #include "Engine/DamageEvents.h"
 #include "Components/TextRenderComponent.h"
 #include "Core/HitmenGameSettings.h"
@@ -379,7 +380,7 @@ AHitmenSecurityMonitor::AHitmenSecurityMonitor()
 	SetRootComponent(Screen);
 	NoSignalText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("NoSignalText"));
 	NoSignalText->SetupAttachment(Screen);
-	NoSignalText->SetText(NSLOCTEXT("Hitmen", "NoSignal", "NO SIGNAL"));
+	NoSignalText->SetText(HITMEN_TEXT("Hitmen.NoSignal", "NO SIGNAL"));
 	NoSignalText->SetHorizontalAlignment(EHTA_Center);
 	NoSignalText->SetVerticalAlignment(EVRTA_TextCenter);
 	NoSignalText->SetTextRenderColor(FColor(230, 230, 230));
@@ -451,7 +452,7 @@ void AHitmenSecurityMonitor::Refresh()
 
 AHitmenControlConsole::AHitmenControlConsole()
 {
-	InteractionText = NSLOCTEXT("Hitmen", "DisableCameras", "Disable cameras");
+	InteractionText = HITMEN_TEXT("Hitmen.DisableCameras", "Disable cameras");
 	Screen = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Screen"));
 	Screen->SetupAttachment(Root);
 	// Above the back of the desk, facing the operator (+X), parallel to the desk front.
@@ -528,7 +529,7 @@ void AHitmenControlConsole::RefreshScreen()
 
 FText AHitmenControlConsole::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return bCamerasDisabled ? NSLOCTEXT("Hitmen", "EnableCameras", "Enable cameras") : InteractionText;
+	return bCamerasDisabled ? HITMEN_TEXT("Hitmen.EnableCameras", "Enable cameras") : InteractionText;
 }
 
 void AHitmenControlConsole::OnInteracted(AActor* Interactor)
@@ -587,7 +588,7 @@ AHitmenTurret::AHitmenTurret()
 
 FText AHitmenTurret::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return NSLOCTEXT("Hitmen", "HackTurret", "Hack turret");
+	return HITMEN_TEXT("Hitmen.HackTurret", "Hack turret");
 }
 
 void AHitmenTurret::UpdateLaser()
@@ -810,7 +811,7 @@ AHitmenHackPanel::AHitmenHackPanel()
 {
 	// Fixtures are never vaulted, climbed or hung from.
 	Tags.AddUnique(HitmenTags::NoTraversal);
-	InteractionText = NSLOCTEXT("Hitmen", "HackTurret", "Hack turret");
+	InteractionText = HITMEN_TEXT("Hitmen.HackTurret", "Hack turret");
 }
 
 bool AHitmenHackPanel::CanInteract_Implementation(AActor* Interactor) const
@@ -922,31 +923,31 @@ bool AHitmenBlackoutVolume::IsLocationDark(const FVector& Location) const
 
 FText AHitmenLightFixture::GetInteractionInfo_Implementation(AActor* Interactor) const
 {
-	return bPowered ? NSLOCTEXT("Hitmen", "LightOn", "Light  -  On") : NSLOCTEXT("Hitmen", "LightOff", "Light  -  Off");
+	return bPowered ? HITMEN_TEXT("Hitmen.LightOn", "Light  -  On") : HITMEN_TEXT("Hitmen.LightOff", "Light  -  Off");
 }
 
 AHitmenLightSwitch::AHitmenLightSwitch()
 {
-	DisplayName = NSLOCTEXT("Hitmen", "LightSwitch", "Light switch");
-	InteractionText = NSLOCTEXT("Hitmen", "SwitchOff", "Switch off");
+	DisplayName = HITMEN_TEXT("Hitmen.LightSwitch", "Light switch");
+	InteractionText = HITMEN_TEXT("Hitmen.SwitchOff", "Switch off");
 }
 
 FText AHitmenLightSwitch::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return bPowered ? InteractionText : NSLOCTEXT("Hitmen", "SwitchOn", "Switch on");
+	return bPowered ? InteractionText : HITMEN_TEXT("Hitmen.SwitchOn", "Switch on");
 }
 
 FText AHitmenLightSwitch::GetInteractionInfo_Implementation(AActor* Interactor) const
 {
-	return FText::Format(NSLOCTEXT("Hitmen", "LightSwitchInfo", "{0}  -  {1}"), DisplayName,
-		bPowered ? NSLOCTEXT("Hitmen", "On", "On") : NSLOCTEXT("Hitmen", "Off", "Off"));
+	return FText::Format(HITMEN_TEXT("Hitmen.LightSwitchInfo", "{0}  -  {1}"), DisplayName,
+		bPowered ? HITMEN_TEXT("Hitmen.On", "On") : HITMEN_TEXT("Hitmen.Off", "Off"));
 }
 
 AHitmenCircuitBreaker::AHitmenCircuitBreaker()
 {
 	// Fixtures are never vaulted, climbed or hung from.
 	Tags.AddUnique(HitmenTags::NoTraversal);
-	InteractionText = NSLOCTEXT("Hitmen", "CutPower", "Cut the power");
+	InteractionText = HITMEN_TEXT("Hitmen.CutPower", "Cut the power");
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	Lever = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Lever"));
@@ -978,7 +979,7 @@ void AHitmenCircuitBreaker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 
 FText AHitmenCircuitBreaker::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return bPowered ? InteractionText : NSLOCTEXT("Hitmen", "RestorePower", "Restore power");
+	return bPowered ? InteractionText : HITMEN_TEXT("Hitmen.RestorePower", "Restore power");
 }
 
 void AHitmenCircuitBreaker::OnInteracted(AActor* Interactor)

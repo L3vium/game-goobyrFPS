@@ -1,6 +1,7 @@
 // Hitmen — manipulation abilities
 
 #include "Abilities/Manipulation/HitmenManipulationAbilities.h"
+#include "Core/HitmenText.h"
 #include "World/Interactables/HitmenStealth.h"
 #include "Core/HitmenTeamLibrary.h"
 #include "Weapons/HitmenCombatLibrary.h"
@@ -125,7 +126,7 @@ AActor* UHitmenAbility_RemoteDistraction::FindHintTarget(const FVector& Origin, 
 {
 	if (AActor* Target = PickConeTarget(Origin, Direction, GatherRemoteTargets(GetWorld(), this, AllowedTargetClasses), TargetConeAngle))
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintRemoteActivate", "Activate remotely");
+		OutAction = HITMEN_TEXT("Hitmen.HintRemoteActivate", "Activate remotely");
 		return Target;
 	}
 	return nullptr;
@@ -158,7 +159,7 @@ AActor* UHitmenAbility_Charm::FindHintTarget(const FVector& Origin, const FVecto
 {
 	if (AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, false))
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintCharm", "Charm");
+		OutAction = HITMEN_TEXT("Hitmen.HintCharm", "Charm");
 		return Target;
 	}
 	return nullptr;
@@ -193,7 +194,7 @@ AActor* UHitmenAbility_Lighter::FindHintTarget(const FVector& Origin, const FVec
 	AHitmenCharacterBase* Body = AimCharacterInCone(Origin, Direction, true, true);
 	if (Body && !Body->IsVIP())
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintLighter", "Lighter");
+		OutAction = HITMEN_TEXT("Hitmen.HintLighter", "Lighter");
 		return Body;
 	}
 	return nullptr;
@@ -309,7 +310,7 @@ AActor* UHitmenAbility_MultiKill::FindHintTarget(const FVector& Origin, const FV
 	AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, false);
 	if (Target && !MarkedTargets.Contains(Target))
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintMark", "Hold to mark");
+		OutAction = HITMEN_TEXT("Hitmen.HintMark", "Hold to mark");
 		return Target;
 	}
 	return nullptr;
@@ -407,7 +408,7 @@ UHitmenAbility_PoisonVial::UHitmenAbility_PoisonVial()
 	Cooldown = 5.f;
 	MaxCharges = 2;
 	Range = 250.f;
-	RoomNotSealedText = NSLOCTEXT("Hitmen", "RoomNotSealed", "Room not sealed");
+	RoomNotSealedText = HITMEN_TEXT("Hitmen.RoomNotSealed", "Room not sealed");
 }
 
 namespace

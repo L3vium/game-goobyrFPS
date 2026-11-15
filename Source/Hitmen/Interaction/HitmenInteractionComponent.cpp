@@ -1,6 +1,7 @@
 // Hitmen — interaction component
 
 #include "Interaction/HitmenInteractionComponent.h"
+#include "Core/HitmenText.h"
 #include "Data/HitmenSoundSet.h"
 #include "Characters/HitmenNPC.h"
 #include "Interaction/HitmenInteractable.h"
@@ -114,7 +115,7 @@ void UHitmenInteractionComponent::UpdateFocusTarget()
 				SetFocus(Victim, IHitmenInteractable::Execute_GetInteractionText(Victim, Pawn));
 				return;
 			}
-			SetFocus(Victim, NSLOCTEXT("Hitmen", "Eliminate", "Eliminate"));
+			SetFocus(Victim, HITMEN_TEXT("Hitmen.Eliminate", "Eliminate"));
 			return;
 		}
 	}
@@ -160,7 +161,7 @@ void UHitmenInteractionComponent::UpdateFocusTarget()
 	// Carrying a body with nothing focused: F drops it.
 	if (const UHitmenBodyCarryComponent* Carry = Pawn->FindComponentByClass<UHitmenBodyCarryComponent>(); Carry && Carry->IsCarrying())
 	{
-		SetFocus(nullptr, NSLOCTEXT("Hitmen", "DropBody", "Drop body"));
+		SetFocus(nullptr, HITMEN_TEXT("Hitmen.DropBody", "Drop body"));
 		return;
 	}
 	SetFocus(nullptr, FText::GetEmpty());
@@ -176,7 +177,7 @@ void UHitmenInteractionComponent::RefreshCornerHint(const APawn* Pawn)
 	{
 		const UHitmenUIEventSubsystem* KeyUI = UHitmenUIEventSubsystem::GetFromPawn(Pawn);
 		const FString Key = KeyUI ? KeyUI->GetKeyLabel(EHitmenKeyLabel::Interact) : FString(TEXT("F"));
-		Hint = FText::Format(NSLOCTEXT("Hitmen", "ThrowHint", "{0}  Throw"), FText::FromString(Key));
+		Hint = FText::Format(HITMEN_TEXT("Hitmen.ThrowHint", "{0}  Throw"), FText::FromString(Key));
 	}
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Pawn))
 	{

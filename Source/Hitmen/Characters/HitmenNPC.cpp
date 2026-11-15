@@ -1,6 +1,7 @@
 // Hitmen — NPC
 
 #include "Characters/HitmenNPC.h"
+#include "Core/HitmenText.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -56,7 +57,7 @@ AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	KeycardMesh->SetupAttachment(GetMesh(), KeycardBone);
 	KeycardMesh->SetRelativeScale3D(FVector(0.055f, 0.01f, 0.09f));
 	BodyCarryComponent = CreateDefaultSubobject<UHitmenBodyCarryComponent>(TEXT("BodyCarryComponent"));
-	DisplayName = NSLOCTEXT("Hitmen", "NPCGuard", "Guard");
+	DisplayName = HITMEN_TEXT("Hitmen.NPCGuard", "Guard");
 	KeycardMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	KeycardMesh->SetVisibility(false);
 	AimLaser = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AimLaser"));
@@ -249,14 +250,14 @@ FText AHitmenNPC::GetInteractionInfo_Implementation(AActor* Interactor) const
 		return FText::GetEmpty();
 	}
 	// VIP candidates: the one picked is the target; the others became guards at match start.
-	FText Info = IsVIP() ? NSLOCTEXT("Hitmen", "NPCTarget", "Target") : (bVIPCandidate ? NSLOCTEXT("Hitmen", "NPCGuard", "Guard") : DisplayName);
+	FText Info = IsVIP() ? HITMEN_TEXT("Hitmen.NPCTarget", "Target") : (bVIPCandidate ? HITMEN_TEXT("Hitmen.NPCGuard", "Guard") : UHitmenTextSubsystem::Translate(DisplayName));
 	if (Weapon && Weapon->GetWeaponData())
 	{
-		Info = FText::Format(NSLOCTEXT("Hitmen", "NPCInfoWeapon", "{0}  -  {1}"), Info, Weapon->GetWeaponData()->DisplayName);
+		Info = FText::Format(HITMEN_TEXT("Hitmen.NPCInfoWeapon", "{0}  -  {1}"), Info, UHitmenTextSubsystem::Translate(Weapon->GetWeaponData()->DisplayName));
 	}
 	if (CarriedKeycard >= 0)
 	{
-		Info = FText::Format(NSLOCTEXT("Hitmen", "NPCInfoKeycard", "{0}  -  Keycard {1}"), Info, FText::AsNumber(CarriedKeycard));
+		Info = FText::Format(HITMEN_TEXT("Hitmen.NPCInfoKeycard", "{0}  -  Keycard {1}"), Info, FText::AsNumber(CarriedKeycard));
 	}
 	return Info;
 }
@@ -274,7 +275,7 @@ FText AHitmenNPC::GetInteractionText_Implementation(AActor* Interactor) const
 {
 	if (CanBePickpocketedBy(Interactor))
 	{
-		return FText::Format(NSLOCTEXT("Hitmen", "Pickpocket", "Pickpocket keycard {0}"), FText::AsNumber(CarriedKeycard));
+		return FText::Format(HITMEN_TEXT("Hitmen.Pickpocket", "Pickpocket keycard {0}"), FText::AsNumber(CarriedKeycard));
 	}
 	return Super::GetInteractionText_Implementation(Interactor);
 }

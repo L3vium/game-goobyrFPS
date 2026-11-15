@@ -1,6 +1,7 @@
 // Hitmen — HUD elements
 
 #include "UI/HitmenHUDElements.h"
+#include "Core/HitmenText.h"
 #include "GameFramework/SpectatorPawn.h"
 #include "Framework/HitmenPlayerState.h"
 #include "Engine/Texture2D.h"
@@ -107,7 +108,7 @@ int32 UHitmenActionPromptWidget::NativePaint(const FPaintArgs& Args, const FGeom
 	{
 		const FSlateFontInfo LabelFont = HitmenUI::SpacedFont(19, TEXT("SemiBold"), 60);
 		const FSlateFontInfo ExtraFont = HitmenUI::SpacedFont(17, TEXT("Italic"), 30);
-		const FString Upper = Label.ToUpper();
+		const FString Upper = FText::FromString(Label).ToUpper().ToString();
 		const FVector2D LabelSize = HitmenUI::MeasureText(Upper, LabelFont);
 		const FVector2D ExtraSize = Extra.IsEmpty() ? FVector2D::ZeroVector : HitmenUI::MeasureText(Extra, ExtraFont);
 		const float KeyWidth = KeyCapWidth(Key, 17);
@@ -572,14 +573,14 @@ int32 UHitmenInventoryBarWidget::NativePaint(const FPaintArgs& Args, const FGeom
 		const bool bActive = Place == 0;
 		const bool bValid = Inventory.Slots.IsValidIndex(SlotIndex) && !Inventory.Slots[SlotIndex].bEmpty;
 		const FHitmenHUDSlotView* View = bValid ? &Inventory.Slots[SlotIndex] : nullptr;
-		FString Name = View ? View->Name.ToString().ToUpper() : (bActive ? FString(TEXT("FISTS")) : FString(TEXT("EMPTY")));
+		FString Name = View ? View->Name.ToUpper().ToString() : (bActive ? HITMEN_TEXT("Hud.Fists", "FISTS").ToString() : HITMEN_TEXT("Hud.Empty", "EMPTY").ToString());
 		FString Sub;
 		FLinearColor SubColor = HitmenUI::TextDim();
 		if (Place == 0 && Inventory.bCarryingBody)
 		{
 			// The body fills the left card while it is in your arms.
-			PaintCard(LeftX, true, 1.f, nullptr, Inventory.bCarryingVIP ? FString(TEXT("TARGET")) : FString(TEXT("BODY")),
-				FString::Printf(TEXT("%s / wheel: put down"), KeyUI ? *KeyUI->GetKeyLabel(EHitmenKeyLabel::Interact) : TEXT("F")), HitmenUI::TextDim());
+			PaintCard(LeftX, true, 1.f, nullptr, Inventory.bCarryingVIP ? HITMEN_TEXT("Hud.TargetCard", "TARGET").ToString() : HITMEN_TEXT("Hud.BodyCard", "BODY").ToString(),
+				FText::Format(HITMEN_TEXT("Hud.PutDown", "{0} / wheel: put down"), FText::FromString(KeyUI ? KeyUI->GetKeyLabel(EHitmenKeyLabel::Interact) : FString(TEXT("F")))).ToString(), HitmenUI::TextDim());
 			continue;
 		}
 		if (View && View->Ammo >= 0)
@@ -615,7 +616,7 @@ int32 UHitmenInventoryBarWidget::NativePaint(const FPaintArgs& Args, const FGeom
 		{
 			Sub = FString::Printf(TEXT("%.0fs"), FMath::CeilToFloat(View.CooldownRemaining));
 		}
-		PaintCard(CardX, bReady, View.bValid ? 1.f : 0.5f, View.Icon.Get(), View.bValid ? View.Name.ToString().ToUpper() : FString(TEXT("NONE")), Sub, HitmenUI::TextDim());
+		PaintCard(CardX, bReady, View.bValid ? 1.f : 0.5f, View.Icon.Get(), View.bValid ? View.Name.ToUpper().ToString() : HITMEN_TEXT("Hud.NoAbility", "NONE").ToString(), Sub, HitmenUI::TextDim());
 		if (!View.bValid)
 		{
 			return;
@@ -669,16 +670,16 @@ int32 UHitmenCheatPanelWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 	{
 		return LayerId;
 	}
-	struct FRow { const TCHAR* Key; const TCHAR* Label; EHitmenCheat Cheat; bool bToggle; };
-	static const FRow Rows[] = {
-		{ TEXT("F1"), TEXT("Invulnerable"), EHitmenCheat::Invulnerable, true },
-		{ TEXT("F2"), TEXT("Infinite ammo"), EHitmenCheat::InfiniteAmmo, true },
-		{ TEXT("F3"), TEXT("No cooldown"), EHitmenCheat::NoCooldown, true },
-		{ TEXT("F4"), TEXT("Invisible to AI"), EHitmenCheat::InvisibleToAI, true },
-		{ TEXT("F5"), TEXT("Respawn enemies"), EHitmenCheat::RespawnEnemies, false },
-		{ TEXT("F6"), TEXT("Kill all enemies"), EHitmenCheat::KillEnemies, false },
-		{ TEXT("F7"), TEXT("Reset the map"), EHitmenCheat::ResetGym, false },
-		{ TEXT("F8"), TEXT("Fly (no collision)"), EHitmenCheat::Fly, true },
+	struct FRow { const TCHAR* Key; FString Label; EHitmenCheat Cheat; bool bToggle; };
+	const FRow Rows[] = {
+		{ TEXT("F1"), HITMEN_TEXT("Cheat.Invulnerable", "Invulnerable").ToString(), EHitmenCheat::Invulnerable, true },
+		{ TEXT("F2"), HITMEN_TEXT("Cheat.InfiniteAmmo", "Infinite ammo").ToString(), EHitmenCheat::InfiniteAmmo, true },
+		{ TEXT("F3"), HITMEN_TEXT("Cheat.NoCooldown", "No cooldown").ToString(), EHitmenCheat::NoCooldown, true },
+		{ TEXT("F4"), HITMEN_TEXT("Cheat.InvisibleToAI", "Invisible to AI").ToString(), EHitmenCheat::InvisibleToAI, true },
+		{ TEXT("F5"), HITMEN_TEXT("Cheat.RespawnEnemies", "Respawn enemies").ToString(), EHitmenCheat::RespawnEnemies, false },
+		{ TEXT("F6"), HITMEN_TEXT("Cheat.KillEnemies", "Kill all enemies").ToString(), EHitmenCheat::KillEnemies, false },
+		{ TEXT("F7"), HITMEN_TEXT("Cheat.ResetMap", "Reset the map").ToString(), EHitmenCheat::ResetGym, false },
+		{ TEXT("F8"), HITMEN_TEXT("Cheat.Fly", "Fly (no collision)").ToString(), EHitmenCheat::Fly, true },
 	};
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
 	const float Width = 250.f;
@@ -688,7 +689,7 @@ int32 UHitmenCheatPanelWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 	const FVector2D Origin(Size.X - 24.f - Width, (Size.Y - Height) * 0.5f);
 	HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, Origin - FVector2D(30.f, 0.f), FVector2D(Width + 54.f, Height),
 		FLinearColor(0.f, 0.f, 0.f, 0.f), FLinearColor(0.f, 0.f, 0.f, 0.5f), true);
-	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, TEXT("CHEATS"), Origin + FVector2D(0.f, 2.f), HitmenUI::SpacedFont(14, TEXT("SemiBold"), 240), HitmenUI::TextDim());
+	HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, HITMEN_TEXT("Cheat.Title", "CHEATS").ToString(), Origin + FVector2D(0.f, 2.f), HitmenUI::SpacedFont(14, TEXT("SemiBold"), 240), HitmenUI::TextDim());
 	const FSlateFontInfo LabelFont = HitmenUI::Font(16, TEXT("SemiBold"));
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Rows); ++Index)
 	{
@@ -761,7 +762,7 @@ int32 UHitmenWorldHintWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 		return LayerId;
 	}
 	const FSlateFontInfo LabelFont = HitmenUI::SpacedFont(17, TEXT("SemiBold"), 60);
-	const FString Label = Hint.Action.ToString().ToUpper();
+	const FString Label = Hint.Action.ToUpper().ToString();
 	const FVector2D LabelSize = HitmenUI::MeasureText(Label, LabelFont);
 	const float Total = 30.f + 8.f + LabelSize.X;
 	const FVector2D Position(Screen.X - Total * 0.5f, Screen.Y + 10.f);
@@ -803,8 +804,8 @@ int32 UHitmenIntroWidget::NativePaint(const FPaintArgs& Args, const FGeometry& A
 	HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D::ZeroVector, FVector2D(Size.X, Size.Y * 0.4f), FLinearColor(0, 0, 0, 0.75f * Alpha), FLinearColor(0, 0, 0, 0), false);
 	const FSlateFontInfo Overline = HitmenUI::SpacedFont(18, TEXT("Medium"), 300);
 	const FSlateFontInfo Title = HitmenUI::SpacedFont(64, TEXT("Bold"), 40);
-	const FString Over = TEXT("DROPPING IN");
-	const FString Name = MapName.ToString().ToUpper();
+	const FString Over = HITMEN_TEXT("Hud.DroppingIn", "DROPPING IN").ToString();
+	const FString Name = UHitmenTextSubsystem::Translate(MapName).ToUpper().ToString();
 	const FVector2D OverSize = HitmenUI::MeasureText(Over, Overline);
 	const FVector2D NameSize = HitmenUI::MeasureText(Name, Title);
 	const float Y = Size.Y * 0.08f;
@@ -854,7 +855,7 @@ int32 UHitmenStatusCornerWidget::NativePaint(const FPaintArgs& Args, const FGeom
 		// Health: a bar at the top centre, under the compass.
 		const FVector2D BarSize(420.f, 8.f);
 		const FVector2D BarPos((Size.X - BarSize.X) * 0.5f, 86.f);
-		const FString Title = Vehicle.Name.ToString().ToUpper();
+		const FString Title = Vehicle.Name.ToUpper().ToString();
 		const FVector2D TitleSize = HitmenUI::MeasureText(Title, TitleFont);
 		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Title, FVector2D((Size.X - TitleSize.X) * 0.5f, BarPos.Y - TitleSize.Y - 4.f), TitleFont, HitmenUI::Text());
 		HitmenUI::PaintBox(OutDrawElements, LayerId, AllottedGeometry, BarPos - FVector2D(2.f), BarSize + FVector2D(4.f), FLinearColor(0.f, 0.f, 0.f, 0.55f));
@@ -884,7 +885,7 @@ int32 UHitmenStatusCornerWidget::NativePaint(const FPaintArgs& Args, const FGeom
 	}
 	if (Vehicle.bActive)
 	{
-		const FString Label = TEXT("EXIT");
+		const FString Label = HITMEN_TEXT("Hud.Exit", "EXIT").ToString();
 		const FSlateFontInfo LabelFont = HitmenUI::SpacedFont(19, TEXT("SemiBold"), 60);
 		const FVector2D LabelSize = HitmenUI::MeasureText(Label, LabelFont);
 		const float RowHeight = 30.f;
@@ -899,7 +900,7 @@ int32 UHitmenStatusCornerWidget::NativePaint(const FPaintArgs& Args, const FGeom
 	}
 	for (int32 Index = Keycards.Num() - 1; Index >= 0; --Index)
 	{
-		const FString Label = FString::Printf(TEXT("KEYCARD %d"), Keycards[Index]);
+		const FString Label = FText::Format(HITMEN_TEXT("Hud.Keycard", "KEYCARD {0}"), FText::AsNumber(Keycards[Index])).ToString();
 		const FVector2D LabelSize = HitmenUI::MeasureText(Label, SmallFont);
 		const FVector2D ChipSize(LabelSize.X + 22.f, 22.f);
 		const FVector2D ChipPos(Size.X - Margin - ChipSize.X, Bottom - ChipSize.Y);

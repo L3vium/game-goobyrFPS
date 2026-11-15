@@ -1,6 +1,7 @@
 // Hitmen — options screen
 
 #include "UI/HitmenOptionsWidgets.h"
+#include "Core/HitmenText.h"
 #include "UI/HitmenUIFactory.h"
 #include "UI/HitmenUIEventSubsystem.h"
 #include "Core/HitmenUserSettings.h"
@@ -62,12 +63,12 @@ namespace
 
 	TArray<FText> QualityNames()
 	{
-		return { LOCTEXT("Low", "Low"), LOCTEXT("Medium", "Medium"), LOCTEXT("High", "High"), LOCTEXT("Epic", "Epic") };
+		return { HITMEN_TEXT("HitmenOptions.Low", "Low"), HITMEN_TEXT("HitmenOptions.Medium", "Medium"), HITMEN_TEXT("HitmenOptions.High", "High"), HITMEN_TEXT("HitmenOptions.Epic", "Epic") };
 	}
 
 	TArray<FText> OffOn()
 	{
-		return { LOCTEXT("Off", "Off"), LOCTEXT("On", "On") };
+		return { HITMEN_TEXT("HitmenOptions.Off", "Off"), HITMEN_TEXT("HitmenOptions.On", "On") };
 	}
 
 	FText Percent(float Value) { return FText::FromString(FString::Printf(TEXT("%d %%"), FMath::RoundToInt(Value * 100.f))); }
@@ -137,7 +138,7 @@ FText UHitmenOptionRow::GetDescription() const
 {
 	if (!ConflictWith.IsEmpty())
 	{
-		return FText::Format(LOCTEXT("ConflictDesc", "{0}\n\nThis key is also used by {1}."), Description, ConflictWith);
+		return FText::Format(HITMEN_TEXT("HitmenOptions.ConflictDesc", "{0}\n\nThis key is also used by {1}."), Description, ConflictWith);
 	}
 	return Description;
 }
@@ -216,7 +217,7 @@ int32 UHitmenOptionRow::NativePaint(const FPaintArgs& Args, const FGeometry& All
 	{
 		if (bListening)
 		{
-			const FString Prompt = LOCTEXT("PressKey", "PRESS A KEY  (ESC CANCELS)").ToString();
+			const FString Prompt = HITMEN_TEXT("HitmenOptions.PressKey", "PRESS A KEY  (ESC CANCELS)").ToString();
 			const FSlateFontInfo PromptFont = HitmenUI::Font(17, TEXT("SemiBoldItalic"));
 			const FVector2D PromptSize = HitmenUI::MeasureText(Prompt, PromptFont);
 			const float Blink = 0.55f + 0.45f * FMath::Sin(GetWorld() ? GetWorld()->GetRealTimeSeconds() * 8.f : 0.f);
@@ -601,11 +602,11 @@ void UHitmenOptionsWidget::BuildDefaultLayout()
 	Panel->SetContent(Column);
 
 	// Title and tabs.
-	UTextBlock* Title = HitmenUI::MakeText(WidgetTree, LOCTEXT("OptionsTitle", "OPTIONS"), 46, TEXT("Bold"));
+	UTextBlock* Title = HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenOptions.OptionsTitle", "OPTIONS"), 46, TEXT("Bold"));
 	Title->SetFont(HitmenUI::SpacedFont(46, TEXT("Bold"), 80));
 	HitmenUI::AddToVBox(Column, Title, FMargin(40.f, 28.f, 40.f, 6.f));
 	TabBar = WidgetTree->ConstructWidget<UHitmenTabBar>(UHitmenTabBar::StaticClass());
-	TabBar->SetTabs({ LOCTEXT("TabGameplay", "Gameplay"), LOCTEXT("TabControls", "Controls"), LOCTEXT("TabGraphics", "Graphics"), LOCTEXT("TabAudio", "Audio") }, 0);
+	TabBar->SetTabs({ HITMEN_TEXT("HitmenOptions.TabGameplay", "Gameplay"), HITMEN_TEXT("HitmenOptions.TabControls", "Controls"), HITMEN_TEXT("HitmenOptions.TabGraphics", "Graphics"), HITMEN_TEXT("HitmenOptions.TabAudio", "Audio") }, 0);
 	TabBar->OnTabChosen = [this](int32 Tab) { ShowTab(static_cast<EHitmenOptionsTab>(Tab)); };
 	USizeBox* TabSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
 	TabSize->SetHeightOverride(56.f);
@@ -655,8 +656,8 @@ void UHitmenOptionsWidget::BuildDefaultLayout()
 		HintSize->SetContent(Hint);
 		HitmenUI::AddToHBox(Footer, HintSize, FMargin(28.f, 0.f, 0.f, 0.f));
 	};
-	AddHint(TEXT("R"), LOCTEXT("Defaults", "Defaults"), [this]() { ResetToDefaults(); });
-	AddHint(TEXT("ESC"), LOCTEXT("Back", "Back"), [this]() { Close(); });
+	AddHint(TEXT("R"), HITMEN_TEXT("HitmenOptions.Defaults", "Defaults"), [this]() { ResetToDefaults(); });
+	AddHint(TEXT("ESC"), HITMEN_TEXT("HitmenOptions.Back", "Back"), [this]() { Close(); });
 	HitmenUI::AddToVBox(Column, Footer, FMargin(40.f, 12.f, 40.f, 22.f), false, HAlign_Right);
 }
 
@@ -781,23 +782,57 @@ void UHitmenOptionsWidget::BuildGameplay()
 	{
 		return;
 	}
-	AddHeader(LOCTEXT("Mouse", "Mouse"));
-	AddRow()->SetupSlider(LOCTEXT("Sensitivity", "Mouse sensitivity"), LOCTEXT("SensitivityDesc", "How fast the view turns with the mouse."),
+	// Language: Auto (the system's) or any column of the translation sheet.
+	if (UHitmenTextSubsystem* Text = UHitmenTextSubsystem::GetInstance())
+	{
+		AddHeader(HITMEN_TEXT("HitmenOptions.LanguageHeader", "Language"));
+		TArray<FText> Names = { HITMEN_TEXT("HitmenOptions.LanguageAuto", "Auto (system)") };
+		TArray<FString> Codes = { FString() };
+		for (const FString& Code : Text->GetLanguages())
+		{
+			Names.Add(Text->GetLanguageName(Code));
+			Codes.Add(Code);
+		}
+		const int32 Current = FMath::Max(0, Codes.IndexOfByKey(S->Language));
+		TWeakObjectPtr<UHitmenOptionsWidget> WeakThis(this);
+		AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.Language", "Language"),
+			HITMEN_TEXT("HitmenOptions.LanguageDesc", "Every text of the game. The translations are in Content/Hitmen/Localization/HitmenText.csv."),
+			Names, Current, [Codes, WeakThis](int32 I)
+			{
+				if (UHitmenTextSubsystem* Sheet = UHitmenTextSubsystem::GetInstance(); Sheet && Codes.IsValidIndex(I))
+				{
+					Sheet->SetLanguage(Codes[I]);
+				}
+				// The page is rebuilt in the new language (next tick: this row is still handling its click).
+				if (WeakThis.IsValid() && WeakThis->GetWorld())
+				{
+					WeakThis->GetWorld()->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(WeakThis.Get(), [WeakThis]()
+					{
+						if (WeakThis.IsValid())
+						{
+							WeakThis->RefreshCurrentTab();
+						}
+					}));
+				}
+			});
+	}
+	AddHeader(HITMEN_TEXT("HitmenOptions.Mouse", "Mouse"));
+	AddRow()->SetupSlider(HITMEN_TEXT("HitmenOptions.Sensitivity", "Mouse sensitivity"), HITMEN_TEXT("HitmenOptions.SensitivityDesc", "How fast the view turns with the mouse."),
 		0.05f, 1.5f, 0.01f, S->MouseSensitivity, [](float V) { return FText::FromString(FString::Printf(TEXT("%.2f"), V)); },
 		[S](float V) { S->MouseSensitivity = V; S->ApplyHitmenSettings(); });
-	AddRow()->SetupSlider(LOCTEXT("AimSensitivity", "Aiming sensitivity"), LOCTEXT("AimSensitivityDesc", "Multiplies the sensitivity while aiming. The zoom is already compensated: 1.00 feels the same as the hip."),
+	AddRow()->SetupSlider(HITMEN_TEXT("HitmenOptions.AimSensitivity", "Aiming sensitivity"), HITMEN_TEXT("HitmenOptions.AimSensitivityDesc", "Multiplies the sensitivity while aiming. The zoom is already compensated: 1.00 feels the same as the hip."),
 		0.25f, 2.f, 0.05f, S->AimSensitivityMultiplier, [](float V) { return FText::FromString(FString::Printf(TEXT("x %.2f"), V)); },
 		[S](float V) { S->AimSensitivityMultiplier = V; S->ApplyHitmenSettings(); });
-	AddRow()->SetupChoice(LOCTEXT("InvertY", "Invert vertical look"), LOCTEXT("InvertYDesc", "Moving the mouse forward looks down."),
+	AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.InvertY", "Invert vertical look"), HITMEN_TEXT("HitmenOptions.InvertYDesc", "Moving the mouse forward looks down."),
 		OffOn(), S->bInvertY ? 1 : 0, [S](int32 I) { S->bInvertY = I == 1; S->ApplyHitmenSettings(); });
-	AddHeader(LOCTEXT("Movement", "Movement"));
-	const TArray<FText> HoldToggle = { LOCTEXT("Hold", "Hold"), LOCTEXT("Toggle", "Toggle") };
-	AddRow()->SetupChoice(LOCTEXT("CrouchMode", "Crouch"), LOCTEXT("CrouchModeDesc", "Hold the key to stay crouched, or press it once to switch."),
+	AddHeader(HITMEN_TEXT("HitmenOptions.Movement", "Movement"));
+	const TArray<FText> HoldToggle = { HITMEN_TEXT("HitmenOptions.Hold", "Hold"), HITMEN_TEXT("HitmenOptions.Toggle", "Toggle") };
+	AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.CrouchMode", "Crouch"), HITMEN_TEXT("HitmenOptions.CrouchModeDesc", "Hold the key to stay crouched, or press it once to switch."),
 		HoldToggle, S->bToggleCrouch ? 1 : 0, [S](int32 I) { S->bToggleCrouch = I == 1; S->ApplyHitmenSettings(); });
-	AddRow()->SetupChoice(LOCTEXT("SprintMode", "Sprint"), LOCTEXT("SprintModeDesc", "Hold the key to sprint, or press it once to switch. A quick tap dashes when you have the dash."),
+	AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.SprintMode", "Sprint"), HITMEN_TEXT("HitmenOptions.SprintModeDesc", "Hold the key to sprint, or press it once to switch. A quick tap dashes when you have the dash."),
 		HoldToggle, S->bToggleSprint ? 1 : 0, [S](int32 I) { S->bToggleSprint = I == 1; S->ApplyHitmenSettings(); });
-	AddRow()->SetupChoice(LOCTEXT("ClimbMode", "Ladders and gutters"), LOCTEXT("ClimbModeDesc", "Forward climbs toward where you look (facing the ladder: up, facing away: down), or forward is always up."),
-		{ LOCTEXT("FollowCamera", "Follow the camera"), LOCTEXT("ForwardUp", "Forward is up") }, S->bLadderForwardAlwaysUp ? 1 : 0,
+	AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.ClimbMode", "Ladders and gutters"), HITMEN_TEXT("HitmenOptions.ClimbModeDesc", "Forward climbs toward where you look (facing the ladder: up, facing away: down), or forward is always up."),
+		{ HITMEN_TEXT("HitmenOptions.FollowCamera", "Follow the camera"), HITMEN_TEXT("HitmenOptions.ForwardUp", "Forward is up") }, S->bLadderForwardAlwaysUp ? 1 : 0,
 		[S](int32 I) { S->bLadderForwardAlwaysUp = I == 1; S->ApplyHitmenSettings(); });
 }
 
@@ -807,7 +842,7 @@ void UHitmenOptionsWidget::BuildControls()
 	const UEnhancedPlayerMappableKeyProfile* Profile = InputSettings ? InputSettings->GetActiveKeyProfile() : nullptr;
 	if (!Profile)
 	{
-		AddHeader(LOCTEXT("NoBindings", "Key bindings are not available yet"));
+		AddHeader(HITMEN_TEXT("HitmenOptions.NoBindings", "Key bindings are not available yet"));
 		return;
 	}
 	// Group the first slot of every mapping by its category.
@@ -851,8 +886,8 @@ void UHitmenOptionsWidget::BuildControls()
 		for (const FPlayerKeyMapping* Mapping : Mappings)
 		{
 			const FText Description = Category == TEXT("Spectator")
-				? LOCTEXT("SpectatorKeyDesc", "Free fly while you watch or after the match. Only used while spectating, so it may share keys with the game.")
-				: LOCTEXT("KeyDesc", "Click, then press a key or a mouse button. Escape cancels.");
+				? HITMEN_TEXT("HitmenOptions.SpectatorKeyDesc", "Free fly while you watch or after the match. Only used while spectating, so it may share keys with the game.")
+				: HITMEN_TEXT("HitmenOptions.KeyDesc", "Click, then press a key or a mouse button. Escape cancels.");
 			AddRow()->SetupKey(Mapping->GetDisplayName(), Description, Mapping->GetMappingName(), Mapping->GetCurrentKey());
 		}
 	}
@@ -952,21 +987,21 @@ void UHitmenOptionsWidget::BuildGraphics()
 		}
 	};
 
-	AddHeader(LOCTEXT("Quality", "Quality"));
+	AddHeader(HITMEN_TEXT("HitmenOptions.Quality", "Quality"));
 	TArray<FText> Presets = QualityNames();
 	const int32 Overall = S->GetOverallScalabilityLevel();
 	int32 PresetIndex = Overall;
 	if (Overall < 0 || Overall > 3)
 	{
-		Presets.Add(LOCTEXT("Custom", "Custom"));
+		Presets.Add(HITMEN_TEXT("HitmenOptions.Custom", "Custom"));
 		PresetIndex = Presets.Num() - 1;
 	}
-	AddRow()->SetupChoice(LOCTEXT("Preset", "Quality preset"), LOCTEXT("PresetDesc", "Sets every quality below at once. Changing one of them makes the preset Custom."),
+	AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.Preset", "Quality preset"), HITMEN_TEXT("HitmenOptions.PresetDesc", "Sets every quality below at once. Changing one of them makes the preset Custom."),
 		Presets, PresetIndex, [S, ApplyAndRefresh](int32 I) { if (I <= 3) { S->SetOverallScalabilityLevel(I); ApplyAndRefresh(); } });
-	AddRow()->SetupAction(LOCTEXT("AutoDetect", "Detect the best settings"), LOCTEXT("AutoDetectDesc", "Measures this computer (a second or two) and picks the qualities. It runs once by itself on the first launch."),
-		LOCTEXT("Run", "Run"), [this, S]() { S->RunAutoDetect(); RefreshCurrentTab(); });
+	AddRow()->SetupAction(HITMEN_TEXT("HitmenOptions.AutoDetect", "Detect the best settings"), HITMEN_TEXT("HitmenOptions.AutoDetectDesc", "Measures this computer (a second or two) and picks the qualities. It runs once by itself on the first launch."),
+		HITMEN_TEXT("HitmenOptions.Run", "Run"), [this, S]() { S->RunAutoDetect(); RefreshCurrentTab(); });
 
-	AddHeader(LOCTEXT("Display", "Display"));
+	AddHeader(HITMEN_TEXT("HitmenOptions.Display", "Display"));
 	{
 		TArray<FIntPoint> Resolutions;
 		UKismetSystemLibrary::GetSupportedFullscreenResolutions(Resolutions);
@@ -978,7 +1013,7 @@ void UHitmenOptionsWidget::BuildGraphics()
 		{
 			Names.Add(FText::FromString(FString::Printf(TEXT("%d x %d"), R.X, R.Y)));
 		}
-		AddRow()->SetupChoice(LOCTEXT("Resolution", "Resolution"), LOCTEXT("ResolutionDesc", "Size of the game image on screen."),
+		AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.Resolution", "Resolution"), HITMEN_TEXT("HitmenOptions.ResolutionDesc", "Size of the game image on screen."),
 			Names, Resolutions.IndexOfByKey(Current), [S, Resolutions](int32 I)
 			{
 				if (Resolutions.IsValidIndex(I)) { S->SetScreenResolution(Resolutions[I]); S->ApplyResolutionSettings(false); S->SaveSettings(); }
@@ -988,42 +1023,42 @@ void UHitmenOptionsWidget::BuildGraphics()
 		const EWindowMode::Type Modes[3] = { EWindowMode::Fullscreen, EWindowMode::WindowedFullscreen, EWindowMode::Windowed };
 		const EWindowMode::Type Mode = S->GetFullscreenMode();
 		const int32 ModeIndex = Mode == EWindowMode::Fullscreen ? 0 : (Mode == EWindowMode::WindowedFullscreen ? 1 : 2);
-		AddRow()->SetupChoice(LOCTEXT("WindowMode", "Window"), LOCTEXT("WindowModeDesc", "Fullscreen, a borderless window over the desktop, or a normal window."),
-			{ LOCTEXT("Fullscreen", "Fullscreen"), LOCTEXT("Borderless", "Borderless"), LOCTEXT("Windowed", "Windowed") }, ModeIndex,
+		AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.WindowMode", "Window"), HITMEN_TEXT("HitmenOptions.WindowModeDesc", "Fullscreen, a borderless window over the desktop, or a normal window."),
+			{ HITMEN_TEXT("HitmenOptions.Fullscreen", "Fullscreen"), HITMEN_TEXT("HitmenOptions.Borderless", "Borderless"), HITMEN_TEXT("HitmenOptions.Windowed", "Windowed") }, ModeIndex,
 			[S, Modes](int32 I) { S->SetFullscreenMode(Modes[FMath::Clamp(I, 0, 2)]); S->ApplyResolutionSettings(false); S->SaveSettings(); });
 	}
-	AddRow()->SetupChoice(LOCTEXT("VSync", "Vertical sync"), LOCTEXT("VSyncDesc", "Removes tearing; adds a little input latency."),
+	AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.VSync", "Vertical sync"), HITMEN_TEXT("HitmenOptions.VSyncDesc", "Removes tearing; adds a little input latency."),
 		OffOn(), S->IsVSyncEnabled() ? 1 : 0, [S](int32 I) { S->SetVSyncEnabled(I == 1); S->ApplySettings(false); });
 	{
 		const TArray<int32> Limits = { 0, 30, 60, 90, 120, 144, 165, 240 };
 		TArray<FText> Names;
 		for (int32 Limit : Limits)
 		{
-			Names.Add(Limit == 0 ? LOCTEXT("Unlimited", "Unlimited") : FText::AsNumber(Limit));
+			Names.Add(Limit == 0 ? HITMEN_TEXT("HitmenOptions.Unlimited", "Unlimited") : FText::AsNumber(Limit));
 		}
 		const int32 Current = FMath::RoundToInt(S->GetFrameRateLimit());
-		AddRow()->SetupChoice(LOCTEXT("FrameLimit", "Frame rate limit"), LOCTEXT("FrameLimitDesc", "Caps the frames per second (less heat and noise)."),
+		AddRow()->SetupChoice(HITMEN_TEXT("HitmenOptions.FrameLimit", "Frame rate limit"), HITMEN_TEXT("HitmenOptions.FrameLimitDesc", "Caps the frames per second (less heat and noise)."),
 			Names, FMath::Max(0, Limits.IndexOfByKey(Current)), [S, Limits](int32 I) { S->SetFrameRateLimit(static_cast<float>(Limits[I])); S->ApplySettings(false); });
 	}
 	{
 		float Normalized = 1.f, Value = 100.f, Min = 50.f, Max = 100.f;
 		S->GetResolutionScaleInformationEx(Normalized, Value, Min, Max);
-		AddRow()->SetupSlider(LOCTEXT("RenderScale", "Render scale"), LOCTEXT("RenderScaleDesc", "Renders fewer pixels and upscales them (TSR). Lower is faster and softer."),
+		AddRow()->SetupSlider(HITMEN_TEXT("HitmenOptions.RenderScale", "Render scale"), HITMEN_TEXT("HitmenOptions.RenderScaleDesc", "Renders fewer pixels and upscales them (TSR). Lower is faster and softer."),
 			FMath::Max(50.f, Min), FMath::Min(100.f, Max), 5.f, Value, [](float V) { return FText::FromString(FString::Printf(TEXT("%d %%"), FMath::RoundToInt(V))); },
 			[S](float V) { S->SetResolutionScaleValueEx(V); S->ApplySettings(false); });
 	}
 
-	AddHeader(LOCTEXT("Details", "Details"));
+	AddHeader(HITMEN_TEXT("HitmenOptions.Details", "Details"));
 	struct FQualityRow { FText Label; FText Description; int32 Value; TFunction<void(int32)> Set; };
 	const FQualityRow Qualities[] = {
-		{ LOCTEXT("Shadows", "Shadows"), LOCTEXT("ShadowsDesc", "Sharpness and reach of the shadows."), S->GetShadowQuality(), [S](int32 I) { S->SetShadowQuality(I); } },
-		{ LOCTEXT("GI", "Global illumination"), LOCTEXT("GIDesc", "Light bouncing in rooms (Lumen). Low and Medium turn Lumen off: much faster, flatter rooms."), S->GetGlobalIlluminationQuality(), [S](int32 I) { S->SetGlobalIlluminationQuality(I); } },
-		{ LOCTEXT("Reflections", "Reflections"), LOCTEXT("ReflectionsDesc", "Reflections on floors, glass and metal."), S->GetReflectionQuality(), [S](int32 I) { S->SetReflectionQuality(I); } },
-		{ LOCTEXT("Effects", "Effects"), LOCTEXT("EffectsDesc", "Particles, smoke and fire."), S->GetVisualEffectQuality(), [S](int32 I) { S->SetVisualEffectQuality(I); } },
-		{ LOCTEXT("ViewDistance", "View distance"), LOCTEXT("ViewDistanceDesc", "How far small objects and details are drawn."), S->GetViewDistanceQuality(), [S](int32 I) { S->SetViewDistanceQuality(I); } },
-		{ LOCTEXT("PostProcess", "Post-processing"), LOCTEXT("PostProcessDesc", "Bloom, ambient occlusion and other screen effects."), S->GetPostProcessingQuality(), [S](int32 I) { S->SetPostProcessingQuality(I); } },
-		{ LOCTEXT("Textures", "Textures"), LOCTEXT("TexturesDesc", "Texture resolution (video memory)."), S->GetTextureQuality(), [S](int32 I) { S->SetTextureQuality(I); } },
-		{ LOCTEXT("AntiAliasing", "Anti-aliasing"), LOCTEXT("AntiAliasingDesc", "Smooths edges (TSR quality)."), S->GetAntiAliasingQuality(), [S](int32 I) { S->SetAntiAliasingQuality(I); } },
+		{ HITMEN_TEXT("HitmenOptions.Shadows", "Shadows"), HITMEN_TEXT("HitmenOptions.ShadowsDesc", "Sharpness and reach of the shadows."), S->GetShadowQuality(), [S](int32 I) { S->SetShadowQuality(I); } },
+		{ HITMEN_TEXT("HitmenOptions.GI", "Global illumination"), HITMEN_TEXT("HitmenOptions.GIDesc", "Light bouncing in rooms (Lumen). Low and Medium turn Lumen off: much faster, flatter rooms."), S->GetGlobalIlluminationQuality(), [S](int32 I) { S->SetGlobalIlluminationQuality(I); } },
+		{ HITMEN_TEXT("HitmenOptions.Reflections", "Reflections"), HITMEN_TEXT("HitmenOptions.ReflectionsDesc", "Reflections on floors, glass and metal."), S->GetReflectionQuality(), [S](int32 I) { S->SetReflectionQuality(I); } },
+		{ HITMEN_TEXT("HitmenOptions.Effects", "Effects"), HITMEN_TEXT("HitmenOptions.EffectsDesc", "Particles, smoke and fire."), S->GetVisualEffectQuality(), [S](int32 I) { S->SetVisualEffectQuality(I); } },
+		{ HITMEN_TEXT("HitmenOptions.ViewDistance", "View distance"), HITMEN_TEXT("HitmenOptions.ViewDistanceDesc", "How far small objects and details are drawn."), S->GetViewDistanceQuality(), [S](int32 I) { S->SetViewDistanceQuality(I); } },
+		{ HITMEN_TEXT("HitmenOptions.PostProcess", "Post-processing"), HITMEN_TEXT("HitmenOptions.PostProcessDesc", "Bloom, ambient occlusion and other screen effects."), S->GetPostProcessingQuality(), [S](int32 I) { S->SetPostProcessingQuality(I); } },
+		{ HITMEN_TEXT("HitmenOptions.Textures", "Textures"), HITMEN_TEXT("HitmenOptions.TexturesDesc", "Texture resolution (video memory)."), S->GetTextureQuality(), [S](int32 I) { S->SetTextureQuality(I); } },
+		{ HITMEN_TEXT("HitmenOptions.AntiAliasing", "Anti-aliasing"), HITMEN_TEXT("HitmenOptions.AntiAliasingDesc", "Smooths edges (TSR quality)."), S->GetAntiAliasingQuality(), [S](int32 I) { S->SetAntiAliasingQuality(I); } },
 	};
 	for (const FQualityRow& Quality : Qualities)
 	{
@@ -1032,11 +1067,11 @@ void UHitmenOptionsWidget::BuildGraphics()
 			[Set, ApplyAndRefresh](int32 I) { Set(I); ApplyAndRefresh(); });
 	}
 
-	AddHeader(LOCTEXT("Camera", "Camera"));
-	AddRow()->SetupSlider(LOCTEXT("FOV", "Field of view"), LOCTEXT("FOVDesc", "Horizontal field of view of the first-person camera."),
+	AddHeader(HITMEN_TEXT("HitmenOptions.Camera", "Camera"));
+	AddRow()->SetupSlider(HITMEN_TEXT("HitmenOptions.FOV", "Field of view"), HITMEN_TEXT("HitmenOptions.FOVDesc", "Horizontal field of view of the first-person camera."),
 		70.f, 110.f, 1.f, S->FieldOfView, [](float V) { return FText::FromString(FString::Printf(TEXT("%d"), FMath::RoundToInt(V))); },
 		[S](float V) { S->FieldOfView = V; S->ApplyHitmenSettings(); });
-	AddRow()->SetupSlider(LOCTEXT("HeadBob", "Head bob"), LOCTEXT("HeadBobDesc", "How much the view bobs with your steps. 0 % keeps it still."),
+	AddRow()->SetupSlider(HITMEN_TEXT("HitmenOptions.HeadBob", "Head bob"), HITMEN_TEXT("HitmenOptions.HeadBobDesc", "How much the view bobs with your steps. 0 % keeps it still."),
 		0.f, 1.f, 0.05f, S->HeadBobScale, Percent, [S](float V) { S->HeadBobScale = V; S->ApplyHitmenSettings(); });
 }
 
@@ -1047,14 +1082,14 @@ void UHitmenOptionsWidget::BuildAudio()
 	{
 		return;
 	}
-	AddHeader(LOCTEXT("Volume", "Volume"));
+	AddHeader(HITMEN_TEXT("HitmenOptions.Volume", "Volume"));
 	struct FVolumeRow { FText Label; FText Description; float* Value; };
 	const FVolumeRow Volumes[] = {
-		{ LOCTEXT("Master", "Master"), LOCTEXT("MasterDesc", "Everything."), &S->MasterVolume },
-		{ LOCTEXT("Music", "Music"), LOCTEXT("MusicDesc", "Menus and match music."), &S->MusicVolume },
-		{ LOCTEXT("SFX", "Effects"), LOCTEXT("SFXDesc", "Shots, steps, doors, abilities."), &S->SFXVolume },
-		{ LOCTEXT("Voice", "Voice"), LOCTEXT("VoiceDesc", "Voices and proximity chat."), &S->VoiceVolume },
-		{ LOCTEXT("UIVolume", "Interface"), LOCTEXT("UIVolumeDesc", "Menu clicks and hovers."), &S->UIVolume },
+		{ HITMEN_TEXT("HitmenOptions.Master", "Master"), HITMEN_TEXT("HitmenOptions.MasterDesc", "Everything."), &S->MasterVolume },
+		{ HITMEN_TEXT("HitmenOptions.Music", "Music"), HITMEN_TEXT("HitmenOptions.MusicDesc", "Menus and match music."), &S->MusicVolume },
+		{ HITMEN_TEXT("HitmenOptions.SFX", "Effects"), HITMEN_TEXT("HitmenOptions.SFXDesc", "Shots, steps, doors, abilities."), &S->SFXVolume },
+		{ HITMEN_TEXT("HitmenOptions.Voice", "Voice"), HITMEN_TEXT("HitmenOptions.VoiceDesc", "Voices and proximity chat."), &S->VoiceVolume },
+		{ HITMEN_TEXT("HitmenOptions.UIVolume", "Interface"), HITMEN_TEXT("HitmenOptions.UIVolumeDesc", "Menu clicks and hovers."), &S->UIVolume },
 	};
 	for (const FVolumeRow& Volume : Volumes)
 	{

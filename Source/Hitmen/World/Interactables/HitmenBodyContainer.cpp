@@ -1,6 +1,7 @@
 // Hitmen — body container
 
 #include "World/Interactables/HitmenBodyContainer.h"
+#include "Core/HitmenText.h"
 #include "World/HitmenGeometry.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -9,7 +10,7 @@
 
 AHitmenBodyContainer::AHitmenBodyContainer()
 {
-	DisplayName = NSLOCTEXT("Hitmen", "BodyContainer", "Body container");
+	DisplayName = HITMEN_TEXT("Hitmen.BodyContainer", "Body container");
 	BodyCapacity = 2;
 	// Two bodies lying side by side along the bin (rolled like in the arms).
 	BodySlots = {

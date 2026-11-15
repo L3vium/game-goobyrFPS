@@ -1,6 +1,7 @@
 // Hitmen — match game mode
 
 #include "Framework/HitmenMatchGameMode.h"
+#include "Core/HitmenText.h"
 #include "UObject/UnrealType.h"
 #include "Components/HitmenHealthComponent.h"
 #include "Framework/HitmenGameState.h"
@@ -403,7 +404,7 @@ void AHitmenMatchGameMode::OnVIPDelivered(APawn* Carrier, AHitmenRetrievalPoint*
 	FHitmenMatchResult Result;
 	Result.WinningTeamId = PS->GetLobbyTeamId();
 	Result.WinningPlayerName = PS->GetPlayerName();
-	Result.Reason = NSLOCTEXT("Hitmen", "WinDelivered", "The VIP was extracted");
+	Result.Reason = HITMEN_TEXT("Hitmen.WinDelivered", "The VIP was extracted");
 	// The body goes into the extraction, everyone watches it leave, then everyone watches the map.
 	if (UHitmenBodyCarryComponent* Carry = Carrier->FindComponentByClass<UHitmenBodyCarryComponent>())
 	{
@@ -476,7 +477,7 @@ void AHitmenMatchGameMode::CheckWinConditions()
 	{
 		FHitmenMatchResult Result;
 		Result.bIsDraw = true;
-		Result.Reason = NSLOCTEXT("Hitmen", "Draw", "No agent survived");
+		Result.Reason = HITMEN_TEXT("Hitmen.Draw", "No agent survived");
 		EndMatch(Result);
 		return;
 	}
@@ -486,7 +487,7 @@ void AHitmenMatchGameMode::CheckWinConditions()
 	{
 		FHitmenMatchResult Result;
 		Result.WinningTeamId = AnyProtector->GetLobbyTeamId();
-		Result.Reason = NSLOCTEXT("Hitmen", "WinProtect", "Every intruder was eliminated");
+		Result.Reason = HITMEN_TEXT("Hitmen.WinProtect", "Every intruder was eliminated");
 		EndMatch(Result);
 	}
 }

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/HitmenText.h"
 #include "Engine/DataAsset.h"
 #include "Core/HitmenTypes.h"
 #include "HitmenBarkSet.generated.h"
@@ -37,10 +38,10 @@ public:
 	TMap<EHitmenAlertReason, FHitmenBarkLines> Lines;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barks")
-	FText SpeakerName = NSLOCTEXT("Hitmen", "BarkSpeakerGuard", "Guard");
+	FText SpeakerName = HITMEN_TEXT("Hitmen.BarkSpeakerGuard", "Guard");
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barks")
-	FText VIPSpeakerName = NSLOCTEXT("Hitmen", "BarkSpeakerVIP", "Target");
+	FText VIPSpeakerName = HITMEN_TEXT("Hitmen.BarkSpeakerVIP", "Target");
 
 	/** Speaker colour when the NPC is calm again (all clear); otherwise its alert colour. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barks")

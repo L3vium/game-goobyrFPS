@@ -1,6 +1,7 @@
 // Hitmen — name tags
 
 #include "UI/HitmenNameTagsWidget.h"
+#include "Core/HitmenText.h"
 #include "UI/HitmenUIEventSubsystem.h"
 #include "UI/HitmenUIFactory.h"
 #include "Framework/HitmenPlayerState.h"
@@ -103,7 +104,7 @@ int32 UHitmenNameTagsWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 		if (bWatchers && View.bWatching && !View.Watched)
 		{
 			const FVector At = (PS->GetSmoothedWatcherLocation().IsZero() ? FVector(View.Location) : PS->GetSmoothedWatcherLocation()) + FVector(0.f, 0.f, WatcherTagOffset);
-			PaintTag(At, PS->GetPlayerName(), TEXT("WATCHING"), WatcherTagColor);
+			PaintTag(At, PS->GetPlayerName(), HITMEN_TEXT("Tags.Watching", "WATCHING").ToString(), WatcherTagColor);
 		}
 	}
 	// Being watched: top right, under the compass line.

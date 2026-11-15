@@ -169,6 +169,9 @@ public:
 	/** Drops an aimed ability (blink) without using it; true if one was aimed. */
 	bool CancelAbilityAim();
 
+	/** QWERTY keyboards: the AZERTY default keys move to the same places once (W A S D, Q), rebinds kept. */
+	void ApplyKeyboardLayout(class UEnhancedInputUserSettings* UserSettings);
+
 	/** Console, QA (gym / dev builds): presses or releases an input action as if its key were used: Fire, Aim, Jump,
 	 *  Crouch, Sprint, Interact, MoveAbility, Manipulation, Pause, SwitchSlot; Move takes "Move <forward> <right>". */
 	UFUNCTION(Exec)

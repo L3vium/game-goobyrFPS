@@ -1,6 +1,7 @@
 // Hitmen — character base
 
 #include "Characters/HitmenCharacterBase.h"
+#include "Core/HitmenText.h"
 #include "GameFramework/SpectatorPawn.h"
 #include "Components/HitmenHealthComponent.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
@@ -413,7 +414,7 @@ bool AHitmenCharacterBase::CanInteract_Implementation(AActor* Interactor) const
 
 FText AHitmenCharacterBase::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return NSLOCTEXT("Hitmen", "CarryBody", "Carry body");
+	return HITMEN_TEXT("Hitmen.CarryBody", "Carry body");
 }
 
 void AHitmenCharacterBase::Interact_Implementation(AActor* Interactor)

@@ -1,6 +1,7 @@
 // Hitmen — vehicles
 
 #include "World/Vehicles/HitmenVehicles.h"
+#include "Core/HitmenText.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Core/HitmenGameSettings.h"
 #include "Weapons/HitmenCosmeticActors.h"
@@ -81,7 +82,7 @@ bool AHitmenVehiclePawn::CanInteract_Implementation(AActor* Interactor) const
 
 FText AHitmenVehiclePawn::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return NSLOCTEXT("Hitmen", "UseVehicle", "Use");
+	return HITMEN_TEXT("Hitmen.UseVehicle", "Use");
 }
 
 void AHitmenVehiclePawn::Interact_Implementation(AActor* Interactor)
@@ -377,7 +378,7 @@ AHitmenMountedGun::AHitmenMountedGun()
 	GunPivot = CreateDefaultSubobject<USceneComponent>(TEXT("GunPivot"));
 	GunPivot->SetupAttachment(Collision);
 	GunPivot->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
-	DisplayName = NSLOCTEXT("Hitmen", "MountedGun", "Mounted gun");
+	DisplayName = HITMEN_TEXT("Hitmen.MountedGun", "Mounted gun");
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(GunPivot);
@@ -406,7 +407,7 @@ AHitmenMountedGun::AHitmenMountedGun()
 	DriverDamageShare = 0.6f;
 	PointDamageMultiplier = 0.15f;
 	RadialDamageMultiplier = 0.75f;
-	UseFromBehindText = NSLOCTEXT("Hitmen", "UseFromBehind", "Use from behind");
+	UseFromBehindText = HITMEN_TEXT("Hitmen.UseFromBehind", "Use from behind");
 }
 
 void AHitmenMountedGun::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -428,7 +429,7 @@ bool AHitmenMountedGun::IsUserBehind(const AActor* User) const
 FText AHitmenMountedGun::GetInteractionText_Implementation(AActor* Interactor) const
 {
 	// The prompt stays visible from the front so the player knows where to stand.
-	return bUsableFromAnySide || IsUserBehind(Interactor) ? NSLOCTEXT("Hitmen", "UseMountedGun", "Use mounted gun") : UseFromBehindText;
+	return bUsableFromAnySide || IsUserBehind(Interactor) ? HITMEN_TEXT("Hitmen.UseMountedGun", "Use mounted gun") : UseFromBehindText;
 }
 
 void AHitmenMountedGun::Interact_Implementation(AActor* Interactor)
@@ -542,7 +543,7 @@ AHitmenTank::AHitmenTank()
 {
 	Collision->SetBoxExtent(FVector(300.f, 180.f, 100.f));
 
-	DisplayName = NSLOCTEXT("Hitmen", "Tank", "Tank");
+	DisplayName = HITMEN_TEXT("Hitmen.Tank", "Tank");
 	Turret = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Turret"));
 	Turret->SetupAttachment(Collision);
 	Barrel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Barrel"));

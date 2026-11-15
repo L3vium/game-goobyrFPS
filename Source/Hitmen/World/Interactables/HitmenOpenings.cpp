@@ -1,6 +1,7 @@
 // Hitmen — openings
 
 #include "World/Interactables/HitmenOpenings.h"
+#include "Core/HitmenText.h"
 #include "Engine/StaticMesh.h"
 #include "Hitmen.h"
 #include "UObject/ConstructorHelpers.h"
@@ -22,8 +23,8 @@ AHitmenOpeningBase::AHitmenOpeningBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
-	OpenText = NSLOCTEXT("Hitmen", "Open", "Open");
-	CloseText = NSLOCTEXT("Hitmen", "Close", "Close");
+	OpenText = HITMEN_TEXT("Hitmen.Open", "Open");
+	CloseText = HITMEN_TEXT("Hitmen.Close", "Close");
 }
 
 void AHitmenOpeningBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -156,7 +157,7 @@ FText AHitmenDoor::GetInteractionText_Implementation(AActor* Interactor) const
 	if (!bOpen && !HasKeycard(Interactor))
 	{
 		// The action stays readable; the reason sits in brackets after it.
-		return FText::Format(NSLOCTEXT("Hitmen", "LockedDoor", "{0}  [Locked - Keycard {1}]"), OpenText, FText::AsNumber(RequiredKeycard));
+		return FText::Format(HITMEN_TEXT("Hitmen.LockedDoor", "{0}  [Locked - Keycard {1}]"), OpenText, FText::AsNumber(RequiredKeycard));
 	}
 	return Super::GetInteractionText_Implementation(Interactor);
 }
@@ -193,8 +194,8 @@ void AHitmenDoor::HandleNPCOverlap(UPrimitiveComponent* OverlappedComponent, AAc
 
 AHitmenWindow::AHitmenWindow()
 {
-	OpenText = NSLOCTEXT("Hitmen", "OpenWindow", "Open window");
-	CloseText = NSLOCTEXT("Hitmen", "CloseWindow", "Close window");
+	OpenText = HITMEN_TEXT("Hitmen.OpenWindow", "Open window");
+	CloseText = HITMEN_TEXT("Hitmen.CloseWindow", "Close window");
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(HitmenGeometry::CubePath);
 	auto MakePiece = [this](const TCHAR* Name, USceneComponent* Parent)
@@ -267,8 +268,8 @@ void AHitmenWindow::ApplyOpenAlpha(float Alpha)
 
 AHitmenVentHatch::AHitmenVentHatch()
 {
-	OpenText = NSLOCTEXT("Hitmen", "OpenVent", "Open vent");
-	CloseText = NSLOCTEXT("Hitmen", "CloseVent", "Close vent");
+	OpenText = HITMEN_TEXT("Hitmen.OpenVent", "Open vent");
+	CloseText = HITMEN_TEXT("Hitmen.CloseVent", "Close vent");
 }
 
 void AHitmenVentHatch::BeginPlay()

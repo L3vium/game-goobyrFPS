@@ -45,6 +45,12 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - `SprintDirections` (ForwardOnly / ForwardAndSides / AllDirections, default AllDirections), `WindowVaultMaxHeight`
   135 cm, `ClimbSideJumpSpeed` / `ClimbSideJumpOut` / `ClimbSideJumpUp`.
 - QA consoles `HitmenPress` / `HitmenRelease` (input actions and move input) and `HitmenTraverse`.
+- Translation sheet: every text of the game comes from `Content/Hitmen/Localization/HitmenText.csv` (Excel, one
+  column per language, English and French), read by `UHitmenTextSubsystem` through `HITMEN_TEXT`; Options ->
+  Gameplay -> Language; consoles `HitmenText.Language` / `HitmenText.Reload`; `Tools/Localization` keeps the sheet
+  in step with the code. Recipe in `docs/Pipelines.md`.
+- Keyboard layout: on a QWERTY keyboard (from the Windows layout) the AZERTY defaults move to the same places (W A S
+  D, Q) unless rebound; `KeyboardLayoutOverride` in Project Settings -> Hitmen -> Input.
 
 
 

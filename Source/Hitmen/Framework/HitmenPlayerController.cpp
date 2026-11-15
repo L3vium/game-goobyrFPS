@@ -1,6 +1,7 @@
 // Hitmen — player controller
 
 #include "Framework/HitmenPlayerController.h"
+#include "Core/HitmenText.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Character.h"
@@ -160,6 +161,7 @@ void AHitmenPlayerController::RefreshMappingContexts()
 			UserSettings->RegisterInputMappingContext(SpectatorMappingContext);
 		}
 		UserSettings->OnSettingsChanged.AddUniqueDynamic(this, &AHitmenPlayerController::HandleInputUserSettingsChanged);
+		ApplyKeyboardLayout(UserSettings);
 	}
 	// The subsystem rebuilds its mappings on the next tick: read the keys after that.
 	FTimerHandle LabelTimer;
@@ -530,7 +532,7 @@ void AHitmenPlayerController::HandleHUDInventoryChanged()
 		SlotView.bEmpty = Slots[Index].IsEmpty();
 		if (!SlotView.bEmpty && Slots[Index].Weapon)
 		{
-			SlotView.Name = Slots[Index].Weapon->DisplayName;
+			SlotView.Name = UHitmenTextSubsystem::Translate(Slots[Index].Weapon->DisplayName);
 			SlotView.Ammo = Slots[Index].Weapon->bUsesAmmo ? Slots[Index].Ammo : -1;
 			SlotView.MaxAmmo = Slots[Index].Weapon->bUsesAmmo ? Slots[Index].Weapon->MaxAmmo : -1;
 			SlotView.Icon = Slots[Index].Weapon->Icon.LoadSynchronous();
@@ -583,7 +585,7 @@ void AHitmenPlayerController::PublishEmotes(APawn* InPawn)
 	{
 		for (const FHitmenEmote& Emote : AnimSet->Emotes)
 		{
-			Names.Add(Emote.DisplayName);
+			Names.Add(UHitmenTextSubsystem::Translate(Emote.DisplayName));
 		}
 	}
 	UI->SetEmoteNames(Names);
@@ -605,7 +607,7 @@ void AHitmenPlayerController::RefreshHUDViews()
 		if (Ability && Ability->GetData())
 		{
 			View.bValid = true;
-			View.Name = Ability->GetData()->DisplayName;
+			View.Name = UHitmenTextSubsystem::Translate(Ability->GetData()->DisplayName);
 			View.Charges = Ability->GetCharges();
 			View.MaxCharges = Ability->GetMaxCharges();
 			View.CooldownRemaining = Ability->GetCooldownRemaining();
@@ -1408,7 +1410,7 @@ void AHitmenPlayerController::Client_ShowDistractionCamera_Implementation(AActor
 {
 	if (UHitmenGameSettings::Get()->bEventCameraOnDistraction)
 	{
-		ShowEventCamera(Guard, NSLOCTEXT("Hitmen", "EventDistraction", "Distraction"));
+		ShowEventCamera(Guard, HITMEN_TEXT("Hitmen.EventDistraction", "Distraction"));
 	}
 }
 
@@ -2065,7 +2067,7 @@ void AHitmenPlayerController::PushVehicleView()
 	if (Vehicle)
 	{
 		View.bActive = true;
-		View.Name = Vehicle->DisplayName;
+		View.Name = UHitmenTextSubsystem::Translate(Vehicle->DisplayName);
 		View.Health = Vehicle->GetHealthNormalized();
 		View.Reload = Vehicle->GetReloadAlpha();
 	}
@@ -2106,7 +2108,7 @@ void AHitmenPlayerController::UpdateSecurityFeed(float DeltaTime)
 		}
 		if (EventCamera)
 		{
-			EventCamera->ShowFrom(Seeing->GetFeedView(), Seeing->GetFeedFOV(), NSLOCTEXT("Hitmen", "EventCameraFeed", "Camera"), 0.f, this);
+			EventCamera->ShowFrom(Seeing->GetFeedView(), Seeing->GetFeedFOV(), HITMEN_TEXT("Hitmen.EventCameraFeed", "Camera"), 0.f, this);
 		}
 		SecurityFeedCamera = Seeing;
 	}
@@ -2185,4 +2187,58 @@ void AHitmenPlayerController::HitmenRelease(const FString& Action)
 	else if (A == TEXT("manipulation")) { HandleManipulationReleased(); }
 	else if (A == TEXT("move")) { QAMoveInput = FVector2D::ZeroVector; }
 	UE_LOG(LogHitmen, Display, TEXT("HitmenRelease %s"), *Action);
+}
+
+void AHitmenPlayerController::ApplyKeyboardLayout(UEnhancedInputUserSettings* UserSettings)
+{
+	UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
+	UEnhancedPlayerMappableKeyProfile* Profile = UserSettings ? UserSettings->GetActiveKeyProfile() : nullptr;
+	if (!Settings || !Profile)
+	{
+		return;
+	}
+	// The default keys are authored for AZERTY (Z Q S D, A, E). On a QWERTY keyboard the same places are W A S D, Q, E:
+	// moved there once, only for keys the player never rebound.
+	const int32 Wanted = HitmenUI::IsAzertyLayout() ? 1 : 2;
+	if (Settings->AppliedKeyboardLayout == Wanted)
+	{
+		return;
+	}
+	const TMap<FKey, FKey> AzertyToQwerty = { { EKeys::Z, EKeys::W }, { EKeys::Q, EKeys::A }, { EKeys::A, EKeys::Q }, { EKeys::W, EKeys::Z } };
+	int32 Moved = 0;
+	for (const TPair<FName, FKeyMappingRow>& Row : Profile->GetPlayerMappingRows())
+	{
+		for (const FPlayerKeyMapping& Mapping : Row.Value.Mappings)
+		{
+			const FKey Default = Mapping.GetDefaultKey();
+			const FKey* OnQwerty = AzertyToQwerty.Find(Default);
+			if (!OnQwerty)
+			{
+				continue;
+			}
+			// Untouched by the player: on its default (AZERTY) or on the QWERTY place this code gave it.
+			const FKey Current = Mapping.GetCurrentKey();
+			if (Current != Default && Current != *OnQwerty)
+			{
+				continue;
+			}
+			const FKey Target = Wanted == 2 ? *OnQwerty : Default;
+			if (Current == Target)
+			{
+				continue;
+			}
+			FMapPlayerKeyArgs Args;
+			Args.MappingName = Mapping.GetMappingName();
+			Args.Slot = Mapping.GetSlot();
+			Args.NewKey = Target;
+			FGameplayTagContainer Failure;
+			UserSettings->MapPlayerKey(Args, Failure);
+			++Moved;
+		}
+	}
+	Settings->AppliedKeyboardLayout = Wanted;
+	Settings->SaveSettings();
+	UserSettings->ApplySettings();
+	UserSettings->SaveSettings();
+	UE_LOG(LogHitmen, Log, TEXT("Keyboard layout %s: %d default keys placed."), Wanted == 2 ? TEXT("QWERTY") : TEXT("AZERTY"), Moved);
 }

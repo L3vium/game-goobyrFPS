@@ -33,6 +33,15 @@ public:
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
 	float MouseSensitivity = 0.25f;
 
+	/** Game language ("en", "fr"... a column of the translation sheet); empty = the system language. */
+	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Language")
+	FString Language;
+
+	/** The keyboard layout the default keys were last placed for (0 none yet, 1 AZERTY, 2 QWERTY): the AZERTY defaults
+	 *  move to the same keys on a QWERTY keyboard once (keys the player rebound stay). */
+	UPROPERTY(Config)
+	int32 AppliedKeyboardLayout = 0;
+
 	/** Extra multiplier while aiming; the zoom itself is already compensated (FOV ratio). */
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
 	float AimSensitivityMultiplier = 1.f;

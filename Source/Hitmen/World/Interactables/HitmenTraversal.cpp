@@ -1,6 +1,7 @@
 // Hitmen — traversal fixtures
 
 #include "World/Interactables/HitmenTraversal.h"
+#include "Core/HitmenText.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -56,7 +57,7 @@ AHitmenZipline::AHitmenZipline()
 	GrabVolume->SetCollisionProfileName(TEXT("NoCollision"));
 	GrabVolume->SetGenerateOverlapEvents(false);
 	Mesh->SetCollisionProfileName(TEXT("NoCollision"));
-	InteractionText = NSLOCTEXT("Hitmen", "RideZipline", "Ride zipline");
+	InteractionText = HITMEN_TEXT("Hitmen.RideZipline", "Ride zipline");
 
 	// Posts: solid, and the F target at each end.
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> PostMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
@@ -121,7 +122,7 @@ FText AHitmenZipline::GetInteractionText_Implementation(AActor* Interactor) cons
 {
 	if (Interactor && FMath::IsNearlyZero(GetRideDirectionFrom(Interactor->GetActorLocation())))
 	{
-		return NSLOCTEXT("Hitmen", "ZiplineOneWay", "Ride zipline  [Other end only]");
+		return HITMEN_TEXT("Hitmen.ZiplineOneWay", "Ride zipline  [Other end only]");
 	}
 	return InteractionText;
 }

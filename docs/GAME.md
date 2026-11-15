@@ -166,6 +166,11 @@ views first (`[1] player view  [2] split screen  [3] free fly`); every spectator
 everyone at match end too, `bSpectatorsCanFreeFly`, on).
 
 ## 5. Controls (defaults, AZERTY, all rebindable)
+On a QWERTY keyboard the keys sit at the same places: W A S D to move, Q for the manipulation ability. The game
+reads the Windows keyboard layout (French and Belgian are AZERTY, everything else QWERTY) and moves only the keys the
+player never rebound; prompts, HUD keys and the watcher line follow. `KeyboardLayoutOverride` (Project Settings ->
+Hitmen -> Input: Auto / AZERTY / QWERTY) forces one for testing.
+
 | Action | Key |
 |---|---|
 | Move | Z Q S D |
@@ -190,7 +195,8 @@ everyone at match end too, `bSpectatorsCanFreeFly`, on).
 
 **Options** (title and pause; `Esc` closes them, `R` resets the tab on screen, `Q` / `E` switch tabs): a centred panel
 with tabs, one row per setting (label left, `< value >` or a slider right) and the hovered row described on the right.
-- **Gameplay**: mouse and aiming sensitivity, invert Y, crouch and sprint hold / toggle, ladder direction.
+- **Gameplay**: language (Auto follows the system, then every language the text sheet has), mouse and aiming
+  sensitivity, invert Y, crouch and sprint hold / toggle, ladder direction.
 - **Controls**: every key by section (Movement, Combat, Abilities, Interaction, Spectator, Menus); click then press a key
   or a mouse button (`Esc` cancels); a key used twice turns red and the description names the other action. Spectator
   keys only clash with each other. Prompts and HUD keys follow the rebinding.
@@ -652,5 +658,8 @@ adaptation, so the image never drifts when you land, enter a room or leave a cav
   data assets (`DA_MatchRules_*`, `DA_Weapon_*`, `DA_Ability_*`, `DA_Map_*`, `DA_AnimSet_*`).
 - **Framework Blueprints.** `BP_GameInstance` (Options volume mix), `BP_GameState`,
   `BP_PlayerState`, `BP_SpectatorPawn`, `BP_PlayerController` and the `BP_GM_*` game modes.
+- **Every text from one sheet.** Player-facing text is `HITMEN_TEXT("<Area>.<Key>", "<English>")`, read from
+  `Content/Hitmen/Localization/HitmenText.csv` (Key, en, fr, ...) by `UHitmenTextSubsystem`; data-asset names are
+  matched by their English (`Asset.*` rows). A new column is a new language. Recipe in `docs/Pipelines.md`.
 - **Animations in one place.** `UHitmenAnimInstance` exposes state; a `DA_AnimSet_*` lists every
   sequence, blend space and montage so ABPs swap animations without code.

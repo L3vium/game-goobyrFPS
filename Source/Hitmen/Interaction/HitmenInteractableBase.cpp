@@ -1,6 +1,7 @@
 // Hitmen — interactable base
 
 #include "Interaction/HitmenInteractableBase.h"
+#include "Core/HitmenText.h"
 #include "Interaction/HitmenScanRegistry.h"
 #include "Components/HitmenMapMarkerComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -22,7 +23,7 @@ AHitmenInteractableBase::AHitmenInteractableBase()
 
 	MapMarker = CreateDefaultSubobject<UHitmenMapMarkerComponent>(TEXT("MapMarker"));
 
-	InteractionText = NSLOCTEXT("Hitmen", "Use", "Use");
+	InteractionText = HITMEN_TEXT("Hitmen.Use", "Use");
 }
 
 void AHitmenInteractableBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

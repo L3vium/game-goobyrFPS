@@ -1,6 +1,8 @@
 // Hitmen — traversal fixtures
 
 #include "World/Interactables/HitmenTraversal.h"
+#include "Core/HitmenText.h"
+#include "AI/HitmenAISubsystem.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
@@ -30,8 +32,10 @@ void AHitmenLadder::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	// Volume in front of the ladder, from the floor to a bit above the top ledge.
-	ClimbVolume->SetBoxExtent(FVector(55.f, 45.f, Height * 0.5f + 50.f));
-	ClimbVolume->SetRelativeLocation(FVector(40.f, 0.f, Height * 0.5f + 50.f));
+	// With top entry it fills the shaft in front (whoever drops in is caught).
+	const float Reach = bAllowTopEntry ? FMath::Max(TopEntryReach, 110.f) : 110.f;
+	ClimbVolume->SetBoxExtent(FVector(Reach * 0.5f, bAllowTopEntry ? Reach * 0.5f : 45.f, Height * 0.5f + 50.f));
+	ClimbVolume->SetRelativeLocation(FVector(Reach * 0.5f - 15.f, 0.f, Height * 0.5f + 50.f));
 }
 
 FVector AHitmenLadder::GetClimbStart() const
@@ -55,7 +59,7 @@ AHitmenZipline::AHitmenZipline()
 	GrabVolume->SetCollisionProfileName(TEXT("NoCollision"));
 	GrabVolume->SetGenerateOverlapEvents(false);
 	Mesh->SetCollisionProfileName(TEXT("NoCollision"));
-	InteractionText = NSLOCTEXT("Hitmen", "RideZipline", "Ride zipline");
+	InteractionText = HITMEN_TEXT("Hitmen.RideZipline", "Ride zipline");
 
 	// Posts: solid, and the F target at each end.
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> PostMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
@@ -120,7 +124,7 @@ FText AHitmenZipline::GetInteractionText_Implementation(AActor* Interactor) cons
 {
 	if (Interactor && FMath::IsNearlyZero(GetRideDirectionFrom(Interactor->GetActorLocation())))
 	{
-		return NSLOCTEXT("Hitmen", "ZiplineOneWay", "Ride zipline  [Other end only]");
+		return HITMEN_TEXT("Hitmen.ZiplineOneWay", "Ride zipline  [Other end only]");
 	}
 	return InteractionText;
 }
@@ -214,7 +218,10 @@ void AHitmenTeleporter::HandleOverlap(UPrimitiveComponent* OverlappedComponent, 
 		Movement->StopClimbing(false);
 	}
 	Destination->MarkArrival(Character);
+	const FVector From = Character->GetActorLocation();
 	Character->TeleportTo(Destination->GetExitLocation(), Destination->GetActorRotation());
+	// Gone in an instant: guards hunting it that cannot see the exit lose it.
+	UHitmenAISubsystem::NotifyTeleport(Character, From, Character->GetActorLocation());
 	Multicast_Teleported(Character);
 }
 

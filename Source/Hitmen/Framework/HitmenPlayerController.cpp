@@ -1,6 +1,8 @@
 // Hitmen — player controller
 
 #include "Framework/HitmenPlayerController.h"
+#include "Core/HitmenText.h"
+#include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Character.h"
 #include "World/Vehicles/HitmenVehicles.h"
@@ -22,6 +24,7 @@
 #include "Components/HitmenHealthComponent.h"
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Abilities/HitmenAbilityComponent.h"
+#include "Movement/HitmenCharacterMovementComponent.h"
 #include "Data/HitmenAbilityData.h"
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenCatalog.h"
@@ -158,6 +161,7 @@ void AHitmenPlayerController::RefreshMappingContexts()
 			UserSettings->RegisterInputMappingContext(SpectatorMappingContext);
 		}
 		UserSettings->OnSettingsChanged.AddUniqueDynamic(this, &AHitmenPlayerController::HandleInputUserSettingsChanged);
+		ApplyKeyboardLayout(UserSettings);
 	}
 	// The subsystem rebuilds its mappings on the next tick: read the keys after that.
 	FTimerHandle LabelTimer;
@@ -179,7 +183,7 @@ void AHitmenPlayerController::RefreshKeyLabels()
 		return;
 	}
 	// Same order as EHitmenKeyLabel.
-	const UInputAction* Actions[] = { InteractAction, JumpAction, MoveAbilityAction, ManipulationAbilityAction, SightroomAction, ConfirmAction };
+	const UInputAction* Actions[] = { InteractAction, JumpAction, MoveAbilityAction, ManipulationAbilityAction, SightroomAction, ConfirmAction, SprintAction };
 	static_assert(UE_ARRAY_COUNT(Actions) == static_cast<int32>(EHitmenKeyLabel::Count), "One action per key label");
 	TArray<FString> Labels;
 	for (const UInputAction* Action : Actions)
@@ -417,6 +421,11 @@ void AHitmenPlayerController::OnPossess(APawn* InPawn)
 		if (IsLocalController())
 		{
 			RefreshMappingContexts();
+			// Alive again: the spectator keys go away.
+			if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+			{
+				UI->OnSpectatorModeChanged.Broadcast(static_cast<uint8>(SpectatorMode));
+			}
 		}
 	}
 }
@@ -523,7 +532,7 @@ void AHitmenPlayerController::HandleHUDInventoryChanged()
 		SlotView.bEmpty = Slots[Index].IsEmpty();
 		if (!SlotView.bEmpty && Slots[Index].Weapon)
 		{
-			SlotView.Name = Slots[Index].Weapon->DisplayName;
+			SlotView.Name = UHitmenTextSubsystem::Translate(Slots[Index].Weapon->DisplayName);
 			SlotView.Ammo = Slots[Index].Weapon->bUsesAmmo ? Slots[Index].Ammo : -1;
 			SlotView.MaxAmmo = Slots[Index].Weapon->bUsesAmmo ? Slots[Index].Weapon->MaxAmmo : -1;
 			SlotView.Icon = Slots[Index].Weapon->Icon.LoadSynchronous();
@@ -576,7 +585,7 @@ void AHitmenPlayerController::PublishEmotes(APawn* InPawn)
 	{
 		for (const FHitmenEmote& Emote : AnimSet->Emotes)
 		{
-			Names.Add(Emote.DisplayName);
+			Names.Add(UHitmenTextSubsystem::Translate(Emote.DisplayName));
 		}
 	}
 	UI->SetEmoteNames(Names);
@@ -598,12 +607,13 @@ void AHitmenPlayerController::RefreshHUDViews()
 		if (Ability && Ability->GetData())
 		{
 			View.bValid = true;
-			View.Name = Ability->GetData()->DisplayName;
+			View.Name = UHitmenTextSubsystem::Translate(Ability->GetData()->DisplayName);
 			View.Charges = Ability->GetCharges();
 			View.MaxCharges = Ability->GetMaxCharges();
 			View.CooldownRemaining = Ability->GetCooldownRemaining();
 			View.CooldownAlpha = 1.f - Ability->GetCooldownNormalized();
 			View.Icon = Ability->GetData()->Icon.LoadSynchronous();
+			View.Key = Ability->GetHUDKey();
 			if (const UHitmenAbility_Jetpack* Jetpack = Cast<UHitmenAbility_Jetpack>(Ability))
 			{
 				View.Meter = Jetpack->GetFuelNormalized();
@@ -612,8 +622,37 @@ void AHitmenPlayerController::RefreshHUDViews()
 		return View;
 	};
 	const UHitmenAbilityComponent* Abilities = HUDAbilities.Get();
-	UI->SetAbilityViews(MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Move) : nullptr),
-		MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Manipulation) : nullptr));
+	FHitmenHUDAbilityView MoveView = MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Move) : nullptr);
+	FHitmenHUDAbilityView ManipulationView = MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Manipulation) : nullptr);
+	if (!MoveView.bValid)
+	{
+		MoveView.Key = EHitmenKeyLabel::MoveAbility;
+	}
+	if (!ManipulationView.bValid)
+	{
+		ManipulationView.Key = EHitmenKeyLabel::Manipulation;
+	}
+	UI->SetAbilityViews(MoveView, ManipulationView);
+
+	// Timed effects on you (invisibility, pill...): a ring above the crosshair empties as each runs out.
+	TArray<FHitmenHUDStatusTimer> Timers;
+	if (const AHitmenCharacterBase* ViewCharacter = Cast<AHitmenCharacterBase>(ViewPawn); ViewCharacter && ViewCharacter->GetStatusEffects())
+	{
+		const UHitmenStatusEffectComponent* Statuses = ViewCharacter->GetStatusEffects();
+		const float Now = Statuses->GetServerTime();
+		for (const FHitmenActiveStatus& Status : Statuses->GetActiveStatuses())
+		{
+			const bool bShown = Status.Type == EHitmenStatusEffect::Invisible || Status.Type == EHitmenStatusEffect::Boosted || Status.Type == EHitmenStatusEffect::Armored;
+			if (bShown && Status.EndTime > 0.f && Status.StartTime >= 0.f && Status.EndTime > Now)
+			{
+				FHitmenHUDStatusTimer& Timer = Timers.AddDefaulted_GetRef();
+				Timer.Status = Status.Type;
+				Timer.Remaining = Status.EndTime - Now;
+				Timer.Duration = FMath::Max(Status.EndTime - Status.StartTime, 0.1f);
+			}
+		}
+	}
+	UI->SetStatusTimers(Timers);
 
 	// Crosshair spread.
 	const UHitmenInventoryComponent* Inventory = HUDInventory.Get();
@@ -793,6 +832,14 @@ void AHitmenPlayerController::HandleCrouchReleased()
 
 void AHitmenPlayerController::HandleSprintPressed()
 {
+	// Fly cheat: Shift flies faster.
+	if (IsCheatFlying())
+	{
+		bFlyFastHeld = true;
+		ApplyCheatFlySpeed(true);
+		Server_SetCheatFlyFast(true);
+		return;
+	}
 	IHitmenInputReceiver* R = GetReceiver();
 	if (!R || IsGameplayInputBlocked())
 	{
@@ -813,9 +860,21 @@ void AHitmenPlayerController::HandleSprintPressed()
 
 void AHitmenPlayerController::HandleSprintReleased()
 {
+	if (bFlyFastHeld)
+	{
+		bFlyFastHeld = false;
+		ApplyCheatFlySpeed(false);
+		Server_SetCheatFlyFast(false);
+		return;
+	}
 	const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
+	// Toggle sprint: the release ends nothing, but a quick tap still dashes.
 	if (Settings && Settings->bToggleSprint)
 	{
+		if (IHitmenInputReceiver* R = GetReceiver(); R && GetWorld()->GetTimeSeconds() - SprintPressTime <= SprintTapTime && !IsGameplayInputBlocked())
+		{
+			R->Input_SprintTapped();
+		}
 		return;
 	}
 	IHitmenInputReceiver* R = GetReceiver();
@@ -838,7 +897,25 @@ void AHitmenPlayerController::HandleFirePressed()
 		SpectateNext();
 		return;
 	}
+	// Aiming a blink: left click blinks now.
+	if (UHitmenAbilityComponent* Abilities = GetPawn() ? GetPawn()->FindComponentByClass<UHitmenAbilityComponent>() : nullptr; Abilities && Abilities->IsAimingAny())
+	{
+		Abilities->ConfirmAim(Abilities->IsAimingSlot(EHitmenAbilitySlot::Move) ? EHitmenAbilitySlot::Move : EHitmenAbilitySlot::Manipulation);
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_FirePressed(); }
+}
+
+bool AHitmenPlayerController::CancelAbilityAim()
+{
+	UHitmenAbilityComponent* Abilities = GetPawn() ? GetPawn()->FindComponentByClass<UHitmenAbilityComponent>() : nullptr;
+	if (!Abilities || !Abilities->IsAimingAny())
+	{
+		return false;
+	}
+	Abilities->CancelAim(EHitmenAbilitySlot::Move);
+	Abilities->CancelAim(EHitmenAbilitySlot::Manipulation);
+	return true;
 }
 
 void AHitmenPlayerController::HandleFireReleased()
@@ -851,6 +928,11 @@ void AHitmenPlayerController::HandleAimPressed()
 	if (bSpectating)
 	{
 		SpectatePrevious();
+		return;
+	}
+	// Aiming a blink: right click drops it.
+	if (CancelAbilityAim())
+	{
 		return;
 	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_AimChanged(true); }
@@ -874,6 +956,11 @@ void AHitmenPlayerController::HandleInteractReleased()
 
 void AHitmenPlayerController::HandleInteract()
 {
+	// Aiming a blink: F drops it.
+	if (CancelAbilityAim())
+	{
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_Interact(); }
 }
 
@@ -955,6 +1042,8 @@ void AHitmenPlayerController::HandleEmoteWheelReleased()
 
 void AHitmenPlayerController::HandlePause()
 {
+	// Aiming a blink: Esc drops it, and the pause menu still opens.
+	CancelAbilityAim();
 	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
 	if (!UI)
 	{
@@ -1321,7 +1410,7 @@ void AHitmenPlayerController::Client_ShowDistractionCamera_Implementation(AActor
 {
 	if (UHitmenGameSettings::Get()->bEventCameraOnDistraction)
 	{
-		ShowEventCamera(Guard, NSLOCTEXT("Hitmen", "EventDistraction", "Distraction"));
+		ShowEventCamera(Guard, HITMEN_TEXT("Hitmen.EventDistraction", "Distraction"));
 	}
 }
 
@@ -1513,8 +1602,8 @@ TArray<APawn*> AHitmenPlayerController::GetSpectatableTargets() const
 
 void AHitmenPlayerController::SetSpectatorMode(EHitmenSpectatorMode NewMode)
 {
-	// Dead players cannot free-fly unless they are watchers.
-	if (!bIsWatcher && NewMode == EHitmenSpectatorMode::FreeFly)
+	// Dead players free fly too unless Project Settings -> Hitmen -> Watchers -> bSpectatorsCanFreeFly is off.
+	if (!bIsWatcher && NewMode == EHitmenSpectatorMode::FreeFly && !UHitmenGameSettings::Get()->bSpectatorsCanFreeFly)
 	{
 		NewMode = EHitmenSpectatorMode::Follow;
 	}
@@ -1748,6 +1837,17 @@ void AHitmenPlayerController::PlayerTick(float DeltaTime)
 		GetPawn()->AddMovementInput(FVector::UpVector, (bFlyUpHeld ? 1.f : 0.f) - (bFlyDownHeld ? 1.f : 0.f));
 	}
 	PushVehicleView();
+	if (IsLocalController())
+	{
+		UpdateSecurityFeed(DeltaTime);
+	}
+	// QA scripted move input (console HitmenPress Move <forward> <right>).
+	if (!QAMoveInput.IsNearlyZero() && GetPawn())
+	{
+		const FRotator Yaw(0.f, GetControlRotation().Yaw, 0.f);
+		GetPawn()->AddMovementInput(Yaw.Vector(), QAMoveInput.X);
+		GetPawn()->AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y), QAMoveInput.Y);
+	}
 	if (bSpectating && IsLocalController())
 	{
 		UpdateSpectatorThirdPerson();
@@ -1967,10 +2067,178 @@ void AHitmenPlayerController::PushVehicleView()
 	if (Vehicle)
 	{
 		View.bActive = true;
-		View.Name = Vehicle->DisplayName;
+		View.Name = UHitmenTextSubsystem::Translate(Vehicle->DisplayName);
 		View.Health = Vehicle->GetHealthNormalized();
 		View.Reload = Vehicle->GetReloadAlpha();
 	}
 	bVehicleViewActive = View.bActive;
 	UI->SetVehicleView(View);
+}
+
+void AHitmenPlayerController::UpdateSecurityFeed(float DeltaTime)
+{
+	SecurityFeedAccumulator += DeltaTime;
+	if (SecurityFeedAccumulator < 0.15f)
+	{
+		return;
+	}
+	SecurityFeedAccumulator = 0.f;
+	// A camera whose meter fills on this player: its feed top left while it sees them (off by default).
+	AHitmenSecurityCamera* Seeing = nullptr;
+	const APawn* MyPawn = GetPawn();
+	if (UHitmenGameSettings::Get()->bCameraFeedWhenSeen && MyPawn && !bSpectating)
+	{
+		for (TActorIterator<AHitmenSecurityCamera> It(GetWorld()); It; ++It)
+		{
+			if (It->IsSeeingIntruder() && It->GetSeenIntruder() == MyPawn && !It->IsCameraDisabled())
+			{
+				Seeing = *It;
+				break;
+			}
+		}
+	}
+	if (Seeing)
+	{
+		if (!EventCamera)
+		{
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			Params.ObjectFlags |= RF_Transient;
+			EventCamera = GetWorld()->SpawnActor<AHitmenEventCamera>(Params);
+		}
+		if (EventCamera)
+		{
+			EventCamera->ShowFrom(Seeing->GetFeedView(), Seeing->GetFeedFOV(), HITMEN_TEXT("Hitmen.EventCameraFeed", "Camera"), 0.f, this);
+		}
+		SecurityFeedCamera = Seeing;
+	}
+	else if (SecurityFeedCamera.IsValid())
+	{
+		SecurityFeedCamera.Reset();
+		if (EventCamera && EventCamera->IsShowingView())
+		{
+			EventCamera->Stop();
+		}
+	}
+}
+
+void AHitmenPlayerController::ApplyCheatFlySpeed(bool bFast)
+{
+	ACharacter* Flyer = Cast<ACharacter>(GetPawn());
+	if (UCharacterMovementComponent* Movement = Flyer ? Flyer->GetCharacterMovement() : nullptr; Movement && IsCheatFlying())
+	{
+		const float Speed = CheatFlySpeed * (bFast ? CheatFlyFastMultiplier : 1.f);
+		Movement->MaxFlySpeed = Speed;
+		Movement->BrakingDecelerationFlying = Speed * 3.f;
+	}
+}
+
+void AHitmenPlayerController::Server_SetCheatFlyFast_Implementation(bool bFast)
+{
+	ApplyCheatFlySpeed(bFast);
+}
+
+void AHitmenPlayerController::HitmenTraverse()
+{
+	const AHitmenCharacterBase* Traverser = Cast<AHitmenCharacterBase>(GetPawn());
+	UHitmenCharacterMovementComponent* Movement = Traverser ? Traverser->GetHitmenMovement() : nullptr;
+	if (Movement)
+	{
+		const bool bStarted = Movement->DebugTryMantle(FRotator(0.f, GetControlRotation().Yaw, 0.f).Vector());
+		UE_LOG(LogHitmen, Display, TEXT("HitmenTraverse: %s"), bStarted ? TEXT("started") : TEXT("nothing to traverse"));
+	}
+}
+
+void AHitmenPlayerController::HitmenPress(const FString& Action, float X, float Y)
+{
+	if (!DebugAllowed(GetWorld()))
+	{
+		return;
+	}
+	const FString A = Action.ToLower();
+	if (A == TEXT("fire")) { HandleFirePressed(); }
+	else if (A == TEXT("aim")) { HandleAimPressed(); }
+	else if (A == TEXT("jump")) { HandleJumpPressed(); }
+	else if (A == TEXT("crouch")) { HandleCrouchPressed(); }
+	else if (A == TEXT("sprint")) { HandleSprintPressed(); }
+	else if (A == TEXT("interact")) { HandleInteract(); }
+	else if (A == TEXT("moveability")) { HandleMoveAbilityPressed(); }
+	else if (A == TEXT("manipulation")) { HandleManipulationPressed(); }
+	else if (A == TEXT("pause")) { HandlePause(); }
+	else if (A == TEXT("switchslot")) { HandleSwitchSlot(FInputActionValue(1.f)); }
+	else if (A == TEXT("move")) { QAMoveInput = FVector2D(X, Y); }
+	UE_LOG(LogHitmen, Display, TEXT("HitmenPress %s"), *Action);
+}
+
+void AHitmenPlayerController::HitmenRelease(const FString& Action)
+{
+	if (!DebugAllowed(GetWorld()))
+	{
+		return;
+	}
+	const FString A = Action.ToLower();
+	if (A == TEXT("fire")) { HandleFireReleased(); }
+	else if (A == TEXT("aim")) { HandleAimReleased(); }
+	else if (A == TEXT("jump")) { HandleJumpReleased(); }
+	else if (A == TEXT("crouch")) { HandleCrouchReleased(); }
+	else if (A == TEXT("sprint")) { HandleSprintReleased(); }
+	else if (A == TEXT("interact")) { HandleInteractReleased(); }
+	else if (A == TEXT("moveability")) { HandleMoveAbilityReleased(); }
+	else if (A == TEXT("manipulation")) { HandleManipulationReleased(); }
+	else if (A == TEXT("move")) { QAMoveInput = FVector2D::ZeroVector; }
+	UE_LOG(LogHitmen, Display, TEXT("HitmenRelease %s"), *Action);
+}
+
+void AHitmenPlayerController::ApplyKeyboardLayout(UEnhancedInputUserSettings* UserSettings)
+{
+	UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
+	UEnhancedPlayerMappableKeyProfile* Profile = UserSettings ? UserSettings->GetActiveKeyProfile() : nullptr;
+	if (!Settings || !Profile)
+	{
+		return;
+	}
+	// The default keys are authored for AZERTY (Z Q S D, A, E). On a QWERTY keyboard the same places are W A S D, Q, E:
+	// moved there once, only for keys the player never rebound.
+	const int32 Wanted = HitmenUI::IsAzertyLayout() ? 1 : 2;
+	if (Settings->AppliedKeyboardLayout == Wanted)
+	{
+		return;
+	}
+	const TMap<FKey, FKey> AzertyToQwerty = { { EKeys::Z, EKeys::W }, { EKeys::Q, EKeys::A }, { EKeys::A, EKeys::Q }, { EKeys::W, EKeys::Z } };
+	int32 Moved = 0;
+	for (const TPair<FName, FKeyMappingRow>& Row : Profile->GetPlayerMappingRows())
+	{
+		for (const FPlayerKeyMapping& Mapping : Row.Value.Mappings)
+		{
+			const FKey Default = Mapping.GetDefaultKey();
+			const FKey* OnQwerty = AzertyToQwerty.Find(Default);
+			if (!OnQwerty)
+			{
+				continue;
+			}
+			// Untouched by the player: on its default (AZERTY) or on the QWERTY place this code gave it.
+			const FKey Current = Mapping.GetCurrentKey();
+			if (Current != Default && Current != *OnQwerty)
+			{
+				continue;
+			}
+			const FKey Target = Wanted == 2 ? *OnQwerty : Default;
+			if (Current == Target)
+			{
+				continue;
+			}
+			FMapPlayerKeyArgs Args;
+			Args.MappingName = Mapping.GetMappingName();
+			Args.Slot = Mapping.GetSlot();
+			Args.NewKey = Target;
+			FGameplayTagContainer Failure;
+			UserSettings->MapPlayerKey(Args, Failure);
+			++Moved;
+		}
+	}
+	Settings->AppliedKeyboardLayout = Wanted;
+	Settings->SaveSettings();
+	UserSettings->ApplySettings();
+	UserSettings->SaveSettings();
+	UE_LOG(LogHitmen, Log, TEXT("Keyboard layout %s: %d default keys placed."), Wanted == 2 ? TEXT("QWERTY") : TEXT("AZERTY"), Moved);
 }

@@ -1,11 +1,15 @@
 // Hitmen — move abilities
 
 #include "Abilities/Move/HitmenMoveAbilities.h"
+#include "Core/HitmenText.h"
+#include "AI/HitmenAISubsystem.h"
 #include "Abilities/HitmenAbilityActors.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Components/HitmenHealthComponent.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Movement/HitmenCharacterMovementComponent.h"
+#include "Characters/HitmenPlayerCharacter.h"
+#include "Data/HitmenSoundSet.h"
 #include "Weapons/HitmenProjectile.h"
 #include "Components/CapsuleComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -24,29 +28,63 @@ UHitmenAbility_Blink::UHitmenAbility_Blink()
 	bActivateOnRelease = true;
 }
 
-bool UHitmenAbility_Blink::ComputeDestination(const FVector& AimOrigin, const FVector& AimDirection, FVector& OutDestination) const
+bool UHitmenAbility_Blink::ComputeDestination(const FVector& AimOrigin, const FVector& AimDirection, FVector& OutDestination, bool* bOutLedgeUp) const
 {
 	const AHitmenCharacterBase* Character = GetOwnerCharacter();
 	if (!Character)
 	{
 		return false;
 	}
+	if (bOutLedgeUp)
+	{
+		*bOutLedgeUp = false;
+	}
+	UWorld* World = GetWorld();
+	const float HalfHeight = Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenBlink), false, Character);
 	FHitResult Hit;
 	FVector Target = AimOrigin + AimDirection.GetSafeNormal() * Range;
+	bool bLedgeUp = false;
 	if (AimTrace(AimOrigin, AimDirection, Hit))
 	{
 		Target = Hit.ImpactPoint + Hit.ImpactNormal * WallOffset;
+		// Dishonored: aiming at a wall within reach of its top lands you on top of it (thin walls and thick blocks: the
+		// top is looked for at a few depths behind the face, the nearest one with room to stand wins).
+		if (FMath::Abs(Hit.ImpactNormal.Z) < 0.5f)
+		{
+			const FVector Inward = -Hit.ImpactNormal.GetSafeNormal2D();
+			for (const float Depth : { 20.f, 40.f, LedgeProbeDepth })
+			{
+				const FVector Behind = Hit.ImpactPoint + Inward * Depth;
+				FHitResult Top;
+				const FVector TopStart(Behind.X, Behind.Y, Hit.ImpactPoint.Z + LedgeUpMaxHeight);
+				if (!World->LineTraceSingleByChannel(Top, TopStart, FVector(Behind.X, Behind.Y, Hit.ImpactPoint.Z - 10.f), ECC_Visibility, Params)
+					|| Top.bStartPenetrating || Top.ImpactNormal.Z < 0.7f)
+				{
+					continue;
+				}
+				FVector OnTop = Top.ImpactPoint + FVector::UpVector * (HalfHeight + 5.f);
+				if (World->FindTeleportSpot(Character, OnTop, Character->GetActorRotation()) && FMath::Abs(OnTop.Z - (Top.ImpactPoint.Z + HalfHeight + 5.f)) < 40.f
+					&& FVector::Dist2D(OnTop, Behind) < 90.f)
+				{
+					OutDestination = OnTop;
+					if (bOutLedgeUp)
+					{
+						*bOutLedgeUp = true;
+					}
+					return true;
+				}
+			}
+		}
 	}
-	// Stand on the ground under the target if possible.
-	const float HalfHeight = Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	// On the ground under the target (aiming into the air: the ground below, when it is not too far down).
 	FHitResult Ground;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenBlink), false, Character);
-	if (GetWorld()->LineTraceSingleByChannel(Ground, Target + FVector::UpVector * 50.f, Target - FVector::UpVector * 300.f, ECC_Visibility, Params))
+	if (World->LineTraceSingleByChannel(Ground, Target + FVector::UpVector * 50.f, Target - FVector::UpVector * MaxGroundDrop, ECC_Visibility, Params))
 	{
 		Target = Ground.ImpactPoint + FVector::UpVector * (HalfHeight + 5.f);
 	}
 	FVector Adjusted = Target;
-	if (!GetWorld()->FindTeleportSpot(Character, Adjusted, Character->GetActorRotation()))
+	if (!World->FindTeleportSpot(Character, Adjusted, Character->GetActorRotation()))
 	{
 		return false;
 	}
@@ -54,14 +92,24 @@ bool UHitmenAbility_Blink::ComputeDestination(const FVector& AimOrigin, const FV
 	return true;
 }
 
+void UHitmenAbility_Blink::LocalCancel()
+{
+	bAiming = false;
+	bLastAimLedgeUp = false;
+	Juice_OnAimPreview(false, FVector::ZeroVector);
+}
+
 bool UHitmenAbility_Blink::GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const
 {
 	// Only while E is held: the exact landing spot, on the ground under the capsule.
 	FVector Destination;
-	if (!bAiming || !ComputeDestination(Origin, Direction, Destination))
+	bool bLedgeUp = false;
+	if (!bAiming || !ComputeDestination(Origin, Direction, Destination, &bLedgeUp))
 	{
+		bLastAimLedgeUp = false;
 		return false;
 	}
+	bLastAimLedgeUp = bLedgeUp;
 	const AHitmenCharacterBase* Character = GetOwnerCharacter();
 	const float HalfHeight = Character ? Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.f;
 	OutPoint = Destination - FVector::UpVector * HalfHeight;
@@ -105,8 +153,16 @@ bool UHitmenAbility_Blink::Activate(const FVector& AimOrigin, const FVector& Aim
 	{
 		Movement->StopClimbing(false);
 	}
+	const FVector From = Character->GetActorLocation();
+	PlayActivatedJuice(From);
+	if (!Character->TeleportTo(Destination, Character->GetActorRotation()))
+	{
+		return false;
+	}
+	UHitmenAISubsystem::NotifyTeleport(Character, From, Character->GetActorLocation());
+	// Arrival: the swirl again where you land (every machine, through the component's multicast).
 	PlayActivatedJuice(Character->GetActorLocation());
-	return Character->TeleportTo(Destination, Character->GetActorRotation());
+	return true;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -261,26 +317,26 @@ UHitmenAbility_Dash::UHitmenAbility_Dash()
 	Cooldown = 1.5f;
 }
 
-FVector UHitmenAbility_Dash::GetDashVelocity() const
-{
-	const AHitmenCharacterBase* Character = GetOwnerCharacter();
-	if (!Character)
-	{
-		return FVector::ZeroVector;
-	}
-	FVector Direction = Character->GetLastMovementInputVector().GetSafeNormal2D();
-	if (Direction.IsNearlyZero())
-	{
-		Direction = Character->GetActorForwardVector().GetSafeNormal2D();
-	}
-	return Direction * DashSpeed + FVector::UpVector * UpwardBoost;
-}
-
 void UHitmenAbility_Dash::LocalPress(const FVector& AimOrigin, const FVector& AimDirection)
 {
-	if (AHitmenCharacterBase* Character = GetOwnerCharacter())
+	// Predicted: the request rides in the saved moves, the server runs the same burst.
+	AHitmenCharacterBase* Character = GetOwnerCharacter();
+	UHitmenCharacterMovementComponent* Movement = Character ? Character->GetHitmenMovement() : nullptr;
+	if (!Movement)
 	{
-		Character->LaunchCharacter(GetDashVelocity(), true, true);
+		return;
+	}
+	Movement->RequestDash();
+	if (AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Character); Player && Player->IsLocallyControlled())
+	{
+		Player->AddFOVKick(FOVKick, Movement->DashDuration + 0.25f);
+		Player->AddCameraShake(ViewShake, 0.15f);
+	}
+	UHitmenSoundLibrary::PlayHitmenSoundAt(Character, EHitmenSound::Dash, Character->GetActorLocation());
+	if (TrailFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAttached(TrailFX, Character->GetRootComponent(), NAME_None, FVector::ZeroVector, FRotator::ZeroRotator,
+			EAttachLocation::KeepRelativeOffset, true);
 	}
 }
 
@@ -291,7 +347,8 @@ bool UHitmenAbility_Dash::Activate(const FVector& AimOrigin, const FVector& AimD
 	{
 		return false;
 	}
-	Character->LaunchCharacter(GetDashVelocity(), true, true);
+	// The movement itself is predicted from the owner's moves (LocalPress); the server only spends the cooldown and
+	// shows the burst to everyone.
 	PlayActivatedJuice(Character->GetActorLocation());
 	return true;
 }
@@ -389,7 +446,7 @@ AActor* UHitmenAbility_Transposition::FindHintTarget(const FVector& Origin, cons
 {
 	if (AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, true))
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintTransposition", "Swap places");
+		OutAction = HITMEN_TEXT("Hitmen.HintTransposition", "Swap places");
 		return Target;
 	}
 	return nullptr;
@@ -399,32 +456,77 @@ bool UHitmenAbility_Transposition::Activate(const FVector& AimOrigin, const FVec
 {
 	AHitmenCharacterBase* Self = GetOwnerCharacter();
 	AHitmenCharacterBase* Target = AimCharacterInCone(AimOrigin, AimDirection, true);
-	if (!Self || !Target)
+	UWorld* World = GetWorld();
+	if (!Self || !Target || !World)
 	{
 		return false;
 	}
 	const FVector SelfLocation = Self->GetActorLocation();
+	const FRotator SelfRotation = Self->GetActorRotation();
+	const float HalfHeight = Self->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenSwap), false, Self);
+	Params.AddIgnoredActor(Target);
+	if (UHitmenCharacterMovementComponent* Movement = Self->GetHitmenMovement())
+	{
+		Movement->StopClimbing(false);
+	}
 	if (Target->IsDead())
 	{
-		// A body: you take its place, the ragdoll is moved where you stood.
+		// A body: you stand where it lies, its ragdoll lies where you stood (both on their floors, never inside one).
 		USkeletalMeshComponent* BodyMesh = Target->GetMesh();
-		const FVector BodyLocation = BodyMesh ? BodyMesh->GetBoneLocation(TEXT("pelvis")) : Target->GetActorLocation();
-		const FVector Offset = SelfLocation - BodyLocation;
-		Self->TeleportTo(BodyLocation + FVector::UpVector * Self->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), Self->GetActorRotation());
+		const FVector Pelvis = BodyMesh ? BodyMesh->GetBoneLocation(TEXT("pelvis")) : Target->GetActorLocation();
+		FHitResult Floor;
+		FVector SelfDest = World->LineTraceSingleByChannel(Floor, Pelvis + FVector(0.f, 0.f, 60.f), Pelvis - FVector(0.f, 0.f, 300.f), ECC_Visibility, Params)
+			? Floor.ImpactPoint + FVector(0.f, 0.f, HalfHeight + 5.f) : Pelvis + FVector(0.f, 0.f, HalfHeight * 0.5f);
+		if (!World->FindTeleportSpot(Self, SelfDest, SelfRotation))
+		{
+			return false;
+		}
+		FHitResult BodyFloor;
+		const FVector Feet = World->LineTraceSingleByChannel(BodyFloor, SelfLocation, SelfLocation - FVector(0.f, 0.f, HalfHeight + 200.f), ECC_Visibility, Params)
+			? FVector(BodyFloor.ImpactPoint) : SelfLocation - FVector(0.f, 0.f, HalfHeight);
+		const FVector PelvisDest = Target->FindSafeDropLocation(SelfLocation, Feet + FVector(0.f, 0.f, 25.f));
+		if (!Self->TeleportTo(SelfDest, SelfRotation))
+		{
+			return false;
+		}
+		const FVector Offset = PelvisDest - Pelvis;
 		Target->SetActorLocation(Target->GetActorLocation() + Offset, false, nullptr, ETeleportType::TeleportPhysics);
+		// The ragdoll may or may not follow its capsule: move whatever is left so its pelvis lands exactly there.
 		if (BodyMesh && BodyMesh->IsSimulatingPhysics())
 		{
-			BodyMesh->SetWorldLocation(BodyMesh->GetComponentLocation() + Offset, false, nullptr, ETeleportType::TeleportPhysics);
+			const FVector Left = PelvisDest - BodyMesh->GetBoneLocation(TEXT("pelvis"));
+			if (!Left.IsNearlyZero(1.f))
+			{
+				BodyMesh->SetWorldLocation(BodyMesh->GetComponentLocation() + Left, false, nullptr, ETeleportType::TeleportPhysics);
+			}
 		}
-		PlayActivatedJuice(BodyLocation);
+		UHitmenAISubsystem::NotifyTeleport(Self, SelfLocation, Self->GetActorLocation());
+		PlayActivatedJuice(Pelvis);
+		PlayActivatedJuice(SelfLocation);
 		return true;
 	}
+	// A living target: each stands where the other stood. The target steps aside (no collision) while you move in.
 	const FVector TargetLocation = Target->GetActorLocation();
-	// Move the target out of the way first so the swap never overlaps.
-	Target->SetActorLocation(TargetLocation + FVector::UpVector * 2000.f, false, nullptr, ETeleportType::TeleportPhysics);
-	Self->TeleportTo(TargetLocation, Self->GetActorRotation());
-	Target->TeleportTo(SelfLocation, Target->GetActorRotation());
+	const FRotator TargetRotation = Target->GetActorRotation();
+	Target->SetActorEnableCollision(false);
+	FVector SelfDest = TargetLocation;
+	const bool bSelfFits = World->FindTeleportSpot(Self, SelfDest, SelfRotation) && Self->TeleportTo(SelfDest, SelfRotation);
+	Target->SetActorEnableCollision(true);
+	if (!bSelfFits)
+	{
+		return false;
+	}
+	FVector TargetDest = SelfLocation;
+	if (!World->FindTeleportSpot(Target, TargetDest, TargetRotation) || !Target->TeleportTo(TargetDest, TargetRotation))
+	{
+		// No room for it where you stood: undo, nothing happened.
+		Self->TeleportTo(SelfLocation, SelfRotation);
+		return false;
+	}
+	UHitmenAISubsystem::NotifyTeleport(Self, SelfLocation, Self->GetActorLocation());
 	PlayActivatedJuice(TargetLocation);
+	PlayActivatedJuice(SelfLocation);
 	return true;
 }
 

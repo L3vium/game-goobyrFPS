@@ -150,26 +150,72 @@ public:
 	/** Stops reacting (death, sleep). */
 	void SetSuppressed(bool bSuppressed);
 
+	/** Sixth sense: a hostile right next to it but out of view raises the white fill (never to red) and turns it. */
+	void SenseNearby(AActor* Hostile, float DeltaTime, float Rate);
+
+	/** A colleague died nearby and the killer was not seen: cover, or panic after PanicAllyDeaths. */
+	void RecordAllyDeath(AActor* Killer, const FVector& DeathLocation);
+
+	/** Hides from ThreatLocation (alerted, Target unseen) for Duration seconds. */
+	void TakeCoverFrom(AActor* Threat, const FVector& ThreatLocation, float Duration, EHitmenAlertReason Reason);
+
+	/** True while hiding from an unseen threat (BB TakeCover). */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
+	bool IsTakingCover() const;
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
+	bool IsPanicking() const { return bPanicking && IsTakingCover(); }
+
+	float GetAllyDeathHearRadius() const { return AllyDeathHearRadius; }
+
+	/** The hunted target moved far at once (teleporter, blink, swap) out of sight: search where it was last. */
+	void LoseTrackOf(AActor* Hostile, const FVector& LastPlace);
+
 	/** Every machine, when the NPC barks (voices, a head turn...). Line is the subtitle shown to nearby players. */
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnBark(EHitmenAlertReason Reason, const FText& Line);
 
 protected:
 	// ---- Tuning ----
-	/** Suspicion per second at point-blank range; scales down with distance. */
+	/** Multiplier on SuspicionRateByDistance (1 = the curve as drawn). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0"))
-	float SuspicionRiseRate = 1.2f;
+	float SuspicionRiseRate = 1.f;
+
+	/** White fill per second by distance to the hostile (cm): near instant up close, slow far away. Then scaled by
+	 *  peripheral vision, partial cover, alarming behaviour, on edge and the difficulty. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert")
+	FRuntimeFloatCurve SuspicionRateByDistance;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0"))
 	float SuspicionDecayRate = 0.25f;
 
 	/** Seeing a hostile closer than this goes straight to combat. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="cm"))
-	float InstantDetectionDistance = 300.f;
+	float InstantDetectionDistance = 150.f;
 
-	/** Distance at which the rise rate reaches its minimum. */
-	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="cm"))
-	float SuspicionFalloffDistance = 1600.f;
+	// ---- Cover and panic (unseen threats) ----
+	/** Shot by someone it cannot see, or seeing a colleague drop: takes cover from where it came from instead of
+	 *  walking into it, for UnseenThreatCoverDuration, then searches. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert|Cover")
+	bool bTakeCoverFromUnseenThreats = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert|Cover", meta=(ClampMin="0", Units="s"))
+	float UnseenThreatCoverDuration = 6.f;
+
+	/** Colleagues seen dropping (killer unseen) within AllyDeathWindow that make the NPC panic. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert|Cover", meta=(ClampMin="1"))
+	int32 PanicAllyDeaths = 2;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert|Cover", meta=(ClampMin="0", Units="s"))
+	float AllyDeathWindow = 30.f;
+
+	/** A colleague dropping this close counts even when not seen (the body falling is heard). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert|Cover", meta=(ClampMin="0", Units="cm"))
+	float AllyDeathHearRadius = 800.f;
+
+	/** Panicking: hides crouched, farther away, this long before searching. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert|Cover", meta=(ClampMin="0", Units="s"))
+	float PanicDuration = 12.f;
 
 	/** Multiplier when the hostile is doing something alarming (armed, sprinting, in a restricted act). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="1"))
@@ -238,8 +284,21 @@ protected:
 	UPROPERTY(Replicated)
 	bool bTargetVisible = false;
 
+	float CoverUntil = -1.f;
+	bool bPanicking = false;
+	TArray<float> AllyDeathTimes;
+
 	UPROPERTY(Replicated)
 	EHitmenAlertReason AlertReason = EHitmenAlertReason::None;
+
+	/** Bumped to say a line without a state change (taking cover or panicking while already red). */
+	UPROPERTY(ReplicatedUsing=OnRep_ForcedBark)
+	uint8 ForcedBarkCount = 0;
+
+	UFUNCTION() void OnRep_ForcedBark();
+
+	/** Server: says the line of Reason now, on every machine (state unchanged). */
+	void ForceBark(EHitmenAlertReason Reason);
 
 	UPROPERTY(Replicated)
 	bool bOnEdge = false;
@@ -275,8 +334,6 @@ protected:
 	TWeakObjectPtr<AHitmenCharacterBase> DisposeBody;
 	TWeakObjectPtr<AActor> DisposeContainer;
 	FVector DisposeLocation = FVector::ZeroVector;
-	/** A gunshot heard where the shooter stands: the impact heard right after does not take the guard's attention. */
-	float LastShooterHeardTime = -100.f;
 
 	void StartBodySearch(AHitmenCharacterBase* Body);
 	void TryStartBodyDisposal(AHitmenCharacterBase* Body);

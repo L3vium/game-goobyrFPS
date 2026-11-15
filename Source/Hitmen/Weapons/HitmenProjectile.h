@@ -238,3 +238,26 @@ protected:
 
 	virtual void OnExplode(const FVector& Origin) override;
 };
+
+/** Goobyr gun: a slow lob that bursts into hamsters on impact; they run to the nearest enemy of the shooter and bite. */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenProjectile_Goobyr : public AHitmenProjectile
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenProjectile_Goobyr();
+
+protected:
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Goobyr")
+	TSubclassOf<class AHitmenHamster> HamsterClass;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Goobyr", meta=(ClampMin="1", ClampMax="20"))
+	int32 HamsterCount = 5;
+
+	/** The hamsters land spread around the impact this far. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Goobyr", meta=(ClampMin="0", Units="cm"))
+	float HamsterSpread = 90.f;
+
+	virtual void OnExplode(const FVector& Origin) override;
+};

@@ -2,6 +2,8 @@
 
 #include "Weapons/HitmenWeaponTypes.h"
 #include "Characters/HitmenCharacterBase.h"
+#include "Characters/HitmenPlayerCharacter.h"
+#include "TimerManager.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "Weapons/HitmenProjectile.h"
 #include "Data/HitmenWeaponData.h"
@@ -76,6 +78,11 @@ void AHitmenWeapon_Hitscan::FireServer(const FVector& Origin, const FVector& Dir
 	TracePellets(Origin, Direction, Seed, Hits, OutImpacts);
 
 	AController* InstigatorController = OwnerPawn ? OwnerPawn->GetController() : nullptr;
+	// Every pellet that lands on the same target adds up into one hit (a shotgun blast is one hit marker, one hit
+	// react, one kill); the head counts when any pellet takes it.
+	struct FTargetHit { FHitResult Hit; float Damage = 0.f; bool bHead = false; };
+	TMap<AActor*, FTargetHit> PerTarget;
+	TArray<AActor*> Order;
 	for (const FHitResult& Hit : Hits)
 	{
 		AActor* HitActor = Hit.GetActor();
@@ -86,11 +93,29 @@ void AHitmenWeapon_Hitscan::FireServer(const FVector& Origin, const FVector& Dir
 		float Damage = WeaponData->GetDamageAtDistance(FVector::Dist(Origin, Hit.ImpactPoint));
 		const AHitmenCharacterBase* HitCharacter = Cast<AHitmenCharacterBase>(HitActor);
 		const TArray<FName>& HeadBones = HitCharacter ? HitCharacter->GetHeadBones() : WeaponData->HeadBones;
-		if (HeadBones.Contains(Hit.BoneName))
+		const bool bHead = HeadBones.Contains(Hit.BoneName);
+		if (bHead)
 		{
 			Damage *= WeaponData->HeadshotMultiplier;
 		}
-		UGameplayStatics::ApplyPointDamage(HitActor, Damage, Direction, Hit, InstigatorController, this, UDamageType::StaticClass());
+		FTargetHit* Entry = PerTarget.Find(HitActor);
+		if (!Entry)
+		{
+			Entry = &PerTarget.Add(HitActor);
+			Entry->Hit = Hit;
+			Order.Add(HitActor);
+		}
+		Entry->Damage += Damage;
+		if (bHead && !Entry->bHead)
+		{
+			Entry->bHead = true;
+			Entry->Hit = Hit;
+		}
+	}
+	for (AActor* HitActor : Order)
+	{
+		const FTargetHit& Entry = PerTarget[HitActor];
+		UGameplayStatics::ApplyPointDamage(HitActor, Entry.Damage, Direction, Entry.Hit, InstigatorController, this, UDamageType::StaticClass());
 	}
 }
 
@@ -124,7 +149,7 @@ void AHitmenWeapon_Projectile::FireServer(const FVector& Origin, const FVector& 
 // Melee
 // ---------------------------------------------------------------------------------------------
 
-void AHitmenWeapon_Melee::FireServer(const FVector& Origin, const FVector& Direction, int32 Seed, float Charge, TArray<FVector>& OutImpacts)
+void AHitmenWeapon_Melee::SweepHostiles(const FVector& Origin, const FVector& Direction, TArray<FHitResult>& OutHits) const
 {
 	if (!WeaponData || !OwnerPawn)
 	{
@@ -135,17 +160,54 @@ void AHitmenWeapon_Melee::FireServer(const FVector& Origin, const FVector& Direc
 	TArray<FHitResult> Hits;
 	const FVector End = Origin + Direction * WeaponData->MeleeRange;
 	GetWorld()->SweepMultiByChannel(Hits, Origin, End, FQuat::Identity, HITMEN_TRACE_WEAPON, FCollisionShape::MakeSphere(WeaponData->MeleeRadius), Params);
-
-	TSet<AActor*> Damaged;
+	TSet<AActor*> Seen;
 	for (const FHitResult& Hit : Hits)
 	{
 		AActor* HitActor = Hit.GetActor();
-		if (!HitActor || Damaged.Contains(HitActor) || !UHitmenTeamLibrary::AreHostile(OwnerPawn, HitActor))
+		if (!HitActor || Seen.Contains(HitActor) || !UHitmenTeamLibrary::AreHostile(OwnerPawn, HitActor))
 		{
 			continue;
 		}
-		Damaged.Add(HitActor);
-		UGameplayStatics::ApplyPointDamage(HitActor, WeaponData->Damage, Direction, Hit, OwnerPawn->GetController(), this, UDamageType::StaticClass());
+		Seen.Add(HitActor);
+		OutHits.Add(Hit);
+	}
+}
+
+void AHitmenWeapon_Melee::FireServer(const FVector& Origin, const FVector& Direction, int32 Seed, float Charge, TArray<FVector>& OutImpacts)
+{
+	TArray<FHitResult> Hits;
+	SweepHostiles(Origin, Direction, Hits);
+	for (const FHitResult& Hit : Hits)
+	{
+		UGameplayStatics::ApplyPointDamage(Hit.GetActor(), WeaponData->Damage, Direction, Hit, OwnerPawn->GetController(), this, UDamageType::StaticClass());
 		OutImpacts.Add(Hit.ImpactPoint);
+	}
+}
+
+void AHitmenWeapon_Melee::SimulateImpacts(const FVector& Origin, const FVector& Direction, int32 Seed, TArray<FVector>& OutImpacts) const
+{
+	TArray<FHitResult> Hits;
+	SweepHostiles(Origin, Direction, Hits);
+	for (const FHitResult& Hit : Hits)
+	{
+		OutImpacts.Add(Hit.ImpactPoint);
+	}
+	// The blade lands a little into the slash: shake, view kick and hit stop then.
+	AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(OwnerPawn);
+	if (Hits.Num() > 0 && Player && Player->IsLocallyControlled() && WeaponData)
+	{
+		const float Shake = WeaponData->HitShake;
+		const float Kick = WeaponData->HitFOVKick;
+		const float Stop = WeaponData->HitStop;
+		const float Delay = FMath::Clamp(WeaponData->GetFireInterval() * 0.9f, 0.3f, 0.55f) * 0.4f;
+		TWeakObjectPtr<AHitmenPlayerCharacter> WeakPlayer(Player);
+		FTimerHandle Handle;
+		GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(Player, [WeakPlayer, Shake, Kick, Stop]()
+		{
+			if (WeakPlayer.IsValid())
+			{
+				WeakPlayer->PlayMeleeHitFeedback(Shake, Kick, Stop);
+			}
+		}), Delay, false);
 	}
 }

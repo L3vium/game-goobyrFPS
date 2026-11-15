@@ -21,6 +21,11 @@
 #include "TimerManager.h"
 #include "Weapons/HitmenWeaponBase.h"
 #include "EngineUtils.h"
+#include "DrawDebugHelpers.h"
+#include "HAL/IConsoleManager.h"
+
+static TAutoConsoleVariable<int32> CVarHitmenAICones(TEXT("HitmenAI.Cones"), 0,
+	TEXT("1: draw every NPC's focal (white) and peripheral (grey) view cones and its sixth sense ring (dev builds)."));
 
 namespace HitmenBBKeys
 {
@@ -42,6 +47,7 @@ namespace HitmenBBKeys
 	const FName DisposeBody(TEXT("DisposeBody"));
 	const FName DisposeContainer(TEXT("DisposeContainer"));
 	const FName DisposeLocation(TEXT("DisposeLocation"));
+	const FName TakeCover(TEXT("TakeCover"));
 }
 
 AHitmenAIController::AHitmenAIController()
@@ -351,6 +357,14 @@ void AHitmenAIController::EvaluateSight()
 	{
 		Alert->SeeHostile(Seen, SightEvaluationInterval, IsAlarming(Seen), GetSightRateScale(Seen));
 	}
+	else
+	{
+		EvaluateSixthSense();
+	}
+	if (CVarHitmenAICones.GetValueOnGameThread() > 0)
+	{
+		DrawDebugCones();
+	}
 	EvidenceAccumulator += SightEvaluationInterval;
 	if (EvidenceAccumulator >= EvidenceCheckInterval)
 	{
@@ -394,15 +408,131 @@ void AHitmenAIController::SyncBlackboard()
 	Blackboard->SetValueAsVector(HitmenBBKeys::InvestigateLocation, Alert->GetInvestigateLocation());
 	Blackboard->SetValueAsBool(HitmenBBKeys::TargetVisible, Alert->IsTargetVisible());
 	// An NPC fighting cannot call; one that is alerted but not engaged can (charmed pawns never call).
-	Blackboard->SetValueAsBool(HitmenBBKeys::CanCallReinforcements, !IsPawnCharmed() && Alert->CanCallReinforcementsNow());
+	// Hiding from an unseen shooter comes first: the radio call waits until it stops hiding.
+	Blackboard->SetValueAsBool(HitmenBBKeys::CanCallReinforcements, !IsPawnCharmed() && Alert->CanCallReinforcementsNow() && !Alert->IsTakingCover());
 	Blackboard->SetValueAsBool(HitmenBBKeys::IsOnEdge, Alert->IsOnEdge());
 	// An unarmed VIP runs to safety from real danger (Hitman's evacuation), not from a footstep.
 	const AHitmenNPC* NPC = Cast<AHitmenNPC>(GetPawn());
 	const EHitmenAlertState State = Alert->GetAlertState();
 	const bool bDanger = State == EHitmenAlertState::Combat || State == EHitmenAlertState::Searching
 		|| (State == EHitmenAlertState::Investigating && Alert->IsThreatInvestigation());
-	Blackboard->SetValueAsBool(HitmenBBKeys::Evacuate, NPC && NPC->IsVIP() && !NPC->GetWeapon() && bDanger);
+	Blackboard->SetValueAsBool(HitmenBBKeys::Evacuate, NPC && ((NPC->IsVIP() && !NPC->GetWeapon()) || NPC->IsGuest()) && bDanger);
+	Blackboard->SetValueAsBool(HitmenBBKeys::TakeCover, Alert->IsTakingCover() && !Alert->IsTargetVisible());
 	Blackboard->SetValueAsObject(HitmenBBKeys::DisposeBody, Alert->GetDisposeBody());
 	Blackboard->SetValueAsObject(HitmenBBKeys::DisposeContainer, Alert->GetDisposeContainer());
 	Blackboard->SetValueAsVector(HitmenBBKeys::DisposeLocation, Alert->GetDisposeLocation());
+}
+
+void AHitmenAIController::EvaluateSixthSense()
+{
+	const AHitmenCharacterBase* Self = Cast<AHitmenCharacterBase>(GetPawn());
+	const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
+	if (!Self || !AI || !Alert || SixthSenseRadius <= 0.f || SixthSenseRate <= 0.f)
+	{
+		return;
+	}
+	const EHitmenAlertState State = Alert->GetAlertState();
+	if (State == EHitmenAlertState::Combat || State == EHitmenAlertState::Searching)
+	{
+		return;
+	}
+	// A hostile right next to the NPC, out of its view: felt (a presence, a breath), never through a wall.
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PC = It->Get();
+		AHitmenCharacterBase* Other = PC ? Cast<AHitmenCharacterBase>(PC->GetPawn()) : nullptr;
+		if (!Other || Other->IsDead() || !UHitmenTeamLibrary::AreHostile(Self, Other))
+		{
+			continue;
+		}
+		if (FVector::DistSquared(Self->GetActorLocation(), Other->GetActorLocation()) > FMath::Square(SixthSenseRadius))
+		{
+			continue;
+		}
+		// Hidden players (invisible, inside a hiding spot, cheats) are not felt either: the range-free sight test with a
+		// 180 degree cone keeps walls, smoke and hidden status.
+		if (!AI->CanObserverSee(Self, Other, SixthSenseRadius + 50.f, 180.f, true))
+		{
+			continue;
+		}
+		const UHitmenCharacterMovementComponent* Movement = Other->GetHitmenMovement();
+		const bool bCrouched = Movement && Movement->IsCrouching();
+		const bool bMoving = Other->GetVelocity().Size2D() > 30.f;
+		const float Scale = bCrouched ? (bMoving ? SixthSenseCrouchScale : 0.f) : 1.f;
+		if (Scale > 0.f)
+		{
+			Alert->SenseNearby(Other, SightEvaluationInterval, SixthSenseRate * Scale);
+			return;
+		}
+	}
+}
+
+void AHitmenAIController::DrawDebugCones() const
+{
+#if ENABLE_DRAW_DEBUG
+	const APawn* Self = GetPawn();
+	if (!Self)
+	{
+		return;
+	}
+	FVector Eye;
+	FRotator View;
+	Self->GetActorEyesViewPoint(Eye, View);
+	const float Range = GetEffectiveSightRadius();
+	const float Life = SightEvaluationInterval * 1.1f;
+	const FVector Direction = View.Vector();
+	DrawDebugCone(GetWorld(), Eye, Direction, Range, FMath::DegreesToRadians(FocalVisionHalfAngle), FMath::DegreesToRadians(8.f), 16, FColor::White, false, Life, 0, 1.5f);
+	DrawDebugCone(GetWorld(), Eye, Direction, Range, FMath::DegreesToRadians(PeripheralVisionHalfAngle), FMath::DegreesToRadians(8.f), 24, FColor(120, 120, 120), false, Life, 0, 1.f);
+	DrawDebugCircle(GetWorld(), Self->GetActorLocation() - FVector(0.f, 0.f, 85.f), SixthSenseRadius, 32, FColor::Cyan, false, Life, 0, 1.f, FVector::ForwardVector, FVector::RightVector, false);
+#endif
+}
+
+void AHitmenAIController::UpdateControlRotation(float DeltaTime, bool bUpdatePawn)
+{
+	APawn* const MyPawn = GetPawn();
+	if (!MyPawn)
+	{
+		return;
+	}
+	// Where it wants to look (focus), unless it walks: then never more than MaxStrafeAngle away from the way it walks
+	// (no backward walking: the legs only have forward and side cycles).
+	FRotator Desired = GetControlRotation();
+	FVector FocalPoint = GetFocalPoint();
+	// Watching a target it no longer sees: where it was last known to be, never where it really is (it may have
+	// blinked or teleported away).
+	if (Alert && GetFocusActor() && GetFocusActor() == Alert->GetTarget() && !Alert->IsTargetVisible())
+	{
+		FocalPoint = Alert->GetLastKnownLocation() + FVector(0.f, 0.f, 60.f);
+	}
+	const FVector Velocity = MyPawn->GetVelocity();
+	const bool bWalking = Velocity.Size2D() > FaceMovementMinSpeed;
+	const bool bHasFocus = FAISystem::IsValidLocation(FocalPoint);
+	if (bHasFocus)
+	{
+		Desired = (FocalPoint - MyPawn->GetPawnViewLocation()).Rotation();
+	}
+	if (bWalking)
+	{
+		const float WalkYaw = Velocity.Rotation().Yaw;
+		if (!bHasFocus || FMath::Abs(FRotator::NormalizeAxis(Desired.Yaw - WalkYaw)) > MaxStrafeAngle)
+		{
+			Desired = FRotator(0.f, WalkYaw, 0.f);
+		}
+	}
+	else if (!bHasFocus)
+	{
+		Desired = MyPawn->GetActorRotation();
+	}
+	Desired.Yaw = FRotator::NormalizeAxis(Desired.Yaw);
+	Desired.Roll = 0.f;
+	SetControlRotation(Desired);
+	if (bUpdatePawn)
+	{
+		const FRotator CurrentPawnRotation = MyPawn->GetActorRotation();
+		if (!CurrentPawnRotation.Equals(Desired, 1e-3f))
+		{
+			// The character movement turns the body toward the control rotation at its rotation rate.
+			MyPawn->FaceRotation(Desired, DeltaTime);
+		}
+	}
 }

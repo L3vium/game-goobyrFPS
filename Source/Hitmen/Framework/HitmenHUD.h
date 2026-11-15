@@ -19,6 +19,9 @@ class HITMEN_API AHitmenHUD : public AHUD
 	GENERATED_BODY()
 
 public:
+	/** Seconds the front-end camera takes to fly to a screen's shot (the agent page's arrows wait for it). */
+	float GetShotBlendTime() const { return ShotBlendTime; }
+
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 

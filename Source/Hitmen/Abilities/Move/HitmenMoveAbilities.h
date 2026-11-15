@@ -21,20 +21,45 @@ public:
 	virtual void LocalPress(const FVector& AimOrigin, const FVector& AimDirection) override;
 	virtual void LocalRelease() override;
 	virtual void LocalTick(float DeltaTime) override;
+	virtual bool IsAiming() const override { return bAiming; }
+	virtual void LocalCancel() override;
 
 protected:
 	/** Pulls the destination back from walls by this distance. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Blink", meta=(ClampMin="0"))
 	float WallOffset = 50.f;
 
+	/** Aiming at a wall: its top is reached if it is at most this high above the aimed point (Dishonored-like: you
+	 *  land on top of it). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Blink", meta=(ClampMin="0", Units="cm"))
+	float LedgeUpMaxHeight = 350.f;
+
+	/** How far behind the wall's face its top is looked for. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Blink", meta=(ClampMin="0", Units="cm"))
+	float LedgeProbeDepth = 60.f;
+
+	/** Aiming into the air: the landing drops to the ground under the aim point when it is at most this far down. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Blink", meta=(ClampMin="0", Units="cm"))
+	float MaxGroundDrop = 400.f;
+
+	/** Looping effect flat on the ground where you will land (a Vefects ring). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Blink|Juice")
+	TObjectPtr<class UNiagaraSystem> MarkerFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Blink|Juice", meta=(ClampMin="0.01"))
+	float MarkerFXScale = 0.6f;
+
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
-	bool ComputeDestination(const FVector& AimOrigin, const FVector& AimDirection, FVector& OutDestination) const;
+	bool ComputeDestination(const FVector& AimOrigin, const FVector& AimDirection, FVector& OutDestination, bool* bOutLedgeUp = nullptr) const;
 
 	bool bAiming = false;
+	mutable bool bLastAimLedgeUp = false;
 
 public:
 	/** Holding E shows where you will land (the ability component draws the marker). */
 	virtual bool GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const override;
+	virtual class UNiagaraSystem* GetAimMarkerFX(float& OutScale) const override { OutScale = MarkerFXScale; return MarkerFX; }
+	virtual bool IsAimMarkerLedgeUp() const override { return bLastAimLedgeUp; }
 };
 
 /** Passive: one extra jump in the air. */
@@ -69,6 +94,7 @@ class HITMEN_API UHitmenAbility_Jetpack : public UHitmenMoveAbility
 public:
 	UHitmenAbility_Jetpack();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual EHitmenKeyLabel GetHUDKey() const override { return EHitmenKeyLabel::Jump; }
 	virtual bool WantsTick() const override { return true; }
 	virtual void TickAbility(float DeltaTime) override;
 	virtual void LocalPress(const FVector& AimOrigin, const FVector& AimDirection) override;
@@ -138,16 +164,22 @@ class HITMEN_API UHitmenAbility_Dash : public UHitmenMoveAbility
 public:
 	UHitmenAbility_Dash();
 	virtual void LocalPress(const FVector& AimOrigin, const FVector& AimDirection) override;
+	virtual EHitmenKeyLabel GetHUDKey() const override { return EHitmenKeyLabel::Sprint; }
 
 protected:
-	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Dash", meta=(ClampMin="0"))
-	float DashSpeed = 2200.f;
+	/** The burst itself (speed, duration, exit speed, air dash) is on the movement component (Hitmen|Movement|Dash):
+	 *  it is predicted like sprint. These are its juice on the dasher. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Dash", meta=(ClampMin="0", Units="deg"))
+	float FOVKick = 7.f;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Dash", meta=(ClampMin="0"))
-	float UpwardBoost = 150.f;
+	float ViewShake = 0.35f;
+
+	/** Streak left behind (attached to the dasher for the burst). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Dash|Juice")
+	TObjectPtr<class UNiagaraSystem> TrailFX;
 
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
-	FVector GetDashVelocity() const;
 };
 
 /** Grapple to a surface and get pulled toward it. */

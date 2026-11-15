@@ -1,6 +1,7 @@
 // Hitmen — VIP tracker (local)
 
 #include "Framework/HitmenVIPTracker.h"
+#include "Core/HitmenText.h"
 #include "Framework/HitmenGameState.h"
 #include "Framework/HitmenPlayerController.h"
 #include "Characters/HitmenCharacterBase.h"
@@ -174,8 +175,8 @@ void UHitmenVIPTrackerComponent::OnVIPDied(AHitmenCharacterBase* Body)
 	if (UI)
 	{
 		FHitmenToast Toast;
-		Toast.Title = NSLOCTEXT("Hitmen", "TargetEliminated", "Target eliminated");
-		Toast.Subtitle = NSLOCTEXT("Hitmen", "TargetEliminatedSub", "Its body shows in yellow; the retrieval points in gold");
+		Toast.Title = HITMEN_TEXT("Hitmen.TargetEliminated", "Target eliminated");
+		Toast.Subtitle = HITMEN_TEXT("Hitmen.TargetEliminatedSub", "Its body shows in yellow; the retrieval points in gold");
 		Toast.Duration = 4.5f;
 		UI->PushToast(Toast);
 	}
@@ -183,7 +184,7 @@ void UHitmenVIPTrackerComponent::OnVIPDied(AHitmenCharacterBase* Body)
 	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
 	if (AHitmenPlayerController* HitmenPC = Cast<AHitmenPlayerController>(PC); HitmenPC && Settings->bEventCameraOnTargetKill)
 	{
-		HitmenPC->ShowEventCamera(Body, NSLOCTEXT("Hitmen", "EventTargetDown", "Target down"));
+		HitmenPC->ShowEventCamera(Body, HITMEN_TEXT("Hitmen.EventTargetDown", "Target down"));
 	}
 }
 

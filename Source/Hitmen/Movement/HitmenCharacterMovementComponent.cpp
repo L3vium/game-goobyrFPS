@@ -1,6 +1,7 @@
 // Hitmen — predicted movement
 
 #include "Movement/HitmenCharacterMovementComponent.h"
+#include "World/Interactables/HitmenOpenings.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Core/HitmenInterfaces.h"
 #include "Hitmen.h"
@@ -59,7 +60,17 @@ bool UHitmenCharacterMovementComponent::IsSprinting() const
 		return false;
 	}
 	const FVector Input = Acceleration.GetSafeNormal2D();
-	return !Input.IsNearlyZero() && FVector::DotProduct(Input, CharacterOwner->GetActorForwardVector()) >= SprintMinForwardDot;
+	if (Input.IsNearlyZero())
+	{
+		return false;
+	}
+	const float Forward = FVector::DotProduct(Input, CharacterOwner->GetActorForwardVector().GetSafeNormal2D());
+	switch (SprintDirections)
+	{
+	case EHitmenSprintDirections::ForwardOnly:     return Forward >= 0.5f;
+	case EHitmenSprintDirections::ForwardAndSides: return Forward >= -0.1f;
+	default:                                       return true;
+	}
 }
 
 float UHitmenCharacterMovementComponent::GetTimeSeconds() const
@@ -99,6 +110,7 @@ float UHitmenCharacterMovementComponent::GetMaxSpeed() const
 		switch (static_cast<EHitmenCustomMovement>(CustomMovementMode))
 		{
 		case EHitmenCustomMovement::Slide: return FMath::Max(SlideEntrySpeed, SprintSpeed);
+		case EHitmenCustomMovement::Dash: return DashSpeed;
 		case EHitmenCustomMovement::Hang: return HangShimmyFastSpeed;
 		case EHitmenCustomMovement::Climb:
 			if (const IHitmenClimbable* Climbable = Cast<IHitmenClimbable>(ClimbTarget.Get()))
@@ -154,6 +166,17 @@ void UHitmenCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float
 	if (!CharacterOwner)
 	{
 		return;
+	}
+	// Dash request (predicted: sent in the saved move flags, replayed the same way).
+	if (bWantsDash)
+	{
+		bWantsDash = false;
+		const bool bFree = MovementMode == MOVE_Walking || MovementMode == MOVE_NavWalking || MovementMode == MOVE_Falling;
+		const bool bAirOk = !IsFalling() || (bAirDash && !bAirDashUsed);
+		if (bFree && bAirOk && !IsCrouching())
+		{
+			StartDash();
+		}
 	}
 	const bool bJumpHeld = CharacterOwner->bPressedJump;
 	const bool bJumpPressedNow = bJumpHeld && !bPrevPressedJump;
@@ -240,6 +263,10 @@ void UHitmenCharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 	Super::UpdateFromCompressedFlags(Flags);
 	bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
 	bWantsJetpackThrust = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
+	if ((Flags & FSavedMove_Character::FLAG_Custom_2) != 0)
+	{
+		bWantsDash = true;
+	}
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -310,6 +337,11 @@ void UHitmenCharacterMovementComponent::OnMovementModeChanged(EMovementMode Prev
 		ClimbTarget.Reset();
 		ClimbAxisInput = 0.f;
 	}
+	// Landing gives the air dash back.
+	if (MovementMode == MOVE_Walking || MovementMode == MOVE_NavWalking)
+	{
+		bAirDashUsed = false;
+	}
 	if (Previous != Current)
 	{
 		OnCustomMovementChanged.Broadcast(Current);
@@ -324,6 +356,7 @@ void UHitmenCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iterat
 	case EHitmenCustomMovement::Climb:  PhysClimb(DeltaTime, Iterations); break;
 	case EHitmenCustomMovement::Mantle: PhysMantle(DeltaTime, Iterations); break;
 	case EHitmenCustomMovement::Hang:   PhysHang(DeltaTime, Iterations); break;
+	case EHitmenCustomMovement::Dash:   PhysDash(DeltaTime, Iterations); break;
 	default: Super::PhysCustom(DeltaTime, Iterations); break;
 	}
 }
@@ -676,7 +709,10 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 	OutPlan = FHitmenMantlePlan();
 	OutPlan.Start = Location;
 	OutPlan.LedgeHeight = LedgeHeight;
-	if (LedgeHeight <= VaultMaxHeight && bFarSide)
+	// An open window's sill vaults higher: from the walkable ledge outside, the sill is ~121 cm up.
+	const bool bWindow = Cast<AHitmenWindow>(TopHit.GetActor()) || Cast<AHitmenWindow>(WallHit.GetActor());
+	const float VaultLimit = bWindow ? FMath::Max(VaultMaxHeight, WindowVaultMaxHeight) : VaultMaxHeight;
+	if (LedgeHeight <= VaultLimit && bFarSide)
 	{
 		// Vault: one fluid arc over the top.
 		OutPlan.Action = EHitmenTraversalAction::Vault;
@@ -901,6 +937,19 @@ bool UHitmenCharacterMovementComponent::ShouldGrabClimbable(const IHitmenClimbab
 		bOutFromTop = true;
 		return true;
 	}
+	// A ladder down a shaft: dropping in near its top, or walking into the hole (stiff ledges stop you at its edge),
+	// grabs it whatever the facing.
+	if (Climbable.AllowsTopEntry() && Alpha > 0.8f)
+	{
+		const float Reach = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + 40.f;
+		const bool bDropping = IsFalling() && Velocity.Z <= 0.f;
+		const bool bWalkingIn = !IsFalling() && !Input.IsNearlyZero() && !HasGroundWithinStiffDrop(UpdatedComponent->GetComponentLocation() + Input * Reach);
+		if (bDropping || bWalkingIn)
+		{
+			bOutFromTop = true;
+			return true;
+		}
+	}
 	if (Facing < Climbable.GetMinFacingDot())
 	{
 		return false;
@@ -919,6 +968,7 @@ void UHitmenCharacterMovementComponent::StartClimb(AActor* ClimbableActor, bool 
 	ClimbTarget = ClimbableActor;
 	ClimbStartTime = GetTimeSeconds();
 	ClimbAlpha = bFromTop ? 0.97f : ProjectOnClimbAxis(UpdatedComponent->GetComponentLocation(), *Climbable);
+	bClimbDownLatch = bFromTop && Climbable->GetClimbType() == EHitmenClimbType::Ladder;
 	Velocity = FVector::ZeroVector;
 	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Climb));
 	OnTraversalMontage.Broadcast(EHitmenAnimMontage::ClimbEnter);
@@ -959,7 +1009,21 @@ void UHitmenCharacterMovementComponent::StopClimbing(bool bJumpOff)
 	{
 		if (Climbable->GetClimbType() == EHitmenClimbType::Ladder)
 		{
-			Velocity = Climbable->GetClimbNormal().GetSafeNormal2D() * ClimbJumpOffSpeed + FVector::UpVector * ClimbJumpOffSpeed * 0.8f;
+			// The move keys decide where to: left / right hops along the wall (soft enough for the air grab to catch a
+			// ledge beside it), anything else jumps away from the wall.
+			const FVector Out = Climbable->GetClimbNormal().GetSafeNormal2D();
+			const FVector Along = FVector::CrossProduct(FVector::UpVector, Out).GetSafeNormal();
+			const FVector Input = Acceleration.GetSafeNormal2D();
+			const float SideInput = FVector::DotProduct(Input, Along);
+			const float OutInput = FVector::DotProduct(Input, Out);
+			if (FMath::Abs(SideInput) > 0.5f && FMath::Abs(SideInput) >= FMath::Abs(OutInput))
+			{
+				Velocity = Along * FMath::Sign(SideInput) * ClimbSideJumpSpeed + Out * ClimbSideJumpOut + FVector::UpVector * ClimbSideJumpUp;
+			}
+			else
+			{
+				Velocity = Out * ClimbJumpOffSpeed + FVector::UpVector * ClimbJumpOffSpeed * 0.8f;
+			}
 		}
 		else
 		{
@@ -995,8 +1059,22 @@ void UHitmenCharacterMovementComponent::PhysClimb(float DeltaTime, int32 Iterati
 	{
 		if (bClimbRelativeToCamera)
 		{
-			const float Pitch = CharacterOwner->GetControlRotation().GetNormalized().Pitch;
-			Forward *= Pitch < -15.f ? -1.f : 1.f;
+			// Facing the ladder, forward climbs up; facing away from it, forward climbs down.
+			const FVector LookYaw = FRotator(0.f, CharacterOwner->GetControlRotation().Yaw, 0.f).Vector();
+			const FVector IntoLadder = -Climbable->GetClimbNormal().GetSafeNormal2D();
+			Forward *= FVector::DotProduct(LookYaw, IntoLadder) >= 0.f ? 1.f : -1.f;
+		}
+		// Just got on from the top: the keys that walked you in take you down, until released.
+		if (bClimbDownLatch)
+		{
+			if (Input.IsNearlyZero())
+			{
+				bClimbDownLatch = false;
+			}
+			else
+			{
+				Forward = -1.f;
+			}
 		}
 	}
 	else
@@ -1384,6 +1462,10 @@ void FSavedMove_Hitmen::Clear()
 	SavedSlideBoostCooldownLeft = 0.f;
 	bSavedSlideNeedsCrouchRelease = false;
 	bSavedSprintSlideNeedsRelease = false;
+	bSavedWantsDash = false;
+	bSavedAirDashUsed = false;
+	SavedDashTimeLeft = 0.f;
+	SavedDashDirection = FVector::ForwardVector;
 }
 
 uint8 FSavedMove_Hitmen::GetCompressedFlags() const
@@ -1397,6 +1479,10 @@ uint8 FSavedMove_Hitmen::GetCompressedFlags() const
 	{
 		Result |= FLAG_Custom_1;
 	}
+	if (bSavedWantsDash)
+	{
+		Result |= FLAG_Custom_2;
+	}
 	return Result;
 }
 
@@ -1405,7 +1491,9 @@ bool FSavedMove_Hitmen::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter*
 	const FSavedMove_Hitmen* Other = static_cast<FSavedMove_Hitmen*>(NewMove.Get());
 	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || bSavedWantsJetpackThrust != Other->bSavedWantsJetpackThrust
 		|| bSavedSlideNeedsCrouchRelease != Other->bSavedSlideNeedsCrouchRelease || bSavedSprintSlideNeedsRelease != Other->bSavedSprintSlideNeedsRelease
-		|| (SavedSlideBoostCooldownLeft > 0.f) != (Other->SavedSlideBoostCooldownLeft > 0.f))
+		|| (SavedSlideBoostCooldownLeft > 0.f) != (Other->SavedSlideBoostCooldownLeft > 0.f)
+		|| bSavedWantsDash || Other->bSavedWantsDash || SavedDashTimeLeft > 0.f || Other->SavedDashTimeLeft > 0.f
+		|| bSavedAirDashUsed != Other->bSavedAirDashUsed)
 	{
 		return false;
 	}
@@ -1437,6 +1525,10 @@ void FSavedMove_Hitmen::SetMoveFor(ACharacter* C, float InDeltaTime, FVector con
 		SavedSlideBoostCooldownLeft = Movement->SlideBoostCooldownLeft;
 		bSavedSlideNeedsCrouchRelease = Movement->bSlideNeedsCrouchRelease;
 		bSavedSprintSlideNeedsRelease = Movement->bSprintSlideNeedsRelease;
+		bSavedWantsDash = Movement->bWantsDash;
+		bSavedAirDashUsed = Movement->bAirDashUsed;
+		SavedDashTimeLeft = Movement->DashTimeLeft;
+		SavedDashDirection = Movement->DashDirection;
 	}
 }
 
@@ -1454,10 +1546,81 @@ void FSavedMove_Hitmen::PrepMoveFor(ACharacter* C)
 		Movement->SlideBoostCooldownLeft = SavedSlideBoostCooldownLeft;
 		Movement->bSlideNeedsCrouchRelease = bSavedSlideNeedsCrouchRelease;
 		Movement->bSprintSlideNeedsRelease = bSavedSprintSlideNeedsRelease;
+		Movement->bWantsDash = bSavedWantsDash;
+		Movement->bAirDashUsed = bSavedAirDashUsed;
+		Movement->DashTimeLeft = SavedDashTimeLeft;
+		Movement->DashDirection = SavedDashDirection;
 	}
 }
 
 FSavedMovePtr FNetworkPredictionData_Client_Hitmen::AllocateNewMove()
 {
 	return FSavedMovePtr(new FSavedMove_Hitmen());
+}
+
+// ---------------------------------------------------------------------------------------------
+// Dash
+// ---------------------------------------------------------------------------------------------
+
+void UHitmenCharacterMovementComponent::StartDash()
+{
+	// Toward the move keys, else where you look; flat (Celeste-like: a fixed burst, no gravity while it lasts).
+	FVector Direction = Acceleration.GetSafeNormal2D();
+	if (Direction.IsNearlyZero() && CharacterOwner)
+	{
+		Direction = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
+	}
+	DashDirection = Direction.IsNearlyZero() ? FVector::ForwardVector : Direction;
+	DashTimeLeft = DashDuration;
+	if (IsFalling())
+	{
+		bAirDashUsed = true;
+	}
+	Velocity = DashDirection * DashSpeed;
+	SetMovementMode(MOVE_Custom, static_cast<uint8>(EHitmenCustomMovement::Dash));
+}
+
+void UHitmenCharacterMovementComponent::PhysDash(float DeltaTime, int32 Iterations)
+{
+	if (DeltaTime < MIN_TICK_TIME)
+	{
+		return;
+	}
+	const float Step = FMath::Min(DeltaTime, DashTimeLeft);
+	Velocity = DashDirection * DashSpeed;
+	const FVector Delta = Velocity * Step;
+	FHitResult Hit(1.f);
+	SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
+	if (Hit.IsValidBlockingHit())
+	{
+		// Along walls (and up small steps) rather than stopping dead.
+		SlideAlongSurface(Delta, 1.f - Hit.Time, Hit.Normal, Hit, true);
+	}
+	DashTimeLeft -= Step;
+	if (DashTimeLeft > KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+	// Burst over: a run-like speed carries on, on the ground or in the air.
+	DashTimeLeft = 0.f;
+	Velocity = DashDirection * DashExitSpeed;
+	FFindFloorResult Floor;
+	FindFloor(UpdatedComponent->GetComponentLocation(), Floor, false);
+	SetMovementMode(Floor.IsWalkableFloor() ? MOVE_Walking : MOVE_Falling);
+	const float Remaining = DeltaTime - Step;
+	if (Remaining > MIN_TICK_TIME)
+	{
+		StartNewPhysics(Remaining, Iterations + 1);
+	}
+}
+
+bool UHitmenCharacterMovementComponent::DebugTryMantle(const FVector& Forward)
+{
+	FHitmenMantlePlan Plan;
+	if (!PlanMantle(Forward.GetSafeNormal2D(), Plan))
+	{
+		return false;
+	}
+	StartMantlePlan(Plan);
+	return true;
 }

@@ -3,6 +3,113 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
+## [Unreleased]
+
+## [0.10.0] - 2026-11-15
+
+### Added
+- Juice switches `bMantleHandsFX` and `bMantleLandFX` (off): no particles on climbs and vaults by default.
+- Sound-set events MeleeHit, KnifeWhoosh, WallBreak, BodyBurn, HamsterSqueak, HamsterBite, Dash, BlinkArrive; a
+  synthesized headshot cue (`Tools/Audio/hitmen_synth_sfx.py`, `Audio/SFX/Synth`).
+- Punch juice: a whoosh on the swing; on a hit a puff (`PunchHitFX`), a thump, a view shake, a short field-of-view
+  kick and a hit stop, predicted for the puncher. Knife (and any melee weapon): hits predicted on the attacker
+  (`HitShake`, `HitFOVKick`, `HitStop` in the weapon data), slash whoosh, blood hit.
+- AI: distance curve for the white fill (`SuspicionRateByDistance`: near instant point blank, 4 s at 20 m), sixth
+  sense (`SixthSenseRadius` 250 cm), console `HitmenAI.Cones 1`.
+- AI cover and panic: shot by an unseen shooter or seeing a colleague drop, an NPC takes cover from where it seemed
+  to come from (`UnseenThreatCoverDuration` 6 s); two deaths within 30 s make it panic (`PanicDuration` 12 s); barks
+  TakeCover / Panic; BB key `TakeCover`, `UBTTask_HitmenHoldCover`, `UBTTask_HitmenFindCover::bHideFromLastKnown`.
+- AI loses a hunted pawn that teleports, blinks or swaps 6 m or more out of its sight (`LoseAggroTeleportDistance`,
+  `UHitmenAISubsystem::NotifyTeleport`).
+- Turrets break like cameras (`TurretHealth` 80, `BrokenFX`). Breakable walls: `BreakFX`, `BreakSound`, debris
+  chunks (`DebrisCount`).
+- `bCameraFeedWhenSeen` (Project Settings -> Hitmen -> HUD, off): the picture top left shows what a security camera
+  sees while it sees you (`AHitmenEventCamera::ShowFrom`).
+- NPC option `bGuest` (off): a neutral, unarmed guest that runs from danger. `CandidateGuardWeapon` for VIP
+  candidates.
+- HUD: rings above the crosshair for timed effects (invisibility, pill, armor); a small "F  Throw" hint bottom right
+  while aiming; ability cards show the key that triggers them (Space for the jetpack, Shift for the dash; new key
+  label Sprint).
+- `bSpectatorsCanFreeFly` (Project Settings -> Hitmen -> Watchers, on): dead players and everyone at match end may
+  free fly. Fly cheat: Shift flies faster (`CheatFlyFastMultiplier` x3, server-synced).
+- QA: `HitmenEditorTools.take_pie_screenshot` (PIE picture with widgets, whatever window PIE plays in).
+- Dash rebuilt Celeste-like and predicted (custom movement mode, saved-move flag): `DashSpeed` 3000 for
+  `DashDuration` 0.12 s, no gravity, then `DashExitSpeed` 700; one air dash between landings (`bAirDash`); a view
+  kick, a streak (`TrailFX`), a whoosh.
+- Blink, Dishonored-like: a ground ring where you land (`MarkerFX`), release or left click to blink, right click / F
+  / Esc cancel (Esc still pauses); ledge-up onto what you aim at (`LedgeUpMaxHeight` 350 cm, an arrow over the
+  ring); `MaxGroundDrop`; generic aim confirm / cancel on the ability component; `ActivatedSound` on abilities.
+- Goobyr gun (`DA_Weapon_Goobyr`, `BP_Projectile_Goobyr`, `AHitmenHamster` / `BP_Hamster`): five hamsters that bite
+  the shooter's enemies; in the catalog, the loot and the gym armoury.
+- Bow from basic shapes (`SM_Bow`), a 110 cm arrow (`SM_Arrow`); weapon data `HeadshotAssistRadius` (bow 15 cm).
+- Lighter: fire on the body for the burn (`BurnFX`, attached to the ragdoll), ash after (`AshFX`), `BurnTime` 2 s, a
+  burning sound.
+- `SprintDirections` (ForwardOnly / ForwardAndSides / AllDirections, default AllDirections), `WindowVaultMaxHeight`
+  135 cm, `ClimbSideJumpSpeed` / `ClimbSideJumpOut` / `ClimbSideJumpUp`.
+- QA consoles `HitmenPress` / `HitmenRelease` (input actions and move input) and `HitmenTraverse`.
+- Translation sheet: every text of the game comes from `Content/Hitmen/Localization/HitmenText.csv` (Excel, one
+  column per language, English and French), read by `UHitmenTextSubsystem` through `HITMEN_TEXT`; Options ->
+  Gameplay -> Language; consoles `HitmenText.Language` / `HitmenText.Reload`; `Tools/Localization` keeps the sheet
+  in step with the code. Recipe in `docs/Pipelines.md`.
+- Level design tool: structures at the gym metrics (`AHitmenLDBlock`, `AHitmenLDWall`, `AHitmenLDStairs`,
+  `AHitmenLDBuilding`, `AHitmenLDVentDuct`) with real door / window / hatch / gutter / lamp actors and a bake to static
+  meshes; PCG lines (`AHitmenLDPCGLine`) and three generated graphs (`PCG_Hitmen_CoverLine`, `PCG_Hitmen_Rocks`,
+  `PCG_Hitmen_RoofDressing`; PCG plugin on); the "Hitmen LD" tab (Window menu, level toolbar) to place them and the
+  builder pieces, rebuild the navmesh and run the reach / door checks (`UHitmenLDTools`). Recipe in `docs/Pipelines.md`.
+- Ladders: `bAllowTopEntry` / `TopEntryReach` (a shaft ladder catches whoever steps or drops in from above).
+- Keyboard layout: on a QWERTY keyboard (from the Windows layout) the AZERTY defaults move to the same places (W A S
+  D, Q) unless rebound; `KeyboardLayoutOverride` in Project Settings -> Hitmen -> Input.
+
+### Changed
+- A gunshot (report and impact alike) draws guards to where the bullet landed: they turn to the impact, never to the
+  shooter (`UHitmenAISubsystem::ReportNoiseHeardAt`).
+- NPCs never walk backward: the body follows the controller, which faces the walking direction whenever the focus is
+  more than `MaxStrafeAngle` (100°) off it; turning to a noise or staring now turns the body too; stale shooting /
+  noise focus cleared; an unseen target is faced where it was last known.
+- Snipers show their red star only while they aim at someone they see (`bGlintOnlyWhileAiming`), like the red line.
+- Explosions: four responders, `ExplosionOcclusionMultiplier` 0.8, barrels heard 40 m away (`ExplosionNoiseRadius`).
+- VIP candidates not picked become guards at match start (named Guard, armed); the VIP reads "Target".
+- Security cameras: white cone, red while they see someone (`IdleColor`, `DetectingColor`, `AlertColor`), the sweep
+  stops where they see someone (`bFreezeSweepWhileSeeing`); the floor ring is off.
+- Event cameras top left are off by default (`bEventCameraOnTargetKill`, `bEventCameraOnDistraction`).
+- Inventory bar: the held weapon is always the left card; switching makes the cards trade places (`SwapTime` 0.12
+  s).
+- Watcher keys line: only for spectators, views first (1 / 2 / 3, free fly listed), WASD on QWERTY.
+- Agent screen: look counters read 0 / N for the base look; the arrows wait for the camera to arrive in the room,
+  then fade in.
+- Hiding spots holding a body: no "Look inside"; F only hides you (room) or stows the body you carry.
+- Shotgun pellets 25 (12) and pellets on one target add up into one hit; bow 55 (90), a headshot kills.
+- Ladders and gutters follow the camera by default (facing the ladder: forward up; facing away: forward down); the
+  Options row keeps "Forward is up" (setting `bLadderForwardAlwaysUp`). Jumping off follows the move keys (left /
+  right: a hop along the wall).
+- Remote distraction only sets off distractions (`AllowedTargetClasses`, default the distraction class).
+- Invisibility view fades in and out (`InvisibilityFadeInTime` / `InvisibilityFadeOutTime`).
+- First-person punch: wind-up, a longer jab to the crosshair, the other fist tucks in. Knife and bow grips solved
+  again (`hitmen_fp_solve.py`: `HOLD_TILT` raises the blade into view, `AUTHORED_FRAME` for the bow).
+
+
+
+
+
+- San Lazaro: shaft rims 45 cm with a coping you step onto, ladders caught from above (the cave vents and tunnel
+  shafts could not be entered); crawl hatches behind real ducts with an outer hatch; ravine rocks are flat-topped
+  blocks on a parkour line at the gym metrics; turrets in sight on the gatehouse roof and before the control room.
+
+### Fixed
+- Radios and TVs fell silent after one play of their clip: the clip restarts as long as the distraction is on.
+- Muzzle light: at the barrel as drawn (first person), and other players no longer see the host's flash at its
+  first-person gun.
+- Punches flagged headshots (red cross and sound without a kill). The Shift-tap dash with toggle sprint on.
+- Prompt info line: one line under the key, clear of the hold ring; spectator info no longer drawn over living
+  players' prompts.
+- Sprint never worked backward or sideways (only within 60 degrees of forward).
+- Vaulting from a window ledge back in through the window (the sill is 121 cm above the ledge, over the 120 cm
+  vault).
+- Transposition: bodies swapped under the floor or into walls; a living target could be left 20 m up when the swap
+  failed.
+- Arrows never scored headshots (they hit the capsule, not the head bone).
+- Pill and blinding post-process defaults pointed at assets that do not exist (`PP_Pill`, `PP_Blind`).
+
 ## [0.9.0] - 2026-11-15
 
 ### Added
@@ -333,7 +440,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Lobby log lines (LogHitmen): who asked to start and how many players are ready, to diagnose Ready in player
   builds.
 
-
 ### Changed
 - Create Room on one 8 px grid: 112 px side margins, a fixed title band, the map tile and the players panel start on
   the same line and the panel ends on the same edge as Choose your agent; the player name has room again; a dim line
@@ -384,9 +490,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - hitmen_check_reach.py also checks pickups: each needs a reachable standing spot within grabbing range (a pedestal
   top is a navmesh island of its own).
 
-
-
-
 ### Fixed
 - Generated buildings: door openings match the door (110 x 230), stairs leave room to step on and switch back on
   three-floor houses (upper floors were unreachable); the ground has holes for stair wells instead of covering them.
@@ -405,16 +508,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   turret panel takes 3 s and the security console 2 s; a bar fills under the crosshair with a hacking sound;
   releasing F or looking away cancels; the server times the hold too.
 - Landing sounds on every landing by fall speed (soft / hard), a view dip on hard landings.
-
-
-
-
-
-
-
-
-
-
 
 ### Changed
 - UI red is pure red (sRGB 215, 0, 0) everywhere: menus, alert red, HUD. It was a linear colour shown as pink.
@@ -473,10 +566,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   data.
 - Last-known-position ghost: a faint white silhouette (15 % opacity, was 35 %), Hitman-like.
 
-
-
-
-
 ### Fixed
 - First person: guns point along the view. The 0.4.0 hold fix was never saved into the weapon data assets (the pistol
   and launchers were still turned -90 degrees, the rifles pitched 45 degrees). `hitmen_fp_solve.py` now solves the
@@ -509,7 +598,6 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Footsteps were silent (the per-surface sound slots were empty): players and NPCs now play a footstep per surface
   (grass, stone, dirt, wood, metal, concrete by default).
 - Gym: the armor and C4 pickups sat inside blocks (they could not be picked up): they now rest on top.
-
 
 ### Removed
 - Every weapon VFX (muzzle flashes, impact puffs, surface dust, blood, rocket back blast, turret and arrow impacts):

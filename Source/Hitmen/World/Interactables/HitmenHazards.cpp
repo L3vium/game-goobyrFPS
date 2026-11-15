@@ -148,7 +148,7 @@ void AHitmenExplosiveBarrel::Explode(AController* InstigatorController)
 	}
 	bExploded = true;
 	Multicast_Exploded();
-	UHitmenCombatLibrary::Explode(this, GetActorLocation(), ExplosionRadius, ExplosionDamage, this, InstigatorController);
+	UHitmenCombatLibrary::Explode(this, GetActorLocation(), ExplosionRadius, ExplosionDamage, this, InstigatorController, ExplosionNoiseRadius);
 	SetLifeSpan(0.2f);
 }
 
@@ -214,8 +214,72 @@ void AHitmenBreakableWall::OnRep_Broken()
 {
 	if (bBroken)
 	{
+		PlayBreakEffects();
 		Mesh->SetVisibility(false);
 		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Juice_OnBroken();
+	}
+}
+
+void AHitmenBreakableWall::PlayBreakEffects()
+{
+	if (bPlayedBreakEffects || GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	bPlayedBreakEffects = true;
+	const FBox Bounds = Mesh->Bounds.GetBox();
+	const FVector Center = Bounds.GetCenter();
+	const FVector Extent = Bounds.GetExtent();
+	// Dust and debris over the wall's face, scaled to its size; the crumbling sound.
+	if (BreakFX)
+	{
+		const float Size = FMath::Clamp(FMath::Max(Extent.X, Extent.Y) / 150.f, 0.5f, 3.f) * BreakFXScale;
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, BreakFX, Center, GetActorRotation(), FVector(Size));
+	}
+	if (BreakSound)
+	{
+		UHitmenSoundLibrary::PlaySoundInSpace(this, BreakSound, Center, EHitmenSoundSpace::Gunshot, 1.f, FMath::FRandRange(0.9f, 1.05f));
+	}
+	else
+	{
+		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::WallBreak, Center);
+	}
+	// Chunks of the wall thrown out (cosmetic, local physics, no collision with pawns), gone after a while.
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	UMaterialInterface* WallMaterial = Mesh->GetMaterial(0);
+	for (int32 Index = 0; Index < DebrisCount && Cube; ++Index)
+	{
+		const FVector Spot = Center + FVector(FMath::FRandRange(-Extent.X, Extent.X), FMath::FRandRange(-Extent.Y, Extent.Y), FMath::FRandRange(-Extent.Z, Extent.Z) * 0.8f);
+		UStaticMeshComponent* Chunk = NewObject<UStaticMeshComponent>(this);
+		Chunk->SetStaticMesh(Cube);
+		if (WallMaterial)
+		{
+			Chunk->SetMaterial(0, WallMaterial);
+		}
+		Chunk->SetUsingAbsoluteLocation(true);
+		Chunk->SetUsingAbsoluteRotation(true);
+		Chunk->SetUsingAbsoluteScale(true);
+		Chunk->SetupAttachment(Mesh);
+		Chunk->RegisterComponent();
+		Chunk->SetWorldLocationAndRotation(Spot, FRotator(FMath::FRandRange(0.f, 360.f), FMath::FRandRange(0.f, 360.f), 0.f));
+		Chunk->SetWorldScale3D(FVector(FMath::FRandRange(0.12f, 0.32f)));
+		Chunk->SetCollisionProfileName(TEXT("PhysicsActor"));
+		Chunk->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		Chunk->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+		Chunk->SetCastShadow(true);
+		Chunk->SetVisibility(true);
+		Chunk->SetSimulatePhysics(true);
+		const FVector Out = (Spot - Center).GetSafeNormal() + FVector(0.f, 0.f, 0.6f);
+		Chunk->AddImpulse(Out.GetSafeNormal() * FMath::FRandRange(250.f, 650.f), NAME_None, true);
+		TWeakObjectPtr<UStaticMeshComponent> WeakChunk(Chunk);
+		FTimerHandle Handle;
+		GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [WeakChunk]()
+		{
+			if (WeakChunk.IsValid())
+			{
+				WeakChunk->DestroyComponent();
+			}
+		}), FMath::Max(0.5f, DebrisLifetime + FMath::FRandRange(-0.5f, 0.5f)), false);
 	}
 }

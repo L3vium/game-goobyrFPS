@@ -1,6 +1,7 @@
 // Hitmen — security fixtures
 
 #include "World/Interactables/HitmenSecurity.h"
+#include "Core/HitmenText.h"
 #include "Engine/DamageEvents.h"
 #include "Components/TextRenderComponent.h"
 #include "Core/HitmenGameSettings.h"
@@ -81,6 +82,12 @@ void AHitmenSecurityCamera::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(AHitmenSecurityCamera, bSeeingIntruder);
 	DOREPLIFETIME(AHitmenSecurityCamera, DetectionProgress);
 	DOREPLIFETIME(AHitmenSecurityCamera, bBroken);
+	DOREPLIFETIME(AHitmenSecurityCamera, SeenIntruder);
+}
+
+USceneComponent* AHitmenSecurityCamera::GetFeedView() const
+{
+	return Capture;
 }
 
 void AHitmenSecurityCamera::BeginPlay()
@@ -190,8 +197,13 @@ void AHitmenSecurityCamera::UpdateFootprint()
 
 FLinearColor AHitmenSecurityCamera::GetStateColor() const
 {
-	// One colour only (yellow): the zone stays yellow whatever happens; the meter fills inside it.
-	return SuspiciousColor;
+	// White while nobody is in view, red as soon as it sees someone (the meter fills inside it), AlertColor once the
+	// alarm is raised and it still sees them.
+	if (!bSeeingIntruder)
+	{
+		return IdleColor;
+	}
+	return DetectionProgress >= 255 ? AlertColor : DetectingColor;
 }
 
 void AHitmenSecurityCamera::Tick(float DeltaSeconds)
@@ -201,8 +213,9 @@ void AHitmenSecurityCamera::Tick(float DeltaSeconds)
 	{
 		return;
 	}
-	// Sweep (deterministic on every machine from time).
-	if (SweepAngle > 0.f)
+	// Sweep (deterministic on every machine from time). Seeing someone stops it where it looks (no tracking); it goes on
+	// once they leave the cone.
+	if (SweepAngle > 0.f && !(bFreezeSweepWhileSeeing && bSeeingIntruder))
 	{
 		SweepTime += DeltaSeconds * SweepSpeed;
 		const float Yaw = FMath::Sin(SweepTime) * SweepAngle * 0.5f;
@@ -216,6 +229,7 @@ void AHitmenSecurityCamera::Tick(float DeltaSeconds)
 
 	APawn* Intruder = FindIntruder();
 	const bool bSeeing = Intruder != nullptr;
+	SeenIntruder = Intruder;
 	if (bSeeing != bSeeingIntruder)
 	{
 		bSeeingIntruder = bSeeing;
@@ -304,6 +318,7 @@ void AHitmenSecurityCamera::SetCameraDisabled(bool bInDisabled)
 	{
 		bDisabled = bInDisabled;
 		bSeeingIntruder = false;
+		SeenIntruder = nullptr;
 		DetectionProgress = 0;
 		SeenTime = 0.f;
 		OnRep_Visuals();
@@ -365,7 +380,7 @@ AHitmenSecurityMonitor::AHitmenSecurityMonitor()
 	SetRootComponent(Screen);
 	NoSignalText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("NoSignalText"));
 	NoSignalText->SetupAttachment(Screen);
-	NoSignalText->SetText(NSLOCTEXT("Hitmen", "NoSignal", "NO SIGNAL"));
+	NoSignalText->SetText(HITMEN_TEXT("Hitmen.NoSignal", "NO SIGNAL"));
 	NoSignalText->SetHorizontalAlignment(EHTA_Center);
 	NoSignalText->SetVerticalAlignment(EVRTA_TextCenter);
 	NoSignalText->SetTextRenderColor(FColor(230, 230, 230));
@@ -437,7 +452,7 @@ void AHitmenSecurityMonitor::Refresh()
 
 AHitmenControlConsole::AHitmenControlConsole()
 {
-	InteractionText = NSLOCTEXT("Hitmen", "DisableCameras", "Disable cameras");
+	InteractionText = HITMEN_TEXT("Hitmen.DisableCameras", "Disable cameras");
 	Screen = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Screen"));
 	Screen->SetupAttachment(Root);
 	// Above the back of the desk, facing the operator (+X), parallel to the desk front.
@@ -514,7 +529,7 @@ void AHitmenControlConsole::RefreshScreen()
 
 FText AHitmenControlConsole::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return bCamerasDisabled ? NSLOCTEXT("Hitmen", "EnableCameras", "Enable cameras") : InteractionText;
+	return bCamerasDisabled ? HITMEN_TEXT("Hitmen.EnableCameras", "Enable cameras") : InteractionText;
 }
 
 void AHitmenControlConsole::OnInteracted(AActor* Interactor)
@@ -573,7 +588,7 @@ AHitmenTurret::AHitmenTurret()
 
 FText AHitmenTurret::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return NSLOCTEXT("Hitmen", "HackTurret", "Hack turret");
+	return HITMEN_TEXT("Hitmen.HackTurret", "Hack turret");
 }
 
 void AHitmenTurret::UpdateLaser()
@@ -599,11 +614,51 @@ void AHitmenTurret::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AHitmenTurret, TeamId);
 	DOREPLIFETIME(AHitmenTurret, bHacked);
 	DOREPLIFETIME(AHitmenTurret, CurrentTarget);
+	DOREPLIFETIME(AHitmenTurret, bBroken);
+}
+
+float AHitmenTurret::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	const float Taken = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	if (!HasAuthority() || bBroken || DamageAmount <= 0.f)
+	{
+		return Taken;
+	}
+	TurretDamageTaken += DamageAmount;
+	if (TurretDamageTaken >= TurretHealth)
+	{
+		// Shot to pieces like a camera: sparks, the gun droops, it never fires again; the crash draws a guard.
+		bBroken = true;
+		CurrentTarget = nullptr;
+		OnRep_Broken();
+		UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), 1000.f, EventInstigator ? EventInstigator->GetPawn() : nullptr, EHitmenNoiseType::Impact);
+	}
+	return DamageAmount;
+}
+
+void AHitmenTurret::OnRep_Broken()
+{
+	if (!bBroken)
+	{
+		return;
+	}
+	Laser->SetVisibility(false);
+	Head->SetRelativeRotation(Head->GetRelativeRotation() + FRotator(-35.f, 0.f, 18.f));
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		if (BrokenFX)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, BrokenFX, Head->GetComponentLocation(), FRotator::ZeroRotator, FVector(0.6f));
+		}
+		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::BreakerSwitch, Head->GetComponentLocation());
+	}
+	SetActorTickEnabled(false);
+	Juice_OnBroken();
 }
 
 void AHitmenTurret::Hack(AActor* Hacker)
 {
-	if (!HasAuthority() || bHacked)
+	if (!HasAuthority() || bHacked || bBroken)
 	{
 		return;
 	}
@@ -660,6 +715,10 @@ AActor* AHitmenTurret::FindTarget() const
 void AHitmenTurret::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (bBroken)
+	{
+		return;
+	}
 	if (CurrentTarget)
 	{
 		const FRotator Desired = (CurrentTarget->GetActorLocation() - Head->GetComponentLocation()).Rotation();
@@ -713,7 +772,8 @@ void AHitmenTurret::Tick(float DeltaSeconds)
 		AController* InstigatorController = HackedBy ? HackedBy->GetInstigatorController() : nullptr;
 		UGameplayStatics::ApplyPointDamage(Hit.GetActor(), Damage, Direction, Hit, InstigatorController, this, UDamageType::StaticClass());
 	}
-	UHitmenAISubsystem::ReportNoise(this, Start, 900.f, this, EHitmenNoiseType::Gunshot);
+	// Heard around the turret, but guards go where its bullets land.
+	UHitmenAISubsystem::ReportNoiseHeardAt(this, Start, Impact, 900.f, this, EHitmenNoiseType::Gunshot);
 	Multicast_Fire(Impact);
 }
 
@@ -751,7 +811,7 @@ AHitmenHackPanel::AHitmenHackPanel()
 {
 	// Fixtures are never vaulted, climbed or hung from.
 	Tags.AddUnique(HitmenTags::NoTraversal);
-	InteractionText = NSLOCTEXT("Hitmen", "HackTurret", "Hack turret");
+	InteractionText = HITMEN_TEXT("Hitmen.HackTurret", "Hack turret");
 }
 
 bool AHitmenHackPanel::CanInteract_Implementation(AActor* Interactor) const
@@ -863,31 +923,31 @@ bool AHitmenBlackoutVolume::IsLocationDark(const FVector& Location) const
 
 FText AHitmenLightFixture::GetInteractionInfo_Implementation(AActor* Interactor) const
 {
-	return bPowered ? NSLOCTEXT("Hitmen", "LightOn", "Light  -  On") : NSLOCTEXT("Hitmen", "LightOff", "Light  -  Off");
+	return bPowered ? HITMEN_TEXT("Hitmen.LightOn", "Light  -  On") : HITMEN_TEXT("Hitmen.LightOff", "Light  -  Off");
 }
 
 AHitmenLightSwitch::AHitmenLightSwitch()
 {
-	DisplayName = NSLOCTEXT("Hitmen", "LightSwitch", "Light switch");
-	InteractionText = NSLOCTEXT("Hitmen", "SwitchOff", "Switch off");
+	DisplayName = HITMEN_TEXT("Hitmen.LightSwitch", "Light switch");
+	InteractionText = HITMEN_TEXT("Hitmen.SwitchOff", "Switch off");
 }
 
 FText AHitmenLightSwitch::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return bPowered ? InteractionText : NSLOCTEXT("Hitmen", "SwitchOn", "Switch on");
+	return bPowered ? InteractionText : HITMEN_TEXT("Hitmen.SwitchOn", "Switch on");
 }
 
 FText AHitmenLightSwitch::GetInteractionInfo_Implementation(AActor* Interactor) const
 {
-	return FText::Format(NSLOCTEXT("Hitmen", "LightSwitchInfo", "{0}  -  {1}"), DisplayName,
-		bPowered ? NSLOCTEXT("Hitmen", "On", "On") : NSLOCTEXT("Hitmen", "Off", "Off"));
+	return FText::Format(HITMEN_TEXT("Hitmen.LightSwitchInfo", "{0}  -  {1}"), DisplayName,
+		bPowered ? HITMEN_TEXT("Hitmen.On", "On") : HITMEN_TEXT("Hitmen.Off", "Off"));
 }
 
 AHitmenCircuitBreaker::AHitmenCircuitBreaker()
 {
 	// Fixtures are never vaulted, climbed or hung from.
 	Tags.AddUnique(HitmenTags::NoTraversal);
-	InteractionText = NSLOCTEXT("Hitmen", "CutPower", "Cut the power");
+	InteractionText = HITMEN_TEXT("Hitmen.CutPower", "Cut the power");
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	Lever = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Lever"));
@@ -919,7 +979,7 @@ void AHitmenCircuitBreaker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 
 FText AHitmenCircuitBreaker::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return bPowered ? InteractionText : NSLOCTEXT("Hitmen", "RestorePower", "Restore power");
+	return bPowered ? InteractionText : HITMEN_TEXT("Hitmen.RestorePower", "Restore power");
 }
 
 void AHitmenCircuitBreaker::OnInteracted(AActor* Interactor)

@@ -111,6 +111,13 @@ public:
 	/** Graded, occluded, only the N nearest NPCs that can hear react (MaxNoiseResponders, per type). */
 	static void ReportNoise(const UObject* WorldContext, const FVector& Location, float Radius, AActor* Instigator, EHitmenNoiseType Type);
 
+	/** A noise made at Location (who hears it, through how many walls) that draws listeners to HeardAt instead: a
+	 *  gunshot report sends guards to where the bullet landed, never to the shooter. */
+	static void ReportNoiseHeardAt(const UObject* WorldContext, const FVector& Location, const FVector& HeardAt, float Radius, AActor* Instigator, EHitmenNoiseType Type);
+
+	/** A pawn moved far at once (teleporter, blink, swap): NPCs hunting it that cannot see where it went lose it. */
+	static void NotifyTeleport(APawn* Pawn, const FVector& From, const FVector& To);
+
 	/** NPCs near the victim that really see the killer go straight to combat; those that only see the
 	 *  victim investigate the body. Uses the same sight test as the AI controller. */
 	static void ReportKill(const UObject* WorldContext, AHitmenCharacterBase* Victim, AActor* Killer);

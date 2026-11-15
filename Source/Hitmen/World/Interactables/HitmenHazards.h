@@ -106,6 +106,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barrel", meta=(ClampMin="0"))
 	float ExplosionDamage = 150.f;
 
+	/** How far NPCs hear the blast (explosions are loud: they come to look where it blew up). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barrel", meta=(ClampMin="0", Units="cm"))
+	float ExplosionNoiseRadius = 4000.f;
+
 	/** Delay when set off by another explosion (chain reactions). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Barrel", meta=(ClampMin="0"))
 	float ChainDelay = 0.25f;
@@ -158,4 +162,26 @@ protected:
 	/** Juice: spawn debris / geometry collection here. */
 	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
 	void Juice_OnBroken();
+
+	/** Dust and debris where the wall gives way (scaled to the wall), and the break sound (EHitmenSound::WallBreak
+	 *  when empty). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Breakable|Juice")
+	TObjectPtr<class UNiagaraSystem> BreakFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Breakable|Juice", meta=(ClampMin="0.01"))
+	float BreakFXScale = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Breakable|Juice")
+	TObjectPtr<class USoundBase> BreakSound;
+
+	/** Chunks thrown out of the wall (physics cubes with the wall's material, gone after DebrisLifetime). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Breakable|Juice", meta=(ClampMin="0", ClampMax="40"))
+	int32 DebrisCount = 10;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Breakable|Juice", meta=(ClampMin="0", Units="s"))
+	float DebrisLifetime = 6.f;
+
+	/** Effects on this machine (server and clients, once). */
+	void PlayBreakEffects();
+	bool bPlayedBreakEffects = false;
 };

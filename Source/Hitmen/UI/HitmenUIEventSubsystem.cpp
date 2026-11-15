@@ -1,6 +1,7 @@
 // Hitmen — UI event hub
 
 #include "UI/HitmenUIEventSubsystem.h"
+#include "UI/HitmenUIFactory.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/LocalPlayer.h"
@@ -34,8 +35,9 @@ FString UHitmenUIEventSubsystem::GetKeyLabel(EHitmenKeyLabel Label) const
 	{
 		return KeyLabels[Index];
 	}
-	// Default layout (AZERTY) until the controller pushes the real bindings.
-	static const TCHAR* const Defaults[] = { TEXT("F"), TEXT("SPACE"), TEXT("E"), TEXT("A"), TEXT("TAB"), TEXT("ENTER") };
+	// Default layout until the controller pushes the real bindings (A / Q follow the keyboard layout).
+	const bool bAzerty = HitmenUI::IsAzertyLayout();
+	const TCHAR* const Defaults[] = { TEXT("F"), TEXT("SPACE"), TEXT("E"), bAzerty ? TEXT("A") : TEXT("Q"), TEXT("TAB"), TEXT("ENTER"), TEXT("SHIFT") };
 	return Index >= 0 && Index < UE_ARRAY_COUNT(Defaults) ? FString(Defaults[Index]) : FString();
 }
 

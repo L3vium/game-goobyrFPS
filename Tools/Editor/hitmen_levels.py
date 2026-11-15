@@ -614,7 +614,7 @@ def build_gym():
     # =========================== B. ARMOURY (centre-south) ===========================
     G = "Gym/Armoury"
     zone_title(0, -3000, "ARMOURY")
-    weapons = ["Pistol", "SMG", "AssaultRifle", "Shotgun", "Minigun", "Sniper", "Bow", "RocketLauncher", "GrenadeLauncher", "BlackHole", "Sword"]
+    weapons = ["Pistol", "SMG", "AssaultRifle", "Shotgun", "Minigun", "Sniper", "Bow", "RocketLauncher", "GrenadeLauncher", "BlackHole", "Sword", "Goobyr"]
     for i, name in enumerate(weapons):
         x = -1000 + (i % 6) * 400
         y = -2600 if i < 6 else -2100
@@ -899,11 +899,12 @@ def light_switch(x, y, z, yaw, lamps, folder):
 
 def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", windows=True, gutter=True, roof_access=True,
              z0=0.0, ledges=True, shadow_lamp=False, blind_faces=(), gutter_side="W", vents=(), switch=True, floor_material=None,
-             ground_blind=()):
+             ground_blind=(), vent_duct_out=200.0):
     """Hollow building standing at z0: a door, vaultable windows (BP_Window, some left open) on every facade and floor,
     floors, a switchback stair and a gutter (gutter_side). ledges: from the first floor, a walkable ledge (LEDGE_DEPTH)
     all around just under the room floor: out of a window onto it, along it to the next window, crouched under the
-    sills. vents: (face, t, floor) crawl hatches at floor level. switch: a light switch by the door for every lamp.
+    sills. vents: (face, t, floor) crawl hatches at floor level, each behind a crawl duct vent_duct_out long outside the
+    wall with a hatch at its end (0: the wall hatch only). switch: a light switch by the door for every lamp.
     ground_blind: faces with no ground-floor windows (they would open onto a stair or a wall).
     Two lamps per floor (shadow_lamp: the first one casts shadows)."""
     x0, x1, y0, y1 = cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2
@@ -982,6 +983,12 @@ def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", 
         vz = z0 + vfloor * floor_h
         spot = {"S": (x0 + w * vt, y0, True), "N": (x0 + w * vt, y1, True), "W": (x0, y0 + d * vt, False), "E": (x1, y0 + d * vt, False)}[vface]
         vent_hatch(spot[0], spot[1], vz, spot[2], folder)
+        if vent_duct_out > 0:
+            nx, ny = {"S": (0, -1), "N": (0, 1), "W": (-1, 0), "E": (1, 0)}[vface]
+            a = (spot[0] + nx * 12.5, spot[1] + ny * 12.5)
+            b = (spot[0] + nx * (12.5 + vent_duct_out), spot[1] + ny * (12.5 + vent_duct_out))
+            vent_duct(a, b, vz, folder + "/Vent")
+            vent_hatch(b[0], b[1], vz, spot[2], folder + "/Vent")
     if windows:
         win_actor = bp("World/Interactables/Window/BP_Window")
         for f in range(floors):

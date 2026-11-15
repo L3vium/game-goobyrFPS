@@ -1,6 +1,7 @@
 // Hitmen — NPC
 
 #include "Characters/HitmenNPC.h"
+#include "Core/HitmenText.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -41,7 +42,9 @@ AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	AIControllerClass = AHitmenAIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 	bUseControllerRotationYaw = false;
-	GetCharacterMovement()->bOrientRotationToMovement = true;
+	// The body always turns toward the controller's rotation; the AI controller faces where the NPC walks unless it
+	// looks at something within its strafe angle (UpdateControlRotation), so it never walks backward.
+	GetCharacterMovement()->bOrientRotationToMovement = false;
 	GetCharacterMovement()->bUseControllerDesiredRotation = true;
 	// Path following drives acceleration (not just velocity): the locomotion graph walks / runs.
 	GetCharacterMovement()->GetNavMovementProperties()->bUseAccelerationForPaths = true;
@@ -54,7 +57,7 @@ AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	KeycardMesh->SetupAttachment(GetMesh(), KeycardBone);
 	KeycardMesh->SetRelativeScale3D(FVector(0.055f, 0.01f, 0.09f));
 	BodyCarryComponent = CreateDefaultSubobject<UHitmenBodyCarryComponent>(TEXT("BodyCarryComponent"));
-	DisplayName = NSLOCTEXT("Hitmen", "NPCGuard", "Guard");
+	DisplayName = HITMEN_TEXT("Hitmen.NPCGuard", "Guard");
 	KeycardMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	KeycardMesh->SetVisibility(false);
 	AimLaser = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AimLaser"));
@@ -97,6 +100,7 @@ void AHitmenNPC::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHitmenNPC, Weapon);
 	DOREPLIFETIME(AHitmenNPC, CarriedKeycard);
+	DOREPLIFETIME(AHitmenNPC, bSniperAiming);
 }
 
 void AHitmenNPC::OnRep_CarriedKeycard()
@@ -158,17 +162,24 @@ void AHitmenNPC::Tick(float DeltaSeconds)
 		bWasOnEdge = AlertComponent->IsOnEdge();
 		RefreshWalkSpeed();
 	}
+	// Snipers aim only at a target they see: the server decides, every machine shows it.
+	const AActor* Target = AlertComponent ? AlertComponent->GetTarget() : nullptr;
+	if (bIsSniper && HasAuthority())
+	{
+		bSniperAiming = Target && !IsDead() && Weapon && AlertComponent->GetAlertState() == EHitmenAlertState::Combat && AlertComponent->IsTargetVisible();
+	}
 	// Snipers: a thin red line from the weapon to the target while aiming (every machine).
 	if (!bIsSniper || GetNetMode() == NM_DedicatedServer)
 	{
 		return;
 	}
-	const AActor* Target = AlertComponent ? AlertComponent->GetTarget() : nullptr;
-	const bool bAiming = Target && !IsDead() && AlertComponent->GetAlertState() == EHitmenAlertState::Combat && Weapon;
+	const bool bAiming = bSniperAiming && Target && !IsDead() && Weapon;
 	AimLaser->SetVisibility(bAiming);
-	// The glint: where a sniper is, always (brighter and faster while it aims), never once it is dead or asleep.
+	// The glint: the red star at the scope, only while it aims at you by default (bGlintOnlyWhileAiming), never once it
+	// is dead or asleep.
 	const APlayerCameraManager* ViewCamera = UGameplayStatics::GetPlayerCameraManager(this, 0);
-	const bool bGlint = GlintInstance && Weapon && !IsDead() && !GetStatusEffects()->HasStatus(EHitmenStatusEffect::Asleep);
+	const bool bGlint = GlintInstance && Weapon && !IsDead() && !GetStatusEffects()->HasStatus(EHitmenStatusEffect::Asleep)
+		&& (bAiming || !bGlintOnlyWhileAiming);
 	ScopeGlint->SetVisibility(bGlint);
 	if (bGlint)
 	{
@@ -238,14 +249,15 @@ FText AHitmenNPC::GetInteractionInfo_Implementation(AActor* Interactor) const
 	{
 		return FText::GetEmpty();
 	}
-	FText Info = DisplayName;
+	// VIP candidates: the one picked is the target; the others became guards at match start.
+	FText Info = IsVIP() ? HITMEN_TEXT("Hitmen.NPCTarget", "Target") : (bVIPCandidate ? HITMEN_TEXT("Hitmen.NPCGuard", "Guard") : UHitmenTextSubsystem::Translate(DisplayName));
 	if (Weapon && Weapon->GetWeaponData())
 	{
-		Info = FText::Format(NSLOCTEXT("Hitmen", "NPCInfoWeapon", "{0}  -  {1}"), Info, Weapon->GetWeaponData()->DisplayName);
+		Info = FText::Format(HITMEN_TEXT("Hitmen.NPCInfoWeapon", "{0}  -  {1}"), Info, UHitmenTextSubsystem::Translate(Weapon->GetWeaponData()->DisplayName));
 	}
 	if (CarriedKeycard >= 0)
 	{
-		Info = FText::Format(NSLOCTEXT("Hitmen", "NPCInfoKeycard", "{0}  -  Keycard {1}"), Info, FText::AsNumber(CarriedKeycard));
+		Info = FText::Format(HITMEN_TEXT("Hitmen.NPCInfoKeycard", "{0}  -  Keycard {1}"), Info, FText::AsNumber(CarriedKeycard));
 	}
 	return Info;
 }
@@ -263,7 +275,7 @@ FText AHitmenNPC::GetInteractionText_Implementation(AActor* Interactor) const
 {
 	if (CanBePickpocketedBy(Interactor))
 	{
-		return FText::Format(NSLOCTEXT("Hitmen", "Pickpocket", "Pickpocket keycard {0}"), FText::AsNumber(CarriedKeycard));
+		return FText::Format(HITMEN_TEXT("Hitmen.Pickpocket", "Pickpocket keycard {0}"), FText::AsNumber(CarriedKeycard));
 	}
 	return Super::GetInteractionText_Implementation(Interactor);
 }
@@ -418,10 +430,10 @@ void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAler
 	}
 	if (UHitmenCharacterMovementComponent* Movement = GetHitmenMovement())
 	{
-		// Fighting: face the target (controller focus), strafing while moving; otherwise face where it walks.
-		// Orient-to-movement wins over the controller rotation in the movement code, so it must be off.
+		// The body follows the controller's rotation in every state (the controller faces the way it walks, or its focus
+		// within the strafe angle); fighting turns faster.
 		const bool bFighting = NewState == EHitmenAlertState::Combat;
-		Movement->bOrientRotationToMovement = !bFighting;
+		Movement->bOrientRotationToMovement = false;
 		Movement->bUseControllerDesiredRotation = true;
 		if (bFighting)
 		{
@@ -588,7 +600,37 @@ int32 AHitmenNPC::GetHitmenTeamId_Implementation() const
 	{
 		return UHitmenTeamLibrary::GetTeamId(StatusEffectComponent->GetStatusInstigator(EHitmenStatusEffect::Charmed));
 	}
-	return HitmenTeams::NPC;
+	// Guests are nobody's enemy (off in every map: the whole map is a hostile area).
+	return bGuest ? HitmenTeams::Neutral : HitmenTeams::NPC;
+}
+
+void AHitmenNPC::BecomeGuard()
+{
+	if (!HasAuthority() || IsVIP())
+	{
+		return;
+	}
+	UHitmenWeaponData* GuardWeapon = CandidateGuardWeapon ? CandidateGuardWeapon.Get() : DefaultWeapon.Get();
+	if (!GuardWeapon || !GuardWeapon->WeaponClass || (Weapon && Weapon->GetWeaponData() == GuardWeapon))
+	{
+		return;
+	}
+	if (Weapon)
+	{
+		Weapon->Destroy();
+		Weapon = nullptr;
+	}
+	DefaultWeapon = GuardWeapon;
+	FActorSpawnParameters Params;
+	Params.Owner = this;
+	Params.Instigator = this;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Weapon = GetWorld()->SpawnActor<AHitmenWeaponBase>(GuardWeapon->WeaponClass, GetActorTransform(), Params);
+	if (Weapon)
+	{
+		Weapon->InitWeapon(GuardWeapon, this);
+		Weapon->SetEquipped(true);
+	}
 }
 
 bool AHitmenNPC::CanBeTakenDownBy(const AActor* Attacker) const

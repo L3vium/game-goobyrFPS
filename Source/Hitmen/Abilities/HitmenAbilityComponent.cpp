@@ -1,6 +1,8 @@
 // Hitmen — ability component
 
 #include "Abilities/HitmenAbilityComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
 #include "Abilities/Manipulation/HitmenManipulationAbilities.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Abilities/HitmenAbility.h"
@@ -192,6 +194,7 @@ void UHitmenAbilityComponent::PressSlot(EHitmenAbilitySlot Slot)
 	{
 		return;
 	}
+	bIgnoreNextRelease[Slot == EHitmenAbilitySlot::Manipulation ? 1 : 0] = false;
 	FVector Origin, Direction;
 	GetAim(Origin, Direction);
 	if (Ability->CanActivate() && !GetOwner()->HasAuthority())
@@ -201,11 +204,46 @@ void UHitmenAbilityComponent::PressSlot(EHitmenAbilitySlot Slot)
 	Server_Press(Slot, Origin, Direction);
 }
 
+bool UHitmenAbilityComponent::IsAimingSlot(EHitmenAbilitySlot Slot) const
+{
+	const UHitmenAbility* Ability = GetAbility(Slot);
+	return Ability && Ability->IsAiming();
+}
+
+void UHitmenAbilityComponent::ConfirmAim(EHitmenAbilitySlot Slot)
+{
+	if (!IsAimingSlot(Slot))
+	{
+		return;
+	}
+	ReleaseSlot(Slot);
+	bIgnoreNextRelease[Slot == EHitmenAbilitySlot::Manipulation ? 1 : 0] = true;
+}
+
+void UHitmenAbilityComponent::CancelAim(EHitmenAbilitySlot Slot)
+{
+	UHitmenAbility* Ability = GetAbility(Slot);
+	if (!Ability || !Ability->IsAiming())
+	{
+		return;
+	}
+	// Nothing is sent: aimed abilities only act on release, so dropping the aim spends nothing.
+	Ability->LocalCancel();
+	bIgnoreNextRelease[Slot == EHitmenAbilitySlot::Manipulation ? 1 : 0] = true;
+}
+
 void UHitmenAbilityComponent::ReleaseSlot(EHitmenAbilitySlot Slot)
 {
 	UHitmenAbility* Ability = GetAbility(Slot);
 	if (!Ability)
 	{
+		return;
+	}
+	// Already confirmed (left click) or cancelled (right click, F, Esc) while the key was held.
+	bool& bIgnore = bIgnoreNextRelease[Slot == EHitmenAbilitySlot::Manipulation ? 1 : 0];
+	if (bIgnore)
+	{
+		bIgnore = false;
 		return;
 	}
 	FVector Origin, Direction;
@@ -368,13 +406,58 @@ void UHitmenAbilityComponent::UpdateAbilityVisuals()
 	{
 		AimMarkerComponent = MakeVisual(AimMarkerMesh, AimMarkerMaterial, AimMarkerColor);
 	}
+	// An ability may mark its spot with an effect (the blink's ground ring) instead of the sphere, and an arrow when
+	// the landing is on top of what you aim at.
+	const UHitmenAbility* MarkerAbility = MoveAbility.Get();
+	float MarkerFXScale = 1.f;
+	UNiagaraSystem* MarkerFX = bMarker && MarkerAbility ? MarkerAbility->GetAimMarkerFX(MarkerFXScale) : nullptr;
+	if (MarkerFX && (!AimMarkerFXComponent || AimMarkerFXComponent->GetAsset() != MarkerFX))
+	{
+		if (AimMarkerFXComponent)
+		{
+			AimMarkerFXComponent->DestroyComponent();
+		}
+		AimMarkerFXComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), MarkerFX, MarkerPoint, FRotator::ZeroRotator, FVector(MarkerFXScale), false);
+	}
+	if (AimMarkerFXComponent)
+	{
+		if (MarkerFX)
+		{
+			AimMarkerFXComponent->SetWorldLocation(MarkerPoint + FVector(0.f, 0.f, 2.f));
+			AimMarkerFXComponent->SetWorldScale3D(FVector(MarkerFXScale));
+			if (!AimMarkerFXComponent->IsActive())
+			{
+				AimMarkerFXComponent->Activate(true);
+			}
+		}
+		else if (AimMarkerFXComponent->IsActive())
+		{
+			AimMarkerFXComponent->Deactivate();
+		}
+	}
 	if (AimMarkerComponent)
 	{
-		AimMarkerComponent->SetVisibility(bMarker);
+		AimMarkerComponent->SetVisibility(bMarker && !MarkerFX);
 		if (bMarker)
 		{
 			AimMarkerComponent->SetWorldLocation(MarkerPoint);
 			AimMarkerComponent->SetWorldScale3D(FVector(AimMarkerSize / 100.f));
+		}
+	}
+	const bool bArrow = bMarker && MarkerAbility && MarkerAbility->IsAimMarkerLedgeUp();
+	if (bArrow && !AimArrowComponent)
+	{
+		AimArrowComponent = MakeVisual(AimArrowMesh ? AimArrowMesh.Get() : LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone")), AimMarkerMaterial, AimArrowColor);
+	}
+	if (AimArrowComponent)
+	{
+		AimArrowComponent->SetVisibility(bArrow);
+		if (bArrow)
+		{
+			// An upward arrow bobbing over the landing: up onto the top.
+			const float Bob = FMath::Sin(GetWorld()->GetTimeSeconds() * 6.f) * 6.f;
+			AimArrowComponent->SetWorldLocationAndRotation(MarkerPoint + FVector(0.f, 0.f, 70.f + Bob), FRotator::ZeroRotator);
+			AimArrowComponent->SetWorldScale3D(FVector(0.28f, 0.28f, 0.38f));
 		}
 	}
 }

@@ -134,8 +134,8 @@ protected:
 };
 
 /**
- * Bottom bar: [weapon 1][weapon 2] | [A ability][E ability]. Weapon cards show a name and the
- * ammo in dimmed italics; switching weapons slides the cards. Keycards sit above as chips.
+ * Bottom bar: [held weapon][other weapon] | [A ability][E ability]. Weapon cards show a name and the ammo; switching
+ * weapons makes the two cards trade places. Ability cards show the key that triggers them.
  */
 /**
  * Vehicles and the bottom-right stack: the vehicle's health bar at the top, its reload ring around the crosshair,
@@ -187,6 +187,15 @@ protected:
 	UPROPERTY(Transient) FHitmenHUDAbilityView MoveAbility;
 	UPROPERTY(Transient) FHitmenHUDAbilityView ManipulationAbility;
 	int32 ActiveSlot = 0;
+
+	/** The held weapon is always the left card: switching makes the two cards trade places (0 = just switched, 1 =
+	 *  settled). */
+	float SwapAlpha = 1.f;
+	int32 LastActiveSlot = -1;
+
+	/** Seconds the two weapon cards take to trade places. */
+	UPROPERTY(EditAnywhere, Category="Hitmen|HUD", meta=(ClampMin="0.01", Units="s"))
+	float SwapTime = 0.12f;
 };
 
 /** Match intro: "dropping in" and the map name while players parachute in. */

@@ -1,6 +1,8 @@
 // Hitmen — manipulation abilities
 
 #include "Abilities/Manipulation/HitmenManipulationAbilities.h"
+#include "Core/HitmenText.h"
+#include "World/Interactables/HitmenStealth.h"
 #include "Core/HitmenTeamLibrary.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "EngineUtils.h"
@@ -75,20 +77,45 @@ UHitmenAbility_RemoteDistraction::UHitmenAbility_RemoteDistraction()
 {
 	Cooldown = 5.f;
 	Range = 3000.f;
+	// Distractions only by default (radios, TVs, alarm clocks: every AHitmenDistraction); add classes to allow more.
+	AllowedTargetClasses.Add(AHitmenDistraction::StaticClass());
+}
+
+bool UHitmenAbility_RemoteDistraction::IsAllowedTarget(const AActor* Actor) const
+{
+	if (!Actor || !Actor->GetClass()->ImplementsInterface(UHitmenRemoteActivatable::StaticClass()))
+	{
+		return false;
+	}
+	for (const TSubclassOf<AActor>& Allowed : AllowedTargetClasses)
+	{
+		if (Allowed && Actor->IsA(Allowed))
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 namespace
 {
-	/** Every actor that can be triggered at range right now (distractions, panels, consoles, breakers). */
-	TArray<AActor*> GatherRemoteTargets(const UWorld* World)
+	/** Every actor of the allowed classes that can be triggered at range right now. */
+	TArray<AActor*> GatherRemoteTargets(const UWorld* World, const UHitmenAbility_RemoteDistraction* Ability, const TArray<TSubclassOf<AActor>>& Classes)
 	{
 		TArray<AActor*> Result;
-		for (TActorIterator<AActor> It(World); It; ++It)
+		for (const TSubclassOf<AActor>& Class : Classes)
 		{
-			AActor* Actor = *It;
-			if (Actor->GetClass()->ImplementsInterface(UHitmenRemoteActivatable::StaticClass()) && IHitmenRemoteActivatable::Execute_CanRemoteActivate(Actor))
+			if (!Class)
 			{
-				Result.Add(Actor);
+				continue;
+			}
+			for (TActorIterator<AActor> It(World, Class); It; ++It)
+			{
+				AActor* Actor = *It;
+				if (Actor->GetClass()->ImplementsInterface(UHitmenRemoteActivatable::StaticClass()) && IHitmenRemoteActivatable::Execute_CanRemoteActivate(Actor))
+				{
+					Result.AddUnique(Actor);
+				}
 			}
 		}
 		return Result;
@@ -97,9 +124,9 @@ namespace
 
 AActor* UHitmenAbility_RemoteDistraction::FindHintTarget(const FVector& Origin, const FVector& Direction, FText& OutAction) const
 {
-	if (AActor* Target = PickConeTarget(Origin, Direction, GatherRemoteTargets(GetWorld()), TargetConeAngle))
+	if (AActor* Target = PickConeTarget(Origin, Direction, GatherRemoteTargets(GetWorld(), this, AllowedTargetClasses), TargetConeAngle))
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintRemoteActivate", "Activate remotely");
+		OutAction = HITMEN_TEXT("Hitmen.HintRemoteActivate", "Activate remotely");
 		return Target;
 	}
 	return nullptr;
@@ -107,8 +134,8 @@ AActor* UHitmenAbility_RemoteDistraction::FindHintTarget(const FVector& Origin, 
 
 bool UHitmenAbility_RemoteDistraction::Activate(const FVector& AimOrigin, const FVector& AimDirection)
 {
-	AActor* Target = PickConeTarget(AimOrigin, AimDirection, GatherRemoteTargets(GetWorld()), TargetConeAngle);
-	if (!Target)
+	AActor* Target = PickConeTarget(AimOrigin, AimDirection, GatherRemoteTargets(GetWorld(), this, AllowedTargetClasses), TargetConeAngle);
+	if (!Target || !IsAllowedTarget(Target))
 	{
 		return false;
 	}
@@ -132,7 +159,7 @@ AActor* UHitmenAbility_Charm::FindHintTarget(const FVector& Origin, const FVecto
 {
 	if (AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, false))
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintCharm", "Charm");
+		OutAction = HITMEN_TEXT("Hitmen.HintCharm", "Charm");
 		return Target;
 	}
 	return nullptr;
@@ -167,7 +194,7 @@ AActor* UHitmenAbility_Lighter::FindHintTarget(const FVector& Origin, const FVec
 	AHitmenCharacterBase* Body = AimCharacterInCone(Origin, Direction, true, true);
 	if (Body && !Body->IsVIP())
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintLighter", "Lighter");
+		OutAction = HITMEN_TEXT("Hitmen.HintLighter", "Lighter");
 		return Body;
 	}
 	return nullptr;
@@ -180,8 +207,9 @@ bool UHitmenAbility_Lighter::Activate(const FVector& AimOrigin, const FVector& A
 	{
 		return false;
 	}
-	// Fire on the body (ActivatedFX), then it is gone.
+	// Fire on the body (follows the ragdoll, every machine), a flare where it starts, then ash and it is gone.
 	PlayActivatedJuice(Body->GetActorLocation());
+	Body->Multicast_Burn(BurnFX, BurnFXScale, AshFX, BurnTime);
 	TWeakObjectPtr<AHitmenCharacterBase> WeakBody(Body);
 	FTimerHandle Burn;
 	GetWorld()->GetTimerManager().SetTimer(Burn, FTimerDelegate::CreateLambda([WeakBody]()
@@ -282,7 +310,7 @@ AActor* UHitmenAbility_MultiKill::FindHintTarget(const FVector& Origin, const FV
 	AHitmenCharacterBase* Target = AimCharacterInCone(Origin, Direction, false);
 	if (Target && !MarkedTargets.Contains(Target))
 	{
-		OutAction = NSLOCTEXT("Hitmen", "HintMark", "Hold to mark");
+		OutAction = HITMEN_TEXT("Hitmen.HintMark", "Hold to mark");
 		return Target;
 	}
 	return nullptr;
@@ -380,7 +408,7 @@ UHitmenAbility_PoisonVial::UHitmenAbility_PoisonVial()
 	Cooldown = 5.f;
 	MaxCharges = 2;
 	Range = 250.f;
-	RoomNotSealedText = NSLOCTEXT("Hitmen", "RoomNotSealed", "Room not sealed");
+	RoomNotSealedText = HITMEN_TEXT("Hitmen.RoomNotSealed", "Room not sealed");
 }
 
 namespace

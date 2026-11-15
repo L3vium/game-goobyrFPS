@@ -33,7 +33,13 @@ public class HitmenEditor : ModuleRules
 			"Slate",
 			// Terrain tiles (HitmenContentTools::BuildHeightfieldMesh)
 			"MeshDescription",
-			"StaticMeshDescription"
+			"StaticMeshDescription",
+			// LD tab and PCG graphs (HitmenLDTools, HitmenEditorModule)
+			"PCG",
+			"ToolMenus",
+			"PythonScriptPlugin",
+			"WorkspaceMenuStructure",
+			"InputCore"
 		});
 	}
 }

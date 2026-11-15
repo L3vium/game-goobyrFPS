@@ -90,7 +90,26 @@ enum class EHitmenAlertReason : uint8
 	/** The search found nothing: back to routine, on edge. */
 	SearchOver,
 	/** The investigation found nothing. */
-	AllClear
+	AllClear,
+	/** Shot at or saw a colleague drop without seeing who: takes cover. */
+	TakeCover,
+	/** Colleagues keep dropping around it: panics, hides crouched. */
+	Panic
+};
+
+/** Keys shown in prompts and on the HUD; they follow the player's rebinding. */
+UENUM(BlueprintType)
+enum class EHitmenKeyLabel : uint8
+{
+	Interact,
+	Jump,
+	MoveAbility,
+	Manipulation,
+	Sightroom,
+	Confirm,
+	/** Sprint (held) / dash (tap). */
+	Sprint,
+	Count UMETA(Hidden)
 };
 
 /** Colour group of an alert state (white / yellow / red). */

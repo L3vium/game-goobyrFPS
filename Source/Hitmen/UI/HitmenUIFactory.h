@@ -40,6 +40,11 @@ enum class EHitmenButtonStyle : uint8
 /** Shared palette and fonts. The team restyles by editing these or by building WBP layouts. */
 namespace HitmenUI
 {
+	/** The keyboard is AZERTY (French / Belgian layout on this machine, or Project Settings -> Hitmen -> Input). */
+	HITMEN_API bool IsAzertyLayout();
+	/** "[ZQSD] move" on AZERTY, "[WASD] move" on QWERTY. */
+	HITMEN_API FString MoveKeysLabel(const FString& Action);
+
 	HITMEN_API FLinearColor Background();
 	HITMEN_API FLinearColor Panel();
 	HITMEN_API FLinearColor PanelLight();

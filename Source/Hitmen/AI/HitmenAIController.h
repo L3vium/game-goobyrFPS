@@ -35,6 +35,8 @@ namespace HitmenBBKeys
 	extern HITMEN_API const FName DisposeBody;
 	extern HITMEN_API const FName DisposeContainer;
 	extern HITMEN_API const FName DisposeLocation;
+	/** Hiding from an unseen threat (LastKnownLocation) after being shot at or seeing colleagues drop. */
+	extern HITMEN_API const FName TakeCover;
 }
 
 UCLASS(Blueprintable)
@@ -48,6 +50,8 @@ public:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 	virtual ETeamAttitude::Type GetTeamAttitudeTowards(const AActor& Other) const override;
+	/** Never walks backward: while moving, a focus too far from the way it walks gives way to the walking direction. */
+	virtual void UpdateControlRotation(float DeltaTime, bool bUpdatePawn = true) override;
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|AI")
 	UHitmenAlertComponent* GetAlert() const { return Alert; }
@@ -61,6 +65,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|AI")
 	float GetPeripheralVisionHalfAngle() const { return PeripheralVisionHalfAngle; }
+
+	float GetFocalVisionHalfAngle() const { return FocalVisionHalfAngle; }
 
 	/** Sight radius before the difficulty (clients read it on the controller class default for the maps' cones). */
 	float GetBaseSightRadius() const { return SightRadius; }
@@ -113,6 +119,26 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0.02"))
 	float SightEvaluationInterval = 0.1f;
 
+	/** Sixth sense: a hostile this close is felt even outside the view cone (never through walls); the NPC turns to it. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", Units="cm"))
+	float SixthSenseRadius = 250.f;
+
+	/** White fill per second from the sixth sense (it never completes on its own: the NPC must turn and see). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0"))
+	float SixthSenseRate = 0.5f;
+
+	/** Sixth sense rate while the hostile crouch-walks (0 when it is crouched and still). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", ClampMax="1"))
+	float SixthSenseCrouchScale = 0.5f;
+
+	/** While walking, a focus farther than this from the walking direction is dropped for it (no moonwalk). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Movement", meta=(ClampMin="0", ClampMax="180", Units="deg"))
+	float MaxStrafeAngle = 100.f;
+
+	/** Below this speed the NPC stands: it faces its focus. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Movement", meta=(ClampMin="0", Units="cm/s"))
+	float FaceMovementMinSpeed = 60.f;
+
 	UPROPERTY(VisibleAnywhere, Category="Hitmen|AI")
 	TObjectPtr<UAISenseConfig_Sight> SightConfig;
 
@@ -126,6 +152,10 @@ protected:
 	void HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState);
 
 	void EvaluateSight();
+	/** Hostiles right next to the NPC but out of its view (sixth sense). */
+	void EvaluateSixthSense();
+	/** Debug: draws the focal and peripheral cones (console HitmenAI.Cones 1). */
+	void DrawDebugCones() const;
 	bool CanReallySee(const AActor* Actor) const;
 	bool IsAlarming(const AActor* Actor) const;
 	/** 0..1 how fast the meter fills for this actor: focal or peripheral vision, how much of the body is visible. */

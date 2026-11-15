@@ -1,6 +1,7 @@
 // Hitmen — search EQS pieces
 
 #include "AI/HitmenEQS.h"
+#include "Core/HitmenText.h"
 #include "AI/HitmenAIController.h"
 #include "AI/HitmenAISubsystem.h"
 #include "EnvironmentQuery/Items/EnvQueryItemType_Point.h"
@@ -46,7 +47,7 @@ UEnvQueryGenerator_HitmenSearchSpots::UEnvQueryGenerator_HitmenSearchSpots()
 
 FText UEnvQueryGenerator_HitmenSearchSpots::GetDescriptionTitle() const
 {
-	return NSLOCTEXT("Hitmen", "SearchSpotsGen", "Hitmen search spots around the search center");
+	return HITMEN_TEXT("Hitmen.SearchSpotsGen", "Hitmen search spots around the search center");
 }
 
 void UEnvQueryGenerator_HitmenSearchSpots::GenerateItems(FEnvQueryInstance& QueryInstance) const
@@ -107,7 +108,7 @@ UEnvQueryTest_HitmenSearchFree::UEnvQueryTest_HitmenSearchFree()
 
 FText UEnvQueryTest_HitmenSearchFree::GetDescriptionTitle() const
 {
-	return NSLOCTEXT("Hitmen", "SearchFreeTest", "Not claimed by another searching guard");
+	return HITMEN_TEXT("Hitmen.SearchFreeTest", "Not claimed by another searching guard");
 }
 
 void UEnvQueryTest_HitmenSearchFree::RunTest(FEnvQueryInstance& QueryInstance) const
@@ -133,7 +134,7 @@ UEnvQueryTest_HitmenNearHidingSpot::UEnvQueryTest_HitmenNearHidingSpot()
 
 FText UEnvQueryTest_HitmenNearHidingSpot::GetDescriptionTitle() const
 {
-	return NSLOCTEXT("Hitmen", "NearHidingTest", "In front of a hiding spot");
+	return HITMEN_TEXT("Hitmen.NearHidingTest", "In front of a hiding spot");
 }
 
 void UEnvQueryTest_HitmenNearHidingSpot::RunTest(FEnvQueryInstance& QueryInstance) const

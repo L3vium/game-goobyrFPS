@@ -162,6 +162,27 @@ public:
 	UFUNCTION(Exec)
 	void HitmenWatch();
 
+	/** Console, QA: tries a vault / climb toward the view now (the same plan Space uses). */
+	UFUNCTION(Exec)
+	void HitmenTraverse();
+
+	/** Drops an aimed ability (blink) without using it; true if one was aimed. */
+	bool CancelAbilityAim();
+
+	/** QWERTY keyboards: the AZERTY default keys move to the same places once (W A S D, Q), rebinds kept. */
+	void ApplyKeyboardLayout(class UEnhancedInputUserSettings* UserSettings);
+
+	/** Console, QA (gym / dev builds): presses or releases an input action as if its key were used: Fire, Aim, Jump,
+	 *  Crouch, Sprint, Interact, MoveAbility, Manipulation, Pause, SwitchSlot; Move takes "Move <forward> <right>". */
+	UFUNCTION(Exec)
+	void HitmenPress(const FString& Action, float X = 0.f, float Y = 0.f);
+
+	UFUNCTION(Exec)
+	void HitmenRelease(const FString& Action);
+
+	/** QA move input held between HitmenPress Move calls (applied every frame). */
+	FVector2D QAMoveInput = FVector2D::ZeroVector;
+
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Debug")
 	void Server_DebugWatch();
 
@@ -450,6 +471,22 @@ protected:
 	float SprintPressTime = -100.f;
 
 	virtual void PlayerTick(float DeltaTime) override;
+
+	/** Camera feed top left while a security camera sees you (Project Settings -> Hitmen -> HUD -> bCameraFeedWhenSeen). */
+	void UpdateSecurityFeed(float DeltaTime);
+	float SecurityFeedAccumulator = 0.f;
+	TWeakObjectPtr<AActor> SecurityFeedCamera;
+
+	/** Fly cheat: Shift multiplies the fly speed by this. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Cheats", meta=(ClampMin="1"))
+	float CheatFlyFastMultiplier = 3.f;
+	bool bFlyFastHeld = false;
+
+	/** Fly cheat speed on the server too (the movement is predicted: both sides must agree). */
+	UFUNCTION(Server, Reliable)
+	void Server_SetCheatFlyFast(bool bFast);
+	void ApplyCheatFlySpeed(bool bFast);
+
 	/** Vehicle HUD (health, reload, exit): pushed every frame while driving. */
 	void PushVehicleView();
 	bool bVehicleViewActive = false;

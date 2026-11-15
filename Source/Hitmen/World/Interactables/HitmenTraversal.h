@@ -29,6 +29,7 @@ public:
 	virtual float GetClimbOffset() const override { return StandOffDistance; }
 	virtual float GetClimbSpeed() const override { return ClimbSpeed; }
 	virtual float GetMinFacingDot() const override { return MinFacingDot; }
+	virtual bool AllowsTopEntry() const override { return bAllowTopEntry; }
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
@@ -47,6 +48,15 @@ protected:
 	/** Permissive: you can look left/right a lot and still grab it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Ladder", meta=(ClampMin="-1", ClampMax="1"))
 	float MinFacingDot = 0.15f;
+
+	/** A ladder down a shaft or a hole: stepping or dropping in from above grabs it at the top, whatever way you face,
+	 *  and you climb down. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Ladder")
+	bool bAllowTopEntry = false;
+
+	/** With top entry: how far in front of the ladder the grab reaches (the shaft's width), and as wide. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Ladder", meta=(ClampMin="60", Units="cm", EditCondition="bAllowTopEntry"))
+	float TopEntryReach = 170.f;
 };
 
 /** Which way a zipline can be ridden. */

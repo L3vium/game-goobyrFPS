@@ -928,9 +928,10 @@ def build_guard_loadouts():
 
 
 def set_gunshot_responders(rules):
-    """Three guards answer a gunshot (two for every other noise)."""
+    """Three guards answer a gunshot, four an explosion (two for every other noise)."""
     overrides = dict(rules.get_editor_property("noise_responder_overrides"))
     overrides[unreal.HitmenNoiseType.GUNSHOT] = 3
+    overrides[unreal.HitmenNoiseType.EXPLOSION] = 4
     rules.set_editor_property("noise_responder_overrides", overrides)
 SNIPER_SMOKE = (("smoke_lifetime", 2.2), ("smoke_thickness", 4.0), ("smoke_growth", 9.0), ("smoke_opacity", 0.5))
 
@@ -961,6 +962,7 @@ WEAPON_JUICE = {
     "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 15.0, 6.0),
     "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 10.0, 5.0),
     "BlackHole": ((0.95, 1.05), 1.0, 0.0, 10.0, 5.0),
+    "Goobyr": ((1.2, 1.35), 0.7, 0.0, 6.0, 4.0),
     "Bow": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
     "Sword": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
 }
@@ -1458,6 +1460,7 @@ FP_MOTION = {
     "RocketLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.3, kick_back=4.0, kick_up=6.0, kick_side=1.0, kick_stiffness=150.0),
     "GrenadeLauncher": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.28, kick_back=3.0, kick_up=4.5, kick_side=0.8, kick_stiffness=170.0),
     "BlackHole": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.28, kick_back=3.0, kick_up=4.0, kick_side=0.8, kick_stiffness=170.0),
+    "Goobyr": dict(hip_offset=(0.0, 1.0, -3.0), equip_time=0.28, kick_back=2.5, kick_up=3.5, kick_side=0.6, kick_stiffness=180.0),
     "Sword": dict(equip_time=0.15, kick_back=0.0, kick_up=0.0, kick_side=0.0),
 }
 
@@ -1504,6 +1507,12 @@ def build_weapons(mats):
                             movement={"should_bounce": True, "bounciness": 0.4})
     blackhole = projectile_bp("BP_Projectile_BlackHole", unreal.HitmenProjectile_BlackHole, "sphere", (0.3, 0.3, 0.3), mi["MI_Dark"],
                               movement={"projectile_gravity_scale": 0.0})
+    # Goobyr gun: a slow lob bursting into hamsters (BP_Hamster) on impact.
+    hamster = make_blueprint("BP_Hamster", path("Characters"), unreal.HitmenHamster)
+    set_props(cdo(hamster), puff_fx=fx("Dust/OneShot/NS_Dust_Directional_Small_01_OS"))
+    save(hamster)
+    goobyr = projectile_bp("BP_Projectile_Goobyr", unreal.HitmenProjectile_Goobyr, "sphere", (0.18, 0.18, 0.18), mi["MI_Green"],
+                           explode_on_impact=True, explosion_damage=0.0, explosion_radius=0.0, hamster_class=hamster.generated_class(), hamster_count=5)
     stone = projectile_bp("BP_Projectile_Stone", unreal.HitmenProjectile, "sphere", (0.08, 0.08, 0.08), mi["MI_Stone"],
                           impact_noise_radius=1600.0, impact_noise_type=unreal.HitmenNoiseType.DISTRACTION)
     dart = projectile_bp("BP_Projectile_SleepDart", unreal.HitmenProjectile, "cylinder", (0.02, 0.02, 0.2), mi["MI_Blue"],
@@ -1571,9 +1580,9 @@ def build_weapons(mats):
     launcher_offset.scale3d = unreal.Vector(0.55, 0.55, 0.55)
     launcher_vis["first_person_attach_offset"] = launcher_offset
     knife_offset = unreal.Transform()
-    knife_offset.rotation = unreal.Rotator(roll=174.8, pitch=-80.4, yaw=-88.1).quaternion()
+    knife_offset.rotation = unreal.Rotator(roll=2.8, pitch=-45.2, yaw=72.1).quaternion()
     bow_offset = unreal.Transform()
-    bow_offset.rotation = unreal.Rotator(roll=-89.1, pitch=-9.5, yaw=86.6).quaternion()
+    bow_offset.rotation = unreal.Rotator(roll=0.2, pitch=-8.2, yaw=86.8).quaternion()
     bow_offset.scale3d = unreal.Vector(0.5, 0.5, 0.5)
     launcher_vis["fire_sound"] = load("/Game/Weapons/GrenadeLauncher/Audio/FirstPersonTemplateWeaponFire02")
 
@@ -1589,7 +1598,7 @@ def build_weapons(mats):
         "AssaultRifle": ("Assault rifle", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=620.0, damage=22.0, start_ammo=90,
                          max_ammo=210, ammo_per_pickup=30, hip_spread=2.0, aim_spread=0.5, noise_radius=700.0, impact_noise_radius=600.0, recoil_pitch=0.8,
                          recoil_yaw_random=0.3, static_mesh=rifle_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
-        "Shotgun": ("Shotgun", shotgun, dict(fire_mode=A.SINGLE, rounds_per_minute=70.0, damage=12.0, pellet_count=9, range=2500.0,
+        "Shotgun": ("Shotgun", shotgun, dict(fire_mode=A.SINGLE, rounds_per_minute=70.0, damage=25.0, pellet_count=9, range=2500.0,
                     start_ammo=16, max_ammo=40, ammo_per_pickup=6, hip_spread=1.0, aim_spread=0.6, noise_radius=800.0, impact_noise_radius=600.0,
                     recoil_pitch=3.5, recoil_yaw_random=0.6, static_mesh=shotgun_mesh, skeletal_mesh=None, visual_transform=pack(0.5), **rifle_vis)),
         "Minigun": ("Minigun", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=1100.0, damage=9.0, spin_up_time=1.2, spin_up_start_rpm=450.0, spin_down_grace=0.4, start_ammo=300,
@@ -1599,7 +1608,7 @@ def build_weapons(mats):
                    range=30000.0, start_ammo=10, max_ammo=30, ammo_per_pickup=5, hip_spread=4.0, aim_spread=0.0, aim_fov=20.0,
                    recoil_pitch=5.0, recoil_yaw_random=0.5, noise_radius=800.0, impact_noise_radius=700.0, scope_overlay=True,
                    static_mesh=sniper_mesh, skeletal_mesh=None, visual_transform=pack(0.55), **rifle_vis)),
-        "Bow": ("Bow", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=60.0, damage=90.0, charge_to_fire=True, full_charge_time=1.0,
+        "Bow": ("Bow", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=60.0, damage=55.0, headshot_assist_radius=15.0, charge_to_fire=True, full_charge_time=1.0,
                 projectile_class=gen_class(arrow), projectile_speed=5000.0, silenced=True, noise_radius=0.0, start_ammo=12, max_ammo=30,
                 ammo_per_pickup=6, recoil_pitch=0.8, first_person_pose=pistol_pose, first_person_attach_offset=bow_offset)),
         "RocketLauncher": ("Rocket launcher", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=40.0, projectile_class=gen_class(rocket),
@@ -1609,6 +1618,9 @@ def build_weapons(mats):
         "GrenadeLauncher": ("Grenade launcher", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=70.0, projectile_class=gen_class(grenade),
                             projectile_speed=2200.0, start_ammo=6, max_ammo=12, ammo_per_pickup=3, noise_radius=1000.0, impact_noise_radius=0.0, recoil_pitch=2.5,
                             static_mesh=gl_mesh, skeletal_mesh=gl_skel, **launcher_vis)),
+        "Goobyr": ("Goobyr gun", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=50.0, damage=0.0, projectile_class=gen_class(goobyr),
+                   projectile_speed=1600.0, start_ammo=4, max_ammo=8, ammo_per_pickup=2, noise_radius=400.0, impact_noise_radius=0.0, recoil_pitch=2.0,
+                   static_mesh=gl_mesh, skeletal_mesh=gl_skel, **launcher_vis)),
         "BlackHole": ("Black hole gun", projectile, dict(fire_mode=A.SINGLE, rounds_per_minute=20.0, projectile_class=gen_class(blackhole),
                       projectile_speed=1800.0, start_ammo=2, max_ammo=4, ammo_per_pickup=1, noise_radius=500.0, impact_noise_radius=0.0, recoil_pitch=2.0,
                       static_mesh=gl_mesh, skeletal_mesh=gl_skel, **launcher_vis)),
@@ -1852,6 +1864,8 @@ BARKS = {
     "LOST_TARGET": ("Lost visual!", "Where did they go?", "Spread out, find them!"),
     "SEARCH_OVER": ("Nothing. Stay sharp.", "They're gone... for now.", "Back to positions, eyes open."),
     "ALL_CLEAR": ("Must have been nothing.", "All clear.", "Guess I'm hearing things."),
+    "TAKE_COVER": ("Get down!", "Sniper! Take cover!", "Where's that coming from? Cover!"),
+    "PANIC": ("They're picking us off!", "I'm not dying here!", "Somebody help! They're everywhere!"),
 }
 
 

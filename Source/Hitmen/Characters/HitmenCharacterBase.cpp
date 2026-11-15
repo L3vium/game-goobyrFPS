@@ -1,6 +1,7 @@
 // Hitmen — character base
 
 #include "Characters/HitmenCharacterBase.h"
+#include "Core/HitmenText.h"
 #include "GameFramework/SpectatorPawn.h"
 #include "Components/HitmenHealthComponent.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
@@ -154,7 +155,7 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 		if (FindLedgeInFront(Ledge, Normal))
 		{
 			const FVector Along = FVector::CrossProduct(FVector::UpVector, Normal).GetSafeNormal();
-			if (!bFirstPersonViewer)
+			if (!bFirstPersonViewer && Juice->bMantleHandsFX)
 			{
 				SpawnTraversalDust(Ledge - Normal * 8.f + Along * 22.f, TraversalDustScale);
 				SpawnTraversalDust(Ledge - Normal * 8.f - Along * 22.f, TraversalDustScale);
@@ -162,7 +163,7 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::ClimbGrab, Ledge);
 		}
 	}
-	else if (!bMantling && bWasMantlingJuice)
+	else if (!bMantling && bWasMantlingJuice && Juice->bMantleLandFX)
 	{
 		SpawnTraversalDust(GetActorLocation() - FVector::UpVector * GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), TraversalDustScale);
 	}
@@ -413,7 +414,7 @@ bool AHitmenCharacterBase::CanInteract_Implementation(AActor* Interactor) const
 
 FText AHitmenCharacterBase::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return NSLOCTEXT("Hitmen", "CarryBody", "Carry body");
+	return HITMEN_TEXT("Hitmen.CarryBody", "Carry body");
 }
 
 void AHitmenCharacterBase::Interact_Implementation(AActor* Interactor)
@@ -520,6 +521,11 @@ float AHitmenCharacterBase::TakeDamage(float DamageAmount, FDamageEvent const& D
 			Weapon = Cast<AHitmenWeaponBase>(Projectile->GetOwner());
 		}
 		const bool bWeaponKills = !Weapon || !Weapon->GetWeaponData() || Weapon->GetWeaponData()->bHeadshotKills;
+		// Fists are not weapons: a punch in the face is no headshot (no red cross, no headshot sound).
+		if (!Weapon && !Projectile)
+		{
+			bHeadshot = false;
+		}
 		const bool bLethalCauser = (Weapon || Projectile) && bWeaponKills;
 		if (Settings->bHeadshotKills && bLethalCauser && (!bFromNPC || Settings->bHeadshotKillsFromNPCs))
 		{
@@ -688,6 +694,47 @@ void AHitmenCharacterBase::VanishBody()
 		bVanished = true;
 		OnRep_Body();
 	}
+}
+
+void AHitmenCharacterBase::Multicast_Burn_Implementation(UNiagaraSystem* FireFX, float FireScale, UNiagaraSystem* AshFX, float Duration)
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	// Fire along the body (pelvis and chest), attached to the ragdoll so it burns where the body lies.
+	TArray<TWeakObjectPtr<UNiagaraComponent>> Fires;
+	if (FireFX && GetMesh())
+	{
+		for (const FName Bone : { FName(TEXT("pelvis")), FName(TEXT("spine_03")) })
+		{
+			const FName Socket = GetMesh()->DoesSocketExist(Bone) ? Bone : NAME_None;
+			if (UNiagaraComponent* Fire = UNiagaraFunctionLibrary::SpawnSystemAttached(FireFX, GetMesh(), Socket, FVector::ZeroVector, FRotator::ZeroRotator,
+				FVector(FireScale), EAttachLocation::SnapToTarget, true, ENCPoolMethod::None, true, true))
+			{
+				Fires.Add(Fire);
+			}
+		}
+	}
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::BodyBurn, GetMesh() ? GetMesh()->GetComponentLocation() : GetActorLocation());
+	// When it is gone: the fire dies down and ash puffs where it lay.
+	TWeakObjectPtr<AHitmenCharacterBase> WeakThis(this);
+	FTimerHandle Handle;
+	GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [WeakThis, Fires, AshFX]()
+	{
+		for (const TWeakObjectPtr<UNiagaraComponent>& Fire : Fires)
+		{
+			if (Fire.IsValid())
+			{
+				Fire->Deactivate();
+			}
+		}
+		if (WeakThis.IsValid() && AshFX)
+		{
+			const FVector Where = WeakThis->GetMesh() ? WeakThis->GetMesh()->GetBoneLocation(TEXT("pelvis")) : WeakThis->GetActorLocation();
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(WeakThis.Get(), AshFX, Where, FRotator::ZeroRotator, FVector(0.8f));
+		}
+	}), FMath::Max(0.05f, Duration), false);
 }
 
 void AHitmenCharacterBase::SetCarriedBy(APawn* NewCarrier, FName AttachSocket)

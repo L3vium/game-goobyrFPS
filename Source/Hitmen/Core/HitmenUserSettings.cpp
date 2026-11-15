@@ -20,7 +20,7 @@ void UHitmenUserSettings::SetToDefaults()
 	Super::SetToDefaults();
 	bToggleCrouch = false;
 	bToggleSprint = false;
-	bClimbRelativeToCamera = false;
+	bLadderForwardAlwaysUp = false;
 	MouseSensitivity = 0.25f;
 	AimSensitivityMultiplier = 1.f;
 	HitmenSettingsVersion = CurrentSettingsVersion;

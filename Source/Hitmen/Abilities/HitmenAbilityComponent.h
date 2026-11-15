@@ -48,6 +48,18 @@ public:
 	void PressSlot(EHitmenAbilitySlot Slot);
 	void ReleaseSlot(EHitmenAbilitySlot Slot);
 
+	/** Owning client: an aimed ability (blink) is held in this slot. */
+	bool IsAimingSlot(EHitmenAbilitySlot Slot) const;
+
+	/** Owning client: use the aimed ability now (left click while aiming); the key's later release does nothing. */
+	void ConfirmAim(EHitmenAbilitySlot Slot);
+
+	/** Owning client: drop the aim, nothing spent (right click, F, Esc while aiming). */
+	void CancelAim(EHitmenAbilitySlot Slot);
+
+	/** Owning client: true when any slot is aiming (the controller routes clicks / F / Esc to confirm or cancel). */
+	bool IsAimingAny() const { return IsAimingSlot(EHitmenAbilitySlot::Move) || IsAimingSlot(EHitmenAbilitySlot::Manipulation); }
+
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_AbilityActivated(UHitmenAbility* Ability, FVector_NetQuantize Location);
 
@@ -110,6 +122,23 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> AimMarkerComponent;
+
+	/** The marker effect (GetAimMarkerFX) and the ledge-up arrow over it. */
+	UPROPERTY(Transient)
+	TObjectPtr<class UNiagaraComponent> AimMarkerFXComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> AimArrowComponent;
+
+	/** Arrow over the landing when an aimed blink goes up onto what you aim at (engine cone by default). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Aim")
+	TObjectPtr<UStaticMesh> AimArrowMesh;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Aim")
+	FLinearColor AimArrowColor = FLinearColor(0.55f, 0.85f, 1.f, 1.f);
+
+	/** The next key release of this slot was already handled (confirmed early or cancelled). */
+	bool bIgnoreNextRelease[2] = { false, false };
 
 	/** Multi-kill: red links between the marked targets and a red glow on them (owner only). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Abilities|Visuals")

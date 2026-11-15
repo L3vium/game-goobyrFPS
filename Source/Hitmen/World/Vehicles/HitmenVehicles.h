@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/HitmenText.h"
 #include "GameFramework/Pawn.h"
 #include "Core/HitmenInterfaces.h"
 #include "Core/HitmenTeamLibrary.h"
@@ -37,7 +38,7 @@ public:
 
 	/** Shown on the vehicle HUD (health bar title). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Vehicle")
-	FText DisplayName = NSLOCTEXT("Hitmen", "Vehicle", "Vehicle");
+	FText DisplayName = HITMEN_TEXT("Hitmen.Vehicle", "Vehicle");
 
 	/** Health 0..1 for the HUD. */
 	float GetHealthNormalized() const;

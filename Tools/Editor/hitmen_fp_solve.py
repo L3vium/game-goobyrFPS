@@ -10,7 +10,7 @@ solve() applies it live and returns {weapon: (pitch, yaw, roll)}; save(results) 
 import unreal
 
 WEAPONS = ("Pistol", "SMG", "AssaultRifle", "Shotgun", "Minigun", "Sniper", "Bow",
-           "RocketLauncher", "GrenadeLauncher", "BlackHole", "Sword")
+           "RocketLauncher", "GrenadeLauncher", "BlackHole", "Sword", "Goobyr")
 SOCKET = "HandGrip_R"
 
 
@@ -31,7 +31,12 @@ def _mesh_of(comp):
 
 
 def _equip(inv, data):
-    inv.give_weapon(data, -1, True)
+    if not inv.give_weapon(data, -1, True):
+        # Editor Python cannot always grant: take the copy lying in the level (the gym armoury pedestals).
+        for actor in unreal.GameplayStatics.get_all_actors_of_class(_world(), unreal.HitmenWeaponBase):
+            if actor.get_weapon_data() == data and actor.is_dropped():
+                inv.pick_up_weapon(actor, True)
+                break
     for index, slot in enumerate(inv.get_slots()):
         if slot.get_editor_property("weapon") == data:
             inv.select_slot(index)
@@ -39,9 +44,17 @@ def _equip(inv, data):
     return inv.get_active_weapon()
 
 
+# Meshes authored in the hold frame already (X = where it points, Z = up): the bow (its height is its longest axis).
+AUTHORED_FRAME = ("SM_Bow",)
+# Weapons not held barrel-forward: the knife's blade rises up and forward out of the fist (seen, not end-on).
+HOLD_TILT = {"Sword": unreal.Rotator(roll=0.0, pitch=55.0, yaw=-12.0)}
+
+
 def _mesh_frame(comp):
     """Barrel (+X') and top (+Z') of the mesh in its own local space: the longest bounds axis points to the
     side the mesh extends to from its pivot (the grip), the second longest is the height, signed the same way."""
+    if _mesh_of(comp).get_name() in AUTHORED_FRAME:
+        return unreal.Rotator().quaternion()
     bounds = _mesh_of(comp).get_bounds()
     ext = [bounds.box_extent.x, bounds.box_extent.y, bounds.box_extent.z]
     org = [bounds.origin.x, bounds.origin.y, bounds.origin.z]
@@ -75,6 +88,8 @@ def solve(names=WEAPONS, apply=True):
         comp = comps[0]
         cam = pc.player_camera_manager.get_camera_rotation()
         q_cam = unreal.Rotator(pitch=0.0, yaw=cam.yaw, roll=0.0).quaternion()
+        if name in HOLD_TILT:
+            q_cam = q_cam.multiply(HOLD_TILT[name].quaternion())
         q_mesh_want = q_cam.multiply(_mesh_frame(comp).inversed())
         root = weapon.root_component
         q_root = root.get_world_rotation().quaternion()

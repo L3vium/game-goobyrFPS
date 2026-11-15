@@ -20,8 +20,8 @@ UHitmenStatusEffectComponent::UHitmenStatusEffectComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
-	PillPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/M_PP_Pill.M_PP_Pill")));
-	BlindPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/M_PP_Blind.M_PP_Blind")));
+	PillPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/PP_Pill.PP_Pill")));
+	BlindPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/PP_Blind.PP_Blind")));
 }
 
 void UHitmenStatusEffectComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -59,6 +59,7 @@ void UHitmenStatusEffectComponent::ApplyStatus(EHitmenStatusEffect Type, float D
 	if (FHitmenActiveStatus* Existing = ActiveStatuses.FindByPredicate([Type](const FHitmenActiveStatus& S) { return S.Type == Type; }))
 	{
 		Existing->EndTime = (Existing->EndTime < 0.f || EndTime < 0.f) ? -1.f : FMath::Max(Existing->EndTime, EndTime);
+		Existing->StartTime = GetServerTime();
 		Existing->Magnitude = FMath::Max(Existing->Magnitude, Magnitude);
 		Existing->Instigator = Instigator ? Instigator : Existing->Instigator.Get();
 	}
@@ -67,6 +68,7 @@ void UHitmenStatusEffectComponent::ApplyStatus(EHitmenStatusEffect Type, float D
 		FHitmenActiveStatus& Status = ActiveStatuses.AddDefaulted_GetRef();
 		Status.Type = Type;
 		Status.EndTime = EndTime;
+		Status.StartTime = GetServerTime();
 		Status.Magnitude = Magnitude;
 		Status.Instigator = Instigator;
 	}

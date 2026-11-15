@@ -1,6 +1,7 @@
 // Hitmen — keycard pickup
 
 #include "World/Interactables/HitmenKeycardPickup.h"
+#include "Core/HitmenText.h"
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/StaticMesh.h"
@@ -28,7 +29,7 @@ void AHitmenKeycardPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 
 FText AHitmenKeycardPickup::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return FText::Format(NSLOCTEXT("Hitmen", "TakeKeycard", "Take keycard {0}"), FText::AsNumber(KeycardId));
+	return FText::Format(HITMEN_TEXT("Hitmen.TakeKeycard", "Take keycard {0}"), FText::AsNumber(KeycardId));
 }
 
 void AHitmenKeycardPickup::OnInteracted(AActor* Interactor)

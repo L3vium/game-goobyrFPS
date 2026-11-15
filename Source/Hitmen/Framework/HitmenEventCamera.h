@@ -23,8 +23,14 @@ public:
 	/** Films Subject for Duration seconds and publishes the picture to the local player's UI. */
 	void Show(AActor* Subject, const FText& Title, float Duration, APlayerController* Viewer);
 
+	/** Shows what View sees (a security camera's feed) with its field of view, until Stop or Duration (0 = until Stop). */
+	void ShowFrom(USceneComponent* View, float FOV, const FText& Title, float Duration, APlayerController* Viewer);
+
 	/** Stops now (end cinematic, level change). */
 	void Stop();
+
+	/** Filming a fixed view right now (ShowFrom). */
+	bool IsShowingView() const { return FixedView.IsValid() && EndTime != -1.f; }
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category="Hitmen|Components")
@@ -34,6 +40,7 @@ protected:
 	TObjectPtr<UTextureRenderTarget2D> Target;
 
 	TWeakObjectPtr<AActor> Subject;
+	TWeakObjectPtr<USceneComponent> FixedView;
 	TWeakObjectPtr<APlayerController> Viewer;
 	float EndTime = -1.f;
 	float OrbitYaw = 0.f;

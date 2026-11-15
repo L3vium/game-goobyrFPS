@@ -32,6 +32,12 @@ public:
 
 	void SetIsVIP(bool bVIP) { bIsVIP = bVIP; bAlwaysRelevant = bVIP || bAlwaysRelevant; }
 
+	/** Server: a VIP candidate that was not picked becomes a plain guard (armed, named "Guard"). */
+	void BecomeGuard();
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
+	bool IsGuest() const { return bGuest; }
+
 	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
 	bool IsSniper() const { return bIsSniper; }
 
@@ -139,9 +145,18 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UWidgetComponent> AlertWidget;
 
-	/** This NPC may be picked as the VIP at match start (max 15 per map). */
+	/** This NPC may be picked as the VIP at match start (max 15 per map). The candidates not picked become guards. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
 	bool bVIPCandidate = false;
+
+	/** A VIP candidate that is not picked becomes a guard with this weapon (none = it keeps DefaultWeapon). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
+	TObjectPtr<UHitmenWeaponData> CandidateGuardWeapon;
+
+	/** A guest: neutral (never hostile, never attacked by guards), unarmed, runs from danger. Off in every map: the
+	 *  map is a hostile area. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC|Behavior")
+	bool bGuest = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
 	TObjectPtr<UHitmenWeaponData> DefaultWeapon;
@@ -203,6 +218,14 @@ protected:
 	/** Glint size as a fraction of the screen. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Sniper", meta=(ClampMin="0"))
 	float GlintScreenSize = 0.03f;
+
+	/** The red star only shows while the sniper aims at someone it sees (off: always, pulsing slowly when calm). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Sniper")
+	bool bGlintOnlyWhileAiming = true;
+
+	/** Server: the sniper aims at a target it sees (glint and red line on every machine). */
+	UPROPERTY(Replicated)
+	bool bSniperAiming = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> GlintInstance;

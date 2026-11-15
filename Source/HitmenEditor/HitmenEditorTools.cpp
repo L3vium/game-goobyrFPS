@@ -1,6 +1,11 @@
 // Hitmen — editor tools: builds BB_NPC and the NPC behavior trees as editable graphs
 
 #include "HitmenEditorTools.h"
+#include "Engine/GameViewportClient.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SViewport.h"
+#include "ImageUtils.h"
+#include "Misc/FileHelper.h"
 #include "Core/HitmenTypes.h"
 #include "AI/HitmenAIController.h"
 #include "AI/Tasks/HitmenBTTasks.h"
@@ -304,6 +309,7 @@ namespace
 		AddKey(HitmenBBKeys::DisposeBody, ObjectKey(AActor::StaticClass()));
 		AddKey(HitmenBBKeys::DisposeContainer, ObjectKey(AActor::StaticClass()));
 		AddKey(HitmenBBKeys::DisposeLocation, NewObject<UBlackboardKeyType_Vector>(Blackboard));
+		AddKey(HitmenBBKeys::TakeCover, NewObject<UBlackboardKeyType_Bool>(Blackboard));
 		Blackboard->MarkPackageDirty();
 		return Blackboard;
 	}
@@ -519,7 +525,20 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		UBehaviorTreeGraphNode* HoldGround = B.Task(UBTTask_Wait::StaticClass(), Reposition, 400, 760);
 		SetFloat(HoldGround->NodeInstance, TEXT("WaitTime"), 0.3f);
 
-		UBehaviorTreeGraphNode* Chase = B.Composite(UBTComposite_Sequence::StaticClass(), Sel, 600, 360);
+		// Unseen threat (shot by someone it cannot see, colleagues dropping): hide from where it seemed to come from,
+		// crouched, until the alert component says it is over (then it searches). Crouches where it stands when no
+		// hiding place is found. Seeing the shooter preempts it (the shooting branch above).
+		UBehaviorTreeGraphNode* Hide = B.Composite(UBTComposite_Selector::StaticClass(), Sel, 350, 360);
+		B.KeyIsSet(Hide, HitmenBBKeys::TakeCover, EBTFlowAbortMode::Both);
+		UBehaviorTreeGraphNode* HideMove = B.Composite(UBTComposite_Sequence::StaticClass(), Hide, 250, 560);
+		UBehaviorTreeGraphNode* FindHide = B.Task(UBTTask_HitmenFindCover::StaticClass(), HideMove, 150, 760);
+		SetBool(FindHide->NodeInstance, TEXT("bHideFromLastKnown"), true);
+		SetFloat(FindHide->NodeInstance, TEXT("SearchRadius"), 1200.f);
+		B.MoveTo(HideMove, HitmenBBKeys::MoveLocation, 40.f, 300, 760);
+		B.Task(UBTTask_HitmenHoldCover::StaticClass(), HideMove, 450, 760);
+		B.Task(UBTTask_HitmenHoldCover::StaticClass(), Hide, 500, 560);
+
+		UBehaviorTreeGraphNode* Chase = B.Composite(UBTComposite_Sequence::StaticClass(), Sel, 700, 360);
 		B.MoveToObserved(Chase, HitmenBBKeys::LastKnownLocation, 120.f, 450, 560);
 		B.Task(UBTTask_HitmenLookAround::StaticClass(), Chase, 750, 560);
 		B.Finish();
@@ -622,4 +641,27 @@ void UHitmenEditorTools::SetPIENetMode(int32 NumPlayers)
 	Settings->SetPlayNetMode(NumPlayers > 1 ? EPlayNetMode::PIE_ListenServer : EPlayNetMode::PIE_Standalone);
 	Settings->SetPlayNumberOfClients(FMath::Max(1, NumPlayers));
 	Settings->SetRunUnderOneProcess(true);
+}
+
+bool UHitmenEditorTools::TakePIEScreenshot(UWorld* World, const FString& FilePath)
+{
+	UGameViewportClient* Client = World ? World->GetGameViewport() : nullptr;
+	TSharedPtr<SViewport> Widget = Client ? Client->GetGameViewportWidget() : nullptr;
+	if (!Widget.IsValid() || !FSlateApplication::IsInitialized())
+	{
+		return false;
+	}
+	TArray<FColor> Pixels;
+	FIntVector Size;
+	if (!FSlateApplication::Get().TakeScreenshot(Widget.ToSharedRef(), Pixels, Size) || Pixels.Num() == 0)
+	{
+		return false;
+	}
+	for (FColor& Pixel : Pixels)
+	{
+		Pixel.A = 255;
+	}
+	TArray64<uint8> Png;
+	FImageUtils::PNGCompressImageArray(Size.X, Size.Y, TArrayView64<const FColor>(Pixels.GetData(), Pixels.Num()), Png);
+	return FFileHelper::SaveArrayToFile(Png, *FilePath);
 }

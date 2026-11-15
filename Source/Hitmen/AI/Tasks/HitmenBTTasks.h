@@ -18,6 +18,7 @@ public:
 	UBTTask_HitmenTurnToNoise();
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 	virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
+	virtual void OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult) override;
 	virtual uint16 GetInstanceMemorySize() const override { return sizeof(float); }
 
 protected:
@@ -263,7 +264,26 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="cm"))
 	float CoverStandOff = 70.f;
 
+	/** Hide from an unseen threat (LastKnownLocation) instead of a visible target: no weapon or shooting line needed,
+	 *  out of the shooting range is fine (panic, shot at by someone it cannot see). */
+	UPROPERTY(EditAnywhere, Category="Hitmen")
+	bool bHideFromLastKnown = false;
+
 	bool IsCoverFrom(const UWorld* World, const FVector& ThreatEye, const FVector& Floor, const AActor* Threat, const AActor* Self) const;
+	EBTNodeResult::Type FindHidingSpot(UBehaviorTreeComponent& OwnerComp) const;
+};
+
+/** Crouches behind cover facing the unseen threat (LastKnownLocation) while the alert component says to hide. */
+UCLASS(meta=(DisplayName="Hitmen Hold Cover"))
+class HITMEN_API UBTTask_HitmenHoldCover : public UBTTaskNode
+{
+	GENERATED_BODY()
+
+public:
+	UBTTask_HitmenHoldCover();
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+	virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
+	virtual void OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult) override;
 };
 
 /**

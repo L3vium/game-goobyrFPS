@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/HitmenText.h"
 #include "GameFramework/Actor.h"
 #include "Interaction/HitmenInteractable.h"
 #include "Core/HitmenInterfaces.h"
@@ -24,12 +25,12 @@ public:
 
 	// IHitmenInteractable
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
-	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override { return InteractionText; }
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override { return UHitmenTextSubsystem::Translate(InteractionText); }
 	/** DisplayName by default (subclasses add their state). */
-	virtual FText GetInteractionInfo_Implementation(AActor* Interactor) const override { return DisplayName; }
+	virtual FText GetInteractionInfo_Implementation(AActor* Interactor) const override { return UHitmenTextSubsystem::Translate(DisplayName); }
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Interaction")
-	FText GetDisplayName() const { return DisplayName; }
+	FText GetDisplayName() const { return UHitmenTextSubsystem::Translate(DisplayName); }
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
 	// IHitmenScannable

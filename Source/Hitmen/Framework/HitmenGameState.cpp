@@ -1,6 +1,7 @@
 // Hitmen — game state
 
 #include "Framework/HitmenGameState.h"
+#include "Core/HitmenText.h"
 #include "Framework/HitmenPlayerState.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "World/Spawning/HitmenRetrievalPoint.h"
@@ -70,7 +71,7 @@ int32 AHitmenGameState::CreateTeam(const FLinearColor& Color)
 {
 	FHitmenTeam& Team = Teams.AddDefaulted_GetRef();
 	Team.TeamId = NextTeamId++;
-	Team.DisplayName = FText::Format(NSLOCTEXT("Hitmen", "TeamName", "Team {0}"), FText::AsNumber(Team.TeamId + 1));
+	Team.DisplayName = FText::Format(HITMEN_TEXT("Hitmen.TeamName", "Team {0}"), FText::AsNumber(Team.TeamId + 1));
 	Team.Color = Color;
 	Team.Role = EHitmenTeamRole::Attack;
 	NotifyLobbyChanged();

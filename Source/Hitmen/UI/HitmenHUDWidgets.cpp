@@ -1,6 +1,7 @@
 // Hitmen — match HUD
 
 #include "UI/HitmenHUDWidgets.h"
+#include "Core/HitmenText.h"
 #include "Components/HitmenMapMarkerComponent.h"
 #include "Data/HitmenMapMarkerType.h"
 #include "Core/HitmenGameSettings.h"
@@ -199,6 +200,26 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 	}
 	const FLinearColor White = HitmenUI::Text() * FLinearColor(1.f, 1.f, 1.f, 0.9f);
 	const FLinearColor Shadow(0.f, 0.f, 0.f, 0.35f);
+
+	// Timed effects on you (invisibility, pill, armor): small rings in a row above the crosshair, emptying clockwise.
+	if (UI)
+	{
+		const TArray<FHitmenHUDStatusTimer>& Timers = UI->GetStatusTimers();
+		const float RingRadius = 9.f;
+		const float Spacing = 26.f;
+		for (int32 Index = 0; Index < Timers.Num(); ++Index)
+		{
+			const FHitmenHUDStatusTimer& Timer = Timers[Index];
+			const FVector2D RingCenter = Center + FVector2D((Index - (Timers.Num() - 1) * 0.5f) * Spacing, -40.f);
+			const float Left = FMath::Clamp(Timer.Remaining / FMath::Max(Timer.Duration, 0.01f), 0.f, 1.f);
+			const FLinearColor Tint = Timer.Status == EHitmenStatusEffect::Invisible ? FLinearColor(0.55f, 0.85f, 1.f, 0.95f)
+				: (Timer.Status == EHitmenStatusEffect::Boosted ? FLinearColor(1.f, 0.55f, 0.85f, 0.95f) : FLinearColor(0.7f, 0.8f, 0.95f, 0.95f));
+			// The last seconds blink.
+			const float Blink = Timer.Remaining < 1.5f ? 0.55f + 0.45f * FMath::Cos(Timer.Remaining * 12.f) : 1.f;
+			HitmenUI::PaintArc(OutDrawElements, LayerId, AllottedGeometry, RingCenter, RingRadius, 0.f, 360.f, FLinearColor(0.f, 0.f, 0.f, 0.4f), 4.f, 32);
+			HitmenUI::PaintArc(OutDrawElements, LayerId + 1, AllottedGeometry, RingCenter, RingRadius, 0.f, 360.f * Left, Tint * FLinearColor(1.f, 1.f, 1.f, Blink), 2.5f, 32);
+		}
+	}
 
 	// A kill turns the "+" into an "x" (red on a headshot) for a moment.
 	const float KillAlpha = KillCrossDuration > 0.f ? KillCrossTime / KillCrossDuration : 0.f;
@@ -452,22 +473,22 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 	FLinearColor StatusColor = HitmenUI::Text();
 	if (bTargeted)
 	{
-		Status = TEXT("UNDER FIRE");
+		Status = HITMEN_TEXT("Hud.UnderFire", "UNDER FIRE").ToString();
 		StatusColor = HitmenAlert::ToLinearColor(EHitmenAlertColor::Red);
 	}
 	else if (Worst == EHitmenAlertColor::Red)
 	{
-		Status = TEXT("SPOTTED");
+		Status = HITMEN_TEXT("Hud.Spotted", "SPOTTED").ToString();
 		StatusColor = HitmenAlert::ToLinearColor(EHitmenAlertColor::Red);
 	}
 	else if (Worst == EHitmenAlertColor::Yellow || bSearching)
 	{
-		Status = bSearching ? TEXT("SEARCHING") : TEXT("ALERTED");
+		Status = bSearching ? HITMEN_TEXT("Hud.Searching", "SEARCHING").ToString() : HITMEN_TEXT("Hud.Alerted", "ALERTED").ToString();
 		StatusColor = HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow);
 	}
 	else if (Worst == EHitmenAlertColor::White)
 	{
-		Status = TEXT("SUSPICIOUS");
+		Status = HITMEN_TEXT("Hud.Suspicious", "SUSPICIOUS").ToString();
 	}
 	if (Status != ShownStatus)
 	{
@@ -613,7 +634,7 @@ void UHitmenHUDWidget::HandlePrompt(const FText& Prompt, bool bVisible)
 {
 	if (PromptText)
 	{
-		PromptText->SetText(bVisible ? FText::Format(LOCTEXT("Prompt", "[F]  {0}"), Prompt) : FText::GetEmpty());
+		PromptText->SetText(bVisible ? FText::Format(HITMEN_TEXT("HitmenHUD.Prompt", "[F]  {0}"), Prompt) : FText::GetEmpty());
 	}
 	// The default layout shows prompts through ActionPrompt (it binds the same event).
 }
@@ -624,12 +645,12 @@ void UHitmenHUDWidget::HandleInventoryView(const FHitmenHUDInventoryView& View)
 	{
 		if (!View.Slots.IsValidIndex(Index) || View.Slots[Index].bEmpty)
 		{
-			return FText::Format(LOCTEXT("EmptySlot", "{0}  -"), FText::AsNumber(Index + 1));
+			return FText::Format(HITMEN_TEXT("HitmenHUD.EmptySlot", "{0}  -"), FText::AsNumber(Index + 1));
 		}
 		const FHitmenHUDSlotView& SlotView = View.Slots[Index];
 		const FText Ammo = SlotView.Ammo >= 0 ? FText::AsNumber(SlotView.Ammo) : FText::FromString(TEXT("-"));
 		const FText Marker = SlotView.bActive ? FText::FromString(TEXT("> ")) : FText::GetEmpty();
-		return FText::Format(LOCTEXT("Slot", "{0}{1}  {2}  {3}"), Marker, FText::AsNumber(Index + 1), SlotView.Name, Ammo);
+		return FText::Format(HITMEN_TEXT("HitmenHUD.Slot", "{0}{1}  {2}  {3}"), Marker, FText::AsNumber(Index + 1), SlotView.Name, Ammo);
 	};
 	if (SlotOneText) { SlotOneText->SetText(SlotLabel(0)); }
 	if (SlotTwoText) { SlotTwoText->SetText(SlotLabel(1)); }

@@ -59,6 +59,13 @@ public:
 	/** Renders the camera view into a target (monitors). Does nothing while disabled. */
 	void CaptureTo(UTextureRenderTarget2D* Target);
 
+	/** Who the camera is looking at right now (replicated; the camera-feed picture of the one seen). */
+	APawn* GetSeenIntruder() const { return SeenIntruder; }
+
+	/** The feed's view (position, direction) and field of view, for pictures of what the camera sees. */
+	USceneComponent* GetFeedView() const;
+	float GetFeedFOV() const { return FeedFOV; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<USceneComponent> Root;
@@ -134,15 +141,22 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0"))
 	float AlarmCooldown = 10.f;
 
+	/** Colour of the cone (its light) while nobody is in view. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
 	FLinearColor IdleColor = FLinearColor(1.f, 1.f, 1.f, 0.25f);
 
+	/** Colour while it sees someone (the detection meter fills). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
+	FLinearColor DetectingColor = FLinearColor(1.f, 0.06f, 0.04f, 0.4f);
+
+	/** Colour once it raised the alarm, while it still sees the intruder. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
 	FLinearColor AlertColor = FLinearColor(1.f, 0.05f, 0.05f, 0.4f);
 
-	/** While the detection meter fills (someone in view, no alarm yet): light and ring go from this to AlertColor. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
-	FLinearColor SuspiciousColor = FLinearColor(1.f, 0.78f, 0.1f, 0.4f);
+	/** Seeing someone stops the sweep where the camera looks (it does not follow them); it sweeps again once they
+	 *  leave the cone. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera")
+	bool bFreezeSweepWhileSeeing = true;
 
 	/** The electronic floor ring (Hitman-like): on by default; the decal material draws it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera|Juice")
@@ -185,6 +199,9 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_Visuals)
 	bool bSeeingIntruder = false;
 
+	UPROPERTY(Replicated)
+	TObjectPtr<APawn> SeenIntruder;
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> ColorMaterials;
 
@@ -202,7 +219,7 @@ protected:
 	APawn* FindIntruder() const;
 	/** Places the ring decal over the cone's footprint and feeds the material the cone (follows the sweep). */
 	void UpdateFootprint();
-	/** Idle white, then SuspiciousColor to AlertColor as the meter fills; the light and the ring share it. */
+	/** IdleColor with nobody in view, DetectingColor while it sees someone, AlertColor once it raised the alarm. */
 	FLinearColor GetStateColor() const;
 	void RaiseAlarm(APawn* Intruder);
 
@@ -364,6 +381,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Turret")
 	bool IsHacked() const { return bHacked; }
 
+	/** Shot (or blown) to pieces: it sparks, its gun droops and it never fires again. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Turret")
+	bool IsBroken() const { return bBroken; }
+
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<USceneComponent> Root;
@@ -438,6 +461,23 @@ protected:
 
 	UPROPERTY(Replicated)
 	bool bHacked = false;
+
+	/** Health: bullets and explosions break it for good (like a camera). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="1"))
+	float TurretHealth = 80.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret|Juice")
+	TObjectPtr<UNiagaraSystem> BrokenFX;
+
+	UPROPERTY(ReplicatedUsing=OnRep_Broken)
+	bool bBroken = false;
+
+	UFUNCTION() void OnRep_Broken();
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
+	void Juice_OnBroken();
+
+	float TurretDamageTaken = 0.f;
 
 	UPROPERTY(Replicated)
 	TObjectPtr<AActor> CurrentTarget;

@@ -1,6 +1,7 @@
 // Hitmen — stealth fixtures
 
 #include "World/Interactables/HitmenStealth.h"
+#include "Core/HitmenText.h"
 #include "Characters/HitmenNPC.h"
 #include "NiagaraFunctionLibrary.h"
 #include "EngineUtils.h"
@@ -30,7 +31,7 @@
 
 AHitmenLocker::AHitmenLocker()
 {
-	DisplayName = NSLOCTEXT("Hitmen", "Locker", "Locker");
+	DisplayName = HITMEN_TEXT("Hitmen.Locker", "Locker");
 	BodyCapacity = 1;
 	// The body stands in the back of the locker.
 	BodySlots = { FTransform(FRotator::ZeroRotator, FVector(-8.f, 0.f, 100.f)) };
@@ -140,7 +141,7 @@ AHitmenDistraction::AHitmenDistraction()
 {
 	// Fixtures are never vaulted, climbed or hung from.
 	Tags.AddUnique(HitmenTags::NoTraversal);
-	InteractionText = NSLOCTEXT("Hitmen", "Distract", "Turn on");
+	InteractionText = HITMEN_TEXT("Hitmen.Distract", "Turn on");
 	NoiseRadius = 1000.f;
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
@@ -161,7 +162,7 @@ void AHitmenDistraction::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 
 FText AHitmenDistraction::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return bOn ? NSLOCTEXT("Hitmen", "DistractOff", "Turn off") : InteractionText;
+	return bOn ? HITMEN_TEXT("Hitmen.DistractOff", "Turn off") : InteractionText;
 }
 
 void AHitmenDistraction::Tick(float DeltaSeconds)
@@ -268,8 +269,21 @@ void AHitmenDistraction::OnRep_On()
 			USoundBase* Loop = LoopSound ? LoopSound.Get() : UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::RadioLoop);
 			if (Loop)
 			{
+				// Kept alive and restarted whenever it ends: a radio plays one steady sound until switched off, even
+				// when its asset is a one-shot (an ending clip used to leave the radio silent while it still pulsed).
 				PlayingAudio = UGameplayStatics::SpawnSoundAttached(Loop, Root, NAME_None, FVector::ZeroVector, EAttachLocation::KeepRelativeOffset, false, 1.f, 1.f, 0.f,
-					UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World));
+					UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World), nullptr, false);
+				if (PlayingAudio)
+				{
+					TWeakObjectPtr<AHitmenDistraction> WeakThis(this);
+					PlayingAudio->OnAudioFinishedNative.AddWeakLambda(this, [WeakThis](UAudioComponent* Component)
+					{
+						if (WeakThis.IsValid() && WeakThis->bOn && Component && WeakThis->PlayingAudio == Component)
+						{
+							Component->Play();
+						}
+					});
+				}
 			}
 		}
 		Pulse();
@@ -280,8 +294,12 @@ void AHitmenDistraction::OnRep_On()
 		GetWorldTimerManager().ClearTimer(PulseTimer);
 		if (PlayingAudio)
 		{
-			PlayingAudio->FadeOut(0.3f, 0.f);
+			UAudioComponent* Fading = PlayingAudio;
 			PlayingAudio = nullptr;
+			Fading->FadeOut(0.3f, 0.f);
+			// Not auto-destroyed (it restarts itself while on): removed once faded.
+			FTimerHandle Cleanup;
+			GetWorldTimerManager().SetTimer(Cleanup, FTimerDelegate::CreateWeakLambda(Fading, [Fading]() { Fading->DestroyComponent(); }), 0.4f, false);
 		}
 	}
 	Juice_OnTriggered();

@@ -1,6 +1,7 @@
 // Hitmen — hiding spots
 
 #include "World/Interactables/HitmenHidingSpot.h"
+#include "Core/HitmenText.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Components/HitmenBodyCarryComponent.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
@@ -17,7 +18,7 @@ AHitmenHidingSpot::AHitmenHidingSpot()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = true;
-	InteractionText = NSLOCTEXT("Hitmen", "Hide", "Hide");
+	InteractionText = HITMEN_TEXT("Hitmen.Hide", "Hide");
 }
 
 void AHitmenHidingSpot::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -58,27 +59,27 @@ bool AHitmenHidingSpot::CanInteract_Implementation(AActor* Interactor) const
 		// Only the one inside can use it (to get out).
 		return Occupant == Interactor;
 	}
-	// Carrying a body: F stows it (or nothing, when it does not fit). Otherwise F hides you, or opens it to look at the
-	// bodies inside when there is no room to hide.
+	// Carrying a body: F stows it (or nothing, when it does not fit). Otherwise F hides you when there is room; with a
+	// body inside and no room, F does nothing (the info line says why, the bodies show through the slit).
 	if (const UHitmenBodyCarryComponent* Carry = Interactor->FindComponentByClass<UHitmenBodyCarryComponent>(); Carry && Carry->IsCarrying())
 	{
 		return CanStowBody(Carry->GetCarriedBody());
 	}
-	return CanHide(Interactor) || Bodies.Num() > 0;
+	return CanHide(Interactor);
 }
 
 FText AHitmenHidingSpot::GetInteractionText_Implementation(AActor* Interactor) const
 {
 	if (Occupant && Occupant == Interactor)
 	{
-		return NSLOCTEXT("Hitmen", "LeaveHidingSpot", "Get out");
+		return HITMEN_TEXT("Hitmen.LeaveHidingSpot", "Get out");
 	}
 	const UHitmenBodyCarryComponent* Carry = Interactor ? Interactor->FindComponentByClass<UHitmenBodyCarryComponent>() : nullptr;
 	if (Carry && Carry->IsCarrying())
 	{
-		return NSLOCTEXT("Hitmen", "HideBody", "Hide body");
+		return HITMEN_TEXT("Hitmen.HideBody", "Hide body");
 	}
-	return CanHide(Interactor) ? InteractionText : NSLOCTEXT("Hitmen", "LookInside", "Look inside");
+	return UHitmenTextSubsystem::Translate(InteractionText);
 }
 
 FText AHitmenHidingSpot::GetInteractionInfo_Implementation(AActor* Interactor) const
@@ -89,29 +90,29 @@ FText AHitmenHidingSpot::GetInteractionInfo_Implementation(AActor* Interactor) c
 	const AHitmenCharacterBase* Carried = Carry ? Carry->GetCarriedBody() : nullptr;
 	if (Carried && Carried->IsVIP())
 	{
-		State = NSLOCTEXT("Hitmen", "SpotTarget", "the target can't be hidden");
+		State = HITMEN_TEXT("Hitmen.SpotTarget", "the target can't be hidden");
 	}
 	else if (Carried && !HasRoomForBody())
 	{
-		State = NSLOCTEXT("Hitmen", "SpotFull", "full");
+		State = HITMEN_TEXT("Hitmen.SpotFull", "full");
 	}
 	else if (!Carried && Occupant && Occupant != Interactor)
 	{
-		State = NSLOCTEXT("Hitmen", "SpotTaken", "someone is inside");
+		State = HITMEN_TEXT("Hitmen.SpotTaken", "someone is inside");
 	}
 	else if (!Carried && !Occupant && bCanHideInside && bBlockHidingWhenBodyInside && Bodies.Num() > 0)
 	{
-		State = NSLOCTEXT("Hitmen", "SpotNoRoom", "no room to hide");
+		State = HITMEN_TEXT("Hitmen.SpotNoRoom", "no room to hide");
 	}
-	const FText Name = DisplayName.IsEmpty() ? NSLOCTEXT("Hitmen", "HidingSpot", "Hiding spot") : DisplayName;
+	const FText Name = DisplayName.IsEmpty() ? HITMEN_TEXT("Hitmen.HidingSpot", "Hiding spot") : UHitmenTextSubsystem::Translate(DisplayName);
 	if (BodyCapacity <= 0)
 	{
-		return State.IsEmpty() ? Name : FText::Format(NSLOCTEXT("Hitmen", "SpotInfoState", "{0}  -  {1}"), Name, State);
+		return State.IsEmpty() ? Name : FText::Format(HITMEN_TEXT("Hitmen.SpotInfoState", "{0}  -  {1}"), Name, State);
 	}
-	const FText Count = FText::Format(NSLOCTEXT("Hitmen", "SpotBodies", "{0} / {1} {1}|plural(one=body,other=bodies)"), Bodies.Num(), BodyCapacity);
+	const FText Count = FText::Format(HITMEN_TEXT("Hitmen.SpotBodies", "{0} / {1} {1}|plural(one=body,other=bodies)"), Bodies.Num(), BodyCapacity);
 	return State.IsEmpty()
-		? FText::Format(NSLOCTEXT("Hitmen", "SpotInfo", "{0}  -  {1}"), Name, Count)
-		: FText::Format(NSLOCTEXT("Hitmen", "SpotInfoFull", "{0}  -  {1}  -  {2}"), Name, Count, State);
+		? FText::Format(HITMEN_TEXT("Hitmen.SpotInfo", "{0}  -  {1}"), Name, Count)
+		: FText::Format(HITMEN_TEXT("Hitmen.SpotInfoFull", "{0}  -  {1}  -  {2}"), Name, Count, State);
 }
 
 FTransform AHitmenHidingSpot::GetBodySlotTransform(int32 Index) const

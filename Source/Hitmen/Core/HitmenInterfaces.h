@@ -81,6 +81,8 @@ public:
 	virtual float GetClimbSpeed() const { return 300.f; }
 	/** Permissive facing check: dot(view, -normal) must exceed this to grab a ladder. */
 	virtual float GetMinFacingDot() const { return 0.2f; }
+	/** Dropping onto it from above grabs it near its top whatever way you face (a ladder down a shaft). */
+	virtual bool AllowsTopEntry() const { return false; }
 };
 
 // ---------------------------------------------------------------------------------------------

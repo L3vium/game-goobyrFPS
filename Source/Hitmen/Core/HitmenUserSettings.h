@@ -25,12 +25,22 @@ public:
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
 	bool bToggleSprint = false;
 
-	/** Ladder/zipline direction follows the camera pitch instead of forward = up. */
+	/** Ladders and gutters: by default forward climbs toward where you look (facing the ladder: up, facing away: down);
+	 *  true = forward is always up (the 0.9.0 controls). */
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
-	bool bClimbRelativeToCamera = false;
+	bool bLadderForwardAlwaysUp = false;
 
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
 	float MouseSensitivity = 0.25f;
+
+	/** Game language ("en", "fr"... a column of the translation sheet); empty = the system language. */
+	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Language")
+	FString Language;
+
+	/** The keyboard layout the default keys were last placed for (0 none yet, 1 AZERTY, 2 QWERTY): the AZERTY defaults
+	 *  move to the same keys on a QWERTY keyboard once (keys the player rebound stay). */
+	UPROPERTY(Config)
+	int32 AppliedKeyboardLayout = 0;
 
 	/** Extra multiplier while aiming; the zoom itself is already compensated (FOV ratio). */
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")

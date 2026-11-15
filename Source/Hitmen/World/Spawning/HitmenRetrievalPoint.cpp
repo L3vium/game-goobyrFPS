@@ -1,6 +1,7 @@
 // Hitmen — retrieval point
 
 #include "World/Spawning/HitmenRetrievalPoint.h"
+#include "Core/HitmenText.h"
 #include "Components/HitmenMapMarkerComponent.h"
 #include "Components/HitmenBodyCarryComponent.h"
 #include "Characters/HitmenCharacterBase.h"
@@ -39,7 +40,7 @@ AHitmenRetrievalPoint::AHitmenRetrievalPoint()
 	CinematicCamera->SetFieldOfView(70.f);
 
 	MapMarker = CreateDefaultSubobject<UHitmenMapMarkerComponent>(TEXT("MapMarker"));
-	DisplayName = NSLOCTEXT("Hitmen", "RetrievalPoint", "Retrieval point");
+	DisplayName = HITMEN_TEXT("Hitmen.RetrievalPoint", "Retrieval point");
 }
 
 void AHitmenRetrievalPoint::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -159,7 +160,7 @@ bool AHitmenRetrievalPoint::CanInteract_Implementation(AActor* Interactor) const
 
 FText AHitmenRetrievalPoint::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	return NSLOCTEXT("Hitmen", "ExtractTarget", "Extract the target");
+	return HITMEN_TEXT("Hitmen.ExtractTarget", "Extract the target");
 }
 
 FText AHitmenRetrievalPoint::GetInteractionInfo_Implementation(AActor* Interactor) const
@@ -171,7 +172,7 @@ FText AHitmenRetrievalPoint::GetInteractionInfo_Implementation(AActor* Interacto
 	const UHitmenBodyCarryComponent* Carry = Interactor ? Interactor->FindComponentByClass<UHitmenBodyCarryComponent>() : nullptr;
 	const AHitmenCharacterBase* Body = Carry ? Carry->GetCarriedBody() : nullptr;
 	return Body && Body->IsVIP() ? DisplayName
-		: FText::Format(NSLOCTEXT("Hitmen", "RetrievalBring", "{0}  -  bring the target's body here"), DisplayName);
+		: FText::Format(HITMEN_TEXT("Hitmen.RetrievalBring", "{0}  -  bring the target's body here"), DisplayName);
 }
 
 void AHitmenRetrievalPoint::Interact_Implementation(AActor* Interactor)

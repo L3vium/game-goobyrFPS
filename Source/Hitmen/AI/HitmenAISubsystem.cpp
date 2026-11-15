@@ -236,13 +236,19 @@ void UHitmenAISubsystem::NotifyCallingChanged(const UHitmenAlertComponent* Alert
 
 void UHitmenAISubsystem::ReportNoise(const UObject* WorldContext, const FVector& Location, float Radius, AActor* Instigator, EHitmenNoiseType Type)
 {
+	ReportNoiseHeardAt(WorldContext, Location, Location, Radius, Instigator, Type);
+}
+
+void UHitmenAISubsystem::ReportNoiseHeardAt(const UObject* WorldContext, const FVector& Location, const FVector& HeardAt, float Radius, AActor* Instigator, EHitmenNoiseType Type)
+{
 	UHitmenAISubsystem* AI = Get(WorldContext);
 	if (!AI || Radius <= 0.f || AI->GetWorld()->GetNetMode() == NM_Client)
 	{
 		return;
 	}
 	const UHitmenMatchRules& Rules = GetRules(AI);
-	const float Occlusion = Rules.OcclusionMultiplier;
+	// Explosions shake the walls: they carry through them better than any other noise.
+	const float Occlusion = Type == EHitmenNoiseType::Explosion ? Rules.ExplosionOcclusionMultiplier : Rules.OcclusionMultiplier;
 	// Same cap for every noise type (gunshots and explosions included); designers may override per type.
 	int32 MaxResponders = Rules.MaxNoiseResponders;
 	if (const int32* Override = Rules.NoiseResponderOverrides.Find(Type))
@@ -289,7 +295,7 @@ void UHitmenAISubsystem::ReportNoise(const UObject* WorldContext, const FVector&
 	Listeners.Sort([](const FListener& A, const FListener& B) { return A.Distance < B.Distance; });
 	for (int32 Index = 0; Index < Listeners.Num() && Index < MaxResponders; ++Index)
 	{
-		Listeners[Index].Alert->HearNoise(Location, Type, Instigator, Listeners[Index].Distance);
+		Listeners[Index].Alert->HearNoise(HeardAt, Type, Instigator, Listeners[Index].Distance);
 	}
 }
 
@@ -329,10 +335,20 @@ void UHitmenAISubsystem::ReportKill(const UObject* WorldContext, AHitmenCharacte
 		{
 			Alert->WitnessKill(Killer);
 		}
-		else if (Victim->IsDiscoverableBody() && AI->CanObserverSee(Witness, Victim, Range, HalfAngle, true))
+		else
 		{
-			// Saw someone drop without seeing who did it: investigate the body.
-			Alert->SeeBody(Victim);
+			// Saw (or heard, right next to it) a colleague drop without seeing who did it: the body is known, and the
+			// witness takes cover from where the shot seemed to come from; a second death in a row makes it panic.
+			const bool bSawDrop = AI->CanObserverSee(Witness, Victim, Range, HalfAngle, true);
+			const bool bHeardDrop = FVector::Dist(Witness->GetActorLocation(), Victim->GetActorLocation()) <= Alert->GetAllyDeathHearRadius();
+			if (bSawDrop && Victim->IsDiscoverableBody())
+			{
+				Alert->SeeBody(Victim);
+			}
+			if ((bSawDrop || bHeardDrop) && !UHitmenTeamLibrary::AreHostile(Witness, Victim) && UHitmenTeamLibrary::AreHostile(Witness, Killer))
+			{
+				Alert->RecordAllyDeath(Killer, Victim->GetActorLocation());
+			}
 		}
 	}
 }
@@ -583,8 +599,13 @@ FVector UHitmenAISubsystem::GetFlankLocation(const AActor* NPC, const AActor* Ta
 	static const float SlotAngles[] = { 0.f, 70.f, -70.f, 140.f, -140.f, 180.f };
 	const float Angle = SlotAngles[Slot % UE_ARRAY_COUNT(SlotAngles)];
 
-	// Reference direction: from the target toward the group's average position.
-	const FVector TargetLocation = Target->GetActorLocation();
+	// Reference direction: from the target toward the group's average position. A target this NPC does not see is
+	// where it was last known to be (it may have teleported away).
+	FVector TargetLocation = Target->GetActorLocation();
+	if (const UHitmenAlertComponent* SelfAlert = NPC->FindComponentByClass<UHitmenAlertComponent>(); SelfAlert && !SelfAlert->IsTargetVisible())
+	{
+		TargetLocation = SelfAlert->GetLastKnownLocation();
+	}
 	FVector Average = FVector::ZeroVector;
 	for (const AActor* Actor : Engaged)
 	{
@@ -873,4 +894,35 @@ void UHitmenAISubsystem::RefreshMarker(const TWeakObjectPtr<AActor>& InKey)
 	{
 		SearchMarkers.Remove(Key);
 	}
+}
+
+void UHitmenAISubsystem::NotifyTeleport(APawn* Pawn, const FVector& From, const FVector& To)
+{
+	UHitmenAISubsystem* AI = Get(Pawn);
+	if (!AI || !Pawn || AI->GetWorld()->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+	if (FVector::Dist(From, To) < GetRules(AI).LoseAggroTeleportDistance)
+	{
+		return;
+	}
+	// Whoever hunted this pawn and cannot see where it went loses it: it searches where it was.
+	for (UHitmenAlertComponent* Alert : AI->GetAlertComponents())
+	{
+		const APawn* NPC = Alert ? Cast<APawn>(Alert->GetOwner()) : nullptr;
+		if (!NPC || Alert->GetTarget() != Pawn || IsDeadCharacter(NPC))
+		{
+			continue;
+		}
+		const AHitmenAIController* Brain = Cast<AHitmenAIController>(NPC->GetController());
+		const float Range = Brain ? Brain->GetEffectiveSightRadius() : 2000.f;
+		const float HalfAngle = Brain ? Brain->GetPeripheralVisionHalfAngle() : 65.f;
+		if (!AI->CanObserverSee(NPC, Pawn, Range, HalfAngle, true))
+		{
+			Alert->LoseTrackOf(Pawn, From);
+		}
+	}
+	// Shared sightings of it are stale too.
+	AI->ReportSighting(Pawn, From);
 }

@@ -94,6 +94,19 @@ struct FHitmenHUDAbilityView
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Meter = -1.f;
 	/** The ability's icon (DA_Ability_* Icon). */
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") TObjectPtr<UTexture2D> Icon = nullptr;
+	/** The key that triggers it (as bound): E / A, Space for the jetpack, Shift for the dash. */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") EHitmenKeyLabel Key = EHitmenKeyLabel::MoveAbility;
+};
+
+/** A timed effect on you (invisibility, pill): a small ring above the crosshair empties as it runs out. */
+USTRUCT(BlueprintType)
+struct FHitmenHUDStatusTimer
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") EHitmenStatusEffect Status = EHitmenStatusEffect::Invisible;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Remaining = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Duration = 1.f;
 };
 
 USTRUCT(BlueprintType)
@@ -187,18 +200,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenBark, const FHitmenBarkView
  * Local-player event hub. Gameplay code calls the Broadcast* helpers; widgets bind in
  * NativeConstruct. Lives on the local player, so it survives level travel and pawn changes.
  */
-/** Keys shown in prompts and on the HUD; they follow the player's rebinding. */
-UENUM(BlueprintType)
-enum class EHitmenKeyLabel : uint8
-{
-	Interact,
-	Jump,
-	MoveAbility,
-	Manipulation,
-	Sightroom,
-	Confirm,
-	Count UMETA(Hidden)
-};
 
 UCLASS()
 class HITMEN_API UHitmenUIEventSubsystem : public ULocalPlayerSubsystem
@@ -394,6 +395,14 @@ public:
 	/** What the focused thing is and its state (a line under the prompt; empty = none). */
 	void SetInteractionInfo(const FText& Info) { InteractionInfo = Info; }
 	const FText& GetInteractionInfo() const { return InteractionInfo; }
+
+	/** A small plain hint bottom right ("F  Throw" while aiming), empty = none. */
+	void SetCornerHint(const FText& Hint) { CornerHint = Hint; }
+	const FText& GetCornerHint() const { return CornerHint; }
+
+	/** Timed effects on you (rings above the crosshair), pushed by the controller a few times a second. */
+	void SetStatusTimers(const TArray<FHitmenHUDStatusTimer>& Timers) { StatusTimers = Timers; }
+	const TArray<FHitmenHUDStatusTimer>& GetStatusTimers() const { return StatusTimers; }
 	void BroadcastHitMarker(bool bKill, bool bHeadshot) { OnHitMarker.Broadcast(bKill, bHeadshot); }
 	void BroadcastDamageTaken(float Yaw) { OnDamageTaken.Broadcast(Yaw); }
 	void BroadcastSonar(const FHitmenSonarPing& Ping) { OnSonarPing.Broadcast(Ping); }
@@ -446,6 +455,8 @@ private:
 	FHitmenHUDVehicleView VehicleView;
 
 	FText InteractionInfo;
+	FText CornerHint;
+	TArray<FHitmenHUDStatusTimer> StatusTimers;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextureRenderTarget2D> EventCameraTarget;

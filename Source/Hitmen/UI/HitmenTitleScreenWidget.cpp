@@ -1,6 +1,7 @@
 // Hitmen — front-end root
 
 #include "UI/HitmenTitleScreenWidget.h"
+#include "Core/HitmenText.h"
 #include "UI/HitmenUIFactory.h"
 #include "UI/HitmenMenuKit.h"
 #include "UI/HitmenLobbyWidgets.h"
@@ -90,7 +91,7 @@ void UHitmenTitleScreenWidget::BuildDefaultLayout()
 	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	HitmenUI::AddToCanvas(TitlePage, Column, FAnchors(0.f, 0.5f), FVector2D(118.f, 0.f), FVector2D(0.f, 0.5f));
 	// Wordmark: one heavy, tightly set word, white on the dark scene. No tagline, no underline.
-	UTextBlock* Logo = HitmenUI::MakeText(WidgetTree, LOCTEXT("Logo", "HITMEN"), 190, TEXT("Bold"));
+	UTextBlock* Logo = HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenTitle.Logo", "HITMEN"), 190, TEXT("Bold"));
 	Logo->SetFont(HitmenUI::SpacedFont(190, TEXT("Bold"), -10));
 	Logo->SetShadowOffset(FVector2D(0.f, 4.f));
 	Logo->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.6f));
@@ -100,17 +101,17 @@ void UHitmenTitleScreenWidget::BuildDefaultLayout()
 	UVerticalBox* Menu = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	MenuSize->SetContent(Menu);
 	HitmenUI::AddToVBox(Column, MenuSize, FMargin(0.f), false, HAlign_Left);
-	AddMenuButton(Menu, LOCTEXT("Join", "Join room"), static_cast<int32>(EHitmenMenuButtonKind::Dashed), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, OpenJoin));
-	AddMenuButton(Menu, LOCTEXT("CreateRoom", "Create room"), static_cast<int32>(EHitmenMenuButtonKind::Block), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, CreateRoom));
-	AddMenuButton(Menu, LOCTEXT("Options", "Options"), static_cast<int32>(EHitmenMenuButtonKind::Block), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, OpenOptions));
-	AddMenuButton(Menu, LOCTEXT("Quit", "Quit"), static_cast<int32>(EHitmenMenuButtonKind::Block), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, QuitGame));
+	AddMenuButton(Menu, HITMEN_TEXT("HitmenTitle.Join", "Join room"), static_cast<int32>(EHitmenMenuButtonKind::Dashed), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, OpenJoin));
+	AddMenuButton(Menu, HITMEN_TEXT("HitmenTitle.CreateRoom", "Create room"), static_cast<int32>(EHitmenMenuButtonKind::Block), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, CreateRoom));
+	AddMenuButton(Menu, HITMEN_TEXT("HitmenTitle.Options", "Options"), static_cast<int32>(EHitmenMenuButtonKind::Block), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, OpenOptions));
+	AddMenuButton(Menu, HITMEN_TEXT("HitmenTitle.Quit", "Quit"), static_cast<int32>(EHitmenMenuButtonKind::Block), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, QuitGame));
 	TitleStatusText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 18, TEXT("Italic"), HitmenUI::Accent());
 	HitmenUI::AddToVBox(Column, TitleStatusText, FMargin(4.f, 14.f, 0.f, 0.f));
 
 	if (UHitmenGameSettings::Get()->bShowDebugButton)
 	{
 		UVerticalBox* DebugBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-		AddMenuButton(DebugBox, LOCTEXT("DebugGym", "Debug gym"), static_cast<int32>(EHitmenMenuButtonKind::Back), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, OpenDebugGym));
+		AddMenuButton(DebugBox, HITMEN_TEXT("HitmenTitle.DebugGym", "Debug gym"), static_cast<int32>(EHitmenMenuButtonKind::Back), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, OpenDebugGym));
 		HitmenUI::AddToCanvas(TitlePage, DebugBox, FAnchors(1.f, 1.f), FVector2D(-40.f, -32.f), FVector2D(1.f, 1.f));
 	}
 
@@ -120,7 +121,7 @@ void UHitmenTitleScreenWidget::BuildDefaultLayout()
 	UVerticalBox* JoinColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	UCanvasPanelSlot* JoinSlot = HitmenUI::AddToCanvas(JoinPage, JoinColumn, FAnchors(0.f, 0.f, 0.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
 	JoinSlot->SetOffsets(FMargin(118.f, 90.f, 820.f, 130.f));
-	HitmenUI::AddToVBox(JoinColumn, HitmenUI::MakeText(WidgetTree, LOCTEXT("JoinTitle", "JOIN A ROOM"), 72, TEXT("Bold")), FMargin(0.f, 0.f, 0.f, 6.f));
+	HitmenUI::AddToVBox(JoinColumn, HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenTitle.JoinTitle", "JOIN A ROOM"), 72, TEXT("Bold")), FMargin(0.f, 0.f, 0.f, 6.f));
 	JoinStatusText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 18, TEXT("Italic"), HitmenUI::TextDim());
 	HitmenUI::AddToVBox(JoinColumn, JoinStatusText, FMargin(2.f, 0.f, 0.f, 18.f));
 	UScrollBox* Scroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
@@ -131,12 +132,12 @@ void UHitmenTitleScreenWidget::BuildDefaultLayout()
 	UVerticalBox* Lists = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	Scroll->AddChild(Lists);
 	// Steam friends first.
-	HitmenUI::AddToVBox(Lists, MakeHeader(WidgetTree, LOCTEXT("Friends", "STEAM FRIENDS")), FMargin(0.f, 0.f, 0.f, 8.f));
+	HitmenUI::AddToVBox(Lists, MakeHeader(WidgetTree, HITMEN_TEXT("HitmenTitle.Friends", "STEAM FRIENDS")), FMargin(0.f, 0.f, 0.f, 8.f));
 	FriendList = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	HitmenUI::AddToVBox(Lists, MakeBlock(WidgetTree, FriendList), FMargin(0.f, 0.f, 0.f, 26.f));
 	// Rooms: the header with a refresh button beside it, then the list (messages go inside it).
 	UHorizontalBox* RoomsHeader = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	HitmenUI::AddToHBox(RoomsHeader, MakeHeader(WidgetTree, LOCTEXT("Rooms", "ROOMS")), FMargin(0.f, 0.f, 14.f, 0.f));
+	HitmenUI::AddToHBox(RoomsHeader, MakeHeader(WidgetTree, HITMEN_TEXT("HitmenTitle.Rooms", "ROOMS")), FMargin(0.f, 0.f, 14.f, 0.f));
 	RefreshButton = WidgetTree->ConstructWidget<UHitmenIconButton>(UHitmenIconButton::StaticClass());
 	RefreshButton->Setup(EHitmenIconGlyph::Refresh, 34.f, true);
 	RefreshButton->OnClicked.AddDynamic(this, &UHitmenTitleScreenWidget::RefreshRooms);
@@ -149,7 +150,7 @@ void UHitmenTitleScreenWidget::BuildDefaultLayout()
 	// Room code, right column.
 	UVerticalBox* CodeColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	HitmenUI::AddToCanvas(JoinPage, CodeColumn, FAnchors(1.f, 0.f), FVector2D(-110.f, 250.f), FVector2D(1.f, 0.f));
-	HitmenUI::AddToVBox(CodeColumn, MakeHeader(WidgetTree, LOCTEXT("CodeHeader", "ROOM CODE")), FMargin(0.f, 0.f, 0.f, 8.f));
+	HitmenUI::AddToVBox(CodeColumn, MakeHeader(WidgetTree, HITMEN_TEXT("HitmenTitle.CodeHeader", "ROOM CODE")), FMargin(0.f, 0.f, 0.f, 8.f));
 	CodeEdit = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
 	{
 		FEditableTextBoxStyle Style = CodeEdit->WidgetStyle;
@@ -165,7 +166,7 @@ void UHitmenTitleScreenWidget::BuildDefaultLayout()
 		Style.SetForegroundColor(FSlateColor(HitmenUI::Text()));
 		CodeEdit->WidgetStyle = Style;
 	}
-	CodeEdit->SetHintText(LOCTEXT("CodeHint", "ABC123"));
+	CodeEdit->SetHintText(HITMEN_TEXT("HitmenTitle.CodeHint", "ABC123"));
 	CodeEdit->OnTextCommitted.AddDynamic(this, &UHitmenTitleScreenWidget::HandleCodeCommitted);
 	USizeBox* CodeSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
 	CodeSize->SetWidthOverride(380.f);
@@ -175,13 +176,13 @@ void UHitmenTitleScreenWidget::BuildDefaultLayout()
 	JoinCodeSize->SetWidthOverride(380.f);
 	UVerticalBox* JoinCodeBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	JoinCodeSize->SetContent(JoinCodeBox);
-	AddMenuButton(JoinCodeBox, LOCTEXT("JoinCode", "Join"), static_cast<int32>(EHitmenMenuButtonKind::Block), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, JoinWithCode));
+	AddMenuButton(JoinCodeBox, HITMEN_TEXT("HitmenTitle.JoinCode", "Join"), static_cast<int32>(EHitmenMenuButtonKind::Block), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, JoinWithCode));
 	HitmenUI::AddToVBox(CodeColumn, JoinCodeSize, FMargin(0.f), false, HAlign_Left);
 	CodeStatusText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 17, TEXT("Italic"), HitmenUI::TextDim());
 	HitmenUI::AddToVBox(CodeColumn, CodeStatusText, FMargin(2.f, 8.f, 0.f, 0.f));
 
 	UVerticalBox* BackBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	AddMenuButton(BackBox, LOCTEXT("Back", "Back"), static_cast<int32>(EHitmenMenuButtonKind::Back), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, CloseJoin));
+	AddMenuButton(BackBox, HITMEN_TEXT("HitmenTitle.Back", "Back"), static_cast<int32>(EHitmenMenuButtonKind::Back), GET_FUNCTION_NAME_CHECKED(UHitmenTitleScreenWidget, CloseJoin));
 	HitmenUI::AddToCanvas(JoinPage, BackBox, FAnchors(0.f, 1.f), FVector2D(96.f, -40.f), FVector2D(0.f, 1.f));
 
 	// ---------------- Lobby (create room + customization) ----------------
@@ -314,7 +315,7 @@ void UHitmenTitleScreenWidget::CreateRoom()
 	{
 		if (TitleStatusText)
 		{
-			TitleStatusText->SetText(LOCTEXT("Creating", "Opening the room..."));
+			TitleStatusText->SetText(HITMEN_TEXT("HitmenTitle.Creating", "Opening the room..."));
 		}
 		const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
 		FString Name = Settings && !Settings->PreferredName.IsEmpty() ? Settings->PreferredName : Sessions->GetLocalOnlineName();
@@ -327,7 +328,7 @@ void UHitmenTitleScreenWidget::HandleCreateComplete(bool bSuccess)
 {
 	if (TitleStatusText)
 	{
-		TitleStatusText->SetText(bSuccess ? FText::GetEmpty() : LOCTEXT("CreateFailed", "Could not create the room."));
+		TitleStatusText->SetText(bSuccess ? FText::GetEmpty() : HITMEN_TEXT("HitmenTitle.CreateFailed", "Could not create the room."));
 	}
 }
 
@@ -361,11 +362,11 @@ void UHitmenTitleScreenWidget::RefreshRooms()
 	}
 	if (JoinStatusText)
 	{
-		JoinStatusText->SetText(LOCTEXT("Searching", "Searching..."));
+		JoinStatusText->SetText(HITMEN_TEXT("HitmenTitle.Searching", "Searching..."));
 	}
 	if (RoomList && RoomList->GetChildrenCount() == 0)
 	{
-		HitmenUI::AddToVBox(RoomList, MakeListMessage(LOCTEXT("SearchingRooms", "Searching for rooms...")), FMargin(8.f, 6.f));
+		HitmenUI::AddToVBox(RoomList, MakeListMessage(HITMEN_TEXT("HitmenTitle.SearchingRooms", "Searching for rooms...")), FMargin(8.f, 6.f));
 	}
 	// Spamming refresh while a search runs is ignored by the subsystem (one search at a time).
 	Sessions->FindRooms(bUseLAN);
@@ -381,8 +382,8 @@ void UHitmenTitleScreenWidget::HandleSessionsFound(const TArray<FHitmenSessionIn
 	for (const FHitmenSessionInfo& Info : Sessions)
 	{
 		UHitmenMenuButton* Entry = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
-		const FText Subtitle = FText::Format(LOCTEXT("RoomInfo", "{0} / {1} players  -  {2} ms{3}"), FText::AsNumber(Info.CurrentPlayers), FText::AsNumber(Info.MaxPlayers),
-			FText::AsNumber(Info.PingMs), Info.bIsFriend ? LOCTEXT("FriendTag", "  -  friend") : FText::GetEmpty());
+		const FText Subtitle = FText::Format(HITMEN_TEXT("HitmenTitle.RoomInfo", "{0} / {1} players  -  {2} ms{3}"), FText::AsNumber(Info.CurrentPlayers), FText::AsNumber(Info.MaxPlayers),
+			FText::AsNumber(Info.PingMs), Info.bIsFriend ? HITMEN_TEXT("HitmenTitle.FriendTag", "  -  friend") : FText::GetEmpty());
 		Entry->Setup(FText::FromString(Info.RoomName), EHitmenMenuButtonKind::Block, Subtitle);
 		Entry->Index = Info.ResultIndex;
 		Entry->OnIndexClicked.AddUniqueDynamic(this, &UHitmenTitleScreenWidget::HandleJoinClicked);
@@ -392,12 +393,12 @@ void UHitmenTitleScreenWidget::HandleSessionsFound(const TArray<FHitmenSessionIn
 	const bool bStillSearching = Subsystem && Subsystem->IsSearching();
 	if (Sessions.IsEmpty())
 	{
-		HitmenUI::AddToVBox(RoomList, MakeListMessage(bStillSearching ? LOCTEXT("SearchingRooms", "Searching for rooms...")
-			: (bSuccess ? LOCTEXT("NoRooms", "No room found.") : LOCTEXT("SearchFailed", "Search failed."))), FMargin(8.f, 6.f));
+		HitmenUI::AddToVBox(RoomList, MakeListMessage(bStillSearching ? HITMEN_TEXT("HitmenTitle.SearchingRooms", "Searching for rooms...")
+			: (bSuccess ? HITMEN_TEXT("HitmenTitle.NoRooms", "No room found.") : HITMEN_TEXT("HitmenTitle.SearchFailed", "Search failed."))), FMargin(8.f, 6.f));
 	}
 	if (JoinStatusText)
 	{
-		JoinStatusText->SetText(bStillSearching ? LOCTEXT("Searching", "Searching...") : FText::GetEmpty());
+		JoinStatusText->SetText(bStillSearching ? HITMEN_TEXT("HitmenTitle.Searching", "Searching...") : FText::GetEmpty());
 	}
 }
 
@@ -412,16 +413,16 @@ void UHitmenTitleScreenWidget::HandleFriendsUpdated(const TArray<FHitmenFriendIn
 	if (Friends.IsEmpty())
 	{
 		HitmenUI::AddToVBox(FriendList, MakeListMessage(Sessions && !Sessions->IsUsingSteam()
-			? LOCTEXT("NoSteam", "Steam is not running.")
-			: LOCTEXT("NoFriends", "No friends to show.")), FMargin(8.f, 6.f));
+			? HITMEN_TEXT("HitmenTitle.NoSteam", "Steam is not running.")
+			: HITMEN_TEXT("HitmenTitle.NoFriends", "No friends to show.")), FMargin(8.f, 6.f));
 		return;
 	}
 	for (const FHitmenFriendInfo& Friend : Friends)
 	{
 		UHitmenMenuButton* Entry = WidgetTree->ConstructWidget<UHitmenMenuButton>(UHitmenMenuButton::StaticClass());
 		const bool bHasRoom = Friend.RoomResultIndex != INDEX_NONE;
-		const FText State = bHasRoom ? LOCTEXT("FriendInRoom", "In a room  -  click to join")
-			: (Friend.bPlayingHitmen ? LOCTEXT("FriendPlaying", "Playing Hitmen") : (Friend.bOnline ? LOCTEXT("FriendOnline", "Online") : LOCTEXT("FriendOffline", "Offline")));
+		const FText State = bHasRoom ? HITMEN_TEXT("HitmenTitle.FriendInRoom", "In a room  -  click to join")
+			: (Friend.bPlayingHitmen ? HITMEN_TEXT("HitmenTitle.FriendPlaying", "Playing Hitmen") : (Friend.bOnline ? HITMEN_TEXT("HitmenTitle.FriendOnline", "Online") : HITMEN_TEXT("HitmenTitle.FriendOffline", "Offline")));
 		Entry->Setup(FText::FromString(Friend.DisplayName), EHitmenMenuButtonKind::Block, State);
 		Entry->Index = Friend.RoomResultIndex;
 		Entry->SetButtonEnabled(bHasRoom);
@@ -439,7 +440,7 @@ void UHitmenTitleScreenWidget::HandleJoinClicked(int32 ResultIndex)
 	{
 		if (JoinStatusText)
 		{
-			JoinStatusText->SetText(LOCTEXT("Joining", "Joining..."));
+			JoinStatusText->SetText(HITMEN_TEXT("HitmenTitle.Joining", "Joining..."));
 		}
 		bJoiningByCode = false;
 		Sessions->JoinRoom(ResultIndex);
@@ -467,13 +468,13 @@ void UHitmenTitleScreenWidget::JoinWithCode()
 	{
 		if (CodeStatusText)
 		{
-			CodeStatusText->SetText(LOCTEXT("CodeLength", "A room code has 6 characters."));
+			CodeStatusText->SetText(HITMEN_TEXT("HitmenTitle.CodeLength", "A room code has 6 characters."));
 		}
 		return;
 	}
 	if (CodeStatusText)
 	{
-		CodeStatusText->SetText(LOCTEXT("CodeSearching", "Looking for the room..."));
+		CodeStatusText->SetText(HITMEN_TEXT("HitmenTitle.CodeSearching", "Looking for the room..."));
 	}
 	bJoiningByCode = true;
 	Sessions->JoinByCode(Code, bUseLAN);
@@ -487,11 +488,11 @@ void UHitmenTitleScreenWidget::HandleJoinComplete(bool bSuccess)
 	}
 	if (bJoiningByCode && CodeStatusText)
 	{
-		CodeStatusText->SetText(LOCTEXT("CodeNotFound", "No room with this code."));
+		CodeStatusText->SetText(HITMEN_TEXT("HitmenTitle.CodeNotFound", "No room with this code."));
 	}
 	else if (JoinStatusText)
 	{
-		JoinStatusText->SetText(LOCTEXT("JoinFailed", "Could not join the room."));
+		JoinStatusText->SetText(HITMEN_TEXT("HitmenTitle.JoinFailed", "Could not join the room."));
 	}
 	bJoiningByCode = false;
 }

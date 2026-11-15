@@ -516,6 +516,16 @@ void AHitmenMountedGun::Multicast_Fire_Implementation(FVector_NetQuantize Impact
 	{
 		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::MountedGunFire, GunPivot->GetComponentLocation());
 		MuzzleFlashUntil = GetWorld()->GetTimeSeconds() + 0.04f;
+		// Where the bullets go: a puff on the impact and, now and then, a tracer from the muzzle.
+		const FVector Muzzle = GunPivot->GetComponentLocation() + GunPivot->GetForwardVector() * 150.f;
+		if (ImpactFX && FVector::DistSquared(Muzzle, Impact) < FMath::Square(Range - 10.f))
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ImpactFX, Impact, (Muzzle - Impact).Rotation(), FVector(ImpactFXScale));
+		}
+		if (FMath::FRand() < TracerChance)
+		{
+			AHitmenTracer::SpawnTracer(GetWorld(), Muzzle, Impact, UHitmenGameSettings::Get()->TracerMaterial.LoadSynchronous(), TracerColor);
+		}
 		if (AHitmenPlayerCharacter* Gunner = Cast<AHitmenPlayerCharacter>(Driver); Gunner && IsLocallyControlled())
 		{
 			Gunner->AddCameraShake(FireShake, 0.12f);

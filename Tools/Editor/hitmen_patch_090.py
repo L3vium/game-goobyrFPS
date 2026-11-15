@@ -117,4 +117,16 @@ if wanted("mounted_gun"):
         save(mounted)
     log("mounted_gun: shield lowered")
 
+if wanted("bodies"):
+    # The hollow body container (its walls come from its size in C++), the mounted gun's impact puff.
+    W = "/Game/Hitmen/World/Interactables"
+    mi = {name: load("/Game/Hitmen/Materials/Instances/" + name) for name in ("MI_Green", "MI_Dark")}
+    hitmen_content.build_body_container(W, mi)
+    mounted = load("/Game/Hitmen/World/Vehicles/BP_MountedGun")
+    if mounted:
+        unreal.get_default_object(mounted.generated_class()).set_editor_property("impact_fx", load(hitmen_content.TOON + "NS_Gunshot_Hit"))
+        unreal.BlueprintEditorLibrary.compile_blueprint(mounted)
+        save(mounted)
+    log("bodies: body container, mounted gun impacts")
+
 print("\n".join(LOG))

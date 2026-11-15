@@ -58,6 +58,11 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Sniper shot: a white smoke trail along the shot, lingering ~2 s; shotgun pellets spread per the weapon data
 - [x] Snipers: a red star at the scope, the red aim line visible from the ground (PIE screenshot, 0.9.0); [ ] at 100 m
 - [x] Mounted gun: the barrel shows under the crosshair (PIE screenshot, 0.9.0); [ ] bullets hit what the crosshair is on
+- [x] Carry a body: drawn in first person; dropped facing a wall it lands on your side (PIE script, 0.9.0); [ ] no
+  sprint while carrying, normal walk speed
+- [x] Locker: stow a body (1 / 1, "no room to hide"), `F` opens it to look inside (PIE script, 0.9.0)
+- [x] Body container: info line when empty-handed, hide inside crouched behind the slit, view limited to 180 degrees
+  (PIE screenshots, 0.9.0); [ ] two bodies stowed and visible with the lid open
 - [ ] Tank shells land on the crosshair; a parked tank is at full health; the tank bar only while driving
 - [x] Sniper: a brief trail to the impact and debris there; no warm full-screen wash on your own shots (PIE screenshots,
   0.8.0); [ ] SMG / minigun bursts in a dark room never look like a light left on

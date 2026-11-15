@@ -50,6 +50,10 @@ bool UHitmenCharacterMovementComponent::IsSprinting() const
 	{
 		return false;
 	}
+	if (const AHitmenCharacterBase* Owner = Cast<AHitmenCharacterBase>(CharacterOwner); Owner && !Owner->CanSprintNow())
+	{
+		return false;
+	}
 	if (!(MovementMode == MOVE_Walking || MovementMode == MOVE_NavWalking || MovementMode == MOVE_Falling))
 	{
 		return false;
@@ -86,8 +90,10 @@ float UHitmenCharacterMovementComponent::GetMaxSpeed() const
 	case MOVE_NavWalking:
 	case MOVE_Falling:
 	{
-		const float Base = IsCrouching() ? MaxWalkSpeedCrouched : (IsSprinting() ? SprintSpeed : WalkSpeed);
-		return Base * GetOwnerSpeedMultiplier();
+		const bool bSprinting = IsSprinting();
+		const float Base = IsCrouching() ? MaxWalkSpeedCrouched : (bSprinting ? SprintSpeed : WalkSpeed);
+		const AHitmenCharacterBase* Owner = Cast<AHitmenCharacterBase>(CharacterOwner);
+		return Base * GetOwnerSpeedMultiplier() * (Owner ? Owner->GetCarrySpeedMultiplier(bSprinting) : 1.f);
 	}
 	case MOVE_Custom:
 		switch (static_cast<EHitmenCustomMovement>(CustomMovementMode))

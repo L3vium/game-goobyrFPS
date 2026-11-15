@@ -331,6 +331,10 @@ public:
 	// ---- Broadcast helpers (keep call sites one-liners) ----
 	void BroadcastPawnChanged(APawn* NewPawn) { OnPawnChanged.Broadcast(NewPawn); }
 	void BroadcastPrompt(const FText& Prompt, bool bVisible) { OnInteractionPromptChanged.Broadcast(Prompt, bVisible); }
+
+	/** What the focused thing is and its state (a line under the prompt; empty = none). */
+	void SetInteractionInfo(const FText& Info) { InteractionInfo = Info; }
+	const FText& GetInteractionInfo() const { return InteractionInfo; }
 	void BroadcastHitMarker(bool bKill, bool bHeadshot) { OnHitMarker.Broadcast(bKill, bHeadshot); }
 	void BroadcastDamageTaken(float Yaw) { OnDamageTaken.Broadcast(Yaw); }
 	void BroadcastSonar(const FHitmenSonarPing& Ping) { OnSonarPing.Broadcast(Ping); }
@@ -381,4 +385,6 @@ private:
 	bool bScoped = false;
 	float InteractProgress = -1.f;
 	FHitmenHUDVehicleView VehicleView;
+
+	FText InteractionInfo;
 };

@@ -1,38 +1,56 @@
-// Hitmen — a container (dumpster, chest, freezer) to hide carried bodies in
+// Hitmen — a container (dumpster, chest, freezer) to hide carried bodies in, and to hide in yourself
 
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Interaction/HitmenInteractableBase.h"
+#include "World/Interactables/HitmenHidingSpot.h"
 #include "HitmenBodyContainer.generated.h"
 
-class AHitmenCharacterBase;
-
 /**
- * Carrying a body, F: the lid opens, the body goes in, the lid closes. Hidden bodies are never found by guards.
- * Holds up to Capacity bodies; the VIP is never hidden (it must be delivered).
+ * A hollow bin with a lid hinged on its back edge. Carrying a body, F: the lid opens, the body goes in (it stays there,
+ * visible when the lid opens; guards never find it) and the lid closes; up to BodyCapacity bodies, never the VIP. Empty
+ * handed, F: you climb in and crouch, looking out through a slit under the rim (the view turns within the arc).
+ * Looking at it always shows its name and how many bodies it holds.
  */
 UCLASS(Blueprintable)
-class HITMEN_API AHitmenBodyContainer : public AHitmenInteractableBase
+class HITMEN_API AHitmenBodyContainer : public AHitmenHidingSpot
 {
 	GENERATED_BODY()
 
 public:
 	AHitmenBodyContainer();
-
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	virtual void Tick(float DeltaSeconds) override;
-
-	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
-	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|BodyContainer")
-	int32 GetHiddenCount() const { return HiddenCount; }
+	int32 GetHiddenCount() const { return GetBodyCount(); }
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|BodyContainer")
-	bool IsFull() const { return HiddenCount >= Capacity; }
+	bool IsFull() const { return !HasRoomForBody(); }
 
 protected:
+	/** Outer size (cm): Width along Y (bodies lie along it), Depth along X (front at +X), Height of the walls. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(ClampMin="60", Units="cm"))
+	float Width = 210.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(ClampMin="60", Units="cm"))
+	float Depth = 110.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(ClampMin="60", Units="cm"))
+	float Height = 118.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(ClampMin="1", Units="cm"))
+	float WallThickness = 5.f;
+
+	/** Centre height of the peek slit in the front wall (the crouched eye inside) and its opening. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(Units="cm"))
+	float SlitHeight = 88.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(ClampMin="1", Units="cm"))
+	float SlitGap = 8.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(Units="deg"))
+	float LidOpenAngle = 105.f;
+
 	/** The lid (hinged on its back edge); the team swaps the mesh in the Blueprint. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<USceneComponent> LidPivot;
@@ -40,27 +58,21 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> Lid;
 
-	/** Bodies it can hold. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(ClampMin="1"))
-	int32 Capacity = 2;
+	/** Walls and floor (Mesh is the back wall). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> WallLeft;
 
-	/** Open, body in, closed (seconds). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(ClampMin="0.1", Units="s"))
-	float HideDuration = 0.8f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> WallRight;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|BodyContainer", meta=(Units="deg"))
-	float LidOpenAngle = 105.f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> WallFrontLower;
 
-	UPROPERTY(Replicated)
-	int32 HiddenCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> WallFrontUpper;
 
-	virtual void OnInteracted(AActor* Interactor) override;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<UStaticMeshComponent> Floor;
 
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayHide();
-
-	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
-	void Juice_OnBodyHidden(int32 Count);
-
-	float HideStartTime = -100.f;
+	virtual void ApplyOpenAlpha(float Alpha) override;
 };

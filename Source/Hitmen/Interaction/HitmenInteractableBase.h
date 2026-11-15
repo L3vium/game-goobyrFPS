@@ -25,6 +25,11 @@ public:
 	// IHitmenInteractable
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override { return InteractionText; }
+	/** DisplayName by default (subclasses add their state). */
+	virtual FText GetInteractionInfo_Implementation(AActor* Interactor) const override { return DisplayName; }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Interaction")
+	FText GetDisplayName() const { return DisplayName; }
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
 	// IHitmenScannable
@@ -47,6 +52,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Interaction")
 	FText InteractionText;
+
+	/** Name shown under the prompt when you look at it (and to watchers); empty = no info line. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Interaction")
+	FText DisplayName;
 
 	/** Seconds before it can be used again. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Interaction", meta=(ClampMin="0"))

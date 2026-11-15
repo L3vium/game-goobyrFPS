@@ -19,6 +19,16 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - The player's sniper shot leaves a white smoke trail that lingers 2.2 s (`TracerStyle` smoke values,
   `M_Hitmen_SmokeTrail`).
 - Snipers show a red star glint at the scope at any distance (`ScopeGlint`, `M_Hitmen_Glint`).
+- Hiding spots (`AHitmenHidingSpot`, the base of lockers and body containers): hide inside with a view arc
+  (`ViewArcDegrees` 180, pitch limits), stow carried bodies in slots (`BodyCapacity`: locker 1, container 2), bodies stay
+  visible inside and are never found, `bBlockHidingWhenBodyInside` (on; `F` then opens it to look inside).
+- Body container: hide inside crouched, looking out through a slit in the front wall; rebuilt as a hollow bin.
+- Info line under the prompt (`IHitmenInteractable::GetInteractionInfo`, `DisplayName` on fixtures): name and state of what
+  you look at, also when it cannot be used (highlighted, no key).
+- Carry variables on the carry component: `bCanSprintWhileCarrying` (off), `WalkSpeedPenaltyPercent` and
+  `SprintSpeedPenaltyPercent` (0); they replace the match rules' `CarrySpeedMultiplier` (0.65).
+- Mounted gun: an impact puff and tracers show where the bullets go (`ImpactFX`, `TracerChance`).
+- `AHitmenVehiclePawn::ExitVehicle` (server; scripts and QA).
 - Security turret: `VisionArcDegrees` (180) and `RoundsPerMinute` (200, replaces `FireInterval`). Mounted gun:
   `YawArcDegrees` (180, 360 turns all the way; replaces `MaxYaw`) and `RoundsPerMinute` (660, replaces `FireInterval`).
 
@@ -28,10 +38,13 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Mounted gun: the shield plate sits lower so the barrel shows; vehicle cameras use your field of view.
 - Empty vehicles take no damage by default (`bEmptyVehicleTakesDamage`): the tank no longer starts damaged.
 - The sniper's red aim line keeps about two pixels wide at any distance.
+- Carrying a body: no sprint, no slowdown by default (was 0.65x and sprint allowed).
 - Ladder and gutter puffs, slide dust and footstep puffs are off by default (switches above); the slide scrape stays.
 - Muzzle lights are half as strong (2.5-15 cd).
 
 ### Fixed
+- A carried body no longer goes into walls in your view (drawn like your gun) and a dropped body is never left inside a
+  wall or the floor; putting a body down no longer pushes it with the killing hit again.
 - Mounted gun and tank shots land where the crosshair points (they ran parallel to the view, under it).
 - Guns no longer glow while held: showing the first-person arms (a propagating `SetVisibility`) switched the muzzle light
   on for as long as the gun was in hand. The light is now off at zero intensity and only lives with a muzzle flash; a

@@ -1428,14 +1428,12 @@ def build_cosmetics(mats):
 
 
 def build_body_container(world_folder, mi):
-    """BP_BodyContainer: a dumpster-like box (120 x 90 x 110) with a lid hinged on its back edge; holds 2 bodies."""
+    """BP_BodyContainer: a hollow bin (210 x 110 x 118, built in C++ from its size) with a lid hinged on its back edge
+    and a peek slit in the front wall; holds 2 bodies, and you can hide inside crouched."""
     bp = make_blueprint("BP_BodyContainer", world_folder + "/Container", unreal.HitmenBodyContainer)
     d = cdo(bp)
-    set_mesh(component(d, "mesh"), SHAPES["cube"], (1.2, 0.9, 1.1), mi["MI_Green"], (0, 0, 55))
-    set_mesh(component(d, "lid"), SHAPES["cube"], (1.24, 0.94, 0.08), mi["MI_Dark"], (60, 0, 4))
-    lid_pivot = component(d, "lid_pivot")
-    if lid_pivot:
-        lid_pivot.set_editor_property("relative_location", unreal.Vector(-60, 0, 110))
+    set_mesh(component(d, "mesh"), SHAPES["cube"], None, mi["MI_Green"])
+    set_mesh(component(d, "lid"), SHAPES["cube"], None, mi["MI_Dark"])
     save(bp)
     return bp
 
@@ -1916,6 +1914,7 @@ def build_world(mats, weapons):
     mounted_mesh = component(cdo(mounted), "mesh")
     if mounted_mesh:
         mounted_mesh.set_editor_property("relative_rotation", unreal.Rotator(pitch=-90.0, yaw=0.0, roll=0.0))
+    set_props(cdo(mounted), impact_fx=load(TOON + "NS_Gunshot_Hit"))
     save(mounted)
     tank = fixture("BP_Tank", unreal.HitmenTank, V, {"mesh": ("cube", (6.0, 3.6, 1.6), mi["MI_Green"], None), "turret": ("cube", (2.6, 2.0, 0.8), mi["MI_Green"], None),
                                                     "barrel": ("cylinder", (0.32, 0.32, 3.4), mi["MI_Dark"], None)},

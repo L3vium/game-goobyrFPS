@@ -37,11 +37,23 @@ If any member of a team delivers the VIP, the whole team wins.
 - The VIP is shown in red in the Sightroom; once dead, its highlight turns **yellow**.
 - Any body can be picked up with `F` (the VIP too): it lies across your arms in front of you, takes the left weapon
   slot (with both slots full, the weapon in hand is put down; the other one stays slung in the right slot), you cannot
-  shoot or punch, and you move slower (`CarrySpeedMultiplier`). `F` with nothing in focus or the mouse wheel puts it
-  down, and the remaining weapon comes back to hand. The HUD's left card reads BODY (TARGET for the VIP).
-- **Body containers** (`BP_BodyContainer`, `AHitmenBodyContainer`): carrying a body, `F` opens the lid, the body goes in
-  and the lid closes (0.8 s); a hidden body is never found. `Capacity` 2 by default; the prompt shows `(1/2)` or
-  `[Full]`; the VIP can never be hidden (it must be delivered).
+  shoot or punch. In your own view the body is drawn like your gun (first-person render, no collision): it never goes
+  into a wall. Variables on the carry component (`BP_PlayerCharacter`): `bCanSprintWhileCarrying` (off: you walk),
+  `WalkSpeedPenaltyPercent` and `SprintSpeedPenaltyPercent` (0: no slower). `F` with nothing in focus or the mouse wheel
+  puts it down, and the remaining weapon comes back to hand: the body is set back on your side of any wall it was
+  carried into and above the floor (`DropClearance`), then falls as a ragdoll (no push). The HUD's left card reads BODY
+  (TARGET for the VIP).
+- **Hiding spots** (`AHitmenHidingSpot`: lockers and body containers). Empty-handed, `F` hides you inside: it opens, you
+  step in facing out, it closes; guards cannot see you; the view turns within `ViewArcDegrees` (180 = left to right,
+  360 = free) and `ViewPitchMin / Max`. Carrying a body, `F` stows it in the next slot (`BodySlots`), up to
+  `BodyCapacity`, never the VIP: the body stays there, visible whenever it opens, and guards never find it. With
+  `bBlockHidingWhenBodyInside` (on) a spot holding a body has no room for you: `F` then opens it to look inside.
+  Looking at one always shows its name and contents under the prompt, usable or not ("Body container - 1 / 2 bodies",
+  "Locker - 1 / 1 body - no room to hide").
+  - **Locker** (`BP_Locker`): stand inside and look through the door slit; holds 1 body (upright at the back).
+  - **Body container** (`BP_BodyContainer`): a hollow bin (210 x 110 x 118, `Width / Depth / Height`) with a lid hinged on
+    its back edge and a peek slit in the front wall (`SlitHeight` 88): inside you crouch with your eye at the slit;
+    holds 2 bodies lying side by side.
 - **Sonar**: while a body is carried, a red ping appears at the carrier position, stays fixed even
   if the carrier moves, and refreshes every N seconds; the interval shortens over time
   (curve in match rules).
@@ -342,7 +354,8 @@ act (fire for the lighter, notes for the remote distraction, a swirl for blink a
 | Ladder / gutter | Automatic climb |
 | Zipline | Automatic, up/down |
 | Jump pad | Launches high |
-| Locker | Hollow cabinet; the door (hinged on its right edge) opens and you step in (0.5 s, turning to face out), the door closes; look through the door slit; stepping out is the reverse |
+| Locker | Hollow cabinet; the door (hinged on its right edge) opens and you step in (0.5 s, turning to face out), the door closes; look through the door slit, turning within 180 degrees; stepping out is the reverse; holds one body (see Hiding spots in §2) |
+| Body container | Hollow bin with a lid; hide inside crouched (peek slit, 180 degrees) or stow up to two bodies, visible inside (see §2) |
 | Door | Open/close, swings away from whoever opens it; hinged on its +X edge (`bHingeAtPositiveEnd`, the other edge when off); fills its 110 x 230 opening; optional keycard ID (`[Locked - Keycard N]` in the prompt) |
 | Window | Frame inside the wall opening, two shutters opening 80 degrees away from the opener; vaultable when open |
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
@@ -487,7 +500,9 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   Hitman-like awareness arcs around it, one per guard or camera noticing you, placed toward it: the arc fills from its
   middle as suspicion grows (white), then turns yellow or red; cameras add a small camera mark.
 - **Prompts** under the crosshair: `[F] Open  [Locked - Keycard 1]`, `[SPACE] Vault` (the keys as bound); remote-ability
-  targets glow with `[A] Charm` under them; holding F fills a ring around the key. Keycards are chips bottom right
+  targets glow with `[A] Charm` under them; holding F fills a ring around the key. A smaller info line under the prompt
+  says what you look at and its state (`GetInteractionInfo`, the fixture's `DisplayName` by default); something with info
+  is highlighted and shows it even when it cannot be used now (then without a key). Keycards are chips bottom right
   (above `[F] Exit` while driving).
 - **Damage**: red edges on each hit, a breathing red glow and a heartbeat below 35 % health.
 - **Scope** overlay for the sniper. **Sightroom** (Tab): a fast scan wave and a floor grid around you, then the whole map in a cool look;

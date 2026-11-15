@@ -106,14 +106,13 @@ void UHitmenBodyCarryComponent::NotifyGameMode() const
 	}
 }
 
-float UHitmenBodyCarryComponent::GetSpeedMultiplier() const
+float UHitmenBodyCarryComponent::GetSpeedMultiplier(bool bSprinting) const
 {
 	if (!CarriedBody)
 	{
 		return 1.f;
 	}
-	const AHitmenGameModeBase* GM = GetWorld()->GetAuthGameMode<AHitmenGameModeBase>();
-	// Clients have no game mode: use the default rule value they all share.
-	static const float DefaultMultiplier = GetDefault<UHitmenMatchRules>()->CarrySpeedMultiplier;
-	return GM ? GM->GetRules()->CarrySpeedMultiplier : DefaultMultiplier;
+	// Component values: the same on every machine (the movement is predicted).
+	const float Penalty = bSprinting ? SprintSpeedPenaltyPercent : WalkSpeedPenaltyPercent;
+	return FMath::Clamp(1.f - Penalty / 100.f, 0.05f, 1.f);
 }

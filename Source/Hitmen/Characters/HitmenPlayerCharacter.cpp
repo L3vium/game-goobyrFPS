@@ -1045,7 +1045,17 @@ void AHitmenPlayerCharacter::ApplyCosmetics(const FHitmenCosmeticLoadout& Cosmet
 
 float AHitmenPlayerCharacter::GetMovementSpeedMultiplier() const
 {
-	return Super::GetMovementSpeedMultiplier() * BodyCarryComponent->GetSpeedMultiplier();
+	return Super::GetMovementSpeedMultiplier();
+}
+
+float AHitmenPlayerCharacter::GetCarrySpeedMultiplier(bool bSprinting) const
+{
+	return BodyCarryComponent ? BodyCarryComponent->GetSpeedMultiplier(bSprinting) : 1.f;
+}
+
+bool AHitmenPlayerCharacter::CanSprintNow() const
+{
+	return !BodyCarryComponent || BodyCarryComponent->CanSprint();
 }
 
 int32 AHitmenPlayerCharacter::GetHitmenTeamId_Implementation() const

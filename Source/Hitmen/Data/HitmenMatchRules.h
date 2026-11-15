@@ -80,8 +80,7 @@ public:
 	float SpawnSpreadRandomness = 0.25f;
 
 	// ---- VIP body / carry ----
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Carry", meta=(ClampMin="0.05", ClampMax="1"))
-	float CarrySpeedMultiplier = 0.65f;
+
 
 	/** Sonar timing (seconds). Lobby options: hide one to fix its value by design. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Lobby Options")

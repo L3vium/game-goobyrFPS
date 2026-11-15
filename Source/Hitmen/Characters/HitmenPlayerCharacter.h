@@ -66,6 +66,8 @@ public:
 	/** F would throw the held weapon now (nothing else in focus). */
 	bool CanThrowHeldWeapon() const;
 	virtual float GetMovementSpeedMultiplier() const override;
+	virtual float GetCarrySpeedMultiplier(bool bSprinting) const override;
+	virtual bool CanSprintNow() const override;
 	virtual int32 GetHitmenTeamId_Implementation() const override;
 
 	/** Where held weapons attach: first-person arms for the local player, body for others. */

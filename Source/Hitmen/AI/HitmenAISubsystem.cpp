@@ -76,7 +76,7 @@ void UHitmenAISubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	for (TActorIterator<AActor> It(&InWorld); It; ++It)
 	{
 		AActor* Actor = *It;
-		if (Actor && (Actor->IsA<AHitmenTallGrass>() || Actor->IsA<AHitmenLocker>() || Actor->ActorHasTag(HidingSpotTag)))
+		if (Actor && (Actor->IsA<AHitmenTallGrass>() || Actor->IsA<AHitmenHidingSpot>() || Actor->ActorHasTag(HidingSpotTag)))
 		{
 			HidingSpots.AddUnique(Actor);
 		}
@@ -713,7 +713,7 @@ void UHitmenAISubsystem::GetHidingSpotsNear(const FVector& Center, float Radius,
 		for (const TWeakObjectPtr<AActor>& Weak : Registry->GetScannables())
 		{
 			AActor* Actor = Weak.Get();
-			if (Actor && (Actor->IsA<AHitmenLocker>() || Actor->IsA<AHitmenTallGrass>() || Actor->ActorHasTag(HidingSpotTag)))
+			if (Actor && (Actor->IsA<AHitmenHidingSpot>() || Actor->IsA<AHitmenTallGrass>() || Actor->ActorHasTag(HidingSpotTag)))
 			{
 				Consider(Actor);
 			}

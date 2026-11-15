@@ -50,6 +50,10 @@ public:
 	/** Owning client: the vehicle camera takes the player's field of view (Options > Graphics). */
 	virtual void PawnClientRestart() override;
 
+	/** Server: puts the driver back on foot (what F does; also for scripts and QA). */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Vehicle")
+	void ExitVehicle() { Exit(); }
+
 	// IHitmenInteractable
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
@@ -220,6 +224,20 @@ protected:
 	/** Muzzle flash light while firing (candelas; no bounce light, no fog). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun|Juice", meta=(ClampMin="0", Units="cd"))
 	float MuzzleLightIntensity = 40.f;
+
+	/** Puff where a bullet lands (walls and bodies), so the gunner sees where the shots go. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun|Juice")
+	TObjectPtr<class UNiagaraSystem> ImpactFX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun|Juice", meta=(ClampMin="0"))
+	float ImpactFXScale = 0.6f;
+
+	/** Share of the bullets drawn as tracers (streaks from the muzzle to the impact). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun|Juice", meta=(ClampMin="0", ClampMax="1"))
+	float TracerChance = 0.4f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun|Juice")
+	FLinearColor TracerColor = FLinearColor(1.f, 0.75f, 0.4f);
 
 	float MuzzleFlashUntil = 0.f;
 

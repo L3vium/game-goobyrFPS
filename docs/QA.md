@@ -213,6 +213,10 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Awareness arcs toward guards noticing you; minimap Under fire banner (screenshot, 0.5.0)
 - [ ] Headshot hit ticks are red and a metallic hit sound plays (shooter only)
 - [ ] Minimap: no own view cone, north-up, your arrow turns
+- [x] Watchers (2-3 player PIE, `HitmenWatch`): free fly with the player outlined and tagged, player view first and
+  third person, split screen of 2, the info line on a locker, Tab scan with guards lit, the host sees a client watcher
+  as an orb with its name (screenshots, 0.9.0); [ ] fly through a wall and under the ground in San Lazaro by hand,
+  [ ] split screen with 5-8 players, [ ] N / B toggles by key
 - [x] Sightroom: an enemy brightens progressively from 20 m to 16.5 m (no pop), highlights fade out with the look on
   release (PIE screenshots, 0.9.0); [ ] walk round a corner holding Tab: a locker lights as it shows
 - [x] Map layers: minimap default = NPC diamonds only; all layers on = cones and interactables on both maps; pause map

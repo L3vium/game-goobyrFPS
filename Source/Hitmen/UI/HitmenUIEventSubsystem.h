@@ -173,6 +173,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenPhase, EHitmenMatchPhase, P
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenResult, const FHitmenMatchResult&, Result);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenDamageTaken, float, DirectionYawDegrees);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenSpectatorMode, uint8, Mode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenWatcherSpeed, float, SpeedScale);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHitmenSimpleEvent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenInventoryView, const FHitmenHUDInventoryView&, View);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenAbilityViews, const FHitmenHUDAbilityView&, Move, const FHitmenHUDAbilityView&, Manipulation);
@@ -267,6 +268,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
 	FOnHitmenSpectatorMode OnSpectatorModeChanged;
+
+	/** Watcher fly speed changed (mouse wheel): the spectator widget shows it briefly. */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenWatcherSpeed OnWatcherSpeedChanged;
 
 	// ---- HUD view models (pushed by the player controller; widgets never touch gameplay) ----
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
@@ -374,6 +379,15 @@ public:
 	float GetEventCameraEnd() const { return EventCameraEnd; }
 
 	/** The end cinematic plays: the HUD hides, letterbox bars. */
+	/** Watcher overlays (N players, B watchers), as the controller toggled them; Project Settings decide if allowed. */
+	void SetWatcherOverlay(bool bPlayers, bool bWatchers) { bWatcherShowPlayers = bPlayers; bWatcherShowWatchers = bWatchers; }
+	bool AreWatcherPlayersShown() const { return bWatcherShowPlayers; }
+	bool AreWatcherWatchersShown() const { return bWatcherShowWatchers; }
+
+	/** The player followed in player view (empty otherwise): the spectator line names them. */
+	void SetSpectatorTargetName(const FText& Name) { SpectatorTargetName = Name; }
+	const FText& GetSpectatorTargetName() const { return SpectatorTargetName; }
+
 	void SetCinematic(bool bInCinematic) { if (bCinematic != bInCinematic) { bCinematic = bInCinematic; OnCinematicChanged.Broadcast(bCinematic); } }
 	UFUNCTION(BlueprintPure, Category="Hitmen|UI") bool IsCinematic() const { return bCinematic; }
 
@@ -439,4 +453,7 @@ private:
 	FText EventCameraTitle;
 	float EventCameraEnd = -1.f;
 	bool bCinematic = false;
+	bool bWatcherShowPlayers = true;
+	bool bWatcherShowWatchers = true;
+	FText SpectatorTargetName;
 };

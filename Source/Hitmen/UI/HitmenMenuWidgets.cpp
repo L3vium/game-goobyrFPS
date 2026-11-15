@@ -39,6 +39,7 @@
 #include "Components/ScrollBox.h"
 #include "Components/Image.h"
 #include "Components/UniformGridPanel.h"
+#include "Components/UniformGridSlot.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "EnhancedInputSubsystems.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
@@ -790,13 +791,61 @@ void UHitmenSpectatorWidget::BuildDefaultLayout()
 {
 	UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
 	WidgetTree->RootWidget = Canvas;
-	ModeText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 18);
-	HitmenUI::AddToCanvas(Canvas, ModeText, FAnchors(0.5f, 1.f), FVector2D(0.f, -30.f), FVector2D(0.5f, 1.f));
+	// Split screen: the whole screen but a strip at the bottom for the keys.
 	Grid = WidgetTree->ConstructWidget<UUniformGridPanel>(UUniformGridPanel::StaticClass());
-	Grid->SetSlotPadding(FMargin(4.f));
+	Grid->SetSlotPadding(FMargin(3.f));
 	UCanvasPanelSlot* GridSlot = HitmenUI::AddToCanvas(Canvas, Grid, FAnchors(0.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
-	GridSlot->SetOffsets(FMargin(20.f, 20.f, 20.f, 80.f));
+	GridSlot->SetOffsets(FMargin(6.f, 6.f, 6.f, 64.f));
 	Grid->SetVisibility(ESlateVisibility::Collapsed);
+	// Bottom: the view (and who), then its keys.
+	ModeText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 19, TEXT("Bold"));
+	ModeText->SetJustification(ETextJustify::Center);
+	UCanvasPanelSlot* ModeSlot = HitmenUI::AddToCanvas(Canvas, ModeText, FAnchors(0.5f, 1.f), FVector2D(0.f, -34.f), FVector2D(0.5f, 1.f));
+	ModeSlot->SetAutoSize(true);
+	KeysText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 14, TEXT("Medium"), HitmenUI::TextDim());
+	KeysText->SetJustification(ETextJustify::Center);
+	UCanvasPanelSlot* KeysSlot = HitmenUI::AddToCanvas(Canvas, KeysText, FAnchors(0.5f, 1.f), FVector2D(0.f, -12.f), FVector2D(0.5f, 1.f));
+	KeysSlot->SetAutoSize(true);
+	// The fly speed, briefly, after a wheel notch.
+	SpeedText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 22, TEXT("Bold"));
+	SpeedText->SetJustification(ETextJustify::Center);
+	UCanvasPanelSlot* SpeedSlot = HitmenUI::AddToCanvas(Canvas, SpeedText, FAnchors(0.5f, 0.5f), FVector2D(0.f, 80.f), FVector2D(0.5f, 0.5f));
+	SpeedSlot->SetAutoSize(true);
+	SpeedText->SetRenderOpacity(0.f);
+	InfoText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 16, TEXT("Medium"), FLinearColor(0.88f, 0.88f, 0.88f, 1.f));
+	InfoText->SetJustification(ETextJustify::Center);
+	InfoText->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.8f));
+	InfoText->SetShadowOffset(FVector2D(1.f, 1.f));
+	UCanvasPanelSlot* InfoSlot = HitmenUI::AddToCanvas(Canvas, InfoText, FAnchors(0.5f, 0.5f), FVector2D(0.f, 36.f), FVector2D(0.5f, 0.f));
+	InfoSlot->SetAutoSize(true);
+}
+
+void UHitmenSpectatorWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (SpeedText && GetWorld())
+	{
+		const float Age = GetWorld()->GetRealTimeSeconds() - SpeedShownAt;
+		SpeedText->SetRenderOpacity(FMath::Clamp((SpeedShowTime - Age) / 0.3f, 0.f, 1.f));
+	}
+	if (InfoText)
+	{
+		const UHitmenUIEventSubsystem* UI = GetUIEvents();
+		const FText Info = UI && static_cast<EHitmenSpectatorMode>(CurrentMode) != EHitmenSpectatorMode::Grid ? UI->GetInteractionInfo() : FText::GetEmpty();
+		if (!Info.EqualTo(InfoText->GetText()))
+		{
+			InfoText->SetText(Info);
+		}
+	}
+}
+
+void UHitmenSpectatorWidget::HandleWatcherSpeed(float SpeedScale)
+{
+	if (SpeedText && GetWorld())
+	{
+		SpeedText->SetText(FText::FromString(FString::Printf(TEXT("FLY SPEED  x%.2g"), SpeedScale)));
+		SpeedShownAt = GetWorld()->GetRealTimeSeconds();
+	}
 }
 
 void UHitmenSpectatorWidget::BindEvents()
@@ -805,6 +854,7 @@ void UHitmenSpectatorWidget::BindEvents()
 	{
 		UI->OnSpectatorModeChanged.AddUniqueDynamic(this, &UHitmenSpectatorWidget::HandleModeChanged);
 		UI->OnSpectatorViewsChanged.AddUniqueDynamic(this, &UHitmenSpectatorWidget::HandleViewsChanged);
+		UI->OnWatcherSpeedChanged.AddUniqueDynamic(this, &UHitmenSpectatorWidget::HandleWatcherSpeed);
 		HandleViewsChanged(UI->GetSpectatorViews());
 	}
 }
@@ -815,6 +865,7 @@ void UHitmenSpectatorWidget::UnbindEvents()
 	{
 		UI->OnSpectatorModeChanged.RemoveAll(this);
 		UI->OnSpectatorViewsChanged.RemoveAll(this);
+		UI->OnWatcherSpeedChanged.RemoveAll(this);
 	}
 }
 
@@ -822,16 +873,66 @@ void UHitmenSpectatorWidget::HandleModeChanged(uint8 Mode)
 {
 	CurrentMode = Mode;
 	const EHitmenSpectatorMode SpectatorMode = static_cast<EHitmenSpectatorMode>(Mode);
+	const UHitmenUIEventSubsystem* UI = GetUIEvents();
+	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+	const AHitmenPlayerState* Self = GetOwningPlayerState<AHitmenPlayerState>();
+	const bool bWatcher = !Self || Self->IsWatcher() || Self->IsAlive() == false;
+	const bool bCanFreeFly = Self && Self->IsWatcher();
 	if (ModeText)
 	{
-		const FText ModeName = SpectatorMode == EHitmenSpectatorMode::FreeFly ? LOCTEXT("FreeFly", "FREE FLY")
-			: SpectatorMode == EHitmenSpectatorMode::Follow ? LOCTEXT("Follow", "FOLLOW") : LOCTEXT("Grid", "MULTI-SCREEN");
-		const FText Hint = SpectatorMode == EHitmenSpectatorMode::Grid
-			? LOCTEXT("GridHint", "[Wheel] number of screens     [LMB/RMB] switch player     [V] change view")
-			: SpectatorMode == EHitmenSpectatorMode::FreeFly
-			? LOCTEXT("FreeFlyHint", "[ZQSD] move   [SPACE / A] up   [CTRL / E] down   [SHIFT] faster     [LMB/RMB] follow a player     [V] change view")
-			: LOCTEXT("SpectatorHint", "[LMB/RMB] switch player     [V] change view");
-		ModeText->SetText(FText::Format(LOCTEXT("SpectatorLine", "{0}     {1}"), ModeName, Hint));
+		FString Line;
+		switch (SpectatorMode)
+		{
+		case EHitmenSpectatorMode::Follow:
+		{
+			const FString Name = UI ? UI->GetSpectatorTargetName().ToString().ToUpper() : FString();
+			Line = Name.IsEmpty() ? FString(TEXT("PLAYER VIEW")) : FString::Printf(TEXT("PLAYER VIEW  -  %s"), *Name);
+			break;
+		}
+		case EHitmenSpectatorMode::Grid:
+			Line = ViewCount > 0 ? FString(TEXT("SPLIT SCREEN")) : FString(TEXT("SPLIT SCREEN  -  NOBODY TO WATCH"));
+			break;
+		default:
+			Line = TEXT("FREE FLY");
+			break;
+		}
+		ModeText->SetText(FText::FromString(Line));
+	}
+	if (KeysText)
+	{
+		// The view's own keys, then the views and the switches this server allows.
+		TArray<FString> Keys;
+		switch (SpectatorMode)
+		{
+		case EHitmenSpectatorMode::Follow:
+			Keys = { TEXT("[LMB / RMB] switch player"), TEXT("[V] first / third person") };
+			break;
+		case EHitmenSpectatorMode::Grid:
+			Keys = { TEXT("[LMB / RMB] switch player") };
+			break;
+		default:
+			Keys = { TEXT("[ZQSD] move"), TEXT("[E / SPACE] up"), TEXT("[A / CTRL] down"), TEXT("[SHIFT] faster"), TEXT("[WHEEL] speed") };
+			break;
+		}
+		Keys.Add(TEXT("[1] player view"));
+		Keys.Add(TEXT("[2] split screen"));
+		if (bCanFreeFly)
+		{
+			Keys.Add(TEXT("[3] free fly"));
+		}
+		if (bWatcher && Settings->WatcherSeePlayers == EHitmenWatcherVisibility::ShownToggleable)
+		{
+			Keys.Add(FString::Printf(TEXT("[N] players %s"), UI && UI->AreWatcherPlayersShown() ? TEXT("on") : TEXT("off")));
+		}
+		if (bWatcher && Settings->WatcherSeeWatchers == EHitmenWatcherVisibility::ShownToggleable)
+		{
+			Keys.Add(FString::Printf(TEXT("[B] watchers %s"), UI && UI->AreWatcherWatchersShown() ? TEXT("on") : TEXT("off")));
+		}
+		if (Settings->bWatchersCanScan && SpectatorMode != EHitmenSpectatorMode::Grid)
+		{
+			Keys.Add(TEXT("[TAB] scan"));
+		}
+		KeysText->SetText(FText::FromString(FString::Join(Keys, TEXT("     "))));
 	}
 	if (Grid && SpectatorMode != EHitmenSpectatorMode::Grid)
 	{
@@ -846,7 +947,11 @@ void UHitmenSpectatorWidget::HandleViewsChanged(const TArray<FHitmenSpectatorVie
 		return;
 	}
 	Grid->ClearChildren();
-	const int32 Columns = FMath::Max(1, FMath::CeilToInt(FMath::Sqrt(static_cast<float>(Views.Num()))));
+	ViewCount = Views.Num();
+	// 1, 2 side by side, 2x2, 3x2, 4x2: each picture fills its cell (the controller shapes it like the cell).
+	int32 Columns = 1;
+	int32 Rows = 1;
+	HitmenUI::GetSplitLayout(Views.Num(), Columns, Rows);
 	for (int32 Index = 0; Index < Views.Num(); ++Index)
 	{
 		const FHitmenSpectatorView& View = Views[Index];
@@ -860,18 +965,27 @@ void UHitmenSpectatorWidget::HandleViewsChanged(const TArray<FHitmenSpectatorVie
 		Brush.SetResourceObject(View.RenderTarget);
 		Brush.ImageSize = FVector2D(View.RenderTarget->SizeX, View.RenderTarget->SizeY);
 		Image->SetBrush(Brush);
-		Cell->AddChildToOverlay(Image);
-		UTextBlock* Name = HitmenUI::MakeText(WidgetTree, View.PlayerName, 14);
+		if (UOverlaySlot* ImageSlot = Cell->AddChildToOverlay(Image))
+		{
+			ImageSlot->SetHorizontalAlignment(HAlign_Fill);
+			ImageSlot->SetVerticalAlignment(VAlign_Fill);
+		}
+		UTextBlock* Name = HitmenUI::MakeText(WidgetTree, FText::FromString(View.PlayerName.ToString().ToUpper()), 15, TEXT("Bold"));
 		if (UOverlaySlot* NameSlot = Cell->AddChildToOverlay(Name))
 		{
 			NameSlot->SetHorizontalAlignment(HAlign_Left);
 			NameSlot->SetVerticalAlignment(VAlign_Top);
 			NameSlot->SetPadding(FMargin(8.f, 6.f));
 		}
-		Grid->AddChildToUniformGrid(Cell, Index / Columns, Index % Columns);
+		if (UUniformGridSlot* CellSlot = Grid->AddChildToUniformGrid(Cell, Index / Columns, Index % Columns))
+		{
+			CellSlot->SetHorizontalAlignment(HAlign_Fill);
+			CellSlot->SetVerticalAlignment(VAlign_Fill);
+		}
 	}
 	const bool bGrid = static_cast<EHitmenSpectatorMode>(CurrentMode) == EHitmenSpectatorMode::Grid && !Views.IsEmpty();
 	Grid->SetVisibility(bGrid ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	HandleModeChanged(CurrentMode);
 }
 
 // =============================================================================================

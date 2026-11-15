@@ -1,6 +1,7 @@
 // Hitmen — match events widget
 
 #include "UI/HitmenMatchEventsWidget.h"
+#include "UI/HitmenNameTagsWidget.h"
 #include "UI/HitmenUIFactory.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -14,6 +15,16 @@ void UHitmenMatchEventsWidget::BuildDefaultLayout()
 {
 	UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
 	WidgetTree->RootWidget = Canvas;
+	// Name tags (players for watchers, watchers, the watched line) under everything else here.
+	if (UHitmenNameTagsWidget* NameTags = WidgetTree->ConstructWidget<UHitmenNameTagsWidget>(UHitmenNameTagsWidget::StaticClass()))
+	{
+		NameTags->SetVisibility(ESlateVisibility::HitTestInvisible);
+		if (UCanvasPanelSlot* TagsSlot = Canvas->AddChildToCanvas(NameTags))
+		{
+			TagsSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			TagsSlot->SetOffsets(FMargin(0.f));
+		}
+	}
 	// Event camera: a thin white frame around the picture, top left (under where the title is painted).
 	EventFrame = HitmenUI::MakePanel(WidgetTree, FLinearColor(0.95f, 0.95f, 0.95f, 0.9f), FMargin(2.f));
 	EventImage = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());

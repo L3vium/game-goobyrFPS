@@ -80,6 +80,9 @@ namespace HitmenUI
 	HITMEN_API void PaintArcFill(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float InnerRadius, float OuterRadius, float StartDeg, float EndDeg, const FLinearColor& Color, int32 Segments = 24);
 	/** A map marker of a kind (UHitmenMapMarkerType) centred on Center: its icon or its shape, on a dark outline.
 	 *  Uses Layer and Layer + 1. */
+	/** Split screen grid for Count views (up to 8): 1, 2 side by side, 2x2, 3x2, 4x2. */
+	HITMEN_API void GetSplitLayout(int32 Count, int32& OutColumns, int32& OutRows);
+
 	/** A filled diamond with a dark rim (NPCs on the maps). Radius = centre to tip. */
 	HITMEN_API void PaintDiamond(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Radius, const FLinearColor& Color, const FLinearColor& Rim = FLinearColor(0.f, 0.f, 0.f, 0.75f));
 

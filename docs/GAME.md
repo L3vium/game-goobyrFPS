@@ -137,11 +137,31 @@ and teammates take the nearest free points around it. During the intro (`bParach
 `IntroDropHeight`, `IntroDuration` on the match game mode) everyone falls from above their point
 under a canopy, steering a little (falling at 15 m/s, 3 s intro); control returns on landing. The Gym skips the intro.
 
-Watchers get a spectator mode (`V` cycles): free fly, single-player view (LMB / RMB switch between
-players), multi-screen grid (mouse wheel: 1, 2, 3… all players). Dead players follow teammates.
-Free fly works like the Unreal editor: `ZQSD`, `Shift` x3, `Space` / `A` up, `Ctrl` / `E` down (`IMC_Spectator`, its
-own rebindable keys, above the game keys while spectating). It stays inside the map's world bounds (`DA_Map`, minus
-`BoundsMargin`), above the ground and under a ceiling `MaxHeightAboveGround` over the highest ground flown over.
+**Watchers** (and dead players) watch with three views (`IMC_Spectator`, its own rebindable keys above the game keys):
+- `1` **player view**: one player through their eyes; `V` switches to third person over their shoulder (the mouse
+  orbits, the camera stays in front of walls); `LMB` / `RMB` switch player.
+- `2` **split screen**: every living player at once, up to 8 (`MaxSplitViews`): 1, 2 side by side, 2x2, 3x2, 4x2; each
+  picture is shaped like its cell and redrawn `SpectatorCaptureRate` (20) times a second, the captures staggered across
+  frames (960 px wide up to 4 views, 640 above).
+- `3` **free fly** (watchers only; dead players follow their team): like the Unreal editor on AZERTY, `ZQSD`, `E` /
+  `Space` up, `A` / `Ctrl` down, `Shift` x2, the **mouse wheel** sets the speed (x0.25 to x8, shown briefly). It goes
+  **through walls and objects** and **under the ground** (down to `WatcherDepthBelowGround` 25 m) inside an invisible
+  box: the map's world bounds (`DA_Map`, minus `BoundsMargin`) and a ceiling `MaxHeightAboveGround` over the highest
+  ground flown over. Without terrain pass-through it stays just above the surface under the camera (caves included).
+  Free fly starts where the camera was.
+
+What a watcher sees: every living player **outlined in cyan through walls with their name** (`N` hides them), the other
+watchers as a **glowing orb with their name** (`B`), the info line of what it looks at (name and state, no key, the
+thing glows: "Locker - 0 / 1 body", "Light - On"), and `Tab` scans (free fly, third person) with every guard lit.
+Players can be allowed to see name tags, the watchers and a "WATCHED BY n PLAYERS" line (off by default). Every rule is
+an editor variable in **Project Settings -> Hitmen -> Watchers**: `bWatchersFlyThroughWalls`, `bWatchersFlyThroughTerrain`,
+`WatcherDepthBelowGround`, `bWatchersCanScan`, `WatcherSeePlayers` / `WatcherSeeWatchers` (Hidden, Shown, **Shown and
+toggleable** by default), `bWatchersSeeInteractableInfo`, `bWatchersHighlightInteractables`, `WatcherFocusRange`,
+`bPlayersSeeNameTags` (`PlayerNameTagRange`), `bPlayersSeeWatchers`, `bPlayersSeeWatchedIndicator`, `WatcherViewRate`.
+A watcher's view (position, direction, followed player) goes to the server 10 times a second while it moves
+(`Server_ReportWatcherView`) and is replicated on its PlayerState (`FHitmenWatcherView`); every machine spawns its own
+avatars (`AHitmenWatcherAvatar`, local) and paints the tags in one layer (`UHitmenNameTagsWidget`). QA: the console
+command `HitmenWatch` (gym and dev builds) turns you into a watcher.
 
 ## 5. Controls (defaults, AZERTY, all rebindable)
 | Action | Key |
@@ -161,6 +181,10 @@ own rebindable keys, above the game keys while spectating). It stays inside the 
 | Emote wheel (hold) | R |
 | Pause (no time stop) | Esc |
 | Confirm (match over, host: back to the lobby) | Enter |
+| Watching: player view / split screen / free fly | 1 / 2 / 3 |
+| Watching: first / third person, switch player | V, LMB / RMB |
+| Watching: fly up / down / faster / speed | E or Space / A or Ctrl / Shift / mouse wheel |
+| Watching: show / hide players, watchers | N, B |
 
 **Options** (title and pause; `Esc` closes them, `R` resets the tab on screen, `Q` / `E` switch tabs): a centred panel
 with tabs, one row per setting (label left, `< value >` or a slider right) and the hovered row described on the right.

@@ -587,6 +587,35 @@ void UHitmenEditorTools::SetBackgroundThrottling(bool bThrottle)
 	GetMutableDefault<UEditorPerformanceSettings>()->bThrottleCPUWhenNotForeground = bThrottle;
 }
 
+TArray<UWorld*> UHitmenEditorTools::GetPIEWorlds()
+{
+	TArray<UWorld*> Worlds;
+	if (GEngine)
+	{
+		for (const FWorldContext& Context : GEngine->GetWorldContexts())
+		{
+			if (Context.WorldType == EWorldType::PIE && Context.World())
+			{
+				Worlds.Add(Context.World());
+			}
+		}
+	}
+	// The server (or the standalone world) first.
+	Worlds.StableSort([](const UWorld& A, const UWorld& B) { return A.GetNetMode() != NM_Client && B.GetNetMode() == NM_Client; });
+	return Worlds;
+}
+
+void UHitmenEditorTools::RunPIEConsoleCommand(UWorld* World, const FString& Command)
+{
+	APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	if (!PC)
+	{
+		return;
+	}
+	TGuardValue<bool> RealRPCs(GAllowActorScriptExecutionInEditor, false);
+	PC->ConsoleCommand(Command, true);
+}
+
 void UHitmenEditorTools::SetPIENetMode(int32 NumPlayers)
 {
 	ULevelEditorPlaySettings* Settings = GetMutableDefault<ULevelEditorPlaySettings>();

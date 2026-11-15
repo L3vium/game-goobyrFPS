@@ -151,7 +151,8 @@ protected:
 	FVector2D LastCenter = FVector2D::ZeroVector;
 };
 
-/** Watcher / dead player HUD: mode, target, and the multi-screen grid. */
+/** Watcher / dead player HUD: the view (player view, split screen, free fly), its keys, the fly speed, the split
+ *  screen grid. */
 UCLASS()
 class HITMEN_API UHitmenSpectatorWidget : public UHitmenUserWidget
 {
@@ -161,14 +162,26 @@ protected:
 	virtual void BuildDefaultLayout() override;
 	virtual void BindEvents() override;
 	virtual void UnbindEvents() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	UFUNCTION() void HandleModeChanged(uint8 Mode);
 	UFUNCTION() void HandleViewsChanged(const TArray<FHitmenSpectatorView>& Views);
+	UFUNCTION() void HandleWatcherSpeed(float SpeedScale);
 
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> ModeText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> KeysText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> SpeedText;
+	/** What the watcher looks at (name and state), under the centre: the player's prompt is hidden while watching. */
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> InfoText;
 	UPROPERTY(Transient) TObjectPtr<UUniformGridPanel> Grid;
 
+	/** Seconds the fly speed stays on screen after a wheel notch. */
+	UPROPERTY(EditAnywhere, Category="Hitmen|Spectator", meta=(ClampMin="0.1"))
+	float SpeedShowTime = 1.4f;
+
 	uint8 CurrentMode = 0;
+	int32 ViewCount = 0;
+	float SpeedShownAt = -100.f;
 };
 
 /** Match over: a banner at the top (winner + reason) while everyone spectates; the host gets "[Enter] Back to the

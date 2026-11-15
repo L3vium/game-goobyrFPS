@@ -76,6 +76,16 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   points by default and its legend lists only what is drawn (cameras join it with the NPC layer, as triangles).
 - The overhead diamond pulses while an NPC calls for backup (the red "!" is gone).
 - The cheat panel hides while the pause menu is open.
+- Free fly: `A` down / `E` up (was the reverse), `Shift` x2 (x3); the mouse wheel no longer changes the grid size (the
+  split screen shows every player).
+- Watcher mode: `1` player view (`V` first / third person), `2` split screen (up to 8 players, responsive, captures
+  staggered at 20 Hz), `3` free fly through walls and under the ground inside the map's box, `E` up / `A` down, `Shift`
+  x2, mouse wheel speed. Players outlined through walls with their name for watchers (`N`), other watchers as orbs with
+  their name (`B`), the info line of what a watcher looks at, `Tab` scan for watchers. Project Settings -> Hitmen ->
+  Watchers holds every rule (tri-state `WatcherSeePlayers` / `WatcherSeeWatchers`, players' name tags, seeing watchers,
+  the watched line: off). Watcher views replicate on the PlayerState (`FHitmenWatcherView`, `Server_ReportWatcherView`).
+- QA: console `HitmenWatch` (gym / dev builds); editor `HitmenEditorTools.get_pie_worlds` and `run_pie_console_command`
+  (RPCs from editor Python otherwise run locally) for multiplayer PIE scripts.
 - Sightroom: highlights fade in and out instead of popping: `PP_Sightroom` lights each pixel from the object's distance
   to you (from its custom depth), with soft edges at the enemy / object radii (`HighlightSoftEdge`) and behind the wave
   front; interactables no longer need a line-of-sight trace (the per-pixel depth test decides, so a corner in view lights

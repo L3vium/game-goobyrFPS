@@ -1,6 +1,7 @@
 // Hitmen — character base
 
 #include "Characters/HitmenCharacterBase.h"
+#include "GameFramework/SpectatorPawn.h"
 #include "Components/HitmenHealthComponent.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Components/HitmenFootstepComponent.h"
@@ -806,6 +807,11 @@ EHitmenScanCategory AHitmenCharacterBase::GetScanCategory_Implementation(const A
 	if (IsDead())
 	{
 		return EHitmenScanCategory::None;
+	}
+	// Watchers have no team: every guard is lit for them (players get the watcher outline instead).
+	if (Observer && Observer->IsA<ASpectatorPawn>())
+	{
+		return GetPlayerState() ? EHitmenScanCategory::None : EHitmenScanCategory::Enemy;
 	}
 	return UHitmenTeamLibrary::AreHostile(Observer, this) ? EHitmenScanCategory::Enemy : EHitmenScanCategory::None;
 }

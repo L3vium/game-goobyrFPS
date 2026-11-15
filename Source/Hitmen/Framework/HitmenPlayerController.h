@@ -21,14 +21,14 @@ class AHitmenCharacterBase;
 class UHitmenVIPTrackerComponent;
 struct FInputActionValue;
 
-/** How a watcher (or a dead player) looks at the match. */
+/** How a watcher (or a dead player) looks at the match: keys 1 (player view), 2 (split screen), 3 (free fly). */
 UENUM(BlueprintType)
 enum class EHitmenSpectatorMode : uint8
 {
 	FreeFly,
-	/** First-person view of one player; switch with next / previous. */
+	/** Player view: one player, first or third person (V); LMB / RMB switch player. */
 	Follow,
-	/** Every player's view at once (render targets). */
+	/** Split screen: every living player at once (up to 8, render targets). */
 	Grid
 };
 
@@ -123,6 +123,10 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_EnterSpectatorMode(bool bWatcher);
 
+	/** Owner -> server while spectating: where this watcher looks and whom it follows (avatars, tags, watched line). */
+	UFUNCTION(Server, Unreliable)
+	void Server_ReportWatcherView(FVector_NetQuantize10 Location, float Yaw, float Pitch, AHitmenPlayerState* Watched);
+
 	// ---- Event camera (picture in picture, top left) ----
 	/** Local: films Subject for a few seconds (Project Settings -> Hitmen -> HUD -> EventCameraDuration). */
 	void ShowEventCamera(AActor* Subject, const FText& Title);
@@ -153,6 +157,13 @@ public:
 	/** F1-F8: toggles a cheat (invulnerable, ammo, cooldowns, invisible, fly) or runs one (respawn, kill, reset). */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Debug")
 	void Server_DebugCheat(EHitmenCheat Cheat);
+
+	/** Console, gym and dev builds: leave your body and watch as a watcher (QA of the watcher mode). */
+	UFUNCTION(Exec)
+	void HitmenWatch();
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Debug")
+	void Server_DebugWatch();
 
 	/** Fly cheat on the current pawn (flying, no collision) or back to walking; server and owning client. */
 	void ApplyCheatsToPawn();
@@ -202,12 +213,13 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Spectator")
 	FOnHitmenSpectatorTargetChanged OnSpectatorTargetChanged;
 
-	/** Grid mode: how many screens are shown (0 = every player). Mouse wheel cycles it. */
+	/** Player view in third person (V). */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Spectator")
-	int32 GetSpectatorGridCount() const { return SpectatorGridCount; }
+	bool IsSpectatorThirdPerson() const { return bSpectatorThirdPerson; }
 
+	/** Player view: first (false) or third person (true, over the shoulder, the mouse orbits); V toggles it. */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Spectator")
-	void CycleSpectatorGridCount(int32 Direction);
+	void SetSpectatorThirdPerson(bool bThirdPerson);
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -238,6 +250,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorUpAction;
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorDownAction;
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorFastAction;
+	/** Watcher views (IMC_Spectator): 1 player view, 2 split screen, 3 free fly; N / B show or hide players / watchers. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorPlayerViewAction;
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorSplitViewAction;
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> SpectatorFreeViewAction;
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> WatcherTogglePlayersAction;
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> WatcherToggleWatchersAction;
 	/** Enter: confirm (match over: the host goes back to the lobby). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Input|Actions") TObjectPtr<UInputAction> ConfirmAction;
 
@@ -279,9 +297,25 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|HUD", meta=(ClampMin="0.02", Units="s"))
 	float HUDRefreshInterval = 0.1f;
 
-	// ---- Spectator grid ----
-	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Spectator")
-	FIntPoint SpectatorCaptureResolution = FIntPoint(640, 360);
+	// ---- Spectator: split screen, third person ----
+	/** Width of each split screen picture (up to 4 views); its height follows the cell's shape on screen. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Spectator", meta=(ClampMin="128"))
+	int32 SpectatorCaptureWidth = 960;
+
+	/** Width of each picture above 4 views. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Spectator", meta=(ClampMin="128"))
+	int32 SpectatorSmallCaptureWidth = 640;
+
+	/** Each split screen picture is redrawn this often (captures are staggered across frames). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Spectator", meta=(ClampMin="1", ClampMax="60", Units="Hz"))
+	float SpectatorCaptureRate = 20.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Spectator", meta=(ClampMin="1", ClampMax="8"))
+	int32 MaxSplitViews = 8;
+
+	/** Player view in third person: camera distance behind the player. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Spectator", meta=(ClampMin="50", Units="cm"))
+	float SpectatorThirdPersonDistance = 320.f;
 
 	/** Seconds between grid refreshes (players joining / dying). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Spectator", meta=(ClampMin="0.25", Units="s"))
@@ -366,7 +400,33 @@ protected:
 	UPROPERTY(Transient) TArray<TObjectPtr<UTextureRenderTarget2D>> SpectatorRenderTargets;
 	TArray<TWeakObjectPtr<APawn>> CapturedPawns;
 	FTimerHandle SpectatorGridTimer;
-	int32 SpectatorGridCount = 0;
+	int32 SpectatorCaptureCursor = 0;
+	float SpectatorCaptureBudget = 0.f;
+	void TickSpectatorCaptures(float DeltaTime);
+	void UpdateSpectatorThirdPerson();
+	bool bSpectatorThirdPerson = false;
+
+	// ---- Watcher presence (local): view reports, other watchers' avatars, players outlined for watchers ----
+	void ReportWatcherView();
+	void UpdateWatcherPresence();
+	void ClearWatcherPresence();
+	bool IsWatcherPlayersShown() const;
+	bool IsWatcherWatchersShown() const;
+	void HandleSpectatorPlayerView();
+	void HandleSpectatorSplitView();
+	void HandleSpectatorFreeView();
+	void HandleWatcherTogglePlayers();
+	void HandleWatcherToggleWatchers();
+	void PushWatcherOverlay();
+	UPROPERTY(Transient) TArray<TObjectPtr<class AHitmenWatcherAvatar>> WatcherAvatars;
+	TSet<TWeakObjectPtr<AActor>> WatcherHighlightedPlayers;
+	FTimerHandle WatcherPresenceTimer;
+	float LastWatcherReportTime = -100.f;
+	FVector LastReportedLocation = FVector::ZeroVector;
+	FRotator LastReportedRotation = FRotator::ZeroRotator;
+	TWeakObjectPtr<AHitmenPlayerState> LastReportedWatched;
+	bool bWatcherShowPlayers = true;
+	bool bWatcherShowWatchers = true;
 
 	class IHitmenInputReceiver* GetReceiver() const;
 	bool IsGameplayInputBlocked() const;

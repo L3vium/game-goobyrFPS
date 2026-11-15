@@ -197,4 +197,22 @@ if wanted("sightroom"):
     hitmen_content.build_sightroom_pp()
     log("sightroom: PP_Sightroom rebuilt")
 
+if wanted("watchers"):
+    # Watcher keys (E up / A down, 1 / 2 / 3 views, N / B overlays), the spectator pawn's scan and focus overlay, players
+    # outlined for watchers in PP_Markers (stencil 7).
+    actions, imc, spectator_imc = hitmen_content.build_input()
+    pc_bp = load("/Game/Hitmen/Core/BP_PlayerController")
+    if pc_bp:
+        d = unreal.get_default_object(pc_bp.generated_class())
+        hitmen_content.set_props(d, spectator_mapping_context=spectator_imc, spectator_mode_action=actions["IA_SpectatorMode"],
+                                 **hitmen_content.watcher_actions(actions))
+        unreal.BlueprintEditorLibrary.compile_blueprint(pc_bp)
+        save(pc_bp)
+    spectator_bp = load("/Game/Hitmen/Core/BP_SpectatorPawn")
+    if spectator_bp:
+        hitmen_content.set_spectator_pawn(spectator_bp)
+        save(spectator_bp)
+    hitmen_content.build_markers_pp()
+    log("watchers: input, spectator pawn, PP_Markers")
+
 print("\n".join(LOG))

@@ -164,6 +164,13 @@ namespace HitmenUI
 		FSlateDrawElement::MakeCustomVerts(Out, Layer, Handle, Verts, Indices, nullptr, 0, 0);
 	}
 
+	void GetSplitLayout(int32 Count, int32& OutColumns, int32& OutRows)
+	{
+		Count = FMath::Max(1, Count);
+		OutColumns = Count <= 1 ? 1 : (Count <= 4 ? 2 : (Count <= 6 ? 3 : 4));
+		OutRows = FMath::Max(1, FMath::DivideAndRoundUp(Count, OutColumns));
+	}
+
 	void PaintDiamond(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Radius, const FLinearColor& Color, const FLinearColor& Rim)
 	{
 		auto Diamond = [&](float R) { return TArray<FVector2D>{ Center + FVector2D(0.f, -R), Center + FVector2D(R, 0.f), Center + FVector2D(0.f, R), Center + FVector2D(-R, 0.f) }; };

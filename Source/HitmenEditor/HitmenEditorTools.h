@@ -36,4 +36,15 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
 	static void SetPIENetMode(int32 NumPlayers);
+
+	/** QA: every Play In Editor world (the listen server first, then the clients), for multiplayer test scripts. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
+	static TArray<UWorld*> GetPIEWorlds();
+
+	/**
+	 * QA: runs a console command as World's first local player, with RPCs going over the network (editor Python runs
+	 * with actor script execution allowed, which makes every RPC it triggers run locally).
+	 */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
+	static void RunPIEConsoleCommand(UWorld* World, const FString& Command);
 };

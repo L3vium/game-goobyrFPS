@@ -56,6 +56,12 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "GameFramework/SpectatorPawn.h"
+#include "Spectator/HitmenWatcherAvatar.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/Engine.h"
+#include "Core/HitmenInterfaces.h"
+#include "UI/HitmenUIFactory.h"
 #include "Kismet/KismetMathLibrary.h"
 
 AHitmenPlayerController::AHitmenPlayerController()
@@ -79,6 +85,9 @@ void AHitmenPlayerController::BeginPlay()
 		}
 		// The HUD owns the input mode (menu screens keep the cursor); it may not exist yet.
 		RefreshInputMode();
+		// Watchers around (avatars), players outlined for watchers.
+		GetWorldTimerManager().SetTimer(WatcherPresenceTimer, this, &AHitmenPlayerController::UpdateWatcherPresence, 0.1f, true);
+		PushWatcherOverlay();
 	}
 }
 
@@ -244,6 +253,11 @@ void AHitmenPlayerController::SetupInputComponent()
 	BindIfSet(SpectatorDownAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleSpectatorDownReleased);
 	BindIfSet(SpectatorFastAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorFastPressed);
 	BindIfSet(SpectatorFastAction, ETriggerEvent::Completed, &AHitmenPlayerController::HandleSpectatorFastReleased);
+	BindIfSet(SpectatorPlayerViewAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorPlayerView);
+	BindIfSet(SpectatorSplitViewAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorSplitView);
+	BindIfSet(SpectatorFreeViewAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleSpectatorFreeView);
+	BindIfSet(WatcherTogglePlayersAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleWatcherTogglePlayers);
+	BindIfSet(WatcherToggleWatchersAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleWatcherToggleWatchers);
 	BindIfSet(ConfirmAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleConfirm);
 
 	// Cheats (gym / dev builds): fixed F-keys, not rebindable (the engine's F1-F5 view modes are cleared in
@@ -396,6 +410,10 @@ void AHitmenPlayerController::OnPossess(APawn* InPawn)
 	if (InPawn && !InPawn->IsA<ASpectatorPawn>())
 	{
 		bSpectating = false;
+		if (AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>())
+		{
+			PS->ClearWatcherView();
+		}
 		if (IsLocalController())
 		{
 			RefreshMappingContexts();
@@ -413,6 +431,7 @@ void AHitmenPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UnbindHUDSources();
 	StopSpectatorCaptures();
+	ClearWatcherPresence();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -885,10 +904,17 @@ void AHitmenPlayerController::HandleSwitchSlot(const FInputActionValue& Value)
 	{
 		return;
 	}
-	if (bSpectating && SpectatorMode == EHitmenSpectatorMode::Grid)
+	if (bSpectating)
 	{
-		// Mouse wheel in the grid: one, two, three... or every screen.
-		CycleSpectatorGridCount(Direction > 0.f ? 1 : -1);
+		// Mouse wheel while flying free: fly speed (shown briefly by the spectator widget).
+		if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetSpectatorPawn()); Spectator && SpectatorMode == EHitmenSpectatorMode::FreeFly && !IsGameplayInputBlocked())
+		{
+			const float Scale = Spectator->AdjustSpeed(Direction > 0.f ? 1.f : -1.f);
+			if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+			{
+				UI->OnWatcherSpeedChanged.Broadcast(Scale);
+			}
+		}
 		return;
 	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_SwitchSlot(Direction); }
@@ -950,9 +976,88 @@ void AHitmenPlayerController::HandlePause()
 
 void AHitmenPlayerController::HandleSpectatorMode()
 {
-	if (bSpectating)
+	if (!bSpectating || IsGameplayInputBlocked())
 	{
-		CycleSpectatorMode();
+		return;
+	}
+	// V: first / third person in player view (from another view: player view).
+	if (SpectatorMode == EHitmenSpectatorMode::Follow)
+	{
+		SetSpectatorThirdPerson(!bSpectatorThirdPerson);
+	}
+	else
+	{
+		SetSpectatorMode(EHitmenSpectatorMode::Follow);
+	}
+}
+
+void AHitmenPlayerController::SetSpectatorThirdPerson(bool bThirdPerson)
+{
+	bSpectatorThirdPerson = bThirdPerson;
+	if (bSpectatorThirdPerson)
+	{
+		// Start behind the player, looking where they look.
+		if (const APawn* Target = SpectatorTarget.Get())
+		{
+			SetControlRotation(FRotator(-12.f, Target->GetActorRotation().Yaw, 0.f));
+		}
+	}
+	ApplySpectatorView();
+}
+
+void AHitmenPlayerController::HandleSpectatorPlayerView()
+{
+	if (bSpectating && !IsGameplayInputBlocked()) { SetSpectatorMode(EHitmenSpectatorMode::Follow); }
+}
+
+void AHitmenPlayerController::HandleSpectatorSplitView()
+{
+	if (bSpectating && !IsGameplayInputBlocked()) { SetSpectatorMode(EHitmenSpectatorMode::Grid); }
+}
+
+void AHitmenPlayerController::HandleSpectatorFreeView()
+{
+	if (bSpectating && !IsGameplayInputBlocked()) { SetSpectatorMode(EHitmenSpectatorMode::FreeFly); }
+}
+
+bool AHitmenPlayerController::IsWatcherPlayersShown() const
+{
+	const EHitmenWatcherVisibility Rule = UHitmenGameSettings::Get()->WatcherSeePlayers;
+	return Rule == EHitmenWatcherVisibility::Shown || (Rule == EHitmenWatcherVisibility::ShownToggleable && bWatcherShowPlayers);
+}
+
+bool AHitmenPlayerController::IsWatcherWatchersShown() const
+{
+	const EHitmenWatcherVisibility Rule = UHitmenGameSettings::Get()->WatcherSeeWatchers;
+	return Rule == EHitmenWatcherVisibility::Shown || (Rule == EHitmenWatcherVisibility::ShownToggleable && bWatcherShowWatchers);
+}
+
+void AHitmenPlayerController::HandleWatcherTogglePlayers()
+{
+	if (bSpectating && UHitmenGameSettings::Get()->WatcherSeePlayers == EHitmenWatcherVisibility::ShownToggleable)
+	{
+		bWatcherShowPlayers = !bWatcherShowPlayers;
+		PushWatcherOverlay();
+		UpdateWatcherPresence();
+	}
+}
+
+void AHitmenPlayerController::HandleWatcherToggleWatchers()
+{
+	if (bSpectating && UHitmenGameSettings::Get()->WatcherSeeWatchers == EHitmenWatcherVisibility::ShownToggleable)
+	{
+		bWatcherShowWatchers = !bWatcherShowWatchers;
+		PushWatcherOverlay();
+		UpdateWatcherPresence();
+	}
+}
+
+void AHitmenPlayerController::PushWatcherOverlay()
+{
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+	{
+		UI->SetWatcherOverlay(bWatcherShowPlayers, bWatcherShowWatchers);
+		UI->OnSpectatorModeChanged.Broadcast(static_cast<uint8>(SpectatorMode));
 	}
 }
 
@@ -1304,6 +1409,31 @@ void AHitmenPlayerController::Server_DebugGiveKeycard_Implementation(int32 Keyca
 	}
 }
 
+void AHitmenPlayerController::HitmenWatch()
+{
+	Server_DebugWatch();
+}
+
+void AHitmenPlayerController::Server_DebugWatch_Implementation()
+{
+	AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
+	if (!DebugAllowed(GetWorld()) || !PS || bSpectating)
+	{
+		return;
+	}
+	// Out of the match for good: no body left behind, never a target to follow.
+	if (APawn* Body = GetPawn(); Body && !Body->IsA<ASpectatorPawn>())
+	{
+		UnPossess();
+		Body->Destroy();
+	}
+	PS->SetWatcher(true);
+	PS->SetAlive(false);
+	ChangeState(NAME_Spectating);
+	ClientGotoState(NAME_Spectating);
+	Client_EnterSpectatorMode(true);
+}
+
 void AHitmenPlayerController::Server_DebugCheat_Implementation(EHitmenCheat Cheat)
 {
 	AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
@@ -1388,6 +1518,15 @@ void AHitmenPlayerController::SetSpectatorMode(EHitmenSpectatorMode NewMode)
 	{
 		NewMode = EHitmenSpectatorMode::Follow;
 	}
+	// Free fly starts where the camera was (a player's eyes, the third-person camera).
+	if (NewMode == EHitmenSpectatorMode::FreeFly && SpectatorMode != EHitmenSpectatorMode::FreeFly && PlayerCameraManager)
+	{
+		if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetSpectatorPawn()))
+		{
+			Spectator->TeleportToView(PlayerCameraManager->GetCameraLocation(), PlayerCameraManager->GetCameraRotation());
+			SetControlRotation(PlayerCameraManager->GetCameraRotation());
+		}
+	}
 	SpectatorMode = NewMode;
 	ApplySpectatorView();
 	if (SpectatorMode == EHitmenSpectatorMode::Grid)
@@ -1445,23 +1584,6 @@ void AHitmenPlayerController::SpectatePrevious()
 	ApplySpectatorView();
 }
 
-void AHitmenPlayerController::CycleSpectatorGridCount(int32 Direction)
-{
-	const int32 Available = GetSpectatableTargets().Num();
-	if (Available <= 0)
-	{
-		return;
-	}
-	// 0 means "all": cycle 1, 2, ... Available-1, all.
-	int32 Current = SpectatorGridCount <= 0 || SpectatorGridCount >= Available ? Available : SpectatorGridCount;
-	Current = (Current - 1 + FMath::Sign(Direction) + Available) % Available + 1;
-	SpectatorGridCount = Current >= Available ? 0 : Current;
-	if (SpectatorMode == EHitmenSpectatorMode::Grid)
-	{
-		RebuildSpectatorGrid();
-	}
-}
-
 void AHitmenPlayerController::StopSpectatorCaptures()
 {
 	for (const TWeakObjectPtr<APawn>& CapturedPawn : CapturedPawns)
@@ -1490,15 +1612,15 @@ void AHitmenPlayerController::StopSpectatorCaptures()
 void AHitmenPlayerController::RebuildSpectatorGrid()
 {
 	TArray<APawn*> Targets = GetSpectatableTargets();
-	if (SpectatorGridCount > 0 && Targets.Num() > SpectatorGridCount)
+	if (Targets.Num() > MaxSplitViews)
 	{
-		// Keep the followed player first so a smaller grid still shows them.
+		// Keep the followed player first so the cut never drops them.
 		if (APawn* Followed = SpectatorTarget.Get(); Followed && Targets.Contains(Followed))
 		{
 			Targets.Remove(Followed);
 			Targets.Insert(Followed, 0);
 		}
-		Targets.SetNum(SpectatorGridCount);
+		Targets.SetNum(MaxSplitViews);
 	}
 
 	// Unchanged set: nothing to rebuild (the timer calls this every few seconds).
@@ -1513,6 +1635,18 @@ void AHitmenPlayerController::RebuildSpectatorGrid()
 	}
 
 	StopSpectatorCaptures();
+	// Pictures shaped like their cell on screen (1, 2 side by side, 2x2, 3x2, 4x2), smaller above 4.
+	int32 Columns = 1;
+	int32 Rows = 1;
+	HitmenUI::GetSplitLayout(Targets.Num(), Columns, Rows);
+	FVector2D ViewportSize(1920.f, 1080.f);
+	if (GEngine && GEngine->GameViewport)
+	{
+		GEngine->GameViewport->GetViewportSize(ViewportSize);
+	}
+	const float CellAspect = FMath::Clamp((ViewportSize.X / Columns) / FMath::Max(ViewportSize.Y / Rows, 1.f), 0.3f, 4.f);
+	const int32 Width = Targets.Num() > 4 ? SpectatorSmallCaptureWidth : SpectatorCaptureWidth;
+	const int32 Height = FMath::Max(64, FMath::RoundToInt(Width / CellAspect));
 	TArray<FHitmenSpectatorView> Views;
 	for (int32 Index = 0; Index < Targets.Num(); ++Index)
 	{
@@ -1525,11 +1659,30 @@ void AHitmenPlayerController::RebuildSpectatorGrid()
 		if (!SpectatorRenderTargets.IsValidIndex(Index) || !SpectatorRenderTargets[Index])
 		{
 			SpectatorRenderTargets.SetNum(FMath::Max(SpectatorRenderTargets.Num(), Index + 1));
-			SpectatorRenderTargets[Index] = UKismetRenderingLibrary::CreateRenderTarget2D(this, SpectatorCaptureResolution.X, SpectatorCaptureResolution.Y);
+			// Opaque LDR pictures (scene colour HDR would carry an inverted alpha and show see-through in the grid).
+			SpectatorRenderTargets[Index] = UKismetRenderingLibrary::CreateRenderTarget2D(this, Width, Height, RTF_RGBA8_SRGB);
+		}
+		else if (SpectatorRenderTargets[Index]->SizeX != Width || SpectatorRenderTargets[Index]->SizeY != Height)
+		{
+			UKismetRenderingLibrary::ResizeRenderTarget2D(SpectatorRenderTargets[Index], Width, Height);
+		}
+		// Same vertical field as a 90 degree 16:9 view, whatever the cell's shape.
+		const float HalfVertical = FMath::Atan(FMath::Tan(FMath::DegreesToRadians(45.f)) * 9.f / 16.f);
+		Capture->FOVAngle = FMath::RadiansToDegrees(2.f * FMath::Atan(FMath::Tan(HalfVertical) * CellAspect));
+		Capture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+		// Through their eyes: their own body, arms, weapons and cosmetics stay out of the picture.
+		Capture->HiddenActors.Reset();
+		Capture->HiddenActors.Add(Captured);
+		TArray<AActor*> Attached;
+		Captured->GetAttachedActors(Attached, true, true);
+		for (AActor* Child : Attached)
+		{
+			Capture->HiddenActors.Add(Child);
 		}
 		Capture->TextureTarget = SpectatorRenderTargets[Index];
-		Capture->bCaptureEveryFrame = true;
+		Capture->bCaptureEveryFrame = false;
 		Capture->Activate();
+		Capture->CaptureScene();
 		CapturedPawns.Add(Captured);
 
 		FHitmenSpectatorView& View = Views.AddDefaulted_GetRef();
@@ -1557,13 +1710,32 @@ void AHitmenPlayerController::ApplySpectatorView()
 		}
 		if (APawn* Target = SpectatorTarget.Get())
 		{
-			SetViewTargetWithBlend(Target, 0.25f);
+			// First person: through their eyes; third person: the spectator camera behind them (PlayerTick).
+			if (bSpectatorThirdPerson)
+			{
+				UpdateSpectatorThirdPerson();
+				SetViewTargetWithBlend(GetPawnOrSpectator(), 0.2f);
+			}
+			else
+			{
+				SetViewTargetWithBlend(Target, 0.25f);
+			}
 		}
 	}
 	else
 	{
 		// Free fly and grid both use the spectator pawn camera underneath.
 		SetViewTargetWithBlend(GetPawnOrSpectator(), 0.25f);
+	}
+	if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetSpectatorPawn()))
+	{
+		Spectator->SetFreeFly(SpectatorMode == EHitmenSpectatorMode::FreeFly);
+	}
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+	{
+		const APawn* Followed = SpectatorMode == EHitmenSpectatorMode::Follow ? SpectatorTarget.Get() : nullptr;
+		UI->SetSpectatorTargetName(Followed && Followed->GetPlayerState() ? FText::FromString(Followed->GetPlayerState()->GetPlayerName()) : FText::GetEmpty());
+		UI->OnSpectatorModeChanged.Broadcast(static_cast<uint8>(SpectatorMode));
 	}
 	OnSpectatorTargetChanged.Broadcast(SpectatorTarget.Get());
 }
@@ -1576,6 +1748,207 @@ void AHitmenPlayerController::PlayerTick(float DeltaTime)
 		GetPawn()->AddMovementInput(FVector::UpVector, (bFlyUpHeld ? 1.f : 0.f) - (bFlyDownHeld ? 1.f : 0.f));
 	}
 	PushVehicleView();
+	if (bSpectating && IsLocalController())
+	{
+		UpdateSpectatorThirdPerson();
+		TickSpectatorCaptures(DeltaTime);
+		ReportWatcherView();
+	}
+}
+
+void AHitmenPlayerController::UpdateSpectatorThirdPerson()
+{
+	if (SpectatorMode != EHitmenSpectatorMode::Follow || !bSpectatorThirdPerson)
+	{
+		return;
+	}
+	const APawn* Target = SpectatorTarget.Get();
+	AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetSpectatorPawn());
+	if (!Target || !Spectator)
+	{
+		return;
+	}
+	// Over the shoulder, orbiting with the mouse; pulled in front of walls.
+	const FRotator View = GetControlRotation();
+	const FVector Pivot = Target->GetPawnViewLocation() + FVector(0.f, 0.f, 15.f);
+	FVector Camera = Pivot - View.Vector() * SpectatorThirdPersonDistance + FRotationMatrix(View).GetUnitAxis(EAxis::Y) * 45.f;
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenSpectatorThirdPerson), false, Target);
+	Params.AddIgnoredActor(Spectator);
+	if (GetWorld()->SweepSingleByChannel(Hit, Pivot, Camera, FQuat::Identity, ECC_Camera, FCollisionShape::MakeSphere(12.f), Params))
+	{
+		Camera = Hit.Location;
+	}
+	Spectator->TeleportToView(Camera, View);
+}
+
+void AHitmenPlayerController::TickSpectatorCaptures(float DeltaTime)
+{
+	if (SpectatorMode != EHitmenSpectatorMode::Grid || CapturedPawns.IsEmpty())
+	{
+		return;
+	}
+	// Round robin: each picture about SpectatorCaptureRate times a second, a few captures per frame at most.
+	SpectatorCaptureBudget += DeltaTime * SpectatorCaptureRate * CapturedPawns.Num();
+	for (int32 Done = 0; SpectatorCaptureBudget >= 1.f && Done < CapturedPawns.Num(); ++Done)
+	{
+		SpectatorCaptureCursor = (SpectatorCaptureCursor + 1) % CapturedPawns.Num();
+		if (const AHitmenPlayerCharacter* Captured = Cast<AHitmenPlayerCharacter>(CapturedPawns[SpectatorCaptureCursor].Get()))
+		{
+			if (USceneCaptureComponent2D* Capture = Captured->GetSpectatorCapture())
+			{
+				Capture->CaptureScene();
+			}
+		}
+		SpectatorCaptureBudget -= 1.f;
+	}
+	SpectatorCaptureBudget = FMath::Min(SpectatorCaptureBudget, 1.f);
+}
+
+void AHitmenPlayerController::ReportWatcherView()
+{
+	if (!PlayerCameraManager)
+	{
+		return;
+	}
+	const float Now = GetWorld()->GetTimeSeconds();
+	const float Interval = 1.f / FMath::Max(1.f, UHitmenGameSettings::Get()->WatcherViewRate);
+	if (Now - LastWatcherReportTime < Interval)
+	{
+		return;
+	}
+	const FVector Location = PlayerCameraManager->GetCameraLocation();
+	const FRotator Rotation = PlayerCameraManager->GetCameraRotation();
+	const APawn* Followed = SpectatorMode == EHitmenSpectatorMode::Follow ? SpectatorTarget.Get() : nullptr;
+	AHitmenPlayerState* Watched = Followed ? Followed->GetPlayerState<AHitmenPlayerState>() : nullptr;
+	// Only when something changed (a heartbeat every 2 s).
+	if (Location.Equals(LastReportedLocation, 20.f) && Rotation.Equals(LastReportedRotation, 2.f) && Watched == LastReportedWatched.Get()
+		&& Now - LastWatcherReportTime < 2.f)
+	{
+		return;
+	}
+	LastWatcherReportTime = Now;
+	LastReportedLocation = Location;
+	LastReportedRotation = Rotation;
+	LastReportedWatched = Watched;
+	Server_ReportWatcherView(Location, Rotation.Yaw, Rotation.Pitch, Watched);
+}
+
+void AHitmenPlayerController::Server_ReportWatcherView_Implementation(FVector_NetQuantize10 Location, float Yaw, float Pitch, AHitmenPlayerState* Watched)
+{
+	// Only a player without a gameplay pawn watches.
+	if (const APawn* Current = GetPawn(); Current && !Current->IsA<ASpectatorPawn>())
+	{
+		return;
+	}
+	if (AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>())
+	{
+		FHitmenWatcherView View;
+		View.Location = Location;
+		View.Yaw = Yaw;
+		View.Pitch = FMath::ClampAngle(Pitch, -89.f, 89.f);
+		View.Watched = Watched != PS ? Watched : nullptr;
+		PS->SetWatcherView(View);
+	}
+}
+
+void AHitmenPlayerController::UpdateWatcherPresence()
+{
+	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+	const AGameStateBase* GS = GetWorld() ? GetWorld()->GetGameState() : nullptr;
+	const AHitmenPlayerState* Self = GetPlayerState<AHitmenPlayerState>();
+	const bool bShowWatchers = bSpectating ? IsWatcherWatchersShown() : Settings->bPlayersSeeWatchers;
+	const bool bOutlinePlayers = bSpectating && IsWatcherPlayersShown();
+
+	// Avatars of the watchers flying free (one following a player in player view is with that player).
+	TArray<AHitmenPlayerState*> Wanted;
+	if (GS && bShowWatchers)
+	{
+		for (APlayerState* Base : GS->PlayerArray)
+		{
+			AHitmenPlayerState* PS = Cast<AHitmenPlayerState>(Base);
+			if (PS && PS != Self && PS->GetWatcherView().bWatching && !PS->GetWatcherView().Watched)
+			{
+				Wanted.Add(PS);
+			}
+		}
+	}
+	for (int32 Index = WatcherAvatars.Num() - 1; Index >= 0; --Index)
+	{
+		AHitmenWatcherAvatar* Avatar = WatcherAvatars[Index];
+		if (Avatar && Wanted.Contains(Avatar->GetWatcher()))
+		{
+			Wanted.Remove(Avatar->GetWatcher());
+			continue;
+		}
+		if (Avatar)
+		{
+			Avatar->Destroy();
+		}
+		WatcherAvatars.RemoveAt(Index);
+	}
+	for (AHitmenPlayerState* PS : Wanted)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Params.ObjectFlags |= RF_Transient;
+		if (AHitmenWatcherAvatar* Avatar = GetWorld()->SpawnActor<AHitmenWatcherAvatar>(FVector(PS->GetWatcherView().Location), FRotator::ZeroRotator, Params))
+		{
+			Avatar->SetWatcher(PS);
+			WatcherAvatars.Add(Avatar);
+		}
+	}
+
+	// Players outlined through walls for watchers (PP_Markers, stencil WatchedPlayer).
+	TSet<TWeakObjectPtr<AActor>> Outlined;
+	if (GS && bOutlinePlayers)
+	{
+		for (APlayerState* Base : GS->PlayerArray)
+		{
+			const AHitmenPlayerState* PS = Cast<AHitmenPlayerState>(Base);
+			AHitmenPlayerCharacter* OutlinedPawn = PS && PS->IsAlive() ? Cast<AHitmenPlayerCharacter>(PS->GetPawn()) : nullptr;
+			if (OutlinedPawn)
+			{
+				Outlined.Add(OutlinedPawn);
+			}
+		}
+	}
+	for (const TWeakObjectPtr<AActor>& Old : WatcherHighlightedPlayers)
+	{
+		if (AActor* Actor = Old.Get(); Actor && !Outlined.Contains(Old))
+		{
+			IHitmenScannable::Execute_SetScanHighlight(Actor, false, 0);
+		}
+	}
+	for (const TWeakObjectPtr<AActor>& New : Outlined)
+	{
+		if (AActor* Actor = New.Get(); Actor && !WatcherHighlightedPlayers.Contains(New))
+		{
+			IHitmenScannable::Execute_SetScanHighlight(Actor, true, HitmenStencil::WatchedPlayer);
+		}
+	}
+	WatcherHighlightedPlayers = MoveTemp(Outlined);
+}
+
+void AHitmenPlayerController::ClearWatcherPresence()
+{
+	GetWorldTimerManager().ClearTimer(WatcherPresenceTimer);
+	for (AHitmenWatcherAvatar* Avatar : WatcherAvatars)
+	{
+		if (Avatar)
+		{
+			Avatar->Destroy();
+		}
+	}
+	WatcherAvatars.Reset();
+	for (const TWeakObjectPtr<AActor>& Old : WatcherHighlightedPlayers)
+	{
+		if (AActor* Actor = Old.Get())
+		{
+			IHitmenScannable::Execute_SetScanHighlight(Actor, false, 0);
+		}
+	}
+	WatcherHighlightedPlayers.Reset();
 }
 
 void AHitmenPlayerController::PushVehicleView()

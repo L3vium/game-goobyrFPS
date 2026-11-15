@@ -18,6 +18,16 @@ class UMaterialInterface;
  * Project-wide defaults editable from Project Settings. Gameplay code reads these through
  * UHitmenGameSettings::Get(); no class should hard-code an asset path.
  */
+/** What watchers see of players / other watchers (Project Settings -> Hitmen -> Watchers). */
+UENUM(BlueprintType)
+enum class EHitmenWatcherVisibility : uint8
+{
+	Hidden,
+	Shown,
+	/** Shown, and the watcher can hide them (N players, B watchers). */
+	ShownToggleable
+};
+
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Hitmen"))
 class HITMEN_API UHitmenGameSettings : public UDeveloperSettings
 {
@@ -151,6 +161,61 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps", meta=(ClampMin="2"))
 	float PauseMapNPCSize = 13.f;
+
+	// ---- Watchers (spectating: watchers and dead players) ----
+	/** Free fly goes through walls and objects (still inside the map's box). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bWatchersFlyThroughWalls = true;
+
+	/** Free fly goes under the ground too (down to WatcherDepthBelowGround); off: never lower than just above the
+	 *  surface under the camera. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bWatchersFlyThroughTerrain = true;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers", meta=(ClampMin="0", Units="cm", EditCondition="bWatchersFlyThroughTerrain"))
+	float WatcherDepthBelowGround = 2500.f;
+
+	/** Tab scans for watchers too (free fly and third-person player view). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bWatchersCanScan = true;
+
+	/** Watchers see the players outlined through walls with their name: hidden, shown, or shown with N to hide them. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	EHitmenWatcherVisibility WatcherSeePlayers = EHitmenWatcherVisibility::ShownToggleable;
+
+	/** Watchers see the other watchers (a glowing orb with their name): hidden, shown, or shown with B to hide them. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	EHitmenWatcherVisibility WatcherSeeWatchers = EHitmenWatcherVisibility::ShownToggleable;
+
+	/** What a watcher looks at shows its info line (name and state: "Locker - Body inside", "Light - On"), no key. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bWatchersSeeInteractableInfo = true;
+
+	/** What a watcher looks at glows like the player's focus. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bWatchersHighlightInteractables = true;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers", meta=(ClampMin="100", Units="cm"))
+	float WatcherFocusRange = 3000.f;
+
+	/** Players see other players' names over their heads (in view, within PlayerNameTagRange). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bPlayersSeeNameTags = false;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers", meta=(ClampMin="0", Units="cm", EditCondition="bPlayersSeeNameTags"))
+	float PlayerNameTagRange = 4000.f;
+
+	/** Players see the watchers flying around (orb and name). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bPlayersSeeWatchers = false;
+
+	/** Players see "WATCHED BY n PLAYERS" while watchers follow them in player view. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bPlayersSeeWatchedIndicator = false;
+
+	/** A watcher's view goes to the server this often while it moves (avatars, tags, the watched line). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers", meta=(ClampMin="1", ClampMax="30", Units="Hz"))
+	float WatcherViewRate = 10.f;
 
 	// ---- Combat ----
 	/** A bullet or arrow in the head always kills (the multiplier no longer matters). */

@@ -27,15 +27,21 @@ ACTIONS = {
     "IA_Sightroom": ("bool", [("Sightroom", "Sightroom", "Tab", [])]),
     "IA_EmoteWheel": ("bool", [("EmoteWheel", "Emote wheel", "R", [])]),
     "IA_Pause": ("bool", [("Pause", "Pause", "Escape", []), ("PauseAlt", "Pause (alt)", "P", [])]),
-    "IA_SpectatorMode": ("bool", [("SpectatorMode", "Spectator view", "V", [])]),
+    "IA_SpectatorMode": ("bool", [("SpectatorMode", "Player view: first / third person", "V", [])]),
     "IA_Confirm": ("bool", [("Confirm", "Confirm / back to the lobby", "Enter", [])]),
 }
 
-# Free fly (IMC_Spectator, above the game while spectating): Unreal-like, A up / E down.
+# Watching (IMC_Spectator, above the game while spectating): free fly like the Unreal editor on AZERTY (E up, A down),
+# the views (1 player view, 2 split screen, 3 free fly) and the overlays (N players, B watchers).
 SPECTATOR_ACTIONS = {
-    "IA_SpectatorUp": ("bool", [("SpectatorUp", "Fly up", "SpaceBar", []), ("SpectatorUpAlt", "Fly up (alt)", "A", [])]),
-    "IA_SpectatorDown": ("bool", [("SpectatorDown", "Fly down", "LeftControl", []), ("SpectatorDownAlt", "Fly down (alt)", "E", [])]),
+    "IA_SpectatorUp": ("bool", [("SpectatorUp", "Fly up", "SpaceBar", []), ("SpectatorUpAlt", "Fly up (alt)", "E", [])]),
+    "IA_SpectatorDown": ("bool", [("SpectatorDown", "Fly down", "LeftControl", []), ("SpectatorDownAlt", "Fly down (alt)", "A", [])]),
     "IA_SpectatorFast": ("bool", [("SpectatorFast", "Fly faster", "LeftShift", [])]),
+    "IA_SpectatorPlayerView": ("bool", [("SpectatorPlayerView", "Player view", "One", [])]),
+    "IA_SpectatorSplitView": ("bool", [("SpectatorSplitView", "Split screen", "Two", [])]),
+    "IA_SpectatorFreeView": ("bool", [("SpectatorFreeView", "Free fly", "Three", [])]),
+    "IA_WatcherPlayers": ("bool", [("WatcherPlayers", "Show / hide players", "N", [])]),
+    "IA_WatcherWatchers": ("bool", [("WatcherWatchers", "Show / hide watchers", "B", [])]),
 }
 
 # Options > Controls sections (PlayerMappableKeySettings.DisplayCategory).
@@ -45,6 +51,8 @@ INPUT_CATEGORIES = {
     "IA_MoveAbility": "Abilities", "IA_ManipulationAbility": "Abilities", "IA_Sightroom": "Abilities",
     "IA_Interact": "Interaction", "IA_EmoteWheel": "Interaction",
     "IA_SpectatorMode": "Spectator", "IA_SpectatorUp": "Spectator", "IA_SpectatorDown": "Spectator", "IA_SpectatorFast": "Spectator",
+    "IA_SpectatorPlayerView": "Spectator", "IA_SpectatorSplitView": "Spectator", "IA_SpectatorFreeView": "Spectator",
+    "IA_WatcherPlayers": "Spectator", "IA_WatcherWatchers": "Spectator",
     "IA_Pause": "Menus", "IA_Confirm": "Menus",
 }
 # Not rebindable (the mouse axis).
@@ -380,7 +388,8 @@ c = lerp(c, edgeC, saturate(edge * hl * (edgeA + flash)));
 return lerp(base, c, Fade);"""
 
 
-MARKERS_HLSL = """// Always-on markers through walls: 5 = the VIP's body or its ghost (yellow), 6 = retrieval points (gold).
+MARKERS_HLSL = """// Always-on markers through walls: 5 = the VIP's body or its ghost (yellow), 6 = retrieval points (gold),
+// 7 = players as watchers see them (cyan, only set on a watcher's machine).
 // Same anti-aliased coverage and thin outline as the Sightroom; behind a wall the fill is stronger.
 float2 taps[4] = { float2(-0.35, -0.35), float2(0.35, -0.35), float2(-0.35, 0.35), float2(0.35, 0.35) };
 float cov = 0.0;
@@ -388,7 +397,7 @@ float sv = 0.0;
 for (int i = 0; i < 4; i++)
 {
     float v = round(SceneTextureFetch(PPI_CustomStencil, taps[i]).r);
-    float m = step(4.5, v) * step(v, 6.5);
+    float m = step(4.5, v) * step(v, 7.5);
     cov += m;
     sv = max(sv, v * m);
 }
@@ -398,7 +407,7 @@ for (int j = 0; j < 8; j++)
 {
     float a = j * 0.7853982;
     float v = round(SceneTextureFetch(PPI_CustomStencil, float2(cos(a), sin(a)) * 1.6).r);
-    float m = step(4.5, v) * step(v, 6.5);
+    float m = step(4.5, v) * step(v, 7.5);
     ring = max(ring, m);
     sv = max(sv, v * m);
 }
@@ -409,12 +418,37 @@ if (sv < 4.5)
 }
 float edge = ring * (1.0 - cov);
 float behind = step(SceneDepth.r + 4.0 + SceneDepth.r * 0.003, CustomDepth.r);
-float3 col = sv < 5.5 ? float3(1.0, 0.86, 0.12) : float3(1.0, 0.6, 0.08);
-float pulse = 0.85 + 0.15 * sin(Time * 3.0);
-float fillA = (behind > 0.5 ? 0.5 : 0.18) * pulse;
+float3 col = sv < 5.5 ? float3(1.0, 0.86, 0.12) : (sv < 6.5 ? float3(1.0, 0.6, 0.08) : float3(0.35, 0.85, 1.0));
+float pulse = sv < 6.5 ? 0.85 + 0.15 * sin(Time * 3.0) : 1.0;
+float fillA = (behind > 0.5 ? (sv < 6.5 ? 0.5 : 0.4) : (sv < 6.5 ? 0.18 : 0.08)) * pulse;
 float3 c = lerp(base, col, cov * fillA);
 c = lerp(c, col, edge);
 return c;"""
+
+
+def watcher_actions(actions):
+    """The controller's watcher actions (views 1 / 2 / 3, N / B overlays)."""
+    return dict(spectator_player_view_action=actions["IA_SpectatorPlayerView"], spectator_split_view_action=actions["IA_SpectatorSplitView"],
+                spectator_free_view_action=actions["IA_SpectatorFreeView"], watcher_toggle_players_action=actions["IA_WatcherPlayers"],
+                watcher_toggle_watchers_action=actions["IA_WatcherWatchers"])
+
+
+def set_spectator_pawn(bp):
+    """BP_SpectatorPawn: the Sightroom post process (Tab scan for watchers) and the focus overlay, from the player."""
+    player = load(path("Characters", "Player") + "/BP_PlayerCharacter")
+    player_cdo = unreal.get_default_object(player.generated_class()) if player else None
+    spectator = cdo(bp)
+    if not player_cdo or not spectator:
+        log("WARN set_spectator_pawn: missing player or spectator")
+        return
+    player_scan = player_cdo.get_component_by_class(unreal.HitmenSightroomComponent)
+    scan = spectator.get_component_by_class(unreal.HitmenSightroomComponent)
+    if player_scan and scan:
+        scan.set_editor_property("post_process_material", player_scan.get_editor_property("post_process_material"))
+    interaction = player_cdo.get_component_by_class(unreal.HitmenInteractionComponent)
+    if interaction:
+        set_props(spectator, focus_overlay_material=interaction.get_editor_property("focus_overlay_material"))
+    unreal.BlueprintEditorLibrary.compile_blueprint(bp)
 
 
 def build_markers_pp():
@@ -1952,7 +1986,8 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
               sightroom_action=actions["IA_Sightroom"], emote_wheel_action=actions["IA_EmoteWheel"], pause_action=actions["IA_Pause"],
               spectator_mode_action=actions["IA_SpectatorMode"], spectator_up_action=actions["IA_SpectatorUp"],
               spectator_down_action=actions["IA_SpectatorDown"], spectator_fast_action=actions["IA_SpectatorFast"],
-              confirm_action=actions["IA_Confirm"], last_known_position_marker_class=gen_class(marker))
+              confirm_action=actions["IA_Confirm"], last_known_position_marker_class=gen_class(marker),
+              **watcher_actions(actions))
     save(pc)
 
     manny = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
@@ -2040,6 +2075,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     player_state = make_blueprint("BP_PlayerState", core, unreal.HitmenPlayerState)
     save(player_state)
     spectator_pawn = make_blueprint("BP_SpectatorPawn", core, unreal.HitmenSpectatorPawn)
+    set_spectator_pawn(spectator_pawn)
     save(spectator_pawn)
     build_game_instance(core)
 

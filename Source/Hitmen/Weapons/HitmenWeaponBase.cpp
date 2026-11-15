@@ -89,7 +89,9 @@ AHitmenWeaponBase::AHitmenWeaponBase()
 	// Direct light only: Lumen's bounce and volumetric fog would keep a fading glow after the flash.
 	MuzzleLight->SetIndirectLightingIntensity(0.f);
 	MuzzleLight->SetVolumetricScatteringIntensity(0.f);
-	MuzzleLight->SetVisibility(false);
+	// Off = zero intensity, never a hidden component: the arms / body meshes the gun hangs from are shown with a
+	// propagating SetVisibility, which used to switch this light on for as long as the gun was held.
+	MuzzleLight->SetIntensity(0.f);
 }
 
 void AHitmenWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -114,8 +116,18 @@ void AHitmenWeaponBase::BeginPlay()
 	UHitmenScanRegistry::Register(this);
 }
 
+void AHitmenWeaponBase::TurnOffMuzzleLight()
+{
+	GetWorldTimerManager().ClearTimer(MuzzleLightTimer);
+	if (MuzzleLight)
+	{
+		MuzzleLight->SetIntensity(0.f);
+	}
+}
+
 void AHitmenWeaponBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	TurnOffMuzzleLight();
 	UHitmenScanRegistry::Unregister(this);
 	UnwatchAllInventories();
 	GetWorldTimerManager().ClearAllTimersForObject(this);
@@ -271,6 +283,8 @@ void AHitmenWeaponBase::ApplyWeaponState()
 	bStateApplied = true;
 	AppliedState = WeaponState;
 
+	// Holstered, dropped or re-attached: never with a light on.
+	TurnOffMuzzleLight();
 	SetFirstPersonVisuals(false);
 	if (WeaponState == EHitmenWeaponState::Dropped)
 	{
@@ -1163,16 +1177,9 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 		LastMuzzleLightTime = Now;
 		MuzzleLight->SetWorldLocation(Origin);
 		MuzzleLight->SetIntensity(WeaponData->MuzzleLightIntensity);
-		MuzzleLight->SetVisibility(true);
-		MuzzleLightUntil = GetWorld()->GetTimeSeconds() + MuzzleFlashTime;
-		FTimerHandle LightOff;
-		GetWorldTimerManager().SetTimer(LightOff, FTimerDelegate::CreateWeakLambda(this, [this]()
-		{
-			if (GetWorld()->GetTimeSeconds() >= MuzzleLightUntil - 0.005f)
-			{
-				MuzzleLight->SetVisibility(false);
-			}
-		}), MuzzleFlashTime, false);
+		// Always off when the timer fires: the light only ever lives with a muzzle flash (a time guard here used to
+		// fail on input-fired shots, which run a frame ahead of the timer clock, and left the light on in hand).
+		GetWorldTimerManager().SetTimer(MuzzleLightTimer, this, &AHitmenWeaponBase::TurnOffMuzzleLight, FMath::Max(MuzzleFlashTime, 0.01f), false);
 	}
 	const UHitmenGameSettings* VisualSettings = UHitmenGameSettings::Get();
 	if (WeaponData->MuzzleGlowRadius > 0.f)

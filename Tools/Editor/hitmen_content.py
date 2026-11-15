@@ -126,7 +126,7 @@ def build_physical_materials():
     folder = path("Physics")
     surfaces = {"PM_Grass": unreal.PhysicalSurface.SURFACE_TYPE1, "PM_Stone": unreal.PhysicalSurface.SURFACE_TYPE2,
                 "PM_Sand": unreal.PhysicalSurface.SURFACE_TYPE3, "PM_Wood": unreal.PhysicalSurface.SURFACE_TYPE4,
-                "PM_Metal": unreal.PhysicalSurface.SURFACE_TYPE5}
+                "PM_Metal": unreal.PhysicalSurface.SURFACE_TYPE5, "PM_Tile": unreal.PhysicalSurface.SURFACE_TYPE6}
     result = {}
     for name, surface in surfaces.items():
         pm = create(name, folder, unreal.PhysicalMaterial, unreal.PhysicalMaterialFactoryNew())
@@ -558,17 +558,17 @@ GUN_SOUND = "/Game/Vefects/Flipbook_VFX/Shared/Audio/SFX_GunShot_Cue"
 DRY_SOUND = "/Game/Vefects/Anime_Stylized_VFX/Audio/WAV/SFX_Bomb_Bounce_Cue"
 # name: fire sound pitch (min, max), volume, tracer chance, muzzle light (cd), glow radius (cm)
 # (fire pitch, fire volume, tracer chance, muzzle light candelas, muzzle glow cm). A room lamp is ~8 cd: the flash
-# stays a small warm pop (it was 400-3000 cd, a light left on during automatic fire).
+# stays a small warm pop that only lives with the muzzle flash (0.9.0: half of 0.8.0).
 WEAPON_JUICE = {
-    "Pistol": ((1.55, 1.7), 0.32, 0.0, 5.0, 2.0),
-    "SMG": ((1.25, 1.35), 0.6, 0.35, 12.0, 3.5),
-    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 15.0, 4.0),
-    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 25.0, 5.5),
-    "Minigun": ((1.3, 1.4), 0.55, 0.5, 15.0, 4.0),
-    "Sniper": ((0.97, 1.03), 1.0, 1.0, 22.0, 5.0),
-    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 30.0, 6.0),
-    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 20.0, 5.0),
-    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 20.0, 5.0),
+    "Pistol": ((1.55, 1.7), 0.32, 0.0, 2.5, 2.0),
+    "SMG": ((1.25, 1.35), 0.6, 0.35, 6.0, 3.5),
+    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 7.5, 4.0),
+    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 12.0, 5.5),
+    "Minigun": ((1.3, 1.4), 0.55, 0.5, 7.5, 4.0),
+    "Sniper": ((0.97, 1.03), 1.0, 1.0, 11.0, 5.0),
+    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 15.0, 6.0),
+    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 10.0, 5.0),
+    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 10.0, 5.0),
     "Bow": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
     "Sword": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
 }
@@ -882,31 +882,55 @@ SLIDE_SOUND = ("/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_20_FOOTSTEPS_02/
 
 
 def set_traversal_fx(character_cdo, dust):
-    """Traversal dust (ledge hands, slides, vault landings) and the ladder / gutter puff."""
-    set_props(character_cdo, traversal_dust_fx=dust, climb_fx=dust, traversal_dust_scale=0.15)
+    """Traversal dust (ledge hands, slides, vault landings) and the ladder / gutter puffs up and down. The slide, ladder
+    and footstep puffs only play when switched on in Project Settings -> Hitmen -> Juice."""
+    set_props(character_cdo, traversal_dust_fx=dust, climb_fx=dust, ladder_descend_fx=dust, traversal_dust_scale=0.15)
+
+
+# The surface table of DA_SoundSet: (row name, physical surface, step takes, noise multiplier, volume, pitch). Terrain
+# tiles map their slope to grass / sand (earth) / stone (rock) in C++. Tile reuses the stone takes, higher and softer:
+# a new surface needs no new recording.
+SURFACE_TABLE = (
+    ("Grass", "SURFACE_TYPE1", "Grass", 0.8, 1.0, 1.0),
+    ("Stone", "SURFACE_TYPE2", "Stone", 1.0, 1.0, 1.0),
+    ("Sand", "SURFACE_TYPE3", "Sand", 0.6, 1.0, 1.0),
+    ("Wood", "SURFACE_TYPE4", "Wood", 1.1, 1.0, 1.0),
+    ("Metal", "SURFACE_TYPE5", "Metal", 1.4, 1.0, 1.0),
+    ("Tile", "SURFACE_TYPE6", "Stone", 1.1, 0.85, 1.18),
+)
+
+
+def surface_feedback(takes, noise=1.0, volume=1.0, pitch=1.0, effect=None, effect_scale=0.12):
+    f = unreal.HitmenSurfaceFeedback()
+    for key, value in (("sounds", takes), ("sound", None), ("noise_multiplier", noise), ("volume", volume), ("pitch", pitch),
+                       ("effect", effect), ("effect_scale", effect_scale)):
+        f.set_editor_property(key, value)
+    return f
+
+
+def set_surface_table(sound_set):
+    """Footsteps and landings per physical surface, one place for every character (DA_SoundSet -> Surfaces). Each
+    surface has a small dust puff, used only with Project Settings -> Hitmen -> Juice -> bFootstepFX."""
+    sounds = import_footstep_sounds()
+    dust = load(TRAVERSAL_DUST)
+    rows = []
+    for name, surface, takes, noise, volume, pitch in SURFACE_TABLE:
+        row = unreal.HitmenSurfaceEntry()
+        row.set_editor_property("surface", getattr(unreal.PhysicalSurface, surface))
+        row.set_editor_property("name", name)
+        row.set_editor_property("feedback", surface_feedback(sounds["Step_" + takes], noise, volume, pitch, dust))
+        rows.append(row)
+    set_props(sound_set, surfaces=rows, default_surface=surface_feedback(sounds["Step_Concrete"], effect=dust))
 
 
 def set_footstep_sounds(character_cdo):
-    """Footstep variations per physical surface (PM_Grass / Stone / Sand / Wood / Metal, concrete by default) and the
-    landing thumps. Terrain tiles map their slope to grass / sand (earth) / stone (rock) in C++."""
+    """Landing thumps on the character's footstep component; the steps themselves come from the DA_SoundSet surface
+    table (the component's own per-surface map stays empty: it only overrides a surface for one character)."""
     sounds = import_footstep_sounds()
-    P = unreal.PhysicalSurface
-    table = {P.SURFACE_TYPE1: ("Grass", 0.8), P.SURFACE_TYPE2: ("Stone", 1.0), P.SURFACE_TYPE3: ("Sand", 0.6),
-             P.SURFACE_TYPE4: ("Wood", 1.1), P.SURFACE_TYPE5: ("Metal", 1.4)}
     comp = component(character_cdo, "footstep_component")
     if not comp:
         return
-    feedback = {}
-    for surface, (name, noise) in table.items():
-        f = unreal.HitmenSurfaceFeedback()
-        f.set_editor_property("sounds", sounds["Step_" + name])
-        f.set_editor_property("sound", None)
-        f.set_editor_property("noise_multiplier", noise)
-        feedback[surface] = f
-    default = unreal.HitmenSurfaceFeedback()
-    default.set_editor_property("sounds", sounds["Step_Concrete"])
-    default.set_editor_property("sound", None)
-    set_props(comp, surface_feedback=feedback, default_feedback=default, land_thumps=sounds["Land_Soft"],
+    set_props(comp, surface_feedback={}, default_feedback=unreal.HitmenSurfaceFeedback(), land_thumps=sounds["Land_Soft"],
               hard_land_thumps=sounds["Land_Heavy"])
 
 def build_animation():
@@ -1408,6 +1432,7 @@ def build_sound_set():
     G, W, F = unreal.HitmenSoundSpace.GUNSHOT, unreal.HitmenSoundSpace.WORLD, unreal.HitmenSoundSpace.FOOTSTEP
     spaces = {S.EXPLOSION: G, S.TANK_FIRE: G, S.MOUNTED_GUN_FIRE: G, S.LANDING: F, S.LANDING_HARD: F}
     set_props(data, sounds=sounds, volumes=volumes, attenuations=build_attenuations(), spaces=spaces)
+    set_surface_table(data)
     save(data)
     return data
 

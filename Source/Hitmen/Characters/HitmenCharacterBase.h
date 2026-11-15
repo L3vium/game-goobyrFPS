@@ -146,10 +146,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Animation")
 	TObjectPtr<UHitmenAnimSet> AnimSet;
 
-	/** Traversal juice: a puff and a grab sound every ClimbStepDistance on ladders / gutters, sparks and a cable
-	 *  sound on ziplines (every machine). */
+	/** Traversal juice: a grab sound every ClimbStepDistance on ladders / gutters with a puff going up (ClimbFX,
+	 *  Project Settings -> Hitmen -> Juice -> bLadderClimbFX) or down (LadderDescendFX, bLadderDescendFX); sparks and
+	 *  a cable sound on ziplines (every machine). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
 	TObjectPtr<class UNiagaraSystem> ClimbFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
+	TObjectPtr<class UNiagaraSystem> LadderDescendFX;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
 	TObjectPtr<class UNiagaraSystem> ZiplineFX;
@@ -157,7 +161,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="10", Units="cm"))
 	float ClimbStepDistance = 55.f;
 
-	/** Dust where the hands land on a ledge, under the feet when a vault lands, along a slide (every machine). */
+	/** Dust where the hands land on a ledge, under the feet when a vault lands, along a slide (bSlideFX) (every
+	 *  machine). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
 	TObjectPtr<class UNiagaraSystem> TraversalDustFX;
 

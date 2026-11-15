@@ -50,6 +50,10 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Head bob on, a footstep on each dip; Options head bob 0 removes it
 - [ ] Switching weapons: the new one rises from below in ~0.2 s
 - [ ] Every gun kicks per shot (shotgun / sniper hard, SMG light); the minigun shakes more as it spins up
+- [x] A held gun gives no light; a shot lights the muzzle for one flash and it is off 0.5 s later (PIE script at
+  37 fps, 0.9.0); [ ] the same in a dark room by eye, first person and third person
+- [ ] No ladder / gutter puff, no slide dust, no footstep puff by default; each comes back with its Juice switch
+- [ ] Footsteps sound different on grass, stone, sand, wood, metal and tile floors (DA_SoundSet surface table)
 - [x] Sniper: a brief trail to the impact and debris there; no warm full-screen wash on your own shots (PIE screenshots,
   0.8.0); [ ] SMG / minigun bursts in a dark room never look like a light left on
 - [ ] Sniper: raise, wobble, then zoom; the zoomed aim breathes

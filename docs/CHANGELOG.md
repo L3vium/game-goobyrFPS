@@ -3,6 +3,25 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
+## [Unreleased] - 0.9.0
+
+### Added
+- Juice switches in Project Settings → Hitmen → Juice, every effect keeping its asset slot: `bLadderClimbFX`,
+  `bLadderDescendFX` (new `LadderDescendFX` slot on characters: a puff going down a ladder or gutter), `bSlideFX`,
+  `bSlideSound`, `bFootstepFX`.
+- One surface table for footsteps and landings in `DA_SoundSet` (`Surfaces`, `DefaultSurface`; volume, pitch, puff,
+  noise multiplier per surface) instead of a copy per character; a Tile surface (`SurfaceType6`, `PM_Tile`, the stone
+  takes higher and softer). Recipe for a new surface in `docs/Pipelines.md`.
+
+### Changed
+- Ladder and gutter puffs, slide dust and footstep puffs are off by default (switches above); the slide scrape stays.
+- Muzzle lights are half as strong (2.5-15 cd).
+
+### Fixed
+- Guns no longer glow while held: showing the first-person arms (a propagating `SetVisibility`) switched the muzzle light
+  on for as long as the gun was in hand. The light is now off at zero intensity and only lives with a muzzle flash; a
+  per-shot timer always turns it off (its time guard could fail on input-fired shots).
+
 ## [0.8.0] - 2026-11-14
 
 ### Added

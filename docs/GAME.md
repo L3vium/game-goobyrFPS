@@ -228,11 +228,15 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
   distance. Usable objects within 18 m light up only where you can really see them (depth-tested in `PP_Sightroom`, never
   through a wall). Highlights are anti-aliased with a thin outline. No waypoint in normal view.
 - **Emotes**: hold `R` for a radial wheel.
-- **Footsteps**: five takes per surface (grass, stone, sand / dirt, wood, metal; concrete elsewhere; Kenney Impact
-  Sounds, CC0, sources in `Tools/Audio/Footsteps`), one picked at random and never twice in a row, for players and NPCs;
-  the surface comes from the physical material under the feet (PM_*; rocks and mountains are stone) and terrain tiles
-  read it from their slope like their colour (grass on the flats, earth on slopes, rock on cliffs); it also scales how
-  far NPCs hear the step. Volume per gait (walk, sprint, crouch) and a small random pitch; your own steps are 2D and
+- **Footsteps**: five takes per surface (grass, stone, sand / dirt, wood, metal, tile; concrete elsewhere; Kenney
+  Impact Sounds, CC0, sources in `Tools/Audio/Footsteps`), one picked at random and never twice in a row, for players
+  and NPCs; the surface comes from the physical material under the feet (PM_*; rocks and mountains are stone) and
+  terrain tiles read it from their slope like their colour (grass on the flats, earth on slopes, rock on cliffs); it also
+  scales how far NPCs hear the step. One surface table for every character: `DA_SoundSet` → Surfaces (takes, volume,
+  pitch, puff, noise multiplier; Tile reuses the stone takes higher and softer). Adding a surface: `docs/Pipelines.md`.
+- **Juice switches** (Project Settings → Hitmen → Juice; every effect keeps its asset slot): `bLadderClimbFX` (puff at
+  the hands climbing a ladder / gutter, off), `bLadderDescendFX` (`LadderDescendFX` going down, off), `bSlideFX` (dust
+  along a slide, off), `bSlideSound` (scrape loop, on), `bFootstepFX` (each surface's puff on steps and landings, off). Volume per gait (walk, sprint, crouch) and a small random pitch; your own steps are 2D and
   quieter. **Landings** use the same surface query: that surface's step plus a body thump (heavier on a hard landing).
 - **Sound spaces**: every 3D sound goes through one attenuation per space (`DA_SoundSet` → Attenuations:
   `SA_Hitmen_World`, `_Footstep`, `_Gunshot`, `_Impact`), with distance falloff and occlusion: a guard's steps are
@@ -241,8 +245,9 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
 ## 7. Weapons
 **Juice (toon only, no blood)**: other players' and guards' guns flash at the muzzle (Anime_Stylized `NS_Gunshot_Cast`);
 your own first-person gun shows a small soft glow (`M_Hitmen_FlashGlow`) instead, because the toon flash washed the whole
-view warm on every shot. The muzzle light is weak (5-35 cd, a room lamp is ~8), direct only (no Lumen bounce or fog),
-0.035 s, and at most once every 0.09 s, so automatic fire never reads as a light left on. Hits make a toon puff
+view warm on every shot. The muzzle light only lives with a muzzle flash: weak (2.5-15 cd, a room lamp is ~8), direct
+only (no Lumen bounce or fog), 0.035 s, at most once every 0.09 s; off, it is at zero intensity (never a hidden light that
+showing the arms could switch back on). Hits make a toon puff
 (`NS_Gunshot_Hit`) on walls and bodies alike; a miss (the shot's range ends in the air) makes none. Tracers
 (`AHitmenTracer`, `M_Hitmen_Tracer`, style per weapon in `FHitmenTracerStyle`) show every shotgun pellet and part of the
 machine-gun bullets as fast streaks; the sniper draws a brief trail over the whole shot (it fades in 0.12 s) and throws
@@ -250,8 +255,8 @@ debris out of the surface it hits (`ImpactBurstFX`). All guns share one recordin
 (`FireSoundPitch` / `FireSoundVolume`: the silenced pistol is a quiet high snap). Muzzle points are computed from each
 mesh (the Weapons_Free guns have no socket). Explosions flash (`ExplosionFlash*` on projectiles; the flashbang is a big
 white flash and light), the smoke grenade is the Smoke_Bombs toon cloud (plays 1.8x faster), the jetpack blows smoke
-under your feet, ladders and gutters puff and click at each grab (soft dust, never in your own first-person view),
-hands landing on a ledge throw dust and a grab sound, slides scrape and leave dust, vault landings puff, ziplines throw
+under your feet, ladders and gutters click at each grab, hands landing on a ledge throw dust and a grab sound, slides
+scrape, vault landings puff, ziplines throw
 sparks with a cable sound, the tank's
 barrel slides back 120 cm, its hull rocks and the muzzle blasts, and the turret flashes and fires red tracers. Taking
 a hit: a red arc toward the shooter, a colour fringe and a red tint on the view, a small shake; the world greys as

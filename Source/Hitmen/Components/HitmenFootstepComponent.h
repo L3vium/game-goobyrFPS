@@ -5,31 +5,11 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Chaos/ChaosEngineInterface.h"
+#include "Data/HitmenSoundSet.h"
 #include "HitmenFootstepComponent.generated.h"
 
 class USoundBase;
 class UNiagaraSystem;
-
-USTRUCT(BlueprintType)
-struct FHitmenSurfaceFeedback
-{
-	GENERATED_BODY()
-
-	/** Step variations: one is picked at random each step (never the same twice in a row). */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Footstep")
-	TArray<TObjectPtr<USoundBase>> Sounds;
-
-	/** Single step sound, used when Sounds is empty. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Footstep")
-	TObjectPtr<USoundBase> Sound = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Footstep")
-	TObjectPtr<UNiagaraSystem> Effect = nullptr;
-
-	/** Multiplies the noise radius heard by NPCs (sand quieter, metal louder). */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Footstep", meta=(ClampMin="0"))
-	float NoiseMultiplier = 1.f;
-};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnHitmenFootstep, TEnumAsByte<EPhysicalSurface>, Surface, FVector, Location, float, NoiseRadius);
 
@@ -39,7 +19,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnHitmenFootstep, TEnumAsByte<EP
  * steps from movement so the system works out of the box; a notify suppresses the fallback.
  *
  * Surfaces come from physical materials (DefaultEngine.ini): SurfaceType1 Grass, 2 Stone, 3 Sand,
- * 4 Wood, 5 Metal. The default table has an entry for each (sound/VFX empty, noise multipliers set).
+ * 4 Wood, 5 Metal, 6 Tile. What each sounds like is the surface table of DA_SoundSet (one place for every character);
+ * SurfaceFeedback here only overrides a surface for this character when its entry has a sound.
  */
 UCLASS(ClassGroup=(Hitmen), Blueprintable, meta=(BlueprintSpawnableComponent))
 class HITMEN_API UHitmenFootstepComponent : public UActorComponent
@@ -128,7 +109,7 @@ protected:
 
 	void HandleFootstepInternal(FName FootBone);
 
-	/** Per surface type: sound, VFX and AI noise multiplier. Missing surfaces use DefaultFeedback. */
+	/** Per-character overrides of the DA_SoundSet surface table (an entry counts only when it has a sound). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Footstep")
 	TMap<TEnumAsByte<EPhysicalSurface>, FHitmenSurfaceFeedback> SurfaceFeedback;
 
@@ -170,6 +151,8 @@ protected:
 
 	float ComputeNoiseRadius(float SurfaceMultiplier) const;
 	const FHitmenSurfaceFeedback& GetFeedback(EPhysicalSurface Surface) const;
+	/** The surface puff, only when Project Settings -> Hitmen -> Juice -> bFootstepFX. */
+	void SpawnStepEffect(const FHitmenSurfaceFeedback& Feedback, const FVector& Location) const;
 	/** A random variation of the surface's step (never the last one played). */
 	USoundBase* PickStepSound(const FHitmenSurfaceFeedback& Feedback);
 	/** Your own sounds in 2D, everyone else's in the footstep sound space. */

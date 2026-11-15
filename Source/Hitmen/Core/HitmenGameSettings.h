@@ -64,6 +64,27 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Visuals")
 	TSoftObjectPtr<UMaterialInterface> FlashMaterial;
 
+	// ---- Juice (every effect keeps its asset slot; these switches decide whether it plays) ----
+	/** A puff at the hands at each step up a ladder or gutter (the grab sound always plays). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
+	bool bLadderClimbFX = false;
+
+	/** A puff while going down a ladder or gutter (LadderDescendFX on the character). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
+	bool bLadderDescendFX = false;
+
+	/** Dust along a slide. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
+	bool bSlideFX = false;
+
+	/** The scrape loop while sliding (EHitmenSound::Slide). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
+	bool bSlideSound = true;
+
+	/** A puff under the foot on each step and landing (the Effect of each surface in DA_SoundSet). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
+	bool bFootstepFX = false;
+
 	// ---- Combat ----
 	/** A bullet or arrow in the head always kills (the multiplier no longer matters). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Combat")

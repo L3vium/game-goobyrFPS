@@ -37,6 +37,22 @@ Anything can show on the minimap and the pause map:
 Retrieval points and security cameras carry one (`DA_MapMarker_RetrievalPoint`, `DA_MapMarker_Camera`). You,
 teammates, the VIP and guards on alert are drawn from the game state, not markers.
 
+## Surfaces (footsteps, landings)
+
+What you walk on decides the step sound, its puff and how far NPCs hear it:
+
+1. **Declare the surface**: Project Settings → Engine → Physics → Physical Surface, a new `SurfaceTypeN` (the builder
+   uses 1 Grass, 2 Stone, 3 Sand, 4 Wood, 5 Metal, 6 Tile; saved in `Config/DefaultEngine.ini`).
+2. **Make its physical material**: a `PM_<Name>` in `/Game/Hitmen/Physics` with that **Surface Type**, set as the
+   **Phys Material** of every material instance that looks like it (`MI_<Name>`, `MI_Grid_<Name>`).
+3. **Give it a row**: `DA_SoundSet` → Surfaces → add `Surface`, `Name`, step takes (`Sounds`, five is good), `Volume`,
+   `Pitch` (an existing surface's takes pitched up or down work), `Effect` + `EffectScale` (played only with
+   Project Settings → Hitmen → Juice → `bFootstepFX`) and `NoiseMultiplier` (how far NPCs hear it).
+
+Surfaces without a row use `Default Surface` (concrete). A character can override a surface in its footstep component
+(`Surface Feedback`, used only when the entry has a sound). Terrain tiles (`HitmenTerrain` tag) pick grass / earth /
+rock from their slope (`TerrainGrassMinNormalZ`, `TerrainRockMaxNormalZ` on the footstep component).
+
 ## Maps (generated layouts, minimap, thumbnail)
 
 `Tools/Editor/hitmen_levels.py` builds the match maps from code (`build_ldtest()`, `build_gym()`), with helpers for

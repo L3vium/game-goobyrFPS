@@ -116,18 +116,22 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 	// Hand-level dust stays out of your own first-person view (it would fill the screen); everyone else sees it.
 	const bool bFirstPersonViewer = IsLocallyControlled() && IsPlayerControlled();
 
-	// Ladders and gutters: a grab sound and a small puff at the hands every step of the climb.
+	// Ladders and gutters: a grab sound every step of the climb, and a puff when switched on (up / down).
+	const UHitmenGameSettings* Juice = UHitmenGameSettings::Get();
 	if (bClimbing)
 	{
-		ClimbStepAccumulator += FMath::Abs(Z - LastTraversalZ);
+		const float Step = Z - LastTraversalZ;
+		ClimbStepAccumulator += FMath::Abs(Step);
 		if (ClimbStepAccumulator >= ClimbStepDistance)
 		{
 			ClimbStepAccumulator = 0.f;
-			const FVector Hands = GetActorLocation() + GetActorForwardVector() * 30.f + FVector::UpVector * 60.f;
+			const bool bDown = Step < 0.f;
+			const FVector Hands = GetActorLocation() + GetActorForwardVector() * 30.f + FVector::UpVector * (bDown ? -20.f : 60.f);
 			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::ClimbGrab, Hands);
-			if (ClimbFX && !bFirstPersonViewer)
+			UNiagaraSystem* Puff = bDown ? (Juice->bLadderDescendFX ? LadderDescendFX.Get() : nullptr) : (Juice->bLadderClimbFX ? ClimbFX.Get() : nullptr);
+			if (Puff && !bFirstPersonViewer)
 			{
-				UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ClimbFX, Hands, FRotator::ZeroRotator, FVector(0.35f));
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Puff, Hands, FRotator::ZeroRotator, FVector(0.35f));
 			}
 		}
 	}
@@ -165,13 +169,14 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 	if (bSliding && !bWasSlidingJuice)
 	{
 		SlideDustAccumulator = 0.f;
-		if (USoundBase* Scrape = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::Slide))
+		USoundBase* Scrape = Juice->bSlideSound ? UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::Slide) : nullptr;
+		if (Scrape)
 		{
 			SlideAudio = UGameplayStatics::SpawnSoundAttached(Scrape, GetRootComponent(), NAME_None, FVector(0.f, 0.f, -60.f), EAttachLocation::KeepRelativeOffset,
 				true, UHitmenSoundLibrary::GetHitmenSoundVolume(EHitmenSound::Slide), 1.f, 0.f, UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::Footstep));
 		}
 	}
-	if (bSliding)
+	if (bSliding && Juice->bSlideFX)
 	{
 		SlideDustAccumulator -= DeltaSeconds;
 		if (SlideDustAccumulator <= 0.f)

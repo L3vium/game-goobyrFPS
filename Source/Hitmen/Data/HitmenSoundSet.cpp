@@ -8,6 +8,23 @@
 #include "Sound/SoundAttenuation.h"
 #include "Engine/World.h"
 
+const FHitmenSurfaceFeedback& UHitmenSoundSet::GetSurface(EPhysicalSurface Surface) const
+{
+	for (const FHitmenSurfaceEntry& Entry : Surfaces)
+	{
+		if (Entry.Surface == Surface)
+		{
+			return Entry.Feedback;
+		}
+	}
+	return DefaultSurface;
+}
+
+const UHitmenSoundSet* UHitmenSoundSet::GetProjectSet()
+{
+	return UHitmenGameSettings::Get()->SoundSet.LoadSynchronous();
+}
+
 USoundBase* UHitmenSoundSet::GetSound(EHitmenSound Sound) const
 {
 	const TSoftObjectPtr<USoundBase>* Found = Sounds.Find(Sound);

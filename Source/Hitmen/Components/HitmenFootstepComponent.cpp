@@ -11,6 +11,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "Engine/World.h"
+#include "Core/HitmenGameSettings.h"
 #include "Hitmen.h"
 
 UHitmenFootstepComponent::UHitmenFootstepComponent()
@@ -93,8 +94,25 @@ void UHitmenFootstepComponent::HandleFootstep(FName FootBone)
 
 const FHitmenSurfaceFeedback& UHitmenFootstepComponent::GetFeedback(EPhysicalSurface Surface) const
 {
-	const FHitmenSurfaceFeedback* Found = SurfaceFeedback.Find(Surface);
-	return Found ? *Found : DefaultFeedback;
+	// A character override with a sound wins; otherwise the project surface table (DA_SoundSet).
+	const FHitmenSurfaceFeedback* Own = SurfaceFeedback.Find(Surface);
+	if (Own && Own->HasSound())
+	{
+		return *Own;
+	}
+	if (const UHitmenSoundSet* Set = UHitmenSoundSet::GetProjectSet(); Set && (Set->Surfaces.Num() > 0 || Set->DefaultSurface.HasSound()))
+	{
+		return Set->GetSurface(Surface);
+	}
+	return Own ? *Own : DefaultFeedback;
+}
+
+void UHitmenFootstepComponent::SpawnStepEffect(const FHitmenSurfaceFeedback& Feedback, const FVector& Location) const
+{
+	if (Feedback.Effect && UHitmenGameSettings::Get()->bFootstepFX && GetNetMode() != NM_DedicatedServer)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Feedback.Effect, Location, FRotator::ZeroRotator, FVector(Feedback.EffectScale));
+	}
 }
 
 bool UHitmenFootstepComponent::QuerySurface(const FVector& From, FHitResult& OutHit, EPhysicalSurface& OutSurface) const
@@ -160,16 +178,13 @@ void UHitmenFootstepComponent::PlayLanding(float FallSpeed, bool bHard)
 	}
 	const FHitmenSurfaceFeedback& Feedback = GetFeedback(Surface);
 	const float Pitch = 1.f + FMath::FRandRange(-PitchJitter, PitchJitter);
-	PlayStepSound(PickStepSound(Feedback), Hit.ImpactPoint, LandStepVolume, Pitch * 0.94f);
+	PlayStepSound(PickStepSound(Feedback), Hit.ImpactPoint, LandStepVolume * Feedback.Volume, Pitch * 0.94f * Feedback.Pitch);
 	const TArray<TObjectPtr<USoundBase>>& Thumps = bHard && HardLandThumps.Num() > 0 ? HardLandThumps : LandThumps;
 	if (Thumps.Num() > 0)
 	{
 		PlayStepSound(Thumps[FMath::RandRange(0, Thumps.Num() - 1)], Hit.ImpactPoint, bHard ? HardLandThumpVolume : LandThumpVolume, Pitch);
 	}
-	if (Feedback.Effect)
-	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Feedback.Effect, Hit.ImpactPoint);
-	}
+	SpawnStepEffect(Feedback, Hit.ImpactPoint);
 }
 
 void UHitmenFootstepComponent::HandleFootstepInternal(FName FootBone)
@@ -203,12 +218,9 @@ void UHitmenFootstepComponent::HandleFootstepInternal(FName FootBone)
 		{
 			Volume = SprintVolume;
 		}
-		PlayStepSound(PickStepSound(Feedback), Hit.ImpactPoint, Volume, 1.f + FMath::FRandRange(-PitchJitter, PitchJitter));
+		PlayStepSound(PickStepSound(Feedback), Hit.ImpactPoint, Volume * Feedback.Volume, (1.f + FMath::FRandRange(-PitchJitter, PitchJitter)) * Feedback.Pitch);
 	}
-	if (Feedback.Effect)
-	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Feedback.Effect, Hit.ImpactPoint);
-	}
+	SpawnStepEffect(Feedback, Hit.ImpactPoint);
 
 	float NoiseRadius = 0.f;
 	if (Owner->HasAuthority() && bReportNoiseToAI)

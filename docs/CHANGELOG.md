@@ -45,6 +45,11 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   snipers and guards holding a post hand the job over; the VIP's body is never carried by a guard.
 - The search runs on EQS: `EQ_HitmenSearch` with `UEnvQueryGenerator_HitmenSearchSpots`, `UEnvQueryTest_HitmenSearchFree`,
   `UEnvQueryTest_HitmenNearHidingSpot`, `UEnvQueryContext_HitmenSearchCenter` and engine trace / distance / path tests.
+- Patrol groups: NPCs assigned to one patrol route (`AssignedNPCs`, or sharing `PatrolRoute`) walk it as one group
+  (`bAssignedNPCsPatrolAsGroup`, `GroupFollowDistance`, `GroupFollowSpacing`, `GroupColumns`); the leader waits for
+  followers (`LeaderWaitPace`, `LagDistance`); guard groups get `Columns`.
+- Gym AI pen: one of each kind, labelled (static sentry, stationary rifleman with a radio, lone patroller, a group of 4
+  on one route, keycard guard, sniper, VIP candidate); `hitmen_levels.gym_ai_pen`.
 - Guards per weapon (`BP_NPC_Guard_SMG`, `_Rifle`, `_Shotgun`), `NPCEngageRange`, NPC `DisplayName` and an info line
   (name, weapon, keycard), `bPickpocketRequiresCrouch`; NPCs carry a body carry component.
 - Security turret: `VisionArcDegrees` (180) and `RoundsPerMinute` (200, replaces `FireInterval`). Mounted gun:

@@ -434,6 +434,29 @@ void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAler
 	}
 }
 
+void AHitmenNPC::AssignPatrolRoute(AHitmenPatrolRoute* Route)
+{
+	if (!HasAuthority() || !Route)
+	{
+		return;
+	}
+	PatrolRoute = Route;
+	Behavior = EHitmenNPCBehavior::Patrol;
+	if (AHitmenAIController* AI = Cast<AHitmenAIController>(GetController()))
+	{
+		AI->RefreshNPCKeys();
+	}
+}
+
+void AHitmenNPC::SetPaceMultiplier(float Multiplier)
+{
+	if (!FMath::IsNearlyEqual(PaceMultiplier, Multiplier))
+	{
+		PaceMultiplier = Multiplier;
+		RefreshWalkSpeed();
+	}
+}
+
 void AHitmenNPC::RefreshWalkSpeed()
 {
 	UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
@@ -454,7 +477,7 @@ void AHitmenNPC::RefreshWalkSpeed()
 	case EHitmenAlertState::Combat:        Movement->WalkSpeed = CombatWalkSpeed; break;
 	case EHitmenAlertState::Investigating:
 	case EHitmenAlertState::Searching:     Movement->WalkSpeed = AlertWalkSpeed; break;
-	default:                               Movement->WalkSpeed = AlertComponent->IsOnEdge() ? OnEdgeWalkSpeed : CalmWalkSpeed; break;
+	default:                               Movement->WalkSpeed = (AlertComponent->IsOnEdge() ? OnEdgeWalkSpeed : CalmWalkSpeed) * PaceMultiplier; break;
 	}
 }
 

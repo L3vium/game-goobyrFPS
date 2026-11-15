@@ -68,6 +68,9 @@ public:
 	/** Pushes the alert state into the blackboard (also called on a timer). */
 	void SyncBlackboard();
 
+	/** The NPC's fixed keys (post, sniper, stationary, hold position): at possession and when its role changes. */
+	void RefreshNPCKeys();
+
 protected:
 	virtual void BeginPlay() override;
 

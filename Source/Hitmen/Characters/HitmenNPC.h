@@ -123,6 +123,12 @@ public:
 	int32 GetCarriedKeycard() const { return CarriedKeycard; }
 
 	void SetGuardGroup(class AHitmenGuardGroup* Group);
+
+	/** Server: walks Route (from the route's AssignedNPCs); makes it a patroller. */
+	void AssignPatrolRoute(AHitmenPatrolRoute* Route);
+
+	/** Calm walking pace multiplier (a group leader waiting for its followers). */
+	void SetPaceMultiplier(float Multiplier);
 	class AHitmenGuardGroup* GetGuardGroup() const;
 
 protected:
@@ -266,6 +272,7 @@ protected:
 
 	/** Walk speed from the alert state (and on edge). */
 	void RefreshWalkSpeed();
+	float PaceMultiplier = 1.f;
 
 	UFUNCTION()
 	void HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState);

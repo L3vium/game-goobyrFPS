@@ -222,7 +222,8 @@ def npc(kind, loc, yaw=0, route=None, keycard=None, folder="AI", stationary=Fals
     """Place an NPC. stationary = stands at its post facing yaw; sentry = stationary, sight only,
     never leaves its post."""
     cls = {"guard": "Characters/NPC/BP_NPC_Guard", "sniper": "Characters/NPC/BP_NPC_Sniper",
-           "vip": "Characters/NPC/BP_NPC_VIPCandidate"}[kind]
+           "vip": "Characters/NPC/BP_NPC_VIPCandidate", "smg": "Characters/NPC/BP_NPC_Guard_SMG",
+           "rifle": "Characters/NPC/BP_NPC_Guard_Rifle", "shotgun": "Characters/NPC/BP_NPC_Guard_Shotgun"}[kind]
     actor = spawn(bp(cls), (loc[0], loc[1], loc[2] + 100), (0, yaw, 0), None, folder)
     if actor and route:
         actor.set_editor_property("patrol_route", route)
@@ -756,31 +757,10 @@ def build_gym():
     wall((150, py0), (px1, py0), 0, 260, 25, (), GRID_DARK, G)
     wall((px0, py0), (px0, py1), 0, 260, 25, (), GRID_DARK, G)
     wall((px1, py0), (px1, py1), 0, 260, 25, [(2500 - py0, 120, 0, 120)], GRID_DARK, G)  # vent hole (sealed room)
-    # Curved patrol (spline) around a pillar.
     block(0, 2300, 300, 300, 260, GRID_DARK, G)
-    loop = patrol([(-500, 1800, 100), (500, 1800, 100), (500, 2800, 100), (-500, 2800, 100)], [2.0, 0.0, 2.0, 0.0], G, curved=True)
-    npc("guard", (-500, 1800, 0), 0, route=loop, folder=G)
-    label(0, 2300, 260, "SPLINE PATROL  around the pillar")
-    # Guard group: a leader on a route, two followers in formation.
-    group_route = patrol([(-1100, 1500, 100), (-1100, 3300, 100)], [3.0, 3.0], G, curved=False)
-    leader = npc("guard", (-1100, 1500, 0), 90, route=group_route, folder=G)
-    followers = [npc("guard", (-1250, 1400, 0), 90, folder=G), npc("guard", (-950, 1400, 0), 90, folder=G)]
-    group = spawn(bp("AI/BP_GuardGroup"), (-1100, 1500, 0), label="GuardGroup", folder=G)
-    if group and leader:
-        group.set_editor_property("members", [m for m in [leader] + followers if m])
-    label(-1100, 1450, 200, "GUARD GROUP  leader + 2")
-    # Keycard guard to pickpocket (stationary, back turned to the entrance).
-    npc("guard", (900, 1700, 0), 90, keycard=1, folder=G, stationary=True)
-    label(900, 1700, 200, "KEYCARD GUARD  F from behind: pickpocket")
-    # Sentry, sniper tower, VIP candidate.
-    npc("guard", (1100, 3200, 0), -90, folder=G, sentry=True)
-    label(1100, 3200, 200, "SENTRY  sight only")
     block(-200, 3350, 300, 300, 450, GRID_DARK, G)
     ladder((-200, 3175, 0), -90, 450)
-    npc("sniper", (-200, 3350, 450), -90, folder=G)
-    label(-200, 3350, 650, "SNIPER  red laser")
-    npc("vip", (400, 3300, 0), -90, folder=G, stationary=True)
-    label(400, 3300, 200, "VIP CANDIDATE")
+    gym_ai_pen(G)
     # Hiding spots for the search state.
     spawn(bp("World/Interactables/Locker/BP_Locker"), (1250, 1900, 0), (0, 180, 0), folder=G)
     spawn(bp("World/Interactables/Grass/BP_TallGrass"), (-700, 3300, 55), folder=G).set_actor_scale3d(unreal.Vector(0.4, 0.4, 1.0))
@@ -791,6 +771,40 @@ def build_gym():
     label(-400, py0 - 60, 380, "CAMERA ALARM  calls the pen")
     check_pickups_clear()
     save_map()
+
+
+# The gym's AI pen (x -1400..1400, y 1200..3600; a pillar at (0, 2300), the sniper tower at (-200, 3350)): one of each
+# kind of NPC, labelled. Used by build_gym and by hitmen_patch_090 (step gym_ai) on the hand-edited L_Gym.
+GYM_AI_PEN = (-1400.0, 1400.0, 1200.0, 3600.0)
+
+
+def gym_ai_pen(G="Gym/AI"):
+    # Static: a sentry never moves, never hears, never takes a distraction (sight only).
+    npc("guard", (1100, 3200, 0), -90, folder=G, sentry=True)
+    label(1100, 3200, 200, "STATIC SENTRY  never moves, deaf: sight only")
+    # Stationary: stands at its post, turns to noises and goes to look (a radio beside it to switch on).
+    npc("rifle", (1150, 2500, 0), 180, folder=G, stationary=True)
+    spawn(bp("World/Interactables/Distraction/BP_Distraction_Radio"), (1250, 2200, 80), (0, 180, 0), folder=G)
+    label(1150, 2500, 200, "STATIONARY  rifle, comes to look at the radio")
+    # One patroller on a curve around the pillar.
+    loop = patrol([(-500, 1800, 100), (500, 1800, 100), (500, 2800, 100), (-500, 2800, 100)], [2.0, 0.0, 2.0, 0.0], G, curved=True)
+    npc("guard", (-500, 1800, 0), 0, route=loop, folder=G)
+    label(0, 2300, 260, "PATROL  alone on a curve around the pillar")
+    # A patrol group: four guards assigned to one curved route walk it together (the first leads).
+    group_route = patrol([(-1100, 1500, 100), (-1100, 3200, 100), (-700, 3350, 100), (-700, 1650, 100)], [3.0, 1.0, 3.0, 1.0], G, curved=True)
+    members = [npc(kind, (-1100 + 120 * i, 1450 - 90 * (i % 2), 0), 90, folder=G) for i, kind in enumerate(("shotgun", "smg", "guard", "rifle"))]
+    if group_route:
+        group_route.set_editor_property("assigned_np_cs", [m for m in members if m])
+    label(-900, 1450, 230, "PATROL GROUP  4 on one route: shotgun, SMG, pistol, rifle")
+    # Keycard guard to pickpocket (stationary, back turned to the entrance).
+    npc("guard", (600, 1550, 0), 90, keycard=1, folder=G, stationary=True)
+    label(600, 1550, 200, "KEYCARD GUARD  right pocket, F from behind")
+    # Sniper on its tower, the VIP candidate.
+    npc("sniper", (-200, 3350, 450), -90, folder=G)
+    label(-200, 3350, 650, "SNIPER  red star, red aim line")
+    npc("vip", (400, 3300, 0), -90, folder=G, stationary=True)
+    label(400, 3300, 200, "VIP CANDIDATE")
+    label(1250, 1900, 260, "BODIES  a guard carries them to a locker / container")
 
 
 def check_pickups_clear(radius=25.0):

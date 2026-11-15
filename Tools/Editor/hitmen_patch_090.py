@@ -162,4 +162,28 @@ if wanted("ai"):
     made = hitmen_content.build_guard_loadouts()
     log("ai: gunshot radii and responders, guards", ", ".join(sorted(made)))
 
+if wanted("gym_ai"):
+    # The gym's AI pen, one of each kind: static sentry, stationary, lone patroller, a group of 4 on one route,
+    # keycard guard, sniper, VIP candidate (replaces the pen's NPCs, routes, groups and labels; walls, pillar, tower,
+    # lockers, grass and the camera stay).
+    import hitmen_levels
+    importlib.reload(hitmen_levels)
+    les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    les.load_level("/Game/Hitmen/Maps/L_Gym")
+    x0, x1, y0, y1 = hitmen_levels.GYM_AI_PEN
+    removed = 0
+    for actor in eas.get_all_level_actors():
+        loc = actor.get_actor_location()
+        if not (x0 - 50 <= loc.x <= x1 + 50 and y0 - 50 <= loc.y <= y1 + 50):
+            continue
+        is_label = isinstance(actor, unreal.TextRenderActor) and loc.z > 60
+        is_ai = isinstance(actor, (unreal.HitmenNPC, unreal.HitmenPatrolRoute, unreal.HitmenGuardGroup, unreal.HitmenDistraction))
+        if is_label or is_ai:
+            eas.destroy_actor(actor)
+            removed += 1
+    hitmen_levels.gym_ai_pen("Gym/AI")
+    les.save_current_level()
+    log("gym_ai: removed", removed, "placed the new pen")
+
 print("\n".join(LOG))

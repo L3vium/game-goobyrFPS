@@ -120,17 +120,7 @@ void AHitmenAIController::OnPossess(APawn* InPawn)
 	{
 		RunBehaviorTree(Tree);
 	}
-	if (Blackboard)
-	{
-		Blackboard->SetValueAsVector(HitmenBBKeys::HomeLocation, InPawn->GetActorLocation());
-		if (const AHitmenNPC* NPC = Cast<AHitmenNPC>(InPawn))
-		{
-			Blackboard->SetValueAsVector(HitmenBBKeys::HomeLocation, NPC->GetPostLocation());
-			Blackboard->SetValueAsBool(HitmenBBKeys::IsSniper, NPC->IsSniper());
-			Blackboard->SetValueAsBool(HitmenBBKeys::IsStationary, NPC->GetBehavior() == EHitmenNPCBehavior::Stationary);
-			Blackboard->SetValueAsBool(HitmenBBKeys::HoldPosition, NPC->HoldsPosition());
-		}
-	}
+	RefreshNPCKeys();
 
 	// Charmed pawns hunt hostiles of their new side, starting where they stand.
 	if (IsPawnCharmed())
@@ -373,6 +363,23 @@ void AHitmenAIController::EvaluateSight()
 void AHitmenAIController::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState)
 {
 	SyncBlackboard();
+}
+
+void AHitmenAIController::RefreshNPCKeys()
+{
+	APawn* InPawn = GetPawn();
+	if (!Blackboard || !InPawn)
+	{
+		return;
+	}
+	Blackboard->SetValueAsVector(HitmenBBKeys::HomeLocation, InPawn->GetActorLocation());
+	if (const AHitmenNPC* NPC = Cast<AHitmenNPC>(InPawn))
+	{
+		Blackboard->SetValueAsVector(HitmenBBKeys::HomeLocation, NPC->GetPostLocation());
+		Blackboard->SetValueAsBool(HitmenBBKeys::IsSniper, NPC->IsSniper());
+		Blackboard->SetValueAsBool(HitmenBBKeys::IsStationary, NPC->GetBehavior() == EHitmenNPCBehavior::Stationary);
+		Blackboard->SetValueAsBool(HitmenBBKeys::HoldPosition, NPC->HoldsPosition());
+	}
 }
 
 void AHitmenAIController::SyncBlackboard()

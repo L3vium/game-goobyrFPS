@@ -74,6 +74,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
   every guard back to calm (PIE script, 0.9.0); [ ] never the VIP's body
 - [x] Attack chain after the 0.9.0 AI: an armed player in a guard's view is shot within seconds (PIE script, 0.9.0)
 - [x] Guard info line and the keycard in the right pocket (PIE screenshot, 0.9.0)
+- [x] Gym: the group of 4 walks its curved route together, followers 4-5 m from the leader (PIE script and screenshot,
+  0.9.0); [ ] one of them alerted: the others come
 - [ ] Tank shells land on the crosshair; a parked tank is at full health; the tank bar only while driving
 - [x] Sniper: a brief trail to the impact and debris there; no warm full-screen wash on your own shots (PIE screenshots,
   0.8.0); [ ] SMG / minigun bursts in a dark room never look like a light left on

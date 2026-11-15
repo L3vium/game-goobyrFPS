@@ -32,8 +32,10 @@ void AHitmenLadder::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	// Volume in front of the ladder, from the floor to a bit above the top ledge.
-	ClimbVolume->SetBoxExtent(FVector(55.f, 45.f, Height * 0.5f + 50.f));
-	ClimbVolume->SetRelativeLocation(FVector(40.f, 0.f, Height * 0.5f + 50.f));
+	// With top entry it fills the shaft in front (whoever drops in is caught).
+	const float Reach = bAllowTopEntry ? FMath::Max(TopEntryReach, 110.f) : 110.f;
+	ClimbVolume->SetBoxExtent(FVector(Reach * 0.5f, bAllowTopEntry ? Reach * 0.5f : 45.f, Height * 0.5f + 50.f));
+	ClimbVolume->SetRelativeLocation(FVector(Reach * 0.5f - 15.f, 0.f, Height * 0.5f + 50.f));
 }
 
 FVector AHitmenLadder::GetClimbStart() const

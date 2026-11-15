@@ -366,4 +366,103 @@ if wanted("punch"):
     each_character_cdo(punch, CHARACTERS[:1])
     log("punch: guard / jab / wind-up")
 
+if wanted("sanlazaro"):
+    # San Lazaro (L_LDTest, hand-edited): the 0.10.0 LD pass, the same as the builders.
+    #  - cave and tunnel shafts: rims 70 -> 45 cm (stepped over), ladders caught from above (top entry);
+    #  - crawl hatches get a real duct outside the wall with a hatch at its end (village houses, the dining room);
+    #  - the ravine's squashed spheres become flat-topped rocks at the gym metrics;
+    #  - two turrets in sight (the gatehouse roof, the room before the control room).
+    import hitmen_levels
+    import hitmen_sanlazaro
+    importlib.reload(hitmen_levels)
+    importlib.reload(hitmen_sanlazaro)
+    S = hitmen_sanlazaro
+    les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    les.load_level("/Game/Hitmen/Maps/L_LDTest")
+    actors = eas.get_all_level_actors()
+
+    def folder_of(a):
+        return str(a.get_folder_path())
+
+    # Shafts.
+    h = S.SHAFT_HALF
+    shafts = 0
+    for rung in [a for a in actors if a.get_class().get_name().startswith("BP_Ladder") and folder_of(a) in ("Cave/Vents", "Tunnel/Shafts")]:
+        if rung.get_editor_property("allow_top_entry"):
+            continue
+        at = rung.get_actor_location()
+        cx, cy = at.x, at.y + h - 2
+        top = at.z + rung.get_editor_property("height") - 15
+        for wall_box in actors:
+            if not isinstance(wall_box, unreal.StaticMeshActor) or folder_of(wall_box) != folder_of(rung):
+                continue
+            loc, scale = wall_box.get_actor_location(), wall_box.get_actor_scale3d()
+            if abs(loc.x - cx) > h + 40 or abs(loc.y - cy) > h + 40 or abs(loc.z + scale.z * 50 - top) > 2:
+                continue
+            wall_box.set_actor_scale3d(unreal.Vector(scale.x, scale.y, scale.z - 0.25))
+            wall_box.set_actor_location(unreal.Vector(loc.x, loc.y, loc.z - 12.5), False, False)
+        S.shaft_coping(cx, cy, top - 25 - 45, top - 25, folder_of(rung), hitmen_levels.GRID_DARK if folder_of(rung) == "Tunnel/Shafts" else None)
+        height = rung.get_editor_property("height") - 25
+        rung.set_editor_property("height", height)
+        hitmen_levels.set_mesh_height(rung, height)
+        rung.set_editor_property("allow_top_entry", True)
+        rung.set_editor_property("top_entry_reach", 2 * h - 10)
+        shafts += 1
+
+    # Shafts patched before the coping existed: add it (a box centred just outside the south rim marks it).
+    for rung in [a for a in actors if a.get_class().get_name().startswith("BP_Ladder") and folder_of(a) in ("Cave/Vents", "Tunnel/Shafts")]:
+        at = rung.get_actor_location()
+        cx, cy = at.x, at.y + h - 2
+        top = at.z + rung.get_editor_property("height") - 15
+        mark = unreal.Vector(cx, cy - (h + 20 + S.SHAFT_COPING / 2), 0)
+        has = any(isinstance(a, unreal.StaticMeshActor) and folder_of(a) == folder_of(rung) and abs(a.get_actor_location().x - mark.x) < 2
+                  and abs(a.get_actor_location().y - mark.y) < 2 for a in eas.get_all_level_actors())
+        if not has:
+            S.shaft_coping(cx, cy, top - 45, top, folder_of(rung))
+            shafts += 1
+
+    # Vent ducts outside the walls.
+    hatches = [a for a in actors if a.get_class().get_name().startswith("BP_VentHatch")]
+    ducts = 0
+    for hatch in hatches:
+        f = folder_of(hatch)
+        loc = hatch.get_actor_location()
+        if f.startswith("Village/Row") and "/House" in f and not f.endswith("/Vent"):
+            out, half_wall, length = (1, 0), 12.5, 200.0      # the house's east face, into the alley
+        elif f == "Estate/Dining":
+            out, half_wall, length = (-1, 0), 17.5, 400.0     # the estate's west wall, onto the lawn
+        else:
+            continue
+        a = (loc.x + out[0] * half_wall, loc.y + out[1] * half_wall)
+        b = (loc.x + out[0] * (half_wall + length), loc.y + out[1] * (half_wall + length))
+        if any((other.get_actor_location() - unreal.Vector(b[0], b[1], loc.z)).length() < 5 for other in hatches):
+            continue
+        hitmen_levels.vent_duct(a, b, loc.z, f + "/Vent")
+        hitmen_levels.vent_hatch(b[0], b[1], loc.z, False, f + "/Vent")
+        ducts += 1
+
+    # Ravine rocks.
+    old = [a for a in actors if folder_of(a) == "Ravine/Rocks"]
+    spheres = [a for a in old if isinstance(a, unreal.StaticMeshActor) and a.static_mesh_component.static_mesh
+               and a.static_mesh_component.static_mesh.get_name() == "Sphere"]
+    rebuilt = bool(spheres) or not old
+    if rebuilt:
+        for a in old:
+            eas.destroy_actor(a)
+        S.ravine_rocks()
+
+    # Turrets in sight.
+    turrets = [a for a in actors if a.get_class().get_name().startswith("BP_Turret")]
+    hx, hy, hw, hd, FH = 6800.0, -3000.0, 5600.0, 3200.0, 420
+    wanted_turrets = [(S.GATE_TURRET, 90.0, "Estate/Security"),
+                      ((hx + hw / 2 - 350, hy - hd / 2 + 350, S.EZ + FH), S.CONTROL_TURRET_YAW, "Estate/Control")]
+    placed = 0
+    for (spot, yaw, folder) in wanted_turrets:
+        if not any((t.get_actor_location() - unreal.Vector(*spot)).length() < 50 for t in turrets):
+            hitmen_levels.spawn(hitmen_levels.bp("World/Interactables/Security/BP_Turret"), spot, (0, yaw, 0), folder=folder)
+            placed += 1
+    les.save_current_level()
+    log("sanlazaro: %d shafts, %d vent ducts, ravine rocks %s, %d turrets" % (shafts, ducts, "rebuilt" if rebuilt else "kept", placed))
+
 print("\n".join(LOG))

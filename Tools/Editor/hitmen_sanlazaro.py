@@ -54,6 +54,10 @@ EZ = 300.0
 ESTATE = (1500.0, 11000.0, -8500.0, 2500.0)          # walls: x0, x1, y0, y1
 ESTATE_PAD = (1100.0, 11400.0, -8900.0, 4600.0)      # flat at EZ (north to the ridge foot: the tunnel runs under it)
 GATE_Y = -3000.0
+# Turrets in sight: on the gatehouse roof over the gate courtyard; in the east wing's front room upstairs, facing the
+# control room's keycard door (the roof turret stays).
+GATE_TURRET = (ESTATE[0] + 700 + 300, GATE_Y - 1100 + 250, 300.0 + 320 + 13)
+CONTROL_TURRET_YAW = 115.0
 
 # Cave: the floor is cut into the ridge (the walls are the terrain, lumpy), a heightfield roof continues the ridge above
 # it and a rock slab is its ceiling. Chambers are lumpy ellipses (cx, cy, rx, ry); passages are segments with a half
@@ -473,14 +477,38 @@ def arched_bridge(y, folder):
     return pts
 
 
-def build_ravine(info):
-    # Rocks in the bed (cover), a few dead trees' trunks.
+def ravine_rock_spots():
+    """The ravine bed's rocks, flat topped at the gym metrics (x, y, height, length, depth, yaw): every 7 m a group of
+    a 45 cm step, a 220 cm climb block (top 100 cm deep or more) and a second climb block 1.5 m beyond (jump across),
+    with 100 cm vault blocks (80 cm deep at most) between the groups as cover."""
     rng = random.Random(23)
-    for i in range(18):
-        y = -9000 + i * 700 + rng.uniform(-200, 200)
-        x = ravine_x(y) + rng.uniform(-300, 300)
-        size = rng.uniform(120, 260)
-        box((x, y, gz(x, y) + size * 0.35), (size, size * 1.2, size * 0.9), mi("MI_Stone"), rng.uniform(0, 180), folder="Ravine/Rocks", shape="sphere")
+    spots = []
+    for i in range(16):
+        y = -9000 + i * 700 + rng.uniform(-60, 60)
+        x = ravine_x(y) + rng.uniform(-220, 220)
+        yaw = rng.uniform(-15, 15)
+        if i % 2 == 0:
+            length, depth = rng.uniform(150, 190), rng.uniform(110, 140)
+            spots.append((x, y, 220.0, length, depth, yaw))
+            spots.append((x, y - depth / 2 - 80, 45.0, rng.uniform(140, 180), 120.0, yaw))
+            spots.append((x + rng.uniform(-40, 40), y + depth + 150, 220.0, rng.uniform(150, 190), rng.uniform(110, 140), yaw + rng.uniform(-8, 8)))
+        else:
+            spots.append((x, y, 100.0, rng.uniform(140, 180), rng.uniform(60, 80), yaw))
+    return spots
+
+
+def ravine_rocks(folder="Ravine/Rocks"):
+    """Places ravine_rock_spots(): each block sunk 40 cm under the lowest ground of its footprint, its top at the metric
+    height over the highest."""
+    for (x, y, h, length, depth, yaw) in ravine_rock_spots():
+        grounds = [gz(x + dx, y + dy) for dx in (-length / 2, 0, length / 2) for dy in (-depth / 2, 0, depth / 2)]
+        low, top = min(grounds) - 40.0, max(grounds) + h
+        box((x, y, (low + top) / 2), (length, depth, top - low), mi("MI_Stone"), yaw, folder=folder)
+
+
+def build_ravine(info):
+    # Rocks in the bed: cover and a parkour line at the gym metrics.
+    ravine_rocks()
     for y in BRIDGES_Y:
         arched_bridge(y, "Ravine/Bridge%d" % int(y))
     # Watchtowers on both rims and the high walkway between them.
@@ -538,6 +566,7 @@ def build_estate(holes, info):
     light_switch(ghx + 60, ghy + 336, z, 180, gate_lamps, "Estate/Gatehouse")
     spawn(bp("World/Interactables/Container/BP_WeaponChest"), (ghx + 380, ghy + 200, z), (0, 180, 0), folder="Estate/Gatehouse")
     gate_cam = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (ex0 + 80, GATE_Y + 700, z + 400), (-25, 0, 0), folder="Estate/Security")
+    spawn(bp("World/Interactables/Security/BP_Turret"), GATE_TURRET, (0, 90, 0), folder="Estate/Security")
     spawn(bp("World/Vehicles/BP_MountedGun"), (ex0 + 1400, GATE_Y + 900, z), (0, 180, 0), folder="Estate/Security")
     # The house: 3 floors and a basement, a central hall with the stair, rooms on both sides.
     hx, hy = 6800.0, -3000.0
@@ -646,7 +675,8 @@ def build_estate(holes, info):
     spawn(bp("World/Interactables/Drink/BP_PoisonableDrink"), (hx0 + 950, hy + 800, z + 80), folder="Estate/Dining")
     spawn(bp("World/Interactables/Distraction/BP_Distraction_TV"), (hx1 - 950, hy - 1300, z + 80), (0, 90, 0), folder="Estate/Lounge")
     box((hx1 - 950, hy - 1300, z + 40), (120, 60, 80), mi("MI_Wood"), folder="Estate/Lounge")
-    # Control room upstairs behind the keycard door (console, monitors).
+    # Control room upstairs behind the keycard door (console, monitors), a turret watching that door.
+    spawn(bp("World/Interactables/Security/BP_Turret"), (hx1 - 350, hy0 + 350, z + FH), (0, CONTROL_TURRET_YAW, 0), folder="Estate/Control")
     console = spawn(bp("World/Interactables/Security/BP_ControlConsole"), (hx1 - 600, hy + 1300, z + FH), (0, 180, 0), folder="Estate/Control")
     hall_cam = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (hx - 800, hy0 + 150, z + FH - 40), (-30, 60, 0), folder="Estate/Security")
     garden_cam = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (hx1 - 100, hy1 + 100, z + 2 * FH + 300), (-30, 45, 0), folder="Estate/Security")
@@ -870,15 +900,35 @@ def keycard_pickup(loc, card, folder):
     return pickup
 
 
-def shaft(x, y, bottom_z, ceiling_z, ground_z, folder, material=None, rim=70.0):
-    """A square shaft (inside 2 x SHAFT_HALF) from ceiling_z up through the ground at ground_z, ending in a low rim,
-    with a ladder on its south wall from bottom_z (the floor below) over the rim (you climb out over it)."""
+def shaft(x, y, bottom_z, ceiling_z, ground_z, folder, material=None, rim=45.0):
+    """A square shaft (inside 2 x SHAFT_HALF) from ceiling_z up through the ground at ground_z, ending in a low rim you
+    step over (45 cm), with a ladder on its south wall from bottom_z (the floor below) over the rim: climb out over it,
+    or step into the shaft from any side and the ladder catches you (top entry)."""
     material = material or GRID_DARK
     top = ground_z + rim
     h = SHAFT_HALF
     for (dx, dy, sx, sy) in ((0, -h - 10, 2 * h + 40, 20), (0, h + 10, 2 * h + 40, 20), (-h - 10, 0, 20, 2 * h), (h + 10, 0, 20, 2 * h)):
         box((x + dx, y + dy, (ceiling_z + top) / 2), (sx, sy, top - ceiling_z), material, folder=folder)
-    ladder((x, y - h + 2, bottom_z), 90, top - bottom_z + 15, folder=folder)
+    shaft_coping(x, y, ground_z, top, folder, material)
+    rung = ladder((x, y - h + 2, bottom_z), 90, top - bottom_z + 15, folder=folder)
+    if rung:
+        rung.set_editor_property("allow_top_entry", True)
+        rung.set_editor_property("top_entry_reach", 2 * h - 10)
+
+
+SHAFT_COPING = 50.0
+
+
+def shaft_coping(x, y, ground_z, top, folder, material=None):
+    """A 50 cm coping around a shaft's rim, its top level with the rim: the 20 cm rim alone is too thin to step onto
+    (the step needs room for the feet), with it the rim is a 70 cm step you walk onto, then into the shaft."""
+    material = material or GRID_DARK
+    h, c = SHAFT_HALF, SHAFT_COPING
+    low = ground_z - 30.0
+    zc, sz = (low + top) / 2, top - low
+    out = h + 20 + c / 2
+    for (dx, dy, sx, sy) in ((0, -out, 2 * (h + 20 + c), c), (0, out, 2 * (h + 20 + c), c), (-out, 0, c, 2 * (h + 20)), (out, 0, c, 2 * (h + 20))):
+        box((x + dx, y + dy, zc), (sx, sy, sz), material, folder=folder)
 
 
 def build_undercity(holes, info):

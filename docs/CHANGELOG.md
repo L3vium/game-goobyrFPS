@@ -49,6 +49,12 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   column per language, English and French), read by `UHitmenTextSubsystem` through `HITMEN_TEXT`; Options ->
   Gameplay -> Language; consoles `HitmenText.Language` / `HitmenText.Reload`; `Tools/Localization` keeps the sheet
   in step with the code. Recipe in `docs/Pipelines.md`.
+- Level design tool: structures at the gym metrics (`AHitmenLDBlock`, `AHitmenLDWall`, `AHitmenLDStairs`,
+  `AHitmenLDBuilding`, `AHitmenLDVentDuct`) with real door / window / hatch / gutter / lamp actors and a bake to static
+  meshes; PCG lines (`AHitmenLDPCGLine`) and three generated graphs (`PCG_Hitmen_CoverLine`, `PCG_Hitmen_Rocks`,
+  `PCG_Hitmen_RoofDressing`; PCG plugin on); the "Hitmen LD" tab (Window menu, level toolbar) to place them and the
+  builder pieces, rebuild the navmesh and run the reach / door checks (`UHitmenLDTools`). Recipe in `docs/Pipelines.md`.
+- Ladders: `bAllowTopEntry` / `TopEntryReach` (a shaft ladder catches whoever steps or drops in from above).
 - Keyboard layout: on a QWERTY keyboard (from the Windows layout) the AZERTY defaults move to the same places (W A S
   D, Q) unless rebound; `KeyboardLayoutOverride` in Project Settings -> Hitmen -> Input.
 
@@ -92,6 +98,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 
 
+- San Lazaro: shaft rims 45 cm with a coping you step onto, ladders caught from above (the cave vents and tunnel
+  shafts could not be entered); crawl hatches behind real ducts with an outer hatch; ravine rocks are flat-topped
+  blocks on a parkour line at the gym metrics; turrets in sight on the gatehouse roof and before the control room.
+
 ### Fixed
 - Radios and TVs fell silent after one play of their clip: the clip restarts as long as the distraction is on.
 - Muzzle light: at the barrel as drawn (first person), and other players no longer see the host's flash at its
@@ -105,6 +115,7 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Transposition: bodies swapped under the floor or into walls; a living target could be left 20 m up when the swap
   failed.
 - Arrows never scored headshots (they hit the capsule, not the head bone).
+- Pill and blinding post-process defaults pointed at assets that do not exist (`PP_Pill`, `PP_Blind`).
 
 ## [0.9.0] - 2026-11-15
 

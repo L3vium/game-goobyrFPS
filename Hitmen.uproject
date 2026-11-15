@@ -46,6 +46,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "PCG",
+			"Enabled": true
+		},
+		{
 			"Name": "EnhancedInput",
 			"Enabled": true
 		},

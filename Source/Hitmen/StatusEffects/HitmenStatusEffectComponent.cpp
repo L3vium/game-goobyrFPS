@@ -20,8 +20,8 @@ UHitmenStatusEffectComponent::UHitmenStatusEffectComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
-	PillPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/M_PP_Pill.M_PP_Pill")));
-	BlindPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/M_PP_Blind.M_PP_Blind")));
+	PillPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/PP_Pill.PP_Pill")));
+	BlindPostProcessMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Hitmen/Materials/PostProcess/PP_Blind.PP_Blind")));
 }
 
 void UHitmenStatusEffectComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)

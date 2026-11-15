@@ -937,6 +937,19 @@ bool UHitmenCharacterMovementComponent::ShouldGrabClimbable(const IHitmenClimbab
 		bOutFromTop = true;
 		return true;
 	}
+	// A ladder down a shaft: dropping in near its top, or walking into the hole (stiff ledges stop you at its edge),
+	// grabs it whatever the facing.
+	if (Climbable.AllowsTopEntry() && Alpha > 0.8f)
+	{
+		const float Reach = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + 40.f;
+		const bool bDropping = IsFalling() && Velocity.Z <= 0.f;
+		const bool bWalkingIn = !IsFalling() && !Input.IsNearlyZero() && !HasGroundWithinStiffDrop(UpdatedComponent->GetComponentLocation() + Input * Reach);
+		if (bDropping || bWalkingIn)
+		{
+			bOutFromTop = true;
+			return true;
+		}
+	}
 	if (Facing < Climbable.GetMinFacingDot())
 	{
 		return false;
@@ -955,6 +968,7 @@ void UHitmenCharacterMovementComponent::StartClimb(AActor* ClimbableActor, bool 
 	ClimbTarget = ClimbableActor;
 	ClimbStartTime = GetTimeSeconds();
 	ClimbAlpha = bFromTop ? 0.97f : ProjectOnClimbAxis(UpdatedComponent->GetComponentLocation(), *Climbable);
+	bClimbDownLatch = bFromTop && Climbable->GetClimbType() == EHitmenClimbType::Ladder;
 	Velocity = FVector::ZeroVector;
 	SetMovementMode(MOVE_Custom, ToCustom(EHitmenCustomMovement::Climb));
 	OnTraversalMontage.Broadcast(EHitmenAnimMontage::ClimbEnter);
@@ -1049,6 +1063,18 @@ void UHitmenCharacterMovementComponent::PhysClimb(float DeltaTime, int32 Iterati
 			const FVector LookYaw = FRotator(0.f, CharacterOwner->GetControlRotation().Yaw, 0.f).Vector();
 			const FVector IntoLadder = -Climbable->GetClimbNormal().GetSafeNormal2D();
 			Forward *= FVector::DotProduct(LookYaw, IntoLadder) >= 0.f ? 1.f : -1.f;
+		}
+		// Just got on from the top: the keys that walked you in take you down, until released.
+		if (bClimbDownLatch)
+		{
+			if (Input.IsNearlyZero())
+			{
+				bClimbDownLatch = false;
+			}
+			else
+			{
+				Forward = -1.f;
+			}
 		}
 	}
 	else

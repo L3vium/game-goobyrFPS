@@ -541,6 +541,8 @@ protected:
 	TWeakObjectPtr<AActor> ClimbTarget;
 	float ClimbAlpha = 0.f;
 	float ClimbAxisInput = 0.f;
+	/** Got on a ladder from its top: any move input climbs down until the keys are released. */
+	bool bClimbDownLatch = false;
 	float LastClimbExitTime = -100.f;
 	float ClimbStartTime = -100.f;
 	/** The ladder just left: only it waits for the reattach cooldown. */

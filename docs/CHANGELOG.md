@@ -3,7 +3,7 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
-## [Unreleased] - 0.9.0
+## [0.9.0] - 2026-11-15
 
 ### Added
 - Juice switches in Project Settings → Hitmen → Juice, every effect keeping its asset slot: `bLadderClimbFX`,

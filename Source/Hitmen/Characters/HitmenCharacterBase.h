@@ -103,6 +103,14 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Body")
 	APawn* GetCarrier() const { return Carrier; }
 
+	/** Where a dropped body can lie without being inside a wall or under the floor (sweep from the carrier). */
+	FVector FindSafeDropLocation(const FVector& From, const FVector& Wanted) const;
+
+	/** Every machine: fire on this body for Duration (lighter), then ash where it was. */
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_Burn(class UNiagaraSystem* FireFX, float FireScale, class UNiagaraSystem* AshFX, float Duration);
+
+
 	/** Server: lighter ability, removes the body so nobody can find it. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Body")
 	void VanishBody();
@@ -277,8 +285,6 @@ protected:
 	/** bDeathImpulse: the push of the killing hit (only on death, never when a body is put down). */
 	void EnableRagdoll(bool bDeathImpulse = true);
 
-	/** Where a dropped body can lie without being inside a wall or under the floor (sweep from the carrier). */
-	FVector FindSafeDropLocation(const FVector& From, const FVector& Wanted) const;
 	void ApplyBodyState();
 
 	UFUNCTION(NetMulticast, Unreliable)

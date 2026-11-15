@@ -1,6 +1,7 @@
 // Hitmen — ability base
 
 #include "Abilities/HitmenAbility.h"
+#include "Data/HitmenSoundSet.h"
 #include "Framework/HitmenPlayerState.h"
 #include "TimerManager.h"
 #include "NiagaraComponent.h"
@@ -266,7 +267,15 @@ AHitmenCharacterBase* UHitmenAbility::AimCharacterInCone(const FVector& Origin, 
 void UHitmenAbility::PlayActivatedFX(const FVector& Location) const
 {
 	UWorld* World = GetWorld();
-	if (!ActivatedFX || !World || World->GetNetMode() == NM_DedicatedServer)
+	if (!World || World->GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	if (ActivatedSound)
+	{
+		UHitmenSoundLibrary::PlaySoundInSpace(World, ActivatedSound, Location, EHitmenSoundSpace::World, 1.f, FMath::FRandRange(0.95f, 1.05f));
+	}
+	if (!ActivatedFX)
 	{
 		return;
 	}

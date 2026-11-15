@@ -78,6 +78,11 @@ void AHitmenWeapon_Hitscan::FireServer(const FVector& Origin, const FVector& Dir
 	TracePellets(Origin, Direction, Seed, Hits, OutImpacts);
 
 	AController* InstigatorController = OwnerPawn ? OwnerPawn->GetController() : nullptr;
+	// Every pellet that lands on the same target adds up into one hit (a shotgun blast is one hit marker, one hit
+	// react, one kill); the head counts when any pellet takes it.
+	struct FTargetHit { FHitResult Hit; float Damage = 0.f; bool bHead = false; };
+	TMap<AActor*, FTargetHit> PerTarget;
+	TArray<AActor*> Order;
 	for (const FHitResult& Hit : Hits)
 	{
 		AActor* HitActor = Hit.GetActor();
@@ -88,11 +93,29 @@ void AHitmenWeapon_Hitscan::FireServer(const FVector& Origin, const FVector& Dir
 		float Damage = WeaponData->GetDamageAtDistance(FVector::Dist(Origin, Hit.ImpactPoint));
 		const AHitmenCharacterBase* HitCharacter = Cast<AHitmenCharacterBase>(HitActor);
 		const TArray<FName>& HeadBones = HitCharacter ? HitCharacter->GetHeadBones() : WeaponData->HeadBones;
-		if (HeadBones.Contains(Hit.BoneName))
+		const bool bHead = HeadBones.Contains(Hit.BoneName);
+		if (bHead)
 		{
 			Damage *= WeaponData->HeadshotMultiplier;
 		}
-		UGameplayStatics::ApplyPointDamage(HitActor, Damage, Direction, Hit, InstigatorController, this, UDamageType::StaticClass());
+		FTargetHit* Entry = PerTarget.Find(HitActor);
+		if (!Entry)
+		{
+			Entry = &PerTarget.Add(HitActor);
+			Entry->Hit = Hit;
+			Order.Add(HitActor);
+		}
+		Entry->Damage += Damage;
+		if (bHead && !Entry->bHead)
+		{
+			Entry->bHead = true;
+			Entry->Hit = Hit;
+		}
+	}
+	for (AActor* HitActor : Order)
+	{
+		const FTargetHit& Entry = PerTarget[HitActor];
+		UGameplayStatics::ApplyPointDamage(HitActor, Entry.Damage, Direction, Entry.Hit, InstigatorController, this, UDamageType::StaticClass());
 	}
 }
 

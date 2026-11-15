@@ -162,6 +162,24 @@ public:
 	UFUNCTION(Exec)
 	void HitmenWatch();
 
+	/** Console, QA: tries a vault / climb toward the view now (the same plan Space uses). */
+	UFUNCTION(Exec)
+	void HitmenTraverse();
+
+	/** Drops an aimed ability (blink) without using it; true if one was aimed. */
+	bool CancelAbilityAim();
+
+	/** Console, QA (gym / dev builds): presses or releases an input action as if its key were used: Fire, Aim, Jump,
+	 *  Crouch, Sprint, Interact, MoveAbility, Manipulation, Pause, SwitchSlot; Move takes "Move <forward> <right>". */
+	UFUNCTION(Exec)
+	void HitmenPress(const FString& Action, float X = 0.f, float Y = 0.f);
+
+	UFUNCTION(Exec)
+	void HitmenRelease(const FString& Action);
+
+	/** QA move input held between HitmenPress Move calls (applied every frame). */
+	FVector2D QAMoveInput = FVector2D::ZeroVector;
+
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Debug")
 	void Server_DebugWatch();
 

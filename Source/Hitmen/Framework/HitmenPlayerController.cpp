@@ -23,6 +23,7 @@
 #include "Components/HitmenHealthComponent.h"
 #include "Inventory/HitmenInventoryComponent.h"
 #include "Abilities/HitmenAbilityComponent.h"
+#include "Movement/HitmenCharacterMovementComponent.h"
 #include "Data/HitmenAbilityData.h"
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenCatalog.h"
@@ -894,7 +895,25 @@ void AHitmenPlayerController::HandleFirePressed()
 		SpectateNext();
 		return;
 	}
+	// Aiming a blink: left click blinks now.
+	if (UHitmenAbilityComponent* Abilities = GetPawn() ? GetPawn()->FindComponentByClass<UHitmenAbilityComponent>() : nullptr; Abilities && Abilities->IsAimingAny())
+	{
+		Abilities->ConfirmAim(Abilities->IsAimingSlot(EHitmenAbilitySlot::Move) ? EHitmenAbilitySlot::Move : EHitmenAbilitySlot::Manipulation);
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_FirePressed(); }
+}
+
+bool AHitmenPlayerController::CancelAbilityAim()
+{
+	UHitmenAbilityComponent* Abilities = GetPawn() ? GetPawn()->FindComponentByClass<UHitmenAbilityComponent>() : nullptr;
+	if (!Abilities || !Abilities->IsAimingAny())
+	{
+		return false;
+	}
+	Abilities->CancelAim(EHitmenAbilitySlot::Move);
+	Abilities->CancelAim(EHitmenAbilitySlot::Manipulation);
+	return true;
 }
 
 void AHitmenPlayerController::HandleFireReleased()
@@ -907,6 +926,11 @@ void AHitmenPlayerController::HandleAimPressed()
 	if (bSpectating)
 	{
 		SpectatePrevious();
+		return;
+	}
+	// Aiming a blink: right click drops it.
+	if (CancelAbilityAim())
+	{
 		return;
 	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_AimChanged(true); }
@@ -930,6 +954,11 @@ void AHitmenPlayerController::HandleInteractReleased()
 
 void AHitmenPlayerController::HandleInteract()
 {
+	// Aiming a blink: F drops it.
+	if (CancelAbilityAim())
+	{
+		return;
+	}
 	if (IHitmenInputReceiver* R = GetReceiver(); R && !IsGameplayInputBlocked()) { R->Input_Interact(); }
 }
 
@@ -1011,6 +1040,8 @@ void AHitmenPlayerController::HandleEmoteWheelReleased()
 
 void AHitmenPlayerController::HandlePause()
 {
+	// Aiming a blink: Esc drops it, and the pause menu still opens.
+	CancelAbilityAim();
 	UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this);
 	if (!UI)
 	{
@@ -1808,6 +1839,13 @@ void AHitmenPlayerController::PlayerTick(float DeltaTime)
 	{
 		UpdateSecurityFeed(DeltaTime);
 	}
+	// QA scripted move input (console HitmenPress Move <forward> <right>).
+	if (!QAMoveInput.IsNearlyZero() && GetPawn())
+	{
+		const FRotator Yaw(0.f, GetControlRotation().Yaw, 0.f);
+		GetPawn()->AddMovementInput(Yaw.Vector(), QAMoveInput.X);
+		GetPawn()->AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y), QAMoveInput.Y);
+	}
 	if (bSpectating && IsLocalController())
 	{
 		UpdateSpectatorThirdPerson();
@@ -2096,4 +2134,55 @@ void AHitmenPlayerController::ApplyCheatFlySpeed(bool bFast)
 void AHitmenPlayerController::Server_SetCheatFlyFast_Implementation(bool bFast)
 {
 	ApplyCheatFlySpeed(bFast);
+}
+
+void AHitmenPlayerController::HitmenTraverse()
+{
+	const AHitmenCharacterBase* Traverser = Cast<AHitmenCharacterBase>(GetPawn());
+	UHitmenCharacterMovementComponent* Movement = Traverser ? Traverser->GetHitmenMovement() : nullptr;
+	if (Movement)
+	{
+		const bool bStarted = Movement->DebugTryMantle(FRotator(0.f, GetControlRotation().Yaw, 0.f).Vector());
+		UE_LOG(LogHitmen, Display, TEXT("HitmenTraverse: %s"), bStarted ? TEXT("started") : TEXT("nothing to traverse"));
+	}
+}
+
+void AHitmenPlayerController::HitmenPress(const FString& Action, float X, float Y)
+{
+	if (!DebugAllowed(GetWorld()))
+	{
+		return;
+	}
+	const FString A = Action.ToLower();
+	if (A == TEXT("fire")) { HandleFirePressed(); }
+	else if (A == TEXT("aim")) { HandleAimPressed(); }
+	else if (A == TEXT("jump")) { HandleJumpPressed(); }
+	else if (A == TEXT("crouch")) { HandleCrouchPressed(); }
+	else if (A == TEXT("sprint")) { HandleSprintPressed(); }
+	else if (A == TEXT("interact")) { HandleInteract(); }
+	else if (A == TEXT("moveability")) { HandleMoveAbilityPressed(); }
+	else if (A == TEXT("manipulation")) { HandleManipulationPressed(); }
+	else if (A == TEXT("pause")) { HandlePause(); }
+	else if (A == TEXT("switchslot")) { HandleSwitchSlot(FInputActionValue(1.f)); }
+	else if (A == TEXT("move")) { QAMoveInput = FVector2D(X, Y); }
+	UE_LOG(LogHitmen, Display, TEXT("HitmenPress %s"), *Action);
+}
+
+void AHitmenPlayerController::HitmenRelease(const FString& Action)
+{
+	if (!DebugAllowed(GetWorld()))
+	{
+		return;
+	}
+	const FString A = Action.ToLower();
+	if (A == TEXT("fire")) { HandleFireReleased(); }
+	else if (A == TEXT("aim")) { HandleAimReleased(); }
+	else if (A == TEXT("jump")) { HandleJumpReleased(); }
+	else if (A == TEXT("crouch")) { HandleCrouchReleased(); }
+	else if (A == TEXT("sprint")) { HandleSprintReleased(); }
+	else if (A == TEXT("interact")) { HandleInteractReleased(); }
+	else if (A == TEXT("moveability")) { HandleMoveAbilityReleased(); }
+	else if (A == TEXT("manipulation")) { HandleManipulationReleased(); }
+	else if (A == TEXT("move")) { QAMoveInput = FVector2D::ZeroVector; }
+	UE_LOG(LogHitmen, Display, TEXT("HitmenRelease %s"), *Action);
 }

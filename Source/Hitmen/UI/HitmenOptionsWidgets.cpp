@@ -796,9 +796,9 @@ void UHitmenOptionsWidget::BuildGameplay()
 		HoldToggle, S->bToggleCrouch ? 1 : 0, [S](int32 I) { S->bToggleCrouch = I == 1; S->ApplyHitmenSettings(); });
 	AddRow()->SetupChoice(LOCTEXT("SprintMode", "Sprint"), LOCTEXT("SprintModeDesc", "Hold the key to sprint, or press it once to switch. A quick tap dashes when you have the dash."),
 		HoldToggle, S->bToggleSprint ? 1 : 0, [S](int32 I) { S->bToggleSprint = I == 1; S->ApplyHitmenSettings(); });
-	AddRow()->SetupChoice(LOCTEXT("ClimbMode", "Ladders and ziplines"), LOCTEXT("ClimbModeDesc", "Forward always climbs up, or the direction follows where you look."),
-		{ LOCTEXT("ForwardUp", "Forward is up"), LOCTEXT("FollowCamera", "Follow the camera") }, S->bClimbRelativeToCamera ? 1 : 0,
-		[S](int32 I) { S->bClimbRelativeToCamera = I == 1; S->ApplyHitmenSettings(); });
+	AddRow()->SetupChoice(LOCTEXT("ClimbMode", "Ladders and gutters"), LOCTEXT("ClimbModeDesc", "Forward climbs toward where you look (facing the ladder: up, facing away: down), or forward is always up."),
+		{ LOCTEXT("FollowCamera", "Follow the camera"), LOCTEXT("ForwardUp", "Forward is up") }, S->bLadderForwardAlwaysUp ? 1 : 0,
+		[S](int32 I) { S->bLadderForwardAlwaysUp = I == 1; S->ApplyHitmenSettings(); });
 }
 
 void UHitmenOptionsWidget::BuildControls()
@@ -1079,7 +1079,7 @@ void UHitmenOptionsWidget::ResetToDefaults()
 			S->bInvertY = D->bInvertY;
 			S->bToggleCrouch = D->bToggleCrouch;
 			S->bToggleSprint = D->bToggleSprint;
-			S->bClimbRelativeToCamera = D->bClimbRelativeToCamera;
+			S->bLadderForwardAlwaysUp = D->bLadderForwardAlwaysUp;
 			S->ApplyHitmenSettings();
 		}
 		break;

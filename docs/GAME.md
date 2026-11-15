@@ -172,7 +172,7 @@ everyone at match end too, `bSpectatorsCanFreeFly`, on).
 | Look | Mouse |
 | Jump / ledge grab / vault (held in the air: jetpack) | Space |
 | Crouch (held) — keeps your momentum: a short lunge from a walk, a slide from a sprint; with Shift, an instant slide | Left Ctrl |
-| Sprint (held) / dash (tap, when equipped) | Left Shift |
+| Sprint (held, any direction by default: `SprintDirections` ForwardOnly / ForwardAndSides / AllDirections) / dash (tap, when equipped) | Left Shift |
 | Fire / melee | LMB |
 | Aim | RMB |
 | Interact / stealth kill / swap; throw the held weapon while aiming | F |
@@ -202,7 +202,7 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
 
 ## 6. Player
 - **Movement**: walk (420), sprint (720), crouch (210, the view lowers smoothly), jump (instant, never turned into a
-  climb onto a curb, a step or the floor), ladders / gutters (automatic, forward = up, smooth pull-up at the top),
+  climb onto a curb, a step or the floor), ladders / gutters (automatic; forward climbs toward where you look: facing the ladder up, facing away down — Options "Ladders and gutters: Forward is up" keeps the 0.9.0 controls; a jump off follows the move keys: left / right hop along the wall (`ClimbSideJumpSpeed`, soft enough to catch a ledge beside it), anything else jumps away; smooth pull-up at the top),
   ziplines (`F` at either post: rides to the other end on its own at 16 m/s, up or down), jump pads, lockers (you stand inside and look
   through the slit). Releasing the keys stops you crisply.
 - **Stiff ledges** (Hitman-like, `bStiffLedges` on the movement component, on): walking never takes you over a drop
@@ -244,7 +244,7 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
   sway with the mouse, lag when you walk and tilt when you strafe. A weapon coming into hand rises from below in about
   0.2 s; each shot kicks it back and up on a spring (per weapon); aiming sends it toward the centre at once on a stiff
   spring (settled in about 0.15 s, the view zooms as fast), still low; the sniper rises to the eye and zooms almost at
-  once (about 0.2 s) with a short wobble, and the zoomed aim breathes a little. Punches jab one fist after
+  once (about 0.2 s) with a short wobble, and the zoomed aim breathes a little. Punches cock the fist back, snap it out to the crosshair and back while the other fist tucks in (a hit: a puff, a thump, a view shake and kick, a short hit stop); jabs alternate one fist after
   the other, the knife slashes right to left, a throw winds up and releases, a takedown lunges; body montages no longer
   play on the first-person arms. Near a wall the weapon is pulled back and lowered (first-person scale 0.35, near plane
   3 cm). Machine guns sit lower in the hand; the minigun shakes harder as it spins up; the bow arms pull back with the
@@ -347,7 +347,7 @@ references — every value is in a `DA_Weapon_*` data asset:
 | Pistol | 34 | 260 | 15 → 50 m, x0.6 | silenced |
 | SMG | 13 | 900 | 12 → 40 m, x0.5 | |
 | Assault rifle | 22 | 620 | 30 → 80 m, x0.6 | |
-| Shotgun | 12 x 9 pellets | 70 | 7 → 25 m, x0.25 | pellets 6° hip / 4.5° aiming |
+| Shotgun | 25 x 9 pellets (half of them kill a guard; pellets on one target add up into one hit) | 70 | 7 → 25 m, x0.25 | pellets 6° hip / 4.5° aiming |
 | Minigun | 16 | 450 → 1100 | 30 → 80 m, x0.6 | spread 2.2° / 1.4° |
 | Sniper | 120 | 40 | none (300 m) | zoom, smoke trail | Weapons lying in the world float and turn. The
 sniper shows a scope overlay; zoom keeps the mouse feel (sensitivity follows the field of view).
@@ -355,7 +355,7 @@ sniper shows a scope overlay; zoom keeps the mouse feel (sensitivity follows the
 | Weapon | Family | Notes |
 |---|---|---|
 | Sword | Melee | |
-| Bow | Projectile | charge to fire further |
+| Bow | Projectile | charge to fire further; 55 damage (two arrows to the body), a headshot kills; arrows find the bone they hit (capsule hits trace on to the body) and count a hit within `HeadshotAssistRadius` (15 cm) of the head as a headshot; the 110 cm arrow (`SM_Arrow`) sticks in what it hits and follows the ragdoll; `SM_Bow` from basic shapes |
 | Pistol | Hitscan | silenced |
 | SMG | Hitscan, automatic | fast, inaccurate |
 | Assault rifle | Hitscan, automatic | balanced |
@@ -365,6 +365,7 @@ sniper shows a scope overlay; zoom keeps the mouse feel (sensitivity follows the
 | Rocket launcher | Projectile | explosion breaks walls |
 | Grenade launcher | Projectile | bouncing, timed |
 | Black hole | Projectile | pulls pawns and physics to a point |
+| Goobyr gun | Projectile | a slow lob that bursts into 5 hamsters (`BP_Hamster`, basic shapes): they run to the nearest enemy of the shooter within 20 m and bite (12 every 0.6 s, 10 health, gone after 15 s); a bitten guard is alarmed where it stands; guards may shoot them |
 
 ## 8. Abilities
 One **move** ability (`E`) and one **manipulation** ability (`A`) per loadout. C++ families:
@@ -377,16 +378,15 @@ user and does not spend a charge.
 **Move**: Blink (Dishonored-like teleport), Double jump, Jetpack, Dash, Hook (grapple),
 Transposition (swap positions with an aimed NPC/player), Pill (boost damage/speed/resistance with
 a distorted view, `PP_Pill`), Invisibility, Armor, C4 (place, then detonate). The jetpack is
-client-predicted like sprint and also runs on Space held in the air; the dash also runs on a tap of Shift (cooldown
-1.5 s); the second jump of the double jump goes 1.35x higher; holding E with the blink shows where you will land; the
+client-predicted like sprint and also runs on Space held in the air; the dash (Celeste-like, predicted: 3000 cm/s for 0.12 s with no gravity, then 700, one in the air between landings; `DashSpeed`, `DashDuration`, `DashExitSpeed`, `bAirDash` on the movement component; a view kick, a streak, a whoosh) also runs on a tap of Shift (cooldown 1.5 s); the second jump of the double jump goes 1.35x higher; the blink is Dishonored-like: hold E to aim (a glowing ring on the ground where you land, `MarkerFX`), release or left click to blink, right click / F / Esc cancel without spending it (Esc also opens the pause menu); aiming at a wall within `LedgeUpMaxHeight` (350 cm) of its top lands you on top (an arrow shows over the ring), into the air drops you on the ground below within `MaxGroundDrop` (400 cm); NPCs hunting you lose you if they cannot see where you landed; the
 hook climbs (or hangs from) the ledge at its anchor. The hook shows a small marker where it will grab while it is ready and in range, and a thin cable from the hand
 to the anchor while it pulls (seen by everyone; `UHitmenAbilityComponent` draws both for any ability that asks).
 
 **Manipulation**: Stone (thrown; it rests where it lands, makes a noise with toon "sound" notes, and a guard who
-comes to look picks it up), Remote distraction (activate a distraction, a panel or a console at range), Sleep dart
+comes to look picks it up), Remote distraction (sets off a distraction at range; `AllowedTargetClasses`, default the distraction class: drag consoles, panels or breakers in to allow them), Sleep dart
 (one target goes limp in a ragdoll with "Z z z" over its head, then stands up), Charm (target becomes an ally and
 attacks others; a charmed player is driven by the NPC behavior tree, reckless), Flashbang (stuns around, blinds
-players with `PP_Blind`), Smoke grenade (blocks sight for NPCs and players), Lighter (look at a body nearby:
+players with `PP_Blind`), Smoke grenade (blocks sight for NPCs and players), Lighter (the body burns for `BurnTime` 2 s with fire on it, then ash where it lay; look at a body nearby:
 `[A] Lighter`, it burns and is gone), Multi-kill (hold A: every enemy you look at is marked, up to 5; marks glow red
 and are linked by a red line; killing one kills all), Trap (catches anyone, you too once armed; NPCs stuck 30 s,
 players break free by mashing the move keys), Wind grenade (thrown, bursts on impact and blows everyone around away,
@@ -394,7 +394,7 @@ you too), Poison vial (pour in a drink, or in a vent to poison the sealed rooms 
 
 **Remote targeting**: remote abilities (remote distraction, charm, transposition, lighter, multi-kill) pick the best
 target within `TargetConeAngle` (8°) of the crosshair and in range, with a line of sight to the middle of it; the
-target glows (fresnel) and `[A] action` shows under it. Transposition also swaps with bodies. Picking up an ability
+target glows (fresnel) and `[A] action` shows under it. Transposition also swaps with bodies: you stand where the body lies, the ragdoll lies where you stood (both on their floors); nothing moves when either place has no room. Invisibility and the pill show a ring above the crosshair; the invisible look fades in (0.3 s) and out (0.6 s). Picking up an ability
 when the slot is taken swaps them (the old one stays on the pedestal). Invisible: a cool, dark-edged, slightly warped
 view; armored: steel-blue edges that flash when the armor takes a hit. Abilities can play an `ActivatedFX` where they
 act (fire for the lighter, notes for the remote distraction, a swirl for blink and transposition).

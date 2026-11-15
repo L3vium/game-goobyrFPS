@@ -25,9 +25,10 @@ public:
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
 	bool bToggleSprint = false;
 
-	/** Ladder/zipline direction follows the camera pitch instead of forward = up. */
+	/** Ladders and gutters: by default forward climbs toward where you look (facing the ladder: up, facing away: down);
+	 *  true = forward is always up (the 0.9.0 controls). */
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
-	bool bClimbRelativeToCamera = false;
+	bool bLadderForwardAlwaysUp = false;
 
 	UPROPERTY(Config, BlueprintReadWrite, Category="Hitmen|Controls")
 	float MouseSensitivity = 0.25f;

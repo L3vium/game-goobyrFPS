@@ -185,9 +185,9 @@ void AHitmenPlayerCharacter::ApplyUserSettings()
 	}
 	if (UHitmenCharacterMovementComponent* Movement = GetHitmenMovement())
 	{
-		Movement->SetClimbRelativeToCamera(Settings->bClimbRelativeToCamera);
+		Movement->SetClimbRelativeToCamera(!Settings->bLadderForwardAlwaysUp);
 	}
-	Server_SetClimbRelative(Settings->bClimbRelativeToCamera);
+	Server_SetClimbRelative(!Settings->bLadderForwardAlwaysUp);
 }
 
 void AHitmenPlayerCharacter::PossessedBy(AController* NewController)
@@ -570,15 +570,20 @@ void AHitmenPlayerCharacter::UpdateDamageFeel(float DeltaSeconds)
 	}
 	LastArmorSeen = Armor;
 	ArmorPulse = FMath::Max(0.f, ArmorPulse - DeltaSeconds * 2.5f);
-	Post.bOverride_VignetteIntensity = bInvisible || bArmored;
-	Post.VignetteIntensity = bInvisible ? 0.9f : (bArmored ? 0.55f + 0.4f * ArmorPulse : 0.4f);
-	Post.bOverride_ColorGain = bInvisible || bArmored;
-	Post.ColorGain = bInvisible ? FVector4(0.8f, 0.92f, 1.15f, 1.f)
-		: (bArmored ? FVector4(0.92f + 0.3f * ArmorPulse, 0.97f + 0.3f * ArmorPulse, 1.06f + 0.3f * ArmorPulse, 1.f) : FVector4(1.f, 1.f, 1.f, 1.f));
-	if (bInvisible)
+	// The invisible look fades in and out (InvisibilityFadeInTime / InvisibilityFadeOutTime) instead of popping.
+	const float FadeTime = bInvisible ? InvisibilityFadeInTime : InvisibilityFadeOutTime;
+	InvisibleViewAlpha = FadeTime > 0.f ? FMath::FInterpConstantTo(InvisibleViewAlpha, bInvisible ? 1.f : 0.f, DeltaSeconds, 1.f / FadeTime) : (bInvisible ? 1.f : 0.f);
+	const float Inv = FMath::SmoothStep(0.f, 1.f, InvisibleViewAlpha);
+	const bool bInvisibleLook = Inv > 0.001f;
+	const FVector4 ArmorGain = bArmored ? FVector4(0.92f + 0.3f * ArmorPulse, 0.97f + 0.3f * ArmorPulse, 1.06f + 0.3f * ArmorPulse, 1.f) : FVector4(1.f, 1.f, 1.f, 1.f);
+	Post.bOverride_VignetteIntensity = bInvisibleLook || bArmored;
+	Post.VignetteIntensity = FMath::Lerp(bArmored ? 0.55f + 0.4f * ArmorPulse : 0.4f, 0.9f, Inv);
+	Post.bOverride_ColorGain = bInvisibleLook || bArmored;
+	Post.ColorGain = FMath::Lerp(ArmorGain, FVector4(0.8f, 0.92f, 1.15f, 1.f), Inv);
+	if (bInvisibleLook)
 	{
 		Post.bOverride_SceneFringeIntensity = true;
-		Post.SceneFringeIntensity = FMath::Max(Post.SceneFringeIntensity, 2.5f + FMath::Sin(GetWorld()->GetTimeSeconds() * 3.f));
+		Post.SceneFringeIntensity = FMath::Max(Post.SceneFringeIntensity, (2.5f + FMath::Sin(GetWorld()->GetTimeSeconds() * 3.f)) * Inv);
 	}
 
 	// Trapped: the escape slowly drains between presses (server); the HUD asks to mash.
@@ -653,9 +658,10 @@ void AHitmenPlayerCharacter::EvaluateFirstPersonAction(FVector& OutOffset, FRota
 	switch (FPAction)
 	{
 	case EHitmenFPAction::Punch:
-		// The fist itself travels by IK (GetFirstPersonBodyIK); the arms only lean into the punch.
+		// The fist itself travels by IK (GetFirstPersonBodyIK); the shoulders cock back, then turn into the punch.
 		Keys = { { 0.f, FVector::ZeroVector, FRotator::ZeroRotator },
-				 { 0.25f, FVector(6.f, -2.f * S, 1.f), FRotator(1.f, -3.f * S, 4.f * S) },
+				 { 0.12f, FVector(-3.f, 2.f * S, -1.f), FRotator(-1.f, 4.f * S, -3.f * S) },
+				 { 0.3f, FVector(10.f, -3.f * S, 1.f), FRotator(1.5f, -6.f * S, 8.f * S) },
 				 { 1.f, FVector::ZeroVector, FRotator::ZeroRotator } };
 		break;
 	case EHitmenFPAction::KnifeSlash:
@@ -762,16 +768,31 @@ void AHitmenPlayerCharacter::GetFirstPersonBodyIK(FHitmenBodyIKState& Out) const
 	if (bPunching)
 	{
 		const float T = FMath::Clamp(Elapsed / FMath::Max(FPActionDuration, KINDA_SMALL_NUMBER), 0.f, 1.f);
-		const float BackStart = PunchOutShare + PunchHoldShare;
-		Extension = T < PunchOutShare ? FMath::InterpEaseOut(0.f, 1.f, T / PunchOutShare, 2.f)
-			: (T < BackStart ? 1.f : 1.f - FMath::SmoothStep(0.f, 1.f, (T - BackStart) / FMath::Max(1.f - BackStart, KINDA_SMALL_NUMBER)));
+		// Wind-up (the fist cocks back a little), snap out to the crosshair, hold, ease back to the guard.
+		const float OutStart = PunchWindUpShare;
+		const float OutEnd = OutStart + PunchOutShare;
+		const float BackStart = OutEnd + PunchHoldShare;
+		if (T < OutStart)
+		{
+			Extension = -PunchWindUpAmount * FMath::SmoothStep(0.f, 1.f, T / FMath::Max(OutStart, KINDA_SMALL_NUMBER));
+		}
+		else if (T < OutEnd)
+		{
+			Extension = FMath::Lerp(-PunchWindUpAmount, 1.f, FMath::InterpEaseOut(0.f, 1.f, (T - OutStart) / PunchOutShare, 3.f));
+		}
+		else
+		{
+			Extension = T < BackStart ? 1.f : 1.f - FMath::SmoothStep(0.f, 1.f, (T - BackStart) / FMath::Max(1.f - BackStart, KINDA_SMALL_NUMBER));
+		}
 	}
 	for (int32 Side = 0; Side < 2; ++Side)
 	{
 		const float Sign = Side == 0 ? -1.f : 1.f;
 		const FVector Guard(PunchGuardOffset.X, PunchGuardOffset.Y * Sign, PunchGuardOffset.Z);
 		const FVector Jab(PunchJabOffset.X, PunchJabOffset.Y * Sign, PunchJabOffset.Z);
-		const FVector Local = Side == PunchingSide ? FMath::Lerp(Guard, Jab, Extension) : Guard;
+		// The other fist tucks in to guard the face while one jabs.
+		const FVector Tucked = Guard + FVector(-6.f, -3.f * Sign, 3.f) * FMath::Max(Extension, 0.f);
+		const FVector Local = Side == PunchingSide ? FMath::Lerp(Guard, Jab, Extension) : Tucked;
 		Out.HandAlpha[Side] = 1.f;
 		Out.HandTarget[Side] = FirstPersonViewToWorld(Local);
 		Out.ElbowPole[Side] = Camera.TransformVector(FVector(5.f, 35.f * Sign, -60.f));

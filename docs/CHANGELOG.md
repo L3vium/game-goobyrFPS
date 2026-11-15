@@ -31,11 +31,20 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - `bSpectatorsCanFreeFly` (Project Settings -> Hitmen -> Watchers, on): dead players and everyone at match end may
   free fly. Fly cheat: Shift flies faster (`CheatFlyFastMultiplier` x3, server-synced).
 - QA: `HitmenEditorTools.take_pie_screenshot` (PIE picture with widgets, whatever window PIE plays in).
-
-
-
-
-
+- Dash rebuilt Celeste-like and predicted (custom movement mode, saved-move flag): `DashSpeed` 3000 for
+  `DashDuration` 0.12 s, no gravity, then `DashExitSpeed` 700; one air dash between landings (`bAirDash`); a view
+  kick, a streak (`TrailFX`), a whoosh.
+- Blink, Dishonored-like: a ground ring where you land (`MarkerFX`), release or left click to blink, right click / F
+  / Esc cancel (Esc still pauses); ledge-up onto what you aim at (`LedgeUpMaxHeight` 350 cm, an arrow over the
+  ring); `MaxGroundDrop`; generic aim confirm / cancel on the ability component; `ActivatedSound` on abilities.
+- Goobyr gun (`DA_Weapon_Goobyr`, `BP_Projectile_Goobyr`, `AHitmenHamster` / `BP_Hamster`): five hamsters that bite
+  the shooter's enemies; in the catalog, the loot and the gym armoury.
+- Bow from basic shapes (`SM_Bow`), a 110 cm arrow (`SM_Arrow`); weapon data `HeadshotAssistRadius` (bow 15 cm).
+- Lighter: fire on the body for the burn (`BurnFX`, attached to the ragdoll), ash after (`AshFX`), `BurnTime` 2 s, a
+  burning sound.
+- `SprintDirections` (ForwardOnly / ForwardAndSides / AllDirections, default AllDirections), `WindowVaultMaxHeight`
+  135 cm, `ClimbSideJumpSpeed` / `ClimbSideJumpOut` / `ClimbSideJumpUp`.
+- QA consoles `HitmenPress` / `HitmenRelease` (input actions and move input) and `HitmenTraverse`.
 
 
 
@@ -64,6 +73,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Agent screen: look counters read 0 / N for the base look; the arrows wait for the camera to arrive in the room,
   then fade in.
 - Hiding spots holding a body: no "Look inside"; F only hides you (room) or stows the body you carry.
+- Shotgun pellets 25 (12) and pellets on one target add up into one hit; bow 55 (90), a headshot kills.
+- Ladders and gutters follow the camera by default (facing the ladder: forward up; facing away: forward down); the
+  Options row keeps "Forward is up" (setting `bLadderForwardAlwaysUp`). Jumping off follows the move keys (left /
+  right: a hop along the wall).
+- Remote distraction only sets off distractions (`AllowedTargetClasses`, default the distraction class).
+- Invisibility view fades in and out (`InvisibilityFadeInTime` / `InvisibilityFadeOutTime`).
+- First-person punch: wind-up, a longer jab to the crosshair, the other fist tucks in. Knife and bow grips solved
+  again (`hitmen_fp_solve.py`: `HOLD_TILT` raises the blade into view, `AUTHORED_FRAME` for the bow).
+
 
 
 
@@ -75,6 +93,12 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Punches flagged headshots (red cross and sound without a kill). The Shift-tap dash with toggle sprint on.
 - Prompt info line: one line under the key, clear of the hold ring; spectator info no longer drawn over living
   players' prompts.
+- Sprint never worked backward or sideways (only within 60 degrees of forward).
+- Vaulting from a window ledge back in through the window (the sill is 121 cm above the ledge, over the 120 cm
+  vault).
+- Transposition: bodies swapped under the floor or into walls; a living target could be left 20 m up when the swap
+  failed.
+- Arrows never scored headshots (they hit the capsule, not the head bone).
 
 ## [0.9.0] - 2026-11-15
 

@@ -49,7 +49,7 @@ void UHitmenMeleeComponent::Punch()
 			{
 				WeakThis->PlayPunchHitLocal(Impact);
 			}
-		}), FMath::Max(0.01f, FMath::Clamp(PunchCooldown * 0.8f, 0.25f, 0.45f) * 0.3f), false);
+		}), FMath::Max(0.01f, FMath::Clamp(PunchCooldown * 0.8f, 0.25f, 0.45f) * 0.34f), false);
 	}
 	Server_Punch();
 }

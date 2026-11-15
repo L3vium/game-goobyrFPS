@@ -59,6 +59,18 @@ public:
 	/** Local player, ability ready: a point to mark in the world from this aim (where a hook will land). */
 	virtual bool GetAimMarker(const FVector& Origin, const FVector& Direction, FVector& OutPoint) const { return false; }
 
+	/** The marker as an effect (looping, flat on the ground) instead of the plain sphere; scale in OutScale. */
+	virtual class UNiagaraSystem* GetAimMarkerFX(float& OutScale) const { return nullptr; }
+
+	/** The marked landing is on top of what you aim at (blink up a wall): an arrow shows over the marker. */
+	virtual bool IsAimMarkerLedgeUp() const { return false; }
+
+	/** Owning client: the ability is being aimed (held, confirm on release). */
+	virtual bool IsAiming() const { return false; }
+
+	/** Owning client: drop the aim without using the ability (nothing spent). */
+	virtual void LocalCancel() {}
+
 	/** Every machine: a cable is drawn from the owner's hand to OutAnchor while this returns true (hook pull). */
 	virtual bool GetCableAnchor(FVector& OutAnchor) const { return false; }
 
@@ -136,6 +148,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Juice", meta=(ClampMin="0", Units="s"))
 	float ActivatedFXDuration = 0.f;
+
+	/** Sound played with ActivatedFX where the ability acts (every machine). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Juice")
+	TObjectPtr<class USoundBase> ActivatedSound;
 
 	/** Uses available (0 = unlimited, gated only by cooldown). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Ability|Common", meta=(ClampMin="0"))

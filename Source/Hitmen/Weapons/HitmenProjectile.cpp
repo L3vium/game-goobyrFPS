@@ -1,6 +1,10 @@
 // Hitmen — projectiles
 
 #include "Weapons/HitmenProjectile.h"
+#include "NavigationSystem.h"
+#include "Characters/HitmenHamster.h"
+#include "Data/HitmenWeaponData.h"
+#include "Weapons/HitmenWeaponBase.h"
 #include "NiagaraComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Characters/HitmenPlayerCharacter.h"
@@ -105,9 +109,42 @@ void AHitmenProjectile::HandleHit(UPrimitiveComponent* HitComponent, AActor* Oth
 	}
 }
 
-bool AHitmenProjectile::OnImpact(const FHitResult& Hit)
+bool AHitmenProjectile::OnImpact(const FHitResult& InHit)
 {
+	FHitResult Hit = InHit;
 	AActor* OtherActor = Hit.GetActor();
+	// A character's capsule stops the projectile before its body: find the bone along the flight (arrows stick in it,
+	// headshots count), then the firing weapon's head assist (arrows: a hit near the head is a headshot).
+	if (AHitmenCharacterBase* HitCharacter = Cast<AHitmenCharacterBase>(OtherActor); HitCharacter && HitCharacter->GetMesh())
+	{
+		const FVector Along = GetVelocity().IsNearlyZero() ? GetActorForwardVector() : GetVelocity().GetSafeNormal();
+		if (Hit.BoneName.IsNone())
+		{
+			FHitResult BoneHit;
+			FCollisionQueryParams BoneParams(SCENE_QUERY_STAT(HitmenProjectileBone), true);
+			const FVector From = Hit.ImpactPoint - Along * 60.f;
+			if (HitCharacter->GetMesh()->LineTraceComponent(BoneHit, From, Hit.ImpactPoint + Along * 120.f, BoneParams))
+			{
+				BoneHit.HitObjectHandle = Hit.HitObjectHandle;
+				Hit.BoneName = BoneHit.BoneName;
+				Hit.ImpactPoint = BoneHit.ImpactPoint;
+				Hit.Location = BoneHit.Location;
+				Hit.Component = HitCharacter->GetMesh();
+			}
+		}
+		const AHitmenWeaponBase* Weapon = Cast<AHitmenWeaponBase>(GetOwner());
+		const float Assist = Weapon && Weapon->GetWeaponData() ? Weapon->GetWeaponData()->HeadshotAssistRadius : 0.f;
+		if (Assist > 0.f && !HitCharacter->GetHeadBones().Contains(Hit.BoneName) && HitCharacter->GetHeadBones().Num() > 0)
+		{
+			const FName Head = HitCharacter->GetHeadBones()[0];
+			const FVector HeadLocation = HitCharacter->GetMesh()->GetBoneLocation(Head);
+			if (FMath::PointDistToLine(HeadLocation, Along, Hit.ImpactPoint) <= Assist && FVector::Dist(HeadLocation, Hit.ImpactPoint) <= Assist * 3.f)
+			{
+				Hit.BoneName = Head;
+				Hit.Component = HitCharacter->GetMesh();
+			}
+		}
+	}
 
 	if (Damage > 0.f && OtherActor)
 	{
@@ -373,4 +410,44 @@ void AHitmenProjectile_Smoke::OnExplode(const FVector& Origin)
 	Params.Instigator = GetInstigator();
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	GetWorld()->SpawnActor<AHitmenSmokeCloud>(SmokeClass ? SmokeClass.Get() : AHitmenSmokeCloud::StaticClass(), Origin, FRotator::ZeroRotator, Params);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Goobyr gun
+// ---------------------------------------------------------------------------------------------
+
+AHitmenProjectile_Goobyr::AHitmenProjectile_Goobyr()
+{
+	bExplodeOnImpact = true;
+	ExplosionDamage = 0.f;
+	ExplosionRadius = 0.f;
+	ExplosionNoiseRadius = 600.f;
+	HamsterClass = AHitmenHamster::StaticClass();
+}
+
+void AHitmenProjectile_Goobyr::OnExplode(const FVector& Origin)
+{
+	UWorld* World = GetWorld();
+	if (!World || !HasAuthority())
+	{
+		return;
+	}
+	const UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	for (int32 Index = 0; Index < HamsterCount; ++Index)
+	{
+		const float Angle = (Index + FMath::FRand() * 0.5f) * 2.f * PI / FMath::Max(1, HamsterCount);
+		FVector Spot = Origin + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * HamsterSpread * FMath::FRandRange(0.4f, 1.f) + FVector(0.f, 0.f, 40.f);
+		FNavLocation OnNav;
+		if (Nav && Nav->ProjectPointToNavigation(Spot, OnNav, FVector(150.f, 150.f, 250.f)))
+		{
+			Spot = OnNav.Location + FVector(0.f, 0.f, 25.f);
+		}
+		FActorSpawnParameters Params;
+		Params.Instigator = GetInstigator();
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		if (AHitmenHamster* Hamster = World->SpawnActor<AHitmenHamster>(HamsterClass ? HamsterClass.Get() : AHitmenHamster::StaticClass(), Spot, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), Params))
+		{
+			Hamster->SetMaster(GetInstigator());
+		}
+	}
 }

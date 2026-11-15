@@ -197,4 +197,173 @@ if wanted("security"):
         save(wall)
     log("security: camera colours, turret sparks, wall dust")
 
+
+VFX = "/Game/Vefects/"
+ART = "/Game/Hitmen/Art/Weapons"
+ABILITIES = "/Game/Hitmen/Abilities/"
+
+
+def ability_bp(name):
+    """BP_Ability_<name> wherever the builder put it (Abilities/<Family>/<Name>/)."""
+    for asset_path in EAL.list_assets("/Game/Hitmen/Abilities", recursive=True, include_folder=False):
+        if asset_path.split("/")[-1].split(".")[0] == "BP_Ability_" + name:
+            return load(asset_path.split(".")[0])
+    log("WARN missing BP_Ability_" + name)
+    return None
+
+
+def set_cdo(bp, **props):
+    if not bp:
+        return
+    d = unreal.get_default_object(bp.generated_class())
+    hitmen_common.set_props(d, **props)
+    unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+    save(bp)
+
+
+def merge_parts(name, parts):
+    """A static mesh made of basic shapes: parts = [(shape, location, (roll, pitch, yaw), scale, material path)]. Built at the
+    world origin with temporary actors, merged with its pivot at the origin, the actors removed."""
+    target = ART + "/" + name
+    if EAL.does_asset_exist(target):
+        EAL.delete_asset(target)
+    actors_sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    shapes = {"cube": "/Engine/BasicShapes/Cube", "cylinder": "/Engine/BasicShapes/Cylinder", "cone": "/Engine/BasicShapes/Cone",
+              "sphere": "/Engine/BasicShapes/Sphere"}
+    actors = []
+    for shape, location, rotation, scale, material in parts:
+        actor = actors_sub.spawn_actor_from_object(load(shapes[shape]), unreal.Vector(*location), unreal.Rotator(*rotation))
+        actor.set_actor_scale3d(unreal.Vector(*scale))
+        if material:
+            actor.static_mesh_component.set_material(0, load(material))
+        actors.append(actor)
+    options = unreal.MergeStaticMeshActorsOptions()
+    # The merge adds the "SM_" prefix itself.
+    options.set_editor_property("base_package_name", ART + "/" + (name[3:] if name.startswith("SM_") else name))
+    options.set_editor_property("destroy_source_actors", True)
+    options.set_editor_property("spawn_merged_actor", False)
+    settings = options.get_editor_property("mesh_merging_settings")
+    settings.set_editor_property("pivot_point_at_zero", True)
+    options.set_editor_property("mesh_merging_settings", settings)
+    unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).merge_static_mesh_actors(actors, options)
+    return load(target)
+
+
+if wanted("abilities"):
+    # Blink: a ground ring where you land, a sound on arrival; dash: a streak; lighter: fire on the body, ash after.
+    set_cdo(ability_bp("Blink"), marker_fx=load(VFX + "Item_Pickup_VFX/Shared/Particles/NS_ItemAura_Rare"), marker_fx_scale=0.55,
+            activated_sound=load(SFX + "SFX_ImpactMagic_Cue"))
+    set_cdo(ability_bp("Dash"), trail_fx=load(VFX + "Essential_Trails_VFX/Shared/Particles/NS_Trail_Simple_01"))
+    set_cdo(ability_bp("Lighter"), burn_time=2.0, burn_fx=load(VFX + "Free_Fire/Shared/Particles/NS_Fire_Small"), burn_fx_scale=0.8,
+            ash_fx=load(VFX + "Flipbook_VFX/Shared/Particles/Smoke/OneShot/NS_Smoke_OS"))
+    log("abilities: blink ring, dash trail, lighter fire and ash")
+
+if wanted("weapons"):
+    # Shotgun: half the pellets kill a guard; bow: two arrows to the body, a headshot kills, head assist 15 cm.
+    shotgun = load("/Game/Hitmen/Data/Weapons/DA_Weapon_Shotgun")
+    if shotgun:
+        shotgun.set_editor_property("damage", 25.0)
+        save(shotgun)
+    bow = load("/Game/Hitmen/Data/Weapons/DA_Weapon_Bow")
+    wood, dark, metal = "/Game/Hitmen/Materials/Instances/MI_Wood", "/Game/Hitmen/Materials/Instances/MI_Dark", "/Game/Hitmen/Materials/Instances/MI_Metal"
+    # Arrow along +X, 110 cm: shaft, steel tip, two vanes.
+    arrow_mesh = merge_parts("SM_Arrow", [
+        ("cylinder", (0, 0, 0), (0, 90, 0), (0.03, 0.03, 1.1), wood),
+        ("cone", (58, 0, 0), (0, -90, 0), (0.05, 0.05, 0.08), metal),
+        ("cube", (-50, 0, 0), (0, 0, 0), (0.12, 0.004, 0.05), dark),
+        ("cube", (-50, 0, 0), (90, 0, 0), (0.12, 0.004, 0.05), dark),
+    ])
+    # Bow standing up along Z, the string toward -X: riser, two limbs bending back, the string.
+    bow_mesh = merge_parts("SM_Bow", [
+        ("cylinder", (0, 0, 0), (0, 0, 0), (0.05, 0.05, 0.3), dark),
+        ("cylinder", (-6, 0, 30), (0, -12, 0), (0.035, 0.035, 0.4), wood),
+        ("cylinder", (-6, 0, -30), (0, 12, 0), (0.035, 0.035, 0.4), wood),
+        ("cylinder", (-14, 0, 0), (0, 0, 0), (0.006, 0.006, 1.0), dark),
+    ])
+    if bow:
+        props = dict(damage=55.0, headshot_assist_radius=15.0)
+        if bow_mesh:
+            props["static_mesh"] = bow_mesh
+            visual = unreal.Transform()
+            visual.scale3d = unreal.Vector(1.0, 1.0, 1.0)
+            props["visual_transform"] = visual
+        hitmen_common.set_props(bow, **props)
+        save(bow)
+    arrow_bp = load("/Game/Hitmen/Weapons/Projectiles/BP_Projectile_Arrow")
+    if arrow_bp and arrow_mesh:
+        d = unreal.get_default_object(arrow_bp.generated_class())
+        mesh = d.get_editor_property("mesh")
+        mesh.set_editor_property("static_mesh", arrow_mesh)
+        mesh.set_editor_property("relative_rotation", unreal.Rotator())
+        mesh.set_editor_property("relative_scale3d", unreal.Vector(1, 1, 1))
+        mesh.set_editor_property("override_materials", [])
+        collision = d.get_editor_property("collision")
+        if collision:
+            collision.set_editor_property("sphere_radius", 10.0)
+        unreal.BlueprintEditorLibrary.compile_blueprint(arrow_bp)
+        save(arrow_bp)
+    log("weapons: shotgun 25 x 9, bow 55 + head assist, SM_Bow, SM_Arrow (110 cm)")
+
+if wanted("goobyr"):
+    # Goobyr gun: a lob that bursts into five hamsters biting the shooter's enemies.
+    proj_folder = "/Game/Hitmen/Weapons/Projectiles"
+    proj = load(proj_folder + "/BP_Projectile_Goobyr")
+    if not proj:
+        proj = EAL.duplicate_asset(proj_folder + "/BP_Projectile_Grenade", proj_folder + "/BP_Projectile_Goobyr")
+        unreal.BlueprintEditorLibrary.reparent_blueprint(proj, unreal.HitmenProjectile_Goobyr)
+    hamster = load("/Game/Hitmen/Characters/BP_Hamster")
+    if not hamster:
+        hamster = hitmen_common.make_blueprint("BP_Hamster", "/Game/Hitmen/Characters", unreal.HitmenHamster)
+    set_cdo(hamster, puff_fx=load(VFX + "Flipbook_VFX/Shared/Particles/Dust/OneShot/NS_Dust_Directional_Small_01_OS"))
+    if proj:
+        d = unreal.get_default_object(proj.generated_class())
+        hitmen_common.set_props(d, hamster_class=hamster.generated_class() if hamster else None, hamster_count=5, damage=0.0,
+                                explode_on_impact=True, explosion_damage=0.0, explosion_radius=0.0, fuse_time=0.0)
+        mesh = d.get_editor_property("mesh")
+        if mesh:
+            mesh.set_editor_property("relative_scale3d", unreal.Vector(0.18, 0.18, 0.18))
+        unreal.BlueprintEditorLibrary.compile_blueprint(proj)
+        save(proj)
+    data_path = "/Game/Hitmen/Data/Weapons/DA_Weapon_Goobyr"
+    data = load(data_path) or EAL.duplicate_asset("/Game/Hitmen/Data/Weapons/DA_Weapon_GrenadeLauncher", data_path)
+    if data:
+        hitmen_common.set_props(data, display_name=unreal.Text("Goobyr gun"), projectile_class=proj.generated_class() if proj else None,
+                                projectile_speed=1600.0, damage=0.0, start_ammo=4, max_ammo=8, ammo_per_pickup=2, noise_radius=400.0,
+                                rounds_per_minute=50.0)
+        save(data)
+    catalog = load("/Game/Hitmen/Data/DA_Catalog")
+    if catalog and data:
+        for prop in ("weapons", "loot_weapons"):
+            items = list(catalog.get_editor_property(prop))
+            if data not in items:
+                items.append(data)
+                catalog.set_editor_property(prop, items)
+        save(catalog)
+    log("goobyr: BP_Projectile_Goobyr, BP_Hamster, DA_Weapon_Goobyr in the catalog")
+
+if wanted("gym_goobyr"):
+    # The gym armoury gets the Goobyr gun on a twelfth pedestal (the builder places it too).
+    import hitmen_levels
+    importlib.reload(hitmen_levels)
+    les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    les.load_level("/Game/Hitmen/Maps/L_Gym")
+    goobyr = load("/Game/Hitmen/Data/Weapons/DA_Weapon_Goobyr")
+    exists = any(isinstance(a, unreal.HitmenWeaponPickup) and a.get_editor_property("weapon") == goobyr for a in eas.get_all_level_actors())
+    if not exists:
+        x, y, G = 1000, -2100, "Gym/Armoury"
+        hitmen_levels.block(x, y, 140, 140, 90, hitmen_levels.mi("MI_Dark"), G)
+        hitmen_levels.weapon_pickup((x, y, 140), "Goobyr", G)
+        hitmen_levels.label(x, y, 200, "GOOBYR", 26)
+        les.save_current_level()
+    log("gym_goobyr:", "already there" if exists else "pedestal placed")
+
+if wanted("punch"):
+    # The new first-person punch (guard closer and lower, a longer jab, a wind-up) on the player Blueprint.
+    def punch(cdo):
+        hitmen_common.set_props(cdo, punch_guard_offset=unreal.Vector(46, 15, -14), punch_jab_offset=unreal.Vector(80, 3, -3),
+                                punch_wind_up_share=0.14, punch_wind_up_amount=0.3)
+    each_character_cdo(punch, CHARACTERS[:1])
+    log("punch: guard / jab / wind-up")
+
 print("\n".join(LOG))

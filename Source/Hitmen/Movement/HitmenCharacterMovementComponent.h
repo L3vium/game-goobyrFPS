@@ -17,7 +17,21 @@ enum class EHitmenCustomMovement : uint8
 	Climb,
 	Mantle,
 	/** Hanging from a thin ledge (window ledges): shimmy left / right, climb up or drop. */
-	Hang
+	Hang,
+	/** A short burst at a fixed speed (dash ability), no gravity. */
+	Dash
+};
+
+/** Which ways sprint works (Hitmen|Movement|Speed). */
+UENUM(BlueprintType)
+enum class EHitmenSprintDirections : uint8
+{
+	/** Only within 60 degrees of where you look. */
+	ForwardOnly,
+	/** Forward and straight sideways, never backward. */
+	ForwardAndSides,
+	/** Any direction, backward included. */
+	AllDirections
 };
 
 /** What Space would do in front of the character (shown at the crosshair). */
@@ -92,9 +106,24 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="0", ClampMax="1"))
 	float AimSpeedMultiplier = 0.65f;
 
-	/** Sprint only counts when moving mostly forward. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="-1", ClampMax="1"))
-	float SprintMinForwardDot = 0.5f;
+	/** Which ways Shift sprints: forward only, forward and sideways, or any direction (backward and diagonals too). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed")
+	EHitmenSprintDirections SprintDirections = EHitmenSprintDirections::AllDirections;
+
+	// ---- Dash (Celeste-like: a short burst at a fixed speed, then a normal speed) ----
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Dash", meta=(ClampMin="0", Units="cm/s"))
+	float DashSpeed = 3000.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Dash", meta=(ClampMin="0.02", Units="s"))
+	float DashDuration = 0.12f;
+
+	/** Speed kept at the end of the burst (it then brakes like a run). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Dash", meta=(ClampMin="0", Units="cm/s"))
+	float DashExitSpeed = 700.f;
+
+	/** One dash in the air between two landings (on the ground: as the ability's cooldown allows). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Dash")
+	bool bAirDash = true;
 
 	// ---- Ledges (players) ----
 	/** Hitman-like stiff ledges: walking never goes over a drop deeper than StiffLedgeMaxDrop (you slide along the edge;
@@ -157,6 +186,10 @@ public:
 	/** Obstacles up to this height can be vaulted over instead of climbed. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
 	float VaultMaxHeight = 120.f;
+
+	/** An open window's sill is vaulted up to this height (from the walkable ledge outside, the sill is ~121 cm up). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
+	float WindowVaultMaxHeight = 135.f;
 
 	/** Max thickness of a vaultable obstacle (window sills, low walls, crates). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Mantle", meta=(ClampMin="0", Units="cm"))
@@ -248,6 +281,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0"))
 	float ClimbJumpOffSpeed = 350.f;
 
+	/** Jumping off a ladder / gutter with left or right held: a hop along the wall (a ledge beside it is caught by the
+	 *  air grab, not overshot). Speeds along the wall, away from it and up. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0", Units="cm/s"))
+	float ClimbSideJumpSpeed = 260.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0", Units="cm/s"))
+	float ClimbSideJumpOut = 90.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0", Units="cm/s"))
+	float ClimbSideJumpUp = 300.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Climb", meta=(ClampMin="0", Units="s"))
 	float ClimbReattachCooldown = 0.5f;
 
@@ -271,6 +315,15 @@ public:
 	// ---- State API ----
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Movement")
 	void SetSprinting(bool bSprint) { bWantsToSprint = bSprint; }
+
+	/** Owning client (predicted, sent in the saved moves): dash now, toward the move input (or the view). */
+	void RequestDash() { bWantsDash = true; }
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Movement|Dash")
+	bool IsDashing() const { return IsCustomMode(EHitmenCustomMovement::Dash); }
+
+	/** QA (console HitmenTraverse): plans and starts a vault / climb toward Forward now. */
+	bool DebugTryMantle(const FVector& Forward);
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Movement")
 	bool IsSprinting() const;
@@ -387,6 +440,8 @@ protected:
 	void PhysClimb(float DeltaTime, int32 Iterations);
 	void PhysMantle(float DeltaTime, int32 Iterations);
 	void PhysHang(float DeltaTime, int32 Iterations);
+	void PhysDash(float DeltaTime, int32 Iterations);
+	void StartDash();
 
 	/** A thin ledge in front of a wall face: its top near NearZ and how far it sticks out (false = none). */
 	bool FindHangLedge(const FVector& WallFace, const FVector& WallNormal, float NearZ, float& OutLedgeZ, float& OutEdgeDistance) const;
@@ -428,7 +483,13 @@ protected:
 	float GetTimeSeconds() const;
 
 	bool bWantsToSprint = false;
-	bool bClimbRelativeToCamera = false;
+	bool bClimbRelativeToCamera = true;
+
+	// Dash state (saved with moves)
+	bool bWantsDash = false;
+	float DashTimeLeft = 0.f;
+	FVector DashDirection = FVector::ForwardVector;
+	bool bAirDashUsed = false;
 
 	// Jetpack state (tunables come from the equipped ability)
 	bool bWantsJetpackThrust = false;
@@ -506,6 +567,10 @@ public:
 	float SavedSlideBoostCooldownLeft = 0.f;
 	uint8 bSavedSlideNeedsCrouchRelease : 1;
 	uint8 bSavedSprintSlideNeedsRelease : 1;
+	uint8 bSavedWantsDash : 1;
+	uint8 bSavedAirDashUsed : 1;
+	float SavedDashTimeLeft = 0.f;
+	FVector SavedDashDirection = FVector::ForwardVector;
 
 	virtual void Clear() override;
 	virtual uint8 GetCompressedFlags() const override;

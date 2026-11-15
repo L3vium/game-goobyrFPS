@@ -695,6 +695,47 @@ void AHitmenCharacterBase::VanishBody()
 	}
 }
 
+void AHitmenCharacterBase::Multicast_Burn_Implementation(UNiagaraSystem* FireFX, float FireScale, UNiagaraSystem* AshFX, float Duration)
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	// Fire along the body (pelvis and chest), attached to the ragdoll so it burns where the body lies.
+	TArray<TWeakObjectPtr<UNiagaraComponent>> Fires;
+	if (FireFX && GetMesh())
+	{
+		for (const FName Bone : { FName(TEXT("pelvis")), FName(TEXT("spine_03")) })
+		{
+			const FName Socket = GetMesh()->DoesSocketExist(Bone) ? Bone : NAME_None;
+			if (UNiagaraComponent* Fire = UNiagaraFunctionLibrary::SpawnSystemAttached(FireFX, GetMesh(), Socket, FVector::ZeroVector, FRotator::ZeroRotator,
+				FVector(FireScale), EAttachLocation::SnapToTarget, true, ENCPoolMethod::None, true, true))
+			{
+				Fires.Add(Fire);
+			}
+		}
+	}
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::BodyBurn, GetMesh() ? GetMesh()->GetComponentLocation() : GetActorLocation());
+	// When it is gone: the fire dies down and ash puffs where it lay.
+	TWeakObjectPtr<AHitmenCharacterBase> WeakThis(this);
+	FTimerHandle Handle;
+	GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [WeakThis, Fires, AshFX]()
+	{
+		for (const TWeakObjectPtr<UNiagaraComponent>& Fire : Fires)
+		{
+			if (Fire.IsValid())
+			{
+				Fire->Deactivate();
+			}
+		}
+		if (WeakThis.IsValid() && AshFX)
+		{
+			const FVector Where = WeakThis->GetMesh() ? WeakThis->GetMesh()->GetBoneLocation(TEXT("pelvis")) : WeakThis->GetActorLocation();
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(WeakThis.Get(), AshFX, Where, FRotator::ZeroRotator, FVector(0.8f));
+		}
+	}), FMath::Max(0.05f, Duration), false);
+}
+
 void AHitmenCharacterBase::SetCarriedBy(APawn* NewCarrier, FName AttachSocket)
 {
 	if (!HasAuthority() || !IsDead())

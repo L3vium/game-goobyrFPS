@@ -47,6 +47,13 @@ public:
 
 protected:
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
+
+	/** What it can set off at range (drag classes in): distractions by default; add consoles, panels, breakers... to
+	 *  allow them. A class needs IHitmenRemoteActivatable. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Remote")
+	TArray<TSubclassOf<AActor>> AllowedTargetClasses;
+
+	bool IsAllowedTarget(const AActor* Actor) const;
 };
 
 /** The aimed target fights for you for Duration (charmed players are driven by AI). */
@@ -76,7 +83,18 @@ public:
 protected:
 	/** The body burns this long before it is gone. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Lighter", meta=(ClampMin="0", Units="s"))
-	float BurnTime = 1.2f;
+	float BurnTime = 2.f;
+
+	/** Fire on the body while it burns (attached to its spine and pelvis, so it follows the ragdoll). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Lighter|Juice")
+	TObjectPtr<class UNiagaraSystem> BurnFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Lighter|Juice", meta=(ClampMin="0.01"))
+	float BurnFXScale = 0.8f;
+
+	/** Smoke where the body was when it is gone. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Lighter|Juice")
+	TObjectPtr<class UNiagaraSystem> AshFX;
 
 	virtual bool Activate(const FVector& AimOrigin, const FVector& AimDirection) override;
 };

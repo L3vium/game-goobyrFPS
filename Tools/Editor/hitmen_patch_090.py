@@ -77,4 +77,44 @@ if wanted("traversal_fx"):
     each_character_cdo(lambda c: hitmen_content.set_traversal_fx(c, dust))
     log("traversal_fx: ladder descend slot")
 
+if wanted("weapons"):
+    # Falloff ranges, pellets, spreads, guard engage ranges, minigun damage, the sniper's smoke trail; per-weapon headshot
+    # kills keep their default (on).
+    hitmen_content.build_smoke_trail_material()
+    for name in hitmen_content.WEAPON_JUICE:
+        data = load("/Game/Hitmen/Data/Weapons/DA_Weapon_" + name)
+        if not data:
+            continue
+        rng = data.get_editor_property("range")
+        values = dict(falloff_start_range=rng * 0.5, falloff_end_range=rng)
+        values.update(hitmen_content.WEAPON_BALANCE.get(name, {}))
+        for key, value in values.items():
+            data.set_editor_property(key, value)
+        if name == "Sniper":
+            data.set_editor_property("tracer_style", hitmen_content.weapon_juice("Sniper")["tracer_style"])
+        save(data)
+    log("weapons: balance, falloff, pellets, sniper smoke")
+
+if wanted("sniper_glint"):
+    # Red star at every sniper's scope (the guard Blueprint carries it; only snipers show it).
+    glint = hitmen_content.build_glint_material()
+    for bp_path in ("/Game/Hitmen/Characters/NPC/BP_NPC_Guard", "/Game/Hitmen/Characters/NPC/BP_NPC_Sniper"):
+        bp = load(bp_path)
+        if bp:
+            unreal.get_default_object(bp.generated_class()).set_editor_property("glint_material", glint)
+            unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+            save(bp)
+    log("sniper_glint: M_Hitmen_Glint")
+
+if wanted("mounted_gun"):
+    # The shield plate sits low so the barrel shows in the first-person view.
+    mounted = load("/Game/Hitmen/World/Vehicles/BP_MountedGun")
+    if mounted:
+        d = unreal.get_default_object(mounted.generated_class())
+        hitmen_content.set_mesh(d.get_editor_property("shield"), hitmen_content.SHAPES["cube"], hitmen_content.MOUNTED_GUN_SHIELD[1],
+                                load("/Game/Hitmen/Materials/Instances/MI_Metal"), hitmen_content.MOUNTED_GUN_SHIELD[0])
+        unreal.BlueprintEditorLibrary.compile_blueprint(mounted)
+        save(mounted)
+    log("mounted_gun: shield lowered")
+
 print("\n".join(LOG))

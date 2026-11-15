@@ -26,9 +26,30 @@ void AHitmenWeapon_Hitscan::TracePellets(const FVector& Origin, const FVector& D
 	Params.bReturnPhysicalMaterial = true;
 
 	const int32 Pellets = FMath::Max(1, WeaponData->PelletCount);
+	const AHitmenCharacterBase* Shooter = Cast<AHitmenCharacterBase>(OwnerPawn);
+	const float Spread = WeaponData->GetPelletSpread(Shooter && Shooter->IsAiming());
 	for (int32 Index = 0; Index < Pellets; ++Index)
 	{
-		const FVector Dir = Pellets > 1 ? UHitmenCombatLibrary::RandomConeDirection(Direction, PelletSpread, Seed, Index + 1) : Direction;
+		FVector Dir = Direction;
+		if (Pellets > 1 && WeaponData->bFixedPelletPattern)
+		{
+			// One pellet in the middle, the others on two rings (golden-angle steps), a little seeded jitter.
+			if (Index > 0)
+			{
+				const float Ring = Index <= (Pellets - 1) / 2 ? 0.55f : 1.f;
+				const float Angle = Index * 137.5f;
+				const FVector Right = FVector::CrossProduct(Direction, FMath::Abs(Direction.Z) < 0.99f ? FVector::UpVector : FVector::ForwardVector).GetSafeNormal();
+				const FVector Up = FVector::CrossProduct(Right, Direction);
+				const FVector Offset = (Right * FMath::Cos(FMath::DegreesToRadians(Angle)) + Up * FMath::Sin(FMath::DegreesToRadians(Angle)))
+					* FMath::Tan(FMath::DegreesToRadians(Spread * Ring));
+				Dir = (Direction + Offset).GetSafeNormal();
+			}
+			Dir = UHitmenCombatLibrary::RandomConeDirection(Dir, Spread * 0.1f, Seed, Index + 1);
+		}
+		else if (Pellets > 1)
+		{
+			Dir = UHitmenCombatLibrary::RandomConeDirection(Direction, Spread, Seed, Index + 1);
+		}
 		const FVector End = Origin + Dir * WeaponData->Range;
 		FHitResult Hit;
 		if (GetWorld()->LineTraceSingleByChannel(Hit, Origin, End, HITMEN_TRACE_WEAPON, Params))
@@ -62,9 +83,7 @@ void AHitmenWeapon_Hitscan::FireServer(const FVector& Origin, const FVector& Dir
 		{
 			continue;
 		}
-		const float Distance = FVector::Dist(Origin, Hit.ImpactPoint);
-		const float FalloffAlpha = FMath::Clamp((Distance / WeaponData->Range - 0.5f) * 2.f, 0.f, 1.f);
-		float Damage = WeaponData->Damage * FMath::Lerp(1.f, WeaponData->FalloffAtMaxRange, FalloffAlpha);
+		float Damage = WeaponData->GetDamageAtDistance(FVector::Dist(Origin, Hit.ImpactPoint));
 		const AHitmenCharacterBase* HitCharacter = Cast<AHitmenCharacterBase>(HitActor);
 		const TArray<FName>& HeadBones = HitCharacter ? HitCharacter->GetHeadBones() : WeaponData->HeadBones;
 		if (HeadBones.Contains(Hit.BoneName))
@@ -96,6 +115,7 @@ void AHitmenWeapon_Projectile::FireServer(const FVector& Origin, const FVector& 
 	{
 		const float SpeedScale = WeaponData->bChargeToFire ? FMath::Lerp(MinChargeSpeed, 1.f, Charge) : 1.f;
 		const float DamageScale = WeaponData->bChargeToFire ? FMath::Lerp(0.3f, 1.f, Charge) : 1.f;
+		Projectile->SetHeadshotMultiplier(WeaponData->HeadshotMultiplier);
 		Projectile->Launch(Direction * WeaponData->ProjectileSpeed * SpeedScale, WeaponData->Damage * DamageScale);
 	}
 }

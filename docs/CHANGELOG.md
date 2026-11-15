@@ -12,12 +12,27 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - One surface table for footsteps and landings in `DA_SoundSet` (`Surfaces`, `DefaultSurface`; volume, pitch, puff,
   noise multiplier per surface) instead of a copy per character; a Tile surface (`SurfaceType6`, `PM_Tile`, the stone
   takes higher and softer). Recipe for a new surface in `docs/Pipelines.md`.
+- Weapon data: `bHeadshotKills` per weapon (on), `FalloffStartRange` / `FalloffEndRange` (falloff used to start at half
+  the range), `PelletSpread` / `AimPelletSpread` / `bFixedPelletPattern` (moved from the shotgun class),
+  `CrouchSpreadMultiplier`, `MovingSpreadMultiplier` / `MovingSpreadSpeed`, `NPCEngageRange`. Arrows apply the bow's
+  `HeadshotMultiplier`.
+- The player's sniper shot leaves a white smoke trail that lingers 2.2 s (`TracerStyle` smoke values,
+  `M_Hitmen_SmokeTrail`).
+- Snipers show a red star glint at the scope at any distance (`ScopeGlint`, `M_Hitmen_Glint`).
+- Security turret: `VisionArcDegrees` (180) and `RoundsPerMinute` (200, replaces `FireInterval`). Mounted gun:
+  `YawArcDegrees` (180, 360 turns all the way; replaces `MaxYaw`) and `RoundsPerMinute` (660, replaces `FireInterval`).
 
 ### Changed
+- `F` throws the held weapon only while aiming (`bThrowRequiresAim`), with a `[F] Throw` prompt.
+- Minigun damage 16 (9) and tighter spread (2.2 / 1.4); per-weapon falloff ranges (shotgun 7 → 25 m down to x0.25).
+- Mounted gun: the shield plate sits lower so the barrel shows; vehicle cameras use your field of view.
+- Empty vehicles take no damage by default (`bEmptyVehicleTakesDamage`): the tank no longer starts damaged.
+- The sniper's red aim line keeps about two pixels wide at any distance.
 - Ladder and gutter puffs, slide dust and footstep puffs are off by default (switches above); the slide scrape stays.
 - Muzzle lights are half as strong (2.5-15 cd).
 
 ### Fixed
+- Mounted gun and tank shots land where the crosshair points (they ran parallel to the view, under it).
 - Guns no longer glow while held: showing the first-person arms (a propagating `SetVisibility`) switched the muzzle light
   on for as long as the gun was in hand. The light is now off at zero intensity and only lives with a muzzle flash; a
   per-shot timer always turns it off (its time guard could fail on input-fired shots).

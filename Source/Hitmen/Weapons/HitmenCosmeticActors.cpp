@@ -61,11 +61,55 @@ void AHitmenTracer::SpawnTracer(UWorld* World, const FVector& Start, const FVect
 	}
 }
 
+void AHitmenTracer::SpawnSmokeTrail(UWorld* World, const FVector& Start, const FVector& End, UMaterialInterface* Material, const FHitmenTracerStyle& Style)
+{
+	if (!World || World->GetNetMode() == NM_DedicatedServer || Style.SmokeLifetime <= 0.f || !Material || FVector::DistSquared(Start, End) < 100.f)
+	{
+		return;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AHitmenTracer* Smoke = World->SpawnActor<AHitmenTracer>(Start, FRotator::ZeroRotator, Params))
+	{
+		// Starts a little out of the barrel, so it never fills the shooter's own view.
+		const FVector Direction = (End - Start).GetSafeNormal();
+		Smoke->Start = Start + Direction * 60.f;
+		Smoke->End = End;
+		Smoke->Style = Style;
+		Smoke->bSmoke = true;
+		Smoke->Instance = UMaterialInstanceDynamic::Create(Material, Smoke);
+		Smoke->Instance->SetScalarParameterValue(OpacityParameter, Style.SmokeOpacity);
+		Smoke->Mesh->SetMaterial(0, Smoke->Instance);
+		Smoke->Mesh->SetTranslucentSortPriority(-1);
+		Smoke->SetLifeSpan(Style.SmokeLifetime + 0.5f);
+		Smoke->Tick(0.f);
+	}
+}
+
 void AHitmenTracer::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const FVector Direction = (End - Start).GetSafeNormal();
 	const float Total = FVector::Dist(Start, End);
+	if (bSmoke)
+	{
+		// Smoke: the whole line, widening and thinning out (ease-out), then gone.
+		Age += DeltaSeconds;
+		const float Life = FMath::Clamp(1.f - Age / FMath::Max(Style.SmokeLifetime, 0.01f), 0.f, 1.f);
+		if (Life <= 0.f)
+		{
+			Destroy();
+			return;
+		}
+		if (Instance)
+		{
+			Instance->SetScalarParameterValue(OpacityParameter, Style.SmokeOpacity * Life * Life);
+		}
+		const float Width = Style.SmokeThickness + Style.SmokeGrowth * Age;
+		SetActorLocationAndRotation(Start + Direction * Total * 0.5f, FRotationMatrix::MakeFromZ(Direction).Rotator());
+		SetActorScale3D(FVector(Width / 100.f, Width / 100.f, FMath::Max(Total, 1.f) / 100.f));
+		return;
+	}
 	if (Style.Speed <= 0.f)
 	{
 		// Trail: the whole line at once, thinning and fading out.

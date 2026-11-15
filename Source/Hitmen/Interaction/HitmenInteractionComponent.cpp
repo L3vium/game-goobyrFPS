@@ -6,6 +6,7 @@
 #include "Interaction/HitmenInteractable.h"
 #include "Components/HitmenMeleeComponent.h"
 #include "Characters/HitmenCharacterBase.h"
+#include "Characters/HitmenPlayerCharacter.h"
 #include "Components/HitmenBodyCarryComponent.h"
 #include "UI/HitmenUIEventSubsystem.h"
 #include "Weapons/HitmenCombatLibrary.h"
@@ -148,6 +149,12 @@ void UHitmenInteractionComponent::UpdateFocus()
 	if (const UHitmenBodyCarryComponent* Carry = Pawn->FindComponentByClass<UHitmenBodyCarryComponent>(); Carry && Carry->IsCarrying())
 	{
 		SetFocus(nullptr, NSLOCTEXT("Hitmen", "DropBody", "Drop body"));
+		return;
+	}
+	// Aiming with a weapon and nothing in focus: F throws it.
+	if (const AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Pawn); Player && Player->IsAiming() && Player->CanThrowHeldWeapon())
+	{
+		SetFocus(nullptr, NSLOCTEXT("Hitmen", "ThrowWeapon", "Throw"));
 		return;
 	}
 	SetFocus(nullptr, FText::GetEmpty());

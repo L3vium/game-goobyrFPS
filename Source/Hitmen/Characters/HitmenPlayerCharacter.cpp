@@ -1265,11 +1265,16 @@ void AHitmenPlayerCharacter::Input_Interact()
 			}
 		}
 	}
-	// F: stealth kill > interactable > drop body > throw the held item.
-	if (!InteractionComponent->TryInteract())
+	// F: stealth kill > interactable > drop body > throw the held weapon (while aiming).
+	if (!InteractionComponent->TryInteract() && CanThrowHeldWeapon())
 	{
 		InventoryComponent->ThrowActive();
 	}
+}
+
+bool AHitmenPlayerCharacter::CanThrowHeldWeapon() const
+{
+	return InventoryComponent && InventoryComponent->GetActiveWeapon() && (!bThrowRequiresAim || bIsAiming);
 }
 
 void AHitmenPlayerCharacter::Input_MoveAbilityPressed()

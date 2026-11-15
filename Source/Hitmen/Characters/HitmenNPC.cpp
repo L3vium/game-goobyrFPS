@@ -29,6 +29,10 @@
 #include "Movement/HitmenCharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
+#include "Components/MaterialBillboardComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Kismet/GameplayStatics.h"
+#include "Camera/PlayerCameraManager.h"
 
 AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -59,6 +63,11 @@ AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	AimLaser->SetUsingAbsoluteLocation(true);
 	AimLaser->SetUsingAbsoluteRotation(true);
 	AimLaser->SetUsingAbsoluteScale(true);
+	ScopeGlint = CreateDefaultSubobject<UMaterialBillboardComponent>(TEXT("ScopeGlint"));
+	ScopeGlint->SetupAttachment(GetRootComponent());
+	ScopeGlint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ScopeGlint->SetUsingAbsoluteLocation(true);
+	ScopeGlint->SetVisibility(false);
 	if (Cube.Succeeded())
 	{
 		KeycardMesh->SetStaticMesh(Cube.Object);
@@ -155,6 +164,19 @@ void AHitmenNPC::Tick(float DeltaSeconds)
 	const AActor* Target = AlertComponent ? AlertComponent->GetTarget() : nullptr;
 	const bool bAiming = Target && !IsDead() && AlertComponent->GetAlertState() == EHitmenAlertState::Combat && Weapon;
 	AimLaser->SetVisibility(bAiming);
+	// The glint: where a sniper is, always (brighter and faster while it aims), never once it is dead or asleep.
+	const APlayerCameraManager* ViewCamera = UGameplayStatics::GetPlayerCameraManager(this, 0);
+	const bool bGlint = GlintInstance && Weapon && !IsDead() && !GetStatusEffects()->HasStatus(EHitmenStatusEffect::Asleep);
+	ScopeGlint->SetVisibility(bGlint);
+	if (bGlint)
+	{
+		// At the eye, where the scope is when it aims (the gun hangs low while it idles).
+		const FVector Scope = GetMesh()->DoesSocketExist(TEXT("head"))
+			? GetMesh()->GetSocketLocation(TEXT("head")) + GetActorForwardVector() * 18.f : GetPawnViewLocation();
+		const FVector ToViewer = ViewCamera ? (ViewCamera->GetCameraLocation() - Scope).GetSafeNormal() : FVector::ZeroVector;
+		ScopeGlint->SetWorldLocation(Scope + ToViewer * 25.f);
+		GlintInstance->SetScalarParameterValue(TEXT("Aiming"), bAiming ? 1.f : 0.f);
+	}
 	if (bAiming)
 	{
 		const FVector Start = Weapon->GetMuzzleLocation();
@@ -167,8 +189,15 @@ void AHitmenNPC::Tick(float DeltaSeconds)
 			End = Hit.ImpactPoint;
 		}
 		const float Length = FVector::Dist(Start, End);
+		// About two pixels wide at any distance: the width grows with the distance from your eye to the line.
+		float Width = 1.f;
+		if (ViewCamera)
+		{
+			const FVector Eye = ViewCamera->GetCameraLocation();
+			Width = FMath::Max(1.f, FMath::PointDistToSegment(Eye, Start, End) * AimLaserScreenWidth);
+		}
 		AimLaser->SetWorldLocationAndRotation((Start + End) * 0.5f, FRotationMatrix::MakeFromZ(End - Start).Rotator());
-		AimLaser->SetWorldScale3D(FVector(0.01f, 0.01f, Length / 100.f));
+		AimLaser->SetWorldScale3D(FVector(Width / 100.f, Width / 100.f, Length / 100.f));
 	}
 }
 
@@ -244,6 +273,11 @@ void AHitmenNPC::BeginPlay()
 	Super::BeginPlay();
 	KeycardMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, KeycardBone);
 	OnRep_CarriedKeycard();
+	if (bIsSniper && GlintMaterial && GetNetMode() != NM_DedicatedServer)
+	{
+		GlintInstance = UMaterialInstanceDynamic::Create(GlintMaterial, this);
+		ScopeGlint->AddElement(GlintInstance, nullptr, true, GlintScreenSize, GlintScreenSize, nullptr);
+	}
 	// Every guard ticks for its combat aim pose (raised weapon); only snipers need every frame (aim laser).
 	SetActorTickEnabled(GetNetMode() != NM_DedicatedServer || bIsSniper);
 	SetActorTickInterval(bIsSniper ? 0.f : 0.1f);

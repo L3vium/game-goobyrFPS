@@ -111,7 +111,12 @@ bool AHitmenProjectile::OnImpact(const FHitResult& Hit)
 
 	if (Damage > 0.f && OtherActor)
 	{
-		UGameplayStatics::ApplyPointDamage(OtherActor, Damage, GetVelocity().GetSafeNormal(), Hit, GetInstigatorControllerSafe(), this, UDamageType::StaticClass());
+		float HitDamage = Damage;
+		if (const AHitmenCharacterBase* HitCharacter = Cast<AHitmenCharacterBase>(OtherActor); HitCharacter && HitCharacter->GetHeadBones().Contains(Hit.BoneName))
+		{
+			HitDamage *= HeadshotMultiplier;
+		}
+		UGameplayStatics::ApplyPointDamage(OtherActor, HitDamage, GetVelocity().GetSafeNormal(), Hit, GetInstigatorControllerSafe(), this, UDamageType::StaticClass());
 	}
 	if (StatusOnHit != EHitmenStatusEffect::None)
 	{

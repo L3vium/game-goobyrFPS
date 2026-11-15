@@ -614,6 +614,17 @@ void AHitmenTurret::Hack(AActor* Hacker)
 	Juice_OnHacked();
 }
 
+bool AHitmenTurret::IsInVisionArc(const FVector& Location) const
+{
+	if (VisionArcDegrees >= 359.f)
+	{
+		return true;
+	}
+	const FVector To = (Location - GetActorLocation()).GetSafeNormal2D();
+	const float Cos = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To);
+	return Cos >= FMath::Cos(FMath::DegreesToRadians(VisionArcDegrees * 0.5f));
+}
+
 AActor* AHitmenTurret::FindTarget() const
 {
 	const FVector Eye = Head->GetComponentLocation();
@@ -632,7 +643,7 @@ AActor* AHitmenTurret::FindTarget() const
 			continue;
 		}
 		const float Distance = FVector::Dist(Eye, Character->GetActorLocation());
-		if (Distance > BestDistance || (AI && AI->IsSightBlocked(Eye, Character->GetActorLocation())))
+		if (Distance > BestDistance || !IsInVisionArc(Character->GetActorLocation()) || (AI && AI->IsSightBlocked(Eye, Character->GetActorLocation())))
 		{
 			continue;
 		}
@@ -680,7 +691,7 @@ void AHitmenTurret::Tick(float DeltaSeconds)
 		RetargetAccumulator = 0.f;
 		CurrentTarget = FindTarget();
 	}
-	if (!CurrentTarget || GetWorld()->GetTimeSeconds() - LastFireTime < FireInterval
+	if (!CurrentTarget || GetWorld()->GetTimeSeconds() - LastFireTime < GetFireInterval()
 		|| GetWorld()->GetTimeSeconds() - TargetAcquiredTime < LockOnTime)
 	{
 		return;

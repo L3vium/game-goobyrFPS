@@ -54,6 +54,11 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
   37 fps, 0.9.0); [ ] the same in a dark room by eye, first person and third person
 - [ ] No ladder / gutter puff, no slide dust, no footstep puff by default; each comes back with its Juice switch
 - [ ] Footsteps sound different on grass, stone, sand, wood, metal and tile floors (DA_SoundSet surface table)
+- [ ] `F` with nothing in focus throws the held weapon only while aiming (`[F] Throw` shows); not when just holding it
+- [ ] Sniper shot: a white smoke trail along the shot, lingering ~2 s; shotgun pellets spread per the weapon data
+- [x] Snipers: a red star at the scope, the red aim line visible from the ground (PIE screenshot, 0.9.0); [ ] at 100 m
+- [x] Mounted gun: the barrel shows under the crosshair (PIE screenshot, 0.9.0); [ ] bullets hit what the crosshair is on
+- [ ] Tank shells land on the crosshair; a parked tank is at full health; the tank bar only while driving
 - [x] Sniper: a brief trail to the impact and debris there; no warm full-screen wash on your own shots (PIE screenshots,
   0.8.0); [ ] SMG / minigun bursts in a dark room never look like a light left on
 - [ ] Sniper: raise, wobble, then zoom; the zoomed aim breathes

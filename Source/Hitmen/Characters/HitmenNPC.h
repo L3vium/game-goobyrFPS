@@ -179,6 +179,26 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> AimLaser;
 
+	/** Width of the aim line per cm of distance from your eye (0.0016 = about 2 px at 1080p, 90 degrees): it reads at
+	 *  any distance. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Sniper", meta=(ClampMin="0"))
+	float AimLaserScreenWidth = 0.0016f;
+
+	/** A small red star at a sniper's scope, the same size on screen at any distance (seen only in line of sight). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UMaterialBillboardComponent> ScopeGlint;
+
+	/** Glint sprite material (scalar "Aiming": 0 calm pulse, 1 bright fast pulse while aiming). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Sniper")
+	TObjectPtr<UMaterialInterface> GlintMaterial;
+
+	/** Glint size as a fraction of the screen. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Sniper", meta=(ClampMin="0"))
+	float GlintScreenSize = 0.03f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> GlintInstance;
+
 	/** Pickpocket only works from behind (dot of the NPC forward and the direction to the thief). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC", meta=(ClampMin="-1", ClampMax="1"))
 	float PickpocketMaxDot = -0.2f;

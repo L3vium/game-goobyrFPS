@@ -64,6 +64,10 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Visuals")
 	TSoftObjectPtr<UMaterialInterface> FlashMaterial;
 
+	/** Translucent material for the smoke trail a shot leaves (weapon TracerStyle.SmokeLifetime; scalar "Opacity"). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Visuals")
+	TSoftObjectPtr<UMaterialInterface> SmokeTrailMaterial;
+
 	// ---- Juice (every effect keeps its asset slot; these switches decide whether it plays) ----
 	/** A puff at the hands at each step up a ladder or gutter (the grab sound always plays). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")

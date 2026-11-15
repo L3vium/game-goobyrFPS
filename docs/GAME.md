@@ -128,7 +128,7 @@ own rebindable keys, above the game keys while spectating). It stays inside the 
 | Sprint (held) / dash (tap, when equipped) | Left Shift |
 | Fire / melee | LMB |
 | Aim | RMB |
-| Interact / stealth kill / swap / throw held item | F |
+| Interact / stealth kill / swap; throw the held weapon while aiming | F |
 | Move ability | E |
 | Manipulation ability | A |
 | Switch weapon slot | Mouse wheel |
@@ -202,8 +202,8 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
   Recoil kicks the view up and it recovers smoothly. On death the view leaves the head and orbits your body as it falls (third person). Landings are heard on the
   surface you land on (soft or hard, by fall speed); every landing dips the view a little, a hard one shakes it.
 - **Inventory**: 2 weapon slots (mouse wheel). A new weapon always goes to the left slot (the other one slides right;
-  with both full, the held weapon is swapped out). `F` with no interactable in focus throws the held
-  item: if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
+  with both full, the held weapon is swapped out). While aiming (right mouse), `F` with no interactable in focus throws
+  the held weapon (`[F] Throw` shows; `bThrowRequiresAim` on the player, on): if slot 1 is thrown, slot 2 moves to slot 1 and is equipped; if slot 2 is thrown, slot 1
   stays. Firing with an empty magazine and no reserve throws the weapon where you look. Thrown weapons fly (physics,
   spinning): the first hostile they hit takes the throw damage and is stunned 3 s on a head hit; an empty gun then
   vanishes, a loaded one settles and floats as a pickup. No weapon
@@ -250,8 +250,9 @@ only (no Lumen bounce or fog), 0.035 s, at most once every 0.09 s; off, it is at
 showing the arms could switch back on). Hits make a toon puff
 (`NS_Gunshot_Hit`) on walls and bodies alike; a miss (the shot's range ends in the air) makes none. Tracers
 (`AHitmenTracer`, `M_Hitmen_Tracer`, style per weapon in `FHitmenTracerStyle`) show every shotgun pellet and part of the
-machine-gun bullets as fast streaks; the sniper draws a brief trail over the whole shot (it fades in 0.12 s) and throws
-debris out of the surface it hits (`ImpactBurstFX`). All guns share one recording, pitched and levelled per weapon
+machine-gun bullets as fast streaks; the sniper draws a brief trail over the whole shot (it fades in 0.12 s), leaves a
+white smoke trail along it that widens and thins out over 2.2 s (`TracerStyle.Smoke*`, `M_Hitmen_SmokeTrail` in Project
+Settings → Hitmen → Visuals) and throws debris out of the surface it hits (`ImpactBurstFX`). All guns share one recording, pitched and levelled per weapon
 (`FireSoundPitch` / `FireSoundVolume`: the silenced pistol is a quiet high snap). Muzzle points are computed from each
 mesh (the Weapons_Free guns have no socket). Explosions flash (`ExplosionFlash*` on projectiles; the flashbang is a big
 white flash and light), the smoke grenade is the Smoke_Bombs toon cloud (plays 1.8x faster), the jetpack blows smoke
@@ -264,7 +265,26 @@ health drops, with the heartbeat below 35 %.
 
 All weapons share ammo, fire rate, spread (fixed: firing never widens it), recoil, damage, headshot
 multiplier, noise radius, silenced flag, mesh / visual transform / VFX / SFX / montage / first-person pose
-references — every value is in a `DA_Weapon_*` data asset. Weapons lying in the world float and turn. The
+references — every value is in a `DA_Weapon_*` data asset:
+- **Damage**: `Damage` per bullet / pellet, `Range` (nothing is hit beyond), full damage up to `FalloffStartRange` then
+  linear down to `FalloffAtMaxRange` x damage at `FalloffEndRange`; `HeadshotMultiplier`, and `bHeadshotKills` (on for
+  every weapon: a bullet or arrow in the head kills; Project Settings → Hitmen → `bHeadshotKills` is the master switch,
+  `bHeadshotKillsFromNPCs` off).
+- **Pellets** (shotgun): `PelletCount`, `PelletSpread` / `AimPelletSpread` (cone half-angle, hip / aiming),
+  `bFixedPelletPattern` (one in the middle, two rings, a little jitter, instead of a random cone).
+- **Accuracy**: `HipSpread`, `AimSpread`, `CrouchSpreadMultiplier` (0.8), `MovingSpreadMultiplier` above
+  `MovingSpreadSpeed`; recoil; `AimFOV`.
+- **Fire**: `RoundsPerMinute`, fire mode, burst count, minigun spin-up.
+- **AI**: `NPCEngageRange` (guards with this weapon close in to it before shooting; 0 = the NPC's own range).
+
+| Weapon | Damage | Rate | Falloff (full → min) | Notes |
+|---|---|---|---|---|
+| Pistol | 34 | 260 | 15 → 50 m, x0.6 | silenced |
+| SMG | 13 | 900 | 12 → 40 m, x0.5 | |
+| Assault rifle | 22 | 620 | 30 → 80 m, x0.6 | |
+| Shotgun | 12 x 9 pellets | 70 | 7 → 25 m, x0.25 | pellets 6° hip / 4.5° aiming |
+| Minigun | 16 | 450 → 1100 | 30 → 80 m, x0.6 | spread 2.2° / 1.4° |
+| Sniper | 120 | 40 | none (300 m) | zoom, smoke trail | Weapons lying in the world float and turn. The
 sniper shows a scope overlay; zoom keeps the mouse feel (sensitivity follows the field of view).
 
 | Weapon | Family | Notes |
@@ -327,15 +347,15 @@ act (fire for the lighter, notes for the remote distraction, a swirl for blink a
 | Window | Frame inside the wall opening, two shutters opening 80 degrees away from the opener; vaultable when open |
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
 | Distraction | Radio, TV, alarm clock (`BP_Distraction_*`: mesh, loop sound, light colour, toon notes on every pulse are data). `F` (or the remote distraction) turns it on or off; once on it plays until switched off (`PlayTime` 0); only guards within its noise radius hear it (walls cut it, the nearest two come), and a guard who comes to look switches it off |
-| Turret | Red laser while locking on, then shoots players (muzzle flash, light, red tracers); hacked only from its panel by **holding** `F` 3 s (a ring fills around the F key; releasing or looking away cancels): then shoots NPCs |
+| Turret | Sees and shoots within `Range` (25 m) inside `VisionArcDegrees` (180; 270, 360) around the way it was placed, `Damage` 6, `RoundsPerMinute` 200; red laser while locking on, then shoots players (muzzle flash, light, red tracers); hacked only from its panel by **holding** `F` 3 s (a ring fills around the F key; releasing or looking away cancels): then shoots NPCs |
 | Security camera | A shadowed yellow spotlight aimed at the floor: its lit zone is the camera's view, so walls and obstacles cut it; one colour (yellow) whatever happens while the detection meter fills; sees you only through open air; spotting calls reinforcements; a marker on the maps. 30 health: shot to pieces it sparks, hangs dead and its feed is lost for good |
 | Security station | Desk + screen cycling through its cameras (a 90° feed, tonemapped at the match exposure, without the zone pattern); holding `F` 2 s disables / enables them: the screen keeps the last frame, dimmed and noisy, with NO SIGNAL over it |
 | Circuit breaker | A lever thrown with sparks and a clunk turns off its linked lights (the bulbs go dark too): NPCs cannot see (only hear), players see less |
 | Vent | Crouch-size duct; its hatches are small doors (vertical hinge on the side) that swing away from the opener; poison spreads to linked rooms only if fully closed |
 | Poisonable drink | Poison vial target |
 | Breakable wall | Breaks on any explosion (weapon, C4, tank) |
-| Mounted machine gun | A free-standing tripod (no pedestal: place it anywhere), the gun high on it; usable from any side (option), 180° arc, look speed matches the player's; the view sits above the gun; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
-| Tank | Enter, third-person view; health bar at the top of the HUD, a reload ring around the crosshair (1.25 s), `[F] Exit` bottom right; its cannon barrel follows the aim, slides back 120 cm and the hull rocks on a shot; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle blast, view shake; server-driven from any client; damageable (a driven tank belongs to its driver's team; its own shells never hurt it or its driver), driver ejected when destroyed |
+| Mounted machine gun | A free-standing tripod (no pedestal: place it anywhere), the gun high on it; usable from any side (`bUsableFromAnySide`), `YawArcDegrees` 180 (270, 360 = all around), `Damage` 18, `RoundsPerMinute` 660, `Range` 80 m, look speed matches the player's; the view sits above the gun and the shield plate sits low, so the barrel shows; bullets go where the crosshair points (traced from the view, fired from the muzzle); the camera uses your field of view; every shot has a sound, a muzzle light flash and a view shake; takes damage, part of it reaches the gunner |
+| Tank | Enter, third-person view; health bar at the top of the HUD while driving; shells go where the crosshair points (the view line is traced from the camera behind the tank); a parked, empty tank takes no damage (`bEmptyVehicleTakesDamage` off), so it is always whole when you get in; a reload ring around the crosshair (1.25 s), `[F] Exit` bottom right; its cannon barrel follows the aim, slides back 120 cm and the hull rocks on a shot; the shell is a glowing slug that flies straight and near-instantly (no gravity, 20000 cm/s) and blasts 12 m wide; fire sound, muzzle blast, view shake; server-driven from any client; damageable (a driven tank belongs to its driver's team; its own shells never hurt it or its driver), driver ejected when destroyed |
 | Teleporter | Fixed pair: in → out |
 | Retrieval point candidate | See §2 |
 | Weapon / item spawn candidate | See §2 |
@@ -352,6 +372,10 @@ these are the Mannequin pack animations (pistol / rifle equip and ADS idle, `MM_
 every machine. They fire like Hitman guards: a short raise
 (`NPCFirstShotDelay` 0.6 s), bursts of `NPCBurstShots` (3) at 2.5x the weapon's interval, a 1.2 s pause; low
 damage multiplier per difficulty (Easy 0.35 / Normal 0.55 / Hard 0.8).
+
+**Snipers** show a small red star at their scope, the same size at any distance in line of sight (`ScopeGlint`,
+`M_Hitmen_Glint`: a slow pulse, bright and fast while aiming), and a red line from the scope to whoever they aim at,
+about two pixels wide at any distance (`AimLaserScreenWidth`).
 
 **In combat** guards hold their ground: within `ShootingRange` (15 m, on the NPC; snipers unlimited) they stand and shoot,
 farther away or out of sight they walk closer until in range, and they never back away. They turn to face their target

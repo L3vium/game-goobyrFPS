@@ -47,6 +47,9 @@ public:
 	/** Server: the controller left (disconnect) — put the driver back in the world. */
 	virtual void UnPossessed() override;
 
+	/** Owning client: the vehicle camera takes the player's field of view (Options > Graphics). */
+	virtual void PawnClientRestart() override;
+
 	// IHitmenInteractable
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
@@ -96,9 +99,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Vehicle|Damage", meta=(ClampMin="0"))
 	float RadialDamageMultiplier = 1.f;
 
-	/** Empty vehicles are neutral (not hostile to anyone): allow damaging them anyway. */
+	/** Empty vehicles are neutral (not hostile to anyone): allow damaging them anyway (off: a parked vehicle is always
+	 *  at full health when someone gets in). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Vehicle|Damage")
-	bool bEmptyVehicleTakesDamage = true;
+	bool bEmptyVehicleTakesDamage = false;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Driver, BlueprintReadOnly, Category="Hitmen|Vehicle")
 	TObjectPtr<AHitmenCharacterBase> Driver;
@@ -223,9 +227,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun")
 	bool bUsableFromAnySide = true;
 
-	/** Half of the firing arc. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="0", ClampMax="180", Units="deg"))
-	float MaxYaw = 90.f;
+	/** Whole firing arc around the way the gun was placed (180 = half circle, 270, 360 = turns all the way). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="10", ClampMax="360", Units="deg"))
+	float YawArcDegrees = 180.f;
+
+	bool HasFullTurn() const { return YawArcDegrees >= 359.f; }
+	float ClampYaw(float Yaw) const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(Units="deg"))
 	float MinPitch = -20.f;
@@ -236,10 +243,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="0"))
 	float Damage = 18.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="0.02"))
-	float FireInterval = 0.09f;
+	/** Shots per minute while the trigger is held. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="1"))
+	float RoundsPerMinute = 660.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="0"))
+	float GetFireInterval() const { return 60.f / FMath::Max(RoundsPerMinute, 1.f); }
+
+	/** Bullets reach this far (cm); the shot goes to what the crosshair points at within it. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="0", Units="cm"))
 	float Range = 8000.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|MountedGun", meta=(ClampMin="0"))

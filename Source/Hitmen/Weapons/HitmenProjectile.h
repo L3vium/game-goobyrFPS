@@ -31,6 +31,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Projectile")
 	virtual void Launch(const FVector& Velocity, float InDamage);
 
+	/** Server: a direct hit in the head multiplies the damage (the firing weapon's HeadshotMultiplier). */
+	void SetHeadshotMultiplier(float InMultiplier) { HeadshotMultiplier = FMath::Max(1.f, InMultiplier); }
+
 	/** Server: explode now (fuse, C4 detonation, shot barrel). */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Projectile")
 	virtual void Detonate();
@@ -49,6 +52,8 @@ protected:
 	/** Damage applied to the actor hit directly (0 = none). Overridden by Launch. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Impact", meta=(ClampMin="0"))
 	float Damage = 0.f;
+
+	float HeadshotMultiplier = 1.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Projectile|Impact")
 	bool bExplodeOnImpact = false;

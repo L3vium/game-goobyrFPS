@@ -547,9 +547,108 @@ def glow_material(name, folder, intensity, soft=False):
     return mat
 
 
+def custom_node(mat, code, inputs, x=-400, y=0, output=None, description="Custom"):
+    """A Custom HLSL expression with named inputs [(name, expression)]."""
+    node = MEL.create_material_expression(mat, unreal.MaterialExpressionCustom, x, y)
+    pins = []
+    for input_name, _ in inputs:
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", input_name)
+        pins.append(ci)
+    set_props(node, code=code, output_type=output or unreal.CustomMaterialOutputType.CMOT_FLOAT1, description=description, inputs=pins)
+    for input_name, expression in inputs:
+        MEL.connect_material_expressions(expression, "", node, input_name)
+    return node
+
+
+SMOKE_TRAIL_HLSL = """float edge = saturate(1.0 - F);
+float wisps = 0.65 + 0.35 * sin(WP.x * 0.021 + WP.y * 0.017 + WP.z * 0.029 + T * 1.3);
+return Opacity * edge * edge * wisps;"""
+
+
+def build_smoke_trail_material(folder=None):
+    """M_Hitmen_SmokeTrail: the soft white smoke a sniper shot leaves along its line (scalar "Opacity"; the edges of the
+    cylinder fade out, slow wisps run along it)."""
+    folder = folder or path("Materials", "FX")
+    mat = new_material("M_Hitmen_SmokeTrail", folder)
+    set_props(mat, blend_mode=unreal.BlendMode.BLEND_TRANSLUCENT, shading_model=unreal.MaterialShadingModel.MSM_UNLIT, two_sided=False)
+    opacity = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -900, 0)
+    set_props(opacity, parameter_name="Opacity", default_value=0.45)
+    fresnel = MEL.create_material_expression(mat, unreal.MaterialExpressionFresnel, -900, 120)
+    set_props(fresnel, exponent=1.6, base_reflect_fraction=0.0)
+    world = MEL.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -900, 240)
+    time = MEL.create_material_expression(mat, unreal.MaterialExpressionTime, -900, 360)
+    alpha = custom_node(mat, SMOKE_TRAIL_HLSL, [("Opacity", opacity), ("F", fresnel), ("WP", world), ("T", time)], description="SmokeTrail")
+    MEL.connect_material_property(alpha, "", unreal.MaterialProperty.MP_OPACITY)
+    color = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -400, -200)
+    set_props(color, constant=unreal.LinearColor(0.82, 0.83, 0.86, 1.0))
+    MEL.connect_material_property(color, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
+GLINT_HLSL = """float2 p = UV - 0.5;
+float r = length(p);
+float core = saturate(1.0 - r * 7.0);
+float rays = saturate(1.0 - abs(p.x) * 34.0) * saturate(1.0 - abs(p.y) * 2.1) + saturate(1.0 - abs(p.y) * 34.0) * saturate(1.0 - abs(p.x) * 2.1);
+float2 q = float2(p.x + p.y, p.x - p.y) * 0.7071;
+float diag = saturate(1.0 - abs(q.x) * 40.0) * saturate(1.0 - abs(q.y) * 3.2) + saturate(1.0 - abs(q.y) * 40.0) * saturate(1.0 - abs(q.x) * 3.2);
+float calm = 0.55 + 0.45 * sin(T * 2.4);
+float aim = 0.8 + 0.2 * sin(T * 15.0);
+float pulse = lerp(calm, aim, Aiming);
+return saturate(core * core + rays * 0.9 + diag * 0.45) * pulse;"""
+
+
+def build_glint_material(folder=None):
+    """M_Hitmen_Glint: the red star at a sniper's scope (sprite; scalar "Aiming": calm slow pulse, bright fast pulse while
+    it aims at someone)."""
+    folder = folder or path("Materials", "FX")
+    mat = new_material("M_Hitmen_Glint", folder)
+    set_props(mat, blend_mode=unreal.BlendMode.BLEND_ADDITIVE, shading_model=unreal.MaterialShadingModel.MSM_UNLIT, two_sided=True)
+    uv = MEL.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate, -900, 0)
+    time = MEL.create_material_expression(mat, unreal.MaterialExpressionTime, -900, 120)
+    aiming = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -900, 240)
+    set_props(aiming, parameter_name="Aiming", default_value=0.0)
+    shape = custom_node(mat, GLINT_HLSL, [("UV", uv), ("T", time), ("Aiming", aiming)], description="Glint")
+    color = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -600, -200)
+    set_props(color, constant=unreal.LinearColor(1.0, 0.06, 0.04, 1.0))
+    strength = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant, -600, 380)
+    set_props(strength, r=6.0)
+    mul = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, 0)
+    MEL.connect_material_expressions(color, "", mul, "A")
+    MEL.connect_material_expressions(shape, "", mul, "B")
+    mul2 = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -100, 100)
+    MEL.connect_material_expressions(mul, "", mul2, "A")
+    MEL.connect_material_expressions(strength, "", mul2, "B")
+    MEL.connect_material_property(mul2, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
+# 0.9.0 weapon balance and the new tunables (applied by the builder and hitmen_patch_090): falloff ranges (cm),
+# pellets, spreads, the range guards close in to before shooting, the sniper's smoke trail.
+WEAPON_BALANCE = {
+    "Pistol": dict(falloff_start_range=1500.0, falloff_end_range=5000.0, falloff_at_max_range=0.6, npc_engage_range=1500.0),
+    "SMG": dict(falloff_start_range=1200.0, falloff_end_range=4000.0, falloff_at_max_range=0.5, npc_engage_range=1400.0),
+    "AssaultRifle": dict(falloff_start_range=3000.0, falloff_end_range=8000.0, falloff_at_max_range=0.6),
+    "Shotgun": dict(falloff_start_range=700.0, falloff_end_range=2500.0, falloff_at_max_range=0.25, pellet_spread=6.0,
+                    aim_pellet_spread=4.5, fixed_pellet_pattern=False, npc_engage_range=900.0),
+    "Minigun": dict(damage=16.0, hip_spread=2.2, aim_spread=1.4, falloff_start_range=3000.0, falloff_end_range=8000.0,
+                    falloff_at_max_range=0.6, moving_spread_multiplier=1.3),
+    "Sniper": dict(falloff_start_range=30000.0, falloff_end_range=30000.0, falloff_at_max_range=1.0, moving_spread_multiplier=2.0),
+}
+SNIPER_SMOKE = (("smoke_lifetime", 2.2), ("smoke_thickness", 4.0), ("smoke_growth", 9.0), ("smoke_opacity", 0.5))
+
+# Mounted gun: the shield plate sits low so the barrel shows in the first-person view above it.
+MOUNTED_GUN_SHIELD = ((25.0, 0.0, -20.0), (0.06, 1.1, 0.5))
+
+
 def build_glow_materials():
     folder = path("Materials", "FX")
-    return {"tracer": glow_material("M_Hitmen_Tracer", folder, 10.0), "flash": glow_material("M_Hitmen_FlashGlow", folder, 3.0, soft=True)}
+    return {"tracer": glow_material("M_Hitmen_Tracer", folder, 10.0), "flash": glow_material("M_Hitmen_FlashGlow", folder, 3.0, soft=True),
+            "smoke_trail": build_smoke_trail_material(folder)}
 
 
 # Toon (3D, cel-shaded) effects only: the 2D Flipbook pack reads as comic book. No blood anywhere.
@@ -588,8 +687,9 @@ def weapon_juice(name):
         props["dry_fire_sound"] = load(DRY_SOUND)
     style = unreal.HitmenTracerStyle()
     if name == "Sniper":
-        # A brief trail over the whole shot (it appears at once and fades in 0.12 s) and debris where it lands.
-        for key, value in (("speed", 0.0), ("thickness", 0.9), ("fade_time", 0.12)):
+        # A brief trail over the whole shot (it appears at once and fades in 0.12 s), a white smoke trail lingering
+        # along it, and debris where it lands.
+        for key, value in (("speed", 0.0), ("thickness", 0.9), ("fade_time", 0.12)) + SNIPER_SMOKE:
             style.set_editor_property(key, value)
         props["impact_burst_fx"] = load(TOON + "NS_Arrow_Hit")
         props["impact_burst_scale"] = 0.5
@@ -1222,6 +1322,7 @@ def build_weapons(mats):
         data = make_data("DA_Weapon_" + name, path("Data", "Weapons"), unreal.HitmenWeaponData)
         set_props(data, display_name=display, weapon_class=gen_class(bp), pickup_class=gen_class(pickup), fp_motion=fp_motion(name), **props)
         set_props(data, **weapon_juice(name))
+        set_props(data, **WEAPON_BALANCE.get(name, {}))
         muzzle = weapon_muzzle_offset(data)
         if muzzle:
             set_props(data, muzzle_offset=muzzle)
@@ -1642,6 +1743,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     set_props(ncdo, anim_set=anim_set, ai_controller_class=gen_class(ai), default_weapon=weapons["Pistol"],
               keycard_pickup_class=gen_class(keycard_bp) if keycard_bp else None)
     set_mesh(component(ncdo, "aim_laser"), SHAPES["cylinder"], None, mats["laser"])
+    set_props(ncdo, glint_material=build_glint_material())
     set_mesh(component(ncdo, "keycard_mesh"), SHAPES["cube"], None, mats["mi"]["MI_Blue"])
     alert = component(ncdo, "alert_widget")
     if alert and widgets.get("WBP_AlertIndicator"):
@@ -1809,7 +1911,7 @@ def build_world(mats, weapons):
     fixture("BP_BreakableWall", unreal.HitmenBreakableWall, W + "/Breakable", {"mesh": ("cube", (3.0, 0.3, 3.0), mi["MI_Stone"], (0, 0, 150))})
     mounted = fixture("BP_MountedGun", unreal.HitmenMountedGun, V, {"mesh": ("cylinder", (0.12, 0.12, 1.4), mi["MI_Dark"], (70, 0, 0)),
                                                           "tripod": ("cone", (0.9, 0.9, 0.85), mi["MI_Metal"], (0, 0, -35)),
-                                                          "shield": ("cube", (0.06, 1.1, 0.7), mi["MI_Metal"], (25, 0, 15))})
+                                                          "shield": ("cube", MOUNTED_GUN_SHIELD[1], mi["MI_Metal"], MOUNTED_GUN_SHIELD[0])})
     # The barrel cylinder is modelled along Z: pitch it onto the gun's forward axis.
     mounted_mesh = component(cdo(mounted), "mesh")
     if mounted_mesh:

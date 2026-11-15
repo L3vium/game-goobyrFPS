@@ -706,7 +706,16 @@ float AHitmenWeaponBase::GetCurrentSpread() const
 		return 0.f;
 	}
 	const AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(OwnerPawn);
-	return (Character && Character->IsAiming()) ? WeaponData->AimSpread : WeaponData->HipSpread;
+	float Spread = (Character && Character->IsAiming()) ? WeaponData->AimSpread : WeaponData->HipSpread;
+	if (Character && Character->bIsCrouched)
+	{
+		Spread *= WeaponData->CrouchSpreadMultiplier;
+	}
+	if (OwnerPawn && OwnerPawn->GetVelocity().Size2D() > WeaponData->MovingSpreadSpeed)
+	{
+		Spread *= WeaponData->MovingSpreadMultiplier;
+	}
+	return Spread;
 }
 
 float AHitmenWeaponBase::GetCharge() const
@@ -1196,6 +1205,14 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 			{
 				AHitmenTracer::SpawnTracer(GetWorld(), DrawnMuzzle, Impact, TracerMaterial, WeaponData->TracerColor, WeaponData->TracerStyle);
 			}
+		}
+	}
+	if (WeaponData->TracerStyle.SmokeLifetime > 0.f)
+	{
+		UMaterialInterface* SmokeMaterial = VisualSettings->SmokeTrailMaterial.LoadSynchronous();
+		for (const FVector& Impact : Impacts)
+		{
+			AHitmenTracer::SpawnSmokeTrail(GetWorld(), Origin, Impact, SmokeMaterial, WeaponData->TracerStyle);
 		}
 	}
 	if (UNiagaraSystem* BackBlast = WeaponData->BackBlastFX.LoadSynchronous())

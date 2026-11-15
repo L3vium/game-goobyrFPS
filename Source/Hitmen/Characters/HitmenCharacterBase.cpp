@@ -23,6 +23,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Weapons/HitmenWeaponBase.h"
 #include "Weapons/HitmenProjectile.h"
+#include "Data/HitmenWeaponData.h"
 #include "Hitmen.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -507,7 +508,15 @@ float AHitmenCharacterBase::TakeDamage(float DamageAmount, FDamageEvent const& D
 		const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
 		const AHitmenCharacterBase* Shooter = Cast<AHitmenCharacterBase>(InstigatorActor);
 		const bool bFromNPC = Shooter && !Shooter->IsPlayerControlled();
-		const bool bLethalCauser = Cast<AHitmenWeaponBase>(DamageCauser) || Cast<AHitmenProjectile>(DamageCauser);
+		// The firing weapon decides too (its bHeadshotKills): a projectile is owned by the weapon that fired it.
+		const AHitmenWeaponBase* Weapon = Cast<AHitmenWeaponBase>(DamageCauser);
+		const AHitmenProjectile* Projectile = Cast<AHitmenProjectile>(DamageCauser);
+		if (!Weapon && Projectile)
+		{
+			Weapon = Cast<AHitmenWeaponBase>(Projectile->GetOwner());
+		}
+		const bool bWeaponKills = !Weapon || !Weapon->GetWeaponData() || Weapon->GetWeaponData()->bHeadshotKills;
+		const bool bLethalCauser = (Weapon || Projectile) && bWeaponKills;
 		if (Settings->bHeadshotKills && bLethalCauser && (!bFromNPC || Settings->bHeadshotKillsFromNPCs))
 		{
 			Damage = FMath::Max(Damage, HealthComponent->GetHealth() + HealthComponent->GetArmor() + 1.f);

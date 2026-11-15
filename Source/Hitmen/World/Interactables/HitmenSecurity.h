@@ -382,14 +382,26 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> Laser;
 
+	/** How far the turret sees and shoots (cm, in line of sight). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0", Units="cm"))
 	float Range = 2500.f;
 
+	/** Whole field of view around the way the turret was placed (180, 270, 360 = all around). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="10", ClampMax="360", Units="deg"))
+	float VisionArcDegrees = 180.f;
+
+	/** Damage per bullet. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0"))
 	float Damage = 6.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="0.02"))
-	float FireInterval = 0.3f;
+	/** Shots per minute once locked on. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Turret", meta=(ClampMin="1"))
+	float RoundsPerMinute = 200.f;
+
+	float GetFireInterval() const { return 60.f / FMath::Max(RoundsPerMinute, 1.f); }
+
+	/** Inside the field of view (placement direction, horizontal angle). */
+	bool IsInVisionArc(const FVector& Location) const;
 
 	/** Barrels spin up while the turret fires; a tracer per shot; a light flash at the muzzle. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Turret|Juice")

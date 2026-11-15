@@ -8,6 +8,16 @@
 
 class UTexture2D;
 
+/** Map layer of a marker kind: objectives always draw; the NPCs and Interactables layers follow Project Settings ->
+ *  Hitmen -> Maps (separately for the minimap and the pause map). */
+UENUM(BlueprintType)
+enum class EHitmenMapLayer : uint8
+{
+	Objective,
+	NPC,
+	Interactables
+};
+
 UENUM(BlueprintType)
 enum class EHitmenMapMarkerShape : uint8
 {
@@ -68,4 +78,13 @@ public:
 	/** Legend rows are sorted by this, then by name. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Map Marker")
 	int32 LegendOrder = 0;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Map Marker")
+	EHitmenMapLayer Layer = EHitmenMapLayer::Objective;
+
+	/** Whether the minimap (false) or the pause map (true) draws this kind: its own switch and its layer's. */
+	bool IsShownOn(bool bPauseMap) const;
+
+	/** Whether a map layer is switched on for the minimap (false) or the pause map (true). */
+	static bool IsLayerShown(EHitmenMapLayer InLayer, bool bPauseMap);
 };

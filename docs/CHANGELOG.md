@@ -54,6 +54,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   (name, weapon, keycard), `bPickpocketRequiresCrouch`; NPCs carry a body carry component.
 - Security turret: `VisionArcDegrees` (180) and `RoundsPerMinute` (200, replaces `FireInterval`). Mounted gun:
   `YawArcDegrees` (180, 360 turns all the way; replaces `MaxYaw`) and `RoundsPerMinute` (660, replaces `FireInterval`).
+- Map layers (Project Settings -> Hitmen -> Maps): NPCs, vision cones (fading fans) and interactables, separately for
+  the minimap and the pause map (`bMinimapShowNPCs` on, everything else off; `bPauseMapShowTeammates` on). Marker kinds
+  get a `Layer`; every interactable has a `MapMarker` component; new kinds `DA_MapMarker_HidingSpot`, `_Distraction`,
+  `_Container`, `_Keycard`, `_Device`, `_Hazard` set on their Blueprints (`hitmen_patch_090` step `map_layers`).
 
 ### Changed
 - `F` throws the held weapon only while aiming (`bThrowRequiresAim`), with a `[F] Throw` prompt.
@@ -68,6 +72,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Unsilenced gunshots carry 20-35 m (6-9 m) and their impacts 8-15 m; three guards answer a gunshot (two before).
 - The keycard sits in the guard's right pocket.
 - Results: "Back to the lobby" / "Waiting for the host" sit bottom right.
+- The minimap shows every NPC (calm ones in dark grey), as diamonds; the pause map shows you, the VIP and the retrieval
+  points by default and its legend lists only what is drawn (cameras join it with the NPC layer, as triangles).
+- The overhead diamond pulses while an NPC calls for backup (the red "!" is gone).
+- The cheat panel hides while the pause menu is open.
 - Ladder and gutter puffs, slide dust and footstep puffs are off by default (switches above); the slide scrape stays.
 - Muzzle lights are half as strong (2.5-15 cd).
 

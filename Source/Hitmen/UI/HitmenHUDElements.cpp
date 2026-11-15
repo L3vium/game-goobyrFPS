@@ -647,7 +647,9 @@ int32 UHitmenCheatPanelWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 	const AHitmenGameState* GS = GetHitmenGameState();
 	const APlayerController* PC = GetOwningPlayer();
 	const AHitmenPlayerState* PS = PC ? PC->GetPlayerState<AHitmenPlayerState>() : nullptr;
-	if (!GS || !GS->AreDebugCommandsAllowed() || !PS || !PC->GetPawn() || PC->GetPawn()->IsA<ASpectatorPawn>())
+	const UHitmenUIEventSubsystem* CheatUI = GetUIEvents();
+	// Hidden under the pause menu (its legend sits on the same side).
+	if (!GS || !GS->AreDebugCommandsAllowed() || !PS || !PC->GetPawn() || PC->GetPawn()->IsA<ASpectatorPawn>() || (CheatUI && CheatUI->IsPauseMenuOpen()))
 	{
 		return LayerId;
 	}

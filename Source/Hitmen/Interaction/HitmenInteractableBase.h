@@ -50,6 +50,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> Mesh;
 
+	/** Shows the interactable on the maps' Interactables layer once its Blueprint picks a Type (none: not drawn). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UHitmenMapMarkerComponent> MapMarker;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Interaction")
 	FText InteractionText;
 

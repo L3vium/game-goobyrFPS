@@ -19,17 +19,22 @@ class UTextureRenderTarget2D;
 class APawn;
 class UHitmenMapMarkerType;
 
-/** Top-down map: you, the VIP, retrieval points (no other information). */
+/** Top-down map: you, the VIP, retrieval points; teammates, NPCs (and their cones), interactables per Project
+ *  Settings -> Hitmen -> Maps. */
 UCLASS()
 class HITMEN_API UHitmenPauseMapWidget : public UHitmenUserWidget
 {
 	GENERATED_BODY()
 
 public:
-	/** Legend categories read from the game state: 0 you, 1 teammates, 2 VIP, 3 alerted NPCs. Everything else is a map
+	/** Legend categories read from the game state: 0 you, 1 teammates, 2 VIP, 3 NPCs. Everything else is a map
 	 *  marker (UHitmenMapMarkerComponent) with a legend row per kind. */
 	static constexpr int32 CategoryCount = 4;
 	static constexpr int32 AlertedCategory = 3;
+
+	/** Whether the map draws a category at all (Project Settings -> Hitmen -> Maps; teammates only when you have some):
+	 *  the legend lists only these. */
+	bool IsCategoryDrawn(int32 Category) const;
 	static FText GetCategoryName(int32 Category);
 	static FLinearColor GetCategoryColor(int32 Category);
 
@@ -115,6 +120,8 @@ protected:
 	UPROPERTY(Transient) TObjectPtr<UVerticalBox> LegendBox;
 	/** Marker kind of each legend toggle after the built-in categories. */
 	UPROPERTY(Transient) TArray<TObjectPtr<UHitmenMapMarkerType>> LegendMarkerTypes;
+	/** Built-in category of each legend toggle before the marker kinds (only the categories the map draws). */
+	TArray<int32> LegendCategories;
 
 	UFUNCTION() void HandleLegendToggled(bool bChecked);
 	/** Shows / hides the debug tools (they open over the legend). */

@@ -2,6 +2,7 @@
 
 #include "Components/HitmenMapMarkerComponent.h"
 #include "Data/HitmenMapMarkerType.h"
+#include "Core/HitmenGameSettings.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -64,13 +65,29 @@ void UHitmenMapMarkerSubsystem::Unregister(UHitmenMapMarkerComponent* Marker)
 	Markers.Remove(Marker);
 }
 
+bool UHitmenMapMarkerType::IsLayerShown(EHitmenMapLayer InLayer, bool bPauseMap)
+{
+	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+	switch (InLayer)
+	{
+	case EHitmenMapLayer::NPC:          return bPauseMap ? Settings->bPauseMapShowNPCs : Settings->bMinimapShowNPCs;
+	case EHitmenMapLayer::Interactables: return bPauseMap ? Settings->bPauseMapShowInteractables : Settings->bMinimapShowInteractables;
+	default:                             return true;
+	}
+}
+
+bool UHitmenMapMarkerType::IsShownOn(bool bPauseMap) const
+{
+	return (bPauseMap ? bShowOnPauseMap : bShowOnMinimap) && IsLayerShown(Layer, bPauseMap);
+}
+
 TArray<UHitmenMapMarkerType*> UHitmenMapMarkerSubsystem::GetLegendTypes() const
 {
 	TArray<UHitmenMapMarkerType*> Types;
 	for (const TWeakObjectPtr<UHitmenMapMarkerComponent>& Marker : Markers)
 	{
 		UHitmenMapMarkerType* Type = Marker.IsValid() ? Marker->GetType() : nullptr;
-		if (Type && Type->bShowInLegend && Type->bShowOnPauseMap)
+		if (Type && Type->bShowInLegend && Type->IsShownOn(true))
 		{
 			Types.AddUnique(Type);
 		}

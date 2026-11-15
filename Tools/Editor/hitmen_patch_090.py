@@ -186,4 +186,10 @@ if wanted("gym_ai"):
     les.save_current_level()
     log("gym_ai: removed", removed, "placed the new pen")
 
+if wanted("map_layers"):
+    # Marker kinds get a map layer (cameras on the NPC layer, now in the pause map legend when that layer is on); the
+    # interactable kinds and their Blueprints (Interactables layer, off by default on both maps).
+    hitmen_content.build_map_markers()
+    log("map_layers: marker kinds and interactable markers")
+
 print("\n".join(LOG))

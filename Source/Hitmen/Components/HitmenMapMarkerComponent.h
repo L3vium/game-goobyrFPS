@@ -66,7 +66,7 @@ public:
 	/** Every registered marker (hidden ones included; check IsMarkerVisible). */
 	const TArray<TWeakObjectPtr<UHitmenMapMarkerComponent>>& GetMarkers() const { return Markers; }
 
-	/** Marker kinds present in this world that want a legend row, in legend order. */
+	/** Marker kinds present in this world that the pause map draws and that want a legend row, in legend order. */
 	TArray<UHitmenMapMarkerType*> GetLegendTypes() const;
 
 	/** Brush of a kind's icon, or null when it draws a shape. */

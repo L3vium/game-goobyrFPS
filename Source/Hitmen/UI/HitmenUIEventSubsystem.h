@@ -121,6 +121,10 @@ struct FHitmenHUDAlertBlip
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bCallingReinforcements = false;
 	/** A security camera rather than an NPC (awareness arcs show a camera mark). */
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bIsCamera = false;
+	/** Facing (world yaw) and sight cone (radius, half angle) for the maps' vision cones; radius 0 = no cone. */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Yaw = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float SightRadius = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float SightHalfAngle = 0.f;
 };
 
 /** A hint anchored on a world actor (remote-ability target: glow + action under it). */

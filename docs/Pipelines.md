@@ -28,14 +28,19 @@ Anything can show on the minimap and the pause map:
 1. **Pick or make a kind**: a data asset of class `HitmenMapMarkerType` in `/Game/Hitmen/Data/MapMarkers`
    (duplicate `DA_MapMarker_Camera`). Set **Display Name** (the legend row), **Color**, **Shape** (square, diamond,
    triangle, ring) or an **Icon** (white on transparent, tinted), **Size**, the minimap scale, whether it shows on the
-   minimap / the pause map / the legend, **Clamp To Minimap Edge** for objectives, and **Legend Order**.
+   minimap / the pause map / the legend, **Clamp To Minimap Edge** for objectives, **Legend Order** and the **Layer**:
+   *Objective* always draws; *NPC* and *Interactables* draw only where Project Settings → Hitmen → Maps switches that
+   layer on (minimap and pause map apart; by default only the minimap's NPC layer is on).
 2. **Mark the actor**: in its Blueprint, *Add Component → Hitmen Map Marker*, set **Type** to the kind (and an
-   optional **Label** shown next to it on the pause map).
+   optional **Label** shown next to it on the pause map). Interactables already have a **Map Marker** component: just
+   set its Type (`hitmen_content.INTERACTABLE_MARKERS` does it for the built-in ones).
 3. Done: the legend gets a row with a toggle as soon as one marker of that kind is on the map. Gameplay code hides a
    marker with **Set Marker Visible** (a disabled camera, an unused retrieval point do it already).
 
-Retrieval points and security cameras carry one (`DA_MapMarker_RetrievalPoint`, `DA_MapMarker_Camera`). You,
-teammates, the VIP and guards on alert are drawn from the game state, not markers.
+Retrieval points and security cameras carry one (`DA_MapMarker_RetrievalPoint`, `DA_MapMarker_Camera`), and so do
+lockers, body containers, distractions, containers, keycards, consoles, hack panels, breakers, drinks and barrels
+(`DA_MapMarker_HidingSpot`, `_Distraction`, `_Container`, `_Keycard`, `_Device`, `_Hazard`). You, teammates, the VIP
+and the NPCs (diamonds, vision cones) are drawn from the game state, not markers.
 
 ## Surfaces (footsteps, landings)
 

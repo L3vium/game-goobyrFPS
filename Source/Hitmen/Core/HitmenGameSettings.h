@@ -112,6 +112,46 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD")
 	TSoftObjectPtr<UMaterialInterface> MarkerPostProcessMaterial;
 
+	// ---- Maps (minimap and pause map layers; the pause map legend lists only what is drawn) ----
+	/** Minimap: every living NPC as a diamond (grey calm, white suspicious, yellow alerted, red in combat) and the
+	 *  security cameras (marker kinds on the NPCs layer). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps")
+	bool bMinimapShowNPCs = true;
+
+	/** Minimap: a vision cone in front of each NPC drawn, fading out toward its sight radius. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps", meta=(EditCondition="bMinimapShowNPCs"))
+	bool bMinimapShowVisionCones = false;
+
+	/** Minimap: marker kinds on the Interactables layer (hiding spots, distractions, containers, keycards, devices,
+	 *  hazards). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps")
+	bool bMinimapShowInteractables = false;
+
+	/** Pause map: NPCs and cameras, as on the minimap. Off: the pause map shows you, the VIP and retrieval points. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps")
+	bool bPauseMapShowNPCs = false;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps", meta=(EditCondition="bPauseMapShowNPCs"))
+	bool bPauseMapShowVisionCones = false;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps")
+	bool bPauseMapShowInteractables = false;
+
+	/** Pause map: your teammates (only when you have some). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps")
+	bool bPauseMapShowTeammates = true;
+
+	/** Vision cone opacity at the NPC; it fades to nothing at the NPC's sight radius. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps", meta=(ClampMin="0", ClampMax="1"))
+	float MapVisionConeOpacity = 0.35f;
+
+	/** NPC diamond size on the minimap and the pause map (pixels, tip to tip). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps", meta=(ClampMin="2"))
+	float MinimapNPCSize = 9.f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Maps", meta=(ClampMin="2"))
+	float PauseMapNPCSize = 13.f;
+
 	// ---- Combat ----
 	/** A bullet or arrow in the head always kills (the multiplier no longer matters). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Combat")

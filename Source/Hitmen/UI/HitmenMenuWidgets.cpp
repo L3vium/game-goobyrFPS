@@ -80,7 +80,7 @@ FText UHitmenPauseMapWidget::GetCategoryName(int32 Category)
 	case 0: return LOCTEXT("LegendYou", "You");
 	case 1: return LOCTEXT("LegendTeam", "Teammates");
 	case 2: return LOCTEXT("LegendVIP", "Target (VIP)");
-	default: return LOCTEXT("LegendAlerted", "Guards on alert");
+	default: return LOCTEXT("LegendNPCs", "Guards");
 	}
 }
 
@@ -92,6 +92,39 @@ FLinearColor UHitmenPauseMapWidget::GetCategoryColor(int32 Category)
 	case 1: return FLinearColor(0.3f, 0.7f, 1.f);
 	case 2: return HitmenUI::Accent();
 	default: return HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow);
+	}
+}
+
+bool UHitmenPauseMapWidget::IsCategoryDrawn(int32 Category) const
+{
+	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+	switch (Category)
+	{
+	case 1:
+	{
+		if (!Settings->bPauseMapShowTeammates)
+		{
+			return false;
+		}
+		const APawn* Pawn = GetOwningPlayerPawn();
+		const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
+		const int32 MyTeam = Pawn ? UHitmenTeamLibrary::GetTeamId(Pawn) : HitmenTeams::Neutral;
+		if (!GS || MyTeam == HitmenTeams::Neutral)
+		{
+			return false;
+		}
+		for (const APlayerState* PS : GS->PlayerArray)
+		{
+			const APawn* Mate = PS ? PS->GetPawn() : nullptr;
+			if (Mate && Mate != Pawn && UHitmenTeamLibrary::GetTeamId(Mate) == MyTeam)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+	case AlertedCategory: return Settings->bPauseMapShowNPCs;
+	default: return true;
 	}
 }
 
@@ -241,7 +274,7 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	}
 	auto Marker = [&](int32 Category, const FVector& World, const FString& Label, float Size)
 	{
-		if (!bCategoryVisible[Category])
+		if (!bCategoryVisible[Category] || !IsCategoryDrawn(Category))
 		{
 			return;
 		}
@@ -271,18 +304,26 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 			}
 		}
 	}
-	if (const UHitmenUIEventSubsystem* UI = GetUIEvents())
+	// NPCs (Project Settings -> Hitmen -> Maps, off by default): diamonds as on the minimap, cones under them.
+	const UHitmenGameSettings* MapSettings = UHitmenGameSettings::Get();
+	const UHitmenUIEventSubsystem* BlipSource = bCategoryVisible[AlertedCategory] && IsCategoryDrawn(AlertedCategory) ? GetUIEvents() : nullptr;
+	if (BlipSource)
 	{
-		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
+		const float PixelsPerCm = Side / FMath::Max(WorldSide, 1.f);
+		for (const FHitmenHUDAlertBlip& Blip : BlipSource->GetAlertBlips())
 		{
-			// Security cameras are not shown on the pause map (only on the minimap).
-			if (Blip.Color != EHitmenAlertColor::None && !Blip.bIsCamera && bCategoryVisible[AlertedCategory])
+			if (Blip.bIsCamera)
 			{
-				// Same colours as the minimap: white (suspicious), yellow (alerted / searching), red (combat).
-				const FVector2D P = ToMap(Blip.Location);
-				HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, P - FVector2D(6.5f), FVector2D(13.f), FLinearColor(0.f, 0.f, 0.f, 0.7f));
-				HitmenUI::PaintBox(OutDrawElements, LayerId + 4, AllottedGeometry, P - FVector2D(4.5f), FVector2D(9.f), HitmenAlert::ToLinearColor(Blip.Color));
+				continue;
 			}
+			const FVector2D P = ToMap(Blip.Location);
+			const FLinearColor Tint = HitmenUI::GetMapNPCColor(Blip.Color);
+			if (MapSettings->bPauseMapShowVisionCones && Blip.SightRadius > 0.f)
+			{
+				HitmenUI::PaintVisionCone(OutDrawElements, LayerId + 2, AllottedGeometry, P, Blip.SightRadius * PixelsPerCm, Blip.Yaw,
+					Blip.SightHalfAngle, HitmenUI::GetMapConeColor(Blip.Color) * FLinearColor(1.f, 1.f, 1.f, MapSettings->MapVisionConeOpacity));
+			}
+			HitmenUI::PaintDiamond(OutDrawElements, LayerId + 3, AllottedGeometry, P, MapSettings->PauseMapNPCSize * 0.5f, Tint);
 		}
 	}
 	// Map markers (retrieval points, cameras, anything with a UHitmenMapMarkerComponent), drawn by their kind.
@@ -291,7 +332,7 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 		for (const TWeakObjectPtr<UHitmenMapMarkerComponent>& MapMarker : Markers->GetMarkers())
 		{
 			const UHitmenMapMarkerType* Type = MapMarker.IsValid() ? MapMarker->GetType() : nullptr;
-			if (!Type || !MapMarker->IsMarkerVisible() || !Type->bShowOnPauseMap || HiddenMarkerTypes.Contains(const_cast<UHitmenMapMarkerType*>(Type)))
+			if (!Type || !MapMarker->IsMarkerVisible() || !Type->IsShownOn(true) || HiddenMarkerTypes.Contains(const_cast<UHitmenMapMarkerType*>(Type)))
 			{
 				continue;
 			}
@@ -515,7 +556,16 @@ void UHitmenPauseMenuWidget::RefreshLegend()
 	{
 		Current.Add(Type.Get());
 	}
-	if (LegendToggles.Num() > 0 && Types == Current)
+	// Only what the map draws gets a row (teammates come and go with the players).
+	TArray<int32> Categories;
+	for (int32 Category = 0; Category < UHitmenPauseMapWidget::CategoryCount; ++Category)
+	{
+		if (!Map || Map->IsCategoryDrawn(Category))
+		{
+			Categories.Add(Category);
+		}
+	}
+	if (LegendToggles.Num() > 0 && Types == Current && Categories == LegendCategories)
 	{
 		return;
 	}
@@ -524,6 +574,7 @@ void UHitmenPauseMenuWidget::RefreshLegend()
 	LegendToggles.Reset();
 	LegendMarkerTypes.Reset();
 	LegendMarkerTypes.Append(Types);
+	LegendCategories = Categories;
 	if (Map)
 	{
 		for (int32 Category = 0; Category < UHitmenPauseMapWidget::CategoryCount; ++Category)
@@ -539,16 +590,18 @@ void UHitmenPauseMenuWidget::RefreshLegend()
 	UTextBlock* LegendTitle = HitmenUI::MakeText(WidgetTree, LOCTEXT("Legend", "MAP LEGEND"), 15, TEXT("Medium"), HitmenUI::TextDim());
 	LegendTitle->SetFont(HitmenUI::SpacedFont(15, TEXT("Medium"), 260));
 	HitmenUI::AddToVBox(Legend, LegendTitle, FMargin(0.f, 0.f, 0.f, 12.f));
-	const int32 RowCount = UHitmenPauseMapWidget::CategoryCount + LegendMarkerTypes.Num();
-	for (int32 Category = 0; Category < RowCount; ++Category)
+	const int32 RowCount = LegendCategories.Num() + LegendMarkerTypes.Num();
+	for (int32 RowIndex = 0; RowIndex < RowCount; ++RowIndex)
 	{
-		const UHitmenMapMarkerType* MarkerType = Category >= UHitmenPauseMapWidget::CategoryCount ? LegendMarkerTypes[Category - UHitmenPauseMapWidget::CategoryCount].Get() : nullptr;
+		const UHitmenMapMarkerType* MarkerType = RowIndex >= LegendCategories.Num() ? LegendMarkerTypes[RowIndex - LegendCategories.Num()].Get() : nullptr;
+		const int32 Category = MarkerType ? INDEX_NONE : LegendCategories[RowIndex];
 		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 		UHorizontalBox* Swatches = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 		TArray<FLinearColor> Colors = { MarkerType ? MarkerType->Color : UHitmenPauseMapWidget::GetCategoryColor(Category) };
 		if (Category == UHitmenPauseMapWidget::AlertedCategory)
 		{
-			Colors = { HitmenAlert::ToLinearColor(EHitmenAlertColor::White), HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow), HitmenAlert::ToLinearColor(EHitmenAlertColor::Red) };
+			Colors = { HitmenUI::GetMapNPCColor(EHitmenAlertColor::None), HitmenAlert::ToLinearColor(EHitmenAlertColor::White),
+				HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow), HitmenAlert::ToLinearColor(EHitmenAlertColor::Red) };
 		}
 		for (const FLinearColor& Color : Colors)
 		{
@@ -560,7 +613,7 @@ void UHitmenPauseMenuWidget::RefreshLegend()
 			HitmenUI::AddToHBox(Swatches, SwatchSize, FMargin(0.f, 0.f, 4.f, 0.f));
 		}
 		USizeBox* SwatchColumn = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-		SwatchColumn->SetWidthOverride(52.f);
+		SwatchColumn->SetWidthOverride(68.f);
 		SwatchColumn->SetContent(Swatches);
 		HitmenUI::AddToHBox(Row, SwatchColumn, FMargin(0.f));
 		UHitmenToggle* Toggle = WidgetTree->ConstructWidget<UHitmenToggle>(UHitmenToggle::StaticClass());
@@ -578,16 +631,16 @@ void UHitmenPauseMenuWidget::HandleLegendToggled(bool bChecked)
 	{
 		return;
 	}
-	for (int32 Category = 0; Category < LegendToggles.Num(); ++Category)
+	for (int32 RowIndex = 0; RowIndex < LegendToggles.Num(); ++RowIndex)
 	{
-		const int32 MarkerIndex = Category - UHitmenPauseMapWidget::CategoryCount;
+		const int32 MarkerIndex = RowIndex - LegendCategories.Num();
 		if (MarkerIndex < 0)
 		{
-			Map->SetCategoryVisible(Category, LegendToggles[Category]->IsChecked());
+			Map->SetCategoryVisible(LegendCategories[RowIndex], LegendToggles[RowIndex]->IsChecked());
 		}
 		else if (LegendMarkerTypes.IsValidIndex(MarkerIndex))
 		{
-			Map->SetMarkerTypeVisible(LegendMarkerTypes[MarkerIndex], LegendToggles[Category]->IsChecked());
+			Map->SetMarkerTypeVisible(LegendMarkerTypes[MarkerIndex], LegendToggles[RowIndex]->IsChecked());
 		}
 	}
 }

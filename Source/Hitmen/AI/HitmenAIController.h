@@ -62,6 +62,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|AI")
 	float GetPeripheralVisionHalfAngle() const { return PeripheralVisionHalfAngle; }
 
+	/** Sight radius before the difficulty (clients read it on the controller class default for the maps' cones). */
+	float GetBaseSightRadius() const { return SightRadius; }
+
 	/** Full sight test (range, cone, walls, smoke, darkness, hidden status) against any actor. */
 	bool CanSeeActorNow(const AActor* Actor) const;
 

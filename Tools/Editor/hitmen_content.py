@@ -231,18 +231,38 @@ def build_camera_ring():
     return ring
 
 
+# Interactable marker kinds (Interactables map layer, Project Settings -> Hitmen -> Maps): kind -> (legend name, colour,
+# shape, legend order, interactable classes whose Blueprints get the kind on their MapMarker component).
+INTERACTABLE_MARKERS = {
+    "HidingSpot": ("Hiding spots", (0.3, 0.85, 0.8), "SQUARE", 30, ("HitmenHidingSpot",)),
+    "Distraction": ("Distractions", (0.75, 0.55, 1.0), "RING", 31, ("HitmenDistraction",)),
+    "Container": ("Containers", (0.95, 0.6, 0.25), "SQUARE", 32, ("HitmenContainer",)),
+    "Keycard": ("Keycards", (0.3, 0.6, 1.0), "TRIANGLE", 33, ("HitmenKeycardPickup",)),
+    "Device": ("Security devices", (0.45, 0.85, 0.4), "TRIANGLE", 34, ("HitmenControlConsole", "HitmenHackPanel", "HitmenCircuitBreaker")),
+    "Hazard": ("Hazards", (1.0, 0.4, 0.3), "RING", 35, ("HitmenPoisonableDrink", "HitmenExplosiveBarrel")),
+}
+
+
 def build_map_markers():
     """Map marker kinds (minimap, pause map, legend) and the fixtures that carry them. A new kind: duplicate a
-    DA_MapMarker_*, set its name, colour and shape; give an actor a HitmenMapMarker component and pick the kind."""
+    DA_MapMarker_*, set its name, colour, shape and layer; give an actor a HitmenMapMarker component (every interactable
+    has one) and pick the kind. Layers: objectives always draw, NPC and Interactables follow Project Settings -> Maps."""
     folder = path("Data", "MapMarkers")
     kinds = {
         "RetrievalPoint": dict(display_name=unreal.Text("Retrieval points"), color=unreal.LinearColor(1.0, 0.78, 0.1, 1.0),
                                shape=unreal.HitmenMapMarkerShape.SQUARE, size=14.0, minimap_scale=0.8, show_on_minimap=True,
-                               clamp_to_minimap_edge=True, show_on_pause_map=True, show_in_legend=True, legend_order=10),
+                               clamp_to_minimap_edge=True, show_on_pause_map=True, show_in_legend=True, legend_order=10,
+                               layer=unreal.HitmenMapLayer.OBJECTIVE),
         "Camera": dict(display_name=unreal.Text("Cameras"), color=unreal.LinearColor(0.75, 0.75, 0.8, 1.0),
-                       shape=unreal.HitmenMapMarkerShape.DIAMOND, size=11.0, minimap_scale=0.8, show_on_minimap=True,
-                       clamp_to_minimap_edge=False, show_on_pause_map=False, show_in_legend=False, legend_order=20),
+                       shape=unreal.HitmenMapMarkerShape.TRIANGLE, size=11.0, minimap_scale=0.8, show_on_minimap=True,
+                       clamp_to_minimap_edge=False, show_on_pause_map=True, show_in_legend=True, legend_order=20,
+                       layer=unreal.HitmenMapLayer.NPC),
     }
+    for name, (label, rgb, shape, order, _classes) in INTERACTABLE_MARKERS.items():
+        kinds[name] = dict(display_name=unreal.Text(label), color=unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0),
+                           shape=getattr(unreal.HitmenMapMarkerShape, shape), size=9.0, minimap_scale=0.8,
+                           show_on_minimap=True, clamp_to_minimap_edge=False, show_on_pause_map=True, show_in_legend=True,
+                           legend_order=order, layer=unreal.HitmenMapLayer.INTERACTABLES)
     assets = {}
     for name, props in kinds.items():
         data = make_data("DA_MapMarker_" + name, folder, unreal.HitmenMapMarkerType)
@@ -256,7 +276,35 @@ def build_map_markers():
         if marker:
             marker.set_editor_property("type", assets[kind])
             save(bp)
+    set_interactable_markers(assets)
     return assets
+
+
+def set_interactable_markers(assets):
+    """Every interactable Blueprint under World/ of a class in INTERACTABLE_MARKERS gets that marker kind."""
+    classes = [(getattr(unreal, cls, None), kind) for kind, entry in INTERACTABLE_MARKERS.items() for cls in entry[4]]
+    done = []
+    for asset_path in unreal.EditorAssetLibrary.list_assets(path("World"), recursive=True, include_folder=False):
+        data = unreal.EditorAssetLibrary.find_asset_data(asset_path)
+        if str(data.asset_class_path.asset_name) != "Blueprint":
+            continue
+        bp = unreal.EditorAssetLibrary.load_asset(asset_path)
+        generated = gen_class(bp)
+        default = unreal.get_default_object(generated) if generated else None
+        if not isinstance(default, unreal.HitmenInteractableBase):
+            continue
+        kind = next((k for cls, k in classes if cls and isinstance(default, cls)), None)
+        marker = component(default, "map_marker")
+        if not marker:
+            continue
+        wanted = assets.get(kind) if kind else None
+        if marker.get_editor_property("type") != wanted:
+            marker.set_editor_property("type", wanted)
+            unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+            save(bp)
+        if kind:
+            done.append(bp.get_name() + ":" + kind)
+    log("map markers on interactables:", ", ".join(sorted(done)))
 
 
 SIGHTROOM_HLSL = """// Stencil: 4 sub-pixel taps give an anti-aliased coverage (the stencil is at render resolution and point

@@ -27,6 +27,7 @@
 #include "Data/HitmenCatalog.h"
 #include "Data/HitmenCosmeticItem.h"
 #include "Core/HitmenGameSettings.h"
+#include "AI/HitmenAIController.h"
 #include "Data/HitmenAnimSet.h"
 #include "Abilities/HitmenAbility.h"
 #include "Interaction/HitmenInteractionComponent.h"
@@ -618,6 +619,18 @@ void AHitmenPlayerController::RefreshHUDViews()
 			Blip.Suspicion = Alert->GetSuspicion();
 			Blip.bTargetsViewer = Alert->GetTarget() == ViewPawn;
 			Blip.bCallingReinforcements = Alert->IsCallingReinforcements();
+			// Vision cone: the live controller on the server; clients have none and read the controller class default.
+			Blip.Yaw = NPC->GetActorRotation().Yaw;
+			if (const AHitmenAIController* NPCAI = Cast<AHitmenAIController>(NPC->GetController()))
+			{
+				Blip.SightRadius = NPCAI->GetEffectiveSightRadius();
+				Blip.SightHalfAngle = NPCAI->GetPeripheralVisionHalfAngle();
+			}
+			else if (const AHitmenAIController* Default = NPC->AIControllerClass ? Cast<AHitmenAIController>(NPC->AIControllerClass->GetDefaultObject()) : nullptr)
+			{
+				Blip.SightRadius = Default->GetBaseSightRadius();
+				Blip.SightHalfAngle = Default->GetPeripheralVisionHalfAngle();
+			}
 		}
 	}
 	// Security cameras that are watching an intruder and have you in clear view (awareness arcs, camera mark).

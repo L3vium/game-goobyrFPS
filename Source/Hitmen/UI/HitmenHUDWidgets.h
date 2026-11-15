@@ -97,9 +97,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Minimap")
 	float WorldRadius = 3500.f;
 
-	/** Only NPCs with an alert state are drawn (Hitman-like: no radar for calm NPCs). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Minimap")
-	bool bOnlyShowAlertedNPCs = true;
 
 protected:
 	virtual void BindEvents() override;

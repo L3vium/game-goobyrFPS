@@ -527,8 +527,9 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   top-right corner (as bound). Each card shows the item's icon and full name (the font shrinks to fit), weapons their
   ammo as `current / max`, abilities a cooldown shade that shrinks as they come back, charge pips and a fuel gauge for
   the jetpack. No "ready", no health bar. The bar is centred on the screen.
-- **Minimap** (bottom left, square): the baked map, north up (your arrow turns, no view cone), alerted NPCs, sonar pings,
-  map markers (cameras, retrieval points pinned to the frame when out of range);
+- **Minimap** (bottom left, square): the baked map, north up (your arrow turns, no view cone), every NPC as a diamond
+  (dark grey calm, white suspicious, yellow alerted, red in combat), sonar pings, map markers (cameras, retrieval points
+  pinned to the frame when out of range);
   its frame takes the colour of the worst alert aimed at you and a banner opens across its top with a white flash
   (Suspicious, Alerted, Searching, Spotted; **Under fire** is taller, red and pulses).
 - **Crosshair**: a thin "+"; hit ticks (red, longer and thicker on a headshot, with a metallic hit sound only the shooter
@@ -544,21 +545,31 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
 - **Scope** overlay for the sniper. **Sightroom** (Tab): a fast scan wave and a floor grid around you, then the whole map in a cool look;
   highlights with a thin outline.
 - **Alert indicators** above NPCs (a hatched diamond: white and filling from the bottom while suspicion builds, solid
-  yellow or red once alerted, a red "!" beside it while calling for backup) and around the crosshair.
+  yellow or red once alerted; it pulses while the NPC calls for backup) and around the crosshair.
 - **Pause menu**: **PAUSE** and three big square blocks on the left (Resume, Options, Leave match; the host gets
   **Back to the lobby** once the match is over); the baked
   schematic in the middle (north up, dimmed under the markers; the wheel zooms toward the cursor, a left drag pans, nothing
-  is drawn outside the map square); the legend on the right
-  toggles each marker type and shows its exact colours (you, teammates, VIP, guards on alert in white / yellow / red
-  like the minimap, then one row per map marker kind on the map: retrieval points...; security cameras only show on the minimap). Debug tools (dev builds)
-  open over the legend from a small "Debug tools" button.
+  is drawn outside the map square); by default it shows **you, the VIP and the retrieval points** (and your teammates
+  when you have some). The legend on the right lists **only what the map draws** and toggles each row with its exact
+  colours (you, teammates, VIP, guards in grey / white / yellow / red like the minimap, then one row per map marker kind:
+  retrieval points, cameras, hiding spots...). Debug tools (dev builds) open over the legend from a small "Debug tools"
+  button; the cheat panel hides while the pause menu is open.
+- **Map layers** (Project Settings -> Hitmen -> Maps, editor variables): `bMinimapShowNPCs` (on: NPCs and cameras),
+  `bMinimapShowVisionCones` (off), `bMinimapShowInteractables` (off), `bPauseMapShowNPCs` (off),
+  `bPauseMapShowVisionCones` (off), `bPauseMapShowInteractables` (off), `bPauseMapShowTeammates` (on),
+  `MapVisionConeOpacity`, `MinimapNPCSize`, `PauseMapNPCSize`. A **vision cone** is a fan in front of the NPC over its
+  sight radius and peripheral angle, fading out toward the edge (a dark shade while calm or suspicious, yellow / red once
+  alerted). The **Interactables** layer: hiding spots (lockers, body containers), distractions, containers, keycards,
+  security devices (consoles, hack panels, breakers) and hazards (poisonable drinks, explosive barrels).
 - **Cheats** (gym always, other maps in dev builds; panel on the right, centred vertically, a lit square when on):
   `F1` invulnerable, `F2` infinite ammo, `F3` no cooldown, `F4` invisible to AI and cameras, `F5` respawn every NPC as
   placed (class, place, behaviour, route, group, keycard: recorded at start), `F6` kill all NPCs, `F7` reload the map,
   `F8` fly through walls (look to steer, `Space` / `Ctrl` up / down). Server-checked (`AllowsDebugCommands`); the
   engine's F1-F5 view modes are cleared in `DefaultInput.ini`.
 - **Map markers**: anything with a `HitmenMapMarker` component shows on the minimap and the pause map, drawn and named
-  by its kind (a `DA_MapMarker_*` data asset: legend name, colour, shape or icon, size, which maps, legend order).
+  by its kind (a `DA_MapMarker_*` data asset: legend name, colour, shape or icon, size, which maps, legend order, and
+  its **layer**: Objective always drawn, NPC or Interactables per the map layers above). Every interactable has a
+  `MapMarker` component: pick a kind on its Blueprint and it joins the Interactables layer.
   Recipe in `docs/Pipelines.md`.
 - **Intro**: "Dropping in" and the map name during the parachute drop (no countdown, no sting).
 - **Match events** (`UHitmenMatchEventsWidget`, with or without a pawn): toasts under the compass, the event camera top

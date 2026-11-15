@@ -48,6 +48,9 @@ public:
 	/** Open routes are walked back and forth. */
 	bool IsClosedLoop() const { return bClosedLoop; }
 
+	/** Server: the NPCs that walk this route (assigned here, or that name it as their PatrolRoute). */
+	TArray<class AHitmenNPC*> GatherWalkers() const;
+
 protected:
 	UPROPERTY(VisibleAnywhere, Category="Hitmen|Components")
 	TObjectPtr<UBillboardComponent> Billboard;
@@ -62,6 +65,33 @@ protected:
 	/** The route goes back to the first point after the last one. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Patrol")
 	bool bClosedLoop = true;
+
+	/**
+	 * NPCs that walk this route (they need no PatrolRoute of their own). With bAssignedNPCsPatrolAsGroup, every NPC on
+	 * this route walks as one group: the first leads along the route, the others follow in formation.
+	 */
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Hitmen|Patrol|Group")
+	TArray<TObjectPtr<class AHitmenNPC>> AssignedNPCs;
+
+	/** NPCs sharing this route patrol together (a group of 3, 4...) instead of each on its own. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Patrol|Group")
+	bool bAssignedNPCsPatrolAsGroup = true;
+
+	/** Formation: distance between rows behind the leader, side spacing, followers per row. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Patrol|Group", meta=(ClampMin="50", Units="cm"))
+	float GroupFollowDistance = 170.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Patrol|Group", meta=(ClampMin="0", Units="cm"))
+	float GroupFollowSpacing = 140.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Patrol|Group", meta=(ClampMin="1", ClampMax="4"))
+	int32 GroupColumns = 2;
+
+	/** The group made at BeginPlay (null when the route is walked alone). */
+	UPROPERTY(Transient)
+	TObjectPtr<class AHitmenGuardGroup> RouteGroup;
+
+	void SetUpWalkers();
 
 	/** Distance between two steps along the curve. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Patrol", meta=(ClampMin="50", Units="cm", EditCondition="bCurved"))

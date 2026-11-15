@@ -36,7 +36,8 @@ public:
 	virtual void OnVIPCarrierChanged(APawn* NewCarrier);
 
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Match")
-	void EndMatch(const FHitmenMatchResult& Result);
+	/** SpectateDelay: seconds before everyone becomes a watcher (negative: EndSpectateDelay). */
+	void EndMatch(const FHitmenMatchResult& Result, float SpectateDelay = -1.f);
 
 	/** The host (match over) sends everyone back to the lobby. */
 	void RequestReturnToLobby(APlayerController* Requester);
@@ -129,7 +130,7 @@ protected:
 
 	FTimerHandle SonarTimer;
 	FTimerHandle EndTimer;
-	float CarryStartTime = 0.f;
+	float SonarStartTime = 0.f;
 	bool bMatchSetup = false;
 	bool bMatchOver = false;
 };

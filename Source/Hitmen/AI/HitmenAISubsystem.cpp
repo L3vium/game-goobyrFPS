@@ -76,7 +76,7 @@ void UHitmenAISubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	for (TActorIterator<AActor> It(&InWorld); It; ++It)
 	{
 		AActor* Actor = *It;
-		if (Actor && (Actor->IsA<AHitmenTallGrass>() || Actor->IsA<AHitmenLocker>() || Actor->ActorHasTag(HidingSpotTag)))
+		if (Actor && (Actor->IsA<AHitmenTallGrass>() || Actor->IsA<AHitmenHidingSpot>() || Actor->ActorHasTag(HidingSpotTag)))
 		{
 			HidingSpots.AddUnique(Actor);
 		}
@@ -693,6 +693,51 @@ FVector UHitmenAISubsystem::GetFlankLocation(const AActor* NPC, const AActor* Ta
 // Search coordination
 // ---------------------------------------------------------------------------------------------
 
+AHitmenHidingSpot* UHitmenAISubsystem::FindContainerForBody(const AHitmenCharacterBase* Body, float MaxDistance) const
+{
+	if (!Body)
+	{
+		return nullptr;
+	}
+	UWorld* World = GetWorld();
+	const UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	AHitmenHidingSpot* Best = nullptr;
+	float BestDistance = MaxDistance;
+	for (TActorIterator<AHitmenHidingSpot> It(World); It; ++It)
+	{
+		AHitmenHidingSpot* Spot = *It;
+		if (!Spot->CanStowBody(Body) || Spot->IsOccupied())
+		{
+			continue;
+		}
+		const float Straight = FVector::Dist(Spot->GetActorLocation(), Body->GetActorLocation());
+		if (Straight > BestDistance)
+		{
+			continue;
+		}
+		// The walking distance, when the navmesh has one (a container behind a wall is farther than it looks): from the
+		// body to the front of the container (its own origin is inside it, off the navmesh).
+		float Distance = Straight;
+		FNavLocation From, To;
+		const FVector Front = Spot->GetActorLocation() + Spot->GetActorForwardVector() * 150.f;
+		if (Nav && Nav->ProjectPointToNavigation(Body->GetActorLocation(), From, FVector(250.f)) && Nav->ProjectPointToNavigation(Front, To, FVector(250.f)))
+		{
+			double PathLength = 0.0;
+			if (Nav->GetPathLength(World, From.Location, To.Location, PathLength) != ENavigationQueryResult::Success)
+			{
+				continue;
+			}
+			Distance = static_cast<float>(PathLength);
+		}
+		if (Distance < BestDistance)
+		{
+			BestDistance = Distance;
+			Best = Spot;
+		}
+	}
+	return Best;
+}
+
 void UHitmenAISubsystem::GetHidingSpotsNear(const FVector& Center, float Radius, TArray<AActor*>& OutSpots) const
 {
 	const float RadiusSquared = FMath::Square(Radius);
@@ -713,7 +758,7 @@ void UHitmenAISubsystem::GetHidingSpotsNear(const FVector& Center, float Radius,
 		for (const TWeakObjectPtr<AActor>& Weak : Registry->GetScannables())
 		{
 			AActor* Actor = Weak.Get();
-			if (Actor && (Actor->IsA<AHitmenLocker>() || Actor->IsA<AHitmenTallGrass>() || Actor->ActorHasTag(HidingSpotTag)))
+			if (Actor && (Actor->IsA<AHitmenHidingSpot>() || Actor->IsA<AHitmenTallGrass>() || Actor->ActorHasTag(HidingSpotTag)))
 			{
 				Consider(Actor);
 			}

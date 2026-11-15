@@ -13,6 +13,28 @@ class UTextureRenderTarget2D;
 class UTexture2D;
 
 /** One inventory slot as the HUD shows it. */
+/** A big message at the top of the screen for a few seconds ("TARGET ELIMINATED"). */
+USTRUCT(BlueprintType)
+struct FHitmenToast
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, Category="Hitmen|UI")
+	FText Title;
+
+	UPROPERTY(BlueprintReadWrite, Category="Hitmen|UI")
+	FText Subtitle;
+
+	UPROPERTY(BlueprintReadWrite, Category="Hitmen|UI")
+	FLinearColor Color = FLinearColor(1.f, 0.82f, 0.15f, 1.f);
+
+	UPROPERTY(BlueprintReadWrite, Category="Hitmen|UI")
+	float Duration = 4.f;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenToast, const FHitmenToast&, Toast);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenCinematicChanged, bool, bCinematic);
+
 USTRUCT(BlueprintType)
 struct FHitmenHUDSlotView
 {
@@ -99,6 +121,10 @@ struct FHitmenHUDAlertBlip
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bCallingReinforcements = false;
 	/** A security camera rather than an NPC (awareness arcs show a camera mark). */
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") bool bIsCamera = false;
+	/** Facing (world yaw) and sight cone (radius, half angle) for the maps' vision cones; radius 0 = no cone. */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float Yaw = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float SightRadius = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|HUD") float SightHalfAngle = 0.f;
 };
 
 /** A hint anchored on a world actor (remote-ability target: glow + action under it). */
@@ -147,6 +173,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenPhase, EHitmenMatchPhase, P
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenResult, const FHitmenMatchResult&, Result);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenDamageTaken, float, DirectionYawDegrees);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenSpectatorMode, uint8, Mode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenWatcherSpeed, float, SpeedScale);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHitmenSimpleEvent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenInventoryView, const FHitmenHUDInventoryView&, View);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHitmenAbilityViews, const FHitmenHUDAbilityView&, Move, const FHitmenHUDAbilityView&, Manipulation);
@@ -242,6 +269,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
 	FOnHitmenSpectatorMode OnSpectatorModeChanged;
 
+	/** Watcher fly speed changed (mouse wheel): the spectator widget shows it briefly. */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenWatcherSpeed OnWatcherSpeedChanged;
+
 	// ---- HUD view models (pushed by the player controller; widgets never touch gameplay) ----
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
 	FOnHitmenInventoryView OnInventoryViewChanged;
@@ -331,6 +362,38 @@ public:
 	// ---- Broadcast helpers (keep call sites one-liners) ----
 	void BroadcastPawnChanged(APawn* NewPawn) { OnPawnChanged.Broadcast(NewPawn); }
 	void BroadcastPrompt(const FText& Prompt, bool bVisible) { OnInteractionPromptChanged.Broadcast(Prompt, bVisible); }
+
+	// ---- Match events: toast, event camera (picture in picture), cinematic ----
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenToast OnToast;
+
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenCinematicChanged OnCinematicChanged;
+
+	void PushToast(const FHitmenToast& Toast) { OnToast.Broadcast(Toast); }
+
+	/** The event camera's picture and title until EndTime (world seconds); a null target hides it. */
+	void SetEventCamera(UTextureRenderTarget2D* Target, const FText& Title, float EndTime) { EventCameraTarget = Target; EventCameraTitle = Title; EventCameraEnd = EndTime; }
+	UTextureRenderTarget2D* GetEventCameraTarget() const { return EventCameraTarget; }
+	const FText& GetEventCameraTitle() const { return EventCameraTitle; }
+	float GetEventCameraEnd() const { return EventCameraEnd; }
+
+	/** The end cinematic plays: the HUD hides, letterbox bars. */
+	/** Watcher overlays (N players, B watchers), as the controller toggled them; Project Settings decide if allowed. */
+	void SetWatcherOverlay(bool bPlayers, bool bWatchers) { bWatcherShowPlayers = bPlayers; bWatcherShowWatchers = bWatchers; }
+	bool AreWatcherPlayersShown() const { return bWatcherShowPlayers; }
+	bool AreWatcherWatchersShown() const { return bWatcherShowWatchers; }
+
+	/** The player followed in player view (empty otherwise): the spectator line names them. */
+	void SetSpectatorTargetName(const FText& Name) { SpectatorTargetName = Name; }
+	const FText& GetSpectatorTargetName() const { return SpectatorTargetName; }
+
+	void SetCinematic(bool bInCinematic) { if (bCinematic != bInCinematic) { bCinematic = bInCinematic; OnCinematicChanged.Broadcast(bCinematic); } }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") bool IsCinematic() const { return bCinematic; }
+
+	/** What the focused thing is and its state (a line under the prompt; empty = none). */
+	void SetInteractionInfo(const FText& Info) { InteractionInfo = Info; }
+	const FText& GetInteractionInfo() const { return InteractionInfo; }
 	void BroadcastHitMarker(bool bKill, bool bHeadshot) { OnHitMarker.Broadcast(bKill, bHeadshot); }
 	void BroadcastDamageTaken(float Yaw) { OnDamageTaken.Broadcast(Yaw); }
 	void BroadcastSonar(const FHitmenSonarPing& Ping) { OnSonarPing.Broadcast(Ping); }
@@ -381,4 +444,16 @@ private:
 	bool bScoped = false;
 	float InteractProgress = -1.f;
 	FHitmenHUDVehicleView VehicleView;
+
+	FText InteractionInfo;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextureRenderTarget2D> EventCameraTarget;
+
+	FText EventCameraTitle;
+	float EventCameraEnd = -1.f;
+	bool bCinematic = false;
+	bool bWatcherShowPlayers = true;
+	bool bWatcherShowWatchers = true;
+	FText SpectatorTargetName;
 };

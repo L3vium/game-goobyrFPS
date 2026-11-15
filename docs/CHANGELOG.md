@@ -3,6 +3,122 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
+## [0.9.0] - 2026-11-15
+
+### Added
+- Juice switches in Project Settings → Hitmen → Juice, every effect keeping its asset slot: `bLadderClimbFX`,
+  `bLadderDescendFX` (new `LadderDescendFX` slot on characters: a puff going down a ladder or gutter), `bSlideFX`,
+  `bSlideSound`, `bFootstepFX`.
+- One surface table for footsteps and landings in `DA_SoundSet` (`Surfaces`, `DefaultSurface`; volume, pitch, puff,
+  noise multiplier per surface) instead of a copy per character; a Tile surface (`SurfaceType6`, `PM_Tile`, the stone
+  takes higher and softer). Recipe for a new surface in `docs/Pipelines.md`.
+- Weapon data: `bHeadshotKills` per weapon (on), `FalloffStartRange` / `FalloffEndRange` (falloff used to start at half
+  the range), `PelletSpread` / `AimPelletSpread` / `bFixedPelletPattern` (moved from the shotgun class),
+  `CrouchSpreadMultiplier`, `MovingSpreadMultiplier` / `MovingSpreadSpeed`, `NPCEngageRange`. Arrows apply the bow's
+  `HeadshotMultiplier`.
+- The player's sniper shot leaves a white smoke trail that lingers 2.2 s (`TracerStyle` smoke values,
+  `M_Hitmen_SmokeTrail`).
+- Snipers show a red star glint at the scope at any distance (`ScopeGlint`, `M_Hitmen_Glint`).
+- Hiding spots (`AHitmenHidingSpot`, the base of lockers and body containers): hide inside with a view arc
+  (`ViewArcDegrees` 180, pitch limits), stow carried bodies in slots (`BodyCapacity`: locker 1, container 2), bodies stay
+  visible inside and are never found, `bBlockHidingWhenBodyInside` (on; `F` then opens it to look inside).
+- Body container: hide inside crouched, looking out through a slit in the front wall; rebuilt as a hollow bin.
+- Info line under the prompt (`IHitmenInteractable::GetInteractionInfo`, `DisplayName` on fixtures): name and state of what
+  you look at, also when it cannot be used (highlighted, no key).
+- Carry variables on the carry component: `bCanSprintWhileCarrying` (off), `WalkSpeedPenaltyPercent` and
+  `SprintSpeedPenaltyPercent` (0); they replace the match rules' `CarrySpeedMultiplier` (0.65).
+- Mounted gun: an impact puff and tracers show where the bullets go (`ImpactFX`, `TracerChance`).
+- `AHitmenVehiclePawn::ExitVehicle` (server; scripts and QA).
+- VIP death for everyone: a toast ("TARGET ELIMINATED", `UHitmenMatchEventsWidget`), a sound
+  (`EHitmenSound::TargetEliminated`) and an event camera top left filming the body (`AHitmenEventCamera`); the same camera
+  shows you the guard who comes to look at your distraction. Variables in Project Settings → Hitmen → HUD.
+- `PP_Markers` (always on): the dead VIP in yellow through walls, live while in your view, else a ghost at the newest
+  known place (your last sighting or the last sonar ping; `UHitmenVIPTrackerComponent`, `AHitmenBodyGhost`); active
+  retrieval points in gold once the VIP is dead (`bShowRetrievalPointsAfterVIPDeath`).
+- Retrieval points: `F` extracts the carried VIP (`Extract the target`), a model from `ModelParts` with a
+  `DepartureStyle`, a `CinematicCamera`; `BP_RetrievalPoint_Helicopter`, `_Car`, `_Crate` from basic shapes.
+- End cinematic: everyone watches the extraction leave (letterbox, HUD hidden), then becomes a watcher.
+- AI turns toward what it hears before walking over (`UBTTask_HitmenTurnToNoise`); a shot fired near a guard turns it
+  toward the shooter.
+- Body found: the finder searches around the body (`BodySearchDuration`), calms down, then carries it to the nearest
+  body container / locker with room and stows it (`bNPCsDisposeBodies`, `MaxBodyDisposalDistance`, `BT_DisposeBody`);
+  snipers and guards holding a post hand the job over; the VIP's body is never carried by a guard.
+- The search runs on EQS: `EQ_HitmenSearch` with `UEnvQueryGenerator_HitmenSearchSpots`, `UEnvQueryTest_HitmenSearchFree`,
+  `UEnvQueryTest_HitmenNearHidingSpot`, `UEnvQueryContext_HitmenSearchCenter` and engine trace / distance / path tests.
+- Patrol groups: NPCs assigned to one patrol route (`AssignedNPCs`, or sharing `PatrolRoute`) walk it as one group
+  (`bAssignedNPCsPatrolAsGroup`, `GroupFollowDistance`, `GroupFollowSpacing`, `GroupColumns`); the leader waits for
+  followers (`LeaderWaitPace`, `LagDistance`); guard groups get `Columns`.
+- Gym AI pen: one of each kind, labelled (static sentry, stationary rifleman with a radio, lone patroller, a group of 4
+  on one route, keycard guard, sniper, VIP candidate); `hitmen_levels.gym_ai_pen`.
+- Guards per weapon (`BP_NPC_Guard_SMG`, `_Rifle`, `_Shotgun`), `NPCEngageRange`, NPC `DisplayName` and an info line
+  (name, weapon, keycard), `bPickpocketRequiresCrouch`; NPCs carry a body carry component.
+- Security turret: `VisionArcDegrees` (180) and `RoundsPerMinute` (200, replaces `FireInterval`). Mounted gun:
+  `YawArcDegrees` (180, 360 turns all the way; replaces `MaxYaw`) and `RoundsPerMinute` (660, replaces `FireInterval`).
+- Map layers (Project Settings -> Hitmen -> Maps): NPCs, vision cones (fading fans) and interactables, separately for
+  the minimap and the pause map (`bMinimapShowNPCs` on, everything else off; `bPauseMapShowTeammates` on). Marker kinds
+  get a `Layer`; every interactable has a `MapMarker` component; new kinds `DA_MapMarker_HidingSpot`, `_Distraction`,
+  `_Container`, `_Keycard`, `_Device`, `_Hazard` set on their Blueprints (`hitmen_patch_090` step `map_layers`).
+
+### Changed
+- `F` throws the held weapon only while aiming (`bThrowRequiresAim`), with a `[F] Throw` prompt.
+- Minigun damage 16 (9) and tighter spread (2.2 / 1.4); per-weapon falloff ranges (shotgun 7 → 25 m down to x0.25).
+- Mounted gun: the shield plate sits lower so the barrel shows; vehicle cameras use your field of view.
+- Empty vehicles take no damage by default (`bEmptyVehicleTakesDamage`): the tank no longer starts damaged.
+- The sniper's red aim line keeps about two pixels wide at any distance.
+- Carrying a body: no sprint, no slowdown by default (was 0.65x and sprint allowed).
+- The sonar runs from the VIP's death (it ran only while the body was carried) and pings the body itself; minimap rings
+  are yellow.
+- Walking into a retrieval point no longer delivers the VIP (`F` does).
+- Unsilenced gunshots carry 20-35 m (6-9 m) and their impacts 8-15 m; three guards answer a gunshot (two before).
+- The keycard sits in the guard's right pocket.
+- Results: "Back to the lobby" / "Waiting for the host" sit bottom right.
+- The minimap shows every NPC (calm ones in dark grey), as diamonds; the pause map shows you, the VIP and the retrieval
+  points by default and its legend lists only what is drawn (cameras join it with the NPC layer, as triangles).
+- The overhead diamond pulses while an NPC calls for backup (the red "!" is gone).
+- The cheat panel hides while the pause menu is open.
+- Free fly: `A` down / `E` up (was the reverse), `Shift` x2 (x3); the mouse wheel no longer changes the grid size (the
+  split screen shows every player).
+- Stiff ledges (`bStiffLedges`, `StiffLedgeMaxDrop` 120 cm, `bCanJumpOffStiffLedges`): walking stops at deep drops,
+  jumping still leaves them; players only, predicted.
+- Walkable window ledges (70 cm) on every upper floor (`building()`, the mansion): vault out of a window onto them, walk
+  to the next window, crouch under the sills; the vault planner tries a landing just past the sill first.
+- Doors take `Width` / `Height` / `Thickness` (the mansion gets a double front door); `BP_Door_Keycard2` / `3`;
+  `BP_LightSwitch` (`AHitmenLightSwitch`) and lamps with an info line; `BP_WeaponChest`; `MI_Tile` / `MI_Grid_Tile`
+  (PM_Tile); builder helpers `vent_duct`, `vent_hatch`, `light_switch`, `building(gutter_side, vents, switch,
+  floor_material, ground_blind)`, `tunnel(ceiling_holes)`.
+- San Lazaro: gutters, ledges, vents (alley houses, the mansion's high vent, cave shafts), the smugglers' tunnel with
+  four shafts and a keycard 3 door, keycards 1-3 with carriers and pickups, weapon chests, lockers and containers in
+  every zone, a light switch per building, about 70 tall grass fields, mixed guard loadouts, patrol groups of 3-4 on
+  routes, retrieval models, wood / tile / metal / sand floors.
+- `hitmen_check_doors.py`, `hitmen_check_features.py`.
+- Watcher mode: `1` player view (`V` first / third person), `2` split screen (up to 8 players, responsive, captures
+  staggered at 20 Hz), `3` free fly through walls and under the ground inside the map's box, `E` up / `A` down, `Shift`
+  x2, mouse wheel speed. Players outlined through walls with their name for watchers (`N`), other watchers as orbs with
+  their name (`B`), the info line of what a watcher looks at, `Tab` scan for watchers. Project Settings -> Hitmen ->
+  Watchers holds every rule (tri-state `WatcherSeePlayers` / `WatcherSeeWatchers`, players' name tags, seeing watchers,
+  the watched line: off). Watcher views replicate on the PlayerState (`FHitmenWatcherView`, `Server_ReportWatcherView`).
+- QA: console `HitmenWatch` (gym / dev builds); editor `HitmenEditorTools.get_pie_worlds` and `run_pie_console_command`
+  (RPCs from editor Python otherwise run locally) for multiplayer PIE scripts.
+- Sightroom: highlights fade in and out instead of popping: `PP_Sightroom` lights each pixel from the object's distance
+  to you (from its custom depth), with soft edges at the enemy / object radii (`HighlightSoftEdge`) and behind the wave
+  front; interactables no longer need a line-of-sight trace (the per-pixel depth test decides, so a corner in view lights
+  only that corner); highlights fade out with the look on release (`CandidateMargin`; patch step `sightroom`).
+- Ladder and gutter puffs, slide dust and footstep puffs are off by default (switches above); the slide scrape stays.
+- Muzzle lights are half as strong (2.5-15 cd).
+
+### Fixed
+- San Lazaro: the gatehouse door sat 110 cm beside its opening; the control room's keycard door was embedded in the
+  wall next to its opening (a plain door filled it); ground-floor windows opened onto cross-alley stairs; the estate
+  perimeter patrol started inside the garage.
+- Alerts after a body never ended: the finder's repeated radio call restarted every investigation timer (the same place
+  now keeps its timer, `SameInvestigationRadius`).
+- A carried body no longer goes into walls in your view (drawn like your gun) and a dropped body is never left inside a
+  wall or the floor; putting a body down no longer pushes it with the killing hit again.
+- Mounted gun and tank shots land where the crosshair points (they ran parallel to the view, under it).
+- Guns no longer glow while held: showing the first-person arms (a propagating `SetVisibility`) switched the muzzle light
+  on for as long as the gun was in hand. The light is now off at zero intensity and only lives with a muzzle flash; a
+  per-shot timer always turns it off (its time guard could fail on input-fired shots).
+
 ## [0.8.0] - 2026-11-14
 
 ### Added

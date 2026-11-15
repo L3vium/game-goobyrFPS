@@ -29,6 +29,11 @@
 #include "Movement/HitmenCharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
+#include "Components/HitmenBodyCarryComponent.h"
+#include "Components/MaterialBillboardComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Kismet/GameplayStatics.h"
+#include "Camera/PlayerCameraManager.h"
 
 AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -47,8 +52,9 @@ AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	KeycardMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("KeycardMesh"));
 	KeycardMesh->SetupAttachment(GetMesh(), KeycardBone);
-	KeycardMesh->SetRelativeLocationAndRotation(FVector(0.f, -14.f, 18.f), FRotator(0.f, 0.f, 90.f));
-	KeycardMesh->SetRelativeScale3D(FVector(0.09f, 0.055f, 0.01f));
+	KeycardMesh->SetRelativeScale3D(FVector(0.055f, 0.01f, 0.09f));
+	BodyCarryComponent = CreateDefaultSubobject<UHitmenBodyCarryComponent>(TEXT("BodyCarryComponent"));
+	DisplayName = NSLOCTEXT("Hitmen", "NPCGuard", "Guard");
 	KeycardMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	KeycardMesh->SetVisibility(false);
 	AimLaser = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AimLaser"));
@@ -59,6 +65,11 @@ AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	AimLaser->SetUsingAbsoluteLocation(true);
 	AimLaser->SetUsingAbsoluteRotation(true);
 	AimLaser->SetUsingAbsoluteScale(true);
+	ScopeGlint = CreateDefaultSubobject<UMaterialBillboardComponent>(TEXT("ScopeGlint"));
+	ScopeGlint->SetupAttachment(GetRootComponent());
+	ScopeGlint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ScopeGlint->SetUsingAbsoluteLocation(true);
+	ScopeGlint->SetVisibility(false);
 	if (Cube.Succeeded())
 	{
 		KeycardMesh->SetStaticMesh(Cube.Object);
@@ -155,6 +166,19 @@ void AHitmenNPC::Tick(float DeltaSeconds)
 	const AActor* Target = AlertComponent ? AlertComponent->GetTarget() : nullptr;
 	const bool bAiming = Target && !IsDead() && AlertComponent->GetAlertState() == EHitmenAlertState::Combat && Weapon;
 	AimLaser->SetVisibility(bAiming);
+	// The glint: where a sniper is, always (brighter and faster while it aims), never once it is dead or asleep.
+	const APlayerCameraManager* ViewCamera = UGameplayStatics::GetPlayerCameraManager(this, 0);
+	const bool bGlint = GlintInstance && Weapon && !IsDead() && !GetStatusEffects()->HasStatus(EHitmenStatusEffect::Asleep);
+	ScopeGlint->SetVisibility(bGlint);
+	if (bGlint)
+	{
+		// At the eye, where the scope is when it aims (the gun hangs low while it idles).
+		const FVector Scope = GetMesh()->DoesSocketExist(TEXT("head"))
+			? GetMesh()->GetSocketLocation(TEXT("head")) + GetActorForwardVector() * 18.f : GetPawnViewLocation();
+		const FVector ToViewer = ViewCamera ? (ViewCamera->GetCameraLocation() - Scope).GetSafeNormal() : FVector::ZeroVector;
+		ScopeGlint->SetWorldLocation(Scope + ToViewer * 25.f);
+		GlintInstance->SetScalarParameterValue(TEXT("Aiming"), bAiming ? 1.f : 0.f);
+	}
 	if (bAiming)
 	{
 		const FVector Start = Weapon->GetMuzzleLocation();
@@ -167,8 +191,15 @@ void AHitmenNPC::Tick(float DeltaSeconds)
 			End = Hit.ImpactPoint;
 		}
 		const float Length = FVector::Dist(Start, End);
+		// About two pixels wide at any distance: the width grows with the distance from your eye to the line.
+		float Width = 1.f;
+		if (ViewCamera)
+		{
+			const FVector Eye = ViewCamera->GetCameraLocation();
+			Width = FMath::Max(1.f, FMath::PointDistToSegment(Eye, Start, End) * AimLaserScreenWidth);
+		}
 		AimLaser->SetWorldLocationAndRotation((Start + End) * 0.5f, FRotationMatrix::MakeFromZ(End - Start).Rotator());
-		AimLaser->SetWorldScale3D(FVector(0.01f, 0.01f, Length / 100.f));
+		AimLaser->SetWorldScale3D(FVector(Width / 100.f, Width / 100.f, Length / 100.f));
 	}
 }
 
@@ -188,6 +219,10 @@ bool AHitmenNPC::CanBePickpocketedBy(const AActor* Thief) const
 	{
 		return false;
 	}
+	if (const ACharacter* ThiefCharacter = Cast<ACharacter>(Thief); bPickpocketRequiresCrouch && (!ThiefCharacter || !ThiefCharacter->bIsCrouched))
+	{
+		return false;
+	}
 	const FVector ToThief = (Thief->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 	return FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), ToThief) <= PickpocketMaxDot;
 }
@@ -195,6 +230,33 @@ bool AHitmenNPC::CanBePickpocketedBy(const AActor* Thief) const
 bool AHitmenNPC::CanInteract_Implementation(AActor* Interactor) const
 {
 	return CanBePickpocketedBy(Interactor) || Super::CanInteract_Implementation(Interactor);
+}
+
+FText AHitmenNPC::GetInteractionInfo_Implementation(AActor* Interactor) const
+{
+	if (IsDead())
+	{
+		return FText::GetEmpty();
+	}
+	FText Info = DisplayName;
+	if (Weapon && Weapon->GetWeaponData())
+	{
+		Info = FText::Format(NSLOCTEXT("Hitmen", "NPCInfoWeapon", "{0}  -  {1}"), Info, Weapon->GetWeaponData()->DisplayName);
+	}
+	if (CarriedKeycard >= 0)
+	{
+		Info = FText::Format(NSLOCTEXT("Hitmen", "NPCInfoKeycard", "{0}  -  Keycard {1}"), Info, FText::AsNumber(CarriedKeycard));
+	}
+	return Info;
+}
+
+void AHitmenNPC::HandleCarryChanged(AHitmenCharacterBase* Body)
+{
+	// A guard carrying a body away has its hands full: the gun is put away until it is done.
+	if (Weapon)
+	{
+		Weapon->SetActorHiddenInGame(Body != nullptr || IsDead());
+	}
 }
 
 FText AHitmenNPC::GetInteractionText_Implementation(AActor* Interactor) const
@@ -242,8 +304,18 @@ void AHitmenNPC::PostInitializeComponents()
 void AHitmenNPC::BeginPlay()
 {
 	Super::BeginPlay();
-	KeycardMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, KeycardBone);
+	// The card sits in a right pocket: placed in the NPC's own space at spawn, then it follows the hips.
+	KeycardMesh->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
+	KeycardMesh->SetWorldLocationAndRotation(GetActorTransform().TransformPosition(KeycardHipOffset), GetActorRotation());
+	KeycardMesh->SetWorldScale3D(FVector(0.055f, 0.01f, 0.09f));
+	KeycardMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepWorldTransform, KeycardBone);
+	BodyCarryComponent->OnCarryChanged.AddUniqueDynamic(this, &AHitmenNPC::HandleCarryChanged);
 	OnRep_CarriedKeycard();
+	if (bIsSniper && GlintMaterial && GetNetMode() != NM_DedicatedServer)
+	{
+		GlintInstance = UMaterialInstanceDynamic::Create(GlintMaterial, this);
+		ScopeGlint->AddElement(GlintInstance, nullptr, true, GlintScreenSize, GlintScreenSize, nullptr);
+	}
 	// Every guard ticks for its combat aim pose (raised weapon); only snipers need every frame (aim laser).
 	SetActorTickEnabled(GetNetMode() != NM_DedicatedServer || bIsSniper);
 	SetActorTickInterval(bIsSniper ? 0.f : 0.1f);
@@ -362,6 +434,29 @@ void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAler
 	}
 }
 
+void AHitmenNPC::AssignPatrolRoute(AHitmenPatrolRoute* Route)
+{
+	if (!HasAuthority() || !Route)
+	{
+		return;
+	}
+	PatrolRoute = Route;
+	Behavior = EHitmenNPCBehavior::Patrol;
+	if (AHitmenAIController* AI = Cast<AHitmenAIController>(GetController()))
+	{
+		AI->RefreshNPCKeys();
+	}
+}
+
+void AHitmenNPC::SetPaceMultiplier(float Multiplier)
+{
+	if (!FMath::IsNearlyEqual(PaceMultiplier, Multiplier))
+	{
+		PaceMultiplier = Multiplier;
+		RefreshWalkSpeed();
+	}
+}
+
 void AHitmenNPC::RefreshWalkSpeed()
 {
 	UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
@@ -382,7 +477,7 @@ void AHitmenNPC::RefreshWalkSpeed()
 	case EHitmenAlertState::Combat:        Movement->WalkSpeed = CombatWalkSpeed; break;
 	case EHitmenAlertState::Investigating:
 	case EHitmenAlertState::Searching:     Movement->WalkSpeed = AlertWalkSpeed; break;
-	default:                               Movement->WalkSpeed = AlertComponent->IsOnEdge() ? OnEdgeWalkSpeed : CalmWalkSpeed; break;
+	default:                               Movement->WalkSpeed = (AlertComponent->IsOnEdge() ? OnEdgeWalkSpeed : CalmWalkSpeed) * PaceMultiplier; break;
 	}
 }
 
@@ -392,7 +487,10 @@ float AHitmenNPC::GetEffectiveShootingRange() const
 	{
 		return UnarmedReach;
 	}
-	return IsSniper() || ShootingRange <= 0.f ? TNumericLimits<float>::Max() : ShootingRange;
+	const float Own = IsSniper() || ShootingRange <= 0.f ? TNumericLimits<float>::Max() : ShootingRange;
+	// A shotgun or an SMG closes in to its own range (the weapon's NPCEngageRange).
+	const UHitmenWeaponData* Data = Weapon->GetWeaponData();
+	return Data && Data->NPCEngageRange > 0.f ? FMath::Min(Own, Data->NPCEngageRange) : Own;
 }
 
 bool AHitmenNPC::IsInCover() const

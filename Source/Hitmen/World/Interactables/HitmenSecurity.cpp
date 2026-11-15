@@ -614,6 +614,17 @@ void AHitmenTurret::Hack(AActor* Hacker)
 	Juice_OnHacked();
 }
 
+bool AHitmenTurret::IsInVisionArc(const FVector& Location) const
+{
+	if (VisionArcDegrees >= 359.f)
+	{
+		return true;
+	}
+	const FVector To = (Location - GetActorLocation()).GetSafeNormal2D();
+	const float Cos = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To);
+	return Cos >= FMath::Cos(FMath::DegreesToRadians(VisionArcDegrees * 0.5f));
+}
+
 AActor* AHitmenTurret::FindTarget() const
 {
 	const FVector Eye = Head->GetComponentLocation();
@@ -632,7 +643,7 @@ AActor* AHitmenTurret::FindTarget() const
 			continue;
 		}
 		const float Distance = FVector::Dist(Eye, Character->GetActorLocation());
-		if (Distance > BestDistance || (AI && AI->IsSightBlocked(Eye, Character->GetActorLocation())))
+		if (Distance > BestDistance || !IsInVisionArc(Character->GetActorLocation()) || (AI && AI->IsSightBlocked(Eye, Character->GetActorLocation())))
 		{
 			continue;
 		}
@@ -680,7 +691,7 @@ void AHitmenTurret::Tick(float DeltaSeconds)
 		RetargetAccumulator = 0.f;
 		CurrentTarget = FindTarget();
 	}
-	if (!CurrentTarget || GetWorld()->GetTimeSeconds() - LastFireTime < FireInterval
+	if (!CurrentTarget || GetWorld()->GetTimeSeconds() - LastFireTime < GetFireInterval()
 		|| GetWorld()->GetTimeSeconds() - TargetAcquiredTime < LockOnTime)
 	{
 		return;
@@ -776,6 +787,8 @@ AHitmenLightFixture::AHitmenLightFixture()
 	Light->SetAttenuationRadius(1200.f);
 	// Room lamps never glow in the volumetric fog (only camera beams do).
 	Light->SetVolumetricScatteringIntensity(0.f);
+	// Looked at (the info line), never used: the interact trace stops on the bulb.
+	Mesh->SetCollisionResponseToChannel(HITMEN_TRACE_INTERACT, ECR_Block);
 	// No shadow unless a level asks for it (one lamp per room): every shadowed light costs a virtual shadow map pass.
 	Light->SetCastShadows(false);
 }
@@ -846,6 +859,28 @@ bool AHitmenBlackoutVolume::IsLocationDark(const FVector& Location) const
 	const FVector Local = GetActorTransform().InverseTransformPosition(Location);
 	const FVector Extent = Bounds->GetUnscaledBoxExtent();
 	return FMath::Abs(Local.X) <= Extent.X && FMath::Abs(Local.Y) <= Extent.Y && FMath::Abs(Local.Z) <= Extent.Z;
+}
+
+FText AHitmenLightFixture::GetInteractionInfo_Implementation(AActor* Interactor) const
+{
+	return bPowered ? NSLOCTEXT("Hitmen", "LightOn", "Light  -  On") : NSLOCTEXT("Hitmen", "LightOff", "Light  -  Off");
+}
+
+AHitmenLightSwitch::AHitmenLightSwitch()
+{
+	DisplayName = NSLOCTEXT("Hitmen", "LightSwitch", "Light switch");
+	InteractionText = NSLOCTEXT("Hitmen", "SwitchOff", "Switch off");
+}
+
+FText AHitmenLightSwitch::GetInteractionText_Implementation(AActor* Interactor) const
+{
+	return bPowered ? InteractionText : NSLOCTEXT("Hitmen", "SwitchOn", "Switch on");
+}
+
+FText AHitmenLightSwitch::GetInteractionInfo_Implementation(AActor* Interactor) const
+{
+	return FText::Format(NSLOCTEXT("Hitmen", "LightSwitchInfo", "{0}  -  {1}"), DisplayName,
+		bPowered ? NSLOCTEXT("Hitmen", "On", "On") : NSLOCTEXT("Hitmen", "Off", "Off"));
 }
 
 AHitmenCircuitBreaker::AHitmenCircuitBreaker()

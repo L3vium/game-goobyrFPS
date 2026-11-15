@@ -3,6 +3,11 @@
 #include "AI/HitmenPatrolRoute.h"
 #include "Components/BillboardComponent.h"
 #include "Components/SplineComponent.h"
+#include "AI/HitmenGuardGroup.h"
+#include "Characters/HitmenNPC.h"
+#include "EngineUtils.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
 
 AHitmenPatrolRoute::AHitmenPatrolRoute()
 {
@@ -25,6 +30,53 @@ void AHitmenPatrolRoute::BeginPlay()
 {
 	Super::BeginPlay();
 	RebuildPath();
+	if (HasAuthority())
+	{
+		// Next tick: every placed NPC has begun play (and its own guard group, if any, is set).
+		GetWorldTimerManager().SetTimerForNextTick(this, &AHitmenPatrolRoute::SetUpWalkers);
+	}
+}
+
+TArray<AHitmenNPC*> AHitmenPatrolRoute::GatherWalkers() const
+{
+	TArray<AHitmenNPC*> Walkers;
+	for (AHitmenNPC* NPC : AssignedNPCs)
+	{
+		if (NPC)
+		{
+			Walkers.AddUnique(NPC);
+		}
+	}
+	for (TActorIterator<AHitmenNPC> It(GetWorld()); It; ++It)
+	{
+		if (It->GetPatrolRoute() == this)
+		{
+			Walkers.AddUnique(*It);
+		}
+	}
+	return Walkers;
+}
+
+void AHitmenPatrolRoute::SetUpWalkers()
+{
+	TArray<AHitmenNPC*> Walkers = GatherWalkers();
+	for (AHitmenNPC* NPC : Walkers)
+	{
+		NPC->AssignPatrolRoute(this);
+	}
+	// Several NPCs on one route: one group (unless a placed guard group already holds them).
+	Walkers.RemoveAll([](const AHitmenNPC* NPC) { return NPC->GetGuardGroup() != nullptr; });
+	if (!bAssignedNPCsPatrolAsGroup || Walkers.Num() < 2)
+	{
+		return;
+	}
+	FActorSpawnParameters Params;
+	Params.ObjectFlags |= RF_Transient;
+	RouteGroup = GetWorld()->SpawnActor<AHitmenGuardGroup>(GetActorLocation(), FRotator::ZeroRotator, Params);
+	if (RouteGroup)
+	{
+		RouteGroup->Configure(Walkers, GroupFollowDistance, GroupFollowSpacing, GroupColumns);
+	}
 }
 
 void AHitmenPatrolRoute::RebuildPath()

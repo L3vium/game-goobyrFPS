@@ -45,7 +45,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Carry")
 	void RequestDrop();
 
-	float GetSpeedMultiplier() const;
+	/** Speed multiplier while carrying (1 when not): the walk or sprint penalty. */
+	float GetSpeedMultiplier(bool bSprinting) const;
+
+	/** Sprinting allowed now (always when not carrying; bCanSprintWhileCarrying otherwise). */
+	bool CanSprint() const { return !CarriedBody || bCanSprintWhileCarrying; }
 
 protected:
 	/** Designer toggle: allow carrying bodies at all. */
@@ -55,6 +59,18 @@ protected:
 	/** Only the VIP can be carried (off: any body, to hide it in a container). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Carry")
 	bool bOnlyVIP = false;
+
+	/** Off: carrying a body, you walk (Shift does nothing). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Carry")
+	bool bCanSprintWhileCarrying = false;
+
+	/** Walking speed lost while carrying a body (percent; 0 = as fast as usual). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Carry", meta=(ClampMin="0", ClampMax="95", Units="Percent"))
+	float WalkSpeedPenaltyPercent = 0.f;
+
+	/** Sprint speed lost while carrying a body (percent), when sprinting is allowed. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Carry", meta=(ClampMin="0", ClampMax="95", Units="Percent"))
+	float SprintSpeedPenaltyPercent = 0.f;
 
 	/** Where the body lies in the arms, relative to the carrier (X forward, Z up; rolled to lie across). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Carry")

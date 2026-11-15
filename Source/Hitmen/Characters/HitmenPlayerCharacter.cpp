@@ -1045,7 +1045,17 @@ void AHitmenPlayerCharacter::ApplyCosmetics(const FHitmenCosmeticLoadout& Cosmet
 
 float AHitmenPlayerCharacter::GetMovementSpeedMultiplier() const
 {
-	return Super::GetMovementSpeedMultiplier() * BodyCarryComponent->GetSpeedMultiplier();
+	return Super::GetMovementSpeedMultiplier();
+}
+
+float AHitmenPlayerCharacter::GetCarrySpeedMultiplier(bool bSprinting) const
+{
+	return BodyCarryComponent ? BodyCarryComponent->GetSpeedMultiplier(bSprinting) : 1.f;
+}
+
+bool AHitmenPlayerCharacter::CanSprintNow() const
+{
+	return !BodyCarryComponent || BodyCarryComponent->CanSprint();
 }
 
 int32 AHitmenPlayerCharacter::GetHitmenTeamId_Implementation() const
@@ -1265,11 +1275,16 @@ void AHitmenPlayerCharacter::Input_Interact()
 			}
 		}
 	}
-	// F: stealth kill > interactable > drop body > throw the held item.
-	if (!InteractionComponent->TryInteract())
+	// F: stealth kill > interactable > drop body > throw the held weapon (while aiming).
+	if (!InteractionComponent->TryInteract() && CanThrowHeldWeapon())
 	{
 		InventoryComponent->ThrowActive();
 	}
+}
+
+bool AHitmenPlayerCharacter::CanThrowHeldWeapon() const
+{
+	return InventoryComponent && InventoryComponent->GetActiveWeapon() && (!bThrowRequiresAim || bIsAiming);
 }
 
 void AHitmenPlayerCharacter::Input_MoveAbilityPressed()

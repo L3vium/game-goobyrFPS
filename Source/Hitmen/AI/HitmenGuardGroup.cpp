@@ -4,6 +4,8 @@
 #include "AI/HitmenAlertComponent.h"
 #include "Characters/HitmenNPC.h"
 #include "Components/BillboardComponent.h"
+#include "TimerManager.h"
+#include "Engine/World.h"
 
 AHitmenGuardGroup::AHitmenGuardGroup()
 {
@@ -19,6 +21,28 @@ void AHitmenGuardGroup::BeginPlay()
 	{
 		return;
 	}
+	BindMembers();
+}
+
+void AHitmenGuardGroup::Configure(const TArray<AHitmenNPC*>& InMembers, float InFollowDistance, float InFollowSpacing, int32 InColumns)
+{
+	Members.Reset();
+	for (AHitmenNPC* Member : InMembers)
+	{
+		Members.Add(Member);
+	}
+	FollowDistance = InFollowDistance;
+	FollowSpacing = InFollowSpacing;
+	Columns = FMath::Max(1, InColumns);
+	if (HasActorBegunPlay() && HasAuthority())
+	{
+		BindMembers();
+	}
+}
+
+void AHitmenGuardGroup::BindMembers()
+{
+	GetWorldTimerManager().SetTimer(PaceTimer, this, &AHitmenGuardGroup::UpdatePace, 0.3f, true);
 	for (AHitmenNPC* Member : Members)
 	{
 		if (!Member)
@@ -28,7 +52,7 @@ void AHitmenGuardGroup::BeginPlay()
 		Member->SetGuardGroup(this);
 		if (bShareAlerts && Member->GetAlert())
 		{
-			Member->GetAlert()->OnAlertStateChanged.AddDynamic(this, &AHitmenGuardGroup::HandleMemberAlert);
+			Member->GetAlert()->OnAlertStateChanged.AddUniqueDynamic(this, &AHitmenGuardGroup::HandleMemberAlert);
 		}
 	}
 }
@@ -65,11 +89,35 @@ FVector AHitmenGuardGroup::GetFormationLocation(const AHitmenNPC* Follower) cons
 			++Slot;
 		}
 	}
-	const int32 Row = Slot / 2 + 1;
-	const float Side = (Slot % 2 == 0 ? -0.5f : 0.5f) * FollowSpacing;
+	// Rows of Columns behind the leader, centred.
+	const int32 PerRow = FMath::Max(1, Columns);
+	const int32 Row = Slot / PerRow + 1;
+	const int32 Column = Slot % PerRow;
+	const float Side = (Column - (PerRow - 1) * 0.5f) * FollowSpacing;
 	const FVector Forward = Leader->GetActorForwardVector().GetSafeNormal2D();
 	const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward);
 	return Leader->GetActorLocation() - Forward * FollowDistance * Row + Right * Side;
+}
+
+void AHitmenGuardGroup::UpdatePace()
+{
+	AHitmenNPC* Leader = GetLeader();
+	if (!Leader)
+	{
+		return;
+	}
+	// The group stays together: the leader slows down while someone is far from its slot (calm only).
+	bool bLagging = false;
+	for (const AHitmenNPC* Member : Members)
+	{
+		if (Member && Member != Leader && !Member->IsDead() && Member->GetAlert() && Member->GetAlert()->GetAlertState() == EHitmenAlertState::Unaware
+			&& FVector::Dist2D(Member->GetActorLocation(), GetFormationLocation(Member)) > LagDistance)
+		{
+			bLagging = true;
+			break;
+		}
+	}
+	Leader->SetPaceMultiplier(bLagging ? LeaderWaitPace : 1.f);
 }
 
 void AHitmenGuardGroup::HandleMemberAlert(EHitmenAlertState OldState, EHitmenAlertState NewState)

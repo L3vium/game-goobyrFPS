@@ -29,6 +29,9 @@ public:
 	/** Where a follower should stand behind the leader (world). */
 	FVector GetFormationLocation(const AHitmenNPC* Follower) const;
 
+	/** Server, at runtime (a patrol route's group): members (the first leads) and the formation. */
+	void Configure(const TArray<AHitmenNPC*>& InMembers, float InFollowDistance, float InFollowSpacing, int32 InColumns);
+
 protected:
 	UPROPERTY(VisibleAnywhere, Category="Hitmen|Components")
 	TObjectPtr<UBillboardComponent> Billboard;
@@ -44,8 +47,23 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Group", meta=(ClampMin="0", Units="cm"))
 	float FollowSpacing = 150.f;
 
+	/** Followers per row behind the leader. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Group", meta=(ClampMin="1", ClampMax="4"))
+	int32 Columns = 2;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Group")
 	bool bShareAlerts = true;
+
+	/** The leader walks slower (this share of its pace) while a follower lags more than LagDistance behind its slot. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Group", meta=(ClampMin="0.1", ClampMax="1"))
+	float LeaderWaitPace = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Group", meta=(ClampMin="0", Units="cm"))
+	float LagDistance = 260.f;
+
+	FTimerHandle PaceTimer;
+	void UpdatePace();
+	void BindMembers();
 
 	UFUNCTION()
 	void HandleMemberAlert(EHitmenAlertState OldState, EHitmenAlertState NewState);

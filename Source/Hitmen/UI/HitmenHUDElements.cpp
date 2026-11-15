@@ -82,6 +82,12 @@ void UHitmenActionPromptWidget::NativeTick(const FGeometry& MyGeometry, float In
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	PromptAlpha = FMath::FInterpConstantTo(PromptAlpha, bPromptVisible ? 1.f : 0.f, InDeltaTime, FadeSpeed);
 	const UHitmenUIEventSubsystem* UI = GetUIEvents();
+	const FString NewInfo = UI ? UI->GetInteractionInfo().ToString() : FString();
+	if (!NewInfo.IsEmpty())
+	{
+		Info = NewInfo;
+	}
+	InfoAlpha = FMath::FInterpConstantTo(InfoAlpha, NewInfo.IsEmpty() ? 0.f : 1.f, InDeltaTime, FadeSpeed);
 	const bool bTraversal = UI && !UI->GetTraversalHint().IsEmpty() && !bPromptVisible;
 	TraversalAlpha = FMath::FInterpConstantTo(TraversalAlpha, bTraversal ? 1.f : 0.f, InDeltaTime, FadeSpeed);
 }
@@ -119,6 +125,18 @@ int32 UHitmenActionPromptWidget::NativePaint(const FPaintArgs& Args, const FGeom
 			HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Extra, FVector2D(X, Y + (KeySize.Y - ExtraSize.Y) * 0.5f), ExtraFont, HitmenUI::Accent() * FLinearColor(1.2f, 1.2f, 1.2f, Alpha));
 		}
 	};
+	// The info line: under the prompt, or in its place when the thing cannot be used now (no key).
+	if (InfoAlpha > 0.01f && !Info.IsEmpty())
+	{
+		const FSlateFontInfo InfoFont = HitmenUI::SpacedFont(15, TEXT("Medium"), 40);
+		const FVector2D InfoSize = HitmenUI::MeasureText(Info, InfoFont);
+		// Always under the prompt row (the traversal hint takes that row when nothing can be used).
+		const float InfoY = 36.f;
+		const float X = (Size.X - InfoSize.X) * 0.5f;
+		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D(X - 30.f, InfoY - 3.f), FVector2D(InfoSize.X * 0.5f + 30.f, InfoSize.Y + 6.f), FLinearColor(0, 0, 0, 0), FLinearColor(0, 0, 0, 0.35f * InfoAlpha), true);
+		HitmenUI::PaintGradient(OutDrawElements, LayerId, AllottedGeometry, FVector2D(X + InfoSize.X * 0.5f, InfoY - 3.f), FVector2D(InfoSize.X * 0.5f + 30.f, InfoSize.Y + 6.f), FLinearColor(0, 0, 0, 0.35f * InfoAlpha), FLinearColor(0, 0, 0, 0), true);
+		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Info, FVector2D(X, InfoY), InfoFont, FLinearColor(0.85f, 0.85f, 0.85f, 0.95f * InfoAlpha));
+	}
 	if (PromptAlpha > 0.01f && !Action.IsEmpty())
 	{
 		PaintRow(InteractKey, Action, Reason, 0.f, PromptAlpha);
@@ -629,7 +647,9 @@ int32 UHitmenCheatPanelWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 	const AHitmenGameState* GS = GetHitmenGameState();
 	const APlayerController* PC = GetOwningPlayer();
 	const AHitmenPlayerState* PS = PC ? PC->GetPlayerState<AHitmenPlayerState>() : nullptr;
-	if (!GS || !GS->AreDebugCommandsAllowed() || !PS || !PC->GetPawn() || PC->GetPawn()->IsA<ASpectatorPawn>())
+	const UHitmenUIEventSubsystem* CheatUI = GetUIEvents();
+	// Hidden under the pause menu (its legend sits on the same side).
+	if (!GS || !GS->AreDebugCommandsAllowed() || !PS || !PC->GetPawn() || PC->GetPawn()->IsA<ASpectatorPawn>() || (CheatUI && CheatUI->IsPauseMenuOpen()))
 	{
 		return LayerId;
 	}

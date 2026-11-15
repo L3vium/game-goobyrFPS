@@ -33,6 +33,9 @@ protected:
 	FString Action;
 	FString Reason;
 	FString Traversal;
+	/** What the focused thing is (a line under the prompt, or alone when it cannot be used). */
+	FString Info;
+	float InfoAlpha = 0.f;
 	float PromptAlpha = 0.f;
 	float TraversalAlpha = 0.f;
 	bool bPromptVisible = false;

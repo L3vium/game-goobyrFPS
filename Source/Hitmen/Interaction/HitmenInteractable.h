@@ -29,6 +29,14 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Hitmen|Interaction")
 	void Interact(AActor* Interactor);
 
+	/**
+	 * What it is and its state, shown under the prompt ("Body container  ·  1 / 2 bodies", "Radio  ·  Off"). Something
+	 * with info is focused (highlighted, info shown) even when it cannot be used right now. Empty = nothing to show.
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Hitmen|Interaction")
+	FText GetInteractionInfo(AActor* Interactor) const;
+	virtual FText GetInteractionInfo_Implementation(AActor* Interactor) const { return FText::GetEmpty(); }
+
 	/** Seconds F must be held (hacking a panel...): 0 = instant. A bar fills under the crosshair. */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Hitmen|Interaction")
 	float GetInteractHoldTime(AActor* Interactor) const;

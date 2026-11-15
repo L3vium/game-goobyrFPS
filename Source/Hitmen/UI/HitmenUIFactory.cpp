@@ -6,6 +6,7 @@
 #include "Data/HitmenMapDefinition.h"
 #include "Data/HitmenMapMarkerType.h"
 #include "Core/HitmenGameSettings.h"
+#include "Core/HitmenTypes.h"
 #include "Rendering/SlateRenderer.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
@@ -161,6 +162,62 @@ namespace HitmenUI
 			Verts.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(Transform, FVector2f(Point), FVector2f(0.5f, 0.5f), Vertex));
 		}
 		FSlateDrawElement::MakeCustomVerts(Out, Layer, Handle, Verts, Indices, nullptr, 0, 0);
+	}
+
+	void GetSplitLayout(int32 Count, int32& OutColumns, int32& OutRows)
+	{
+		Count = FMath::Max(1, Count);
+		OutColumns = Count <= 1 ? 1 : (Count <= 4 ? 2 : (Count <= 6 ? 3 : 4));
+		OutRows = FMath::Max(1, FMath::DivideAndRoundUp(Count, OutColumns));
+	}
+
+	void PaintDiamond(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Radius, const FLinearColor& Color, const FLinearColor& Rim)
+	{
+		auto Diamond = [&](float R) { return TArray<FVector2D>{ Center + FVector2D(0.f, -R), Center + FVector2D(R, 0.f), Center + FVector2D(0.f, R), Center + FVector2D(-R, 0.f) }; };
+		PaintVerts(Out, Layer, Geo, Diamond(Radius + 1.5f), { 0, 1, 2, 0, 2, 3 }, Rim);
+		PaintVerts(Out, Layer + 1, Geo, Diamond(Radius), { 0, 1, 2, 0, 2, 3 }, Color);
+	}
+
+	void PaintVisionCone(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Radius, float YawDeg, float HalfAngleDeg, const FLinearColor& Color, int32 Segments)
+	{
+		if (Radius <= 1.f || HalfAngleDeg <= 0.f || Color.A <= 0.f)
+		{
+			return;
+		}
+		Segments = FMath::Max(2, Segments);
+		const FSlateBrush* White = FCoreStyle::Get().GetBrush("WhiteBrush");
+		const FSlateResourceHandle Handle = FSlateApplication::Get().GetRenderer()->GetResourceHandle(*White);
+		const FSlateRenderTransform& Transform = Geo.GetAccumulatedRenderTransform();
+		FLinearColor Edge = Color;
+		Edge.A = 0.f;
+		const FColor TipColor = Color.ToFColorSRGB();
+		const FColor EdgeColor = Edge.ToFColorSRGB();
+		TArray<FSlateVertex> Verts;
+		TArray<SlateIndex> Indices;
+		Verts.Reserve(Segments + 2);
+		Verts.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(Transform, FVector2f(Center), FVector2f(0.5f, 0.5f), TipColor));
+		for (int32 Index = 0; Index <= Segments; ++Index)
+		{
+			const float Angle = FMath::DegreesToRadians(YawDeg + FMath::Lerp(-HalfAngleDeg, HalfAngleDeg, static_cast<float>(Index) / Segments));
+			const FVector2D Point = Center + FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)) * Radius;
+			Verts.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(Transform, FVector2f(Point), FVector2f(0.5f, 0.5f), EdgeColor));
+			if (Index > 0)
+			{
+				Indices.Append({ 0, static_cast<SlateIndex>(Index), static_cast<SlateIndex>(Index + 1) });
+			}
+		}
+		FSlateDrawElement::MakeCustomVerts(Out, Layer, Handle, Verts, Indices, nullptr, 0, 0);
+	}
+
+	FLinearColor GetMapNPCColor(EHitmenAlertColor AlertColor)
+	{
+		return AlertColor == EHitmenAlertColor::None ? FLinearColor(0.2f, 0.22f, 0.25f, 1.f) : HitmenAlert::ToLinearColor(AlertColor);
+	}
+
+	FLinearColor GetMapConeColor(EHitmenAlertColor AlertColor)
+	{
+		return AlertColor == EHitmenAlertColor::None || AlertColor == EHitmenAlertColor::White ? FLinearColor(0.01f, 0.015f, 0.03f, 1.f)
+			: HitmenAlert::ToLinearColor(AlertColor);
 	}
 
 	void PaintTriangle(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D A, FVector2D B, FVector2D C, const FLinearColor& Color)

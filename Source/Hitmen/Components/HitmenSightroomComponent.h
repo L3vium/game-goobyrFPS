@@ -1,5 +1,7 @@
 // Hitmen — Sightroom (Tab): a fast scan wave around you, then the whole map in the scan look; enemies through
-// walls everywhere, interactables near you in line of sight, the target in red at any distance. Local only.
+// walls near you, interactables near you where you really see them, the target in red at any distance. Local only.
+// C++ only keeps custom depth on the candidates (a little beyond the radii); PP_Sightroom decides per pixel from your
+// current position, the wave front and the depth test, with soft edges, so nothing pops in or out.
 
 #pragma once
 
@@ -62,15 +64,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0"))
 	float WaveHeightWeight = 0.35f;
 
-	/** Interactables inside this radius are shown if directly visible. */
+	/** Interactables inside this radius are shown where directly visible (depth test per pixel in PP_Sightroom). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0", Units="cm"))
 	float InteractableRadius = 1800.f;
 
-	/** Seconds for the scan wave to reach full radius. Highlights follow the wave every frame meanwhile. */
+	/** Highlights fade in over this distance inside EnemyRadius / InteractableRadius (and behind the wave front), so an
+	 *  enemy walking into range or an object you walk toward appears progressively. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="1", Units="cm"))
+	float HighlightSoftEdge = 350.f;
+
+	/** Candidates keep custom depth this far beyond their radius (the shader fades them; covers the refresh delay). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0", Units="cm"))
+	float CandidateMargin = 400.f;
+
+	/** Seconds for the scan wave to reach full radius (the shader shows highlights as the front reaches them). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0.05", Units="s"))
 	float ScanDuration = 0.5f;
 
-	/** Seconds between highlight refreshes once the wave is done (moving enemies, line of sight). */
+	/** Seconds between refreshes of the candidate set (who keeps custom depth); the look itself updates every frame. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Sightroom", meta=(ClampMin="0.02", Units="s"))
 	float RefreshInterval = 0.1f;
 
@@ -94,7 +105,6 @@ protected:
 	void Refresh();
 	void ClearHighlights();
 	UCameraComponent* GetCamera() const;
-	bool HasLineOfSight(const FVector& From, const AActor* Target) const;
 	/** Wave radius now (eased like the drawn wave). */
 	float GetWaveRadius() const;
 	/** Distance used by the wave: horizontal + |height| x WaveHeightWeight. */

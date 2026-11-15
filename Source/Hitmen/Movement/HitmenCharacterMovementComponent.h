@@ -96,6 +96,19 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Speed", meta=(ClampMin="-1", ClampMax="1"))
 	float SprintMinForwardDot = 0.5f;
 
+	// ---- Ledges (players) ----
+	/** Hitman-like stiff ledges: walking never goes over a drop deeper than StiffLedgeMaxDrop (you slide along the edge;
+	 *  smaller steps down still walk off). Climbing down, ladders and gutters are unchanged. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Ledges")
+	bool bStiffLedges = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Ledges", meta=(ClampMin="0", Units="cm", EditCondition="bStiffLedges"))
+	float StiffLedgeMaxDrop = 120.f;
+
+	/** A jump still leaves a stiff ledge; off: a ground jump toward such a drop goes straight up. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Movement|Ledges", meta=(EditCondition="bStiffLedges"))
+	bool bCanJumpOffStiffLedges = true;
+
 	// ---- Slide (momentum crouch) ----
 	// Crouching while moving keeps the momentum in the direction you were going and brakes it down to crouch speed:
 	// a short lunge from a walk, a slide from a sprint. Crouch + Shift slides at once from any pace (no ramp-up).
@@ -362,6 +375,10 @@ public:
 	virtual class FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
+	virtual bool CanWalkOffLedges() const override;
+	/** Ground within StiffLedgeMaxDrop under Location (the capsule centre)? */
+	bool HasGroundWithinStiffDrop(const FVector& Location) const;
+	bool UsesStiffLedges() const;
 
 protected:
 	virtual void PhysCustom(float DeltaTime, int32 Iterations) override;

@@ -30,9 +30,10 @@
 
 AHitmenLocker::AHitmenLocker()
 {
-	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.bStartWithTickEnabled = false;
-	InteractionText = NSLOCTEXT("Hitmen", "Hide", "Hide");
+	DisplayName = NSLOCTEXT("Hitmen", "Locker", "Locker");
+	BodyCapacity = 1;
+	// The body stands in the back of the locker.
+	BodySlots = { FTransform(FRotator::ZeroRotator, FVector(-8.f, 0.f, 100.f)) };
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(HitmenGeometry::CubePath);
 	auto MakePanel = [this](const TCHAR* Name, USceneComponent* Parent)
@@ -61,12 +62,6 @@ AHitmenLocker::AHitmenLocker()
 	DoorLower = MakePanel(TEXT("DoorLower"), DoorHinge);
 }
 
-void AHitmenLocker::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AHitmenLocker, Occupant);
-}
-
 void AHitmenLocker::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -92,118 +87,9 @@ void AHitmenLocker::OnConstruction(const FTransform& Transform)
 	DoorHinge->SetRelativeRotation(FRotator::ZeroRotator);
 }
 
-bool AHitmenLocker::CanInteract_Implementation(AActor* Interactor) const
+void AHitmenLocker::ApplyOpenAlpha(float Alpha)
 {
-	return Super::CanInteract_Implementation(Interactor) && (!Occupant || Occupant == Interactor);
-}
-
-FText AHitmenLocker::GetInteractionText_Implementation(AActor* Interactor) const
-{
-	return Occupant == Interactor ? NSLOCTEXT("Hitmen", "LeaveLocker", "Get out") : InteractionText;
-}
-
-void AHitmenLocker::OnInteracted(AActor* Interactor)
-{
-	AHitmenCharacterBase* Character = Cast<AHitmenCharacterBase>(Interactor);
-	if (!Character)
-	{
-		return;
-	}
-	if (Occupant == Character)
-	{
-		Character->GetStatusEffects()->RemoveStatus(EHitmenStatusEffect::Hidden);
-		Occupant = nullptr;
-	}
-	else
-	{
-		Occupant = Character;
-		Character->GetStatusEffects()->ApplyStatus(EHitmenStatusEffect::Hidden, 0.f, 1.f, this);
-	}
-	OnRep_Occupant();
-}
-
-void AHitmenLocker::OnRep_Occupant()
-{
-	if (AHitmenCharacterBase* Previous = AppliedOccupant.Get(); Previous && Previous != Occupant)
-	{
-		ApplyOccupant(Previous, false);
-	}
-	if (Occupant && AppliedOccupant.Get() != Occupant)
-	{
-		ApplyOccupant(Occupant, true);
-	}
-	AppliedOccupant = Occupant;
-	StartDoorCycle();
-	Juice_OnOccupantChanged(Occupant != nullptr);
-}
-
-void AHitmenLocker::ApplyOccupant(AHitmenCharacterBase* Character, bool bInside)
-{
-	UCharacterMovementComponent* Movement = Character->GetCharacterMovement();
-	// The door opens, the character steps in (or out) turning to face out, the door closes: UpdateStep moves it
-	// on every machine while the door cycles.
-	const FRotator Facing(0.f, GetActorRotation().Yaw, 0.f);
-	Character->MoveIgnoreActorAdd(this);
-	Movement->StopMovementImmediately();
-	Movement->DisableMovement();
-	SteppingCharacter = Character;
-	bSteppingIn = bInside;
-	StepFrom = Character->GetActorLocation();
-	StepTo = GetActorTransform().TransformPosition(bInside ? InsideOffset : ExitOffset);
-	StepFromRotation = Character->GetControlRotation();
-	StepToRotation = bInside ? Facing : FRotator(0.f, Facing.Yaw, 0.f);
-	Character->PlayCosmeticMontage(Character->GetAnimSet() ? Character->GetAnimSet()->GetMontage(bInside ? EHitmenAnimMontage::LockerEnter : EHitmenAnimMontage::LockerExit) : nullptr);
-	UHitmenSoundLibrary::PlayHitmenSoundAt(this, bInside ? EHitmenSound::LockerEnter : EHitmenSound::LockerExit, GetActorLocation());
-}
-
-void AHitmenLocker::StartDoorCycle()
-{
-	DoorCycleStart = GetWorld()->GetTimeSeconds();
-	SetActorTickEnabled(true);
-}
-
-void AHitmenLocker::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-	const float Alpha = FMath::Clamp((GetWorld()->GetTimeSeconds() - DoorCycleStart) / DoorCycleTime, 0.f, 1.f);
-	// Opens, lets the occupant through, closes again (smooth).
-	const float Open = FMath::Sin(Alpha * PI);
-	DoorHinge->SetRelativeRotation(FRotator(0.f, (bDoorHingeOnRight ? 1.f : -1.f) * DoorOpenAngle * FMath::SmoothStep(0.f, 1.f, Open), 0.f));
-	UpdateStep();
-	if (Alpha >= 1.f && !SteppingCharacter.IsValid())
-	{
-		DoorHinge->SetRelativeRotation(FRotator::ZeroRotator);
-		SetActorTickEnabled(false);
-	}
-}
-
-void AHitmenLocker::UpdateStep()
-{
-	AHitmenCharacterBase* Character = SteppingCharacter.Get();
-	if (!Character)
-	{
-		return;
-	}
-	const float T = FMath::Clamp((GetWorld()->GetTimeSeconds() - DoorCycleStart - StepDelay) / StepTime, 0.f, 1.f);
-	const float Ease = FMath::InterpEaseInOut(0.f, 1.f, T, 2.f);
-	Character->SetActorLocation(FMath::Lerp(StepFrom, StepTo, Ease), false, nullptr, ETeleportType::TeleportPhysics);
-	if (APlayerController* PC = Cast<APlayerController>(Character->GetController()); PC && PC->IsLocalController())
-	{
-		PC->SetControlRotation(FMath::Lerp(StepFromRotation, StepToRotation, Ease));
-	}
-	if (T >= 1.f)
-	{
-		SteppingCharacter.Reset();
-		if (!bSteppingIn)
-		{
-			// Out: walk again.
-			Character->MoveIgnoreActorRemove(this);
-			if (!Character->IsDead())
-			{
-				Character->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
-			}
-		}
-	}
+	DoorHinge->SetRelativeRotation(FRotator(0.f, (bDoorHingeOnRight ? 1.f : -1.f) * DoorOpenAngle * Alpha, 0.f));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -361,6 +247,11 @@ void AHitmenDistraction::SetOn(bool bNewOn, AActor* SwitchedBy)
 	}
 	LastTriggerTime = GetWorld()->GetTimeSeconds();
 	bOn = bNewOn;
+	if (bOn)
+	{
+		SwitchedOnBy = SwitchedBy;
+		bEventCameraShown = false;
+	}
 	OnRep_On();
 }
 

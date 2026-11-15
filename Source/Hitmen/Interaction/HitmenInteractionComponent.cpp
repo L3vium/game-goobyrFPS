@@ -6,6 +6,7 @@
 #include "Interaction/HitmenInteractable.h"
 #include "Components/HitmenMeleeComponent.h"
 #include "Characters/HitmenCharacterBase.h"
+#include "Characters/HitmenPlayerCharacter.h"
 #include "Components/HitmenBodyCarryComponent.h"
 #include "UI/HitmenUIEventSubsystem.h"
 #include "Weapons/HitmenCombatLibrary.h"
@@ -121,16 +122,22 @@ void UHitmenInteractionComponent::UpdateFocus()
 	{
 		Candidate = Hit.GetActor();
 	}
-	if (Candidate && Candidate->GetClass()->ImplementsInterface(UHitmenInteractable::StaticClass())
-		&& IHitmenInteractable::Execute_CanInteract(Candidate, Pawn))
+	if (Candidate && Candidate->GetClass()->ImplementsInterface(UHitmenInteractable::StaticClass()))
 	{
-		FocusLostTime = -1.f;
-		SetFocus(Candidate, IHitmenInteractable::Execute_GetInteractionText(Candidate, Pawn));
-		return;
+		// Usable: the prompt (and its info line). Not usable but it has info (a full body container, a locker with a
+		// body inside...): highlighted with the info line only, no key.
+		const bool bUsable = IHitmenInteractable::Execute_CanInteract(Candidate, Pawn);
+		const FText Info = IHitmenInteractable::Execute_GetInteractionInfo(Candidate, Pawn);
+		if (bUsable || !Info.IsEmpty())
+		{
+			FocusLostTime = -1.f;
+			SetFocus(Candidate, bUsable ? IHitmenInteractable::Execute_GetInteractionText(Candidate, Pawn) : FText::GetEmpty(), Info);
+			return;
+		}
 	}
 	// The sweep grazing a frame / the wall around it for a frame must not make the prompt blink.
 	if (AActor* Current = FocusedActor.Get(); Current && Current->GetClass()->ImplementsInterface(UHitmenInteractable::StaticClass())
-		&& IHitmenInteractable::Execute_CanInteract(Current, Pawn) && FVector::Dist(Current->GetActorLocation(), Origin) < TraceDistance + 150.f)
+		&& (IHitmenInteractable::Execute_CanInteract(Current, Pawn) || !FocusedInfo.IsEmpty()) && FVector::Dist(Current->GetActorLocation(), Origin) < TraceDistance + 150.f)
 	{
 		const float Now = GetWorld()->GetTimeSeconds();
 		if (FocusLostTime < 0.f)
@@ -150,17 +157,24 @@ void UHitmenInteractionComponent::UpdateFocus()
 		SetFocus(nullptr, NSLOCTEXT("Hitmen", "DropBody", "Drop body"));
 		return;
 	}
+	// Aiming with a weapon and nothing in focus: F throws it.
+	if (const AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Pawn); Player && Player->IsAiming() && Player->CanThrowHeldWeapon())
+	{
+		SetFocus(nullptr, NSLOCTEXT("Hitmen", "ThrowWeapon", "Throw"));
+		return;
+	}
 	SetFocus(nullptr, FText::GetEmpty());
 }
 
-void UHitmenInteractionComponent::SetFocus(AActor* NewFocus, const FText& Prompt)
+void UHitmenInteractionComponent::SetFocus(AActor* NewFocus, const FText& Prompt, const FText& Info)
 {
-	if (FocusedActor.Get() == NewFocus && FocusedPrompt.EqualTo(Prompt))
+	if (FocusedActor.Get() == NewFocus && FocusedPrompt.EqualTo(Prompt) && FocusedInfo.EqualTo(Info))
 	{
 		return;
 	}
 	FocusedActor = NewFocus;
 	FocusedPrompt = Prompt;
+	FocusedInfo = Info;
 	if (HighlightedActor.Get() != NewFocus)
 	{
 		SetActorHighlight(HighlightedActor.Get(), FocusOverlayMaterial, false);
@@ -171,6 +185,7 @@ void UHitmenInteractionComponent::SetFocus(AActor* NewFocus, const FText& Prompt
 	OnFocusChanged.Broadcast(NewFocus, Prompt);
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Cast<APawn>(GetOwner())))
 	{
+		UI->SetInteractionInfo(Info);
 		UI->BroadcastPrompt(Prompt, !Prompt.IsEmpty());
 	}
 }
@@ -194,7 +209,9 @@ bool UHitmenInteractionComponent::TryInteract()
 			return true;
 		}
 	}
-	if (AActor* Target = FocusedActor.Get())
+	// Focused for its info only (not usable now): F falls through to drop / throw.
+	if (AActor* Target = FocusedActor.Get(); Target && (!Target->GetClass()->ImplementsInterface(UHitmenInteractable::StaticClass())
+		|| IHitmenInteractable::Execute_CanInteract(Target, Pawn)))
 	{
 		const float Hold = Target->GetClass()->ImplementsInterface(UHitmenInteractable::StaticClass())
 			? IHitmenInteractable::Execute_GetInteractHoldTime(Target, Pawn) : 0.f;

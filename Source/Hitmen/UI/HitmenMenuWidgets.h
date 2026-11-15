@@ -19,17 +19,22 @@ class UTextureRenderTarget2D;
 class APawn;
 class UHitmenMapMarkerType;
 
-/** Top-down map: you, the VIP, retrieval points (no other information). */
+/** Top-down map: you, the VIP, retrieval points; teammates, NPCs (and their cones), interactables per Project
+ *  Settings -> Hitmen -> Maps. */
 UCLASS()
 class HITMEN_API UHitmenPauseMapWidget : public UHitmenUserWidget
 {
 	GENERATED_BODY()
 
 public:
-	/** Legend categories read from the game state: 0 you, 1 teammates, 2 VIP, 3 alerted NPCs. Everything else is a map
+	/** Legend categories read from the game state: 0 you, 1 teammates, 2 VIP, 3 NPCs. Everything else is a map
 	 *  marker (UHitmenMapMarkerComponent) with a legend row per kind. */
 	static constexpr int32 CategoryCount = 4;
 	static constexpr int32 AlertedCategory = 3;
+
+	/** Whether the map draws a category at all (Project Settings -> Hitmen -> Maps; teammates only when you have some):
+	 *  the legend lists only these. */
+	bool IsCategoryDrawn(int32 Category) const;
 	static FText GetCategoryName(int32 Category);
 	static FLinearColor GetCategoryColor(int32 Category);
 
@@ -115,6 +120,8 @@ protected:
 	UPROPERTY(Transient) TObjectPtr<UVerticalBox> LegendBox;
 	/** Marker kind of each legend toggle after the built-in categories. */
 	UPROPERTY(Transient) TArray<TObjectPtr<UHitmenMapMarkerType>> LegendMarkerTypes;
+	/** Built-in category of each legend toggle before the marker kinds (only the categories the map draws). */
+	TArray<int32> LegendCategories;
 
 	UFUNCTION() void HandleLegendToggled(bool bChecked);
 	/** Shows / hides the debug tools (they open over the legend). */
@@ -144,7 +151,8 @@ protected:
 	FVector2D LastCenter = FVector2D::ZeroVector;
 };
 
-/** Watcher / dead player HUD: mode, target, and the multi-screen grid. */
+/** Watcher / dead player HUD: the view (player view, split screen, free fly), its keys, the fly speed, the split
+ *  screen grid. */
 UCLASS()
 class HITMEN_API UHitmenSpectatorWidget : public UHitmenUserWidget
 {
@@ -154,14 +162,26 @@ protected:
 	virtual void BuildDefaultLayout() override;
 	virtual void BindEvents() override;
 	virtual void UnbindEvents() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	UFUNCTION() void HandleModeChanged(uint8 Mode);
 	UFUNCTION() void HandleViewsChanged(const TArray<FHitmenSpectatorView>& Views);
+	UFUNCTION() void HandleWatcherSpeed(float SpeedScale);
 
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> ModeText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> KeysText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> SpeedText;
+	/** What the watcher looks at (name and state), under the centre: the player's prompt is hidden while watching. */
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> InfoText;
 	UPROPERTY(Transient) TObjectPtr<UUniformGridPanel> Grid;
 
+	/** Seconds the fly speed stays on screen after a wheel notch. */
+	UPROPERTY(EditAnywhere, Category="Hitmen|Spectator", meta=(ClampMin="0.1"))
+	float SpeedShowTime = 1.4f;
+
 	uint8 CurrentMode = 0;
+	int32 ViewCount = 0;
+	float SpeedShownAt = -100.f;
 };
 
 /** Match over: a banner at the top (winner + reason) while everyone spectates; the host gets "[Enter] Back to the

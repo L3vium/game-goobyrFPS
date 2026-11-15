@@ -3,6 +3,7 @@
 #include "UI/HitmenHUDWidgets.h"
 #include "Components/HitmenMapMarkerComponent.h"
 #include "Data/HitmenMapMarkerType.h"
+#include "Core/HitmenGameSettings.h"
 #include "Engine/Texture2D.h"
 #include "Data/HitmenMapDefinition.h"
 #include "UI/HitmenHUDElements.h"
@@ -372,32 +373,35 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 			&MapBrush, ESlateDrawEffect::None, FLinearColor(1.f, 1.f, 1.f, 0.92f));
 	}
 
-	if (const UHitmenUIEventSubsystem* UI = GetUIEvents())
+	// NPCs (Project Settings -> Hitmen -> Maps): diamonds in their alert colour, grey when calm; cones under them.
+	const UHitmenGameSettings* MapSettings = UHitmenGameSettings::Get();
+	if (const UHitmenUIEventSubsystem* UI = MapSettings->bMinimapShowNPCs ? GetUIEvents() : nullptr)
 	{
 		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
 		{
-			if (bOnlyShowAlertedNPCs && Blip.Color == EHitmenAlertColor::None)
-			{
-				continue;
-			}
 			bool bInside = false;
 			const FVector2D Point = ToMap(Blip.Location, bInside);
+			const FLinearColor Tint = HitmenUI::GetMapNPCColor(Blip.Color);
+			if (MapSettings->bMinimapShowVisionCones && !Blip.bIsCamera && Blip.SightRadius > 0.f)
+			{
+				HitmenUI::PaintVisionCone(OutDrawElements, LayerId + 2, AllottedGeometry, Point, Blip.SightRadius * Scale, Blip.Yaw,
+					Blip.SightHalfAngle, HitmenUI::GetMapConeColor(Blip.Color) * FLinearColor(1.f, 1.f, 1.f, MapSettings->MapVisionConeOpacity));
+			}
 			if (bInside)
 			{
-				const FLinearColor Tint = Blip.Color == EHitmenAlertColor::None ? HitmenUI::TextDim() : HitmenAlert::ToLinearColor(Blip.Color);
-				DrawBox(OutDrawElements, LayerId + 2, AllottedGeometry, Point - FVector2D(3.f), FVector2D(6.f), Tint);
+				HitmenUI::PaintDiamond(OutDrawElements, LayerId + 3, AllottedGeometry, Point, MapSettings->MinimapNPCSize * 0.5f, Tint);
 			}
 		}
 	}
 
-	// Map markers (retrieval points, cameras, anything with a UHitmenMapMarkerComponent) at their kind's minimap size;
-	// kinds marked as objectives stick to the frame when out of range.
+	// Map markers (retrieval points, cameras, anything with a UHitmenMapMarkerComponent) at their kind's minimap size
+	// when their layer is on; kinds marked as objectives stick to the frame when out of range.
 	if (const UHitmenMapMarkerSubsystem* Markers = UHitmenMapMarkerSubsystem::Get(this))
 	{
 		for (const TWeakObjectPtr<UHitmenMapMarkerComponent>& MapMarker : Markers->GetMarkers())
 		{
 			const UHitmenMapMarkerType* Type = MapMarker.IsValid() ? MapMarker->GetType() : nullptr;
-			if (!Type || !Type->bShowOnMinimap || !MapMarker->IsMarkerVisible())
+			if (!Type || !Type->IsShownOn(false) || !MapMarker->IsMarkerVisible())
 			{
 				continue;
 			}
@@ -419,7 +423,7 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		}
 	}
 
-	// Sonar ping of the carried VIP body.
+	// Sonar ping of the dead VIP's body (yellow, like its marker).
 	if (LastPing.IsValid() && LastPing.NextInterval > 0.f)
 	{
 		const float Age = GetWorld()->GetTimeSeconds() - LastPingLocalTime;
@@ -428,7 +432,7 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		const FVector2D Point = ToMap(LastPing.Location, bInside);
 		if (bInside && Alpha > 0.f)
 		{
-			DrawArc(OutDrawElements, LayerId + 3, AllottedGeometry, Point, 6.f + (1.f - Alpha) * 18.f, 0.f, 360.f, HitmenUI::Accent() * FLinearColor(1.f, 1.f, 1.f, Alpha), 2.f, 20);
+			DrawArc(OutDrawElements, LayerId + 3, AllottedGeometry, Point, 6.f + (1.f - Alpha) * 18.f, 0.f, 360.f, FLinearColor(1.f, 0.86f, 0.12f, Alpha), 2.f, 20);
 		}
 	}
 
@@ -568,6 +572,7 @@ void UHitmenHUDWidget::BindEvents()
 	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
 		UI->OnPawnChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandlePawnChanged);
+		UI->OnCinematicChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleCinematic);
 		UI->OnInteractionPromptChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandlePrompt);
 		UI->OnInventoryViewChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleInventoryView);
 		UI->OnAbilityViewsChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleAbilityViews);
@@ -585,6 +590,7 @@ void UHitmenHUDWidget::UnbindEvents()
 	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
 		UI->OnPawnChanged.RemoveAll(this);
+		UI->OnCinematicChanged.RemoveAll(this);
 		UI->OnInteractionPromptChanged.RemoveAll(this);
 		UI->OnInventoryViewChanged.RemoveAll(this);
 		UI->OnAbilityViewsChanged.RemoveAll(this);
@@ -594,7 +600,13 @@ void UHitmenHUDWidget::UnbindEvents()
 
 void UHitmenHUDWidget::HandlePawnChanged(APawn* NewPawn)
 {
-	SetVisibility(NewPawn ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	const UHitmenUIEventSubsystem* UI = GetUIEvents();
+	SetVisibility(NewPawn && !(UI && UI->IsCinematic()) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+}
+
+void UHitmenHUDWidget::HandleCinematic(bool bCinematic)
+{
+	HandlePawnChanged(GetOwningPlayerPawn());
 }
 
 void UHitmenHUDWidget::HandlePrompt(const FText& Prompt, bool bVisible)
@@ -711,8 +723,11 @@ int32 UHitmenAlertIndicatorWidget::NativePaint(const FPaintArgs& Args, const FGe
 	}
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
 	const FVector2D C = Size * 0.5f;
-	const float R = FMath::Min(Size.X, Size.Y) * 0.45f;
-	const FLinearColor Tint = HitmenAlert::ToLinearColor(Color);
+	// Calling reinforcements: the diamond pulses (no extra mark).
+	const float Pulse = bCallingReinforcements ? 0.5f + 0.5f * FMath::Sin((GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f) * 9.f) : 0.f;
+	const float R = FMath::Min(Size.X, Size.Y) * 0.45f * (bCallingReinforcements ? 0.82f + 0.18f * Pulse : 1.f);
+	FLinearColor Tint = HitmenAlert::ToLinearColor(Color);
+	Tint.A = bCallingReinforcements ? 0.55f + 0.45f * Pulse : Tint.A;
 	const TArray<FVector2D> Diamond = { C + FVector2D(0, -R), C + FVector2D(R, 0), C + FVector2D(0, R), C + FVector2D(-R, 0), C + FVector2D(0, -R) };
 	FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Diamond, ESlateDrawEffect::None, Tint, true, 2.5f);
 
@@ -729,10 +744,6 @@ int32 UHitmenAlertIndicatorWidget::NativePaint(const FPaintArgs& Args, const FGe
 		const float Y = C.Y + R - T * 2.f * R;
 		const float HalfWidth = R - FMath::Abs(Y - C.Y);
 		DrawLine(OutDrawElements, LayerId + 1, AllottedGeometry, FVector2D(C.X - HalfWidth, Y), FVector2D(C.X + HalfWidth, Y), Tint * FLinearColor(1.f, 1.f, 1.f, 0.8f), 2.f);
-	}
-	if (bCallingReinforcements)
-	{
-		DrawText(OutDrawElements, LayerId + 2, AllottedGeometry, TEXT("!"), FVector2D(C.X + R + 2.f, C.Y - R), 14, HitmenUI::Accent());
 	}
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 3, InWidgetStyle, bParentEnabled);
 }

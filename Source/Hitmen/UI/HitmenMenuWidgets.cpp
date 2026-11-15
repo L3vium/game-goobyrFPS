@@ -39,6 +39,7 @@
 #include "Components/ScrollBox.h"
 #include "Components/Image.h"
 #include "Components/UniformGridPanel.h"
+#include "Components/UniformGridSlot.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "EnhancedInputSubsystems.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
@@ -80,7 +81,7 @@ FText UHitmenPauseMapWidget::GetCategoryName(int32 Category)
 	case 0: return LOCTEXT("LegendYou", "You");
 	case 1: return LOCTEXT("LegendTeam", "Teammates");
 	case 2: return LOCTEXT("LegendVIP", "Target (VIP)");
-	default: return LOCTEXT("LegendAlerted", "Guards on alert");
+	default: return LOCTEXT("LegendNPCs", "Guards");
 	}
 }
 
@@ -92,6 +93,39 @@ FLinearColor UHitmenPauseMapWidget::GetCategoryColor(int32 Category)
 	case 1: return FLinearColor(0.3f, 0.7f, 1.f);
 	case 2: return HitmenUI::Accent();
 	default: return HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow);
+	}
+}
+
+bool UHitmenPauseMapWidget::IsCategoryDrawn(int32 Category) const
+{
+	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+	switch (Category)
+	{
+	case 1:
+	{
+		if (!Settings->bPauseMapShowTeammates)
+		{
+			return false;
+		}
+		const APawn* Pawn = GetOwningPlayerPawn();
+		const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
+		const int32 MyTeam = Pawn ? UHitmenTeamLibrary::GetTeamId(Pawn) : HitmenTeams::Neutral;
+		if (!GS || MyTeam == HitmenTeams::Neutral)
+		{
+			return false;
+		}
+		for (const APlayerState* PS : GS->PlayerArray)
+		{
+			const APawn* Mate = PS ? PS->GetPawn() : nullptr;
+			if (Mate && Mate != Pawn && UHitmenTeamLibrary::GetTeamId(Mate) == MyTeam)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+	case AlertedCategory: return Settings->bPauseMapShowNPCs;
+	default: return true;
 	}
 }
 
@@ -241,7 +275,7 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 	}
 	auto Marker = [&](int32 Category, const FVector& World, const FString& Label, float Size)
 	{
-		if (!bCategoryVisible[Category])
+		if (!bCategoryVisible[Category] || !IsCategoryDrawn(Category))
 		{
 			return;
 		}
@@ -271,18 +305,26 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 			}
 		}
 	}
-	if (const UHitmenUIEventSubsystem* UI = GetUIEvents())
+	// NPCs (Project Settings -> Hitmen -> Maps, off by default): diamonds as on the minimap, cones under them.
+	const UHitmenGameSettings* MapSettings = UHitmenGameSettings::Get();
+	const UHitmenUIEventSubsystem* BlipSource = bCategoryVisible[AlertedCategory] && IsCategoryDrawn(AlertedCategory) ? GetUIEvents() : nullptr;
+	if (BlipSource)
 	{
-		for (const FHitmenHUDAlertBlip& Blip : UI->GetAlertBlips())
+		const float PixelsPerCm = Side / FMath::Max(WorldSide, 1.f);
+		for (const FHitmenHUDAlertBlip& Blip : BlipSource->GetAlertBlips())
 		{
-			// Security cameras are not shown on the pause map (only on the minimap).
-			if (Blip.Color != EHitmenAlertColor::None && !Blip.bIsCamera && bCategoryVisible[AlertedCategory])
+			if (Blip.bIsCamera)
 			{
-				// Same colours as the minimap: white (suspicious), yellow (alerted / searching), red (combat).
-				const FVector2D P = ToMap(Blip.Location);
-				HitmenUI::PaintBox(OutDrawElements, LayerId + 3, AllottedGeometry, P - FVector2D(6.5f), FVector2D(13.f), FLinearColor(0.f, 0.f, 0.f, 0.7f));
-				HitmenUI::PaintBox(OutDrawElements, LayerId + 4, AllottedGeometry, P - FVector2D(4.5f), FVector2D(9.f), HitmenAlert::ToLinearColor(Blip.Color));
+				continue;
 			}
+			const FVector2D P = ToMap(Blip.Location);
+			const FLinearColor Tint = HitmenUI::GetMapNPCColor(Blip.Color);
+			if (MapSettings->bPauseMapShowVisionCones && Blip.SightRadius > 0.f)
+			{
+				HitmenUI::PaintVisionCone(OutDrawElements, LayerId + 2, AllottedGeometry, P, Blip.SightRadius * PixelsPerCm, Blip.Yaw,
+					Blip.SightHalfAngle, HitmenUI::GetMapConeColor(Blip.Color) * FLinearColor(1.f, 1.f, 1.f, MapSettings->MapVisionConeOpacity));
+			}
+			HitmenUI::PaintDiamond(OutDrawElements, LayerId + 3, AllottedGeometry, P, MapSettings->PauseMapNPCSize * 0.5f, Tint);
 		}
 	}
 	// Map markers (retrieval points, cameras, anything with a UHitmenMapMarkerComponent), drawn by their kind.
@@ -291,7 +333,7 @@ int32 UHitmenPauseMapWidget::NativePaint(const FPaintArgs& Args, const FGeometry
 		for (const TWeakObjectPtr<UHitmenMapMarkerComponent>& MapMarker : Markers->GetMarkers())
 		{
 			const UHitmenMapMarkerType* Type = MapMarker.IsValid() ? MapMarker->GetType() : nullptr;
-			if (!Type || !MapMarker->IsMarkerVisible() || !Type->bShowOnPauseMap || HiddenMarkerTypes.Contains(const_cast<UHitmenMapMarkerType*>(Type)))
+			if (!Type || !MapMarker->IsMarkerVisible() || !Type->IsShownOn(true) || HiddenMarkerTypes.Contains(const_cast<UHitmenMapMarkerType*>(Type)))
 			{
 				continue;
 			}
@@ -515,7 +557,16 @@ void UHitmenPauseMenuWidget::RefreshLegend()
 	{
 		Current.Add(Type.Get());
 	}
-	if (LegendToggles.Num() > 0 && Types == Current)
+	// Only what the map draws gets a row (teammates come and go with the players).
+	TArray<int32> Categories;
+	for (int32 Category = 0; Category < UHitmenPauseMapWidget::CategoryCount; ++Category)
+	{
+		if (!Map || Map->IsCategoryDrawn(Category))
+		{
+			Categories.Add(Category);
+		}
+	}
+	if (LegendToggles.Num() > 0 && Types == Current && Categories == LegendCategories)
 	{
 		return;
 	}
@@ -524,6 +575,7 @@ void UHitmenPauseMenuWidget::RefreshLegend()
 	LegendToggles.Reset();
 	LegendMarkerTypes.Reset();
 	LegendMarkerTypes.Append(Types);
+	LegendCategories = Categories;
 	if (Map)
 	{
 		for (int32 Category = 0; Category < UHitmenPauseMapWidget::CategoryCount; ++Category)
@@ -539,16 +591,18 @@ void UHitmenPauseMenuWidget::RefreshLegend()
 	UTextBlock* LegendTitle = HitmenUI::MakeText(WidgetTree, LOCTEXT("Legend", "MAP LEGEND"), 15, TEXT("Medium"), HitmenUI::TextDim());
 	LegendTitle->SetFont(HitmenUI::SpacedFont(15, TEXT("Medium"), 260));
 	HitmenUI::AddToVBox(Legend, LegendTitle, FMargin(0.f, 0.f, 0.f, 12.f));
-	const int32 RowCount = UHitmenPauseMapWidget::CategoryCount + LegendMarkerTypes.Num();
-	for (int32 Category = 0; Category < RowCount; ++Category)
+	const int32 RowCount = LegendCategories.Num() + LegendMarkerTypes.Num();
+	for (int32 RowIndex = 0; RowIndex < RowCount; ++RowIndex)
 	{
-		const UHitmenMapMarkerType* MarkerType = Category >= UHitmenPauseMapWidget::CategoryCount ? LegendMarkerTypes[Category - UHitmenPauseMapWidget::CategoryCount].Get() : nullptr;
+		const UHitmenMapMarkerType* MarkerType = RowIndex >= LegendCategories.Num() ? LegendMarkerTypes[RowIndex - LegendCategories.Num()].Get() : nullptr;
+		const int32 Category = MarkerType ? INDEX_NONE : LegendCategories[RowIndex];
 		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 		UHorizontalBox* Swatches = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 		TArray<FLinearColor> Colors = { MarkerType ? MarkerType->Color : UHitmenPauseMapWidget::GetCategoryColor(Category) };
 		if (Category == UHitmenPauseMapWidget::AlertedCategory)
 		{
-			Colors = { HitmenAlert::ToLinearColor(EHitmenAlertColor::White), HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow), HitmenAlert::ToLinearColor(EHitmenAlertColor::Red) };
+			Colors = { HitmenUI::GetMapNPCColor(EHitmenAlertColor::None), HitmenAlert::ToLinearColor(EHitmenAlertColor::White),
+				HitmenAlert::ToLinearColor(EHitmenAlertColor::Yellow), HitmenAlert::ToLinearColor(EHitmenAlertColor::Red) };
 		}
 		for (const FLinearColor& Color : Colors)
 		{
@@ -560,7 +614,7 @@ void UHitmenPauseMenuWidget::RefreshLegend()
 			HitmenUI::AddToHBox(Swatches, SwatchSize, FMargin(0.f, 0.f, 4.f, 0.f));
 		}
 		USizeBox* SwatchColumn = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-		SwatchColumn->SetWidthOverride(52.f);
+		SwatchColumn->SetWidthOverride(68.f);
 		SwatchColumn->SetContent(Swatches);
 		HitmenUI::AddToHBox(Row, SwatchColumn, FMargin(0.f));
 		UHitmenToggle* Toggle = WidgetTree->ConstructWidget<UHitmenToggle>(UHitmenToggle::StaticClass());
@@ -578,16 +632,16 @@ void UHitmenPauseMenuWidget::HandleLegendToggled(bool bChecked)
 	{
 		return;
 	}
-	for (int32 Category = 0; Category < LegendToggles.Num(); ++Category)
+	for (int32 RowIndex = 0; RowIndex < LegendToggles.Num(); ++RowIndex)
 	{
-		const int32 MarkerIndex = Category - UHitmenPauseMapWidget::CategoryCount;
+		const int32 MarkerIndex = RowIndex - LegendCategories.Num();
 		if (MarkerIndex < 0)
 		{
-			Map->SetCategoryVisible(Category, LegendToggles[Category]->IsChecked());
+			Map->SetCategoryVisible(LegendCategories[RowIndex], LegendToggles[RowIndex]->IsChecked());
 		}
 		else if (LegendMarkerTypes.IsValidIndex(MarkerIndex))
 		{
-			Map->SetMarkerTypeVisible(LegendMarkerTypes[MarkerIndex], LegendToggles[Category]->IsChecked());
+			Map->SetMarkerTypeVisible(LegendMarkerTypes[MarkerIndex], LegendToggles[RowIndex]->IsChecked());
 		}
 	}
 }
@@ -737,13 +791,61 @@ void UHitmenSpectatorWidget::BuildDefaultLayout()
 {
 	UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
 	WidgetTree->RootWidget = Canvas;
-	ModeText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 18);
-	HitmenUI::AddToCanvas(Canvas, ModeText, FAnchors(0.5f, 1.f), FVector2D(0.f, -30.f), FVector2D(0.5f, 1.f));
+	// Split screen: the whole screen but a strip at the bottom for the keys.
 	Grid = WidgetTree->ConstructWidget<UUniformGridPanel>(UUniformGridPanel::StaticClass());
-	Grid->SetSlotPadding(FMargin(4.f));
+	Grid->SetSlotPadding(FMargin(3.f));
 	UCanvasPanelSlot* GridSlot = HitmenUI::AddToCanvas(Canvas, Grid, FAnchors(0.f, 0.f, 1.f, 1.f), FVector2D::ZeroVector, FVector2D::ZeroVector);
-	GridSlot->SetOffsets(FMargin(20.f, 20.f, 20.f, 80.f));
+	GridSlot->SetOffsets(FMargin(6.f, 6.f, 6.f, 64.f));
 	Grid->SetVisibility(ESlateVisibility::Collapsed);
+	// Bottom: the view (and who), then its keys.
+	ModeText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 19, TEXT("Bold"));
+	ModeText->SetJustification(ETextJustify::Center);
+	UCanvasPanelSlot* ModeSlot = HitmenUI::AddToCanvas(Canvas, ModeText, FAnchors(0.5f, 1.f), FVector2D(0.f, -34.f), FVector2D(0.5f, 1.f));
+	ModeSlot->SetAutoSize(true);
+	KeysText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 14, TEXT("Medium"), HitmenUI::TextDim());
+	KeysText->SetJustification(ETextJustify::Center);
+	UCanvasPanelSlot* KeysSlot = HitmenUI::AddToCanvas(Canvas, KeysText, FAnchors(0.5f, 1.f), FVector2D(0.f, -12.f), FVector2D(0.5f, 1.f));
+	KeysSlot->SetAutoSize(true);
+	// The fly speed, briefly, after a wheel notch.
+	SpeedText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 22, TEXT("Bold"));
+	SpeedText->SetJustification(ETextJustify::Center);
+	UCanvasPanelSlot* SpeedSlot = HitmenUI::AddToCanvas(Canvas, SpeedText, FAnchors(0.5f, 0.5f), FVector2D(0.f, 80.f), FVector2D(0.5f, 0.5f));
+	SpeedSlot->SetAutoSize(true);
+	SpeedText->SetRenderOpacity(0.f);
+	InfoText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 16, TEXT("Medium"), FLinearColor(0.88f, 0.88f, 0.88f, 1.f));
+	InfoText->SetJustification(ETextJustify::Center);
+	InfoText->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.8f));
+	InfoText->SetShadowOffset(FVector2D(1.f, 1.f));
+	UCanvasPanelSlot* InfoSlot = HitmenUI::AddToCanvas(Canvas, InfoText, FAnchors(0.5f, 0.5f), FVector2D(0.f, 36.f), FVector2D(0.5f, 0.f));
+	InfoSlot->SetAutoSize(true);
+}
+
+void UHitmenSpectatorWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (SpeedText && GetWorld())
+	{
+		const float Age = GetWorld()->GetRealTimeSeconds() - SpeedShownAt;
+		SpeedText->SetRenderOpacity(FMath::Clamp((SpeedShowTime - Age) / 0.3f, 0.f, 1.f));
+	}
+	if (InfoText)
+	{
+		const UHitmenUIEventSubsystem* UI = GetUIEvents();
+		const FText Info = UI && static_cast<EHitmenSpectatorMode>(CurrentMode) != EHitmenSpectatorMode::Grid ? UI->GetInteractionInfo() : FText::GetEmpty();
+		if (!Info.EqualTo(InfoText->GetText()))
+		{
+			InfoText->SetText(Info);
+		}
+	}
+}
+
+void UHitmenSpectatorWidget::HandleWatcherSpeed(float SpeedScale)
+{
+	if (SpeedText && GetWorld())
+	{
+		SpeedText->SetText(FText::FromString(FString::Printf(TEXT("FLY SPEED  x%.2g"), SpeedScale)));
+		SpeedShownAt = GetWorld()->GetRealTimeSeconds();
+	}
 }
 
 void UHitmenSpectatorWidget::BindEvents()
@@ -752,6 +854,7 @@ void UHitmenSpectatorWidget::BindEvents()
 	{
 		UI->OnSpectatorModeChanged.AddUniqueDynamic(this, &UHitmenSpectatorWidget::HandleModeChanged);
 		UI->OnSpectatorViewsChanged.AddUniqueDynamic(this, &UHitmenSpectatorWidget::HandleViewsChanged);
+		UI->OnWatcherSpeedChanged.AddUniqueDynamic(this, &UHitmenSpectatorWidget::HandleWatcherSpeed);
 		HandleViewsChanged(UI->GetSpectatorViews());
 	}
 }
@@ -762,6 +865,7 @@ void UHitmenSpectatorWidget::UnbindEvents()
 	{
 		UI->OnSpectatorModeChanged.RemoveAll(this);
 		UI->OnSpectatorViewsChanged.RemoveAll(this);
+		UI->OnWatcherSpeedChanged.RemoveAll(this);
 	}
 }
 
@@ -769,16 +873,66 @@ void UHitmenSpectatorWidget::HandleModeChanged(uint8 Mode)
 {
 	CurrentMode = Mode;
 	const EHitmenSpectatorMode SpectatorMode = static_cast<EHitmenSpectatorMode>(Mode);
+	const UHitmenUIEventSubsystem* UI = GetUIEvents();
+	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
+	const AHitmenPlayerState* Self = GetOwningPlayerState<AHitmenPlayerState>();
+	const bool bWatcher = !Self || Self->IsWatcher() || Self->IsAlive() == false;
+	const bool bCanFreeFly = Self && Self->IsWatcher();
 	if (ModeText)
 	{
-		const FText ModeName = SpectatorMode == EHitmenSpectatorMode::FreeFly ? LOCTEXT("FreeFly", "FREE FLY")
-			: SpectatorMode == EHitmenSpectatorMode::Follow ? LOCTEXT("Follow", "FOLLOW") : LOCTEXT("Grid", "MULTI-SCREEN");
-		const FText Hint = SpectatorMode == EHitmenSpectatorMode::Grid
-			? LOCTEXT("GridHint", "[Wheel] number of screens     [LMB/RMB] switch player     [V] change view")
-			: SpectatorMode == EHitmenSpectatorMode::FreeFly
-			? LOCTEXT("FreeFlyHint", "[ZQSD] move   [SPACE / A] up   [CTRL / E] down   [SHIFT] faster     [LMB/RMB] follow a player     [V] change view")
-			: LOCTEXT("SpectatorHint", "[LMB/RMB] switch player     [V] change view");
-		ModeText->SetText(FText::Format(LOCTEXT("SpectatorLine", "{0}     {1}"), ModeName, Hint));
+		FString Line;
+		switch (SpectatorMode)
+		{
+		case EHitmenSpectatorMode::Follow:
+		{
+			const FString Name = UI ? UI->GetSpectatorTargetName().ToString().ToUpper() : FString();
+			Line = Name.IsEmpty() ? FString(TEXT("PLAYER VIEW")) : FString::Printf(TEXT("PLAYER VIEW  -  %s"), *Name);
+			break;
+		}
+		case EHitmenSpectatorMode::Grid:
+			Line = ViewCount > 0 ? FString(TEXT("SPLIT SCREEN")) : FString(TEXT("SPLIT SCREEN  -  NOBODY TO WATCH"));
+			break;
+		default:
+			Line = TEXT("FREE FLY");
+			break;
+		}
+		ModeText->SetText(FText::FromString(Line));
+	}
+	if (KeysText)
+	{
+		// The view's own keys, then the views and the switches this server allows.
+		TArray<FString> Keys;
+		switch (SpectatorMode)
+		{
+		case EHitmenSpectatorMode::Follow:
+			Keys = { TEXT("[LMB / RMB] switch player"), TEXT("[V] first / third person") };
+			break;
+		case EHitmenSpectatorMode::Grid:
+			Keys = { TEXT("[LMB / RMB] switch player") };
+			break;
+		default:
+			Keys = { TEXT("[ZQSD] move"), TEXT("[E / SPACE] up"), TEXT("[A / CTRL] down"), TEXT("[SHIFT] faster"), TEXT("[WHEEL] speed") };
+			break;
+		}
+		Keys.Add(TEXT("[1] player view"));
+		Keys.Add(TEXT("[2] split screen"));
+		if (bCanFreeFly)
+		{
+			Keys.Add(TEXT("[3] free fly"));
+		}
+		if (bWatcher && Settings->WatcherSeePlayers == EHitmenWatcherVisibility::ShownToggleable)
+		{
+			Keys.Add(FString::Printf(TEXT("[N] players %s"), UI && UI->AreWatcherPlayersShown() ? TEXT("on") : TEXT("off")));
+		}
+		if (bWatcher && Settings->WatcherSeeWatchers == EHitmenWatcherVisibility::ShownToggleable)
+		{
+			Keys.Add(FString::Printf(TEXT("[B] watchers %s"), UI && UI->AreWatcherWatchersShown() ? TEXT("on") : TEXT("off")));
+		}
+		if (Settings->bWatchersCanScan && SpectatorMode != EHitmenSpectatorMode::Grid)
+		{
+			Keys.Add(TEXT("[TAB] scan"));
+		}
+		KeysText->SetText(FText::FromString(FString::Join(Keys, TEXT("     "))));
 	}
 	if (Grid && SpectatorMode != EHitmenSpectatorMode::Grid)
 	{
@@ -793,7 +947,11 @@ void UHitmenSpectatorWidget::HandleViewsChanged(const TArray<FHitmenSpectatorVie
 		return;
 	}
 	Grid->ClearChildren();
-	const int32 Columns = FMath::Max(1, FMath::CeilToInt(FMath::Sqrt(static_cast<float>(Views.Num()))));
+	ViewCount = Views.Num();
+	// 1, 2 side by side, 2x2, 3x2, 4x2: each picture fills its cell (the controller shapes it like the cell).
+	int32 Columns = 1;
+	int32 Rows = 1;
+	HitmenUI::GetSplitLayout(Views.Num(), Columns, Rows);
 	for (int32 Index = 0; Index < Views.Num(); ++Index)
 	{
 		const FHitmenSpectatorView& View = Views[Index];
@@ -807,18 +965,27 @@ void UHitmenSpectatorWidget::HandleViewsChanged(const TArray<FHitmenSpectatorVie
 		Brush.SetResourceObject(View.RenderTarget);
 		Brush.ImageSize = FVector2D(View.RenderTarget->SizeX, View.RenderTarget->SizeY);
 		Image->SetBrush(Brush);
-		Cell->AddChildToOverlay(Image);
-		UTextBlock* Name = HitmenUI::MakeText(WidgetTree, View.PlayerName, 14);
+		if (UOverlaySlot* ImageSlot = Cell->AddChildToOverlay(Image))
+		{
+			ImageSlot->SetHorizontalAlignment(HAlign_Fill);
+			ImageSlot->SetVerticalAlignment(VAlign_Fill);
+		}
+		UTextBlock* Name = HitmenUI::MakeText(WidgetTree, FText::FromString(View.PlayerName.ToString().ToUpper()), 15, TEXT("Bold"));
 		if (UOverlaySlot* NameSlot = Cell->AddChildToOverlay(Name))
 		{
 			NameSlot->SetHorizontalAlignment(HAlign_Left);
 			NameSlot->SetVerticalAlignment(VAlign_Top);
 			NameSlot->SetPadding(FMargin(8.f, 6.f));
 		}
-		Grid->AddChildToUniformGrid(Cell, Index / Columns, Index % Columns);
+		if (UUniformGridSlot* CellSlot = Grid->AddChildToUniformGrid(Cell, Index / Columns, Index % Columns))
+		{
+			CellSlot->SetHorizontalAlignment(HAlign_Fill);
+			CellSlot->SetVerticalAlignment(VAlign_Fill);
+		}
 	}
 	const bool bGrid = static_cast<EHitmenSpectatorMode>(CurrentMode) == EHitmenSpectatorMode::Grid && !Views.IsEmpty();
 	Grid->SetVisibility(bGrid ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	HandleModeChanged(CurrentMode);
 }
 
 // =============================================================================================
@@ -840,8 +1007,11 @@ void UHitmenResultsWidget::BuildDefaultLayout()
 	ReasonText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 22, TEXT("Regular"), HitmenUI::TextDim());
 	ReasonText->SetJustification(ETextJustify::Center);
 	HitmenUI::AddToVBox(Column, WinnerText, FMargin(0.f), false, HAlign_Center);
-	HitmenUI::AddToVBox(Column, ReasonText, FMargin(0.f, 2.f, 0.f, 14.f), false, HAlign_Center);
-	// Host: [Enter] Back to the lobby (also in the pause menu). Others: waiting for the host.
+	HitmenUI::AddToVBox(Column, ReasonText, FMargin(0.f, 2.f, 0.f, 4.f), false, HAlign_Center);
+	// Bottom right: host, [Enter] Back to the lobby (also in the pause menu); others, waiting for the host.
+	UVerticalBox* Corner = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	UCanvasPanelSlot* CornerSlot = HitmenUI::AddToCanvas(Canvas, Corner, FAnchors(1.f, 1.f), FVector2D(-40.f, -36.f), FVector2D(1.f, 1.f));
+	CornerSlot->SetAutoSize(true);
 	BackHint = WidgetTree->ConstructWidget<UHitmenKeyHint>(UHitmenKeyHint::StaticClass());
 	BackHint->Setup(TEXT("ENTER"), LOCTEXT("BackToLobbyHint", "Back to the lobby"));
 	BackHint->OnClicked = [this]() { HandleBackClicked(); };
@@ -849,9 +1019,9 @@ void UHitmenResultsWidget::BuildDefaultLayout()
 	HintSize->SetHeightOverride(40.f);
 	HintSize->SetWidthOverride(330.f);
 	HintSize->SetContent(BackHint);
-	HitmenUI::AddToVBox(Column, HintSize, FMargin(0.f), false, HAlign_Center);
+	HitmenUI::AddToVBox(Corner, HintSize, FMargin(0.f), false, HAlign_Right);
 	WaitText = HitmenUI::MakeText(WidgetTree, LOCTEXT("WaitingForHost", "Waiting for the host to go back to the lobby"), 19, TEXT("Italic"), HitmenUI::TextDim());
-	HitmenUI::AddToVBox(Column, WaitText, FMargin(0.f), false, HAlign_Center);
+	HitmenUI::AddToVBox(Corner, WaitText, FMargin(0.f), false, HAlign_Right);
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 

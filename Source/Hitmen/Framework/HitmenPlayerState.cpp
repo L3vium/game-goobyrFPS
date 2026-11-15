@@ -25,6 +25,23 @@ void AHitmenPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AHitmenPlayerState, Kills);
 	// Read by the server (damage, ammo, AI) and the owner (fly, the cheat panel) only.
 	DOREPLIFETIME_CONDITION(AHitmenPlayerState, CheatFlags, COND_OwnerOnly);
+	// The owner knows where it looks.
+	DOREPLIFETIME_CONDITION(AHitmenPlayerState, WatcherView, COND_SkipOwner);
+}
+
+void AHitmenPlayerState::SetWatcherView(const FHitmenWatcherView& View)
+{
+	WatcherView = View;
+	WatcherView.bWatching = true;
+}
+
+void AHitmenPlayerState::ClearWatcherView()
+{
+	if (WatcherView.bWatching)
+	{
+		WatcherView = FHitmenWatcherView();
+		ForceNetUpdate();
+	}
 }
 
 void AHitmenPlayerState::SetCheat(EHitmenCheat Cheat, bool bEnabled)

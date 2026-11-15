@@ -29,6 +29,9 @@ public:
 	static void SpawnTracer(UWorld* World, const FVector& Start, const FVector& End, UMaterialInterface* Material, const FLinearColor& Color,
 		const FHitmenTracerStyle& Style = FHitmenTracerStyle());
 
+	/** Local cosmetic: a soft smoke trail over the whole line that lingers, widens and fades (Style.Smoke*). */
+	static void SpawnSmokeTrail(UWorld* World, const FVector& Start, const FVector& End, UMaterialInterface* Material, const FHitmenTracerStyle& Style);
+
 	virtual void Tick(float DeltaSeconds) override;
 
 	UPROPERTY(VisibleAnywhere, Category="Hitmen|Components")
@@ -40,6 +43,7 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> Instance;
 	float Age = 0.f;
+	bool bSmoke = false;
 	FVector Start = FVector::ZeroVector;
 	FVector End = FVector::ZeroVector;
 	float Travelled = 0.f;

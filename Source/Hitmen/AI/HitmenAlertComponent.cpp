@@ -1,6 +1,9 @@
 // Hitmen — alert state machine
 
 #include "AI/HitmenAlertComponent.h"
+#include "Hitmen.h"
+#include "Characters/HitmenNPC.h"
+#include "NavigationSystem.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
@@ -8,6 +11,9 @@
 #include "Data/HitmenMatchRules.h"
 #include "Core/HitmenTeamLibrary.h"
 #include "Weapons/HitmenWeaponBase.h"
+#include "Framework/HitmenPlayerController.h"
+#include "Components/HitmenBodyCarryComponent.h"
+#include "World/Interactables/HitmenHidingSpot.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 
@@ -67,7 +73,7 @@ float UHitmenAlertComponent::GetRuleLoseTime() const
 
 float UHitmenAlertComponent::GetRuleSearchTime() const
 {
-	return UHitmenAISubsystem::GetRules(this).SearchDuration;
+	return bBodySearch ? UHitmenAISubsystem::GetRules(this).BodySearchDuration : UHitmenAISubsystem::GetRules(this).SearchDuration;
 }
 
 float UHitmenAlertComponent::GetRuleInvestigateTime() const
@@ -261,9 +267,17 @@ void UHitmenAlertComponent::SetSuppressed(bool bInSuppressed)
 
 void UHitmenAlertComponent::SetInvestigate(const FVector& Location, bool bThreat, EHitmenAlertReason Reason)
 {
+	const bool bSamePlace = AlertState == EHitmenAlertState::Investigating && FVector::Dist2D(Location, InvestigateLocation) < SameInvestigationRadius;
 	InvestigateLocation = Location;
 	if (AlertState == EHitmenAlertState::Combat)
 	{
+		return;
+	}
+	// Already looking into that very place (a repeated radio call, the same noise again): the running timer goes on,
+	// so an alert always ends (repeated calls used to restart it for ever).
+	if (bSamePlace)
+	{
+		bThreatInvestigation |= bThreat;
 		return;
 	}
 	const bool bAlreadyInvestigating = AlertState == EHitmenAlertState::Investigating;
@@ -418,6 +432,20 @@ void UHitmenAlertComponent::HearNoise(const FVector& Location, EHitmenNoiseType 
 	}
 	// Gunfire, explosions and fighting are threats; footsteps and distractions are only curiosities.
 	const bool bThreat = bLoud || Type == EHitmenNoiseType::Combat;
+	// A shot heard where the shooter stands (the report, not the impact): the guard turns to the shooter, and the impact
+	// heard a moment later does not pull it away (Hitman: it looks at you; if you are in its view it sees you).
+	if (Type == EHitmenNoiseType::Gunshot && NoiseInstigator && FVector::Dist(Location, NoiseInstigator->GetActorLocation()) < 250.f)
+	{
+		LastShooterHeardTime = GetWorld()->GetTimeSeconds();
+	}
+	else if (Type == EHitmenNoiseType::Gunshot && GetWorld()->GetTimeSeconds() - LastShooterHeardTime < 0.5f && AlertState == EHitmenAlertState::Investigating)
+	{
+		return;
+	}
+	if (Type == EHitmenNoiseType::Distraction && AlertState != EHitmenAlertState::Investigating)
+	{
+		AHitmenPlayerController::NotifyDistractionNoticed(GetOwner(), NoiseInstigator);
+	}
 	SetInvestigate(Location, bThreat, bThreat ? EHitmenAlertReason::Gunfire : EHitmenAlertReason::Noise);
 }
 
@@ -438,7 +466,97 @@ void UHitmenAlertComponent::SeeBody(AHitmenCharacterBase* Body)
 	if (AlertState != EHitmenAlertState::Combat)
 	{
 		SetInvestigate(Body->GetActorLocation(), true, EHitmenAlertReason::Body);
+		BodyFound = Body;
+		UE_LOG(LogHitmen, Log, TEXT("%s: found the body of %s"), *GetNameSafe(GetOwner()), *GetNameSafe(Body));
 	}
+}
+
+void UHitmenAlertComponent::StartBodySearch(AHitmenCharacterBase* Body)
+{
+	UE_LOG(LogHitmen, Log, TEXT("%s: searching around the body of %s"), *GetNameSafe(GetOwner()), *GetNameSafe(Body));
+	// Hitman: whoever finds a body looks around it for a while (EQS search points), then calms down.
+	StartSearchAround(Body ? Body->GetActorLocation() : GetOwner()->GetActorLocation());
+	bBodySearch = true;
+}
+
+void UHitmenAlertComponent::TryStartBodyDisposal(AHitmenCharacterBase* Body)
+{
+	const UHitmenMatchRules& Rules = UHitmenAISubsystem::GetRules(this);
+	// The VIP's body is never carried away by a guard (it must stay for the players).
+	if (!Rules.bNPCsDisposeBodies || !Body || Body->IsVIP() || !Body->IsDead() || Body->GetCarrier() || Body->GetStowedIn() || Body->IsVanished())
+	{
+		return;
+	}
+	const UHitmenBodyCarryComponent* Carry = GetOwner()->FindComponentByClass<UHitmenBodyCarryComponent>();
+	const UHitmenAISubsystem* AI = UHitmenAISubsystem::Get(this);
+	AHitmenHidingSpot* Spot = AI ? AI->FindContainerForBody(Body, Rules.MaxBodyDisposalDistance) : nullptr;
+	if (!Spot)
+	{
+		return;
+	}
+	// A sniper on its tower or a guard holding its post cannot walk the body away: the nearest colleague who can does.
+	const AHitmenNPC* Self = Cast<AHitmenNPC>(GetOwner());
+	const bool bCanWalk = Carry && Self && !Self->IsSniper() && !Self->HoldsPosition();
+	UHitmenAlertComponent* Handler = bCanWalk ? this : nullptr;
+	if (!Handler && AI)
+	{
+		float Best = Rules.MaxBodyDisposalDistance;
+		for (UHitmenAlertComponent* Other : const_cast<UHitmenAISubsystem*>(AI)->GetAlertComponents())
+		{
+			const AHitmenNPC* NPC = Other ? Cast<AHitmenNPC>(Other->GetOwner()) : nullptr;
+			if (!NPC || NPC == Self || NPC->IsDead() || NPC->IsSniper() || NPC->HoldsPosition() || NPC->IsVIP()
+				|| !NPC->FindComponentByClass<UHitmenBodyCarryComponent>() || Other->GetAlertState() == EHitmenAlertState::Combat || Other->GetDisposeBody())
+			{
+				continue;
+			}
+			const float Distance = FVector::Dist(NPC->GetActorLocation(), Body->GetActorLocation());
+			if (Distance < Best)
+			{
+				Best = Distance;
+				Handler = Other;
+			}
+		}
+	}
+	UE_LOG(LogHitmen, Log, TEXT("%s: body of %s -> %s by %s"), *GetNameSafe(GetOwner()), *GetNameSafe(Body), *GetNameSafe(Spot),
+		Handler ? *GetNameSafe(Handler->GetOwner()) : TEXT("nobody"));
+	if (Handler)
+	{
+		Handler->AssignBodyDisposal(Body, Spot);
+	}
+}
+
+void UHitmenAlertComponent::AssignBodyDisposal(AHitmenCharacterBase* Body, AActor* Spot)
+{
+	DisposeBody = Body;
+	DisposeContainer = Spot;
+	BodyFound = Body;
+	// Stand in front of it (its origin is inside it, off the navmesh).
+	DisposeLocation = Spot ? Spot->GetActorLocation() + Spot->GetActorForwardVector() * 130.f : FVector::ZeroVector;
+	if (const UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
+	{
+		FNavLocation Projected;
+		if (Nav->ProjectPointToNavigation(DisposeLocation, Projected, FVector(150.f, 150.f, 250.f)))
+		{
+			DisposeLocation = Projected.Location;
+		}
+	}
+}
+
+AActor* UHitmenAlertComponent::GetDisposeBody() const
+{
+	return DisposeBody.Get();
+}
+
+void UHitmenAlertComponent::EndBodyDisposal()
+{
+	// Never left holding a body.
+	if (UHitmenBodyCarryComponent* Carry = GetOwner() ? GetOwner()->FindComponentByClass<UHitmenBodyCarryComponent>() : nullptr; Carry && Carry->IsCarrying())
+	{
+		Carry->Drop();
+	}
+	DisposeBody.Reset();
+	DisposeContainer.Reset();
+	BodyFound.Reset();
 }
 
 void UHitmenAlertComponent::SeeSleeper(AHitmenCharacterBase* Sleeper)
@@ -601,6 +719,10 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	{
 		bOnEdge = false;
 	}
+	if (DisposeBody.IsValid() && AlertState != EHitmenAlertState::Unaware)
+	{
+		EndBodyDisposal();
+	}
 	// Shared knowledge: pull the latest sighting of the hunted target (a colleague may have seen it since).
 	SharedKnowledgeAccumulator += DeltaTime;
 	if (SharedKnowledgeAccumulator >= SharedKnowledgeInterval && Target && !bTargetVisible
@@ -659,9 +781,15 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 			}
 			else
 			{
-				// Nothing found: back to routine, on edge for a while.
+				// Nothing found: back to routine, on edge for a while (after a body search: then carry it away).
+				const bool bWasBodySearch = bBodySearch;
+				bBodySearch = false;
 				EnterOnEdge();
 				SetAlertStateWithReason(EHitmenAlertState::Unaware, EHitmenAlertReason::SearchOver);
+				if (bWasBodySearch)
+				{
+					TryStartBodyDisposal(BodyFound.Get());
+				}
 			}
 		}
 		break;
@@ -687,6 +815,13 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 			const bool bWasThreat = bThreatInvestigation;
 			WakeTarget.Reset();
 			EvidenceTarget.Reset();
+			// The investigation was the body (a radio call or a noise may have changed the reason since, not the place).
+			if (AHitmenCharacterBase* Body = BodyFound.Get(); Body && FVector::Dist2D(InvestigateLocation, Body->GetActorLocation()) < 400.f)
+			{
+				// A body: search around it before calming down.
+				StartBodySearch(Body);
+				break;
+			}
 			if (bWasThreat)
 			{
 				EnterOnEdge();

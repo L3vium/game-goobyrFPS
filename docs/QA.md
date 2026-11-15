@@ -13,7 +13,8 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
   `Saved/Config/Windows/GameUserSettings.ini` to try again)
 - [x] GC stress: the Dev build with `-ExecCmds="gc.CollectGarbageEveryFrame 1"` — 100 s in the Gym (minimap) and
   400 s on the title screen, no crash (0.4.1); 100 s in the Gym and 90 s on San Lazaro, no crash (0.6.0, 0.6.1);
-  222 s in the Gym and 122 s on the rebuilt San Lazaro, both at once, no crash (0.7.0);
+  222 s in the Gym and 122 s on the rebuilt San Lazaro, both at once, no crash (0.7.0); 150 s in the Gym and on the
+  0.9.0 San Lazaro at once, no crash, no new crash report (0.9.0);
   [ ] Create Room map tiles and the pause map by hand
 - [ ] Crash reports, if any: `python Tools/Debug/hitmen_crash_report.py "Builds/Windows Dev"`
 - [ ] No crash: 10 min of menu stress with Steam running (create / leave / join / refresh spam / map cycling)
@@ -50,6 +51,33 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [ ] Head bob on, a footstep on each dip; Options head bob 0 removes it
 - [ ] Switching weapons: the new one rises from below in ~0.2 s
 - [ ] Every gun kicks per shot (shotgun / sniper hard, SMG light); the minigun shakes more as it spins up
+- [x] A held gun gives no light; a shot lights the muzzle for one flash and it is off 0.5 s later (PIE script at
+  37 fps, 0.9.0); [ ] the same in a dark room by eye, first person and third person
+- [ ] No ladder / gutter puff, no slide dust, no footstep puff by default; each comes back with its Juice switch
+- [ ] Footsteps sound different on grass, stone, sand, wood, metal and tile floors (DA_SoundSet surface table)
+- [ ] `F` with nothing in focus throws the held weapon only while aiming (`[F] Throw` shows); not when just holding it
+- [ ] Sniper shot: a white smoke trail along the shot, lingering ~2 s; shotgun pellets spread per the weapon data
+- [x] Snipers: a red star at the scope, the red aim line visible from the ground (PIE screenshot, 0.9.0); [ ] at 100 m
+- [x] Mounted gun: the barrel shows under the crosshair (PIE screenshot, 0.9.0); [ ] bullets hit what the crosshair is on
+- [x] Carry a body: drawn in first person; dropped facing a wall it lands on your side (PIE script, 0.9.0); [ ] no
+  sprint while carrying, normal walk speed
+- [x] Locker: stow a body (1 / 1, "no room to hide"), `F` opens it to look inside (PIE script, 0.9.0)
+- [x] Body container: info line when empty-handed, hide inside crouched behind the slit, view limited to 180 degrees
+  (PIE screenshots, 0.9.0); [ ] two bodies stowed and visible with the lid open
+- [x] VIP death: toast, sound, event camera on the body, body outlined yellow, gold retrieval points (PIE screenshot,
+  0.9.0); [ ] the same on a client and a watcher
+- [x] Out of sight: a yellow ghost through walls where the body was (PIE screenshot, 0.9.0); [ ] a sonar ping moves it
+- [x] Carry the VIP to a retrieval point: `[F] Extract the target`, the cinematic with letterbox, banner, then free fly
+  with "Back to the lobby" bottom right (PIE screenshots, 0.9.0); [ ] on every client at once
+- [x] Distraction: the guard who comes to look shows in the event camera (PIE screenshot, 0.9.0)
+- [x] A sniper shot 6-9 m from guards: the nearest turn to the shooter, see you and fight (PIE script, 0.9.0)
+- [x] A body found: the finder looks around it, calms down, carries it to the nearest locker / container and stows it;
+  every guard back to calm (PIE script, 0.9.0); [ ] never the VIP's body
+- [x] Attack chain after the 0.9.0 AI: an armed player in a guard's view is shot within seconds (PIE script, 0.9.0)
+- [x] Guard info line and the keycard in the right pocket (PIE screenshot, 0.9.0)
+- [x] Gym: the group of 4 walks its curved route together, followers 4-5 m from the leader (PIE script and screenshot,
+  0.9.0); [ ] one of them alerted: the others come
+- [ ] Tank shells land on the crosshair; a parked tank is at full health; the tank bar only while driving
 - [x] Sniper: a brief trail to the impact and debris there; no warm full-screen wash on your own shots (PIE screenshots,
   0.8.0); [ ] SMG / minigun bursts in a dark room never look like a light left on
 - [ ] Sniper: raise, wobble, then zoom; the zoomed aim breathes
@@ -186,6 +214,23 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Awareness arcs toward guards noticing you; minimap Under fire banner (screenshot, 0.5.0)
 - [ ] Headshot hit ticks are red and a metallic hit sound plays (shooter only)
 - [ ] Minimap: no own view cone, north-up, your arrow turns
+- [x] Stiff ledges: pushed toward the edge of a window ledge at 7 and 14 m/s, the player stays on it (PIE script,
+  0.9.0); [ ] by hand: walk along a ledge window to window, crouch under a sill with a guard inside
+- [x] Window vaults (PIE `QueryTraversalAction` on every open window): every upper window vaults out onto its ledge and
+  back in; ground floor 136 / 139 (the rest sit right over a stair lane) (0.9.0)
+- [x] San Lazaro 0.9.0 rebuild: `hitmen_check_reach.py` problems 0 (55 doors, 89 targets, 24 starts),
+  `hitmen_check_doors.py` problems 0, `hitmen_check_features.py` missing 0; `hitmen_check_patrols.py` flags one guard
+  pausing at a route end per run (a different one each time, all seen walking) (0.9.0)
+- [x] Screenshots: ledges and gutter, the tunnel's keycard 3 door, a cave vent shaft, the double front door, the high
+  vent hatch (0.9.0); [ ] crawl through the high vent and the tunnel by hand
+- [x] Watchers (2-3 player PIE, `HitmenWatch`): free fly with the player outlined and tagged, player view first and
+  third person, split screen of 2, the info line on a locker, Tab scan with guards lit, the host sees a client watcher
+  as an orb with its name (screenshots, 0.9.0); [ ] fly through a wall and under the ground in San Lazaro by hand,
+  [ ] split screen with 5-8 players, [ ] N / B toggles by key
+- [x] Sightroom: an enemy brightens progressively from 20 m to 16.5 m (no pop), highlights fade out with the look on
+  release (PIE screenshots, 0.9.0); [ ] walk round a corner holding Tab: a locker lights as it shows
+- [x] Map layers: minimap default = NPC diamonds only; all layers on = cones and interactables on both maps; pause map
+  default = you, VIP, retrieval points and a legend of exactly those; overhead diamond without "!" (screenshots, 0.9.0)
 - [x] Overhead alert marker: yellow / red triangle with "!" and backup arcs (screenshots, 0.6.1); [ ] white, filling with suspicion
 - [x] Map markers: cameras (diamonds) and the retrieval point (yellow, pinned to the edge) on the minimap and the pause map;
   legend rows come from the marker kinds on the map (screenshots, 0.6.0); [ ] a new DA_MapMarker kind shows up by hand

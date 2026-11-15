@@ -27,15 +27,21 @@ ACTIONS = {
     "IA_Sightroom": ("bool", [("Sightroom", "Sightroom", "Tab", [])]),
     "IA_EmoteWheel": ("bool", [("EmoteWheel", "Emote wheel", "R", [])]),
     "IA_Pause": ("bool", [("Pause", "Pause", "Escape", []), ("PauseAlt", "Pause (alt)", "P", [])]),
-    "IA_SpectatorMode": ("bool", [("SpectatorMode", "Spectator view", "V", [])]),
+    "IA_SpectatorMode": ("bool", [("SpectatorMode", "Player view: first / third person", "V", [])]),
     "IA_Confirm": ("bool", [("Confirm", "Confirm / back to the lobby", "Enter", [])]),
 }
 
-# Free fly (IMC_Spectator, above the game while spectating): Unreal-like, A up / E down.
+# Watching (IMC_Spectator, above the game while spectating): free fly like the Unreal editor on AZERTY (E up, A down),
+# the views (1 player view, 2 split screen, 3 free fly) and the overlays (N players, B watchers).
 SPECTATOR_ACTIONS = {
-    "IA_SpectatorUp": ("bool", [("SpectatorUp", "Fly up", "SpaceBar", []), ("SpectatorUpAlt", "Fly up (alt)", "A", [])]),
-    "IA_SpectatorDown": ("bool", [("SpectatorDown", "Fly down", "LeftControl", []), ("SpectatorDownAlt", "Fly down (alt)", "E", [])]),
+    "IA_SpectatorUp": ("bool", [("SpectatorUp", "Fly up", "SpaceBar", []), ("SpectatorUpAlt", "Fly up (alt)", "E", [])]),
+    "IA_SpectatorDown": ("bool", [("SpectatorDown", "Fly down", "LeftControl", []), ("SpectatorDownAlt", "Fly down (alt)", "A", [])]),
     "IA_SpectatorFast": ("bool", [("SpectatorFast", "Fly faster", "LeftShift", [])]),
+    "IA_SpectatorPlayerView": ("bool", [("SpectatorPlayerView", "Player view", "One", [])]),
+    "IA_SpectatorSplitView": ("bool", [("SpectatorSplitView", "Split screen", "Two", [])]),
+    "IA_SpectatorFreeView": ("bool", [("SpectatorFreeView", "Free fly", "Three", [])]),
+    "IA_WatcherPlayers": ("bool", [("WatcherPlayers", "Show / hide players", "N", [])]),
+    "IA_WatcherWatchers": ("bool", [("WatcherWatchers", "Show / hide watchers", "B", [])]),
 }
 
 # Options > Controls sections (PlayerMappableKeySettings.DisplayCategory).
@@ -45,6 +51,8 @@ INPUT_CATEGORIES = {
     "IA_MoveAbility": "Abilities", "IA_ManipulationAbility": "Abilities", "IA_Sightroom": "Abilities",
     "IA_Interact": "Interaction", "IA_EmoteWheel": "Interaction",
     "IA_SpectatorMode": "Spectator", "IA_SpectatorUp": "Spectator", "IA_SpectatorDown": "Spectator", "IA_SpectatorFast": "Spectator",
+    "IA_SpectatorPlayerView": "Spectator", "IA_SpectatorSplitView": "Spectator", "IA_SpectatorFreeView": "Spectator",
+    "IA_WatcherPlayers": "Spectator", "IA_WatcherWatchers": "Spectator",
     "IA_Pause": "Menus", "IA_Confirm": "Menus",
 }
 # Not rebindable (the mouse axis).
@@ -126,7 +134,7 @@ def build_physical_materials():
     folder = path("Physics")
     surfaces = {"PM_Grass": unreal.PhysicalSurface.SURFACE_TYPE1, "PM_Stone": unreal.PhysicalSurface.SURFACE_TYPE2,
                 "PM_Sand": unreal.PhysicalSurface.SURFACE_TYPE3, "PM_Wood": unreal.PhysicalSurface.SURFACE_TYPE4,
-                "PM_Metal": unreal.PhysicalSurface.SURFACE_TYPE5}
+                "PM_Metal": unreal.PhysicalSurface.SURFACE_TYPE5, "PM_Tile": unreal.PhysicalSurface.SURFACE_TYPE6}
     result = {}
     for name, surface in surfaces.items():
         pm = create(name, folder, unreal.PhysicalMaterial, unreal.PhysicalMaterialFactoryNew())
@@ -231,18 +239,38 @@ def build_camera_ring():
     return ring
 
 
+# Interactable marker kinds (Interactables map layer, Project Settings -> Hitmen -> Maps): kind -> (legend name, colour,
+# shape, legend order, interactable classes whose Blueprints get the kind on their MapMarker component).
+INTERACTABLE_MARKERS = {
+    "HidingSpot": ("Hiding spots", (0.3, 0.85, 0.8), "SQUARE", 30, ("HitmenHidingSpot",)),
+    "Distraction": ("Distractions", (0.75, 0.55, 1.0), "RING", 31, ("HitmenDistraction",)),
+    "Container": ("Containers", (0.95, 0.6, 0.25), "SQUARE", 32, ("HitmenContainer",)),
+    "Keycard": ("Keycards", (0.3, 0.6, 1.0), "TRIANGLE", 33, ("HitmenKeycardPickup",)),
+    "Device": ("Security devices", (0.45, 0.85, 0.4), "TRIANGLE", 34, ("HitmenControlConsole", "HitmenHackPanel", "HitmenCircuitBreaker")),
+    "Hazard": ("Hazards", (1.0, 0.4, 0.3), "RING", 35, ("HitmenPoisonableDrink", "HitmenExplosiveBarrel")),
+}
+
+
 def build_map_markers():
     """Map marker kinds (minimap, pause map, legend) and the fixtures that carry them. A new kind: duplicate a
-    DA_MapMarker_*, set its name, colour and shape; give an actor a HitmenMapMarker component and pick the kind."""
+    DA_MapMarker_*, set its name, colour, shape and layer; give an actor a HitmenMapMarker component (every interactable
+    has one) and pick the kind. Layers: objectives always draw, NPC and Interactables follow Project Settings -> Maps."""
     folder = path("Data", "MapMarkers")
     kinds = {
         "RetrievalPoint": dict(display_name=unreal.Text("Retrieval points"), color=unreal.LinearColor(1.0, 0.78, 0.1, 1.0),
                                shape=unreal.HitmenMapMarkerShape.SQUARE, size=14.0, minimap_scale=0.8, show_on_minimap=True,
-                               clamp_to_minimap_edge=True, show_on_pause_map=True, show_in_legend=True, legend_order=10),
+                               clamp_to_minimap_edge=True, show_on_pause_map=True, show_in_legend=True, legend_order=10,
+                               layer=unreal.HitmenMapLayer.OBJECTIVE),
         "Camera": dict(display_name=unreal.Text("Cameras"), color=unreal.LinearColor(0.75, 0.75, 0.8, 1.0),
-                       shape=unreal.HitmenMapMarkerShape.DIAMOND, size=11.0, minimap_scale=0.8, show_on_minimap=True,
-                       clamp_to_minimap_edge=False, show_on_pause_map=False, show_in_legend=False, legend_order=20),
+                       shape=unreal.HitmenMapMarkerShape.TRIANGLE, size=11.0, minimap_scale=0.8, show_on_minimap=True,
+                       clamp_to_minimap_edge=False, show_on_pause_map=True, show_in_legend=True, legend_order=20,
+                       layer=unreal.HitmenMapLayer.NPC),
     }
+    for name, (label, rgb, shape, order, _classes) in INTERACTABLE_MARKERS.items():
+        kinds[name] = dict(display_name=unreal.Text(label), color=unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0),
+                           shape=getattr(unreal.HitmenMapMarkerShape, shape), size=9.0, minimap_scale=0.8,
+                           show_on_minimap=True, clamp_to_minimap_edge=False, show_on_pause_map=True, show_in_legend=True,
+                           legend_order=order, layer=unreal.HitmenMapLayer.INTERACTABLES)
     assets = {}
     for name, props in kinds.items():
         data = make_data("DA_MapMarker_" + name, folder, unreal.HitmenMapMarkerType)
@@ -256,32 +284,70 @@ def build_map_markers():
         if marker:
             marker.set_editor_property("type", assets[kind])
             save(bp)
+    set_interactable_markers(assets)
     return assets
 
 
-SIGHTROOM_HLSL = """// Stencil: 4 sub-pixel taps give an anti-aliased coverage (the stencil is at render resolution and point
-// sampled, so a single tap shows its pixels); 8 taps 1.5 px out draw a thin outline that keeps far enemies
-// readable as sharp dots.
+def set_interactable_markers(assets):
+    """Every interactable Blueprint under World/ of a class in INTERACTABLE_MARKERS gets that marker kind."""
+    classes = [(getattr(unreal, cls, None), kind) for kind, entry in INTERACTABLE_MARKERS.items() for cls in entry[4]]
+    done = []
+    for asset_path in unreal.EditorAssetLibrary.list_assets(path("World"), recursive=True, include_folder=False):
+        data = unreal.EditorAssetLibrary.find_asset_data(asset_path)
+        if str(data.asset_class_path.asset_name) != "Blueprint":
+            continue
+        bp = unreal.EditorAssetLibrary.load_asset(asset_path)
+        generated = gen_class(bp)
+        default = unreal.get_default_object(generated) if generated else None
+        if not isinstance(default, unreal.HitmenInteractableBase):
+            continue
+        kind = next((k for cls, k in classes if cls and isinstance(default, cls)), None)
+        marker = component(default, "map_marker")
+        if not marker:
+            continue
+        wanted = assets.get(kind) if kind else None
+        if marker.get_editor_property("type") != wanted:
+            marker.set_editor_property("type", wanted)
+            unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+            save(bp)
+        if kind:
+            done.append(bp.get_name() + ":" + kind)
+    log("map markers on interactables:", ", ".join(sorted(done)))
+
+
+SIGHTROOM_HLSL = """// Stencil (Sightroom values 1-4 only; 5-6 belong to PP_Markers): 4 sub-pixel taps give an anti-aliased coverage
+// (the stencil is at render resolution and point sampled, so a single tap shows its pixels); 8 taps 1.5 px out draw a
+// thin outline that keeps far enemies readable as sharp dots. The nearest highlighted custom depth among the taps places
+// the object in the world, so its distance to you (not the wall in front of it) decides how lit it is.
 float2 taps[4] = { float2(-0.35, -0.35), float2(0.35, -0.35), float2(-0.35, 0.35), float2(0.35, 0.35) };
-float sv = round(Stencil.r);
+float sv = 0.0;
 float cov = 0.0;
+float objDepth = 1.0e9;
 for (int i = 0; i < 4; i++)
 {
     float v = round(SceneTextureFetch(PPI_CustomStencil, taps[i]).r);
-    cov += step(0.5, v);
-    sv = max(sv, v);
+    float m = step(0.5, v) * step(v, 4.5);
+    cov += m;
+    sv = max(sv, v * m);
+    objDepth = m > 0.5 ? min(objDepth, SceneTextureFetch(PPI_CustomDepth, taps[i]).r) : objDepth;
 }
 cov *= 0.25;
 float ring = 0.0;
 for (int j = 0; j < 8; j++)
 {
     float a = j * 0.7853982;
-    ring = max(ring, round(SceneTextureFetch(PPI_CustomStencil, float2(cos(a), sin(a)) * 1.5).r));
+    float2 o = float2(cos(a), sin(a)) * 1.5;
+    float v = round(SceneTextureFetch(PPI_CustomStencil, o).r);
+    float m = step(0.5, v) * step(v, 4.5);
+    ring = max(ring, m);
+    sv = max(sv, v * m);
+    objDepth = m > 0.5 ? min(objDepth, SceneTextureFetch(PPI_CustomDepth, o).r) : objDepth;
 }
-float s = max(sv, ring);
-float edge = step(0.5, ring) * (1.0 - cov);
-// Usable objects (2) only where they are really in view: their custom depth must be the nearest surface.
-float seen = step(CustomDepth.r, SceneDepth.r + 2.0 + SceneDepth.r * 0.002);
+float s = sv;
+float edge = ring * (1.0 - cov);
+// Usable objects (2) only where they are really in view: their custom depth must be the nearest surface (outline
+// pixels compare the object's depth with what lies behind them, so the outline stays on visible edges only).
+float seen = step(objDepth, SceneDepth.r + 2.0 + SceneDepth.r * 0.002);
 float objectMask = (s > 1.5 && s < 2.5) ? seen : 1.0;
 cov *= objectMask;
 edge *= objectMask;
@@ -300,20 +366,204 @@ float grid = saturate(1.0 - min(g.x, g.y) * 55.0) * saturate((Radius - d) / 250.
 float flatFloor = saturate((Origin.z + 60.0 - WP.z) / 120.0);
 c += float3(0.55, 0.78, 1.0) * (front * 0.9 + grid * 0.16 * flatFloor);
 
+// The object's own distance (same metric as the wave): soft ranges around where you are now, revealed by the front.
+float sceneD = max(SceneDepth.r, 1.0);
+float3 objWP = CamPos + (WP - CamPos) * (min(objDepth, 1.0e7) / sceneD);
+float dObj = length(objWP.xy - Origin.xy) + abs(objWP.z - Origin.z) * HeightWeight;
+float catR = s < 1.5 ? EnemyRadius : (s < 2.5 ? ObjectRadius : 1.0e8);
+float soft = max(SoftEdge, 1.0);
+float rangeA = saturate((catR - dObj) / soft);
+float waveA = max(saturate((Radius - dObj) / soft), smoothstep(0.55, 1.0, Progress));
+float hl = rangeA * waveA;
+// The front brightens an outline as it passes.
+float flash = exp(-abs(dObj - Radius) / 150.0) * (1.0 - Progress);
+
 // 1 enemy (white), 2 interactable (pale), 3 target (red), 4 dead target (yellow).
 float3 fillC = s < 1.5 ? float3(1.0, 1.0, 1.0) : (s < 2.5 ? float3(0.95, 0.97, 1.0) : (s < 3.5 ? float3(1.0, 0.06, 0.05) : float3(1.0, 0.78, 0.1)));
 float fillA = s < 1.5 ? 0.85 : (s < 2.5 ? 0.5 : 1.0);
 float3 edgeC = s < 1.5 ? float3(1.0, 1.0, 1.0) : (s < 2.5 ? float3(0.75, 0.9, 1.0) : fillC);
 float edgeA = s < 2.5 && s > 1.5 ? 0.75 : 1.0;
-c = lerp(c, fillC, cov * fillA * step(0.5, s));
-c = lerp(c, edgeC, edge * edgeA);
+c = lerp(c, fillC, cov * fillA * hl * step(0.5, s));
+c = lerp(c, edgeC, saturate(edge * hl * (edgeA + flash)));
 return lerp(base, c, Fade);"""
+
+
+MARKERS_HLSL = """// Always-on markers through walls: 5 = the VIP's body or its ghost (yellow), 6 = retrieval points (gold),
+// 7 = players as watchers see them (cyan, only set on a watcher's machine).
+// Same anti-aliased coverage and thin outline as the Sightroom; behind a wall the fill is stronger.
+float2 taps[4] = { float2(-0.35, -0.35), float2(0.35, -0.35), float2(-0.35, 0.35), float2(0.35, 0.35) };
+float cov = 0.0;
+float sv = 0.0;
+for (int i = 0; i < 4; i++)
+{
+    float v = round(SceneTextureFetch(PPI_CustomStencil, taps[i]).r);
+    float m = step(4.5, v) * step(v, 7.5);
+    cov += m;
+    sv = max(sv, v * m);
+}
+cov *= 0.25;
+float ring = 0.0;
+for (int j = 0; j < 8; j++)
+{
+    float a = j * 0.7853982;
+    float v = round(SceneTextureFetch(PPI_CustomStencil, float2(cos(a), sin(a)) * 1.6).r);
+    float m = step(4.5, v) * step(v, 7.5);
+    ring = max(ring, m);
+    sv = max(sv, v * m);
+}
+float3 base = Scene.rgb;
+if (sv < 4.5)
+{
+    return base;
+}
+float edge = ring * (1.0 - cov);
+float behind = step(SceneDepth.r + 4.0 + SceneDepth.r * 0.003, CustomDepth.r);
+float3 col = sv < 5.5 ? float3(1.0, 0.86, 0.12) : (sv < 6.5 ? float3(1.0, 0.6, 0.08) : float3(0.35, 0.85, 1.0));
+float pulse = sv < 6.5 ? 0.85 + 0.15 * sin(Time * 3.0) : 1.0;
+float fillA = (behind > 0.5 ? (sv < 6.5 ? 0.5 : 0.4) : (sv < 6.5 ? 0.18 : 0.08)) * pulse;
+float3 c = lerp(base, col, cov * fillA);
+c = lerp(c, col, edge);
+return c;"""
+
+
+def watcher_actions(actions):
+    """The controller's watcher actions (views 1 / 2 / 3, N / B overlays)."""
+    return dict(spectator_player_view_action=actions["IA_SpectatorPlayerView"], spectator_split_view_action=actions["IA_SpectatorSplitView"],
+                spectator_free_view_action=actions["IA_SpectatorFreeView"], watcher_toggle_players_action=actions["IA_WatcherPlayers"],
+                watcher_toggle_watchers_action=actions["IA_WatcherWatchers"])
+
+
+def set_spectator_pawn(bp):
+    """BP_SpectatorPawn: the Sightroom post process (Tab scan for watchers) and the focus overlay, from the player."""
+    player = load(path("Characters", "Player") + "/BP_PlayerCharacter")
+    player_cdo = unreal.get_default_object(player.generated_class()) if player else None
+    spectator = cdo(bp)
+    if not player_cdo or not spectator:
+        log("WARN set_spectator_pawn: missing player or spectator")
+        return
+    player_scan = player_cdo.get_component_by_class(unreal.HitmenSightroomComponent)
+    scan = spectator.get_component_by_class(unreal.HitmenSightroomComponent)
+    if player_scan and scan:
+        scan.set_editor_property("post_process_material", player_scan.get_editor_property("post_process_material"))
+    interaction = player_cdo.get_component_by_class(unreal.HitmenInteractionComponent)
+    if interaction:
+        set_props(spectator, focus_overlay_material=interaction.get_editor_property("focus_overlay_material"))
+    unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+
+
+def build_markers_pp():
+    """PP_Markers: always on (a local unbound volume): the VIP's body / ghost in yellow and retrieval points in gold,
+    through walls, anti-aliased with a thin outline (custom stencil 5 and 6)."""
+    pp = new_material("PP_Markers", path("Materials", "PostProcess"))
+    set_props(pp, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
+    scene = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, -200)
+    set_props(scene, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
+    stencil = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 0)
+    set_props(stencil, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
+    custom_depth = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 200)
+    set_props(custom_depth, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_DEPTH)
+    scene_depth = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 400)
+    set_props(scene_depth, scene_texture_id=unreal.SceneTextureId.PPI_SCENE_DEPTH)
+    time = MEL.create_material_expression(pp, unreal.MaterialExpressionTime, -900, 600)
+    custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
+    inputs = []
+    for input_name in ("Scene", "Stencil", "CustomDepth", "SceneDepth", "Time"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", input_name)
+        inputs.append(ci)
+    set_props(custom, code=MARKERS_HLSL, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Markers", inputs=inputs)
+    MEL.connect_material_expressions(scene, "Color", custom, "Scene")
+    MEL.connect_material_expressions(stencil, "Color", custom, "Stencil")
+    MEL.connect_material_expressions(custom_depth, "Color", custom, "CustomDepth")
+    MEL.connect_material_expressions(scene_depth, "Color", custom, "SceneDepth")
+    MEL.connect_material_expressions(time, "", custom, "Time")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(pp)
+    save(pp)
+    return pp
+
+
+def model_part(shape, scale, material, location, rotation=(0.0, 0.0, 0.0), spins=False):
+    """One FHitmenModelPart: a basic shape (cm location, (pitch, yaw, roll) rotation)."""
+    part = unreal.HitmenModelPart()
+    t = unreal.Transform()
+    t.translation = unreal.Vector(*location)
+    t.rotation = unreal.Rotator(pitch=rotation[0], yaw=rotation[1], roll=rotation[2]).quaternion()
+    t.scale3d = unreal.Vector(*scale)
+    part.set_editor_property("mesh", load(SHAPES[shape]))
+    part.set_editor_property("material", material)
+    part.set_editor_property("transform", t)
+    part.set_editor_property("spins", spins)
+    return part
+
+
+def retrieval_models(mi):
+    """The extraction models from basic shapes: name -> (display, departure, parts, cinematic camera (loc, rot))."""
+    D = unreal.HitmenDepartureStyle
+    dark, metal, glass, red, wood = mi["MI_Dark"], mi["MI_Metal"], mi["MI_Glass"], mi["MI_Red"], mi.get("MI_Wood") or mi["MI_Dark"]
+    heli = [
+        model_part("sphere", (3.6, 1.7, 1.6), dark, (0, 0, 175)),
+        model_part("sphere", (1.5, 1.35, 1.1), glass, (120, 0, 190)),
+        model_part("cylinder", (0.4, 0.4, 3.4), dark, (-330, 0, 205), (90.0, 0.0, 0.0)),
+        model_part("cube", (0.7, 0.08, 1.1), dark, (-490, 0, 265)),
+        model_part("cube", (0.08, 0.06, 1.1), metal, (-495, 22, 225), (0.0, 0.0, 90.0), True),
+        model_part("cylinder", (0.25, 0.25, 0.3), metal, (0, 0, 262)),
+        model_part("cube", (9.5, 0.32, 0.05), metal, (0, 0, 280), (0.0, 0.0, 0.0), True),
+        model_part("cube", (0.32, 9.5, 0.05), metal, (0, 0, 280), (0.0, 0.0, 0.0), True),
+        model_part("cube", (3.4, 0.12, 0.12), metal, (0, 110, 40)),
+        model_part("cube", (3.4, 0.12, 0.12), metal, (0, -110, 40)),
+        model_part("cube", (0.1, 0.1, 0.9), metal, (70, 105, 85), (0.0, 0.0, -15.0)),
+        model_part("cube", (0.1, 0.1, 0.9), metal, (70, -105, 85), (0.0, 0.0, 15.0)),
+        model_part("cube", (0.1, 0.1, 0.9), metal, (-70, 105, 85), (0.0, 0.0, -15.0)),
+        model_part("cube", (0.1, 0.1, 0.9), metal, (-70, -105, 85), (0.0, 0.0, 15.0)),
+    ]
+    car = [
+        model_part("cube", (4.4, 1.9, 0.75), red, (0, 0, 78)),
+        model_part("cube", (2.3, 1.75, 0.65), glass, (-25, 0, 145)),
+        model_part("cylinder", (0.72, 0.72, 0.32), dark, (140, 95, 36), (0.0, 0.0, 90.0)),
+        model_part("cylinder", (0.72, 0.72, 0.32), dark, (140, -95, 36), (0.0, 0.0, 90.0)),
+        model_part("cylinder", (0.72, 0.72, 0.32), dark, (-140, 95, 36), (0.0, 0.0, 90.0)),
+        model_part("cylinder", (0.72, 0.72, 0.32), dark, (-140, -95, 36), (0.0, 0.0, 90.0)),
+    ]
+    crate = [
+        model_part("cube", (1.5, 1.1, 1.0), wood, (0, 0, 50)),
+        model_part("cube", (1.56, 1.16, 0.08), dark, (0, 0, 104)),
+        model_part("cube", (1.56, 0.12, 1.02), dark, (0, 0, 50)),
+    ]
+    return {
+        "Helicopter": ("Helicopter", D.LIFT_OFF, heli, ((-1300, 900, 420), (-6.0, -33.0, 0.0))),
+        "Car": ("Car", D.DRIVE_AWAY, car, ((-650, 820, 260), (-12.0, -50.0, 0.0))),
+        "Crate": ("Supply crate", D.NONE, crate, ((-520, 420, 300), (-25.0, -38.0, 0.0))),
+    }
+
+
+def build_retrieval_variants(folder, mi):
+    """BP_RetrievalPoint_Helicopter / _Car / _Crate: children of BP_RetrievalPoint with a model from basic shapes and a
+    departure for the end cinematic. The team swaps ModelParts (or adds their mesh under Model)."""
+    base = load(folder + "/BP_RetrievalPoint")
+    if not base:
+        log("WARN missing BP_RetrievalPoint")
+        return {}
+    made = {}
+    for name, (display, departure, parts, cam) in retrieval_models(mi).items():
+        bp = make_blueprint("BP_RetrievalPoint_" + name, folder, gen_class(base))
+        d = cdo(bp)
+        set_props(d, model_parts=parts, departure_style=departure, display_name=display)
+        camera = component(d, "cinematic_camera")
+        if camera:
+            camera.set_editor_property("relative_location", unreal.Vector(*cam[0]))
+            camera.set_editor_property("relative_rotation", unreal.Rotator(pitch=cam[1][0], yaw=cam[1][1], roll=cam[1][2]))
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        save(bp)
+        made[name] = bp
+    return made
 
 
 def build_sightroom_pp():
     """PP_Sightroom: a fast scan wave from the player, a floor grid behind it, then the whole map in a cool look;
-    highlighted actors (custom stencil) anti-aliased with a thin outline. Driven by C++: ScanOrigin, ScanRadius,
-    ScanProgress, Fade, HeightWeight."""
+    highlighted actors (custom stencil) anti-aliased with a thin outline, faded per pixel by their distance to you,
+    the wave front and the depth test. Driven by C++: ScanOrigin, ScanRadius, ScanProgress, Fade, HeightWeight,
+    EnemyRadius, ObjectRadius, SoftEdge."""
     pp = new_material("PP_Sightroom", path("Materials", "PostProcess"))
     set_props(pp, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
     scene = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, -200)
@@ -328,7 +578,8 @@ def build_sightroom_pp():
     params = {}
     for i, (pname, kind, default) in enumerate((("ScanOrigin", "vector", None), ("ScanRadius", "scalar", 0.0),
                                                  ("ScanProgress", "scalar", 0.0), ("Fade", "scalar", 0.0),
-                                                 ("HeightWeight", "scalar", 0.35))):
+                                                 ("HeightWeight", "scalar", 0.35), ("EnemyRadius", "scalar", 2000.0),
+                                                 ("ObjectRadius", "scalar", 1800.0), ("SoftEdge", "scalar", 350.0))):
         if kind == "vector":
             node = MEL.create_material_expression(pp, unreal.MaterialExpressionVectorParameter, -900, 350 + i * 120)
             set_props(node, parameter_name=pname, default_value=unreal.LinearColor(0, 0, 0, 0))
@@ -338,10 +589,12 @@ def build_sightroom_pp():
         params[pname] = node
     custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
     inputs = []
-    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight", "CustomDepth", "SceneDepth"):
+    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight", "CustomDepth", "SceneDepth",
+                       "CamPos", "EnemyRadius", "ObjectRadius", "SoftEdge"):
         ci = unreal.CustomInput()
         ci.set_editor_property("input_name", input_name)
         inputs.append(ci)
+    cam_pos = MEL.create_material_expression(pp, unreal.MaterialExpressionCameraPositionWS, -1150, 400)
     set_props(custom, code=SIGHTROOM_HLSL, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Sightroom", inputs=inputs)
     MEL.connect_material_expressions(scene, "Color", custom, "Scene")
     MEL.connect_material_expressions(stencil, "Color", custom, "Stencil")
@@ -353,6 +606,9 @@ def build_sightroom_pp():
     MEL.connect_material_expressions(params["HeightWeight"], "", custom, "HeightWeight")
     MEL.connect_material_expressions(custom_depth, "Color", custom, "CustomDepth")
     MEL.connect_material_expressions(scene_depth, "Color", custom, "SceneDepth")
+    MEL.connect_material_expressions(cam_pos, "", custom, "CamPos")
+    for pname in ("EnemyRadius", "ObjectRadius", "SoftEdge"):
+        MEL.connect_material_expressions(params[pname], "", custom, pname)
     MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     MEL.recompile_material(pp)
     save(pp)
@@ -382,7 +638,7 @@ return c;"""
 
 # Physical surface (footsteps, landings) of each coloured material: what you see is what you hear.
 MATERIAL_SURFACES = {"MI_Grass": "PM_Grass", "MI_Sand": "PM_Sand", "MI_Wood": "PM_Wood", "MI_Metal": "PM_Metal",
-                     "MI_Stone": "PM_Stone", "MI_Mountain": "PM_Stone"}
+                     "MI_Stone": "PM_Stone", "MI_Mountain": "PM_Stone", "MI_Tile": "PM_Tile"}
 
 
 def build_terrain_material(folder=None):
@@ -547,9 +803,145 @@ def glow_material(name, folder, intensity, soft=False):
     return mat
 
 
+def custom_node(mat, code, inputs, x=-400, y=0, output=None, description="Custom"):
+    """A Custom HLSL expression with named inputs [(name, expression)]."""
+    node = MEL.create_material_expression(mat, unreal.MaterialExpressionCustom, x, y)
+    pins = []
+    for input_name, _ in inputs:
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", input_name)
+        pins.append(ci)
+    set_props(node, code=code, output_type=output or unreal.CustomMaterialOutputType.CMOT_FLOAT1, description=description, inputs=pins)
+    for input_name, expression in inputs:
+        MEL.connect_material_expressions(expression, "", node, input_name)
+    return node
+
+
+SMOKE_TRAIL_HLSL = """float edge = saturate(1.0 - F);
+float wisps = 0.65 + 0.35 * sin(WP.x * 0.021 + WP.y * 0.017 + WP.z * 0.029 + T * 1.3);
+return Opacity * edge * edge * wisps;"""
+
+
+def build_smoke_trail_material(folder=None):
+    """M_Hitmen_SmokeTrail: the soft white smoke a sniper shot leaves along its line (scalar "Opacity"; the edges of the
+    cylinder fade out, slow wisps run along it)."""
+    folder = folder or path("Materials", "FX")
+    mat = new_material("M_Hitmen_SmokeTrail", folder)
+    set_props(mat, blend_mode=unreal.BlendMode.BLEND_TRANSLUCENT, shading_model=unreal.MaterialShadingModel.MSM_UNLIT, two_sided=False)
+    opacity = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -900, 0)
+    set_props(opacity, parameter_name="Opacity", default_value=0.45)
+    fresnel = MEL.create_material_expression(mat, unreal.MaterialExpressionFresnel, -900, 120)
+    set_props(fresnel, exponent=1.6, base_reflect_fraction=0.0)
+    world = MEL.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -900, 240)
+    time = MEL.create_material_expression(mat, unreal.MaterialExpressionTime, -900, 360)
+    alpha = custom_node(mat, SMOKE_TRAIL_HLSL, [("Opacity", opacity), ("F", fresnel), ("WP", world), ("T", time)], description="SmokeTrail")
+    MEL.connect_material_property(alpha, "", unreal.MaterialProperty.MP_OPACITY)
+    color = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -400, -200)
+    set_props(color, constant=unreal.LinearColor(0.82, 0.83, 0.86, 1.0))
+    MEL.connect_material_property(color, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
+GLINT_HLSL = """float2 p = UV - 0.5;
+float r = length(p);
+float core = saturate(1.0 - r * 7.0);
+float rays = saturate(1.0 - abs(p.x) * 34.0) * saturate(1.0 - abs(p.y) * 2.1) + saturate(1.0 - abs(p.y) * 34.0) * saturate(1.0 - abs(p.x) * 2.1);
+float2 q = float2(p.x + p.y, p.x - p.y) * 0.7071;
+float diag = saturate(1.0 - abs(q.x) * 40.0) * saturate(1.0 - abs(q.y) * 3.2) + saturate(1.0 - abs(q.y) * 40.0) * saturate(1.0 - abs(q.x) * 3.2);
+float calm = 0.55 + 0.45 * sin(T * 2.4);
+float aim = 0.8 + 0.2 * sin(T * 15.0);
+float pulse = lerp(calm, aim, Aiming);
+return saturate(core * core + rays * 0.9 + diag * 0.45) * pulse;"""
+
+
+def build_glint_material(folder=None):
+    """M_Hitmen_Glint: the red star at a sniper's scope (sprite; scalar "Aiming": calm slow pulse, bright fast pulse while
+    it aims at someone)."""
+    folder = folder or path("Materials", "FX")
+    mat = new_material("M_Hitmen_Glint", folder)
+    set_props(mat, blend_mode=unreal.BlendMode.BLEND_ADDITIVE, shading_model=unreal.MaterialShadingModel.MSM_UNLIT, two_sided=True)
+    uv = MEL.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate, -900, 0)
+    time = MEL.create_material_expression(mat, unreal.MaterialExpressionTime, -900, 120)
+    aiming = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -900, 240)
+    set_props(aiming, parameter_name="Aiming", default_value=0.0)
+    shape = custom_node(mat, GLINT_HLSL, [("UV", uv), ("T", time), ("Aiming", aiming)], description="Glint")
+    color = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -600, -200)
+    set_props(color, constant=unreal.LinearColor(1.0, 0.06, 0.04, 1.0))
+    strength = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant, -600, 380)
+    set_props(strength, r=6.0)
+    mul = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, 0)
+    MEL.connect_material_expressions(color, "", mul, "A")
+    MEL.connect_material_expressions(shape, "", mul, "B")
+    mul2 = MEL.create_material_expression(mat, unreal.MaterialExpressionMultiply, -100, 100)
+    MEL.connect_material_expressions(mul, "", mul2, "A")
+    MEL.connect_material_expressions(strength, "", mul2, "B")
+    MEL.connect_material_property(mul2, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(mat)
+    save(mat)
+    return mat
+
+
+# 0.9.0 weapon balance and the new tunables (applied by the builder and hitmen_patch_090): falloff ranges (cm),
+# pellets, spreads, the range guards close in to before shooting, the sniper's smoke trail.
+WEAPON_BALANCE = {
+    "Pistol": dict(falloff_start_range=1500.0, falloff_end_range=5000.0, falloff_at_max_range=0.6, npc_engage_range=1500.0),
+    "SMG": dict(falloff_start_range=1200.0, falloff_end_range=4000.0, falloff_at_max_range=0.5, npc_engage_range=1400.0,
+                noise_radius=2000.0, impact_noise_radius=800.0),
+    "AssaultRifle": dict(falloff_start_range=3000.0, falloff_end_range=8000.0, falloff_at_max_range=0.6, noise_radius=2500.0,
+                         impact_noise_radius=1000.0),
+    "Shotgun": dict(falloff_start_range=700.0, falloff_end_range=2500.0, falloff_at_max_range=0.25, pellet_spread=6.0,
+                    aim_pellet_spread=4.5, fixed_pellet_pattern=False, npc_engage_range=900.0, noise_radius=2500.0,
+                    impact_noise_radius=1000.0),
+    "Minigun": dict(damage=16.0, hip_spread=2.2, aim_spread=1.4, falloff_start_range=3000.0, falloff_end_range=8000.0,
+                    falloff_at_max_range=0.6, moving_spread_multiplier=1.3, noise_radius=3000.0, impact_noise_radius=1000.0),
+    "Sniper": dict(falloff_start_range=30000.0, falloff_end_range=30000.0, falloff_at_max_range=1.0, moving_spread_multiplier=2.0,
+                   noise_radius=3500.0, impact_noise_radius=1500.0),
+}
+
+# Guards per weapon (children of BP_NPC_Guard): name -> weapon. Place them, or set DefaultWeapon on any placed guard.
+GUARD_LOADOUTS = {"BP_NPC_Guard_SMG": "SMG", "BP_NPC_Guard_Rifle": "AssaultRifle", "BP_NPC_Guard_Shotgun": "Shotgun"}
+
+
+def build_guard_loadouts():
+    """Guard Blueprints per weapon, and the NPC names shown when you look at one (VIP candidates are all "Guest")."""
+    folder = path("Characters", "NPC")
+    guard = load(folder + "/BP_NPC_Guard")
+    if not guard:
+        log("WARN missing BP_NPC_Guard")
+        return {}
+    made = {}
+    for name, weapon in GUARD_LOADOUTS.items():
+        bp = make_blueprint(name, folder, gen_class(guard))
+        set_props(cdo(bp), default_weapon=load(path("Data", "Weapons") + "/DA_Weapon_" + weapon))
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        save(bp)
+        made[name] = bp
+    for name, display in (("BP_NPC_Sniper", "Sniper"), ("BP_NPC_VIPCandidate", "Guest")):
+        bp = load(folder + "/" + name)
+        if bp:
+            set_props(cdo(bp), display_name=display)
+            unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+            save(bp)
+    return made
+
+
+def set_gunshot_responders(rules):
+    """Three guards answer a gunshot (two for every other noise)."""
+    overrides = dict(rules.get_editor_property("noise_responder_overrides"))
+    overrides[unreal.HitmenNoiseType.GUNSHOT] = 3
+    rules.set_editor_property("noise_responder_overrides", overrides)
+SNIPER_SMOKE = (("smoke_lifetime", 2.2), ("smoke_thickness", 4.0), ("smoke_growth", 9.0), ("smoke_opacity", 0.5))
+
+# Mounted gun: the shield plate sits low so the barrel shows in the first-person view above it.
+MOUNTED_GUN_SHIELD = ((25.0, 0.0, -20.0), (0.06, 1.1, 0.5))
+
+
 def build_glow_materials():
     folder = path("Materials", "FX")
-    return {"tracer": glow_material("M_Hitmen_Tracer", folder, 10.0), "flash": glow_material("M_Hitmen_FlashGlow", folder, 3.0, soft=True)}
+    return {"tracer": glow_material("M_Hitmen_Tracer", folder, 10.0), "flash": glow_material("M_Hitmen_FlashGlow", folder, 3.0, soft=True),
+            "smoke_trail": build_smoke_trail_material(folder)}
 
 
 # Toon (3D, cel-shaded) effects only: the 2D Flipbook pack reads as comic book. No blood anywhere.
@@ -558,17 +950,17 @@ GUN_SOUND = "/Game/Vefects/Flipbook_VFX/Shared/Audio/SFX_GunShot_Cue"
 DRY_SOUND = "/Game/Vefects/Anime_Stylized_VFX/Audio/WAV/SFX_Bomb_Bounce_Cue"
 # name: fire sound pitch (min, max), volume, tracer chance, muzzle light (cd), glow radius (cm)
 # (fire pitch, fire volume, tracer chance, muzzle light candelas, muzzle glow cm). A room lamp is ~8 cd: the flash
-# stays a small warm pop (it was 400-3000 cd, a light left on during automatic fire).
+# stays a small warm pop that only lives with the muzzle flash (0.9.0: half of 0.8.0).
 WEAPON_JUICE = {
-    "Pistol": ((1.55, 1.7), 0.32, 0.0, 5.0, 2.0),
-    "SMG": ((1.25, 1.35), 0.6, 0.35, 12.0, 3.5),
-    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 15.0, 4.0),
-    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 25.0, 5.5),
-    "Minigun": ((1.3, 1.4), 0.55, 0.5, 15.0, 4.0),
-    "Sniper": ((0.97, 1.03), 1.0, 1.0, 22.0, 5.0),
-    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 30.0, 6.0),
-    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 20.0, 5.0),
-    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 20.0, 5.0),
+    "Pistol": ((1.55, 1.7), 0.32, 0.0, 2.5, 2.0),
+    "SMG": ((1.25, 1.35), 0.6, 0.35, 6.0, 3.5),
+    "AssaultRifle": ((1.08, 1.15), 0.8, 0.3, 7.5, 4.0),
+    "Shotgun": ((0.72, 0.8), 1.0, 1.0, 12.0, 5.5),
+    "Minigun": ((1.3, 1.4), 0.55, 0.5, 7.5, 4.0),
+    "Sniper": ((0.97, 1.03), 1.0, 1.0, 11.0, 5.0),
+    "RocketLauncher": ((0.95, 1.05), 1.0, 0.0, 15.0, 6.0),
+    "GrenadeLauncher": ((0.95, 1.05), 1.0, 0.0, 10.0, 5.0),
+    "BlackHole": ((0.95, 1.05), 1.0, 0.0, 10.0, 5.0),
     "Bow": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
     "Sword": ((1.0, 1.0), 1.0, 0.0, 0.0, 0.0),
 }
@@ -588,8 +980,9 @@ def weapon_juice(name):
         props["dry_fire_sound"] = load(DRY_SOUND)
     style = unreal.HitmenTracerStyle()
     if name == "Sniper":
-        # A brief trail over the whole shot (it appears at once and fades in 0.12 s) and debris where it lands.
-        for key, value in (("speed", 0.0), ("thickness", 0.9), ("fade_time", 0.12)):
+        # A brief trail over the whole shot (it appears at once and fades in 0.12 s), a white smoke trail lingering
+        # along it, and debris where it lands.
+        for key, value in (("speed", 0.0), ("thickness", 0.9), ("fade_time", 0.12)) + SNIPER_SMOKE:
             style.set_editor_property(key, value)
         props["impact_burst_fx"] = load(TOON + "NS_Arrow_Hit")
         props["impact_burst_scale"] = 0.5
@@ -616,6 +1009,30 @@ def weapon_muzzle_offset(data):
     return unreal.Vector((min(xs) + max(xs)) * 0.5, max(ys) + 2.0, min(zs) + 0.7 * (max(zs) - min(zs)))
 
 
+def palette_instance(name, rgb, color, inst_folder, physical):
+    """A palette colour: MI_<name> on the colour material and its MI_Grid_<name> checker twin for level geometry, both
+    with the colour's physical surface (footsteps). Returns {asset name: instance}."""
+    mi = create(name, inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    set_props(mi, parent=color)
+    MEL.set_material_instance_vector_parameter_value(mi, "Color", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
+    surface = MATERIAL_SURFACES.get(name)
+    if surface:
+        set_props(mi, phys_material=physical[surface])
+    save(mi)
+    # Checker (prototype grid) twin for level geometry: same tint, same physical surface.
+    grid = create("MI_Grid_" + name[3:], inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    set_props(grid, parent=load("/Game/LevelPrototyping/Materials/M_PrototypeGrid"))
+    tint = unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0)
+    for param in ("SurfaceColor", "TopSurfaceColor"):
+        MEL.set_material_instance_vector_parameter_value(grid, param, tint)
+    MEL.set_material_instance_vector_parameter_value(grid, "GridColor", unreal.LinearColor(rgb[0] * 0.35, rgb[1] * 0.35, rgb[2] * 0.35, 1.0))
+    MEL.set_material_instance_vector_parameter_value(grid, "SubGridColor", unreal.LinearColor(rgb[0] * 0.7, rgb[1] * 0.7, rgb[2] * 0.7, 1.0))
+    if surface:
+        set_props(grid, phys_material=physical[surface])
+    save(grid)
+    return {name: mi, "MI_Grid_" + name[3:]: grid}
+
+
 def build_materials(physical):
     folder = path("Materials", "Master")
     inst_folder = path("Materials", "Instances")
@@ -637,29 +1054,10 @@ def build_materials(physical):
         "MI_Blue": (0.08, 0.2, 0.6), "MI_White": (0.9, 0.9, 0.9), "MI_Dark": (0.05, 0.05, 0.06),
         "MI_Wood": (0.35, 0.2, 0.08), "MI_Metal": (0.4, 0.42, 0.45), "MI_Grass": (0.15, 0.35, 0.08),
         "MI_Sand": (0.7, 0.6, 0.38), "MI_Stone": (0.45, 0.45, 0.43), "MI_Gold": (0.83, 0.62, 0.2),
-        "MI_Glass": (0.6, 0.8, 0.9), "MI_Mountain": (0.32, 0.3, 0.28),
+        "MI_Glass": (0.6, 0.8, 0.9), "MI_Mountain": (0.32, 0.3, 0.28), "MI_Tile": (0.74, 0.72, 0.68),
     }
     for name, rgb in palette.items():
-        mi = create(name, inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-        set_props(mi, parent=color)
-        MEL.set_material_instance_vector_parameter_value(mi, "Color", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
-        surface = MATERIAL_SURFACES.get(name)
-        if surface:
-            set_props(mi, phys_material=physical[surface])
-        save(mi)
-        instances[name] = mi
-        # Checker (prototype grid) twin for level geometry: same tint, same physical surface.
-        grid = create("MI_Grid_" + name[3:], inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-        set_props(grid, parent=load("/Game/LevelPrototyping/Materials/M_PrototypeGrid"))
-        tint = unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0)
-        for param in ("SurfaceColor", "TopSurfaceColor"):
-            MEL.set_material_instance_vector_parameter_value(grid, param, tint)
-        MEL.set_material_instance_vector_parameter_value(grid, "GridColor", unreal.LinearColor(rgb[0] * 0.35, rgb[1] * 0.35, rgb[2] * 0.35, 1.0))
-        MEL.set_material_instance_vector_parameter_value(grid, "SubGridColor", unreal.LinearColor(rgb[0] * 0.7, rgb[1] * 0.7, rgb[2] * 0.7, 1.0))
-        if surface:
-            set_props(grid, phys_material=physical[surface])
-        save(grid)
-        instances["MI_Grid_" + name[3:]] = grid
+        instances.update(palette_instance(name, rgb, color, inst_folder, physical))
 
     # Translucent unlit "Color" (camera cones, retrieval beacons).
     cone = new_material("M_Hitmen_TranslucentColor", folder)
@@ -698,6 +1096,7 @@ def build_materials(physical):
     screen = build_screen_material(folder)
 
     pp = build_sightroom_pp()
+    build_markers_pp()
 
     # Pill: wavy, colour-shifted view. Weight = blendable weight driven by the status component.
     pill = new_material("PP_Pill", path("Materials", "PostProcess"))
@@ -882,31 +1281,55 @@ SLIDE_SOUND = ("/Game/SFX_Essentials_FREE_SAMPLE/SFX_Essentials_20_FOOTSTEPS_02/
 
 
 def set_traversal_fx(character_cdo, dust):
-    """Traversal dust (ledge hands, slides, vault landings) and the ladder / gutter puff."""
-    set_props(character_cdo, traversal_dust_fx=dust, climb_fx=dust, traversal_dust_scale=0.15)
+    """Traversal dust (ledge hands, slides, vault landings) and the ladder / gutter puffs up and down. The slide, ladder
+    and footstep puffs only play when switched on in Project Settings -> Hitmen -> Juice."""
+    set_props(character_cdo, traversal_dust_fx=dust, climb_fx=dust, ladder_descend_fx=dust, traversal_dust_scale=0.15)
+
+
+# The surface table of DA_SoundSet: (row name, physical surface, step takes, noise multiplier, volume, pitch). Terrain
+# tiles map their slope to grass / sand (earth) / stone (rock) in C++. Tile reuses the stone takes, higher and softer:
+# a new surface needs no new recording.
+SURFACE_TABLE = (
+    ("Grass", "SURFACE_TYPE1", "Grass", 0.8, 1.0, 1.0),
+    ("Stone", "SURFACE_TYPE2", "Stone", 1.0, 1.0, 1.0),
+    ("Sand", "SURFACE_TYPE3", "Sand", 0.6, 1.0, 1.0),
+    ("Wood", "SURFACE_TYPE4", "Wood", 1.1, 1.0, 1.0),
+    ("Metal", "SURFACE_TYPE5", "Metal", 1.4, 1.0, 1.0),
+    ("Tile", "SURFACE_TYPE6", "Stone", 1.1, 0.85, 1.18),
+)
+
+
+def surface_feedback(takes, noise=1.0, volume=1.0, pitch=1.0, effect=None, effect_scale=0.12):
+    f = unreal.HitmenSurfaceFeedback()
+    for key, value in (("sounds", takes), ("sound", None), ("noise_multiplier", noise), ("volume", volume), ("pitch", pitch),
+                       ("effect", effect), ("effect_scale", effect_scale)):
+        f.set_editor_property(key, value)
+    return f
+
+
+def set_surface_table(sound_set):
+    """Footsteps and landings per physical surface, one place for every character (DA_SoundSet -> Surfaces). Each
+    surface has a small dust puff, used only with Project Settings -> Hitmen -> Juice -> bFootstepFX."""
+    sounds = import_footstep_sounds()
+    dust = load(TRAVERSAL_DUST)
+    rows = []
+    for name, surface, takes, noise, volume, pitch in SURFACE_TABLE:
+        row = unreal.HitmenSurfaceEntry()
+        row.set_editor_property("surface", getattr(unreal.PhysicalSurface, surface))
+        row.set_editor_property("name", name)
+        row.set_editor_property("feedback", surface_feedback(sounds["Step_" + takes], noise, volume, pitch, dust))
+        rows.append(row)
+    set_props(sound_set, surfaces=rows, default_surface=surface_feedback(sounds["Step_Concrete"], effect=dust))
 
 
 def set_footstep_sounds(character_cdo):
-    """Footstep variations per physical surface (PM_Grass / Stone / Sand / Wood / Metal, concrete by default) and the
-    landing thumps. Terrain tiles map their slope to grass / sand (earth) / stone (rock) in C++."""
+    """Landing thumps on the character's footstep component; the steps themselves come from the DA_SoundSet surface
+    table (the component's own per-surface map stays empty: it only overrides a surface for one character)."""
     sounds = import_footstep_sounds()
-    P = unreal.PhysicalSurface
-    table = {P.SURFACE_TYPE1: ("Grass", 0.8), P.SURFACE_TYPE2: ("Stone", 1.0), P.SURFACE_TYPE3: ("Sand", 0.6),
-             P.SURFACE_TYPE4: ("Wood", 1.1), P.SURFACE_TYPE5: ("Metal", 1.4)}
     comp = component(character_cdo, "footstep_component")
     if not comp:
         return
-    feedback = {}
-    for surface, (name, noise) in table.items():
-        f = unreal.HitmenSurfaceFeedback()
-        f.set_editor_property("sounds", sounds["Step_" + name])
-        f.set_editor_property("sound", None)
-        f.set_editor_property("noise_multiplier", noise)
-        feedback[surface] = f
-    default = unreal.HitmenSurfaceFeedback()
-    default.set_editor_property("sounds", sounds["Step_Concrete"])
-    default.set_editor_property("sound", None)
-    set_props(comp, surface_feedback=feedback, default_feedback=default, land_thumps=sounds["Land_Soft"],
+    set_props(comp, surface_feedback={}, default_feedback=unreal.HitmenSurfaceFeedback(), land_thumps=sounds["Land_Soft"],
               hard_land_thumps=sounds["Land_Heavy"])
 
 def build_animation():
@@ -1198,6 +1621,7 @@ def build_weapons(mats):
         data = make_data("DA_Weapon_" + name, path("Data", "Weapons"), unreal.HitmenWeaponData)
         set_props(data, display_name=display, weapon_class=gen_class(bp), pickup_class=gen_class(pickup), fp_motion=fp_motion(name), **props)
         set_props(data, **weapon_juice(name))
+        set_props(data, **WEAPON_BALANCE.get(name, {}))
         muzzle = weapon_muzzle_offset(data)
         if muzzle:
             set_props(data, muzzle_offset=muzzle)
@@ -1303,14 +1727,12 @@ def build_cosmetics(mats):
 
 
 def build_body_container(world_folder, mi):
-    """BP_BodyContainer: a dumpster-like box (120 x 90 x 110) with a lid hinged on its back edge; holds 2 bodies."""
+    """BP_BodyContainer: a hollow bin (210 x 110 x 118, built in C++ from its size) with a lid hinged on its back edge
+    and a peek slit in the front wall; holds 2 bodies, and you can hide inside crouched."""
     bp = make_blueprint("BP_BodyContainer", world_folder + "/Container", unreal.HitmenBodyContainer)
     d = cdo(bp)
-    set_mesh(component(d, "mesh"), SHAPES["cube"], (1.2, 0.9, 1.1), mi["MI_Green"], (0, 0, 55))
-    set_mesh(component(d, "lid"), SHAPES["cube"], (1.24, 0.94, 0.08), mi["MI_Dark"], (60, 0, 4))
-    lid_pivot = component(d, "lid_pivot")
-    if lid_pivot:
-        lid_pivot.set_editor_property("relative_location", unreal.Vector(-60, 0, 110))
+    set_mesh(component(d, "mesh"), SHAPES["cube"], None, mi["MI_Green"])
+    set_mesh(component(d, "lid"), SHAPES["cube"], None, mi["MI_Dark"])
     save(bp)
     return bp
 
@@ -1395,6 +1817,7 @@ def build_sound_set():
         S.RADIO_LOOP: (ESS + "SFX_Essentials_05_GLITCH/Cues/COMRadio_InsJ_Radio_Noise_Long-Wave_01-01_LOOP_Cue", 0.7),
         S.MOUNTED_GUN_FIRE: (SFX + "SFX_GunShot_Cue", 0.8), S.TANK_FIRE: (SFX + "SFX_ExplosionClassic", 1.0),
         S.LANDING_HARD: (path("Audio", "SFX", "Footsteps") + "/SW_Land_Heavy_00", 0.9), S.SLIDE: (SLIDE_SOUND, 0.45),
+        S.TARGET_ELIMINATED: (hb + "Action/Cue/Slowdown3_Cue", 0.9),
     }
     data = make_data("DA_SoundSet", path("Data"), unreal.HitmenSoundSet)
     sounds, volumes = {}, {}
@@ -1408,6 +1831,7 @@ def build_sound_set():
     G, W, F = unreal.HitmenSoundSpace.GUNSHOT, unreal.HitmenSoundSpace.WORLD, unreal.HitmenSoundSpace.FOOTSTEP
     spaces = {S.EXPLOSION: G, S.TANK_FIRE: G, S.MOUNTED_GUN_FIRE: G, S.LANDING: F, S.LANDING_HARD: F}
     set_props(data, sounds=sounds, volumes=volumes, attenuations=build_attenuations(), spaces=spaces)
+    set_surface_table(data)
     save(data)
     return data
 
@@ -1567,7 +1991,8 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
               sightroom_action=actions["IA_Sightroom"], emote_wheel_action=actions["IA_EmoteWheel"], pause_action=actions["IA_Pause"],
               spectator_mode_action=actions["IA_SpectatorMode"], spectator_up_action=actions["IA_SpectatorUp"],
               spectator_down_action=actions["IA_SpectatorDown"], spectator_fast_action=actions["IA_SpectatorFast"],
-              confirm_action=actions["IA_Confirm"], last_known_position_marker_class=gen_class(marker))
+              confirm_action=actions["IA_Confirm"], last_known_position_marker_class=gen_class(marker),
+              **watcher_actions(actions))
     save(pc)
 
     manny = load("/Game/Characters/Mannequins/Meshes/SKM_Manny_Simple")
@@ -1617,6 +2042,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     set_props(ncdo, anim_set=anim_set, ai_controller_class=gen_class(ai), default_weapon=weapons["Pistol"],
               keycard_pickup_class=gen_class(keycard_bp) if keycard_bp else None)
     set_mesh(component(ncdo, "aim_laser"), SHAPES["cylinder"], None, mats["laser"])
+    set_props(ncdo, glint_material=build_glint_material())
     set_mesh(component(ncdo, "keycard_mesh"), SHAPES["cube"], None, mats["mi"]["MI_Blue"])
     alert = component(ncdo, "alert_widget")
     if alert and widgets.get("WBP_AlertIndicator"):
@@ -1631,6 +2057,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     if vbody:
         set_props(vbody, skeletal_mesh_asset=manny)
     save(vip)
+    build_guard_loadouts()
     # Civilians do not exist in Hitmen: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate.
     civilian_path = path("Characters", "NPC", "BP_NPC_Civilian")
     if EAL.does_asset_exist(civilian_path):
@@ -1653,6 +2080,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     player_state = make_blueprint("BP_PlayerState", core, unreal.HitmenPlayerState)
     save(player_state)
     spectator_pawn = make_blueprint("BP_SpectatorPawn", core, unreal.HitmenSpectatorPawn)
+    set_spectator_pawn(spectator_pawn)
     save(spectator_pawn)
     build_game_instance(core)
 
@@ -1712,6 +2140,48 @@ def build_game_instance(core):
 # ---------------------------------------------------------------------------------------------
 # World fixtures (placeholder engine shapes)
 # ---------------------------------------------------------------------------------------------
+
+# Keycard doors: id -> colour (1 blue, 2 red, 3 yellow), the keycard pickups take the same colour.
+KEYCARD_COLORS = {1: "MI_Blue", 2: "MI_Red", 3: "MI_Yellow"}
+# The weapon chest's random pool.
+CHEST_WEAPONS = ("SMG", "AssaultRifle", "Shotgun", "Sniper")
+
+
+def build_ld_fixtures(mi):
+    """0.9.0 fixtures: the light switch, the weapon chest, keycard doors 2 and 3 (and their pickups)."""
+    W = path("World", "Interactables")
+    made = {}
+    switch = make_blueprint("BP_LightSwitch", W + "/Power", unreal.HitmenLightSwitch)
+    d = cdo(switch)
+    set_mesh(component(d, "mesh"), SHAPES["cube"], (0.1, 0.03, 0.15), mi["MI_White"], (0, 0, 130))
+    set_mesh(component(d, "lever"), SHAPES["cube"], (0.025, 0.05, 0.06), mi["MI_Dark"], (0, -2, 130))
+    save(switch)
+    made["BP_LightSwitch"] = switch
+    base = load(W + "/Container/BP_Container_Random")
+    if base:
+        chest = make_blueprint("BP_WeaponChest", W + "/Container", gen_class(base))
+        pool = []
+        for name in CHEST_WEAPONS:
+            data = load(path("Data", "Weapons") + "/DA_Weapon_" + name)
+            if data:
+                entry = unreal.HitmenContainerEntry()
+                entry.set_editor_property("weapon", data)
+                pool.append(entry)
+        set_props(cdo(chest), width=120.0, depth=70.0, height=75.0, display_name=unreal.Text("Weapon chest"), random_pool=pool)
+        mesh = component(cdo(chest), "mesh")
+        if mesh:
+            mesh.set_material(0, mi["MI_Dark"])
+        unreal.BlueprintEditorLibrary.compile_blueprint(chest)
+        save(chest)
+        made["BP_WeaponChest"] = chest
+    for card in (2, 3):
+        door = make_blueprint("BP_Door_Keycard%d" % card, W + "/Door", unreal.HitmenDoor)
+        set_mesh(component(cdo(door), "mesh"), SHAPES["cube"], (1.1, 0.1, 2.3), mi[KEYCARD_COLORS[card]], (55, 0, 115))
+        set_props(cdo(door), required_keycard=card)
+        save(door)
+        made[door.get_name()] = door
+    return made
+
 
 def build_world(mats, weapons):
     mi = mats["mi"]
@@ -1776,6 +2246,7 @@ def build_world(mats, weapons):
     fixture("BP_HackPanel", unreal.HitmenHackPanel, W + "/Security", {"mesh": ("cube", (0.5, 0.1, 0.6), mi["MI_Yellow"], (0, 0, 130))})
     fixture("BP_CircuitBreaker", unreal.HitmenCircuitBreaker, W + "/Power", {"mesh": ("cube", (0.6, 0.2, 0.9), mi["MI_Metal"], (0, 0, 130))})
     fixture("BP_LightFixture", unreal.HitmenLightFixture, W + "/Power", {"mesh": ("sphere", (0.3, 0.3, 0.3), mi["MI_White"], None)})
+    bps.update(build_ld_fixtures(mi))
     fixture("BP_BlackoutVolume", unreal.HitmenBlackoutVolume, W + "/Power")
     fixture("BP_RoomVolume", unreal.HitmenRoomVolume, W + "/Vent")
     fixture("BP_PoisonableDrink", unreal.HitmenPoisonableDrink, W + "/Drink", {"mesh": ("cylinder", (0.08, 0.08, 0.15), mi["MI_Glass"], (0, 0, 8))})
@@ -1784,16 +2255,18 @@ def build_world(mats, weapons):
     fixture("BP_BreakableWall", unreal.HitmenBreakableWall, W + "/Breakable", {"mesh": ("cube", (3.0, 0.3, 3.0), mi["MI_Stone"], (0, 0, 150))})
     mounted = fixture("BP_MountedGun", unreal.HitmenMountedGun, V, {"mesh": ("cylinder", (0.12, 0.12, 1.4), mi["MI_Dark"], (70, 0, 0)),
                                                           "tripod": ("cone", (0.9, 0.9, 0.85), mi["MI_Metal"], (0, 0, -35)),
-                                                          "shield": ("cube", (0.06, 1.1, 0.7), mi["MI_Metal"], (25, 0, 15))})
+                                                          "shield": ("cube", MOUNTED_GUN_SHIELD[1], mi["MI_Metal"], MOUNTED_GUN_SHIELD[0])})
     # The barrel cylinder is modelled along Z: pitch it onto the gun's forward axis.
     mounted_mesh = component(cdo(mounted), "mesh")
     if mounted_mesh:
         mounted_mesh.set_editor_property("relative_rotation", unreal.Rotator(pitch=-90.0, yaw=0.0, roll=0.0))
+    set_props(cdo(mounted), impact_fx=load(TOON + "NS_Gunshot_Hit"))
     save(mounted)
     tank = fixture("BP_Tank", unreal.HitmenTank, V, {"mesh": ("cube", (6.0, 3.6, 1.6), mi["MI_Green"], None), "turret": ("cube", (2.6, 2.0, 0.8), mi["MI_Green"], None),
                                                     "barrel": ("cylinder", (0.32, 0.32, 3.4), mi["MI_Dark"], None)},
                    {"shell_class": gen_class(load(path("Weapons", "Projectiles", "BP_Projectile_TankShell"))), "shell_speed": 20000.0})
     fixture("BP_RetrievalPoint", unreal.HitmenRetrievalPoint, S, {"mesh": ("cylinder", (4.0, 4.0, 0.1), mi["MI_Yellow"], (0, 0, 5))})
+    build_retrieval_variants(S, mi)
     fixture("BP_LootSpawn_Weapon", unreal.HitmenLootSpawnPoint, S, None, {"category": unreal.HitmenLootCategory.WEAPON})
     fixture("BP_LootSpawn_Item", unreal.HitmenLootSpawnPoint, S, None, {"category": unreal.HitmenLootCategory.ANY_ITEM})
     fixture("BP_TeamStart", unreal.HitmenTeamStart, S)

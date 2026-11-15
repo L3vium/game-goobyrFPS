@@ -43,6 +43,20 @@ struct FHitmenTracerStyle
 	/** A trail fades out over this time (s). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Weapon|Tracer", meta=(ClampMin="0.01", Units="s"))
 	float FadeTime = 0.12f;
+
+	/** A white smoke trail left along the whole shot for this long (s; 0 = none). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Weapon|Tracer|Smoke", meta=(ClampMin="0", Units="s"))
+	float SmokeLifetime = 0.f;
+
+	/** Width of the smoke trail when it appears (cm); it widens by SmokeGrowth every second. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Weapon|Tracer|Smoke", meta=(ClampMin="0.1", Units="cm"))
+	float SmokeThickness = 5.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Weapon|Tracer|Smoke", meta=(ClampMin="0", Units="cm"))
+	float SmokeGrowth = 9.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Weapon|Tracer|Smoke", meta=(ClampMin="0", ClampMax="1"))
+	float SmokeOpacity = 0.45f;
 };
 
 USTRUCT(BlueprintType)
@@ -122,6 +136,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon")
 	TSubclassOf<AHitmenWeaponPickup> PickupClass;
 
+	/** Damage of one bullet / pellet at a distance (falloff between FalloffStartRange and FalloffEndRange). */
+	float GetDamageAtDistance(float Distance) const
+	{
+		const float Span = FMath::Max(FalloffEndRange - FalloffStartRange, 1.f);
+		const float Alpha = FMath::Clamp((Distance - FalloffStartRange) / Span, 0.f, 1.f);
+		return Damage * FMath::Lerp(1.f, FalloffAtMaxRange, Alpha);
+	}
+
+	float GetPelletSpread(bool bAiming) const { return bAiming ? AimPelletSpread : PelletSpread; }
+
 	/** Weight in loot tables. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon", meta=(ClampMin="0"))
 	float LootWeight = 1.f;
@@ -182,20 +206,45 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(ClampMin="1"))
 	float HeadshotMultiplier = 2.f;
 
+	/** A bullet / arrow of this weapon in the head always kills (Project Settings -> Hitmen -> bHeadshotKills must be on
+	 *  too); off: the head only takes HeadshotMultiplier. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage")
+	bool bHeadshotKills = true;
+
 	/** Bone names counting as head. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage")
 	TArray<FName> HeadBones = { TEXT("head"), TEXT("neck_01") };
 
+	/** Bullets stop here (cm): nothing is hit beyond. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(ClampMin="0", Units="cm"))
 	float Range = 10000.f;
 
-	/** Damage multiplier at max range (linear falloff from 50% range). */
+	/** Full damage up to this distance (cm), then it drops linearly to FalloffAtMaxRange at FalloffEndRange. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(ClampMin="0", Units="cm"))
+	float FalloffStartRange = 5000.f;
+
+	/** From this distance on (cm), damage is Damage x FalloffAtMaxRange. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(ClampMin="0", Units="cm"))
+	float FalloffEndRange = 10000.f;
+
+	/** Damage multiplier from FalloffEndRange on (1 = no falloff). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(ClampMin="0", ClampMax="1"))
 	float FalloffAtMaxRange = 0.5f;
 
-	/** Pellets per shot (shotgun). */
+	/** Pellets per shot (shotgun); each pellet deals Damage (with falloff and headshots). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(ClampMin="1"))
 	int32 PelletCount = 1;
+
+	/** Half-angle of the pellet cone around the aimed direction, hip fire / aiming (degrees). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(EditCondition="PelletCount>1", ClampMin="0", Units="deg"))
+	float PelletSpread = 5.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(EditCondition="PelletCount>1", ClampMin="0", Units="deg"))
+	float AimPelletSpread = 5.f;
+
+	/** Pellets on fixed rings (one in the middle, the rest evenly around, a little jitter) instead of a random cone. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(EditCondition="PelletCount>1"))
+	bool bFixedPelletPattern = false;
 
 	/** Damage dealt by the weapon when thrown and hitting a pawn. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(ClampMin="0"))
@@ -208,6 +257,17 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="0", Units="deg"))
 	float AimSpread = 0.5f;
+
+	/** Spread multiplier while crouched (hip or aim). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="0"))
+	float CrouchSpreadMultiplier = 0.8f;
+
+	/** Spread multiplier while moving faster than MovingSpreadSpeed (hip or aim). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="0"))
+	float MovingSpreadMultiplier = 1.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="0", Units="cm/s"))
+	float MovingSpreadSpeed = 150.f;
 
 	/** Camera field of view while aiming. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Accuracy", meta=(ClampMin="5", ClampMax="170"))
@@ -236,6 +296,11 @@ public:
 	/** Noise where a bullet lands (hitscan): this is what draws NPCs, silenced or not. 0 = none. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Noise", meta=(ClampMin="0", Units="cm"))
 	float ImpactNoiseRadius = 500.f;
+
+	// ---- AI ----
+	/** Guards holding this weapon close in to this distance before they shoot (cm; 0 = the NPC's own ShootingRange). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|AI", meta=(ClampMin="0", Units="cm"))
+	float NPCEngageRange = 0.f;
 
 	// ---- Projectile ----
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Projectile")

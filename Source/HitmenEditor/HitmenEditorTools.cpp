@@ -23,6 +23,14 @@
 #include "BehaviorTree/Decorators/BTDecorator_Blackboard.h"
 #include "BehaviorTree/Decorators/BTDecorator_Cooldown.h"
 #include "BehaviorTree/Services/BTService_DefaultFocus.h"
+#include "BehaviorTree/Tasks/BTTask_RunEQSQuery.h"
+#include "EnvironmentQuery/EnvQuery.h"
+#include "EnvironmentQuery/EnvQueryOption.h"
+#include "EnvironmentQuery/Tests/EnvQueryTest_Distance.h"
+#include "EnvironmentQuery/Tests/EnvQueryTest_Trace.h"
+#include "EnvironmentQuery/Tests/EnvQueryTest_Pathfinding.h"
+#include "EnvironmentQuery/Contexts/EnvQueryContext_Querier.h"
+#include "AI/HitmenEQS.h"
 
 #include "BehaviorTreeGraph.h"
 #include "BehaviorTreeGraphNode.h"
@@ -293,14 +301,76 @@ namespace
 		AddKey(HitmenBBKeys::UseActor, ObjectKey(AActor::StaticClass()));
 		AddKey(HitmenBBKeys::IsOnEdge, NewObject<UBlackboardKeyType_Bool>(Blackboard));
 		AddKey(HitmenBBKeys::Evacuate, NewObject<UBlackboardKeyType_Bool>(Blackboard));
+		AddKey(HitmenBBKeys::DisposeBody, ObjectKey(AActor::StaticClass()));
+		AddKey(HitmenBBKeys::DisposeContainer, ObjectKey(AActor::StaticClass()));
+		AddKey(HitmenBBKeys::DisposeLocation, NewObject<UBlackboardKeyType_Vector>(Blackboard));
 		Blackboard->MarkPackageDirty();
 		return Blackboard;
+	}
+
+	/**
+	 * EQ_HitmenSearch: where a searching guard looks next. Candidates around the search center (hiding spots, the center,
+	 * random reachable points); reachable only; scored by: not claimed by a colleague, in front of a hiding spot, hidden
+	 * from the center, hidden from the guard, near the center. Generated here (edit this builder, not the asset).
+	 */
+	UEnvQuery* BuildSearchQuery(const FString& Folder)
+	{
+		UEnvQuery* Query = CreateOrLoadAsset<UEnvQuery>(Folder, TEXT("EQ_HitmenSearch"));
+		auto& Options = Query->GetOptionsMutable();
+		Options.Reset();
+		UEnvQueryOption* Option = NewObject<UEnvQueryOption>(Query, NAME_None, RF_Transactional);
+		Option->Generator = NewObject<UEnvQueryGenerator_HitmenSearchSpots>(Option, NAME_None, RF_Transactional);
+
+		UEnvQueryTest_Pathfinding* Reachable = NewObject<UEnvQueryTest_Pathfinding>(Option, NAME_None, RF_Transactional);
+		Reachable->TestMode = EEnvTestPathfinding::PathExist;
+		Reachable->Context = UEnvQueryContext_Querier::StaticClass();
+		Reachable->TestPurpose = EEnvTestPurpose::Filter;
+		Reachable->BoolValue.DefaultValue = true;
+
+		UEnvQueryTest_HitmenSearchFree* Free = NewObject<UEnvQueryTest_HitmenSearchFree>(Option, NAME_None, RF_Transactional);
+		Free->TestPurpose = EEnvTestPurpose::Score;
+		Free->BoolValue.DefaultValue = true;
+		Free->ScoringFactor.DefaultValue = 2.f;
+
+		UEnvQueryTest_HitmenNearHidingSpot* Hiding = NewObject<UEnvQueryTest_HitmenNearHidingSpot>(Option, NAME_None, RF_Transactional);
+		Hiding->TestPurpose = EEnvTestPurpose::Score;
+		Hiding->BoolValue.DefaultValue = true;
+		Hiding->ScoringFactor.DefaultValue = 1.5f;
+
+		// A trace from the center that is blocked = a spot hidden from where the target was (where it could hide).
+		UEnvQueryTest_Trace* HiddenFromCenter = NewObject<UEnvQueryTest_Trace>(Option, NAME_None, RF_Transactional);
+		HiddenFromCenter->Context = UEnvQueryContext_HitmenSearchCenter::StaticClass();
+		HiddenFromCenter->ItemHeightOffset.DefaultValue = 150.f;
+		HiddenFromCenter->ContextHeightOffset.DefaultValue = 150.f;
+		HiddenFromCenter->TestPurpose = EEnvTestPurpose::Score;
+		HiddenFromCenter->BoolValue.DefaultValue = true;
+		HiddenFromCenter->ScoringFactor.DefaultValue = 1.f;
+
+		UEnvQueryTest_Trace* HiddenFromSelf = NewObject<UEnvQueryTest_Trace>(Option, NAME_None, RF_Transactional);
+		HiddenFromSelf->Context = UEnvQueryContext_Querier::StaticClass();
+		HiddenFromSelf->ItemHeightOffset.DefaultValue = 150.f;
+		HiddenFromSelf->ContextHeightOffset.DefaultValue = 150.f;
+		HiddenFromSelf->TestPurpose = EEnvTestPurpose::Score;
+		HiddenFromSelf->BoolValue.DefaultValue = true;
+		HiddenFromSelf->ScoringFactor.DefaultValue = 0.8f;
+
+		UEnvQueryTest_Distance* Near = NewObject<UEnvQueryTest_Distance>(Option, NAME_None, RF_Transactional);
+		Near->DistanceTo = UEnvQueryContext_HitmenSearchCenter::StaticClass();
+		Near->TestPurpose = EEnvTestPurpose::Score;
+		Near->ScoringEquation = EEnvTestScoreEquation::InverseLinear;
+		Near->ScoringFactor.DefaultValue = 1.f;
+
+		Option->Tests = { Reachable, Free, Hiding, HiddenFromCenter, HiddenFromSelf, Near };
+		Options.Add(Option);
+		Query->MarkPackageDirty();
+		return Query;
 	}
 }
 
 bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 {
 	UBlackboardData* Blackboard = BuildBlackboard(Folder);
+	UEnvQuery* SearchQuery = BuildSearchQuery(Folder);
 
 	// ---- BT_Patrol: next point, walk, use the point's actor, wait ----
 	UBehaviorTree* Patrol = CreateOrLoadAsset<UBehaviorTree>(Folder, TEXT("BT_Patrol"));
@@ -338,6 +408,8 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 	{
 		FTreeBuilder B(Investigate, Blackboard);
 		UBehaviorTreeGraphNode* Seq = B.Composite(UBTComposite_Sequence::StaticClass(), B.Root, 0, 150);
+		// "Hm?": face the sound / the sight first (a shot fired near it: toward the shooter), then walk over.
+		B.Task(UBTTask_HitmenTurnToNoise::StaticClass(), Seq, -600, 320);
 		B.MoveToObserved(Seq, HitmenBBKeys::InvestigateLocation, 150.f, -300, 320);
 		B.Task(UBTTask_HitmenLookAround::StaticClass(), Seq, 0, 320);
 		UBehaviorTreeGraphNode* Wait = B.Task(UBTTask_Wait::StaticClass(), Seq, 300, 320);
@@ -345,16 +417,35 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		B.Finish();
 	}
 
-	// ---- BT_Search: scored hiding places around the last known position, one after another,
-	//      a look-around at each (the root loops it until the search times out) ----
+	// ---- BT_Search: EQS (EQ_HitmenSearch) picks the next place to look around the last known position (or the body
+	//      found), it is claimed, the guard walks there and looks around (the root loops it until the search ends) ----
 	UBehaviorTree* Search = CreateOrLoadAsset<UBehaviorTree>(Folder, TEXT("BT_Search"));
 	{
 		FTreeBuilder B(Search, Blackboard);
 		UBehaviorTreeGraphNode* Seq = B.Composite(UBTComposite_Sequence::StaticClass(), B.Root, 0, 150);
-		B.Task(UBTTask_HitmenFindSearchPoint::StaticClass(), Seq, -300, 320);
-		B.MoveTo(Seq, HitmenBBKeys::MoveLocation, 100.f, 0, 320);
+		UBehaviorTreeGraphNode* Query = B.Task(UBTTask_RunEQSQuery::StaticClass(), Seq, -450, 320);
+		if (UBTTask_RunEQSQuery* EQSTask = Cast<UBTTask_RunEQSQuery>(Query->NodeInstance))
+		{
+			EQSTask->EQSRequest.QueryTemplate = SearchQuery;
+			EQSTask->EQSRequest.RunMode = EEnvQueryRunMode::RandomBest25Pct;
+		}
+		SetKey(Query->NodeInstance, TEXT("BlackboardKey"), HitmenBBKeys::MoveLocation);
+		B.Task(UBTTask_HitmenClaimSearchSpot::StaticClass(), Seq, -200, 320);
+		B.MoveTo(Seq, HitmenBBKeys::MoveLocation, 100.f, 50, 320);
 		UBehaviorTreeGraphNode* Look = B.Task(UBTTask_HitmenLookAround::StaticClass(), Seq, 300, 320);
 		SetFloat(Look->NodeInstance, TEXT("Duration"), 2.5f);
+		B.Finish();
+	}
+
+	// ---- BT_DisposeBody: after a body search, carry the body to the nearest container with room and stow it ----
+	UBehaviorTree* Dispose = CreateOrLoadAsset<UBehaviorTree>(Folder, TEXT("BT_DisposeBody"));
+	{
+		FTreeBuilder B(Dispose, Blackboard);
+		UBehaviorTreeGraphNode* Seq = B.Composite(UBTComposite_Sequence::StaticClass(), B.Root, 0, 150);
+		B.MoveTo(Seq, HitmenBBKeys::DisposeBody, 110.f, -450, 320);
+		B.Task(UBTTask_HitmenPickUpBody::StaticClass(), Seq, -150, 320);
+		B.MoveTo(Seq, HitmenBBKeys::DisposeLocation, 60.f, 150, 320);
+		B.Task(UBTTask_HitmenStowBody::StaticClass(), Seq, 450, 320);
 		B.Finish();
 	}
 
@@ -477,6 +568,11 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 		UBehaviorTreeGraphNode* Stare = B.Task(UBTTask_Wait::StaticClass(), Suspicious, 350, 560);
 		SetFloat(Stare->NodeInstance, TEXT("WaitTime"), 0.4f);
 
+		// Calm again after a body search: carry the body away (aborts as soon as anything else happens).
+		UBehaviorTreeGraphNode* DisposeNode = B.Subtree(Dispose, Sel, 600, 360);
+		B.KeyIsSet(DisposeNode, HitmenBBKeys::DisposeBody, EBTFlowAbortMode::Both);
+		B.AlertIs(DisposeNode, { EHitmenAlertState::Unaware });
+
 		UBehaviorTreeGraphNode* GuardNode = B.Subtree(Guard, Sel, 800, 360);
 		B.KeyIsSet(GuardNode, HitmenBBKeys::IsStationary);
 
@@ -489,6 +585,35 @@ bool UHitmenEditorTools::BuildNPCBehaviorTrees(const FString& Folder)
 void UHitmenEditorTools::SetBackgroundThrottling(bool bThrottle)
 {
 	GetMutableDefault<UEditorPerformanceSettings>()->bThrottleCPUWhenNotForeground = bThrottle;
+}
+
+TArray<UWorld*> UHitmenEditorTools::GetPIEWorlds()
+{
+	TArray<UWorld*> Worlds;
+	if (GEngine)
+	{
+		for (const FWorldContext& Context : GEngine->GetWorldContexts())
+		{
+			if (Context.WorldType == EWorldType::PIE && Context.World())
+			{
+				Worlds.Add(Context.World());
+			}
+		}
+	}
+	// The server (or the standalone world) first.
+	Worlds.StableSort([](const UWorld& A, const UWorld& B) { return A.GetNetMode() != NM_Client && B.GetNetMode() == NM_Client; });
+	return Worlds;
+}
+
+void UHitmenEditorTools::RunPIEConsoleCommand(UWorld* World, const FString& Command)
+{
+	APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	if (!PC)
+	{
+		return;
+	}
+	TGuardValue<bool> RealRPCs(GAllowActorScriptExecutionInEditor, false);
+	PC->ConsoleCommand(Command, true);
 }
 
 void UHitmenEditorTools::SetPIENetMode(int32 NumPlayers)

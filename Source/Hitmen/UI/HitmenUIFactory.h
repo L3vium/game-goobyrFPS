@@ -9,6 +9,8 @@
 #include "Layout/Margin.h"
 #include "HitmenUIFactory.generated.h"
 
+enum class EHitmenAlertColor : uint8;
+
 class UWidgetTree;
 class UTextBlock;
 class UButton;
@@ -78,6 +80,23 @@ namespace HitmenUI
 	HITMEN_API void PaintArcFill(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float InnerRadius, float OuterRadius, float StartDeg, float EndDeg, const FLinearColor& Color, int32 Segments = 24);
 	/** A map marker of a kind (UHitmenMapMarkerType) centred on Center: its icon or its shape, on a dark outline.
 	 *  Uses Layer and Layer + 1. */
+	/** Split screen grid for Count views (up to 8): 1, 2 side by side, 2x2, 3x2, 4x2. */
+	HITMEN_API void GetSplitLayout(int32 Count, int32& OutColumns, int32& OutRows);
+
+	/** A filled diamond with a dark rim (NPCs on the maps). Radius = centre to tip. */
+	HITMEN_API void PaintDiamond(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Radius, const FLinearColor& Color, const FLinearColor& Rim = FLinearColor(0.f, 0.f, 0.f, 0.75f));
+
+	/** A vision cone: a fan from Center along YawDeg (0 = up, clockwise, like world yaw on a north-up map), Color at
+	 *  the tip fading to transparent at Radius. */
+	HITMEN_API void PaintVisionCone(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Radius, float YawDeg, float HalfAngleDeg, const FLinearColor& Color, int32 Segments = 14);
+
+	/** An NPC's diamond on the maps: its alert colour, dark grey when calm (reads on the light map texture). */
+	HITMEN_API FLinearColor GetMapNPCColor(EHitmenAlertColor AlertColor);
+
+	/** An NPC's vision cone on the maps (full opacity; the caller fades it): a dark shade while calm or suspicious, the
+	 *  alert colour once alerted. */
+	HITMEN_API FLinearColor GetMapConeColor(EHitmenAlertColor AlertColor);
+
 	HITMEN_API void PaintMapMarker(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, FVector2D Center, float Size, const UHitmenMapMarkerType* Type, const FSlateBrush* IconBrush);
 
 	/** The map definition of the level this widget lives in (minimap, pause map). */

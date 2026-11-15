@@ -1,6 +1,7 @@
 // Hitmen — character base
 
 #include "Characters/HitmenCharacterBase.h"
+#include "GameFramework/SpectatorPawn.h"
 #include "Components/HitmenHealthComponent.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "Components/HitmenFootstepComponent.h"
@@ -23,6 +24,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Weapons/HitmenWeaponBase.h"
 #include "Weapons/HitmenProjectile.h"
+#include "Data/HitmenWeaponData.h"
+#include "World/Interactables/HitmenHidingSpot.h"
 #include "Hitmen.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -55,6 +58,8 @@ void AHitmenCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AHitmenCharacterBase, bIsVIP);
 	DOREPLIFETIME(AHitmenCharacterBase, bVanished);
+	DOREPLIFETIME(AHitmenCharacterBase, StowedIn);
+	DOREPLIFETIME(AHitmenCharacterBase, StowSlot);
 	DOREPLIFETIME(AHitmenCharacterBase, Carrier);
 	DOREPLIFETIME(AHitmenCharacterBase, CarrySocket);
 	DOREPLIFETIME(AHitmenCharacterBase, DeathMontageIndex);
@@ -116,18 +121,22 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 	// Hand-level dust stays out of your own first-person view (it would fill the screen); everyone else sees it.
 	const bool bFirstPersonViewer = IsLocallyControlled() && IsPlayerControlled();
 
-	// Ladders and gutters: a grab sound and a small puff at the hands every step of the climb.
+	// Ladders and gutters: a grab sound every step of the climb, and a puff when switched on (up / down).
+	const UHitmenGameSettings* Juice = UHitmenGameSettings::Get();
 	if (bClimbing)
 	{
-		ClimbStepAccumulator += FMath::Abs(Z - LastTraversalZ);
+		const float Step = Z - LastTraversalZ;
+		ClimbStepAccumulator += FMath::Abs(Step);
 		if (ClimbStepAccumulator >= ClimbStepDistance)
 		{
 			ClimbStepAccumulator = 0.f;
-			const FVector Hands = GetActorLocation() + GetActorForwardVector() * 30.f + FVector::UpVector * 60.f;
+			const bool bDown = Step < 0.f;
+			const FVector Hands = GetActorLocation() + GetActorForwardVector() * 30.f + FVector::UpVector * (bDown ? -20.f : 60.f);
 			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::ClimbGrab, Hands);
-			if (ClimbFX && !bFirstPersonViewer)
+			UNiagaraSystem* Puff = bDown ? (Juice->bLadderDescendFX ? LadderDescendFX.Get() : nullptr) : (Juice->bLadderClimbFX ? ClimbFX.Get() : nullptr);
+			if (Puff && !bFirstPersonViewer)
 			{
-				UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ClimbFX, Hands, FRotator::ZeroRotator, FVector(0.35f));
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Puff, Hands, FRotator::ZeroRotator, FVector(0.35f));
 			}
 		}
 	}
@@ -165,13 +174,14 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 	if (bSliding && !bWasSlidingJuice)
 	{
 		SlideDustAccumulator = 0.f;
-		if (USoundBase* Scrape = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::Slide))
+		USoundBase* Scrape = Juice->bSlideSound ? UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::Slide) : nullptr;
+		if (Scrape)
 		{
 			SlideAudio = UGameplayStatics::SpawnSoundAttached(Scrape, GetRootComponent(), NAME_None, FVector(0.f, 0.f, -60.f), EAttachLocation::KeepRelativeOffset,
 				true, UHitmenSoundLibrary::GetHitmenSoundVolume(EHitmenSound::Slide), 1.f, 0.f, UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::Footstep));
 		}
 	}
-	if (bSliding)
+	if (bSliding && Juice->bSlideFX)
 	{
 		SlideDustAccumulator -= DeltaSeconds;
 		if (SlideDustAccumulator <= 0.f)
@@ -389,7 +399,7 @@ float AHitmenCharacterBase::PlayDeathMontage()
 
 void AHitmenCharacterBase::HandleDeathRagdollTimer()
 {
-	if (IsDead() && !Carrier && !bVanished)
+	if (IsDead() && !Carrier && !bVanished && !StowedIn)
 	{
 		EnableRagdoll();
 	}
@@ -502,7 +512,15 @@ float AHitmenCharacterBase::TakeDamage(float DamageAmount, FDamageEvent const& D
 		const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
 		const AHitmenCharacterBase* Shooter = Cast<AHitmenCharacterBase>(InstigatorActor);
 		const bool bFromNPC = Shooter && !Shooter->IsPlayerControlled();
-		const bool bLethalCauser = Cast<AHitmenWeaponBase>(DamageCauser) || Cast<AHitmenProjectile>(DamageCauser);
+		// The firing weapon decides too (its bHeadshotKills): a projectile is owned by the weapon that fired it.
+		const AHitmenWeaponBase* Weapon = Cast<AHitmenWeaponBase>(DamageCauser);
+		const AHitmenProjectile* Projectile = Cast<AHitmenProjectile>(DamageCauser);
+		if (!Weapon && Projectile)
+		{
+			Weapon = Cast<AHitmenWeaponBase>(Projectile->GetOwner());
+		}
+		const bool bWeaponKills = !Weapon || !Weapon->GetWeaponData() || Weapon->GetWeaponData()->bHeadshotKills;
+		const bool bLethalCauser = (Weapon || Projectile) && bWeaponKills;
 		if (Settings->bHeadshotKills && bLethalCauser && (!bFromNPC || Settings->bHeadshotKillsFromNPCs))
 		{
 			Damage = FMath::Max(Damage, HealthComponent->GetHealth() + HealthComponent->GetArmor() + 1.f);
@@ -593,17 +611,47 @@ void AHitmenCharacterBase::HandleDeath(AActor* Killer, AActor* DamageCauser, boo
 	OnBodyStateChanged.Broadcast(this);
 }
 
-void AHitmenCharacterBase::EnableRagdoll()
+void AHitmenCharacterBase::EnableRagdoll(bool bDeathImpulse)
 {
 	USkeletalMeshComponent* MeshComp = GetMesh();
 	MeshComp->SetCollisionProfileName(TEXT("Ragdoll"));
 	MeshComp->SetCollisionResponseToChannel(HITMEN_TRACE_INTERACT, ECR_Block);
+	// Continuous collision: a limb never tunnels into a wall it starts next to.
+	MeshComp->SetAllUseCCD(true);
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->WakeAllRigidBodies();
-	if (!LastHitDirection.IsNearlyZero())
+	if (bDeathImpulse && !LastHitDirection.IsNearlyZero())
 	{
 		MeshComp->AddImpulse(LastHitDirection * DeathImpulse, LastHitBone, true);
 	}
+}
+
+FVector AHitmenCharacterBase::FindSafeDropLocation(const FVector& From, const FVector& Wanted) const
+{
+	// Sweep a ball the size of the body from the carrier's chest to where the body was held: a wall in between stops
+	// it short; then make sure there is room above the floor.
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenBodyDrop), false, this);
+	if (LastCarrier.IsValid())
+	{
+		Params.AddIgnoredActor(LastCarrier.Get());
+	}
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	const FCollisionShape Ball = FCollisionShape::MakeSphere(DropClearance);
+	FVector Location = Wanted;
+	FHitResult Hit;
+	if (GetWorld()->SweepSingleByObjectType(Hit, From, Wanted, FQuat::Identity, Objects, Ball, Params))
+	{
+		Location = Hit.bStartPenetrating ? From : Hit.Location;
+	}
+	FHitResult Floor;
+	if (GetWorld()->SweepSingleByObjectType(Floor, Location + FVector(0.f, 0.f, 60.f), Location - FVector(0.f, 0.f, 200.f), FQuat::Identity, Objects, Ball, Params)
+		&& !Floor.bStartPenetrating)
+	{
+		Location.Z = FMath::Max(Location.Z, Floor.Location.Z + 5.f);
+	}
+	return Location;
 }
 
 void AHitmenCharacterBase::HandleStatusAdded(EHitmenStatusEffect Status, AActor* StatusInstigator)
@@ -618,7 +666,19 @@ void AHitmenCharacterBase::HandleStatusRemoved(EHitmenStatusEffect Status, AActo
 
 bool AHitmenCharacterBase::IsDiscoverableBody() const
 {
-	return IsDead() && !bVanished && !Carrier;
+	return IsDead() && !bVanished && !Carrier && !StowedIn;
+}
+
+void AHitmenCharacterBase::SetStowedIn(AHitmenHidingSpot* Spot, int32 Slot)
+{
+	if (!HasAuthority() || !IsDead())
+	{
+		return;
+	}
+	Carrier = nullptr;
+	StowedIn = Spot;
+	StowSlot = Slot;
+	OnRep_Body();
 }
 
 void AHitmenCharacterBase::VanishBody()
@@ -636,6 +696,10 @@ void AHitmenCharacterBase::SetCarriedBy(APawn* NewCarrier, FName AttachSocket)
 	{
 		return;
 	}
+	if (NewCarrier)
+	{
+		StowedIn = nullptr;
+	}
 	Carrier = NewCarrier;
 	CarrySocket = AttachSocket;
 	OnRep_Body();
@@ -651,9 +715,18 @@ void AHitmenCharacterBase::OnRep_Body()
 void AHitmenCharacterBase::ApplyBodyState()
 {
 	USkeletalMeshComponent* MeshComp = GetMesh();
-	if (bVanished || Carrier)
+	if (bVanished || Carrier || StowedIn)
 	{
 		GetWorldTimerManager().ClearTimer(DeathRagdollTimer);
+	}
+	// Your own carried body is drawn like your gun (first-person render: never inside a wall); everyone else, and
+	// every body that is not in your arms, is a normal world mesh.
+	const bool bInMyArms = Carrier && Carrier->IsLocallyControlled() && Carrier->IsPlayerControlled();
+	if (MeshComp->FirstPersonPrimitiveType != (bInMyArms ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::None))
+	{
+		MeshComp->FirstPersonPrimitiveType = bInMyArms ? EFirstPersonPrimitiveType::FirstPerson : EFirstPersonPrimitiveType::None;
+		MeshComp->SetCastShadow(!bInMyArms);
+		MeshComp->MarkRenderStateDirty();
 	}
 	if (bVanished)
 	{
@@ -662,8 +735,22 @@ void AHitmenCharacterBase::ApplyBodyState()
 		MeshComp->SetSimulatePhysics(false);
 		return;
 	}
+	if (StowedIn)
+	{
+		// In its slot inside the hiding spot: still, no collision, seen when the door / lid opens.
+		MeshComp->SetSimulatePhysics(false);
+		MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		const AHitmenHidingSpot* Spot = Cast<AHitmenHidingSpot>(StowedIn);
+		AttachToComponent(StowedIn->GetRootComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		SetActorRelativeTransform(Spot ? Spot->GetBodySlotTransform(StowSlot) : FTransform(FVector(0.f, 0.f, 40.f)));
+		MeshComp->AttachToComponent(GetCapsuleComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		MeshComp->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -92.f), FRotator(0.f, -90.f, 0.f));
+		return;
+	}
 	if (Carrier)
 	{
+		LastCarrier = Carrier;
 		MeshComp->SetSimulatePhysics(false);
 		MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		USceneComponent* AttachParent = Carrier->FindComponentByClass<USkeletalMeshComponent>();
@@ -687,22 +774,29 @@ void AHitmenCharacterBase::ApplyBodyState()
 		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		return;
 	}
-	// Dropped: back to a ragdoll where the carrier stands.
-	if (GetAttachParentActor())
+	// Dropped: back to a ragdoll in front of the carrier, never inside a wall or the floor (it was carried with no
+	// collision), and without the killing hit's push.
+	const bool bWasHeld = GetAttachParentActor() != nullptr;
+	if (bWasHeld)
 	{
 		DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		if (const APawn* From = LastCarrier.Get())
+		{
+			const FVector Safe = FindSafeDropLocation(From->GetActorLocation() + FVector(0.f, 0.f, 20.f), GetActorLocation());
+			SetActorLocation(Safe, false, nullptr, ETeleportType::TeleportPhysics);
+		}
 	}
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	if (IsDead())
 	{
-		EnableRagdoll();
+		EnableRagdoll(!bWasHeld);
 	}
 }
 
 EHitmenScanCategory AHitmenCharacterBase::GetScanCategory_Implementation(const AActor* Observer) const
 {
-	if (bVanished)
+	if (bVanished || StowedIn)
 	{
 		return EHitmenScanCategory::None;
 	}
@@ -713,6 +807,11 @@ EHitmenScanCategory AHitmenCharacterBase::GetScanCategory_Implementation(const A
 	if (IsDead())
 	{
 		return EHitmenScanCategory::None;
+	}
+	// Watchers have no team: every guard is lit for them (players get the watcher outline instead).
+	if (Observer && Observer->IsA<ASpectatorPawn>())
+	{
+		return GetPlayerState() ? EHitmenScanCategory::None : EHitmenScanCategory::Enemy;
 	}
 	return UHitmenTeamLibrary::AreHostile(Observer, this) ? EHitmenScanCategory::Enemy : EHitmenScanCategory::None;
 }

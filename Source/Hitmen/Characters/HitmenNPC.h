@@ -30,7 +30,7 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
 	bool IsVIPCandidate() const { return bVIPCandidate; }
 
-	void SetIsVIP(bool bVIP) { bIsVIP = bVIP; }
+	void SetIsVIP(bool bVIP) { bIsVIP = bVIP; bAlwaysRelevant = bVIP || bAlwaysRelevant; }
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
 	bool IsSniper() const { return bIsSniper; }
@@ -111,6 +111,8 @@ public:
 	// F: pickpocket the keycard from behind (alive, unaware); otherwise carry the body.
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	/** "Guard  -  Shotgun  -  Keycard 2": what you see when you look at it up close. */
+	virtual FText GetInteractionInfo_Implementation(AActor* Interactor) const override;
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
 	/** Alive, unaware of the player, carrying a keycard, player behind it. */
@@ -121,6 +123,12 @@ public:
 	int32 GetCarriedKeycard() const { return CarriedKeycard; }
 
 	void SetGuardGroup(class AHitmenGuardGroup* Group);
+
+	/** Server: walks Route (from the route's AssignedNPCs); makes it a patroller. */
+	void AssignPatrolRoute(AHitmenPatrolRoute* Route);
+
+	/** Calm walking pace multiplier (a group leader waiting for its followers). */
+	void SetPaceMultiplier(float Multiplier);
 	class AHitmenGuardGroup* GetGuardGroup() const;
 
 protected:
@@ -179,6 +187,45 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> AimLaser;
 
+	/** Width of the aim line per cm of distance from your eye (0.0016 = about 2 px at 1080p, 90 degrees): it reads at
+	 *  any distance. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Sniper", meta=(ClampMin="0"))
+	float AimLaserScreenWidth = 0.0016f;
+
+	/** A small red star at a sniper's scope, the same size on screen at any distance (seen only in line of sight). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UMaterialBillboardComponent> ScopeGlint;
+
+	/** Glint sprite material (scalar "Aiming": 0 calm pulse, 1 bright fast pulse while aiming). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Sniper")
+	TObjectPtr<UMaterialInterface> GlintMaterial;
+
+	/** Glint size as a fraction of the screen. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Sniper", meta=(ClampMin="0"))
+	float GlintScreenSize = 0.03f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> GlintInstance;
+
+	/** Name shown when you look at it (VIP candidates are "Guest", whichever one is the VIP). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
+	FText DisplayName;
+
+	/** Where the keycard sits, in the NPC's own space (X forward, Y right, Z up from the capsule centre): a right pocket. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC")
+	FVector KeycardHipOffset = FVector(4.f, 21.f, 2.f);
+
+	/** Pickpocketing also needs the thief to be crouched. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
+	bool bPickpocketRequiresCrouch = false;
+
+	/** Carries bodies to a container after a body search (the VIP's body never). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UHitmenBodyCarryComponent> BodyCarryComponent;
+
+	UFUNCTION()
+	void HandleCarryChanged(AHitmenCharacterBase* Body);
+
 	/** Pickpocket only works from behind (dot of the NPC forward and the direction to the thief). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC", meta=(ClampMin="-1", ClampMax="1"))
 	float PickpocketMaxDot = -0.2f;
@@ -225,6 +272,7 @@ protected:
 
 	/** Walk speed from the alert state (and on edge). */
 	void RefreshWalkSpeed();
+	float PaceMultiplier = 1.f;
 
 	UFUNCTION()
 	void HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAlertState NewState);

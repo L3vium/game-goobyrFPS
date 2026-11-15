@@ -80,6 +80,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")
 	virtual float GetMovementSpeedMultiplier() const;
 
+	/** Speed multiplier while carrying a body (walk or sprint); 1 when not carrying. */
+	virtual float GetCarrySpeedMultiplier(bool bSprinting) const { return 1.f; }
+
+	/** False while something forbids sprinting (carrying a body, ...). Read by the movement component (predicted). */
+	virtual bool CanSprintNow() const { return true; }
+
 	/** NPC alert state or "unaware from behind" for players; used by stealth kills. */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")
 	/** Silent takedown allowed by Attacker: default = from behind (players see what is in front of them);
@@ -105,7 +111,14 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Body")
 	void SetCarriedBy(APawn* NewCarrier, FName AttachSocket);
 
-	/** Bodies NPCs should react to: dead, not vanished, not carried away. */
+	/** Server: the body lies in a hiding spot (locker, body container), in its slot Slot: visible when it opens, never
+	 *  found by guards. */
+	void SetStowedIn(class AHitmenHidingSpot* Spot, int32 Slot);
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Body")
+	AActor* GetStowedIn() const { return StowedIn; }
+
+	/** Bodies NPCs should react to: dead, not vanished, not carried away, not stowed. */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Body")
 	bool IsDiscoverableBody() const;
 
@@ -146,10 +159,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Animation")
 	TObjectPtr<UHitmenAnimSet> AnimSet;
 
-	/** Traversal juice: a puff and a grab sound every ClimbStepDistance on ladders / gutters, sparks and a cable
-	 *  sound on ziplines (every machine). */
+	/** Traversal juice: a grab sound every ClimbStepDistance on ladders / gutters with a puff going up (ClimbFX,
+	 *  Project Settings -> Hitmen -> Juice -> bLadderClimbFX) or down (LadderDescendFX, bLadderDescendFX); sparks and
+	 *  a cable sound on ziplines (every machine). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
 	TObjectPtr<class UNiagaraSystem> ClimbFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
+	TObjectPtr<class UNiagaraSystem> LadderDescendFX;
 
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
 	TObjectPtr<class UNiagaraSystem> ZiplineFX;
@@ -157,7 +174,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice", meta=(ClampMin="10", Units="cm"))
 	float ClimbStepDistance = 55.f;
 
-	/** Dust where the hands land on a ledge, under the feet when a vault lands, along a slide (every machine). */
+	/** Dust where the hands land on a ledge, under the feet when a vault lands, along a slide (bSlideFX) (every
+	 *  machine). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Juice")
 	TObjectPtr<class UNiagaraSystem> TraversalDustFX;
 
@@ -215,6 +233,20 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_Body)
 	TObjectPtr<APawn> Carrier;
 
+	/** The hiding spot this body is stowed in (null = not stowed) and its slot there. */
+	UPROPERTY(ReplicatedUsing=OnRep_Body)
+	TObjectPtr<AActor> StowedIn;
+
+	UPROPERTY(Replicated)
+	int32 StowSlot = 0;
+
+	/** Who carried the body last (every machine): a drop starts from it. */
+	TWeakObjectPtr<APawn> LastCarrier;
+
+	/** A dropped body is put back this far from walls (cm), never inside them. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Body", meta=(ClampMin="5", Units="cm"))
+	float DropClearance = 35.f;
+
 	UPROPERTY(Replicated)
 	FName CarrySocket = NAME_None;
 
@@ -242,7 +274,11 @@ protected:
 	UFUNCTION()
 	void OnRep_Body();
 
-	void EnableRagdoll();
+	/** bDeathImpulse: the push of the killing hit (only on death, never when a body is put down). */
+	void EnableRagdoll(bool bDeathImpulse = true);
+
+	/** Where a dropped body can lie without being inside a wall or under the floor (sweep from the carrier). */
+	FVector FindSafeDropLocation(const FVector& From, const FVector& Wanted) const;
 	void ApplyBodyState();
 
 	UFUNCTION(NetMulticast, Unreliable)

@@ -17,10 +17,6 @@ protected:
 	virtual void FireServer(const FVector& Origin, const FVector& Direction, int32 Seed, float Charge, TArray<FVector>& OutImpacts) override;
 	virtual void SimulateImpacts(const FVector& Origin, const FVector& Direction, int32 Seed, TArray<FVector>& OutImpacts) const override;
 
-	/** Pellet spread for multi-pellet weapons (degrees, around the aimed direction). */
-	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Hitscan", meta=(ClampMin="0"))
-	float PelletSpread = 5.f;
-
 	void TracePellets(const FVector& Origin, const FVector& Direction, int32 Seed, TArray<FHitResult>& OutHits, TArray<FVector>& OutImpacts) const;
 };
 

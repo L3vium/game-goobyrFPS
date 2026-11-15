@@ -97,9 +97,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Minimap")
 	float WorldRadius = 3500.f;
 
-	/** Only NPCs with an alert state are drawn (Hitman-like: no radar for calm NPCs). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hitmen|Minimap")
-	bool bOnlyShowAlertedNPCs = true;
 
 protected:
 	virtual void BindEvents() override;
@@ -154,6 +151,7 @@ protected:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenSubtitlesWidget> Subtitles;
 
 	UFUNCTION() void HandlePawnChanged(APawn* NewPawn);
+	UFUNCTION() void HandleCinematic(bool bCinematic);
 	UFUNCTION() void HandlePrompt(const FText& Prompt, bool bVisible);
 	UFUNCTION() void HandleInventoryView(const FHitmenHUDInventoryView& View);
 	UFUNCTION() void HandleAbilityViews(const FHitmenHUDAbilityView& Move, const FHitmenHUDAbilityView& Manipulation);

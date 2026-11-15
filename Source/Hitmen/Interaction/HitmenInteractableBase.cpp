@@ -2,6 +2,7 @@
 
 #include "Interaction/HitmenInteractableBase.h"
 #include "Interaction/HitmenScanRegistry.h"
+#include "Components/HitmenMapMarkerComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
@@ -18,6 +19,8 @@ AHitmenInteractableBase::AHitmenInteractableBase()
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	Mesh->SetupAttachment(Root);
 	Mesh->SetCollisionResponseToChannel(HITMEN_TRACE_INTERACT, ECR_Block);
+
+	MapMarker = CreateDefaultSubobject<UHitmenMapMarkerComponent>(TEXT("MapMarker"));
 
 	InteractionText = NSLOCTEXT("Hitmen", "Use", "Use");
 }

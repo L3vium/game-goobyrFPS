@@ -8,6 +8,57 @@
 #include "Core/HitmenTypes.h"
 #include "HitmenBTTasks.generated.h"
 
+/** "Hm?": turns to face what it heard / saw (InvestigateLocation) and pauses, before walking over (Hitman). */
+UCLASS(meta=(DisplayName="Hitmen Turn To Noise"))
+class HITMEN_API UBTTask_HitmenTurnToNoise : public UBTTaskNode
+{
+	GENERATED_BODY()
+
+public:
+	UBTTask_HitmenTurnToNoise();
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+	virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
+	virtual uint16 GetInstanceMemorySize() const override { return sizeof(float); }
+
+protected:
+	/** Seconds facing the sound before moving. */
+	UPROPERTY(EditAnywhere, Category="Hitmen", meta=(ClampMin="0", Units="s"))
+	float TurnTime = 1.f;
+};
+
+/** Claims MoveLocation (the EQS pick) so other searching guards go elsewhere. */
+UCLASS(meta=(DisplayName="Hitmen Claim Search Spot"))
+class HITMEN_API UBTTask_HitmenClaimSearchSpot : public UBTTaskNode
+{
+	GENERATED_BODY()
+
+public:
+	UBTTask_HitmenClaimSearchSpot();
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+};
+
+/** Picks up the body in DisposeBody (the guard must be next to it). */
+UCLASS(meta=(DisplayName="Hitmen Pick Up Body"))
+class HITMEN_API UBTTask_HitmenPickUpBody : public UBTTaskNode
+{
+	GENERATED_BODY()
+
+public:
+	UBTTask_HitmenPickUpBody();
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+};
+
+/** Stows the carried body in DisposeContainer (drops it there when it is full); the disposal is over. */
+UCLASS(meta=(DisplayName="Hitmen Stow Body"))
+class HITMEN_API UBTTask_HitmenStowBody : public UBTTaskNode
+{
+	GENERATED_BODY()
+
+public:
+	UBTTask_HitmenStowBody();
+	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+};
+
 /** Next patrol point (or a random spot around home) into MoveLocation + WaitTime. */
 UCLASS(meta=(DisplayName="Hitmen Find Patrol Point"))
 class HITMEN_API UBTTask_HitmenFindPatrolPoint : public UBTTaskNode

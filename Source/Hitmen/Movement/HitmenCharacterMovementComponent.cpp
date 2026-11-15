@@ -50,6 +50,10 @@ bool UHitmenCharacterMovementComponent::IsSprinting() const
 	{
 		return false;
 	}
+	if (const AHitmenCharacterBase* Owner = Cast<AHitmenCharacterBase>(CharacterOwner); Owner && !Owner->CanSprintNow())
+	{
+		return false;
+	}
 	if (!(MovementMode == MOVE_Walking || MovementMode == MOVE_NavWalking || MovementMode == MOVE_Falling))
 	{
 		return false;
@@ -86,8 +90,10 @@ float UHitmenCharacterMovementComponent::GetMaxSpeed() const
 	case MOVE_NavWalking:
 	case MOVE_Falling:
 	{
-		const float Base = IsCrouching() ? MaxWalkSpeedCrouched : (IsSprinting() ? SprintSpeed : WalkSpeed);
-		return Base * GetOwnerSpeedMultiplier();
+		const bool bSprinting = IsSprinting();
+		const float Base = IsCrouching() ? MaxWalkSpeedCrouched : (bSprinting ? SprintSpeed : WalkSpeed);
+		const AHitmenCharacterBase* Owner = Cast<AHitmenCharacterBase>(CharacterOwner);
+		return Base * GetOwnerSpeedMultiplier() * (Owner ? Owner->GetCarrySpeedMultiplier(bSprinting) : 1.f);
 	}
 	case MOVE_Custom:
 		switch (static_cast<EHitmenCustomMovement>(CustomMovementMode))
@@ -615,10 +621,10 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 	const FCollisionShape StandShape = FCollisionShape::MakeCapsule(Radius * 0.95f, HalfHeight * 0.95f);
 	const FVector OverTop = TopHit.ImpactPoint + FVector::UpVector * (HalfHeight + MantleClearance);
 
-	// Is there floor right past the wall (thin obstacle) and room to land there?
-	auto FindFarSide = [&](FVector& OutDest) -> bool
+	// Is there floor past the wall (thin obstacle), Distance in from its near face, and room to land there?
+	auto FindFarSide = [&](FVector& OutDest, float Distance) -> bool
 	{
-		const FVector FarProbe = FVector(WallHit.ImpactPoint.X, WallHit.ImpactPoint.Y, TopHit.ImpactPoint.Z + 15.f) + Into * (VaultMaxDepth + Radius + 10.f);
+		const FVector FarProbe = FVector(WallHit.ImpactPoint.X, WallHit.ImpactPoint.Y, TopHit.ImpactPoint.Z + 15.f) + Into * Distance;
 		FHitResult Blocked;
 		// Pawn channel too: closed shutters block bodies without blocking sight.
 		const FCollisionShape PassShape = FCollisionShape::MakeSphere(10.f);
@@ -660,8 +666,11 @@ bool UHitmenCharacterMovementComponent::PlanMantle(const FVector& Forward, FHitm
 		&& FMath::Abs(StandFloor.ImpactPoint.Z - TopHit.ImpactPoint.Z) < 30.f;
 	const bool bCanStand = TopDepth >= MinStandDepth && bTopUnderStand && !World->OverlapBlockingTestByChannel(StandDest, FQuat::Identity, Channel, StandShape, Params);
 
+	// Land just past the obstacle first (a window ledge under an upper-floor sill), else as far as a vault reaches.
 	FVector FarDest;
-	const bool bFarSide = FindFarSide(FarDest);
+	const float FarDistance = VaultMaxDepth + Radius + 10.f;
+	const float NearDistance = TopDepth + Radius + 12.f;
+	const bool bFarSide = (NearDistance < FarDistance - 10.f && FindFarSide(FarDest, NearDistance)) || FindFarSide(FarDest, FarDistance);
 	const float HeightAlpha = FMath::GetMappedRangeValueClamped(FVector2D(MantleMinHeight, MantleMaxHeight), FVector2D(0.8f, 1.25f), LedgeHeight);
 
 	OutPlan = FHitmenMantlePlan();
@@ -1054,8 +1063,51 @@ void UHitmenCharacterMovementComponent::PhysClimb(float DeltaTime, int32 Iterati
 // Jumps, hook mantle
 // ---------------------------------------------------------------------------------------------
 
+bool UHitmenCharacterMovementComponent::UsesStiffLedges() const
+{
+	// Players only (NPCs follow the navmesh); vehicles, ladders and climbing never ask.
+	return bStiffLedges && CharacterOwner && UpdatedComponent && CharacterOwner->IsPlayerControlled();
+}
+
+bool UHitmenCharacterMovementComponent::HasGroundWithinStiffDrop(const FVector& Location) const
+{
+	const UCapsuleComponent* Capsule = CharacterOwner ? CharacterOwner->GetCapsuleComponent() : nullptr;
+	if (!Capsule)
+	{
+		return true;
+	}
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenStiffLedge), false, CharacterOwner);
+	FCollisionResponseParams Response;
+	InitCollisionParams(Params, Response);
+	const float Radius = Capsule->GetScaledCapsuleRadius() * 0.5f;
+	const FVector End = Location - FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight() + StiffLedgeMaxDrop);
+	FHitResult Hit;
+	return GetWorld()->SweepSingleByChannel(Hit, Location, End, FQuat::Identity, UpdatedComponent->GetCollisionObjectType(),
+		FCollisionShape::MakeSphere(Radius), Params, Response) && IsWalkable(Hit);
+}
+
+bool UHitmenCharacterMovementComponent::CanWalkOffLedges() const
+{
+	if (!Super::CanWalkOffLedges())
+	{
+		return false;
+	}
+	// Asked when the floor is lost after a move: only a shallow step down lets you walk on.
+	return !UsesStiffLedges() || HasGroundWithinStiffDrop(UpdatedComponent->GetComponentLocation());
+}
+
 bool UHitmenCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)
 {
+	// Stiff ledges without jumping off: a ground jump toward a deep drop goes straight up.
+	if (!bCanJumpOffStiffLedges && UsesStiffLedges() && IsMovingOnGround() && !Velocity.IsNearlyZero())
+	{
+		const float Reach = (CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + 80.f);
+		if (!HasGroundWithinStiffDrop(UpdatedComponent->GetComponentLocation() + Velocity.GetSafeNormal2D() * Reach))
+		{
+			Velocity.X = 0.f;
+			Velocity.Y = 0.f;
+		}
+	}
 	// Extra jumps (double jump) go higher than the first one.
 	const bool bExtraJump = CharacterOwner && CharacterOwner->JumpCurrentCount > 0 && IsFalling();
 	const float SavedJumpZ = JumpZVelocity;

@@ -3,6 +3,7 @@
 #include "Framework/HitmenGameState.h"
 #include "Framework/HitmenPlayerState.h"
 #include "Characters/HitmenCharacterBase.h"
+#include "World/Spawning/HitmenRetrievalPoint.h"
 #include "UI/HitmenUIEventSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
@@ -163,6 +164,21 @@ void AHitmenGameState::SetSonarPing(const FHitmenSonarPing& Ping)
 {
 	SonarPing = Ping;
 	OnRep_Sonar();
+}
+
+void AHitmenGameState::SetExtractionPoint(AActor* Point)
+{
+	ExtractionPoint = Point;
+	OnRep_Extraction();
+}
+
+void AHitmenGameState::OnRep_Extraction()
+{
+	if (AHitmenRetrievalPoint* Point = Cast<AHitmenRetrievalPoint>(ExtractionPoint))
+	{
+		Point->PlayDeparture();
+	}
+	OnExtractionStarted.Broadcast();
 }
 
 void AHitmenGameState::SetMatchResult(const FHitmenMatchResult& Result)

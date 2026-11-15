@@ -5,8 +5,8 @@ Rebuilding trees inside a running editor can crash it (stale runtime templates),
 import unreal
 
 FOLDER = "/Game/Hitmen/AI/BehaviorTrees"
-TREES = ("BB_NPC", "BT_Patrol", "BT_Guard", "BT_Investigate", "BT_Search", "BT_CallReinforcements",
-         "BT_Sniper", "BT_Combat", "BT_NPC")
+TREES = ("BB_NPC", "EQ_HitmenSearch", "BT_Patrol", "BT_Guard", "BT_Investigate", "BT_Search", "BT_DisposeBody",
+         "BT_CallReinforcements", "BT_Sniper", "BT_Combat", "BT_NPC")
 
 ok = unreal.HitmenEditorTools.build_npc_behavior_trees(FOLDER)
 saved = [name for name in TREES if unreal.EditorAssetLibrary.save_asset(FOLDER + "/" + name, only_if_is_dirty=False)]

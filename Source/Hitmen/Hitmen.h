@@ -27,4 +27,9 @@ namespace HitmenStencil
 	constexpr int32 Interactable = 2;
 	constexpr int32 Target = 3;
 	constexpr int32 TargetDead = 4;
+	/** Always-on markers (PP_Markers, through walls): the VIP's body or its yellow ghost, retrieval points in gold. */
+	constexpr int32 VIPMarker = 5;
+	constexpr int32 RetrievalMarker = 6;
+	/** Players as watchers see them (PP_Markers, outlined through walls; local render state only). */
+	constexpr int32 WatchedPlayer = 7;
 }

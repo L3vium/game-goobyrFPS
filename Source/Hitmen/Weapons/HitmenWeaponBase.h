@@ -348,7 +348,9 @@ protected:
 
 	bool bEvidence = false;
 
-	float MuzzleLightUntil = 0.f;
+	/** Turns the muzzle light off MuzzleFlashTime after each lit shot (re-armed by the next one). */
+	FTimerHandle MuzzleLightTimer;
+	void TurnOffMuzzleLight();
 
 	/** Thrown weapons fly with physics and spin; one on the head stuns a pawn this long. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Weapon|Throw", meta=(ClampMin="0", Units="deg"))

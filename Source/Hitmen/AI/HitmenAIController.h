@@ -31,6 +31,10 @@ namespace HitmenBBKeys
 	extern HITMEN_API const FName HoldPosition;
 	extern HITMEN_API const FName IsOnEdge;
 	extern HITMEN_API const FName Evacuate;
+	/** Body disposal: the body to carry and the container to put it in (set after a body search). */
+	extern HITMEN_API const FName DisposeBody;
+	extern HITMEN_API const FName DisposeContainer;
+	extern HITMEN_API const FName DisposeLocation;
 }
 
 UCLASS(Blueprintable)
@@ -58,11 +62,17 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|AI")
 	float GetPeripheralVisionHalfAngle() const { return PeripheralVisionHalfAngle; }
 
+	/** Sight radius before the difficulty (clients read it on the controller class default for the maps' cones). */
+	float GetBaseSightRadius() const { return SightRadius; }
+
 	/** Full sight test (range, cone, walls, smoke, darkness, hidden status) against any actor. */
 	bool CanSeeActorNow(const AActor* Actor) const;
 
 	/** Pushes the alert state into the blackboard (also called on a timer). */
 	void SyncBlackboard();
+
+	/** The NPC's fixed keys (post, sniper, stationary, hold position): at possession and when its role changes. */
+	void RefreshNPCKeys();
 
 protected:
 	virtual void BeginPlay() override;

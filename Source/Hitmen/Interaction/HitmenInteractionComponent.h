@@ -86,7 +86,7 @@ protected:
 	float ServerHoldStartTime = 0.f;
 
 	void UpdateFocus();
-	void SetFocus(AActor* NewFocus, const FText& Prompt);
+	void SetFocus(AActor* NewFocus, const FText& Prompt, const FText& Info = FText::GetEmpty());
 
 	void StartFocusTrace();
 	void StopFocusTrace();
@@ -94,6 +94,7 @@ protected:
 	TWeakObjectPtr<AActor> FocusedActor;
 	TWeakObjectPtr<AActor> HighlightedActor;
 	FText FocusedPrompt;
+	FText FocusedInfo;
 
 	/** Time the trace first lost the focused interactable: it stays focused a moment (no flicker on thin frames). */
 	float FocusLostTime = -1.f;

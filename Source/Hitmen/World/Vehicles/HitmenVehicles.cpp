@@ -26,6 +26,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
+#include "Core/HitmenUserSettings.h"
 
 // ---------------------------------------------------------------------------------------------
 // Base
@@ -353,6 +354,20 @@ void AHitmenVehiclePawn::HandleDriverHealthChanged(UHitmenHealthComponent* Healt
 	}
 }
 
+void AHitmenVehiclePawn::PawnClientRestart()
+{
+	Super::PawnClientRestart();
+	if (const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
+	{
+		TArray<UCameraComponent*> Cameras;
+		GetComponents<UCameraComponent>(Cameras);
+		for (UCameraComponent* ViewCamera : Cameras)
+		{
+			ViewCamera->SetFieldOfView(Settings->FieldOfView);
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------------------------
 // Mounted gun
 // ---------------------------------------------------------------------------------------------
@@ -424,9 +439,14 @@ void AHitmenMountedGun::Interact_Implementation(AActor* Interactor)
 	}
 }
 
+float AHitmenMountedGun::ClampYaw(float Yaw) const
+{
+	return HasFullTurn() ? FRotator::NormalizeAxis(Yaw) : FMath::Clamp(Yaw, -YawArcDegrees * 0.5f, YawArcDegrees * 0.5f);
+}
+
 void AHitmenMountedGun::Input_Look(const FVector2D& Axis)
 {
-	AimRotation.Yaw = FMath::Clamp(AimRotation.Yaw + Axis.X * LookSensitivity, -MaxYaw, MaxYaw);
+	AimRotation.Yaw = ClampYaw(AimRotation.Yaw + Axis.X * LookSensitivity);
 	AimRotation.Pitch = FMath::Clamp(AimRotation.Pitch + Axis.Y * LookSensitivity, MinPitch, MaxPitch);
 	if (HasAuthority() || ShouldSendAim(AimRotation))
 	{
@@ -436,7 +456,7 @@ void AHitmenMountedGun::Input_Look(const FVector2D& Axis)
 
 void AHitmenMountedGun::Server_SetAim_Implementation(FRotator NewAim)
 {
-	AimRotation = FRotator(FMath::Clamp(NewAim.Pitch, MinPitch, MaxPitch), FMath::Clamp(NewAim.Yaw, -MaxYaw, MaxYaw), 0.f);
+	AimRotation = FRotator(FMath::Clamp(NewAim.Pitch, MinPitch, MaxPitch), ClampYaw(NewAim.Yaw), 0.f);
 }
 
 void AHitmenMountedGun::Tick(float DeltaSeconds)
@@ -449,7 +469,7 @@ void AHitmenMountedGun::Tick(float DeltaSeconds)
 	{
 		Server_SetAim(AimRotation);
 	}
-	if (HasAuthority() && bFiring && !bVehicleDestroyed && GetWorld()->GetTimeSeconds() - LastFireTime >= FireInterval)
+	if (HasAuthority() && bFiring && !bVehicleDestroyed && GetWorld()->GetTimeSeconds() - LastFireTime >= GetFireInterval())
 	{
 		FireServer();
 	}
@@ -457,20 +477,29 @@ void AHitmenMountedGun::Tick(float DeltaSeconds)
 
 void AHitmenMountedGun::FireServer()
 {
-	if (bVehicleDestroyed || GetWorld()->GetTimeSeconds() - LastFireTime < FireInterval)
+	if (bVehicleDestroyed || GetWorld()->GetTimeSeconds() - LastFireTime < GetFireInterval())
 	{
 		return;
 	}
 	LastFireTime = GetWorld()->GetTimeSeconds();
-	const FVector Start = GunPivot->GetComponentLocation() + GunPivot->GetForwardVector() * 100.f;
-	const FVector Direction = FMath::VRandCone(GunPivot->GetForwardVector(), FMath::DegreesToRadians(SpreadDegrees));
-	FVector Impact = Start + Direction * Range;
-	FHitResult Hit;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenMountedGun), false, this);
 	if (Driver)
 	{
 		Params.AddIgnoredActor(Driver);
 	}
+	// The view sits above the gun: aim where the crosshair (the camera's centre) points, then fire from the muzzle
+	// toward that point (shots used to run parallel to the view, 55 cm under it).
+	const FVector Start = GunPivot->GetComponentLocation() + GunPivot->GetForwardVector() * 100.f;
+	const FVector Eye = Camera->GetComponentLocation();
+	FVector AimPoint = Eye + Camera->GetForwardVector() * Range;
+	FHitResult AimHit;
+	if (GetWorld()->LineTraceSingleByChannel(AimHit, Eye, AimPoint, HITMEN_TRACE_WEAPON, Params))
+	{
+		AimPoint = AimHit.ImpactPoint;
+	}
+	const FVector Direction = FMath::VRandCone((AimPoint - Start).GetSafeNormal(), FMath::DegreesToRadians(SpreadDegrees));
+	FVector Impact = Start + Direction * Range;
+	FHitResult Hit;
 	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, Impact, HITMEN_TRACE_WEAPON, Params))
 	{
 		Impact = Hit.ImpactPoint;
@@ -487,6 +516,16 @@ void AHitmenMountedGun::Multicast_Fire_Implementation(FVector_NetQuantize Impact
 	{
 		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::MountedGunFire, GunPivot->GetComponentLocation());
 		MuzzleFlashUntil = GetWorld()->GetTimeSeconds() + 0.04f;
+		// Where the bullets go: a puff on the impact and, now and then, a tracer from the muzzle.
+		const FVector Muzzle = GunPivot->GetComponentLocation() + GunPivot->GetForwardVector() * 150.f;
+		if (ImpactFX && FVector::DistSquared(Muzzle, Impact) < FMath::Square(Range - 10.f))
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ImpactFX, Impact, (Muzzle - Impact).Rotation(), FVector(ImpactFXScale));
+		}
+		if (FMath::FRand() < TracerChance)
+		{
+			AHitmenTracer::SpawnTracer(GetWorld(), Muzzle, Impact, UHitmenGameSettings::Get()->TracerMaterial.LoadSynchronous(), TracerColor);
+		}
 		if (AHitmenPlayerCharacter* Gunner = Cast<AHitmenPlayerCharacter>(Driver); Gunner && IsLocallyControlled())
 		{
 			Gunner->AddCameraShake(FireShake, 0.12f);
@@ -742,13 +781,30 @@ void AHitmenTank::FireServer()
 	LastShotTime = GetWorld()->GetTimeSeconds();
 	const FRotator Aim = AimRotation;
 	const FVector Start = Turret->GetComponentLocation() + Aim.Vector() * MuzzleOffset;
+	// The shell goes where the crosshair points: the camera sits on its spring arm behind and above the turret (its
+	// place is rebuilt from the aim, the server never runs the owner's camera), so trace the view line first.
+	const FVector Eye = SpringArm->GetComponentLocation() - Aim.Vector() * SpringArm->TargetArmLength + Aim.RotateVector(SpringArm->SocketOffset);
+	FVector AimPoint = Eye + Aim.Vector() * 30000.f;
+	{
+		FHitResult AimHit;
+		FCollisionQueryParams AimParams(SCENE_QUERY_STAT(HitmenTankAim), false, this);
+		if (Driver)
+		{
+			AimParams.AddIgnoredActor(Driver);
+		}
+		if (GetWorld()->LineTraceSingleByChannel(AimHit, Eye, AimPoint, HITMEN_TRACE_WEAPON, AimParams))
+		{
+			AimPoint = AimHit.ImpactPoint;
+		}
+	}
+	const FVector ShotDirection = (AimPoint - Start).GetSafeNormal();
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.Owner = this;
 	SpawnParams.Instigator = this;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (AHitmenProjectile* Shell = GetWorld()->SpawnActor<AHitmenProjectile>(ShellClass, Start, Aim, SpawnParams))
+	if (AHitmenProjectile* Shell = GetWorld()->SpawnActor<AHitmenProjectile>(ShellClass, Start, ShotDirection.Rotation(), SpawnParams))
 	{
-		Shell->Launch(Aim.Vector() * ShellSpeed, 0.f);
+		Shell->Launch(ShotDirection * ShellSpeed, 0.f);
 	}
 	Multicast_TankFired();
 	UHitmenAISubsystem::ReportNoise(this, Start, CannonNoiseRadius, Driver ? static_cast<AActor*>(Driver) : this, EHitmenNoiseType::Explosion);

@@ -4,25 +4,25 @@
 
 #include "CoreMinimal.h"
 #include "Interaction/HitmenInteractableBase.h"
+#include "World/Interactables/HitmenHidingSpot.h"
 #include "Core/HitmenInterfaces.h"
 #include "HitmenStealth.generated.h"
 
 class UBoxComponent;
 class AHitmenCharacterBase;
 
-/** Hide inside; F again to get out. NPCs cannot see you inside. */
+/**
+ * A locker: hide inside standing, looking out through the slit of the door (F again to get out); carrying a body, F
+ * stows it (one body by default). Hiding, the view arc and the bodies are AHitmenHidingSpot's.
+ */
 UCLASS(Blueprintable)
-class HITMEN_API AHitmenLocker : public AHitmenInteractableBase
+class HITMEN_API AHitmenLocker : public AHitmenHidingSpot
 {
 	GENERATED_BODY()
 
 public:
 	AHitmenLocker();
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void OnConstruction(const FTransform& Transform) override;
-	virtual void Tick(float DeltaSeconds) override;
-	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
-	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
 
 protected:
 	/**
@@ -55,26 +55,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker")
 	bool bDoorHingeOnRight = true;
 
-	/** Door opens and closes again over this time when someone gets in or out. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0.1", Units="s"))
-	float DoorCycleTime = 0.8f;
-
-	/** The occupant steps in (or out) over this time while the door is open, turning to face out. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0.05", Units="s"))
-	float StepTime = 0.5f;
-
-	/** Delay after the door starts opening before the occupant moves. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(ClampMin="0", Units="s"))
-	float StepDelay = 0.12f;
-
-	/** Inside point (capsule centre), relative to the locker. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(MakeEditWidget=true))
-	FVector InsideOffset = FVector(-4.f, 0.f, 96.f);
-
-	/** Exit point, relative to the locker. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Locker", meta=(MakeEditWidget=true))
-	FVector ExitOffset = FVector(95.f, 0.f, 96.f);
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> PanelLeft;
 
@@ -96,32 +76,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
 	TObjectPtr<UStaticMeshComponent> DoorLower;
 
-	UPROPERTY(ReplicatedUsing=OnRep_Occupant, BlueprintReadOnly, Category="Hitmen|Locker")
-	TObjectPtr<AHitmenCharacterBase> Occupant;
-
-	virtual void OnInteracted(AActor* Interactor) override;
-
-	UFUNCTION()
-	void OnRep_Occupant();
-
-	/** Every machine: collision, movement and view for whoever gets in / out. */
-	void ApplyOccupant(AHitmenCharacterBase* Character, bool bInside);
-	void StartDoorCycle();
-
-	UFUNCTION(BlueprintImplementableEvent, Category="Hitmen|Juice")
-	void Juice_OnOccupantChanged(bool bOccupied);
-
-	TWeakObjectPtr<AHitmenCharacterBase> AppliedOccupant;
-	float DoorCycleStart = -100.f;
-
-	/** The character stepping in or out (every machine moves it the same way). */
-	TWeakObjectPtr<AHitmenCharacterBase> SteppingCharacter;
-	bool bSteppingIn = false;
-	FVector StepFrom = FVector::ZeroVector;
-	FVector StepTo = FVector::ZeroVector;
-	FRotator StepFromRotation = FRotator::ZeroRotator;
-	FRotator StepToRotation = FRotator::ZeroRotator;
-	void UpdateStep();
+	virtual void ApplyOpenAlpha(float Alpha) override;
 };
 
 /** Crouching inside hides you from NPC sight. */
@@ -169,6 +124,17 @@ public:
 	/** Server: turns it on or off (players with F or remotely, guards switch it off). */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Distraction")
 	void SetOn(bool bNewOn, AActor* SwitchedBy);
+
+public:
+	/** Who switched it on last (a player, or whoever threw the remote distraction). */
+	AActor* GetSwitchedOnBy() const { return SwitchedOnBy.Get(); }
+
+	/** True once per switch-on: the first guard coming to look shows the event camera. */
+	bool ConsumeEventCamera() { const bool bFirst = !bEventCameraShown; bEventCameraShown = true; return bFirst; }
+
+protected:
+	TWeakObjectPtr<AActor> SwitchedOnBy;
+	bool bEventCameraShown = false;
 
 protected:
 	/** Guards within this radius hear it (walls cut it, the nearest two come). */

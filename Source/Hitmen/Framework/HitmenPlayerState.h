@@ -10,6 +10,21 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenPlayerInfoChanged, AHitmenPlayerState*, PlayerState);
 
+/** Where a spectating player looks (replicated to the others: avatars, name tags, the watched line). */
+USTRUCT(BlueprintType)
+struct FHitmenWatcherView
+{
+	GENERATED_BODY()
+
+	/** True while this player spectates (watcher or dead). */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Watcher") bool bWatching = false;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Watcher") FVector_NetQuantize10 Location = FVector::ZeroVector;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Watcher") float Yaw = 0.f;
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Watcher") float Pitch = 0.f;
+	/** The player followed in player view (null while flying free or in split screen). */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Watcher") TObjectPtr<class AHitmenPlayerState> Watched;
+};
+
 UCLASS()
 class HITMEN_API AHitmenPlayerState : public APlayerState, public IHitmenTeamMember
 {
@@ -71,6 +86,17 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Player")
 	EHitmenTeamRole GetTeamRole() const;
 
+	UFUNCTION(BlueprintPure, Category="Hitmen|Watcher")
+	const FHitmenWatcherView& GetWatcherView() const { return WatcherView; }
+
+	/** Server (the owner reports its view through the controller). */
+	void SetWatcherView(const FHitmenWatcherView& View);
+	void ClearWatcherView();
+
+	/** Local: this watcher's avatar position (smoothed), read by the name tags. */
+	const FVector& GetSmoothedWatcherLocation() const { return SmoothedWatcherLocation; }
+	void SetSmoothedWatcherLocation(const FVector& Location) { SmoothedWatcherLocation = Location; }
+
 	// ---- Server setters (called by the GameMode / controller RPCs) ----
 	void SetLobbyTeamId(int32 NewTeamId);
 	void SetWatcher(bool bNewWatcher);
@@ -82,6 +108,11 @@ public:
 	void AddKill() { ++Kills; }
 
 protected:
+	UPROPERTY(Replicated)
+	FHitmenWatcherView WatcherView;
+
+	FVector SmoothedWatcherLocation = FVector::ZeroVector;
+
 	UPROPERTY(ReplicatedUsing=OnRep_Info)
 	int32 LobbyTeamId = INDEX_NONE;
 

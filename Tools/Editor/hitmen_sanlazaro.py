@@ -22,9 +22,9 @@ import unreal
 
 import hitmen_levels as L
 from hitmen_common import *
-from hitmen_levels import (GRID, GRID_ALT, GRID_DARK, box, bp, building, environment, floor, game_mode, hedge_maze, ladder,
-                           mi, nav_bounds, new_map, npc, patrol, room_light, save_map, spawn, stair_well, stairs, team_starts,
-                           text, tunnel, wall)
+from hitmen_levels import (GRID, GRID_ALT, GRID_DARK, LEDGE_DEPTH, LEDGE_DROP, VENT_SIZE, box, bp, building, environment, floor,
+                           game_mode, hedge_maze, ladder, light_switch, mi, nav_bounds, new_map, npc, patrol, room_light, save_map,
+                           spawn, stair_well, stairs, team_starts, text, tunnel, vent_duct, vent_hatch, wall)
 
 # ---------------------------------------------------------------------------------------------
 # Layout (cm)
@@ -70,6 +70,20 @@ CAVE_ROOF_RECT = (-1200.0, 7800.0, 4300.0, 8800.0)   # x0, x1, y0, y1 of the roo
 
 BRIDGES_Y = (-3000.0, 2400.0)
 WALKWAY_Y = -500.0
+
+# The smugglers' tunnel under the middle: from the village kiosk east under the ravine, north along the plain, then
+# under the estate wall to the gatehouse (keycard 3 door before the end). Shafts with ladders come up in the kiosk, the
+# ravine bed, the plain and the gatehouse.
+TUNNEL_Y = -7600.0
+TUNNEL_PLAIN_X = 1000.0
+TUNNEL_H = 340.0
+SHAFT_HALF = 90.0
+
+# Cave vents: shafts from the ridge down into chambers 0 and 2 (ladders), small ways in from above.
+CAVE_VENTS = [(300.0 - 200.0, 6400.0 + 450.0), (6400.0 + 150.0, 6900.0 + 400.0)]
+
+# Light weapons in every zone: guards per weapon cycle these (pistol, SMG, rifle, shotgun).
+LOADOUT_CYCLE = ("guard", "smg", "rifle", "shotgun")
 
 
 def smoothstep(e0, e1, x):
@@ -325,8 +339,11 @@ def build_village(info):
             # Never toward a cross alley (its stair fills it): after one, the door faces north; before one, south.
             rng.random()
             door = "N" if slot % 3 == 0 else "S"
-            r = building(hx, cy, HOUSE_D, wy, floors, 350, door_side=door, folder="%s/House%02d" % (row, slot), z0=tz, gutter=False,
-                         blind_faces=("W",))
+            # Gutters on the alley side of every house of 2+ floors (the ledges keep a gap for them), wood floors,
+            # a crawl vent from the alley into one house per row.
+            r = building(hx, cy, HOUSE_D, wy, floors, 350, door_side=door, folder="%s/House%02d" % (row, slot), z0=tz,
+                         gutter=floors >= 2, gutter_side="E", blind_faces=("W",), vents=[("E", 0.15, 0)] if slot == 1 else (),
+                         floor_material=mi("MI_Grid_Wood"), ground_blind=("N",) if slot % 3 == 1 else (("S",) if slot > 0 else ()))
             houses.append((hx, cy, HOUSE_D, wy, floors, tz))
             roofs.append((cy, wy, floors, r[4]))
             # Roofs one floor high sit about the next terrace's level: a plank from its edge onto the roof.
@@ -380,7 +397,9 @@ def build_village(info):
     kz = gz(kx, ky)
     box((kx, ky, kz + 300), (650, 550, 25), GRID, folder="Village/Kiosk")
     spawn(bp("World/Interactables/Door/BP_Door_Keycard1"), (kx + 55, ky + 250, kz), (0, 180, 0), folder="Village/Kiosk")
-    room_light(kx, ky, kz + 260, "Village/Kiosk", shadow=True)
+    kiosk_lamp = room_light(kx, ky, kz + 260, "Village/Kiosk", shadow=True)
+    light_switch(kx + 110, ky + 236, kz, 0, [kiosk_lamp], "Village/Kiosk")
+    info["kiosk"] = (kx, ky, kz)
     breaker = spawn(bp("World/Interactables/Power/BP_CircuitBreaker"), (kx, ky - 220, kz), folder="Village/Kiosk")
     if breaker:
         breaker.set_editor_property("linked_lights", lamps)
@@ -395,8 +414,8 @@ def build_village(info):
     for (a, b) in (((tx - 400, ty - 400), (tx + 400, ty - 400)), ((tx - 400, ty + 400), (tx + 400, ty + 400)), ((tx - 400, ty - 400), (tx - 400, ty + 400)), ((tx + 400, ty - 400), (tx + 400, ty + 400))):
         wall(a, b, tz + 2215, 110, 30, (), GRID_ALT, "Village/BellTower")
     ladder((tx, ty - 375, tz), 90, 2215, folder="Village/BellTower")
-    room_light(tx, ty, tz + 2100, "Village/BellTower")
-    room_light(tx, ty, tz + 300, "Village/BellTower", lumens=300.0)
+    tower_lamps = [room_light(tx, ty, tz + 2100, "Village/BellTower"), room_light(tx, ty, tz + 300, "Village/BellTower", lumens=300.0)]
+    light_switch(tx + 160, ty + 376, tz, 180, tower_lamps, "Village/BellTower")
     spawn(bp("World/Interactables/Door/BP_Door"), (tx + 55, ty + 400, tz), (0, 180, 0), folder="Village/BellTower")
     info["bell_tower"] = (tx, ty, tz + 2215)
     # Props.
@@ -408,8 +427,12 @@ def build_village(info):
     box((xe - 60, -400, tz + 40), (80, 80, 80), mi("MI_Wood"), folder="Village/Props")
     xw, xe, tz = TERRACES[0]
     spawn(bp("World/Interactables/Container/BP_BodyContainer"), (xe - 70, 1500, tz), (0, 180, 0), folder="Village/Props")
-    for gx, gy in ((-11200, -1500), (-11300, 1500), (-3000, -6800)):
-        spawn(bp("World/Interactables/Grass/BP_TallGrass"), (gx, gy, gz(gx, gy) + 55), folder="Village/Gardens")
+    xw, xe, tz = TERRACES[3]
+    spawn(bp("World/Interactables/Container/BP_BodyContainer"), (xe - 70, 1200, tz), (0, 180, 0), folder="Village/Props")
+    # Weapon chest in the market, a keycard on a stall.
+    mx, my, mz = info["market"]
+    spawn(bp("World/Interactables/Container/BP_WeaponChest"), (mx - 450, my + 1100, mz), (0, 90, 0), folder="Village/Props")
+    keycard_pickup((mx - 450, my, mz + 82), 1, "Village/Props")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -508,9 +531,12 @@ def build_estate(holes, info):
                        ((ghx - 500, ghy - 350), (ghx - 500, ghy + 350), [(350, 120, 100, 220)]), ((ghx + 500, ghy - 350), (ghx + 500, ghy + 350), ())):
         wall(a, b, z, 320, 25, op, GRID_DARK, "Estate/Gatehouse")
     box((ghx, ghy, z + 320), (1050, 750, 25), GRID, folder="Estate/Gatehouse")
-    spawn(bp("World/Interactables/Door/BP_Door"), (ghx - 55, ghy + 350, z), (0, 180, 0), folder="Estate/Gatehouse")
-    room_light(ghx - 200, ghy, z + 280, "Estate/Gatehouse", shadow=True)
-    room_light(ghx + 250, ghy, z + 280, "Estate/Gatehouse", lumens=260.0)
+    # Turned 180: the panel runs from its origin toward -x, so the origin is the opening's +x side.
+    spawn(bp("World/Interactables/Door/BP_Door"), (ghx + 55, ghy + 350, z), (0, 180, 0), folder="Estate/Gatehouse")
+    gate_lamps = [room_light(ghx - 200, ghy, z + 280, "Estate/Gatehouse", shadow=True),
+                  room_light(ghx + 250, ghy, z + 280, "Estate/Gatehouse", lumens=260.0)]
+    light_switch(ghx + 60, ghy + 336, z, 180, gate_lamps, "Estate/Gatehouse")
+    spawn(bp("World/Interactables/Container/BP_WeaponChest"), (ghx + 380, ghy + 200, z), (0, 180, 0), folder="Estate/Gatehouse")
     gate_cam = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (ex0 + 80, GATE_Y + 700, z + 400), (-25, 0, 0), folder="Estate/Security")
     spawn(bp("World/Vehicles/BP_MountedGun"), (ex0 + 1400, GATE_Y + 900, z), (0, 180, 0), folder="Estate/Security")
     # The house: 3 floors and a basement, a central hall with the stair, rooms on both sides.
@@ -529,12 +555,16 @@ def build_estate(holes, info):
         wall((hx0, hy0), (hx0, hy1), fz, FH, 35, west, GRID_DARK, house)
         wall((hx1, hy0), (hx1, hy1), fz, FH, 35, [(hd * 0.5, 120, 100, 220)], GRID_DARK, house)
         for sx in (hx - 900, hx + 900):
-            wall((sx, hy0), (sx, hy1), fz, FH, 25, [(hd * 0.3, 110, 0, 230), (hd * 0.75, 110, 0, 230)], GRID, house)
+            vent_open = [(hd - 260, VENT_SIZE, 280, 280 + VENT_SIZE)] if f == 0 else []
+            wall((sx, hy0), (sx, hy1), fz, FH, 25, [(hd * 0.3, 110, 0, 230), (hd * 0.75, 110, 0, 230)] + vent_open, GRID, house)
             spawn(bp("World/Interactables/Door/BP_Door"), (sx, hy0 + hd * 0.3 - 55, fz), (0, 90, 0), folder=house)
             spawn(bp("World/Interactables/Door/BP_Door"), (sx, hy0 + hd * 0.75 - 55, fz), (0, 90, 0), folder=house)
         for (wx0, wx1) in ((hx0, hx - 900), (hx + 900, hx1)):
             wall((wx0, hy), (wx1, hy), fz, FH, 25, [((wx1 - wx0) * 0.5, 110, 0, 230)], GRID, house)
-            spawn(bp("World/Interactables/Door/BP_Door"), ((wx0 + wx1) / 2 - 55, hy, fz), folder=house)
+            # The first floor's east-wing door is the control room's keycard door.
+            control = f == 1 and wx0 == hx + 900
+            door_bp = "World/Interactables/Door/BP_Door_Keycard1" if control else "World/Interactables/Door/BP_Door"
+            spawn(bp(door_bp), ((wx0 + wx1) / 2 - 55, hy, fz), folder="Estate/Control" if control else house)
         # Two lamps per room (the first casts shadows) and two in the hall.
         # The wing rooms are large (about 19 x 16 m): brighter lamps than a village house.
         for (lx, ly) in ((hx0 + 950, hy - 800), (hx0 + 950, hy + 800), (hx1 - 950, hy - 800), (hx1 - 950, hy + 800)):
@@ -543,17 +573,34 @@ def build_estate(holes, info):
         room_light(hx, hy - 600, fz + FH - 50, house, shadow=True, lumens=800.0, radius=1600.0)
         room_light(hx, hy + 700, fz + FH - 50, house, lumens=550.0, radius=1500.0)
         if f > 0:
-            box(((hx0 + hx - 900) / 2, hy, fz), (hx - 900 - hx0, hd, 25), GRID, folder=house)
-            box(((hx + 900 + hx1) / 2, hy, fz), (hx1 - hx - 900, hd, 25), GRID, folder=house)
+            box(((hx0 + hx - 900) / 2, hy, fz), (hx - 900 - hx0, hd, 25), mi("MI_Grid_Tile"), folder=house)
+            box(((hx + 900 + hx1) / 2, hy, fz), (hx1 - hx - 900, hd, 25), mi("MI_Grid_Tile"), folder=house)
             hole_x0, hole_x1 = (hx + 450, hx + 750) if f == 1 else (hx + 100, hx + 400)
             hole_y1 = hy0 + 1650
             box(((hx - 900 + hole_x0) / 2, hy, fz), (hole_x0 - (hx - 900), hd, 25), GRID, folder=house)
             box(((hole_x1 + hx + 900) / 2, hy, fz), (hx + 900 - hole_x1, hd, 25), GRID, folder=house)
             box(((hole_x0 + hole_x1) / 2, (hole_y1 + hy1) / 2, fz), (hole_x1 - hole_x0, hy1 - hole_y1, 25), GRID, folder=house)
     box((hx, hy, z + 3 * FH), (hw + 100, hd + 100, 30), GRID_ALT, folder=house)
+    # Tile floors (footsteps on PM_Tile) on the ground floor.
+    box((hx, hy, z + 1), (hw - 35, hd - 35, 2), mi("MI_Grid_Tile"), folder=house + "/Floors")
+    # A high vent: hatches 2.8 m up in the two wing walls, a duct under the hall ceiling between them, a crate under each
+    # hatch to climb in.
+    duct_y = hy1 - 260
+    duct_z = z + 280
+    vent_duct((hx - 900, duct_y), (hx + 900, duct_y), duct_z, house + "/Vent")
+    duct_hatches = []
+    for (sx, crate_dx) in ((hx - 900, -110), (hx + 900, 110)):
+        duct_hatches.append(vent_hatch(sx, duct_y, duct_z, False, house + "/Vent"))
+        box((sx + crate_dx, duct_y, z + 50), (120, 120, 100), mi("MI_Wood"), folder=house + "/Vent")
     stairs((hx + 600, hy0 + 150, z), 90, FH, 1500, 300, folder=house)
     stairs((hx + 250, hy0 + 1650, z + FH), -90, FH, 1500, 300, folder=house)
-    spawn(bp("World/Interactables/Door/BP_Door"), (hx - 55, hy0, z), folder=house)
+    # The front opening is 240 x 280: a double door (each leaf hinged on its outer side).
+    for (leaf_x, positive) in ((hx - 120, False), (hx, True)):
+        leaf = spawn(bp("World/Interactables/Door/BP_Door"), (leaf_x, hy0, z), folder=house)
+        if leaf:
+            leaf.set_editor_property("width", 120.0)
+            leaf.set_editor_property("height", 280.0)
+            leaf.set_editor_property("hinge_at_positive_end", positive)
     spawn(bp("World/Interactables/Door/BP_Door"), (hx0, hy0 + hd * 0.2 - 55, z), (0, 90, 0), folder=house)
     win = bp("World/Interactables/Window/BP_Window")
     for f in range(3):
@@ -564,14 +611,18 @@ def build_estate(holes, info):
             spawn(win, (hx0 + hw * t, hy1, fz), (0, -90, 0), folder=house)
         spawn(win, (hx0, hy0 + hd * 0.5, fz), (0, 180, 0), folder=house)
         spawn(win, (hx1, hy0 + hd * 0.5, fz), (0, 0, 0), folder=house)
-        # The ledge band under the windows, all around (from the first floor: on the ground it would bar the doors).
+        # Walkable ledges under the windows, all around (from the first floor: on the ground they would bar the doors),
+        # their top just under the floor; gaps where the two gutters climb.
         if f == 0:
             continue
-        lz = fz + 80 - 6
-        box((hx, hy0 - 26, lz), (hw + 90, 18, 12), GRID_ALT, folder=house + "/Ledges")
-        box((hx, hy1 + 26, lz), (hw + 90, 18, 12), GRID_ALT, folder=house + "/Ledges")
-        box((hx0 - 26, hy, lz), (18, hd + 35, 12), GRID_ALT, folder=house + "/Ledges")
-        box((hx1 + 26, hy, lz), (18, hd + 35, 12), GRID_ALT, folder=house + "/Ledges")
+        top = fz - LEDGE_DROP
+        lz = top - 6
+        out = 17.5 + LEDGE_DEPTH / 2
+        box((hx, hy0 - out, lz), (hw + 2 * (17.5 + LEDGE_DEPTH), LEDGE_DEPTH, 12), GRID_ALT, folder=house + "/Ledges")
+        box((hx, hy1 + out, lz), (hw + 2 * (17.5 + LEDGE_DEPTH), LEDGE_DEPTH, 12), GRID_ALT, folder=house + "/Ledges")
+        for (side_x, gutter_y) in ((hx0 - out, hy - 1200), (hx1 + out, hy + 1200)):
+            for (s0, s1) in ((hy0 - 17.5, gutter_y - 70), (gutter_y + 70, hy1 + 17.5)):
+                box((side_x, (s0 + s1) / 2, lz), (LEDGE_DEPTH, s1 - s0, 12), GRID_ALT, folder=house + "/Ledges")
     ladder((hx1 + 25, hy + 1200, z), 0, 3 * FH + 30, gutter=True, folder=house)
     ladder((hx0 - 25, hy - 1200, z), 180, 3 * FH + 30, gutter=True, folder=house)
     roof_z = z + 3 * FH
@@ -587,7 +638,8 @@ def build_estate(holes, info):
     hatch = spawn(bp("World/Interactables/Vent/BP_VentHatch"), (hx0, hy + 1100, z), (0, 90, 0), folder="Estate/Dining")
     if dining:
         dining.set_actor_scale3d(unreal.Vector(1.7, 1.5, 1.3))
-        dining.set_editor_property("openings", [o for o in (dining_door, hatch) if o])
+        # The high vent's west hatch opens into the dining room too.
+        dining.set_editor_property("openings", [o for o in (dining_door, hatch, duct_hatches[0]) if o])
     if hatch and dining:
         hatch.set_editor_property("linked_rooms", [dining])
     box((hx0 + 950, hy + 800, z + 40), (900, 300, 80), mi("MI_Wood"), folder="Estate/Dining")
@@ -595,7 +647,6 @@ def build_estate(holes, info):
     spawn(bp("World/Interactables/Distraction/BP_Distraction_TV"), (hx1 - 950, hy - 1300, z + 80), (0, 90, 0), folder="Estate/Lounge")
     box((hx1 - 950, hy - 1300, z + 40), (120, 60, 80), mi("MI_Wood"), folder="Estate/Lounge")
     # Control room upstairs behind the keycard door (console, monitors).
-    spawn(bp("World/Interactables/Door/BP_Door_Keycard1"), (hx + 2000 - 55, hy, z + FH), folder="Estate/Control")
     console = spawn(bp("World/Interactables/Security/BP_ControlConsole"), (hx1 - 600, hy + 1300, z + FH), (0, 180, 0), folder="Estate/Control")
     hall_cam = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (hx - 800, hy0 + 150, z + FH - 40), (-30, 60, 0), folder="Estate/Security")
     garden_cam = spawn(bp("World/Interactables/Security/BP_SecurityCamera"), (hx1 - 100, hy1 + 100, z + 2 * FH + 300), (-30, 45, 0), folder="Estate/Security")
@@ -653,6 +704,8 @@ def build_estate(holes, info):
         box((gx0 - 700 + i * 280, gy0 + (200 if i % 2 else -200), z + 60), (160, 160, 120), mi("MI_Green"), folder="Estate/Greenhouse", shape="sphere")
     room_light(gx0 - 400, gy0, z + 300, "Estate/Greenhouse")
     room_light(gx0 + 400, gy0, z + 300, "Estate/Greenhouse", lumens=260.0)
+    # Sand paths in the greenhouse (footsteps on PM_Sand).
+    box((gx0, gy0, z + 1), (1960, 1160, 2), mi("MI_Grid_Sand"), folder="Estate/Greenhouse")
     spawn(bp("World/Interactables/Grass/BP_TallGrass"), (gx0 - 400, gy0 - 1200, z + 55), folder="Estate/Greenhouse")
     # Garage (the tank) in the south-west corner, its wide door to the north.
     grx, gry = 3300.0, -7200.0
@@ -661,11 +714,19 @@ def build_estate(holes, info):
         wall(a, b, z, 550, 30, op, GRID_DARK, "Estate/Garage")
     box((grx, gry, z + 550), (2650, 1850, 30), GRID, folder="Estate/Garage")
     spawn(bp("World/Vehicles/BP_Tank"), (grx, gry, z + 100), (0, 90, 0), folder="Estate/Garage")
-    spawn(bp("World/Interactables/Door/BP_Door"), (grx - 1300, gry - 55, z), (0, 90, 0), folder="Estate/Garage")
-    room_light(grx - 700, gry, z + 500, "Estate/Garage", shadow=True, lumens=900.0, radius=1600.0)
-    room_light(grx + 700, gry, z + 500, "Estate/Garage", lumens=600.0, radius=1500.0)
+    # The garage side door takes keycard 2; a metal floor; a weapon chest.
+    spawn(bp("World/Interactables/Door/BP_Door_Keycard2"), (grx - 1300, gry - 55, z), (0, 90, 0), folder="Estate/Garage")
+    box((grx, gry, z + 1), (2560, 1760, 2), mi("MI_Grid_Metal"), folder="Estate/Garage")
+    garage_lamps = [room_light(grx - 700, gry, z + 500, "Estate/Garage", shadow=True, lumens=900.0, radius=1600.0),
+                    room_light(grx + 700, gry, z + 500, "Estate/Garage", lumens=600.0, radius=1500.0)]
+    light_switch(grx - 1284, gry + 120, z, 90, garage_lamps, "Estate/Garage")
+    spawn(bp("World/Interactables/Container/BP_WeaponChest"), (grx + 1000, gry - 700, z), (0, 0, 0), folder="Estate/Garage")
     spawn(bp("World/Interactables/Container/BP_BodyContainer"), (grx + 1500, gry - 600, z), (0, 0, 0), folder="Estate/Props")
     spawn(bp("World/Interactables/Locker/BP_Locker"), (ghx + 400, ghy - 250, z), (0, 90, 0), folder="Estate/Props")
+    # Lockers in two wing rooms, a body container behind the house.
+    spawn(bp("World/Interactables/Locker/BP_Locker"), (hx0 + 80, hy - 400, z), (0, 0, 0), folder="Estate/Props")
+    spawn(bp("World/Interactables/Locker/BP_Locker"), (hx1 - 80, hy + 400, z + FH), (0, 180, 0), folder="Estate/Props")
+    spawn(bp("World/Interactables/Container/BP_BodyContainer"), (hx + 1500, hy1 + 700, z), (0, 0, 0), folder="Estate/Props")
     for bx, by in ((ex0 + 2500, GATE_Y - 500), (10200, 1500), (10300, -6800)):
         spawn(bp("World/Interactables/Barrel/BP_ExplosiveBarrel"), (bx, by, z), folder="Estate/Props")
     info.update(house=(hx, hy, hx0, hx1, hy0, hy1, FH, BZ), maze=(maze_x, maze_y), greenhouse=(gx0, gy0), garage=(grx, gry),
@@ -708,12 +769,17 @@ def build_cave(holes, info):
     tunnel([(mouth_x, well[1]), (mouth_x, 3500), (hx1 + 300, 3500), (hx1 + 300, hy + 250)], BZ)
     # Rock floor and ceiling over each room's bounding rectangle (the parts beyond the lumpy walls are inside the rock).
     well_rect = (well[0], well[2], well[1], well[3])
+    vent_rects = [(vx - SHAFT_HALF - 10, vx + SHAFT_HALF + 10, vy - SHAFT_HALF - 10, vy + SHAFT_HALF + 10) for (vx, vy) in CAVE_VENTS]
     for i, (x0, x1, y0, y1) in enumerate(cave_rects()):
         passage = i >= len(CAVE_CHAMBERS)
         if i == len(CAVE_CHAMBERS):
             y0 = max(y0, COVER_Y)   # the entrance trench is open to the sky
         h = PASSAGE_HEIGHT if passage else CAVE_HEIGHT
-        box(((x0 + x1) / 2, (y0 + y1) / 2, CZ + h + 25), (x1 - x0, y1 - y0, 50), rock, folder="Cave/Ceiling")
+        pieces = [(x0, x1, y0, y1)]
+        for vr in vent_rects:
+            pieces = [p for piece in pieces for p in subtract_rect(piece, vr)]
+        for (px0, px1, py0, py1) in pieces:
+            box(((px0 + px1) / 2, (py0 + py1) / 2, CZ + h + 25), (px1 - px0, py1 - py0, 50), rock, folder="Cave/Ceiling")
     for i, rect in enumerate(cave_rects()):
         if i == len(CAVE_CHAMBERS):
             rect = (rect[0], rect[1], max(rect[2], ENTRANCE_RAMP[1]), rect[3])   # the trench ramp is ground
@@ -746,7 +812,9 @@ def build_cave(holes, info):
     for iy in range(ny - 1):
         run = None
         for ix in range(nx):
-            covered = ix < nx - 1 and ry0 + iy * CELL >= COVER_Y and any(cave_corner[(iy + dy) * nx + ix + dx] for dx in (0, 1) for dy in (0, 1))
+            cell_x, cell_y = rx0 + ix * CELL, ry0 + iy * CELL
+            in_vent = any(vr[0] < cell_x + CELL and cell_x < vr[1] and vr[2] < cell_y + CELL and cell_y < vr[3] for vr in vent_rects)
+            covered = ix < nx - 1 and ry0 + iy * CELL >= COVER_Y and not in_vent and any(cave_corner[(iy + dy) * nx + ix + dx] for dx in (0, 1) for dy in (0, 1))
             if not covered and ix < nx - 1:
                 run = ix if run is None else run
             elif run is not None:
@@ -776,11 +844,100 @@ def build_cave(holes, info):
     for (a, b, hw) in CAVE_LINKS:
         t0 = 0.75 if a == CAVE_LINKS[0][0] else 0.5
         room_light(a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0, CZ + PASSAGE_HEIGHT - 40, "Cave/Lamps", lumens=300.0, radius=900.0)
+    # The vent shafts: walls from the ceiling up through the ridge, a rim, a ladder down to the chamber floor.
+    for (vx, vy) in CAVE_VENTS:
+        shaft(vx, vy, CZ, CZ + CAVE_HEIGHT, height(vx, vy, cave=False), "Cave/Vents", rock)
+    # A locker in the first chamber, a weapon chest in the den.
+    c0 = CAVE_CHAMBERS[0]
+    spawn(bp("World/Interactables/Locker/BP_Locker"), (c0[0] - c0[2] * 0.5, c0[1] - 200, CZ), (0, 0, 0), folder="Cave/Props")
     # The den in the middle chamber: a table, the mounted gun.
     cx, cy, rx, ry = CAVE_CHAMBERS[1]
     box((cx, cy - 300, CZ + 40), (500, 300, 80), mi("MI_Wood"), folder="Cave/Den")
     spawn(bp("World/Vehicles/BP_MountedGun"), (cx + 600, cy - 500, CZ), (0, -90, 0), folder="Cave/Den")
+    spawn(bp("World/Interactables/Container/BP_WeaponChest"), (cx - 500, cy + 300, CZ), (0, 0, 0), folder="Cave/Den")
+    keycard_pickup((cx - 180, cy - 420, CZ + 82), 2, "Cave/Den")
     info["cave"] = (cx, cy)
+
+
+# ---------------------------------------------------------------------------------------------
+# Shafts, the smugglers' tunnel, tall grass
+# ---------------------------------------------------------------------------------------------
+
+def keycard_pickup(loc, card, folder):
+    pickup = spawn(bp("World/Interactables/Keycard/BP_KeycardPickup"), loc, folder=folder)
+    if pickup:
+        pickup.set_editor_property("keycard_id", card)
+    return pickup
+
+
+def shaft(x, y, bottom_z, ceiling_z, ground_z, folder, material=None, rim=70.0):
+    """A square shaft (inside 2 x SHAFT_HALF) from ceiling_z up through the ground at ground_z, ending in a low rim,
+    with a ladder on its south wall from bottom_z (the floor below) over the rim (you climb out over it)."""
+    material = material or GRID_DARK
+    top = ground_z + rim
+    h = SHAFT_HALF
+    for (dx, dy, sx, sy) in ((0, -h - 10, 2 * h + 40, 20), (0, h + 10, 2 * h + 40, 20), (-h - 10, 0, 20, 2 * h), (h + 10, 0, 20, 2 * h)):
+        box((x + dx, y + dy, (ceiling_z + top) / 2), (sx, sy, top - ceiling_z), material, folder=folder)
+    ladder((x, y - h + 2, bottom_z), 90, top - bottom_z + 15, folder=folder)
+
+
+def build_undercity(holes, info):
+    """The smugglers' tunnel under the middle: the village kiosk -> under the ravine -> north along the plain -> under the
+    estate wall -> the gatehouse, with a keycard 3 door before the end. Shafts with ladders: the kiosk, the ravine bed,
+    the plain, the gatehouse."""
+    kx, ky, kz = info["kiosk"]
+    ghx, ghy = info["gatehouse"]
+    start = (kx - 150, ky + 60)
+    end = (ghx - 300, ghy - 120)
+    bed = (ravine_x(TUNNEL_Y), TUNNEL_Y)
+    plain = (TUNNEL_PLAIN_X, (TUNNEL_Y + end[1]) / 2)
+    # The corridor runs a little past the end shafts; caps close it.
+    points = [(start[0], start[1] - 160), (start[0], TUNNEL_Y), (TUNNEL_PLAIN_X, TUNNEL_Y), (TUNNEL_PLAIN_X, end[1]), (end[0] + 160, end[1])]
+    lowest = 1.0e9
+    for a, b in zip(points[:-1], points[1:]):
+        steps = int(max(abs(b[0] - a[0]), abs(b[1] - a[1])) / 150.0) + 1
+        for k in range(steps + 1):
+            t = k / float(steps)
+            lowest = min(lowest, gz(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+    tz = lowest - TUNNEL_H - 250.0
+    shafts = [start, bed, plain, end]
+    tunnel(points, tz, height=TUNNEL_H, lamp_every=1200, folder="Tunnel/Smugglers", ceiling_holes=[(sx, sy, SHAFT_HALF + 10) for (sx, sy) in shafts])
+    box((points[0][0], points[0][1] - 10, tz + TUNNEL_H / 2), (440, 20, TUNNEL_H + 40), GRID_DARK, folder="Tunnel/Smugglers")
+    box((points[-1][0] + 10, points[-1][1], tz + TUNNEL_H / 2), (20, 440, TUNNEL_H + 40), GRID_DARK, folder="Tunnel/Smugglers")
+    for (sx, sy) in shafts:
+        holes.append((sx - SHAFT_HALF - 20, sy - SHAFT_HALF - 20, sx + SHAFT_HALF + 20, sy + SHAFT_HALF + 20))
+        shaft(sx, sy, tz, tz + TUNNEL_H + 20, gz(sx, sy), "Tunnel/Shafts")
+    # Keycard 3 before the gatehouse.
+    door_x = (TUNNEL_PLAIN_X + end[0]) / 2
+    wall((door_x, end[1] - 200), (door_x, end[1] + 200), tz, TUNNEL_H, 25, [(200, 110, 0, 230)], GRID_DARK, "Tunnel/Smugglers")
+    spawn(bp("World/Interactables/Door/BP_Door_Keycard3"), (door_x, end[1] - 55, tz), (0, 90, 0), folder="Tunnel/Smugglers")
+    # A body container half way (nobody looks down here).
+    spawn(bp("World/Interactables/Container/BP_BodyContainer"), ((start[0] + TUNNEL_PLAIN_X) / 2, TUNNEL_Y + 130, tz), (0, 180, 0), folder="Tunnel/Smugglers")
+    info["tunnel"] = (points, tz)
+
+
+def build_grass(info):
+    """Tall grass fields (hide in them): the slope from the village down to the ravine, the ravine's east rim, the north
+    plain, the estate lawns, the west foot of the mountains and the east edge."""
+    rng = random.Random(77)
+    keep_clear = [(ravine_x(WALKWAY_Y) - 1600, WALKWAY_Y), (ravine_x(WALKWAY_Y) + 1600, WALKWAY_Y), (1600, 3300), (1300, 3200),
+                  (1600, 3800), (1500, 3600), (2900, -2100), (10300, -6800), (TUNNEL_PLAIN_X, (TUNNEL_Y - 4220) / 2),
+                  (ravine_x(TUNNEL_Y), TUNNEL_Y), (ravine_x(-8500), -8500), (ravine_x(-5000), -5000), (ravine_x(500), 500)]
+    fields = [(-3050.0, -2300.0, -6800.0, 2600.0, 16), (-500.0, 800.0, -6500.0, 1800.0, 10), (-2400.0, 900.0, 2700.0, 3300.0, 8),
+              (9600.0, 10700.0, -7600.0, -4600.0, 6), (2000.0, 2900.0, -2200.0, 1800.0, 6), (-11600.0, -10900.0, -6000.0, 2600.0, 8),
+              (11200.0, 11900.0, -6000.0, 3000.0, 6)]
+    placed = 0
+    for (x0, x1, y0, y1, count) in fields:
+        for _ in range(count):
+            for _attempt in range(12):
+                x, y = rng.uniform(x0, x1), rng.uniform(y0, y1)
+                if all(math.hypot(x - cx, y - cy) > 500 for (cx, cy) in keep_clear) and all(abs(y - by) > 450 for by in BRIDGES_Y):
+                    spawn(bp("World/Interactables/Grass/BP_TallGrass"), (x, y, gz(x, y) + 55), (0, rng.uniform(0, 90), 0), folder="Grass")
+                    placed += 1
+                    break
+    for gx, gy in ((-11200, -1500), (-11300, 1500), (-3000, -6800), (2500, 3000), (8200, -6200)):
+        spawn(bp("World/Interactables/Grass/BP_TallGrass"), (gx, gy, gz(gx, gy) + 55), folder="Grass")
+    log("tall grass:", placed + 5)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -812,7 +969,8 @@ def build_gameplay(info):
         npc("vip", loc, 0, folder="AI/VIPCandidates")
     routes = []
     # Estate: inside the walls, around the house, the front garden, the maze, each floor and the basement.
-    routes.append([(ex0 + 1200, ey0 + 1200, z + 100), (ex1 - 1200, ey0 + 1200, z + 100), (ex1 - 1200, ey1 - 1200, z + 100), (ex0 + 1200, ey1 - 1200, z + 100)])
+    # (The south-west corner is the garage: the loop turns north of it.)
+    routes.append([(ex0 + 1200, ey0 + 2600, z + 100), (ex1 - 1200, ey0 + 1200, z + 100), (ex1 - 1200, ey1 - 1200, z + 100), (ex0 + 1200, ey1 - 1200, z + 100)])
     routes.append([(hx0 - 1000, hy0 - 900, z + 100), (hx1 + 1500, hy0 - 900, z + 100), (hx1 + 1500, hy1 + 900, z + 100), (hx0 - 1000, hy1 + 900, z + 100)])
     routes.append([(hx - 2400, hy0 - 2000, z + 100), (hx + 2400, hy0 - 2000, z + 100)])
     routes.append([(maze_x - 1600, maze_y - 1600, z + 100), (maze_x + 1600, maze_y - 1600, z + 100), (maze_x + 1600, maze_y + 1600, z + 100), (maze_x - 1600, maze_y + 1600, z + 100)])
@@ -840,32 +998,35 @@ def build_gameplay(info):
     c = [(cx, cy) for (cx, cy, rx, ry) in CAVE_CHAMBERS]
     routes.append([(c[0][0], c[0][1], CZ + 100), (c[1][0], c[1][1], CZ + 100), (c[2][0] + 300, c[2][1] + 300, CZ + 100)])
     guards = []
+    route_actors = []
+    # Keycards: 1 on two estate patrols, 2 on the estate perimeter, 3 on the cave patrol.
+    keycards = {5: 1, 9: 1, 0: 2, len(routes) - 1: 3}
     for i, points in enumerate(routes):
         route = patrol(points, folder="AI/Routes")
+        route_actors.append(route)
         start = points[0]
-        guards.append(npc("guard", (start[0], start[1], start[2] - 100), 0, route=route, keycard=1 if i in (5, 9) else None, folder="AI/Guards"))
-    # Groups: two followers behind the front garden patrol, one behind the market patrol.
-    group_specs = [(2, 2), (market_route, 1)]
-    for leader_index, followers in group_specs:
-        leader = guards[leader_index]
-        if not leader:
+        guards.append(npc(LOADOUT_CYCLE[i % len(LOADOUT_CYCLE)], (start[0], start[1], start[2] - 100), 0, route=route,
+                          keycard=keycards.get(i), folder="AI/Guards"))
+    # Patrol groups (the route's AssignedNPCs walk it together, the first leads): 4 on the estate perimeter, 3 on the
+    # front garden, 3 at the market.
+    for route_index, size in ((0, 4), (2, 3), (market_route, 3)):
+        route, leader = route_actors[route_index], guards[route_index]
+        if not route or not leader:
             continue
-        members = [leader]
         loc = leader.get_actor_location()
-        for f in range(followers):
-            members.append(npc("guard", (loc.x + 180 * (f + 1), loc.y + 120, loc.z - 100), 0, folder="AI/Groups"))
-        group = spawn(bp("AI/BP_GuardGroup"), (loc.x, loc.y, loc.z), label="GuardGroup", folder="AI/Groups")
-        if group:
-            group.set_editor_property("members", [m for m in members if m])
+        members = [leader] + [npc(LOADOUT_CYCLE[(route_index + k) % len(LOADOUT_CYCLE)], (loc.x + 150 * k, loc.y + 120, loc.z - 100), 0,
+                                  folder="AI/Groups") for k in range(1, size)]
+        route.set_editor_property("assigned_np_cs", [m for m in members if m])
     # Posts: the gate (sentries), the house front and back, the east door, the garage, the market, a bridge, the cave.
     posts = [((ex0 + 300, GATE_Y - 700, z), 180, True), ((ex0 + 300, GATE_Y + 700, z), 180, True), ((hx - 300, hy0 - 300, z), 270, False),
              ((hx1 - 300, hy1 + 300, z), 0, False), ((ex1 - 300, ey0 + 6500, z), 0, False), ((grx + 1500, gry + 1300, z), 180, False),
              ((mx + 600, my, mz), 0, False), (ground_point(ravine_x(BRIDGES_Y[1]) + 1800, BRIDGES_Y[1] + 400), 180, False),
              ((CAVE_LINKS[0][0][0] + 150, COVER_Y - 600, CZ), 270, False)]
-    for (loc, yaw, sentry) in posts:
-        npc("guard", loc, yaw, folder="AI/Guards", stationary=True, sentry=sentry)
+    for j, (loc, yaw, sentry) in enumerate(posts):
+        npc("guard" if sentry else LOADOUT_CYCLE[(j + 1) % len(LOADOUT_CYCLE)], loc, yaw, folder="AI/Guards", stationary=True, sentry=sentry)
     tx, ty, tz = info["bell_tower"]
     npc("sniper", (tx, ty, tz), 0, folder="AI/Snipers")
+    keycard_pickup((tx + 250, ty + 250, tz + 5), 3, "Gameplay/Keycards")
     npc("sniper", (hx + 2300, hy0 + 300, info["roof_z"] + 30), 270, folder="AI/Snipers")
     # A rock perch on the ridge over the estate (the slope there is too steep to stand on).
     rx, ry = 7800.0, 5400.0
@@ -873,9 +1034,11 @@ def build_gameplay(info):
     box((rx, ry, perch - 300), (520, 520, 600), mi("MI_Mountain"), folder="AI/Snipers")
     npc("sniper", (rx, ry, perch), 270, folder="AI/Snipers")
     # Retrieval points: the helipad, the bridge foot, the far favela, the cave, east gate, the north plain.
-    for loc in ((hx + 1600, hy, info["roof_z"] + 25), ground_point(ravine_x(-8500), -8500), (TERRACES[4][1] - 200, 2400, TERRACES[4][2]),
-                (c[2][0] + 500, c[2][1] + 400, CZ), ground_point(11900, -2500), ground_point(1600, 3300)):
-        spawn(bp("World/Spawning/BP_RetrievalPoint"), loc, folder="Gameplay/Retrieval")
+    # Each with its own model: the helicopter on the helipad and the north plain, cars by roads, crates elsewhere.
+    for loc, model in (((hx + 1600, hy, info["roof_z"] + 25), "Helicopter"), (ground_point(ravine_x(-8500), -8500), "Car"),
+                       ((TERRACES[4][1] - 200, 2400, TERRACES[4][2]), "Crate"), ((c[2][0] + 500, c[2][1] + 400, CZ), "Crate"),
+                       (ground_point(11900, -2500), "Car"), (ground_point(1600, 3300), "Helicopter")):
+        spawn(bp("World/Spawning/BP_RetrievalPoint_" + model), loc, folder="Gameplay/Retrieval")
     # Loot: weapons and items spread over the three zones.
     loot_w = [(ghx, ghy, z + 30), (hx0 + 950, hy - 800, z + 30), (hx1 - 950, hy + 800, z + FH + 30), (hx, hy, BZ + 30), (grx + 800, gry, z + 30),
               (gx0, gy0, z + 30), (ccx, ccy, CZ + 30), (c[0][0], c[0][1], CZ + 30), (mx, my - 650, mz + 30),
@@ -924,7 +1087,9 @@ def build():
     build_ravine(info)
     build_estate(holes, info)
     build_cave(holes, info)
+    build_undercity(holes, info)
     build_gameplay(info)
+    build_grass(info)
     build_terrain(holes)
     # Map definition: square bounds around the outline (minimap, pause map, spectator limits).
     data = load(path("Data", "Maps", "DA_Map_LDTest"))

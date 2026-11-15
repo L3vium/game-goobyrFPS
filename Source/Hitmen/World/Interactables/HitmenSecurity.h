@@ -488,15 +488,24 @@ protected:
 	virtual void OnInteracted(AActor* Interactor) override;
 };
 
-/** A lamp; turned off by its circuit breaker. */
+/** A lamp; turned off by its circuit breaker or light switch. Looking at it shows "Light - On / Off" (no key). */
 UCLASS(Blueprintable)
-class HITMEN_API AHitmenLightFixture : public AActor
+class HITMEN_API AHitmenLightFixture : public AActor, public IHitmenInteractable
 {
 	GENERATED_BODY()
 
 public:
 	AHitmenLightFixture();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	// IHitmenInteractable: info only.
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override { return false; }
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override { return FText::GetEmpty(); }
+	virtual void Interact_Implementation(AActor* Interactor) override {}
+	virtual FText GetInteractionInfo_Implementation(AActor* Interactor) const override;
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Light")
+	bool IsPowered() const { return bPowered; }
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Light")
 	void SetPowered(bool bPowered);
@@ -583,4 +592,16 @@ protected:
 	void ApplyLever();
 
 	virtual void OnInteracted(AActor* Interactor) override;
+};
+
+/** A wall light switch: a breaker for a room's lamps ("Light switch - On / Off"; F switches them). */
+UCLASS(Blueprintable)
+class HITMEN_API AHitmenLightSwitch : public AHitmenCircuitBreaker
+{
+	GENERATED_BODY()
+
+public:
+	AHitmenLightSwitch();
+	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	virtual FText GetInteractionInfo_Implementation(AActor* Interactor) const override;
 };

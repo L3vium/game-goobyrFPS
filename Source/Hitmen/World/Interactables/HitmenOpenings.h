@@ -92,9 +92,22 @@ public:
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
 
 protected:
+	virtual void OnConstruction(const FTransform& Transform) override;
+
 	/** Keycard needed to open (-1 = none). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Door")
 	int32 RequiredKeycard = INDEX_NONE;
+
+	/** The panel fills its opening: Width x Height (the actor origin is the panel's bottom -X corner; the builders pass
+	 *  the wall opening). Mesh is a 1 m cube. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Door", meta=(ClampMin="40", Units="cm"))
+	float Width = 110.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Door", meta=(ClampMin="100", Units="cm"))
+	float Height = 230.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Door", meta=(ClampMin="2", Units="cm"))
+	float Thickness = 10.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Door", meta=(Units="deg"))
 	float OpenAngle = 95.f;

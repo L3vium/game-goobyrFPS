@@ -213,6 +213,15 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Awareness arcs toward guards noticing you; minimap Under fire banner (screenshot, 0.5.0)
 - [ ] Headshot hit ticks are red and a metallic hit sound plays (shooter only)
 - [ ] Minimap: no own view cone, north-up, your arrow turns
+- [x] Stiff ledges: pushed toward the edge of a window ledge at 7 and 14 m/s, the player stays on it (PIE script,
+  0.9.0); [ ] by hand: walk along a ledge window to window, crouch under a sill with a guard inside
+- [x] Window vaults (PIE `QueryTraversalAction` on every open window): every upper window vaults out onto its ledge and
+  back in; ground floor 136 / 139 (the rest sit right over a stair lane) (0.9.0)
+- [x] San Lazaro 0.9.0 rebuild: `hitmen_check_reach.py` problems 0 (55 doors, 89 targets, 24 starts),
+  `hitmen_check_doors.py` problems 0, `hitmen_check_features.py` missing 0; `hitmen_check_patrols.py` flags one guard
+  pausing at a route end per run (a different one each time, all seen walking) (0.9.0)
+- [x] Screenshots: ledges and gutter, the tunnel's keycard 3 door, a cave vent shaft, the double front door, the high
+  vent hatch (0.9.0); [ ] crawl through the high vent and the tunnel by hand
 - [x] Watchers (2-3 player PIE, `HitmenWatch`): free fly with the player outlined and tagged, player view first and
   third person, split screen of 2, the info line on a locker, Tab scan with guards lit, the host sees a client watcher
   as an orb with its name (screenshots, 0.9.0); [ ] fly through a wall and under the ground in San Lazaro by hand,

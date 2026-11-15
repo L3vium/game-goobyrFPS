@@ -829,12 +829,88 @@ def check_pickups_clear(radius=25.0):
 # cave + tunnel, mountains around a basin, invisible walls.
 # ---------------------------------------------------------------------------------------------
 
+# Walkable window ledges (upper floors): depth, and how far their top sits under the room floor. Crouched on one you
+# stay under the sills (crouched 110 cm, sills 100 cm over the floor); standing, a guard inside sees you.
+LEDGE_DEPTH = 70.0
+LEDGE_DROP = 15.0
+# Crawl vents: a 120 x 120 hatch (BP_VentHatch) and ducts with that inside (crouched 110 cm fits).
+VENT_SIZE = 120.0
+
+
+def gutter_spot(face, x0, x1, y0, y1, cx, cy, w, d):
+    """Where a gutter stands on a face (and its yaw): 30 % along the face from the centre."""
+    return {"W": ((x0 - 15, cy + d * 0.3), 180), "E": ((x1 + 15, cy + d * 0.3), 0),
+            "S": ((cx + w * 0.3, y0 - 15), -90), "N": ((cx + w * 0.3, y1 + 15), 90)}[face]
+
+
+def ledge_band(face, x0, x1, y0, y1, top, gap_at=None, folder="Town", material=None):
+    """A walkable ledge along a face (wrapping the corners on S / N), its top at top, with a 140 cm gap around
+    gap_at (a gutter: the climb stays clear)."""
+    out = 12.5 + LEDGE_DEPTH / 2
+    lz = top - 6
+    material = material or GRID_ALT
+    if face in ("S", "N"):
+        y = y0 - out if face == "S" else y1 + out
+        a, b = x0 - 12.5 - LEDGE_DEPTH, x1 + 12.5 + LEDGE_DEPTH
+        spans = [(a, gap_at - 70), (gap_at + 70, b)] if gap_at is not None else [(a, b)]
+        for s0, s1 in spans:
+            if s1 - s0 > 20:
+                box(((s0 + s1) / 2, y, lz), (s1 - s0, LEDGE_DEPTH, 12), material, folder=folder)
+    else:
+        x = x0 - out if face == "W" else x1 + out
+        a, b = y0 - 12.5, y1 + 12.5
+        spans = [(a, gap_at - 70), (gap_at + 70, b)] if gap_at is not None else [(a, b)]
+        for s0, s1 in spans:
+            if s1 - s0 > 20:
+                box((x, (s0 + s1) / 2, lz), (LEDGE_DEPTH, s1 - s0, 12), material, folder=folder)
+
+
+def vent_duct(a, b, z, folder="Vents", material=None):
+    """A straight crawl duct from a to b (x, y; axis-aligned) with its inside floor at z: VENT_SIZE wide and high
+    inside, open at both ends (hatches go in the walls it meets)."""
+    material = material or mi("MI_Metal")
+    (ax, ay), (bx, by) = a, b
+    along_x = abs(bx - ax) >= abs(by - ay)
+    length = abs(bx - ax) if along_x else abs(by - ay)
+    cx, cy = (ax + bx) / 2, (ay + by) / 2
+    half = VENT_SIZE / 2 + 5
+    size = (length, VENT_SIZE + 20, 10) if along_x else (VENT_SIZE + 20, length, 10)
+    box((cx, cy, z - 5), size, material, folder=folder)
+    box((cx, cy, z + VENT_SIZE + 5), size, material, folder=folder)
+    for side in (-1, 1):
+        if along_x:
+            box((cx, cy + side * half, z + VENT_SIZE / 2), (length, 10, VENT_SIZE), material, folder=folder)
+        else:
+            box((cx + side * half, cy, z + VENT_SIZE / 2), (10, length, VENT_SIZE), material, folder=folder)
+
+
+def vent_hatch(x, y, z, along_x, folder="Vents"):
+    """A BP_VentHatch in a wall opening VENT_SIZE wide whose bottom is at z (along_x: the wall runs along x)."""
+    return spawn(bp("World/Interactables/Vent/BP_VentHatch"), (x, y, z), (0, 0 if along_x else 90, 0), folder=folder)
+
+
+def light_switch(x, y, z, yaw, lamps, folder):
+    """A wall light switch (BP_LightSwitch) driving lamps."""
+    switch = spawn(bp("World/Interactables/Power/BP_LightSwitch"), (x, y, z), (0, yaw, 0), folder=folder)
+    if switch and lamps:
+        switch.set_editor_property("linked_lights", [l for l in lamps if l])
+    return switch
+
+
 def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", windows=True, gutter=True, roof_access=True,
-             z0=0.0, ledges=True, shadow_lamp=False, blind_faces=()):
-    """Hollow building standing at z0: a door, vaultable windows (BP_Window) on every facade and floor, floors, a
-    switchback stair and a gutter. ledges: a continuous band just under the windows all around each floor (hang and
-    shimmy along it). Two lamps per floor (shadow_lamp: the first one casts shadows)."""
+             z0=0.0, ledges=True, shadow_lamp=False, blind_faces=(), gutter_side="W", vents=(), switch=True, floor_material=None,
+             ground_blind=()):
+    """Hollow building standing at z0: a door, vaultable windows (BP_Window, some left open) on every facade and floor,
+    floors, a switchback stair and a gutter (gutter_side). ledges: from the first floor, a walkable ledge (LEDGE_DEPTH)
+    all around just under the room floor: out of a window onto it, along it to the next window, crouched under the
+    sills. vents: (face, t, floor) crawl hatches at floor level. switch: a light switch by the door for every lamp.
+    ground_blind: faces with no ground-floor windows (they would open onto a stair or a wall).
+    Two lamps per floor (shadow_lamp: the first one casts shadows)."""
     x0, x1, y0, y1 = cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2
+    floor_material = floor_material or GRID
+    vent_open = {}
+    for (vface, vt, vfloor) in vents:
+        vent_open.setdefault((vface, vfloor), []).append(vt)
     H = floors * floor_h
     lane_w = 280  # stair lane (260 cm flight + margins)
     sy0, sy1 = y0 + 120, cy + 60  # every flight spans sy0..sy1
@@ -842,36 +918,40 @@ def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", 
     for f in range(floors):
         z = z0 + f * floor_h
         win = [(w * 0.25, 120, 100, 220), (w * 0.75, 120, 100, 220)] if windows else []
-        south = list(win)
+        south = [] if (f == 0 and "S" in ground_blind) else list(win)
         if f == 0 and door_side == "S":
             south = [(w * 0.5, 110, 0, 230)] + [o for o in win if abs(o[0] - w * 0.5) > 200]
-        north = list(win)
+        north = [] if (f == 0 and "N" in ground_blind) else list(win)
         if f == 0 and door_side == "N":
             north = [(w * 0.5, 110, 0, 230)] + [o for o in win if abs(o[0] - w * 0.5) > 200]
+        south = south + [(w * t, VENT_SIZE, 0, VENT_SIZE) for t in vent_open.get(("S", f), [])]
+        north = north + [(w * t, VENT_SIZE, 0, VENT_SIZE) for t in vent_open.get(("N", f), [])]
         wall((x0, y0), (x1, y0), z, floor_h, 25, south, GRID_DARK, folder)
         wall((x0, y1), (x1, y1), z, floor_h, 25, north, GRID_DARK, folder)
         side_win = [(d * t, 120, 100, 220) for t in side_t] if windows else []
-        wall((x0, y0), (x0, y1), z, floor_h, 25, [] if "W" in blind_faces else side_win, GRID_DARK, folder)
-        wall((x1, y0), (x1, y1), z, floor_h, 25, [] if "E" in blind_faces else side_win, GRID_DARK, folder)
+        west = ([] if "W" in blind_faces else side_win) + [(d * t, VENT_SIZE, 0, VENT_SIZE) for t in vent_open.get(("W", f), [])]
+        east = ([] if "E" in blind_faces else side_win) + [(d * t, VENT_SIZE, 0, VENT_SIZE) for t in vent_open.get(("E", f), [])]
+        wall((x0, y0), (x0, y1), z, floor_h, 25, west, GRID_DARK, folder)
+        wall((x1, y0), (x1, y1), z, floor_h, 25, east, GRID_DARK, folder)
         if f > 0:
             # Floor slab: the main part, then two stair lanes on the east side. The lane of the flight that comes up
             # here has a hole over the flight; a 1.2 m landing stays at each end.
-            box(((x0 + x1 - 2 * lane_w) / 2, cy, z), (w - 2 * lane_w, d, 25), GRID, folder=folder)
+            box(((x0 + x1 - 2 * lane_w) / 2, cy, z), (w - 2 * lane_w, d, 25), floor_material, folder=folder)
             for lane in (0, 1):
                 lx = x1 - lane_w * (lane + 0.5)
                 if lane == (f - 1) % 2:
-                    box((lx, (y0 + sy0) / 2, z), (lane_w, sy0 - y0, 25), GRID, folder=folder)
-                    box((lx, (sy1 + y1) / 2, z), (lane_w, y1 - sy1, 25), GRID, folder=folder)
+                    box((lx, (y0 + sy0) / 2, z), (lane_w, sy0 - y0, 25), floor_material, folder=folder)
+                    box((lx, (sy1 + y1) / 2, z), (lane_w, y1 - sy1, 25), floor_material, folder=folder)
                 else:
-                    box((lx, cy, z), (lane_w, d, 25), GRID, folder=folder)
+                    box((lx, cy, z), (lane_w, d, 25), floor_material, folder=folder)
         if ledges and windows and f > 0:
-            # 18 cm band, its top 20 cm under the sills, wrapping the corners.
-            lz = z + 80 - 6
-            out = 12.5 + 9
-            box((cx, y0 - out, lz), (w + 2 * (12.5 + 18), 18, 12), GRID_ALT, folder=folder + "/Ledges")
-            box((cx, y1 + out, lz), (w + 2 * (12.5 + 18), 18, 12), GRID_ALT, folder=folder + "/Ledges")
-            box((x0 - out, cy, lz), (18, d + 25, 12), GRID_ALT, folder=folder + "/Ledges")
-            box((x1 + out, cy, lz), (18, d + 25, 12), GRID_ALT, folder=folder + "/Ledges")
+            # Walkable ledges all around (none on a blind face), a gap where the gutter climbs.
+            (gx, gy), _ = gutter_spot(gutter_side, x0, x1, y0, y1, cx, cy, w, d)
+            for face in ("S", "N", "W", "E"):
+                if face in blind_faces:
+                    continue
+                gap = (gx if face in ("S", "N") else gy) if (gutter and face == gutter_side) else None
+                ledge_band(face, x0, x1, y0, y1, z - LEDGE_DROP, gap, folder + "/Ledges")
     box((cx, cy, z0 + H), (w, d, 25), GRID, folder=folder)
     # Switchback: even flights rise north on the east lane, odd flights rise south on the next lane, so a flight
     # never runs under the one above it (head room), with room to step on at the bottom.
@@ -885,27 +965,47 @@ def building(cx, cy, w, d, floors=2, floor_h=350, door_side="S", folder="Town", 
         spawn(bp("World/Interactables/Door/BP_Door"), (cx - 55, y0, z0), folder=folder)
     else:
         spawn(bp("World/Interactables/Door/BP_Door"), (cx + 55, y1, z0), (0, 180, 0), folder=folder)
-    # Fixed exposure: two lamps per floor (a key and a fill).
+    if floor_material is not GRID:
+        box((cx, cy, z0 + 1), (w - 25, d - 25, 2), floor_material, folder=folder)
+    # Fixed exposure: two lamps per floor (a key and a fill); a switch by the door turns them all off.
+    lamps = []
     for f in range(floors):
         lz = z0 + f * floor_h + floor_h - 45
-        room_light(cx - w * 0.22, cy - d * 0.15, lz, folder, shadow=shadow_lamp)
-        room_light(cx + w * 0.12, cy + d * 0.2, lz, folder, lumens=LAMP_FILL_LUMENS)
+        lamps.append(room_light(cx - w * 0.22, cy - d * 0.15, lz, folder, shadow=shadow_lamp))
+        lamps.append(room_light(cx + w * 0.12, cy + d * 0.2, lz, folder, lumens=LAMP_FILL_LUMENS))
+    if switch:
+        if door_side == "S":
+            light_switch(cx + 95, y0 + 14, z0, 0, lamps, folder)
+        else:
+            light_switch(cx - 95, y1 - 14, z0, 180, lamps, folder)
+    for (vface, vt, vfloor) in vents:
+        vz = z0 + vfloor * floor_h
+        spot = {"S": (x0 + w * vt, y0, True), "N": (x0 + w * vt, y1, True), "W": (x0, y0 + d * vt, False), "E": (x1, y0 + d * vt, False)}[vface]
+        vent_hatch(spot[0], spot[1], vz, spot[2], folder)
     if windows:
         win_actor = bp("World/Interactables/Window/BP_Window")
         for f in range(floors):
             z = z0 + f * floor_h
+            placed = []
             for t in (0.25, 0.75):
-                if not (f == 0 and abs(w * t - w * 0.5) <= 200 and door_side == "S"):
-                    spawn(win_actor, (x0 + w * t, y0, z), (0, 90, 0), folder=folder)
-                if not (f == 0 and abs(w * t - w * 0.5) <= 200 and door_side == "N"):
-                    spawn(win_actor, (x0 + w * t, y1, z), (0, -90, 0), folder=folder)
+                if not (f == 0 and ((abs(w * t - w * 0.5) <= 200 and door_side == "S") or "S" in ground_blind)):
+                    placed.append(spawn(win_actor, (x0 + w * t, y0, z), (0, 90, 0), folder=folder))
+                if not (f == 0 and ((abs(w * t - w * 0.5) <= 200 and door_side == "N") or "N" in ground_blind)):
+                    placed.append(spawn(win_actor, (x0 + w * t, y1, z), (0, -90, 0), folder=folder))
             for t in side_t:
                 if "W" not in blind_faces:
-                    spawn(win_actor, (x0, y0 + d * t, z), (0, 180, 0), folder=folder)
+                    placed.append(spawn(win_actor, (x0, y0 + d * t, z), (0, 180, 0), folder=folder))
                 if "E" not in blind_faces:
-                    spawn(win_actor, (x1, y0 + d * t, z), (0, 0, 0), folder=folder)
+                    placed.append(spawn(win_actor, (x1, y0 + d * t, z), (0, 0, 0), folder=folder))
+            # About one window in three starts open (deterministic from its place).
+            for win_a in placed:
+                if win_a:
+                    loc = win_a.get_actor_location()
+                    if (int(abs(loc.x)) // 50 + int(abs(loc.y)) // 50 + f) % 3 == 0:
+                        win_a.set_editor_property("open", True)
     if gutter:
-        ladder((x0 - 15, cy + d * 0.3, z0), 180, H + 20, gutter=True, folder=folder)
+        (gx, gy), gyaw = gutter_spot(gutter_side, x0, x1, y0, y1, cx, cy, w, d)
+        ladder((gx, gy, z0), gyaw, H + 20, gutter=True, folder=folder)
     return (x0, x1, y0, y1, z0 + H)
 
 
@@ -997,9 +1097,11 @@ def stair_well(rect, bottom_z, rise_dir, run, holes, mouths=None, low_wall=True,
     return length
 
 
-def tunnel(points, z, width=400, height=340, lamp_every=2500, folder="Tunnel"):
+def tunnel(points, z, width=400, height=340, lamp_every=2500, folder="Tunnel", ceiling_holes=()):
     """Underground corridor along a polyline, floor top at z. At each corner the outer wall runs on to close it and
-    the inner wall stops short, so the way stays open; both ends are open (they join a stair well or a room)."""
+    the inner wall stops short, so the way stays open; both ends are open (they join a stair well or a room).
+    ceiling_holes: (x, y, half) square openings in the ceiling (shafts up to the surface); the ceiling closes around
+    them."""
     n = len(points)
     dirs = []
     for a, b in zip(points[:-1], points[1:]):
@@ -1031,7 +1133,26 @@ def tunnel(points, z, width=400, height=340, lamp_every=2500, folder="Tunnel"):
         mid = (t0 + t1) / 2
         cx, cy = a[0] + dx * mid, a[1] + dy * mid
         box((cx, cy, z - 10), (t1 - t0, width + 40, 20), GRID_DARK, yaw, folder=folder)
-        box((cx, cy, z + height + 10), (t1 - t0, width + 40, 20), GRID_DARK, yaw, folder=folder)
+        # Ceiling, cut where a shaft comes down: pieces along the segment, and strips beside each shaft.
+        cuts = []
+        for (hx, hy, half) in ceiling_holes:
+            along = (hx - a[0]) * dx + (hy - a[1]) * dy
+            across = -(hx - a[0]) * dy + (hy - a[1]) * dx
+            if t0 - half < along < t1 + half and abs(across) < hw:
+                cuts.append((along - half, along + half, across, half))
+        cuts.sort()
+        edge = t0
+        for (c0, c1, across, half) in cuts + [(t1, t1, 0.0, 0.0)]:
+            if c0 > edge + 1:
+                m = (edge + c0) / 2
+                box((a[0] + dx * m, a[1] + dy * m, z + height + 10), (c0 - edge, width + 40, 20), GRID_DARK, yaw, folder=folder)
+            if c1 > c0:
+                m = (c0 + c1) / 2
+                for s0, s1 in ((-(hw + 20), across - half), (across + half, hw + 20)):
+                    if s1 - s0 > 1:
+                        o = (s0 + s1) / 2
+                        box((a[0] + dx * m + nx * o, a[1] + dy * m + ny * o, z + height + 10), (c1 - c0, s1 - s0, 20), GRID_DARK, yaw, folder=folder)
+            edge = max(edge, c1)
         count = int(length / lamp_every)
         for k in range(1, count + 1):
             t = length * k / (count + 1)

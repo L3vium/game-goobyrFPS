@@ -638,7 +638,7 @@ return c;"""
 
 # Physical surface (footsteps, landings) of each coloured material: what you see is what you hear.
 MATERIAL_SURFACES = {"MI_Grass": "PM_Grass", "MI_Sand": "PM_Sand", "MI_Wood": "PM_Wood", "MI_Metal": "PM_Metal",
-                     "MI_Stone": "PM_Stone", "MI_Mountain": "PM_Stone"}
+                     "MI_Stone": "PM_Stone", "MI_Mountain": "PM_Stone", "MI_Tile": "PM_Tile"}
 
 
 def build_terrain_material(folder=None):
@@ -1009,6 +1009,30 @@ def weapon_muzzle_offset(data):
     return unreal.Vector((min(xs) + max(xs)) * 0.5, max(ys) + 2.0, min(zs) + 0.7 * (max(zs) - min(zs)))
 
 
+def palette_instance(name, rgb, color, inst_folder, physical):
+    """A palette colour: MI_<name> on the colour material and its MI_Grid_<name> checker twin for level geometry, both
+    with the colour's physical surface (footsteps). Returns {asset name: instance}."""
+    mi = create(name, inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    set_props(mi, parent=color)
+    MEL.set_material_instance_vector_parameter_value(mi, "Color", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
+    surface = MATERIAL_SURFACES.get(name)
+    if surface:
+        set_props(mi, phys_material=physical[surface])
+    save(mi)
+    # Checker (prototype grid) twin for level geometry: same tint, same physical surface.
+    grid = create("MI_Grid_" + name[3:], inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    set_props(grid, parent=load("/Game/LevelPrototyping/Materials/M_PrototypeGrid"))
+    tint = unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0)
+    for param in ("SurfaceColor", "TopSurfaceColor"):
+        MEL.set_material_instance_vector_parameter_value(grid, param, tint)
+    MEL.set_material_instance_vector_parameter_value(grid, "GridColor", unreal.LinearColor(rgb[0] * 0.35, rgb[1] * 0.35, rgb[2] * 0.35, 1.0))
+    MEL.set_material_instance_vector_parameter_value(grid, "SubGridColor", unreal.LinearColor(rgb[0] * 0.7, rgb[1] * 0.7, rgb[2] * 0.7, 1.0))
+    if surface:
+        set_props(grid, phys_material=physical[surface])
+    save(grid)
+    return {name: mi, "MI_Grid_" + name[3:]: grid}
+
+
 def build_materials(physical):
     folder = path("Materials", "Master")
     inst_folder = path("Materials", "Instances")
@@ -1030,29 +1054,10 @@ def build_materials(physical):
         "MI_Blue": (0.08, 0.2, 0.6), "MI_White": (0.9, 0.9, 0.9), "MI_Dark": (0.05, 0.05, 0.06),
         "MI_Wood": (0.35, 0.2, 0.08), "MI_Metal": (0.4, 0.42, 0.45), "MI_Grass": (0.15, 0.35, 0.08),
         "MI_Sand": (0.7, 0.6, 0.38), "MI_Stone": (0.45, 0.45, 0.43), "MI_Gold": (0.83, 0.62, 0.2),
-        "MI_Glass": (0.6, 0.8, 0.9), "MI_Mountain": (0.32, 0.3, 0.28),
+        "MI_Glass": (0.6, 0.8, 0.9), "MI_Mountain": (0.32, 0.3, 0.28), "MI_Tile": (0.74, 0.72, 0.68),
     }
     for name, rgb in palette.items():
-        mi = create(name, inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-        set_props(mi, parent=color)
-        MEL.set_material_instance_vector_parameter_value(mi, "Color", unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
-        surface = MATERIAL_SURFACES.get(name)
-        if surface:
-            set_props(mi, phys_material=physical[surface])
-        save(mi)
-        instances[name] = mi
-        # Checker (prototype grid) twin for level geometry: same tint, same physical surface.
-        grid = create("MI_Grid_" + name[3:], inst_folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
-        set_props(grid, parent=load("/Game/LevelPrototyping/Materials/M_PrototypeGrid"))
-        tint = unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0)
-        for param in ("SurfaceColor", "TopSurfaceColor"):
-            MEL.set_material_instance_vector_parameter_value(grid, param, tint)
-        MEL.set_material_instance_vector_parameter_value(grid, "GridColor", unreal.LinearColor(rgb[0] * 0.35, rgb[1] * 0.35, rgb[2] * 0.35, 1.0))
-        MEL.set_material_instance_vector_parameter_value(grid, "SubGridColor", unreal.LinearColor(rgb[0] * 0.7, rgb[1] * 0.7, rgb[2] * 0.7, 1.0))
-        if surface:
-            set_props(grid, phys_material=physical[surface])
-        save(grid)
-        instances["MI_Grid_" + name[3:]] = grid
+        instances.update(palette_instance(name, rgb, color, inst_folder, physical))
 
     # Translucent unlit "Color" (camera cones, retrieval beacons).
     cone = new_material("M_Hitmen_TranslucentColor", folder)
@@ -2136,6 +2141,48 @@ def build_game_instance(core):
 # World fixtures (placeholder engine shapes)
 # ---------------------------------------------------------------------------------------------
 
+# Keycard doors: id -> colour (1 blue, 2 red, 3 yellow), the keycard pickups take the same colour.
+KEYCARD_COLORS = {1: "MI_Blue", 2: "MI_Red", 3: "MI_Yellow"}
+# The weapon chest's random pool.
+CHEST_WEAPONS = ("SMG", "AssaultRifle", "Shotgun", "Sniper")
+
+
+def build_ld_fixtures(mi):
+    """0.9.0 fixtures: the light switch, the weapon chest, keycard doors 2 and 3 (and their pickups)."""
+    W = path("World", "Interactables")
+    made = {}
+    switch = make_blueprint("BP_LightSwitch", W + "/Power", unreal.HitmenLightSwitch)
+    d = cdo(switch)
+    set_mesh(component(d, "mesh"), SHAPES["cube"], (0.1, 0.03, 0.15), mi["MI_White"], (0, 0, 130))
+    set_mesh(component(d, "lever"), SHAPES["cube"], (0.025, 0.05, 0.06), mi["MI_Dark"], (0, -2, 130))
+    save(switch)
+    made["BP_LightSwitch"] = switch
+    base = load(W + "/Container/BP_Container_Random")
+    if base:
+        chest = make_blueprint("BP_WeaponChest", W + "/Container", gen_class(base))
+        pool = []
+        for name in CHEST_WEAPONS:
+            data = load(path("Data", "Weapons") + "/DA_Weapon_" + name)
+            if data:
+                entry = unreal.HitmenContainerEntry()
+                entry.set_editor_property("weapon", data)
+                pool.append(entry)
+        set_props(cdo(chest), width=120.0, depth=70.0, height=75.0, display_name=unreal.Text("Weapon chest"), random_pool=pool)
+        mesh = component(cdo(chest), "mesh")
+        if mesh:
+            mesh.set_material(0, mi["MI_Dark"])
+        unreal.BlueprintEditorLibrary.compile_blueprint(chest)
+        save(chest)
+        made["BP_WeaponChest"] = chest
+    for card in (2, 3):
+        door = make_blueprint("BP_Door_Keycard%d" % card, W + "/Door", unreal.HitmenDoor)
+        set_mesh(component(cdo(door), "mesh"), SHAPES["cube"], (1.1, 0.1, 2.3), mi[KEYCARD_COLORS[card]], (55, 0, 115))
+        set_props(cdo(door), required_keycard=card)
+        save(door)
+        made[door.get_name()] = door
+    return made
+
+
 def build_world(mats, weapons):
     mi = mats["mi"]
     W = path("World", "Interactables")
@@ -2199,6 +2246,7 @@ def build_world(mats, weapons):
     fixture("BP_HackPanel", unreal.HitmenHackPanel, W + "/Security", {"mesh": ("cube", (0.5, 0.1, 0.6), mi["MI_Yellow"], (0, 0, 130))})
     fixture("BP_CircuitBreaker", unreal.HitmenCircuitBreaker, W + "/Power", {"mesh": ("cube", (0.6, 0.2, 0.9), mi["MI_Metal"], (0, 0, 130))})
     fixture("BP_LightFixture", unreal.HitmenLightFixture, W + "/Power", {"mesh": ("sphere", (0.3, 0.3, 0.3), mi["MI_White"], None)})
+    bps.update(build_ld_fixtures(mi))
     fixture("BP_BlackoutVolume", unreal.HitmenBlackoutVolume, W + "/Power")
     fixture("BP_RoomVolume", unreal.HitmenRoomVolume, W + "/Vent")
     fixture("BP_PoisonableDrink", unreal.HitmenPoisonableDrink, W + "/Drink", {"mesh": ("cylinder", (0.08, 0.08, 0.15), mi["MI_Glass"], (0, 0, 8))})

@@ -73,7 +73,9 @@ mazes. After changing a layout, in the open editor:
    of their own. Building the map takes a few minutes.
 2. Bake its navmesh: `Tools/Editor/ue_bake_nav.sh L_<Name>`.
 3. Check it: `python Tools/Editor/ue_remote.py --file Tools/Editor/hitmen_check_reach.py` must end with
-   `problems 0`. Snipers and roof points are reached by ladder and are only listed. Then the patrols, in PIE:
+   `problems 0`. Snipers and roof points are reached by ladder and are only listed; retrieval points count when a
+   reachable spot lies around their model. `hitmen_check_doors.py` (every door fills its opening) and
+   `hitmen_check_features.py` (every placeable at least once; San Lazaro) must end with `problems 0` / `missing 0`. Then the patrols, in PIE:
    `hitmen_check_patrols.py` twice about 15 s apart (every Patrol guard has a route of two points or more, or follows a
    group leader, and walks) must end with `problems 0`.
 4. Minimap and pause map: `hitmen_levels.bake_map_textures()` writes `/Game/Hitmen/UI/Maps/T_Map_<Name>`. On hills the

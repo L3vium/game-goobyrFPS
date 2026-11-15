@@ -215,4 +215,14 @@ if wanted("watchers"):
     hitmen_content.build_markers_pp()
     log("watchers: input, spectator pawn, PP_Markers")
 
+if wanted("ld_fixtures"):
+    # Tile (PM_Tile) for floors, the light switch, the weapon chest, keycard doors 2 and 3; their map markers.
+    physical = {name: load("/Game/Hitmen/Physics/" + name) for name in set(hitmen_content.MATERIAL_SURFACES.values())}
+    color = load("/Game/Hitmen/Materials/Master/M_Hitmen_Color")
+    made = hitmen_content.palette_instance("MI_Tile", (0.74, 0.72, 0.68), color, "/Game/Hitmen/Materials/Instances", physical)
+    mi = {name: load("/Game/Hitmen/Materials/Instances/" + name) for name in ("MI_White", "MI_Dark", "MI_Blue", "MI_Red", "MI_Yellow")}
+    made.update(hitmen_content.build_ld_fixtures(mi))
+    hitmen_content.build_map_markers()
+    log("ld_fixtures:", ", ".join(sorted(made)))
+
 print("\n".join(LOG))

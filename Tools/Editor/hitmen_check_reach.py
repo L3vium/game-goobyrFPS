@@ -14,6 +14,9 @@ import unreal
 
 LADDER_ONLY_Z = 1000.0
 GRAB_RANGE = 220.0  # a pickup counts as reachable from a standing spot this close (3D)
+# Retrieval points carry a model (helicopter, car, crate) over their own spot: F works from beside it, so a reachable
+# spot on a ring this far around counts.
+RETRIEVAL_RINGS = (250.0, 400.0, 600.0)
 EAS = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 WORLD = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
 NAV = unreal.NavigationSystemV1
@@ -65,6 +68,17 @@ def reachable_near(origin, location):
     return False
 
 
+def reachable_around(origin, location, rings):
+    """True when a reachable navmesh spot lies on a ring around location (a model covers the spot itself)."""
+    for radius in rings:
+        for k in range(8):
+            angle = math.radians(k * 45.0)
+            point = project(V(location.x + math.cos(angle) * radius, location.y + math.sin(angle) * radius, location.z), V(60, 60, 250))
+            if point and (point - location).length() <= radius + 150.0 and reachable(origin, point)[0]:
+                return True
+    return False
+
+
 def class_name(actor):
     return actor.get_class().get_name()
 
@@ -108,6 +122,8 @@ def run():
         point = project(loc, V(150, 150, 300))
         if "Pickup" in class_name(target) or class_name(target).startswith("BP_LootSpawn"):
             ok = reachable_near(origin, loc)
+        elif class_name(target).startswith("BP_RetrievalPoint"):
+            ok = reachable_around(origin, loc, RETRIEVAL_RINGS)
         else:
             ok = bool(point) and reachable(origin, point)[0]
         if ok:

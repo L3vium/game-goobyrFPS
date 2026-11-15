@@ -114,6 +114,15 @@ void AHitmenOpeningBase::RotateAroundHinge(const FRotator& Delta)
 	Mesh->SetRelativeLocationAndRotation(Hinge + Open.RotateVector(HingeToCenter), Open.Rotator());
 }
 
+void AHitmenDoor::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	Mesh->SetRelativeLocation(FVector(Width * 0.5f, 0.f, Height * 0.5f));
+	Mesh->SetRelativeScale3D(FVector(Width / 100.f, Thickness / 100.f, Height / 100.f));
+	NPCTrigger->SetBoxExtent(FVector(Width, 110.f, 100.f));
+	NPCTrigger->SetRelativeLocation(FVector(Width * 0.5f, 0.f, 100.f));
+}
+
 void AHitmenDoor::BeginPlay()
 {
 	Super::BeginPlay();

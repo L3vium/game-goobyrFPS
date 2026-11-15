@@ -78,6 +78,19 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - The cheat panel hides while the pause menu is open.
 - Free fly: `A` down / `E` up (was the reverse), `Shift` x2 (x3); the mouse wheel no longer changes the grid size (the
   split screen shows every player).
+- Stiff ledges (`bStiffLedges`, `StiffLedgeMaxDrop` 120 cm, `bCanJumpOffStiffLedges`): walking stops at deep drops,
+  jumping still leaves them; players only, predicted.
+- Walkable window ledges (70 cm) on every upper floor (`building()`, the mansion): vault out of a window onto them, walk
+  to the next window, crouch under the sills; the vault planner tries a landing just past the sill first.
+- Doors take `Width` / `Height` / `Thickness` (the mansion gets a double front door); `BP_Door_Keycard2` / `3`;
+  `BP_LightSwitch` (`AHitmenLightSwitch`) and lamps with an info line; `BP_WeaponChest`; `MI_Tile` / `MI_Grid_Tile`
+  (PM_Tile); builder helpers `vent_duct`, `vent_hatch`, `light_switch`, `building(gutter_side, vents, switch,
+  floor_material, ground_blind)`, `tunnel(ceiling_holes)`.
+- San Lazaro: gutters, ledges, vents (alley houses, the mansion's high vent, cave shafts), the smugglers' tunnel with
+  four shafts and a keycard 3 door, keycards 1-3 with carriers and pickups, weapon chests, lockers and containers in
+  every zone, a light switch per building, about 70 tall grass fields, mixed guard loadouts, patrol groups of 3-4 on
+  routes, retrieval models, wood / tile / metal / sand floors.
+- `hitmen_check_doors.py`, `hitmen_check_features.py`.
 - Watcher mode: `1` player view (`V` first / third person), `2` split screen (up to 8 players, responsive, captures
   staggered at 20 Hz), `3` free fly through walls and under the ground inside the map's box, `E` up / `A` down, `Shift`
   x2, mouse wheel speed. Players outlined through walls with their name for watchers (`N`), other watchers as orbs with
@@ -94,6 +107,9 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Muzzle lights are half as strong (2.5-15 cd).
 
 ### Fixed
+- San Lazaro: the gatehouse door sat 110 cm beside its opening; the control room's keycard door was embedded in the
+  wall next to its opening (a plain door filled it); ground-floor windows opened onto cross-alley stairs; the estate
+  perimeter patrol started inside the garage.
 - Alerts after a body never ended: the finder's repeated radio call restarted every investigation timer (the same place
   now keeps its timer, `SameInvestigationRadius`).
 - A carried body no longer goes into walls in your view (drawn like your gun) and a dropped body is never left inside a

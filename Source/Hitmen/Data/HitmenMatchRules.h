@@ -163,6 +163,18 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI", meta=(ClampMin="0"))
 	float SearchDuration = 25.f;
 
+	/** After looking at a body, the finder searches around it this long (EQS), then calms down (on edge). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Bodies", meta=(ClampMin="0", Units="s"))
+	float BodySearchDuration = 20.f;
+
+	/** After the search, the finder carries the body to the nearest body container / locker with room. Never the VIP. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Bodies")
+	bool bNPCsDisposeBodies = true;
+
+	/** Containers farther than this from the body are not used (cm). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Bodies", meta=(ClampMin="0", Units="cm"))
+	float MaxBodyDisposalDistance = 6000.f;
+
 	/** Seconds spent investigating a point. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI", meta=(ClampMin="0"))
 	float InvestigateDuration = 8.f;

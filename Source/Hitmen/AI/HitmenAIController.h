@@ -31,6 +31,10 @@ namespace HitmenBBKeys
 	extern HITMEN_API const FName HoldPosition;
 	extern HITMEN_API const FName IsOnEdge;
 	extern HITMEN_API const FName Evacuate;
+	/** Body disposal: the body to carry and the container to put it in (set after a body search). */
+	extern HITMEN_API const FName DisposeBody;
+	extern HITMEN_API const FName DisposeContainer;
+	extern HITMEN_API const FName DisposeLocation;
 }
 
 UCLASS(Blueprintable)

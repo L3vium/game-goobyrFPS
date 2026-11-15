@@ -146,4 +146,20 @@ if wanted("vip"):
     made = hitmen_content.build_retrieval_variants("/Game/Hitmen/World/Spawning", mi)
     log("vip: PP_Markers, sound, retrieval variants", ", ".join(sorted(made)))
 
+if wanted("ai"):
+    # Louder unsilenced gunshots, three guards answer a shot, guards per weapon, NPC names.
+    for name, values in hitmen_content.WEAPON_BALANCE.items():
+        data = load("/Game/Hitmen/Data/Weapons/DA_Weapon_" + name)
+        if data and "noise_radius" in values:
+            data.set_editor_property("noise_radius", values["noise_radius"])
+            data.set_editor_property("impact_noise_radius", values.get("impact_noise_radius", data.get_editor_property("impact_noise_radius")))
+            save(data)
+    for asset in EAL.list_assets("/Game/Hitmen/Data/Rules", recursive=True, include_folder=False):
+        rules = EAL.load_asset(asset)
+        if isinstance(rules, unreal.HitmenMatchRules):
+            hitmen_content.set_gunshot_responders(rules)
+            save(rules)
+    made = hitmen_content.build_guard_loadouts()
+    log("ai: gunshot radii and responders, guards", ", ".join(sorted(made)))
+
 print("\n".join(LOG))

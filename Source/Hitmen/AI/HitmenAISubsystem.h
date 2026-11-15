@@ -142,6 +142,9 @@ public:
 	/** Hiding spots (actors) within Radius of Center. */
 	void GetHidingSpotsNear(const FVector& Center, float Radius, TArray<AActor*>& OutSpots) const;
 
+	/** The nearest hiding spot with room for Body within MaxDistance of it (path length on the navmesh), or null. */
+	class AHitmenHidingSpot* FindContainerForBody(const class AHitmenCharacterBase* Body, float MaxDistance) const;
+
 	/** Marks a spot as searched by Claimer (other NPCs avoid it for SearchSpotClaimLifetime). */
 	void ClaimSearchSpot(const AActor* Claimer, const FVector& Location);
 

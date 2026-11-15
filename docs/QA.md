@@ -69,6 +69,11 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Carry the VIP to a retrieval point: `[F] Extract the target`, the cinematic with letterbox, banner, then free fly
   with "Back to the lobby" bottom right (PIE screenshots, 0.9.0); [ ] on every client at once
 - [x] Distraction: the guard who comes to look shows in the event camera (PIE screenshot, 0.9.0)
+- [x] A sniper shot 6-9 m from guards: the nearest turn to the shooter, see you and fight (PIE script, 0.9.0)
+- [x] A body found: the finder looks around it, calms down, carries it to the nearest locker / container and stows it;
+  every guard back to calm (PIE script, 0.9.0); [ ] never the VIP's body
+- [x] Attack chain after the 0.9.0 AI: an armed player in a guard's view is shot within seconds (PIE script, 0.9.0)
+- [x] Guard info line and the keycard in the right pocket (PIE screenshot, 0.9.0)
 - [ ] Tank shells land on the crosshair; a parked tank is at full health; the tank bar only while driving
 - [x] Sniper: a brief trail to the impact and debris there; no warm full-screen wash on your own shots (PIE screenshots,
   0.8.0); [ ] SMG / minigun bursts in a dark room never look like a light left on

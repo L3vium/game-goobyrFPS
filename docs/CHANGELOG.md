@@ -38,6 +38,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Retrieval points: `F` extracts the carried VIP (`Extract the target`), a model from `ModelParts` with a
   `DepartureStyle`, a `CinematicCamera`; `BP_RetrievalPoint_Helicopter`, `_Car`, `_Crate` from basic shapes.
 - End cinematic: everyone watches the extraction leave (letterbox, HUD hidden), then becomes a watcher.
+- AI turns toward what it hears before walking over (`UBTTask_HitmenTurnToNoise`); a shot fired near a guard turns it
+  toward the shooter.
+- Body found: the finder searches around the body (`BodySearchDuration`), calms down, then carries it to the nearest
+  body container / locker with room and stows it (`bNPCsDisposeBodies`, `MaxBodyDisposalDistance`, `BT_DisposeBody`);
+  snipers and guards holding a post hand the job over; the VIP's body is never carried by a guard.
+- The search runs on EQS: `EQ_HitmenSearch` with `UEnvQueryGenerator_HitmenSearchSpots`, `UEnvQueryTest_HitmenSearchFree`,
+  `UEnvQueryTest_HitmenNearHidingSpot`, `UEnvQueryContext_HitmenSearchCenter` and engine trace / distance / path tests.
+- Guards per weapon (`BP_NPC_Guard_SMG`, `_Rifle`, `_Shotgun`), `NPCEngageRange`, NPC `DisplayName` and an info line
+  (name, weapon, keycard), `bPickpocketRequiresCrouch`; NPCs carry a body carry component.
 - Security turret: `VisionArcDegrees` (180) and `RoundsPerMinute` (200, replaces `FireInterval`). Mounted gun:
   `YawArcDegrees` (180, 360 turns all the way; replaces `MaxYaw`) and `RoundsPerMinute` (660, replaces `FireInterval`).
 
@@ -51,11 +60,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - The sonar runs from the VIP's death (it ran only while the body was carried) and pings the body itself; minimap rings
   are yellow.
 - Walking into a retrieval point no longer delivers the VIP (`F` does).
+- Unsilenced gunshots carry 20-35 m (6-9 m) and their impacts 8-15 m; three guards answer a gunshot (two before).
+- The keycard sits in the guard's right pocket.
 - Results: "Back to the lobby" / "Waiting for the host" sit bottom right.
 - Ladder and gutter puffs, slide dust and footstep puffs are off by default (switches above); the slide scrape stays.
 - Muzzle lights are half as strong (2.5-15 cd).
 
 ### Fixed
+- Alerts after a body never ended: the finder's repeated radio call restarted every investigation timer (the same place
+  now keeps its timer, `SameInvestigationRadius`).
 - A carried body no longer goes into walls in your view (drawn like your gun) and a dropped body is never left inside a
   wall or the floor; putting a body down no longer pushes it with the killing hit again.
 - Mounted gun and tank shots land where the crosshair points (they ran parallel to the view, under it).

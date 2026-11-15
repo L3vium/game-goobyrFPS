@@ -111,6 +111,8 @@ public:
 	// F: pickpocket the keycard from behind (alive, unaware); otherwise carry the body.
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation(AActor* Interactor) const override;
+	/** "Guard  -  Shotgun  -  Keycard 2": what you see when you look at it up close. */
+	virtual FText GetInteractionInfo_Implementation(AActor* Interactor) const override;
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
 	/** Alive, unaware of the player, carrying a keycard, player behind it. */
@@ -198,6 +200,25 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> GlintInstance;
+
+	/** Name shown when you look at it (VIP candidates are "Guest", whichever one is the VIP). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
+	FText DisplayName;
+
+	/** Where the keycard sits, in the NPC's own space (X forward, Y right, Z up from the capsule centre): a right pocket. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC")
+	FVector KeycardHipOffset = FVector(4.f, 21.f, 2.f);
+
+	/** Pickpocketing also needs the thief to be crouched. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
+	bool bPickpocketRequiresCrouch = false;
+
+	/** Carries bodies to a container after a body search (the VIP's body never). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UHitmenBodyCarryComponent> BodyCarryComponent;
+
+	UFUNCTION()
+	void HandleCarryChanged(AHitmenCharacterBase* Body);
 
 	/** Pickpocket only works from behind (dot of the NPC forward and the direction to the thief). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC", meta=(ClampMin="-1", ClampMax="1"))

@@ -1,8 +1,10 @@
 // Hitmen — behavior tree tasks
 
 #include "AI/Tasks/HitmenBTTasks.h"
-#include "AI/HitmenAIController.h"
+#include "Components/HitmenBodyCarryComponent.h"
+#include "World/Interactables/HitmenHidingSpot.h"
 #include "AI/HitmenAlertComponent.h"
+#include "AI/HitmenAIController.h"
 #include "AI/HitmenAISubsystem.h"
 #include "AI/HitmenPatrolRoute.h"
 #include "AI/HitmenGuardGroup.h"
@@ -747,4 +749,122 @@ EBTNodeResult::Type UBTTask_HitmenSetAlertState::ExecuteTask(UBehaviorTreeCompon
 		return EBTNodeResult::Succeeded;
 	}
 	return EBTNodeResult::Failed;
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Turn to noise, claim, body disposal
+// ---------------------------------------------------------------------------------------------
+
+UBTTask_HitmenTurnToNoise::UBTTask_HitmenTurnToNoise()
+{
+	NodeName = TEXT("Turn To Noise");
+	bNotifyTick = true;
+}
+
+EBTNodeResult::Type UBTTask_HitmenTurnToNoise::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	AAIController* Controller = OwnerComp.GetAIOwner();
+	const UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+	if (!Controller || !BB || TurnTime <= 0.f)
+	{
+		return EBTNodeResult::Succeeded;
+	}
+	*reinterpret_cast<float*>(NodeMemory) = 0.f;
+	const FVector Where = BB->GetValueAsVector(HitmenBBKeys::InvestigateLocation);
+	if (!FAISystem::IsValidLocation(Where) || Where.IsNearlyZero())
+	{
+		return EBTNodeResult::Succeeded;
+	}
+	Controller->SetFocalPoint(Where + FVector(0.f, 0.f, 80.f), EAIFocusPriority::Gameplay);
+	return EBTNodeResult::InProgress;
+}
+
+void UBTTask_HitmenTurnToNoise::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
+{
+	float& Elapsed = *reinterpret_cast<float*>(NodeMemory);
+	Elapsed += DeltaSeconds;
+	if (Elapsed >= TurnTime)
+	{
+		if (AAIController* Controller = OwnerComp.GetAIOwner())
+		{
+			Controller->ClearFocus(EAIFocusPriority::Gameplay);
+		}
+		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+	}
+}
+
+UBTTask_HitmenClaimSearchSpot::UBTTask_HitmenClaimSearchSpot()
+{
+	NodeName = TEXT("Claim Search Spot");
+}
+
+EBTNodeResult::Type UBTTask_HitmenClaimSearchSpot::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	const APawn* Pawn = OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr;
+	const UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+	if (UHitmenAISubsystem* AI = Pawn ? UHitmenAISubsystem::Get(Pawn) : nullptr; AI && BB)
+	{
+		AI->ClaimSearchSpot(Pawn, BB->GetValueAsVector(HitmenBBKeys::MoveLocation));
+	}
+	return EBTNodeResult::Succeeded;
+}
+
+UBTTask_HitmenPickUpBody::UBTTask_HitmenPickUpBody()
+{
+	NodeName = TEXT("Pick Up Body");
+}
+
+EBTNodeResult::Type UBTTask_HitmenPickUpBody::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	APawn* Pawn = OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr;
+	const UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+	AHitmenCharacterBase* Body = BB ? Cast<AHitmenCharacterBase>(BB->GetValueAsObject(HitmenBBKeys::DisposeBody)) : nullptr;
+	UHitmenBodyCarryComponent* Carry = Pawn ? Pawn->FindComponentByClass<UHitmenBodyCarryComponent>() : nullptr;
+	UHitmenAlertComponent* Alert = Pawn ? Pawn->FindComponentByClass<UHitmenAlertComponent>() : nullptr;
+	if (Carry && Body && Carry->GetCarriedBody() == Body)
+	{
+		return EBTNodeResult::Succeeded;
+	}
+	if (!Carry || !Body || !Carry->CanCarry(Body) || FVector::Dist2D(Pawn->GetActorLocation(), Body->GetActorLocation()) > 260.f)
+	{
+		if (Alert)
+		{
+			Alert->EndBodyDisposal();
+		}
+		return EBTNodeResult::Failed;
+	}
+	Carry->PickUp(Body);
+	return EBTNodeResult::Succeeded;
+}
+
+UBTTask_HitmenStowBody::UBTTask_HitmenStowBody()
+{
+	NodeName = TEXT("Stow Body");
+}
+
+EBTNodeResult::Type UBTTask_HitmenStowBody::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	APawn* Pawn = OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr;
+	const UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+	AHitmenHidingSpot* Spot = BB ? Cast<AHitmenHidingSpot>(BB->GetValueAsObject(HitmenBBKeys::DisposeContainer)) : nullptr;
+	UHitmenAlertComponent* Alert = Pawn ? Pawn->FindComponentByClass<UHitmenAlertComponent>() : nullptr;
+	bool bStowed = false;
+	if (Spot && Pawn)
+	{
+		bStowed = Spot->StowCarriedBody(Pawn);
+	}
+	if (!bStowed && Pawn)
+	{
+		// No room left (someone filled it on the way): put it down here.
+		if (UHitmenBodyCarryComponent* Carry = Pawn->FindComponentByClass<UHitmenBodyCarryComponent>())
+		{
+			Carry->Drop();
+		}
+	}
+	if (Alert)
+	{
+		Alert->EndBodyDisposal();
+	}
+	return bStowed ? EBTNodeResult::Succeeded : EBTNodeResult::Failed;
 }

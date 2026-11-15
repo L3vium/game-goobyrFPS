@@ -776,14 +776,51 @@ def build_glint_material(folder=None):
 # pellets, spreads, the range guards close in to before shooting, the sniper's smoke trail.
 WEAPON_BALANCE = {
     "Pistol": dict(falloff_start_range=1500.0, falloff_end_range=5000.0, falloff_at_max_range=0.6, npc_engage_range=1500.0),
-    "SMG": dict(falloff_start_range=1200.0, falloff_end_range=4000.0, falloff_at_max_range=0.5, npc_engage_range=1400.0),
-    "AssaultRifle": dict(falloff_start_range=3000.0, falloff_end_range=8000.0, falloff_at_max_range=0.6),
+    "SMG": dict(falloff_start_range=1200.0, falloff_end_range=4000.0, falloff_at_max_range=0.5, npc_engage_range=1400.0,
+                noise_radius=2000.0, impact_noise_radius=800.0),
+    "AssaultRifle": dict(falloff_start_range=3000.0, falloff_end_range=8000.0, falloff_at_max_range=0.6, noise_radius=2500.0,
+                         impact_noise_radius=1000.0),
     "Shotgun": dict(falloff_start_range=700.0, falloff_end_range=2500.0, falloff_at_max_range=0.25, pellet_spread=6.0,
-                    aim_pellet_spread=4.5, fixed_pellet_pattern=False, npc_engage_range=900.0),
+                    aim_pellet_spread=4.5, fixed_pellet_pattern=False, npc_engage_range=900.0, noise_radius=2500.0,
+                    impact_noise_radius=1000.0),
     "Minigun": dict(damage=16.0, hip_spread=2.2, aim_spread=1.4, falloff_start_range=3000.0, falloff_end_range=8000.0,
-                    falloff_at_max_range=0.6, moving_spread_multiplier=1.3),
-    "Sniper": dict(falloff_start_range=30000.0, falloff_end_range=30000.0, falloff_at_max_range=1.0, moving_spread_multiplier=2.0),
+                    falloff_at_max_range=0.6, moving_spread_multiplier=1.3, noise_radius=3000.0, impact_noise_radius=1000.0),
+    "Sniper": dict(falloff_start_range=30000.0, falloff_end_range=30000.0, falloff_at_max_range=1.0, moving_spread_multiplier=2.0,
+                   noise_radius=3500.0, impact_noise_radius=1500.0),
 }
+
+# Guards per weapon (children of BP_NPC_Guard): name -> weapon. Place them, or set DefaultWeapon on any placed guard.
+GUARD_LOADOUTS = {"BP_NPC_Guard_SMG": "SMG", "BP_NPC_Guard_Rifle": "AssaultRifle", "BP_NPC_Guard_Shotgun": "Shotgun"}
+
+
+def build_guard_loadouts():
+    """Guard Blueprints per weapon, and the NPC names shown when you look at one (VIP candidates are all "Guest")."""
+    folder = path("Characters", "NPC")
+    guard = load(folder + "/BP_NPC_Guard")
+    if not guard:
+        log("WARN missing BP_NPC_Guard")
+        return {}
+    made = {}
+    for name, weapon in GUARD_LOADOUTS.items():
+        bp = make_blueprint(name, folder, gen_class(guard))
+        set_props(cdo(bp), default_weapon=load(path("Data", "Weapons") + "/DA_Weapon_" + weapon))
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        save(bp)
+        made[name] = bp
+    for name, display in (("BP_NPC_Sniper", "Sniper"), ("BP_NPC_VIPCandidate", "Guest")):
+        bp = load(folder + "/" + name)
+        if bp:
+            set_props(cdo(bp), display_name=display)
+            unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+            save(bp)
+    return made
+
+
+def set_gunshot_responders(rules):
+    """Three guards answer a gunshot (two for every other noise)."""
+    overrides = dict(rules.get_editor_property("noise_responder_overrides"))
+    overrides[unreal.HitmenNoiseType.GUNSHOT] = 3
+    rules.set_editor_property("noise_responder_overrides", overrides)
 SNIPER_SMOKE = (("smoke_lifetime", 2.2), ("smoke_thickness", 4.0), ("smoke_growth", 9.0), ("smoke_opacity", 0.5))
 
 # Mounted gun: the shield plate sits low so the barrel shows in the first-person view above it.
@@ -1903,6 +1940,7 @@ def build_framework(actions, imc, spectator_imc, abp, anim_set, widgets, mats, w
     if vbody:
         set_props(vbody, skeletal_mesh_asset=manny)
     save(vip)
+    build_guard_loadouts()
     # Civilians do not exist in Hitmen: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate.
     civilian_path = path("Characters", "NPC", "BP_NPC_Civilian")
     if EAL.does_asset_exist(civilian_path):

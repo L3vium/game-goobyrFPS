@@ -39,6 +39,9 @@ namespace HitmenBBKeys
 	const FName HoldPosition = TEXT("HoldPosition");
 	const FName IsOnEdge(TEXT("IsOnEdge"));
 	const FName Evacuate(TEXT("Evacuate"));
+	const FName DisposeBody(TEXT("DisposeBody"));
+	const FName DisposeContainer(TEXT("DisposeContainer"));
+	const FName DisposeLocation(TEXT("DisposeLocation"));
 }
 
 AHitmenAIController::AHitmenAIController()
@@ -392,4 +395,7 @@ void AHitmenAIController::SyncBlackboard()
 	const bool bDanger = State == EHitmenAlertState::Combat || State == EHitmenAlertState::Searching
 		|| (State == EHitmenAlertState::Investigating && Alert->IsThreatInvestigation());
 	Blackboard->SetValueAsBool(HitmenBBKeys::Evacuate, NPC && NPC->IsVIP() && !NPC->GetWeapon() && bDanger);
+	Blackboard->SetValueAsObject(HitmenBBKeys::DisposeBody, Alert->GetDisposeBody());
+	Blackboard->SetValueAsObject(HitmenBBKeys::DisposeContainer, Alert->GetDisposeContainer());
+	Blackboard->SetValueAsVector(HitmenBBKeys::DisposeLocation, Alert->GetDisposeLocation());
 }

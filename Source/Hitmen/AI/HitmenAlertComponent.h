@@ -117,6 +117,18 @@ public:
 	/** Searches around a point without a known target (charmed pawns hunting for their new side). */
 	void StartSearchAround(const FVector& Location);
 
+	/** Body disposal (after a body search): the body to carry and where to stow it (null = none). */
+	AActor* GetDisposeBody() const;
+	AActor* GetDisposeContainer() const { return DisposeContainer.Get(); }
+	/** Where to stand to stow it: in front of the container, on the navmesh. */
+	FVector GetDisposeLocation() const { return DisposeLocation; }
+
+	/** The disposal is over (stowed, failed, or interrupted). */
+	void EndBodyDisposal();
+
+	/** Server: carry Body to Spot (given by a colleague who cannot walk there: a sniper, a guard holding its post). */
+	void AssignBodyDisposal(AHitmenCharacterBase* Body, AActor* Spot);
+
 	/** Forces a state (BT tasks, charm, debug). */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Alert")
 	void SetAlertState(EHitmenAlertState NewState);
@@ -192,6 +204,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="cm"))
 	float HandleReach = 160.f;
 
+	/** A new investigation closer than this to the current one is the same one (its timer keeps running). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="cm"))
+	float SameInvestigationRadius = 400.f;
+
 	/** Seconds without seeing the hostile before a white NPC counts it as lost. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="0", Units="s"))
 	float LoseSightGraceTime = 0.5f;
@@ -252,6 +268,18 @@ protected:
 	float AlertedSinceTime = 0.f;
 	float LastCallStartTime = -UE_BIG_NUMBER;
 	TSet<TWeakObjectPtr<AHitmenCharacterBase>> KnownBodies;
+
+	/** The body being investigated (then searched around, then carried away). */
+	TWeakObjectPtr<AHitmenCharacterBase> BodyFound;
+	bool bBodySearch = false;
+	TWeakObjectPtr<AHitmenCharacterBase> DisposeBody;
+	TWeakObjectPtr<AActor> DisposeContainer;
+	FVector DisposeLocation = FVector::ZeroVector;
+	/** A gunshot heard where the shooter stands: the impact heard right after does not take the guard's attention. */
+	float LastShooterHeardTime = -100.f;
+
+	void StartBodySearch(AHitmenCharacterBase* Body);
+	void TryStartBodyDisposal(AHitmenCharacterBase* Body);
 	EHitmenAlertState PreviousRepState = EHitmenAlertState::Unaware;
 
 	UFUNCTION() void OnRep_AlertState();

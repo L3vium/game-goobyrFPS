@@ -29,6 +29,7 @@
 #include "Movement/HitmenCharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
+#include "Components/HitmenBodyCarryComponent.h"
 #include "Components/MaterialBillboardComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
@@ -51,8 +52,9 @@ AHitmenNPC::AHitmenNPC(const FObjectInitializer& ObjectInitializer)
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	KeycardMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("KeycardMesh"));
 	KeycardMesh->SetupAttachment(GetMesh(), KeycardBone);
-	KeycardMesh->SetRelativeLocationAndRotation(FVector(0.f, -14.f, 18.f), FRotator(0.f, 0.f, 90.f));
-	KeycardMesh->SetRelativeScale3D(FVector(0.09f, 0.055f, 0.01f));
+	KeycardMesh->SetRelativeScale3D(FVector(0.055f, 0.01f, 0.09f));
+	BodyCarryComponent = CreateDefaultSubobject<UHitmenBodyCarryComponent>(TEXT("BodyCarryComponent"));
+	DisplayName = NSLOCTEXT("Hitmen", "NPCGuard", "Guard");
 	KeycardMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	KeycardMesh->SetVisibility(false);
 	AimLaser = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AimLaser"));
@@ -217,6 +219,10 @@ bool AHitmenNPC::CanBePickpocketedBy(const AActor* Thief) const
 	{
 		return false;
 	}
+	if (const ACharacter* ThiefCharacter = Cast<ACharacter>(Thief); bPickpocketRequiresCrouch && (!ThiefCharacter || !ThiefCharacter->bIsCrouched))
+	{
+		return false;
+	}
 	const FVector ToThief = (Thief->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 	return FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), ToThief) <= PickpocketMaxDot;
 }
@@ -224,6 +230,33 @@ bool AHitmenNPC::CanBePickpocketedBy(const AActor* Thief) const
 bool AHitmenNPC::CanInteract_Implementation(AActor* Interactor) const
 {
 	return CanBePickpocketedBy(Interactor) || Super::CanInteract_Implementation(Interactor);
+}
+
+FText AHitmenNPC::GetInteractionInfo_Implementation(AActor* Interactor) const
+{
+	if (IsDead())
+	{
+		return FText::GetEmpty();
+	}
+	FText Info = DisplayName;
+	if (Weapon && Weapon->GetWeaponData())
+	{
+		Info = FText::Format(NSLOCTEXT("Hitmen", "NPCInfoWeapon", "{0}  -  {1}"), Info, Weapon->GetWeaponData()->DisplayName);
+	}
+	if (CarriedKeycard >= 0)
+	{
+		Info = FText::Format(NSLOCTEXT("Hitmen", "NPCInfoKeycard", "{0}  -  Keycard {1}"), Info, FText::AsNumber(CarriedKeycard));
+	}
+	return Info;
+}
+
+void AHitmenNPC::HandleCarryChanged(AHitmenCharacterBase* Body)
+{
+	// A guard carrying a body away has its hands full: the gun is put away until it is done.
+	if (Weapon)
+	{
+		Weapon->SetActorHiddenInGame(Body != nullptr || IsDead());
+	}
 }
 
 FText AHitmenNPC::GetInteractionText_Implementation(AActor* Interactor) const
@@ -271,7 +304,12 @@ void AHitmenNPC::PostInitializeComponents()
 void AHitmenNPC::BeginPlay()
 {
 	Super::BeginPlay();
-	KeycardMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, KeycardBone);
+	// The card sits in a right pocket: placed in the NPC's own space at spawn, then it follows the hips.
+	KeycardMesh->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
+	KeycardMesh->SetWorldLocationAndRotation(GetActorTransform().TransformPosition(KeycardHipOffset), GetActorRotation());
+	KeycardMesh->SetWorldScale3D(FVector(0.055f, 0.01f, 0.09f));
+	KeycardMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepWorldTransform, KeycardBone);
+	BodyCarryComponent->OnCarryChanged.AddUniqueDynamic(this, &AHitmenNPC::HandleCarryChanged);
 	OnRep_CarriedKeycard();
 	if (bIsSniper && GlintMaterial && GetNetMode() != NM_DedicatedServer)
 	{
@@ -426,7 +464,10 @@ float AHitmenNPC::GetEffectiveShootingRange() const
 	{
 		return UnarmedReach;
 	}
-	return IsSniper() || ShootingRange <= 0.f ? TNumericLimits<float>::Max() : ShootingRange;
+	const float Own = IsSniper() || ShootingRange <= 0.f ? TNumericLimits<float>::Max() : ShootingRange;
+	// A shotgun or an SMG closes in to its own range (the weapon's NPCEngageRange).
+	const UHitmenWeaponData* Data = Weapon->GetWeaponData();
+	return Data && Data->NPCEngageRange > 0.f ? FMath::Min(Own, Data->NPCEngageRange) : Own;
 }
 
 bool AHitmenNPC::IsInCover() const

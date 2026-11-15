@@ -154,6 +154,7 @@ protected:
 	UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<class UHitmenSubtitlesWidget> Subtitles;
 
 	UFUNCTION() void HandlePawnChanged(APawn* NewPawn);
+	UFUNCTION() void HandleCinematic(bool bCinematic);
 	UFUNCTION() void HandlePrompt(const FText& Prompt, bool bVisible);
 	UFUNCTION() void HandleInventoryView(const FHitmenHUDInventoryView& View);
 	UFUNCTION() void HandleAbilityViews(const FHitmenHUDAbilityView& Move, const FHitmenHUDAbilityView& Manipulation);

@@ -9,6 +9,7 @@
 #include "Framework/HitmenGameInstance.h"
 #include "Characters/HitmenPlayerCharacter.h"
 #include "Characters/HitmenNPC.h"
+#include "Components/HitmenBodyCarryComponent.h"
 #include "World/Spawning/HitmenRetrievalPoint.h"
 #include "World/Spawning/HitmenLootSpawnPoint.h"
 #include "World/Spawning/HitmenTeamStart.h"
@@ -292,6 +293,10 @@ void AHitmenMatchGameMode::OnCharacterKilled(AHitmenCharacterBase* Victim, ACont
 	if (Victim == GS->GetVIP())
 	{
 		GS->SetVIPDead(true);
+		// Everyone gets the body's position, then more and more often (ramp from the death).
+		SonarStartTime = GetWorld()->GetTimeSeconds();
+		GetWorldTimerManager().ClearTimer(SonarTimer);
+		TickSonar();
 	}
 
 	if (AController* VictimController = Victim->GetController())
@@ -354,31 +359,21 @@ void AHitmenMatchGameMode::OnVIPCarrierChanged(APawn* NewCarrier)
 		return;
 	}
 	GS->SetVIPCarrier(NewCarrier);
-	GetWorldTimerManager().ClearTimer(SonarTimer);
-	if (NewCarrier)
-	{
-		CarryStartTime = GetWorld()->GetTimeSeconds();
-		TickSonar();
-	}
-	else
-	{
-		GS->SetSonarPing(FHitmenSonarPing());
-	}
 }
 
 void AHitmenMatchGameMode::TickSonar()
 {
 	AHitmenGameState* GS = GetGameState<AHitmenGameState>();
-	APawn* Carrier = GS ? GS->GetVIPCarrier() : nullptr;
-	if (!Carrier || bMatchOver)
+	const AHitmenCharacterBase* Body = GS ? GS->GetVIP() : nullptr;
+	if (!Body || !GS->IsVIPDead() || Body->IsVanished() || bMatchOver)
 	{
 		return;
 	}
-	const float CarryTime = GetWorld()->GetTimeSeconds() - CarryStartTime;
-	const float Interval = GetRules()->GetSonarInterval(CarryTime, GS->GetLobbySettings());
+	const float SinceDeath = GetWorld()->GetTimeSeconds() - SonarStartTime;
+	const float Interval = GetRules()->GetSonarInterval(SinceDeath, GS->GetLobbySettings());
 
 	FHitmenSonarPing Ping;
-	Ping.Location = Carrier->GetActorLocation();
+	Ping.Location = Body->GetActorLocation();
 	Ping.ServerTime = GS->GetServerWorldTimeSeconds();
 	Ping.NextInterval = Interval;
 	GS->SetSonarPing(Ping);
@@ -401,7 +396,26 @@ void AHitmenMatchGameMode::OnVIPDelivered(APawn* Carrier, AHitmenRetrievalPoint*
 	Result.WinningTeamId = PS->GetLobbyTeamId();
 	Result.WinningPlayerName = PS->GetPlayerName();
 	Result.Reason = NSLOCTEXT("Hitmen", "WinDelivered", "The VIP was extracted");
-	EndMatch(Result);
+	// The body goes into the extraction, everyone watches it leave, then everyone watches the map.
+	if (UHitmenBodyCarryComponent* Carry = Carrier->FindComponentByClass<UHitmenBodyCarryComponent>())
+	{
+		AHitmenCharacterBase* Body = Carry->GetCarriedBody();
+		Carry->Drop();
+		if (Body)
+		{
+			Body->VanishBody();
+		}
+	}
+	float Spectate = EndSpectateDelay;
+	if (Point)
+	{
+		if (AHitmenGameState* GS = GetGameState<AHitmenGameState>())
+		{
+			GS->SetExtractionPoint(Point);
+		}
+		Spectate = FMath::Max(Spectate, Point->GetCinematicDuration());
+	}
+	EndMatch(Result, Spectate);
 }
 
 void AHitmenMatchGameMode::CheckWinConditions()
@@ -469,7 +483,7 @@ void AHitmenMatchGameMode::CheckWinConditions()
 	}
 }
 
-void AHitmenMatchGameMode::EndMatch(const FHitmenMatchResult& Result)
+void AHitmenMatchGameMode::EndMatch(const FHitmenMatchResult& Result, float SpectateDelay)
 {
 	if (bMatchOver)
 	{
@@ -484,7 +498,7 @@ void AHitmenMatchGameMode::EndMatch(const FHitmenMatchResult& Result)
 	}
 	Juice_OnMatchEnded(Result);
 	// No return timer: after a beat on the result everyone flies free; the host sends everyone back.
-	GetWorldTimerManager().SetTimer(EndTimer, this, &AHitmenMatchGameMode::MoveEveryoneToSpectators, FMath::Max(0.01f, EndSpectateDelay), false);
+	GetWorldTimerManager().SetTimer(EndTimer, this, &AHitmenMatchGameMode::MoveEveryoneToSpectators, FMath::Max(0.01f, SpectateDelay >= 0.f ? SpectateDelay : EndSpectateDelay), false);
 }
 
 void AHitmenMatchGameMode::MoveEveryoneToSpectators()

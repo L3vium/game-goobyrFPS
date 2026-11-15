@@ -56,12 +56,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|HUD")
 	TSubclassOf<UUserWidget> ResultsClass;
 
+	/** Toasts, the event camera and the cinematic bars (match HUDs; the C++ default when unset). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|HUD")
+	TSubclassOf<UUserWidget> MatchEventsClass;
+
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> PrimaryWidget;
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> PauseMenuWidget;
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> OptionsWidget;
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> EmoteWheelWidget;
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> SpectatorWidget;
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> ResultsWidget;
+	UPROPERTY(Transient) TObjectPtr<UUserWidget> MatchEventsWidget;
 
 	UFUNCTION() void HandlePauseToggled(bool bOpen);
 	UFUNCTION() void HandleOptionsToggled(bool bOpen);

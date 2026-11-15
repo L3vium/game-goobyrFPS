@@ -89,6 +89,29 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
 	bool bFootstepFX = false;
 
+	// ---- HUD ----
+	/** A small camera top left shows the VIP's body for a few seconds when it dies (everyone). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD")
+	bool bEventCameraOnTargetKill = true;
+
+	/** A small camera top left shows the guard who comes to look at a distraction you switched on (you only). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD")
+	bool bEventCameraOnDistraction = true;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD", meta=(ClampMin="1", Units="s"))
+	float EventCameraDuration = 4.f;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD")
+	FIntPoint EventCameraResolution = FIntPoint(480, 270);
+
+	/** Once the VIP is dead, active retrieval points show gold through walls for everyone. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD")
+	bool bShowRetrievalPointsAfterVIPDeath = true;
+
+	/** Always-on post process drawing the VIP marker (yellow) and retrieval points (gold) through walls. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD")
+	TSoftObjectPtr<UMaterialInterface> MarkerPostProcessMaterial;
+
 	// ---- Combat ----
 	/** A bullet or arrow in the head always kills (the multiplier no longer matters). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Combat")

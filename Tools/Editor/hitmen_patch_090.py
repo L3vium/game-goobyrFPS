@@ -129,4 +129,21 @@ if wanted("bodies"):
         save(mounted)
     log("bodies: body container, mounted gun impacts")
 
+if wanted("vip"):
+    # The dead VIP: PP_Markers (yellow body / ghost, gold retrieval points), the target-eliminated sound, extraction
+    # models (helicopter, car, crate) for retrieval points.
+    hitmen_content.build_markers_pp()
+    sound_set = load("/Game/Hitmen/Data/DA_SoundSet")
+    if sound_set:
+        sounds = dict(sound_set.get_editor_property("sounds"))
+        volumes = dict(sound_set.get_editor_property("volumes"))
+        sounds[unreal.HitmenSound.TARGET_ELIMINATED] = load("/Game/HeartBeats/Action/Cue/Slowdown3_Cue")
+        volumes[unreal.HitmenSound.TARGET_ELIMINATED] = 0.9
+        sound_set.set_editor_property("sounds", sounds)
+        sound_set.set_editor_property("volumes", volumes)
+        save(sound_set)
+    mi = {n: load("/Game/Hitmen/Materials/Instances/" + n) for n in ("MI_Dark", "MI_Metal", "MI_Glass", "MI_Red", "MI_Wood")}
+    made = hitmen_content.build_retrieval_variants("/Game/Hitmen/World/Spawning", mi)
+    log("vip: PP_Markers, sound, retrieval variants", ", ".join(sorted(made)))
+
 print("\n".join(LOG))

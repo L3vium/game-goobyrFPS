@@ -419,7 +419,7 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		}
 	}
 
-	// Sonar ping of the carried VIP body.
+	// Sonar ping of the dead VIP's body (yellow, like its marker).
 	if (LastPing.IsValid() && LastPing.NextInterval > 0.f)
 	{
 		const float Age = GetWorld()->GetTimeSeconds() - LastPingLocalTime;
@@ -428,7 +428,7 @@ int32 UHitmenMinimapWidget::NativePaint(const FPaintArgs& Args, const FGeometry&
 		const FVector2D Point = ToMap(LastPing.Location, bInside);
 		if (bInside && Alpha > 0.f)
 		{
-			DrawArc(OutDrawElements, LayerId + 3, AllottedGeometry, Point, 6.f + (1.f - Alpha) * 18.f, 0.f, 360.f, HitmenUI::Accent() * FLinearColor(1.f, 1.f, 1.f, Alpha), 2.f, 20);
+			DrawArc(OutDrawElements, LayerId + 3, AllottedGeometry, Point, 6.f + (1.f - Alpha) * 18.f, 0.f, 360.f, FLinearColor(1.f, 0.86f, 0.12f, Alpha), 2.f, 20);
 		}
 	}
 
@@ -568,6 +568,7 @@ void UHitmenHUDWidget::BindEvents()
 	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
 		UI->OnPawnChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandlePawnChanged);
+		UI->OnCinematicChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleCinematic);
 		UI->OnInteractionPromptChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandlePrompt);
 		UI->OnInventoryViewChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleInventoryView);
 		UI->OnAbilityViewsChanged.AddUniqueDynamic(this, &UHitmenHUDWidget::HandleAbilityViews);
@@ -585,6 +586,7 @@ void UHitmenHUDWidget::UnbindEvents()
 	if (UHitmenUIEventSubsystem* UI = GetUIEvents())
 	{
 		UI->OnPawnChanged.RemoveAll(this);
+		UI->OnCinematicChanged.RemoveAll(this);
 		UI->OnInteractionPromptChanged.RemoveAll(this);
 		UI->OnInventoryViewChanged.RemoveAll(this);
 		UI->OnAbilityViewsChanged.RemoveAll(this);
@@ -594,7 +596,13 @@ void UHitmenHUDWidget::UnbindEvents()
 
 void UHitmenHUDWidget::HandlePawnChanged(APawn* NewPawn)
 {
-	SetVisibility(NewPawn ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	const UHitmenUIEventSubsystem* UI = GetUIEvents();
+	SetVisibility(NewPawn && !(UI && UI->IsCinematic()) ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+}
+
+void UHitmenHUDWidget::HandleCinematic(bool bCinematic)
+{
+	HandlePawnChanged(GetOwningPlayerPawn());
 }
 
 void UHitmenHUDWidget::HandlePrompt(const FText& Prompt, bool bVisible)

@@ -29,6 +29,15 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   `SprintSpeedPenaltyPercent` (0); they replace the match rules' `CarrySpeedMultiplier` (0.65).
 - Mounted gun: an impact puff and tracers show where the bullets go (`ImpactFX`, `TracerChance`).
 - `AHitmenVehiclePawn::ExitVehicle` (server; scripts and QA).
+- VIP death for everyone: a toast ("TARGET ELIMINATED", `UHitmenMatchEventsWidget`), a sound
+  (`EHitmenSound::TargetEliminated`) and an event camera top left filming the body (`AHitmenEventCamera`); the same camera
+  shows you the guard who comes to look at your distraction. Variables in Project Settings → Hitmen → HUD.
+- `PP_Markers` (always on): the dead VIP in yellow through walls, live while in your view, else a ghost at the newest
+  known place (your last sighting or the last sonar ping; `UHitmenVIPTrackerComponent`, `AHitmenBodyGhost`); active
+  retrieval points in gold once the VIP is dead (`bShowRetrievalPointsAfterVIPDeath`).
+- Retrieval points: `F` extracts the carried VIP (`Extract the target`), a model from `ModelParts` with a
+  `DepartureStyle`, a `CinematicCamera`; `BP_RetrievalPoint_Helicopter`, `_Car`, `_Crate` from basic shapes.
+- End cinematic: everyone watches the extraction leave (letterbox, HUD hidden), then becomes a watcher.
 - Security turret: `VisionArcDegrees` (180) and `RoundsPerMinute` (200, replaces `FireInterval`). Mounted gun:
   `YawArcDegrees` (180, 360 turns all the way; replaces `MaxYaw`) and `RoundsPerMinute` (660, replaces `FireInterval`).
 
@@ -39,6 +48,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 - Empty vehicles take no damage by default (`bEmptyVehicleTakesDamage`): the tank no longer starts damaged.
 - The sniper's red aim line keeps about two pixels wide at any distance.
 - Carrying a body: no sprint, no slowdown by default (was 0.65x and sprint allowed).
+- The sonar runs from the VIP's death (it ran only while the body was carried) and pings the body itself; minimap rings
+  are yellow.
+- Walking into a retrieval point no longer delivers the VIP (`F` does).
+- Results: "Back to the lobby" / "Waiting for the host" sit bottom right.
 - Ladder and gutter puffs, slide dust and footstep puffs are off by default (switches above); the slide scrape stays.
 - Muzzle lights are half as strong (2.5-15 cd).
 

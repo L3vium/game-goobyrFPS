@@ -9,6 +9,7 @@
 #include "Core/HitmenTypes.h"
 #include "Blueprint/UserWidget.h"
 #include "UI/HitmenMenuWidgets.h"
+#include "UI/HitmenMatchEventsWidget.h"
 
 void AHitmenHUD::BeginPlay()
 {
@@ -33,6 +34,14 @@ void AHitmenHUD::BeginPlay()
 	EmoteWheelWidget = CreateHidden(EmoteWheelClass, 40);
 	SpectatorWidget = CreateHidden(SpectatorClass, 10);
 	ResultsWidget = CreateHidden(ResultsClass, 70);
+	if (!bPrimaryIsMenu)
+	{
+		MatchEventsWidget = CreateWidget<UUserWidget>(PC, MatchEventsClass ? MatchEventsClass.Get() : UHitmenMatchEventsWidget::StaticClass());
+		if (MatchEventsWidget)
+		{
+			MatchEventsWidget->AddToPlayerScreen(20);
+		}
+	}
 
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(PC))
 	{

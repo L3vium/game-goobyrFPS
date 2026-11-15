@@ -40,6 +40,9 @@
 #include "Characters/HitmenPlayerCharacter.h"
 #include "AI/HitmenAISubsystem.h"
 #include "AI/HitmenAlertComponent.h"
+#include "Framework/HitmenVIPTracker.h"
+#include "Framework/HitmenEventCamera.h"
+#include "World/Interactables/HitmenStealth.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Kismet/KismetRenderingLibrary.h"
@@ -57,6 +60,7 @@
 AHitmenPlayerController::AHitmenPlayerController()
 {
 	bShowMouseCursor = false;
+	VIPTracker = CreateDefaultSubobject<UHitmenVIPTrackerComponent>(TEXT("VIPTracker"));
 }
 
 void AHitmenPlayerController::BeginPlay()
@@ -1168,8 +1172,77 @@ void AHitmenPlayerController::Client_ShowLastKnownPosition_Implementation(FVecto
 	}
 }
 
+void AHitmenPlayerController::ShowEventCamera(AActor* Subject, const FText& Title)
+{
+	if (!IsLocalController() || !Subject)
+	{
+		return;
+	}
+	if (!EventCamera)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Params.ObjectFlags |= RF_Transient;
+		EventCamera = GetWorld()->SpawnActor<AHitmenEventCamera>(Params);
+	}
+	if (EventCamera)
+	{
+		EventCamera->Show(Subject, Title, UHitmenGameSettings::Get()->EventCameraDuration, this);
+	}
+}
+
+void AHitmenPlayerController::StopEventCamera()
+{
+	if (EventCamera)
+	{
+		EventCamera->Stop();
+	}
+}
+
+void AHitmenPlayerController::Client_ShowDistractionCamera_Implementation(AActor* Guard)
+{
+	if (UHitmenGameSettings::Get()->bEventCameraOnDistraction)
+	{
+		ShowEventCamera(Guard, NSLOCTEXT("Hitmen", "EventDistraction", "Distraction"));
+	}
+}
+
+void AHitmenPlayerController::NotifyDistractionNoticed(AActor* Guard, AActor* NoiseInstigator)
+{
+	if (!Guard || !NoiseInstigator || !Guard->HasAuthority())
+	{
+		return;
+	}
+	// Who caused it: whoever switched the distraction on, or the thrower of a stone / dart.
+	AActor* Source = NoiseInstigator;
+	if (AHitmenDistraction* Distraction = Cast<AHitmenDistraction>(NoiseInstigator))
+	{
+		if (!Distraction->ConsumeEventCamera())
+		{
+			return;
+		}
+		Source = Distraction->GetSwitchedOnBy();
+	}
+	const APawn* Pawn = Cast<APawn>(Source);
+	if (!Pawn && Source)
+	{
+		Pawn = Source->GetInstigator();
+	}
+	AHitmenPlayerController* PC = Pawn ? Cast<AHitmenPlayerController>(Pawn->GetController()) : nullptr;
+	const float Now = Guard->GetWorld()->GetTimeSeconds();
+	if (PC && Now - PC->LastDistractionCameraTime >= PC->DistractionCameraCooldown)
+	{
+		PC->LastDistractionCameraTime = Now;
+		PC->Client_ShowDistractionCamera(Guard);
+	}
+}
+
 void AHitmenPlayerController::Client_EnterSpectatorMode_Implementation(bool bWatcher)
 {
+	if (VIPTracker)
+	{
+		VIPTracker->EndCinematic();
+	}
 	bSpectating = true;
 	bIsWatcher = bWatcher;
 	bSpectatorUpHeld = false;

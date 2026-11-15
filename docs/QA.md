@@ -63,6 +63,12 @@ PIE helpers: `Tools/Editor/ue_pie.sh <map>`, `Tools/Editor/ue_ui_shot.sh <name> 
 - [x] Locker: stow a body (1 / 1, "no room to hide"), `F` opens it to look inside (PIE script, 0.9.0)
 - [x] Body container: info line when empty-handed, hide inside crouched behind the slit, view limited to 180 degrees
   (PIE screenshots, 0.9.0); [ ] two bodies stowed and visible with the lid open
+- [x] VIP death: toast, sound, event camera on the body, body outlined yellow, gold retrieval points (PIE screenshot,
+  0.9.0); [ ] the same on a client and a watcher
+- [x] Out of sight: a yellow ghost through walls where the body was (PIE screenshot, 0.9.0); [ ] a sonar ping moves it
+- [x] Carry the VIP to a retrieval point: `[F] Extract the target`, the cinematic with letterbox, banner, then free fly
+  with "Back to the lobby" bottom right (PIE screenshots, 0.9.0); [ ] on every client at once
+- [x] Distraction: the guard who comes to look shows in the event camera (PIE screenshot, 0.9.0)
 - [ ] Tank shells land on the crosshair; a parked tank is at full health; the tank bar only while driving
 - [x] Sniper: a brief trail to the impact and debris there; no warm full-screen wash on your own shots (PIE screenshots,
   0.8.0); [ ] SMG / minigun bursts in a dark room never look like a light left on

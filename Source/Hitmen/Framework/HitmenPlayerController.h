@@ -18,6 +18,7 @@ class UHitmenHealthComponent;
 class UHitmenBodyCarryComponent;
 class UTextureRenderTarget2D;
 class AHitmenCharacterBase;
+class UHitmenVIPTrackerComponent;
 struct FInputActionValue;
 
 /** How a watcher (or a dead player) looks at the match. */
@@ -121,6 +122,20 @@ public:
 
 	UFUNCTION(Client, Reliable)
 	void Client_EnterSpectatorMode(bool bWatcher);
+
+	// ---- Event camera (picture in picture, top left) ----
+	/** Local: films Subject for a few seconds (Project Settings -> Hitmen -> HUD -> EventCameraDuration). */
+	void ShowEventCamera(AActor* Subject, const FText& Title);
+	void StopEventCamera();
+
+	/** Server -> the player who caused it: a guard comes to look at your distraction. */
+	UFUNCTION(Client, Reliable)
+	void Client_ShowDistractionCamera(AActor* Guard);
+
+	/** Server: a guard starts investigating a distraction; the player who switched it on (or threw it) sees it. */
+	static void NotifyDistractionNoticed(AActor* Guard, AActor* NoiseInstigator);
+
+	UHitmenVIPTrackerComponent* GetVIPTracker() const { return VIPTracker; }
 
 	// ---- Debug grants (gym / development) ----
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Hitmen|Debug")
@@ -236,6 +251,19 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AActor> LastKnownPositionMarker;
+
+	/** The dead VIP for this player: toast, kill cam, yellow body / ghost, gold retrieval points, end cinematic. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
+	TObjectPtr<class UHitmenVIPTrackerComponent> VIPTracker;
+
+	UPROPERTY(Transient)
+	TObjectPtr<class AHitmenEventCamera> EventCamera;
+
+	/** Server: distraction event cameras for this player at most this often. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|HUD", meta=(ClampMin="0", Units="s"))
+	float DistractionCameraCooldown = 8.f;
+
+	float LastDistractionCameraTime = -100.f;
 
 	// ---- Sightroom (Tab) ----
 	/** Enemies inside this radius are shown through walls while the Sightroom is on. */

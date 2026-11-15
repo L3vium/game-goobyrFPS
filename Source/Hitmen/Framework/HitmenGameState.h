@@ -33,6 +33,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Events")
 	FOnHitmenMatchPhaseChanged OnMatchPhaseChanged;
 
+	/** The VIP's body is being extracted at a retrieval point (the end cinematic starts). */
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|Match")
+	FOnHitmenGameStateEvent OnExtractionStarted;
+
 	/** VIP picked, killed, picked up, dropped or delivered. */
 	UPROPERTY(BlueprintAssignable, Category="Hitmen|Events")
 	FOnHitmenGameStateEvent OnVIPStateChanged;
@@ -115,6 +119,10 @@ public:
 	void SetVIPCarrier(APawn* Carrier);
 	void SetActiveRetrievalPoints(const TArray<AActor*>& Points);
 	void SetSonarPing(const FHitmenSonarPing& Ping);
+	void SetExtractionPoint(AActor* Point);
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Match")
+	AActor* GetExtractionPoint() const { return ExtractionPoint; }
 	void SetMatchResult(const FHitmenMatchResult& Result);
 
 	/** Debug grants allowed (gym, development builds) — mirrored for the client UI. */
@@ -158,6 +166,9 @@ protected:
 	UPROPERTY(ReplicatedUsing=OnRep_Sonar)
 	FHitmenSonarPing SonarPing;
 
+	UPROPERTY(ReplicatedUsing=OnRep_Extraction)
+	TObjectPtr<AActor> ExtractionPoint;
+
 	UPROPERTY(ReplicatedUsing=OnRep_MatchResult)
 	FHitmenMatchResult MatchResult;
 
@@ -175,6 +186,7 @@ protected:
 	UFUNCTION() void OnRep_VIP();
 	UFUNCTION() void OnRep_RetrievalPoints();
 	UFUNCTION() void OnRep_Sonar();
+	UFUNCTION() void OnRep_Extraction();
 	UFUNCTION() void OnRep_MatchResult();
 
 	void ForEachLocalUI(TFunctionRef<void(class UHitmenUIEventSubsystem&)> Fn) const;

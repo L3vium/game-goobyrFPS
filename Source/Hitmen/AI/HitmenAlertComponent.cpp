@@ -8,6 +8,7 @@
 #include "Data/HitmenMatchRules.h"
 #include "Core/HitmenTeamLibrary.h"
 #include "Weapons/HitmenWeaponBase.h"
+#include "Framework/HitmenPlayerController.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 
@@ -418,6 +419,10 @@ void UHitmenAlertComponent::HearNoise(const FVector& Location, EHitmenNoiseType 
 	}
 	// Gunfire, explosions and fighting are threats; footsteps and distractions are only curiosities.
 	const bool bThreat = bLoud || Type == EHitmenNoiseType::Combat;
+	if (Type == EHitmenNoiseType::Distraction && AlertState != EHitmenAlertState::Investigating)
+	{
+		AHitmenPlayerController::NotifyDistractionNoticed(GetOwner(), NoiseInstigator);
+	}
 	SetInvestigate(Location, bThreat, bThreat ? EHitmenAlertReason::Gunfire : EHitmenAlertReason::Noise);
 }
 

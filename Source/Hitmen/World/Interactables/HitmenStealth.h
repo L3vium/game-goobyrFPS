@@ -125,6 +125,17 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Distraction")
 	void SetOn(bool bNewOn, AActor* SwitchedBy);
 
+public:
+	/** Who switched it on last (a player, or whoever threw the remote distraction). */
+	AActor* GetSwitchedOnBy() const { return SwitchedOnBy.Get(); }
+
+	/** True once per switch-on: the first guard coming to look shows the event camera. */
+	bool ConsumeEventCamera() { const bool bFirst = !bEventCameraShown; bEventCameraShown = true; return bFirst; }
+
+protected:
+	TWeakObjectPtr<AActor> SwitchedOnBy;
+	bool bEventCameraShown = false;
+
 protected:
 	/** Guards within this radius hear it (walls cut it, the nearest two come). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Distraction", meta=(ClampMin="0", Units="cm"))

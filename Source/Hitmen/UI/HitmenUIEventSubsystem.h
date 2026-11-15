@@ -13,6 +13,28 @@ class UTextureRenderTarget2D;
 class UTexture2D;
 
 /** One inventory slot as the HUD shows it. */
+/** A big message at the top of the screen for a few seconds ("TARGET ELIMINATED"). */
+USTRUCT(BlueprintType)
+struct FHitmenToast
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, Category="Hitmen|UI")
+	FText Title;
+
+	UPROPERTY(BlueprintReadWrite, Category="Hitmen|UI")
+	FText Subtitle;
+
+	UPROPERTY(BlueprintReadWrite, Category="Hitmen|UI")
+	FLinearColor Color = FLinearColor(1.f, 0.82f, 0.15f, 1.f);
+
+	UPROPERTY(BlueprintReadWrite, Category="Hitmen|UI")
+	float Duration = 4.f;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenToast, const FHitmenToast&, Toast);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHitmenCinematicChanged, bool, bCinematic);
+
 USTRUCT(BlueprintType)
 struct FHitmenHUDSlotView
 {
@@ -332,6 +354,25 @@ public:
 	void BroadcastPawnChanged(APawn* NewPawn) { OnPawnChanged.Broadcast(NewPawn); }
 	void BroadcastPrompt(const FText& Prompt, bool bVisible) { OnInteractionPromptChanged.Broadcast(Prompt, bVisible); }
 
+	// ---- Match events: toast, event camera (picture in picture), cinematic ----
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenToast OnToast;
+
+	UPROPERTY(BlueprintAssignable, Category="Hitmen|UI")
+	FOnHitmenCinematicChanged OnCinematicChanged;
+
+	void PushToast(const FHitmenToast& Toast) { OnToast.Broadcast(Toast); }
+
+	/** The event camera's picture and title until EndTime (world seconds); a null target hides it. */
+	void SetEventCamera(UTextureRenderTarget2D* Target, const FText& Title, float EndTime) { EventCameraTarget = Target; EventCameraTitle = Title; EventCameraEnd = EndTime; }
+	UTextureRenderTarget2D* GetEventCameraTarget() const { return EventCameraTarget; }
+	const FText& GetEventCameraTitle() const { return EventCameraTitle; }
+	float GetEventCameraEnd() const { return EventCameraEnd; }
+
+	/** The end cinematic plays: the HUD hides, letterbox bars. */
+	void SetCinematic(bool bInCinematic) { if (bCinematic != bInCinematic) { bCinematic = bInCinematic; OnCinematicChanged.Broadcast(bCinematic); } }
+	UFUNCTION(BlueprintPure, Category="Hitmen|UI") bool IsCinematic() const { return bCinematic; }
+
 	/** What the focused thing is and its state (a line under the prompt; empty = none). */
 	void SetInteractionInfo(const FText& Info) { InteractionInfo = Info; }
 	const FText& GetInteractionInfo() const { return InteractionInfo; }
@@ -387,4 +428,11 @@ private:
 	FHitmenHUDVehicleView VehicleView;
 
 	FText InteractionInfo;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextureRenderTarget2D> EventCameraTarget;
+
+	FText EventCameraTitle;
+	float EventCameraEnd = -1.f;
+	bool bCinematic = false;
 };

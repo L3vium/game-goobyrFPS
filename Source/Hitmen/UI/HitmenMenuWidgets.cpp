@@ -840,8 +840,11 @@ void UHitmenResultsWidget::BuildDefaultLayout()
 	ReasonText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 22, TEXT("Regular"), HitmenUI::TextDim());
 	ReasonText->SetJustification(ETextJustify::Center);
 	HitmenUI::AddToVBox(Column, WinnerText, FMargin(0.f), false, HAlign_Center);
-	HitmenUI::AddToVBox(Column, ReasonText, FMargin(0.f, 2.f, 0.f, 14.f), false, HAlign_Center);
-	// Host: [Enter] Back to the lobby (also in the pause menu). Others: waiting for the host.
+	HitmenUI::AddToVBox(Column, ReasonText, FMargin(0.f, 2.f, 0.f, 4.f), false, HAlign_Center);
+	// Bottom right: host, [Enter] Back to the lobby (also in the pause menu); others, waiting for the host.
+	UVerticalBox* Corner = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	UCanvasPanelSlot* CornerSlot = HitmenUI::AddToCanvas(Canvas, Corner, FAnchors(1.f, 1.f), FVector2D(-40.f, -36.f), FVector2D(1.f, 1.f));
+	CornerSlot->SetAutoSize(true);
 	BackHint = WidgetTree->ConstructWidget<UHitmenKeyHint>(UHitmenKeyHint::StaticClass());
 	BackHint->Setup(TEXT("ENTER"), LOCTEXT("BackToLobbyHint", "Back to the lobby"));
 	BackHint->OnClicked = [this]() { HandleBackClicked(); };
@@ -849,9 +852,9 @@ void UHitmenResultsWidget::BuildDefaultLayout()
 	HintSize->SetHeightOverride(40.f);
 	HintSize->SetWidthOverride(330.f);
 	HintSize->SetContent(BackHint);
-	HitmenUI::AddToVBox(Column, HintSize, FMargin(0.f), false, HAlign_Center);
+	HitmenUI::AddToVBox(Corner, HintSize, FMargin(0.f), false, HAlign_Right);
 	WaitText = HitmenUI::MakeText(WidgetTree, LOCTEXT("WaitingForHost", "Waiting for the host to go back to the lobby"), 19, TEXT("Italic"), HitmenUI::TextDim());
-	HitmenUI::AddToVBox(Column, WaitText, FMargin(0.f), false, HAlign_Center);
+	HitmenUI::AddToVBox(Corner, WaitText, FMargin(0.f), false, HAlign_Right);
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 

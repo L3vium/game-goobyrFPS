@@ -247,6 +247,11 @@ void AHitmenDistraction::SetOn(bool bNewOn, AActor* SwitchedBy)
 	}
 	LastTriggerTime = GetWorld()->GetTimeSeconds();
 	bOn = bNewOn;
+	if (bOn)
+	{
+		SwitchedOnBy = SwitchedBy;
+		bEventCameraShown = false;
+	}
 	OnRep_On();
 }
 

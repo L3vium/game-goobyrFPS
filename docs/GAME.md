@@ -54,13 +54,26 @@ If any member of a team delivers the VIP, the whole team wins.
   - **Body container** (`BP_BodyContainer`): a hollow bin (210 x 110 x 118, `Width / Depth / Height`) with a lid hinged on
     its back edge and a peek slit in the front wall (`SlitHeight` 88): inside you crouch with your eye at the slit;
     holds 2 bodies lying side by side.
-- **Sonar**: while a body is carried, a red ping appears at the carrier position, stays fixed even
-  if the carrier moves, and refreshes every N seconds; the interval shortens over time
-  (curve in match rules).
+- **The VIP dies**: everyone gets a toast at the top ("TARGET ELIMINATED") with a sound (`EHitmenSound::TargetEliminated`)
+  and, top left, a small camera filming the body for 4 s (Project Settings → Hitmen → HUD: `bEventCameraOnTargetKill`,
+  `EventCameraDuration`, `EventCameraResolution`). The same camera shows you the guard who comes to look at a distraction
+  you switched on (`bEventCameraOnDistraction`; at most every `DistractionCameraCooldown` 8 s).
+- **Sonar** (from the VIP's death, for everyone): the body shows **yellow through walls** (`PP_Markers`). While it is in
+  your view and nothing is in between it is outlined live; otherwise a yellow ghost (a still copy of the body,
+  `AHitmenBodyGhost`) stays at the newest place you know: where you last saw it, or the last sonar ping, which moves
+  it to where the body is. Pings come every N seconds and more and more often (`SonarStartInterval`,
+  `SonarEndInterval`, `SonarRampDuration`, `SonarRampCurve` in the match rules, from the death); the minimap shows each
+  ping as a yellow ring. Carrying it yourself, there is no marker. The VIP is always network-relevant.
 
 ### Retrieval points
-- Level designers place any number of **retrieval point candidates** (helicopter, boat, van…;
-  meshes are set by the team).
+- Level designers place any number of **retrieval point candidates**. Once the VIP is dead, the active ones show **gold
+  through walls** for everyone (`bShowRetrievalPointsAfterVIPDeath`). Carrying the VIP's body (Attack role, or no team),
+  look at the point and press `F`: **Extract the target** (walking in no longer delivers). The body goes in, every
+  player's view blends to the point's `CinematicCamera` (HUD hidden, letterbox bars) and watches the extraction leave
+  for `CinematicDuration` (6 s); then everyone becomes a watcher.
+- The model is data: `ModelParts` (mesh, material, transform, `bSpins` for rotors) under `Model`, `DepartureStyle`
+  (`LiftOff`: rises and flies off, rotors spool up; `DriveAway`; `None`), `DisplayName`. `BP_RetrievalPoint_Helicopter`,
+  `_Car` and `_Crate` are built from basic shapes; the team swaps the parts for their own mesh.
 - At match start N are activated (match option), picked at random **with spatial spread**
   (randomized farthest-point sampling) so they are never clustered.
 - The compass shows retrieval directions only while carrying the VIP.
@@ -115,9 +128,9 @@ adaptation): every room is lit for it. Space or Escape goes back on every menu p
    cancels it). Watchers have nothing to dress: they see "Waiting for other players (n / m ready)". A watching host's
    button reads **Start** instead of "Choose your agent"; with only watchers in the room the match starts at once.
 5. **Match** — intro (parachute drop, "Dropping in" and the map name, no countdown), play, then the end: a banner at
-   the top (winner, reason), and two seconds later everyone flies free over the map (no timer). The host sends
-   everyone back to the lobby with `Enter` (or **Back to the lobby** in the pause menu); the others see "Waiting for
-   the host". A match with only watchers never ends by itself.
+   the top (winner, reason) — after an extraction, the extraction cinematic first — and two seconds later everyone flies
+   free over the map (no timer). The host sends everyone back to the lobby with `Enter` (the hint sits bottom right; or
+   **Back to the lobby** in the pause menu); the others see "Waiting for the host" there. A match with only watchers never ends by itself.
 
 Spawns: maps carry many `BP_TeamStart` points. Each team (or solo player) takes a random free point
 and teammates take the nearest free points around it. During the intro (`bParachuteIntro`,
@@ -525,6 +538,8 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   by its kind (a `DA_MapMarker_*` data asset: legend name, colour, shape or icon, size, which maps, legend order).
   Recipe in `docs/Pipelines.md`.
 - **Intro**: "Dropping in" and the map name during the parachute drop (no countdown, no sting).
+- **Match events** (`UHitmenMatchEventsWidget`, with or without a pawn): toasts under the compass, the event camera top
+  left (title above the picture), letterbox bars during the end cinematic.
 
 ## 12. Maps
 | Map | Purpose |

@@ -310,6 +310,151 @@ c = lerp(c, edgeC, edge * edgeA);
 return lerp(base, c, Fade);"""
 
 
+MARKERS_HLSL = """// Always-on markers through walls: 5 = the VIP's body or its ghost (yellow), 6 = retrieval points (gold).
+// Same anti-aliased coverage and thin outline as the Sightroom; behind a wall the fill is stronger.
+float2 taps[4] = { float2(-0.35, -0.35), float2(0.35, -0.35), float2(-0.35, 0.35), float2(0.35, 0.35) };
+float cov = 0.0;
+float sv = 0.0;
+for (int i = 0; i < 4; i++)
+{
+    float v = round(SceneTextureFetch(PPI_CustomStencil, taps[i]).r);
+    float m = step(4.5, v) * step(v, 6.5);
+    cov += m;
+    sv = max(sv, v * m);
+}
+cov *= 0.25;
+float ring = 0.0;
+for (int j = 0; j < 8; j++)
+{
+    float a = j * 0.7853982;
+    float v = round(SceneTextureFetch(PPI_CustomStencil, float2(cos(a), sin(a)) * 1.6).r);
+    float m = step(4.5, v) * step(v, 6.5);
+    ring = max(ring, m);
+    sv = max(sv, v * m);
+}
+float3 base = Scene.rgb;
+if (sv < 4.5)
+{
+    return base;
+}
+float edge = ring * (1.0 - cov);
+float behind = step(SceneDepth.r + 4.0 + SceneDepth.r * 0.003, CustomDepth.r);
+float3 col = sv < 5.5 ? float3(1.0, 0.86, 0.12) : float3(1.0, 0.6, 0.08);
+float pulse = 0.85 + 0.15 * sin(Time * 3.0);
+float fillA = (behind > 0.5 ? 0.5 : 0.18) * pulse;
+float3 c = lerp(base, col, cov * fillA);
+c = lerp(c, col, edge);
+return c;"""
+
+
+def build_markers_pp():
+    """PP_Markers: always on (a local unbound volume): the VIP's body / ghost in yellow and retrieval points in gold,
+    through walls, anti-aliased with a thin outline (custom stencil 5 and 6)."""
+    pp = new_material("PP_Markers", path("Materials", "PostProcess"))
+    set_props(pp, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
+    scene = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, -200)
+    set_props(scene, scene_texture_id=unreal.SceneTextureId.PPI_POST_PROCESS_INPUT0)
+    stencil = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 0)
+    set_props(stencil, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_STENCIL)
+    custom_depth = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 200)
+    set_props(custom_depth, scene_texture_id=unreal.SceneTextureId.PPI_CUSTOM_DEPTH)
+    scene_depth = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, 400)
+    set_props(scene_depth, scene_texture_id=unreal.SceneTextureId.PPI_SCENE_DEPTH)
+    time = MEL.create_material_expression(pp, unreal.MaterialExpressionTime, -900, 600)
+    custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
+    inputs = []
+    for input_name in ("Scene", "Stencil", "CustomDepth", "SceneDepth", "Time"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", input_name)
+        inputs.append(ci)
+    set_props(custom, code=MARKERS_HLSL, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Markers", inputs=inputs)
+    MEL.connect_material_expressions(scene, "Color", custom, "Scene")
+    MEL.connect_material_expressions(stencil, "Color", custom, "Stencil")
+    MEL.connect_material_expressions(custom_depth, "Color", custom, "CustomDepth")
+    MEL.connect_material_expressions(scene_depth, "Color", custom, "SceneDepth")
+    MEL.connect_material_expressions(time, "", custom, "Time")
+    MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    MEL.recompile_material(pp)
+    save(pp)
+    return pp
+
+
+def model_part(shape, scale, material, location, rotation=(0.0, 0.0, 0.0), spins=False):
+    """One FHitmenModelPart: a basic shape (cm location, (pitch, yaw, roll) rotation)."""
+    part = unreal.HitmenModelPart()
+    t = unreal.Transform()
+    t.translation = unreal.Vector(*location)
+    t.rotation = unreal.Rotator(pitch=rotation[0], yaw=rotation[1], roll=rotation[2]).quaternion()
+    t.scale3d = unreal.Vector(*scale)
+    part.set_editor_property("mesh", load(SHAPES[shape]))
+    part.set_editor_property("material", material)
+    part.set_editor_property("transform", t)
+    part.set_editor_property("spins", spins)
+    return part
+
+
+def retrieval_models(mi):
+    """The extraction models from basic shapes: name -> (display, departure, parts, cinematic camera (loc, rot))."""
+    D = unreal.HitmenDepartureStyle
+    dark, metal, glass, red, wood = mi["MI_Dark"], mi["MI_Metal"], mi["MI_Glass"], mi["MI_Red"], mi.get("MI_Wood") or mi["MI_Dark"]
+    heli = [
+        model_part("sphere", (3.6, 1.7, 1.6), dark, (0, 0, 175)),
+        model_part("sphere", (1.5, 1.35, 1.1), glass, (120, 0, 190)),
+        model_part("cylinder", (0.4, 0.4, 3.4), dark, (-330, 0, 205), (90.0, 0.0, 0.0)),
+        model_part("cube", (0.7, 0.08, 1.1), dark, (-490, 0, 265)),
+        model_part("cube", (0.08, 0.06, 1.1), metal, (-495, 22, 225), (0.0, 0.0, 90.0), True),
+        model_part("cylinder", (0.25, 0.25, 0.3), metal, (0, 0, 262)),
+        model_part("cube", (9.5, 0.32, 0.05), metal, (0, 0, 280), (0.0, 0.0, 0.0), True),
+        model_part("cube", (0.32, 9.5, 0.05), metal, (0, 0, 280), (0.0, 0.0, 0.0), True),
+        model_part("cube", (3.4, 0.12, 0.12), metal, (0, 110, 40)),
+        model_part("cube", (3.4, 0.12, 0.12), metal, (0, -110, 40)),
+        model_part("cube", (0.1, 0.1, 0.9), metal, (70, 105, 85), (0.0, 0.0, -15.0)),
+        model_part("cube", (0.1, 0.1, 0.9), metal, (70, -105, 85), (0.0, 0.0, 15.0)),
+        model_part("cube", (0.1, 0.1, 0.9), metal, (-70, 105, 85), (0.0, 0.0, -15.0)),
+        model_part("cube", (0.1, 0.1, 0.9), metal, (-70, -105, 85), (0.0, 0.0, 15.0)),
+    ]
+    car = [
+        model_part("cube", (4.4, 1.9, 0.75), red, (0, 0, 78)),
+        model_part("cube", (2.3, 1.75, 0.65), glass, (-25, 0, 145)),
+        model_part("cylinder", (0.72, 0.72, 0.32), dark, (140, 95, 36), (0.0, 0.0, 90.0)),
+        model_part("cylinder", (0.72, 0.72, 0.32), dark, (140, -95, 36), (0.0, 0.0, 90.0)),
+        model_part("cylinder", (0.72, 0.72, 0.32), dark, (-140, 95, 36), (0.0, 0.0, 90.0)),
+        model_part("cylinder", (0.72, 0.72, 0.32), dark, (-140, -95, 36), (0.0, 0.0, 90.0)),
+    ]
+    crate = [
+        model_part("cube", (1.5, 1.1, 1.0), wood, (0, 0, 50)),
+        model_part("cube", (1.56, 1.16, 0.08), dark, (0, 0, 104)),
+        model_part("cube", (1.56, 0.12, 1.02), dark, (0, 0, 50)),
+    ]
+    return {
+        "Helicopter": ("Helicopter", D.LIFT_OFF, heli, ((-1300, 900, 420), (-6.0, -33.0, 0.0))),
+        "Car": ("Car", D.DRIVE_AWAY, car, ((-650, 820, 260), (-12.0, -50.0, 0.0))),
+        "Crate": ("Supply crate", D.NONE, crate, ((-520, 420, 300), (-25.0, -38.0, 0.0))),
+    }
+
+
+def build_retrieval_variants(folder, mi):
+    """BP_RetrievalPoint_Helicopter / _Car / _Crate: children of BP_RetrievalPoint with a model from basic shapes and a
+    departure for the end cinematic. The team swaps ModelParts (or adds their mesh under Model)."""
+    base = load(folder + "/BP_RetrievalPoint")
+    if not base:
+        log("WARN missing BP_RetrievalPoint")
+        return {}
+    made = {}
+    for name, (display, departure, parts, cam) in retrieval_models(mi).items():
+        bp = make_blueprint("BP_RetrievalPoint_" + name, folder, gen_class(base))
+        d = cdo(bp)
+        set_props(d, model_parts=parts, departure_style=departure, display_name=display)
+        camera = component(d, "cinematic_camera")
+        if camera:
+            camera.set_editor_property("relative_location", unreal.Vector(*cam[0]))
+            camera.set_editor_property("relative_rotation", unreal.Rotator(pitch=cam[1][0], yaw=cam[1][1], roll=cam[1][2]))
+        unreal.BlueprintEditorLibrary.compile_blueprint(bp)
+        save(bp)
+        made[name] = bp
+    return made
+
+
 def build_sightroom_pp():
     """PP_Sightroom: a fast scan wave from the player, a floor grid behind it, then the whole map in a cool look;
     highlighted actors (custom stencil) anti-aliased with a thin outline. Driven by C++: ScanOrigin, ScanRadius,
@@ -798,6 +943,7 @@ def build_materials(physical):
     screen = build_screen_material(folder)
 
     pp = build_sightroom_pp()
+    build_markers_pp()
 
     # Pill: wavy, colour-shifted view. Weight = blendable weight driven by the status component.
     pill = new_material("PP_Pill", path("Materials", "PostProcess"))
@@ -1518,6 +1664,7 @@ def build_sound_set():
         S.RADIO_LOOP: (ESS + "SFX_Essentials_05_GLITCH/Cues/COMRadio_InsJ_Radio_Noise_Long-Wave_01-01_LOOP_Cue", 0.7),
         S.MOUNTED_GUN_FIRE: (SFX + "SFX_GunShot_Cue", 0.8), S.TANK_FIRE: (SFX + "SFX_ExplosionClassic", 1.0),
         S.LANDING_HARD: (path("Audio", "SFX", "Footsteps") + "/SW_Land_Heavy_00", 0.9), S.SLIDE: (SLIDE_SOUND, 0.45),
+        S.TARGET_ELIMINATED: (hb + "Action/Cue/Slowdown3_Cue", 0.9),
     }
     data = make_data("DA_SoundSet", path("Data"), unreal.HitmenSoundSet)
     sounds, volumes = {}, {}
@@ -1920,6 +2067,7 @@ def build_world(mats, weapons):
                                                     "barrel": ("cylinder", (0.32, 0.32, 3.4), mi["MI_Dark"], None)},
                    {"shell_class": gen_class(load(path("Weapons", "Projectiles", "BP_Projectile_TankShell"))), "shell_speed": 20000.0})
     fixture("BP_RetrievalPoint", unreal.HitmenRetrievalPoint, S, {"mesh": ("cylinder", (4.0, 4.0, 0.1), mi["MI_Yellow"], (0, 0, 5))})
+    build_retrieval_variants(S, mi)
     fixture("BP_LootSpawn_Weapon", unreal.HitmenLootSpawnPoint, S, None, {"category": unreal.HitmenLootCategory.WEAPON})
     fixture("BP_LootSpawn_Item", unreal.HitmenLootSpawnPoint, S, None, {"category": unreal.HitmenLootCategory.ANY_ITEM})
     fixture("BP_TeamStart", unreal.HitmenTeamStart, S)

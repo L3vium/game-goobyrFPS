@@ -30,7 +30,7 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
 	bool IsVIPCandidate() const { return bVIPCandidate; }
 
-	void SetIsVIP(bool bVIP) { bIsVIP = bVIP; }
+	void SetIsVIP(bool bVIP) { bIsVIP = bVIP; bAlwaysRelevant = bVIP || bAlwaysRelevant; }
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
 	bool IsSniper() const { return bIsSniper; }

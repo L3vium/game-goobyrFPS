@@ -55,12 +55,8 @@ void UHitmenSightroomComponent::SetSightroomActive(bool bActive)
 		ScanProgress = 0.f;
 	}
 	RefreshAccumulator = RefreshInterval;
-	// Keeps ticking after release to fade the look out.
+	// Keeps ticking after release to fade the look out; highlights stay until the fade ends (they fade with it).
 	SetComponentTickEnabled(true);
-	if (!bActive)
-	{
-		ClearHighlights();
-	}
 	UHitmenSoundLibrary::PlayHitmenSound2D(this, bActive ? EHitmenSound::SightroomOn : EHitmenSound::SightroomOff);
 	Juice_OnSightroomChanged(bActive);
 	OnSightroomChanged.Broadcast(bActive);
@@ -79,13 +75,14 @@ void UHitmenSightroomComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 	{
 		if (FadeAlpha <= 0.f)
 		{
+			ClearHighlights();
 			SetComponentTickEnabled(false);
 		}
 		return;
 	}
-	// Every frame while the wave travels, so a highlight appears the moment the front reaches it.
+	// The candidate set (custom depth on / off) follows at RefreshInterval; the shader fades every pixel each frame.
 	RefreshAccumulator += DeltaTime;
-	if (ScanProgress < 1.f || RefreshAccumulator >= RefreshInterval)
+	if (RefreshAccumulator >= RefreshInterval)
 	{
 		RefreshAccumulator = 0.f;
 		Refresh();
@@ -115,28 +112,14 @@ void UHitmenSightroomComponent::ApplyPostProcess()
 	PostProcessInstance->SetScalarParameterValue(TEXT("HeightWeight"), WaveHeightWeight);
 	PostProcessInstance->SetScalarParameterValue(TEXT("Fade"), FadeAlpha);
 	PostProcessInstance->SetVectorParameterValue(TEXT("ScanOrigin"), GetOwner()->GetActorLocation());
+	// Per-pixel ranges around where you are now (enemies anywhere with bEnemiesMapWide, revealed by the wave).
+	PostProcessInstance->SetScalarParameterValue(TEXT("EnemyRadius"), bEnemiesMapWide ? 1.e8f : EnemyRadius);
+	PostProcessInstance->SetScalarParameterValue(TEXT("ObjectRadius"), InteractableRadius);
+	PostProcessInstance->SetScalarParameterValue(TEXT("SoftEdge"), HighlightSoftEdge);
 	if (UCameraComponent* Camera = GetCamera())
 	{
 		Camera->PostProcessSettings.AddBlendable(PostProcessInstance, FadeAlpha > 0.f ? 1.f : 0.f);
 	}
-}
-
-bool UHitmenSightroomComponent::HasLineOfSight(const FVector& From, const AActor* Target) const
-{
-	// Aim at the middle of what you see (a window's origin sits on the sill, inside the wall), then its top.
-	FVector Center;
-	FVector Extent;
-	Target->GetActorBounds(false, Center, Extent);
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenSightroom), false, GetOwner());
-	for (const FVector& Point : { Center, Center + FVector(0.f, 0.f, Extent.Z * 0.8f) })
-	{
-		FHitResult Hit;
-		if (!GetWorld()->LineTraceSingleByChannel(Hit, From, Point, ECC_Visibility, Params) || Hit.GetActor() == Target)
-		{
-			return true;
-		}
-	}
-	return false;
 }
 
 void UHitmenSightroomComponent::Refresh()
@@ -146,12 +129,10 @@ void UHitmenSightroomComponent::Refresh()
 	{
 		return;
 	}
+	// Candidates only: whatever could be lit within its radius (plus a margin). PP_Sightroom fades each pixel by the
+	// object's distance to you, the wave front and (interactables) the depth test, so this set may be generous.
 	const AActor* Observer = GetOwner();
 	const FVector Origin = Observer->GetActorLocation();
-	const UCameraComponent* Camera = GetCamera();
-	const FVector Eye = Camera ? Camera->GetComponentLocation() : Origin;
-	const float WaveRadius = GetWaveRadius();
-	const bool bWaveDone = ScanProgress >= 1.f;
 
 	TMap<TWeakObjectPtr<AActor>, int32> NewHighlights;
 	for (const TWeakObjectPtr<AActor>& Weak : Registry->GetScannables())
@@ -173,12 +154,12 @@ void UHitmenSightroomComponent::Refresh()
 			break;
 		}
 		case EHitmenScanCategory::Enemy:
-			// Through walls, but only near you (or anywhere with bEnemiesMapWide once the wave is done).
-			Stencil = ((WaveDistance <= WaveRadius && WaveDistance <= EnemyRadius) || (bWaveDone && bEnemiesMapWide)) ? HitmenStencil::Enemy : 0;
+			// Through walls, near you (anywhere with bEnemiesMapWide).
+			Stencil = (bEnemiesMapWide || WaveDistance <= EnemyRadius + CandidateMargin) ? HitmenStencil::Enemy : 0;
 			break;
 		case EHitmenScanCategory::Interactable:
-			Stencil = (WaveDistance <= WaveRadius && FVector::Dist(Origin, Actor->GetActorLocation()) <= InteractableRadius && HasLineOfSight(Eye, Actor))
-				? HitmenStencil::Interactable : 0;
+			// Never through walls: the shader only lights the pixels where the object is the nearest surface.
+			Stencil = WaveDistance <= InteractableRadius + CandidateMargin ? HitmenStencil::Interactable : 0;
 			break;
 		default:
 			break;

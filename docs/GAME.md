@@ -251,7 +251,12 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
   (0.5 s) sweeps 90 m out from you and the whole map takes the cool scan look. Enemies light up in white through walls
   only within 20 m (`SightroomEnemyRadius` on the player controller, as the wave passes them); the target is red at any
   distance. Usable objects within 18 m light up only where you can really see them (depth-tested in `PP_Sightroom`, never
-  through a wall). Highlights are anti-aliased with a thin outline. No waypoint in normal view.
+  through a wall). Highlights are anti-aliased with a thin outline. **Nothing pops**: the scan keeps updating while Tab
+  is held, and `PP_Sightroom` lights each pixel from the object's own distance to where you are now (rebuilt from its
+  custom depth), fading in over the last 3.5 m of each radius (`HighlightSoftEdge`) and behind the wave front (whose
+  passing brightens the outline); an object coming round a corner lights up as it shows. On release the highlights fade
+  out with the look. C++ only keeps custom depth on the candidates (`CandidateMargin` beyond each radius, refreshed every
+  0.1 s). No waypoint in normal view.
 - **Emotes**: hold `R` for a radial wheel.
 - **Footsteps**: five takes per surface (grass, stone, sand / dirt, wood, metal, tile; concrete elsewhere; Kenney
   Impact Sounds, CC0, sources in `Tools/Audio/Footsteps`), one picked at random and never twice in a row, for players

@@ -307,29 +307,39 @@ def set_interactable_markers(assets):
     log("map markers on interactables:", ", ".join(sorted(done)))
 
 
-SIGHTROOM_HLSL = """// Stencil: 4 sub-pixel taps give an anti-aliased coverage (the stencil is at render resolution and point
-// sampled, so a single tap shows its pixels); 8 taps 1.5 px out draw a thin outline that keeps far enemies
-// readable as sharp dots.
+SIGHTROOM_HLSL = """// Stencil (Sightroom values 1-4 only; 5-6 belong to PP_Markers): 4 sub-pixel taps give an anti-aliased coverage
+// (the stencil is at render resolution and point sampled, so a single tap shows its pixels); 8 taps 1.5 px out draw a
+// thin outline that keeps far enemies readable as sharp dots. The nearest highlighted custom depth among the taps places
+// the object in the world, so its distance to you (not the wall in front of it) decides how lit it is.
 float2 taps[4] = { float2(-0.35, -0.35), float2(0.35, -0.35), float2(-0.35, 0.35), float2(0.35, 0.35) };
-float sv = round(Stencil.r);
+float sv = 0.0;
 float cov = 0.0;
+float objDepth = 1.0e9;
 for (int i = 0; i < 4; i++)
 {
     float v = round(SceneTextureFetch(PPI_CustomStencil, taps[i]).r);
-    cov += step(0.5, v);
-    sv = max(sv, v);
+    float m = step(0.5, v) * step(v, 4.5);
+    cov += m;
+    sv = max(sv, v * m);
+    objDepth = m > 0.5 ? min(objDepth, SceneTextureFetch(PPI_CustomDepth, taps[i]).r) : objDepth;
 }
 cov *= 0.25;
 float ring = 0.0;
 for (int j = 0; j < 8; j++)
 {
     float a = j * 0.7853982;
-    ring = max(ring, round(SceneTextureFetch(PPI_CustomStencil, float2(cos(a), sin(a)) * 1.5).r));
+    float2 o = float2(cos(a), sin(a)) * 1.5;
+    float v = round(SceneTextureFetch(PPI_CustomStencil, o).r);
+    float m = step(0.5, v) * step(v, 4.5);
+    ring = max(ring, m);
+    sv = max(sv, v * m);
+    objDepth = m > 0.5 ? min(objDepth, SceneTextureFetch(PPI_CustomDepth, o).r) : objDepth;
 }
-float s = max(sv, ring);
-float edge = step(0.5, ring) * (1.0 - cov);
-// Usable objects (2) only where they are really in view: their custom depth must be the nearest surface.
-float seen = step(CustomDepth.r, SceneDepth.r + 2.0 + SceneDepth.r * 0.002);
+float s = sv;
+float edge = ring * (1.0 - cov);
+// Usable objects (2) only where they are really in view: their custom depth must be the nearest surface (outline
+// pixels compare the object's depth with what lies behind them, so the outline stays on visible edges only).
+float seen = step(objDepth, SceneDepth.r + 2.0 + SceneDepth.r * 0.002);
 float objectMask = (s > 1.5 && s < 2.5) ? seen : 1.0;
 cov *= objectMask;
 edge *= objectMask;
@@ -348,13 +358,25 @@ float grid = saturate(1.0 - min(g.x, g.y) * 55.0) * saturate((Radius - d) / 250.
 float flatFloor = saturate((Origin.z + 60.0 - WP.z) / 120.0);
 c += float3(0.55, 0.78, 1.0) * (front * 0.9 + grid * 0.16 * flatFloor);
 
+// The object's own distance (same metric as the wave): soft ranges around where you are now, revealed by the front.
+float sceneD = max(SceneDepth.r, 1.0);
+float3 objWP = CamPos + (WP - CamPos) * (min(objDepth, 1.0e7) / sceneD);
+float dObj = length(objWP.xy - Origin.xy) + abs(objWP.z - Origin.z) * HeightWeight;
+float catR = s < 1.5 ? EnemyRadius : (s < 2.5 ? ObjectRadius : 1.0e8);
+float soft = max(SoftEdge, 1.0);
+float rangeA = saturate((catR - dObj) / soft);
+float waveA = max(saturate((Radius - dObj) / soft), smoothstep(0.55, 1.0, Progress));
+float hl = rangeA * waveA;
+// The front brightens an outline as it passes.
+float flash = exp(-abs(dObj - Radius) / 150.0) * (1.0 - Progress);
+
 // 1 enemy (white), 2 interactable (pale), 3 target (red), 4 dead target (yellow).
 float3 fillC = s < 1.5 ? float3(1.0, 1.0, 1.0) : (s < 2.5 ? float3(0.95, 0.97, 1.0) : (s < 3.5 ? float3(1.0, 0.06, 0.05) : float3(1.0, 0.78, 0.1)));
 float fillA = s < 1.5 ? 0.85 : (s < 2.5 ? 0.5 : 1.0);
 float3 edgeC = s < 1.5 ? float3(1.0, 1.0, 1.0) : (s < 2.5 ? float3(0.75, 0.9, 1.0) : fillC);
 float edgeA = s < 2.5 && s > 1.5 ? 0.75 : 1.0;
-c = lerp(c, fillC, cov * fillA * step(0.5, s));
-c = lerp(c, edgeC, edge * edgeA);
+c = lerp(c, fillC, cov * fillA * hl * step(0.5, s));
+c = lerp(c, edgeC, saturate(edge * hl * (edgeA + flash)));
 return lerp(base, c, Fade);"""
 
 
@@ -505,8 +527,9 @@ def build_retrieval_variants(folder, mi):
 
 def build_sightroom_pp():
     """PP_Sightroom: a fast scan wave from the player, a floor grid behind it, then the whole map in a cool look;
-    highlighted actors (custom stencil) anti-aliased with a thin outline. Driven by C++: ScanOrigin, ScanRadius,
-    ScanProgress, Fade, HeightWeight."""
+    highlighted actors (custom stencil) anti-aliased with a thin outline, faded per pixel by their distance to you,
+    the wave front and the depth test. Driven by C++: ScanOrigin, ScanRadius, ScanProgress, Fade, HeightWeight,
+    EnemyRadius, ObjectRadius, SoftEdge."""
     pp = new_material("PP_Sightroom", path("Materials", "PostProcess"))
     set_props(pp, material_domain=unreal.MaterialDomain.MD_POST_PROCESS)
     scene = MEL.create_material_expression(pp, unreal.MaterialExpressionSceneTexture, -900, -200)
@@ -521,7 +544,8 @@ def build_sightroom_pp():
     params = {}
     for i, (pname, kind, default) in enumerate((("ScanOrigin", "vector", None), ("ScanRadius", "scalar", 0.0),
                                                  ("ScanProgress", "scalar", 0.0), ("Fade", "scalar", 0.0),
-                                                 ("HeightWeight", "scalar", 0.35))):
+                                                 ("HeightWeight", "scalar", 0.35), ("EnemyRadius", "scalar", 2000.0),
+                                                 ("ObjectRadius", "scalar", 1800.0), ("SoftEdge", "scalar", 350.0))):
         if kind == "vector":
             node = MEL.create_material_expression(pp, unreal.MaterialExpressionVectorParameter, -900, 350 + i * 120)
             set_props(node, parameter_name=pname, default_value=unreal.LinearColor(0, 0, 0, 0))
@@ -531,10 +555,12 @@ def build_sightroom_pp():
         params[pname] = node
     custom = MEL.create_material_expression(pp, unreal.MaterialExpressionCustom, -350, 0)
     inputs = []
-    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight", "CustomDepth", "SceneDepth"):
+    for input_name in ("Scene", "Stencil", "WP", "Origin", "Radius", "Progress", "Fade", "HeightWeight", "CustomDepth", "SceneDepth",
+                       "CamPos", "EnemyRadius", "ObjectRadius", "SoftEdge"):
         ci = unreal.CustomInput()
         ci.set_editor_property("input_name", input_name)
         inputs.append(ci)
+    cam_pos = MEL.create_material_expression(pp, unreal.MaterialExpressionCameraPositionWS, -1150, 400)
     set_props(custom, code=SIGHTROOM_HLSL, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Sightroom", inputs=inputs)
     MEL.connect_material_expressions(scene, "Color", custom, "Scene")
     MEL.connect_material_expressions(stencil, "Color", custom, "Stencil")
@@ -546,6 +572,9 @@ def build_sightroom_pp():
     MEL.connect_material_expressions(params["HeightWeight"], "", custom, "HeightWeight")
     MEL.connect_material_expressions(custom_depth, "Color", custom, "CustomDepth")
     MEL.connect_material_expressions(scene_depth, "Color", custom, "SceneDepth")
+    MEL.connect_material_expressions(cam_pos, "", custom, "CamPos")
+    for pname in ("EnemyRadius", "ObjectRadius", "SoftEdge"):
+        MEL.connect_material_expressions(params[pname], "", custom, pname)
     MEL.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     MEL.recompile_material(pp)
     save(pp)

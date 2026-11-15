@@ -192,4 +192,9 @@ if wanted("map_layers"):
     hitmen_content.build_map_markers()
     log("map_layers: marker kinds and interactable markers")
 
+if wanted("sightroom"):
+    # PP_Sightroom fades highlights per pixel (object distance to you, wave front, depth test): rebuilt.
+    hitmen_content.build_sightroom_pp()
+    log("sightroom: PP_Sightroom rebuilt")
+
 print("\n".join(LOG))

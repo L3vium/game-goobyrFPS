@@ -76,6 +76,10 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
   points by default and its legend lists only what is drawn (cameras join it with the NPC layer, as triangles).
 - The overhead diamond pulses while an NPC calls for backup (the red "!" is gone).
 - The cheat panel hides while the pause menu is open.
+- Sightroom: highlights fade in and out instead of popping: `PP_Sightroom` lights each pixel from the object's distance
+  to you (from its custom depth), with soft edges at the enemy / object radii (`HighlightSoftEdge`) and behind the wave
+  front; interactables no longer need a line-of-sight trace (the per-pixel depth test decides, so a corner in view lights
+  only that corner); highlights fade out with the look on release (`CandidateMargin`; patch step `sightroom`).
 - Ladder and gutter puffs, slide dust and footstep puffs are off by default (switches above); the slide scrape stays.
 - Muzzle lights are half as strong (2.5-15 cd).
 

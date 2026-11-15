@@ -147,7 +147,9 @@ void AHitmenHUD::HandleEmoteWheelToggled(bool bOpen)
 
 void AHitmenHUD::HandleSpectatorMode(uint8 Mode)
 {
-	SetShown(SpectatorWidget, true);
+	// Only watchers and dead players see the spectator keys (living players get a mode broadcast too).
+	const AHitmenPlayerController* PC = Cast<AHitmenPlayerController>(GetOwningPlayerController());
+	SetShown(SpectatorWidget, PC && PC->IsSpectating());
 }
 
 void AHitmenHUD::HandleMatchEnded(const FHitmenMatchResult& Result)

@@ -93,6 +93,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Camera")
 	void AddCameraShake(float Intensity, float Duration);
 
+	/** Local: the view widens by Degrees at once and settles back over Duration (hits, dash). */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Camera")
+	void AddFOVKick(float Degrees, float Duration);
+
+	/** Local: the first-person action (punch, slash) holds still this long: a hit stop on contact. */
+	void AddFirstPersonHitStop(float Seconds);
+
+	/** Local: a melee hit landing for this player (shake, view kick, hit stop). */
+	void PlayMeleeHitFeedback(float Shake, float FOVKick, float HitStop);
+
 	/** Server: starts the intro drop (no control, slow fall under a canopy until landing). */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Hitmen|Intro")
 	void StartParachute();
@@ -565,6 +575,14 @@ protected:
 	EHitmenFPAction FPAction = EHitmenFPAction::None;
 	float FPActionStart = -100.f;
 	float FPActionDuration = 0.f;
+	/** Hit stop window: the action's clock does not advance between these times. */
+	float FPHitStopStart = -100.f;
+	float FPHitStopEnd = -100.f;
+	/** Time into the current first-person action, hit stops removed. */
+	float GetFirstPersonActionElapsed() const;
+	float FOVKickAmount = 0.f;
+	float FOVKickDuration = 0.f;
+	float FOVKickTimeLeft = 0.f;
 	float FPActionSide = 1.f;
 	float AimHeldTime = 0.f;
 	float WallPullAlpha = 0.f;

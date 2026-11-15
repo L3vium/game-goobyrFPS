@@ -8,6 +8,8 @@
 #include "Core/HitmenTeamLibrary.h"
 #include "Weapons/HitmenCombatLibrary.h"
 #include "AI/HitmenAISubsystem.h"
+#include "Data/HitmenSoundSet.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Hitmen.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/OverlapResult.h"
@@ -34,7 +36,53 @@ void UHitmenMeleeComponent::Punch()
 	LastPunchTime = GetWorld()->GetTimeSeconds();
 	// Predicted on the puncher: arms show at once, the server confirms the hit.
 	PlayPunchLocal();
+	FHitResult Hit;
+	if (SweepPunch(Hit))
+	{
+		// The fist lands about a third of the way into the jab.
+		const FVector Impact = Hit.ImpactPoint;
+		TWeakObjectPtr<UHitmenMeleeComponent> WeakThis(this);
+		FTimerHandle Handle;
+		GetWorld()->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [WeakThis, Impact]()
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->PlayPunchHitLocal(Impact);
+			}
+		}), FMath::Max(0.01f, FMath::Clamp(PunchCooldown * 0.8f, 0.25f, 0.45f) * 0.3f), false);
+	}
 	Server_Punch();
+}
+
+bool UHitmenMeleeComponent::SweepPunch(FHitResult& OutHit) const
+{
+	APawn* Pawn = Cast<APawn>(GetOwner());
+	if (!Pawn)
+	{
+		return false;
+	}
+	FVector Origin, Direction;
+	UHitmenCombatLibrary::GetAimPoint(Pawn, Origin, Direction);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenPunch), false, Pawn);
+	return GetWorld()->SweepSingleByChannel(OutHit, Origin, Origin + Direction * PunchRange, FQuat::Identity, HITMEN_TRACE_WEAPON, FCollisionShape::MakeSphere(PunchRadius), Params)
+		&& UHitmenTeamLibrary::AreHostile(Pawn, OutHit.GetActor());
+}
+
+void UHitmenMeleeComponent::PlayPunchHitLocal(const FVector& HitLocation)
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::MeleeHit, HitLocation);
+	if (PunchHitFX)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, PunchHitFX, HitLocation, FRotator::ZeroRotator, FVector(PunchHitFXScale));
+	}
+	if (AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(GetOwner()); Player && Player->IsLocallyControlled())
+	{
+		Player->PlayMeleeHitFeedback(PunchHitShake, PunchHitFOVKick, PunchHitStop);
+	}
 }
 
 void UHitmenMeleeComponent::PlayPunchLocal()
@@ -52,6 +100,7 @@ void UHitmenMeleeComponent::PlayPunchLocal()
 		Player->PlayFirstPersonAction(EHitmenFPAction::Punch, FMath::Clamp(PunchCooldown * 0.8f, 0.25f, 0.45f));
 		Player->ShowFirstPersonArms(FMath::Max(Length / FMath::Max(PunchPlayRate, 0.1f), PunchCooldown) + 0.2f);
 	}
+	UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::PunchWhoosh, Character->GetPawnViewLocation() + Character->GetActorForwardVector() * 40.f);
 	Juice_OnPunch();
 }
 
@@ -64,10 +113,9 @@ void UHitmenMeleeComponent::Server_Punch_Implementation()
 	}
 	FVector Origin, Direction;
 	UHitmenCombatLibrary::GetAimPoint(Pawn, Origin, Direction);
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenPunch), false, Pawn);
 	FHitResult Hit;
-	if (GetWorld()->SweepSingleByChannel(Hit, Origin, Origin + Direction * PunchRange, FQuat::Identity, HITMEN_TRACE_WEAPON, FCollisionShape::MakeSphere(PunchRadius), Params)
-		&& UHitmenTeamLibrary::AreHostile(Pawn, Hit.GetActor()))
+	const bool bHit = SweepPunch(Hit);
+	if (bHit)
 	{
 		UGameplayStatics::ApplyPointDamage(Hit.GetActor(), PunchDamage, Direction, Hit, Pawn->GetController(), Pawn, UDamageType::StaticClass());
 	}
@@ -75,10 +123,10 @@ void UHitmenMeleeComponent::Server_Punch_Implementation()
 	{
 		UHitmenAISubsystem::ReportNoise(this, Pawn->GetActorLocation(), PunchNoiseRadius, Pawn, EHitmenNoiseType::Combat);
 	}
-	Multicast_PlayPunch();
+	Multicast_PlayPunch(bHit, bHit ? FVector(Hit.ImpactPoint) : FVector::ZeroVector);
 }
 
-void UHitmenMeleeComponent::Multicast_PlayPunch_Implementation()
+void UHitmenMeleeComponent::Multicast_PlayPunch_Implementation(bool bHit, FVector_NetQuantize HitLocation)
 {
 	// The puncher already played it (prediction).
 	const APawn* Pawn = Cast<APawn>(GetOwner());
@@ -87,6 +135,10 @@ void UHitmenMeleeComponent::Multicast_PlayPunch_Implementation()
 		return;
 	}
 	PlayPunchLocal();
+	if (bHit)
+	{
+		PlayPunchHitLocal(HitLocation);
+	}
 }
 
 bool UHitmenMeleeComponent::IsValidStealthKillVictim(const AHitmenCharacterBase* Victim) const

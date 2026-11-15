@@ -226,6 +226,11 @@ void UBTTask_HitmenShoot::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Nod
 
 void UBTTask_HitmenShoot::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
 {
+	// The shooting focus ends with the burst (success or abort): the combat tree's own focus takes over again.
+	if (AAIController* Controller = OwnerComp.GetAIOwner())
+	{
+		Controller->ClearFocus(EAIFocusPriority::Gameplay);
+	}
 	// Never left crouched behind cover once the shooting stops.
 	if (AHitmenNPC* NPC = Cast<AHitmenNPC>(OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr); NPC && NPC->bIsCrouched)
 	{
@@ -252,8 +257,83 @@ bool UBTTask_HitmenFindCover::IsCoverFrom(const UWorld* World, const FVector& Th
 	return bLowHidden && bHighClear;
 }
 
+EBTNodeResult::Type UBTTask_HitmenFindCover::FindHidingSpot(UBehaviorTreeComponent& OwnerComp) const
+{
+	// Hiding from an unseen threat: any reachable spot near the guard, away from the threat, that hides a crouched
+	// guard from where the threat seemed to be. Prefer spots farther from the threat and close to the guard.
+	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+	AHitmenNPC* NPC = Cast<AHitmenNPC>(OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr);
+	UNavigationSystemV1* Nav = NPC ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(NPC->GetWorld()) : nullptr;
+	if (!BB || !NPC || !Nav)
+	{
+		return EBTNodeResult::Failed;
+	}
+	const FVector Threat = BB->GetValueAsVector(HitmenBBKeys::LastKnownLocation);
+	const FVector ThreatEye = Threat + FVector(0.f, 0.f, 160.f);
+	const float HalfHeight = NPC->GetCapsuleComponent() ? NPC->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.f;
+	const FVector Origin = NPC->GetActorLocation();
+	const FVector Feet = Origin - FVector(0.f, 0.f, HalfHeight);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenHide), false, NPC);
+	auto IsHidden = [&](const FVector& Floor)
+	{
+		return NPC->GetWorld()->LineTraceTestByChannel(ThreatEye, Floor + FVector(0.f, 0.f, CrouchedHeight), ECC_Visibility, Params);
+	};
+	// Already hidden where it stands: crouch here.
+	if (IsHidden(Feet))
+	{
+		NPC->SetCoverLocation(Feet);
+		BB->SetValueAsVector(HitmenBBKeys::MoveLocation, Feet);
+		return EBTNodeResult::Succeeded;
+	}
+	float BestScore = TNumericLimits<float>::Max();
+	FVector Best = FVector::ZeroVector;
+	for (int32 Index = 0; Index < CandidateCount * 2; ++Index)
+	{
+		const FVector2D Disk = FMath::RandPointInCircle(SearchRadius);
+		const FVector Probe = Feet + FVector(Disk.X, Disk.Y, CrouchedHeight);
+		FHitResult Hit;
+		FNavLocation Candidate;
+		if (NPC->GetWorld()->LineTraceSingleByChannel(Hit, ThreatEye, Probe, ECC_Visibility, Params) && FVector::Dist2D(Hit.ImpactPoint, Feet) <= SearchRadius)
+		{
+			const FVector Behind = Hit.ImpactPoint + (Probe - ThreatEye).GetSafeNormal2D() * CoverStandOff;
+			if (!Nav->ProjectPointToNavigation(Behind, Candidate, FVector(60.f, 60.f, 250.f)))
+			{
+				continue;
+			}
+		}
+		else if (!Nav->GetRandomReachablePointInRadius(Origin, SearchRadius, Candidate))
+		{
+			continue;
+		}
+		const FVector Floor = Candidate.Location;
+		if (!IsHidden(Floor))
+		{
+			continue;
+		}
+		// Close to the guard, not toward the threat.
+		const float Toward = FVector::DotProduct((Floor - Feet).GetSafeNormal2D(), (Threat - Feet).GetSafeNormal2D());
+		const float Score = FVector::Dist(Feet, Floor) * (1.f + FMath::Max(0.f, Toward));
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			Best = Floor;
+		}
+	}
+	if (BestScore == TNumericLimits<float>::Max())
+	{
+		return EBTNodeResult::Failed;
+	}
+	NPC->SetCoverLocation(Best);
+	BB->SetValueAsVector(HitmenBBKeys::MoveLocation, Best);
+	return EBTNodeResult::Succeeded;
+}
+
 EBTNodeResult::Type UBTTask_HitmenFindCover::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
+	if (bHideFromLastKnown)
+	{
+		return FindHidingSpot(OwnerComp);
+	}
 	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
 	AHitmenNPC* NPC = Cast<AHitmenNPC>(OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr);
 	const AActor* Target = BB ? Cast<AActor>(BB->GetValueAsObject(HitmenBBKeys::TargetActor)) : nullptr;
@@ -347,7 +427,7 @@ EBTNodeResult::Type UBTTask_HitmenFindSafeSpot::ExecuteTask(UBehaviorTreeCompone
 		return EBTNodeResult::Failed;
 	}
 	AActor* Threat = Alert->GetTarget();
-	const FVector ThreatLocation = Threat ? Threat->GetActorLocation() : Alert->GetCallLocation();
+	const FVector ThreatLocation = Threat ? (Alert->IsTargetVisible() ? Threat->GetActorLocation() : Alert->GetLastKnownLocation()) : Alert->GetCallLocation();
 	const FVector Origin = NPC->GetActorLocation();
 	UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 
@@ -780,6 +860,16 @@ EBTNodeResult::Type UBTTask_HitmenTurnToNoise::ExecuteTask(UBehaviorTreeComponen
 	return EBTNodeResult::InProgress;
 }
 
+void UBTTask_HitmenTurnToNoise::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
+{
+	// Aborted too (something more urgent came up): never left staring at an old noise.
+	if (AAIController* Controller = OwnerComp.GetAIOwner())
+	{
+		Controller->ClearFocus(EAIFocusPriority::Gameplay);
+	}
+	Super::OnTaskFinished(OwnerComp, NodeMemory, TaskResult);
+}
+
 void UBTTask_HitmenTurnToNoise::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
 	float& Elapsed = *reinterpret_cast<float*>(NodeMemory);
@@ -867,4 +957,52 @@ EBTNodeResult::Type UBTTask_HitmenStowBody::ExecuteTask(UBehaviorTreeComponent& 
 		Alert->EndBodyDisposal();
 	}
 	return bStowed ? EBTNodeResult::Succeeded : EBTNodeResult::Failed;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Hold cover (unseen threat)
+// ---------------------------------------------------------------------------------------------
+
+UBTTask_HitmenHoldCover::UBTTask_HitmenHoldCover()
+{
+	NodeName = TEXT("Hold Cover");
+	bNotifyTick = true;
+}
+
+EBTNodeResult::Type UBTTask_HitmenHoldCover::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	AAIController* Controller = OwnerComp.GetAIOwner();
+	AHitmenNPC* NPC = Cast<AHitmenNPC>(Controller ? Controller->GetPawn() : nullptr);
+	const UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+	if (!NPC || !BB)
+	{
+		return EBTNodeResult::Failed;
+	}
+	// Crouched, facing where the threat seemed to be.
+	Controller->SetFocalPoint(BB->GetValueAsVector(HitmenBBKeys::LastKnownLocation) + FVector(0.f, 0.f, 120.f), EAIFocusPriority::Gameplay);
+	NPC->Crouch();
+	return EBTNodeResult::InProgress;
+}
+
+void UBTTask_HitmenHoldCover::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
+{
+	const AHitmenNPC* NPC = Cast<AHitmenNPC>(OwnerComp.GetAIOwner() ? OwnerComp.GetAIOwner()->GetPawn() : nullptr);
+	const UHitmenAlertComponent* Alert = NPC ? NPC->GetAlert() : nullptr;
+	if (!Alert || !Alert->IsTakingCover() || Alert->IsTargetVisible())
+	{
+		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+	}
+}
+
+void UBTTask_HitmenHoldCover::OnTaskFinished(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTNodeResult::Type TaskResult)
+{
+	if (AAIController* Controller = OwnerComp.GetAIOwner())
+	{
+		Controller->ClearFocus(EAIFocusPriority::Gameplay);
+		if (AHitmenNPC* NPC = Cast<AHitmenNPC>(Controller->GetPawn()); NPC && NPC->bIsCrouched)
+		{
+			NPC->UnCrouch();
+		}
+	}
+	Super::OnTaskFinished(OwnerComp, NodeMemory, TaskResult);
 }

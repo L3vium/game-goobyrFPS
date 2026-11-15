@@ -877,7 +877,7 @@ void UHitmenSpectatorWidget::HandleModeChanged(uint8 Mode)
 	const UHitmenGameSettings* Settings = UHitmenGameSettings::Get();
 	const AHitmenPlayerState* Self = GetOwningPlayerState<AHitmenPlayerState>();
 	const bool bWatcher = !Self || Self->IsWatcher() || Self->IsAlive() == false;
-	const bool bCanFreeFly = Self && Self->IsWatcher();
+	const bool bCanFreeFly = Self && (Self->IsWatcher() || Settings->bSpectatorsCanFreeFly);
 	if (ModeText)
 	{
 		FString Line;
@@ -900,25 +900,25 @@ void UHitmenSpectatorWidget::HandleModeChanged(uint8 Mode)
 	}
 	if (KeysText)
 	{
-		// The view's own keys, then the views and the switches this server allows.
+		// The views first (leftmost), then the view's own keys and the switches this server allows.
 		TArray<FString> Keys;
-		switch (SpectatorMode)
-		{
-		case EHitmenSpectatorMode::Follow:
-			Keys = { TEXT("[LMB / RMB] switch player"), TEXT("[V] first / third person") };
-			break;
-		case EHitmenSpectatorMode::Grid:
-			Keys = { TEXT("[LMB / RMB] switch player") };
-			break;
-		default:
-			Keys = { TEXT("[ZQSD] move"), TEXT("[E / SPACE] up"), TEXT("[A / CTRL] down"), TEXT("[SHIFT] faster"), TEXT("[WHEEL] speed") };
-			break;
-		}
 		Keys.Add(TEXT("[1] player view"));
 		Keys.Add(TEXT("[2] split screen"));
 		if (bCanFreeFly)
 		{
 			Keys.Add(TEXT("[3] free fly"));
+		}
+		switch (SpectatorMode)
+		{
+		case EHitmenSpectatorMode::Follow:
+			Keys.Append({ TEXT("[LMB / RMB] switch player"), TEXT("[V] first / third person") });
+			break;
+		case EHitmenSpectatorMode::Grid:
+			Keys.Add(TEXT("[LMB / RMB] switch player"));
+			break;
+		default:
+			Keys.Append({ HitmenUI::MoveKeysLabel(TEXT("move")), TEXT("[SPACE] up"), TEXT("[CTRL] down"), TEXT("[SHIFT] faster"), TEXT("[WHEEL] speed") });
+			break;
 		}
 		if (bWatcher && Settings->WatcherSeePlayers == EHitmenWatcherVisibility::ShownToggleable)
 		{

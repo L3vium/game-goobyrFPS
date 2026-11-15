@@ -211,6 +211,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage")
 	bool bHeadshotKills = true;
 
+	/** Projectiles: a hit within this distance of the head bone counts as a headshot (arrows: easier headshots). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage", meta=(ClampMin="0", Units="cm"))
+	float HeadshotAssistRadius = 0.f;
+
 	/** Bone names counting as head. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Damage")
 	TArray<FName> HeadBones = { TEXT("head"), TEXT("neck_01") };
@@ -446,6 +450,17 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice")
 	TSubclassOf<UCameraShakeBase> FireCameraShake;
+
+	/** Local feedback when one of your hits lands on a body (melee, predicted): view shake (degrees), view kick
+	 *  (degrees of field of view) and hit stop (the swing holds still). 0 = none. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0"))
+	float HitShake = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="deg"))
+	float HitFOVKick = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Juice", meta=(ClampMin="0", Units="s"))
+	float HitStop = 0.f;
 
 	float GetFireInterval() const { return 60.f / FMath::Max(1.f, RoundsPerMinute); }
 

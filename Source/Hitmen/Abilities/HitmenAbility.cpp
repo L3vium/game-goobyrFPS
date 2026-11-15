@@ -285,3 +285,8 @@ void UHitmenAbility::PlayActivatedFX(const FVector& Location) const
 		}), ActivatedFXDuration, false);
 	}
 }
+
+EHitmenKeyLabel UHitmenAbility::GetHUDKey() const
+{
+	return Slot == EHitmenAbilitySlot::Manipulation ? EHitmenKeyLabel::Manipulation : EHitmenKeyLabel::MoveAbility;
+}

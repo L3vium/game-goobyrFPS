@@ -1,6 +1,7 @@
 // Hitmen — player controller
 
 #include "Framework/HitmenPlayerController.h"
+#include "StatusEffects/HitmenStatusEffectComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Character.h"
 #include "World/Vehicles/HitmenVehicles.h"
@@ -179,7 +180,7 @@ void AHitmenPlayerController::RefreshKeyLabels()
 		return;
 	}
 	// Same order as EHitmenKeyLabel.
-	const UInputAction* Actions[] = { InteractAction, JumpAction, MoveAbilityAction, ManipulationAbilityAction, SightroomAction, ConfirmAction };
+	const UInputAction* Actions[] = { InteractAction, JumpAction, MoveAbilityAction, ManipulationAbilityAction, SightroomAction, ConfirmAction, SprintAction };
 	static_assert(UE_ARRAY_COUNT(Actions) == static_cast<int32>(EHitmenKeyLabel::Count), "One action per key label");
 	TArray<FString> Labels;
 	for (const UInputAction* Action : Actions)
@@ -417,6 +418,11 @@ void AHitmenPlayerController::OnPossess(APawn* InPawn)
 		if (IsLocalController())
 		{
 			RefreshMappingContexts();
+			// Alive again: the spectator keys go away.
+			if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+			{
+				UI->OnSpectatorModeChanged.Broadcast(static_cast<uint8>(SpectatorMode));
+			}
 		}
 	}
 }
@@ -604,6 +610,7 @@ void AHitmenPlayerController::RefreshHUDViews()
 			View.CooldownRemaining = Ability->GetCooldownRemaining();
 			View.CooldownAlpha = 1.f - Ability->GetCooldownNormalized();
 			View.Icon = Ability->GetData()->Icon.LoadSynchronous();
+			View.Key = Ability->GetHUDKey();
 			if (const UHitmenAbility_Jetpack* Jetpack = Cast<UHitmenAbility_Jetpack>(Ability))
 			{
 				View.Meter = Jetpack->GetFuelNormalized();
@@ -612,8 +619,37 @@ void AHitmenPlayerController::RefreshHUDViews()
 		return View;
 	};
 	const UHitmenAbilityComponent* Abilities = HUDAbilities.Get();
-	UI->SetAbilityViews(MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Move) : nullptr),
-		MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Manipulation) : nullptr));
+	FHitmenHUDAbilityView MoveView = MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Move) : nullptr);
+	FHitmenHUDAbilityView ManipulationView = MakeAbilityView(Abilities ? Abilities->GetAbility(EHitmenAbilitySlot::Manipulation) : nullptr);
+	if (!MoveView.bValid)
+	{
+		MoveView.Key = EHitmenKeyLabel::MoveAbility;
+	}
+	if (!ManipulationView.bValid)
+	{
+		ManipulationView.Key = EHitmenKeyLabel::Manipulation;
+	}
+	UI->SetAbilityViews(MoveView, ManipulationView);
+
+	// Timed effects on you (invisibility, pill...): a ring above the crosshair empties as each runs out.
+	TArray<FHitmenHUDStatusTimer> Timers;
+	if (const AHitmenCharacterBase* ViewCharacter = Cast<AHitmenCharacterBase>(ViewPawn); ViewCharacter && ViewCharacter->GetStatusEffects())
+	{
+		const UHitmenStatusEffectComponent* Statuses = ViewCharacter->GetStatusEffects();
+		const float Now = Statuses->GetServerTime();
+		for (const FHitmenActiveStatus& Status : Statuses->GetActiveStatuses())
+		{
+			const bool bShown = Status.Type == EHitmenStatusEffect::Invisible || Status.Type == EHitmenStatusEffect::Boosted || Status.Type == EHitmenStatusEffect::Armored;
+			if (bShown && Status.EndTime > 0.f && Status.StartTime >= 0.f && Status.EndTime > Now)
+			{
+				FHitmenHUDStatusTimer& Timer = Timers.AddDefaulted_GetRef();
+				Timer.Status = Status.Type;
+				Timer.Remaining = Status.EndTime - Now;
+				Timer.Duration = FMath::Max(Status.EndTime - Status.StartTime, 0.1f);
+			}
+		}
+	}
+	UI->SetStatusTimers(Timers);
 
 	// Crosshair spread.
 	const UHitmenInventoryComponent* Inventory = HUDInventory.Get();
@@ -793,6 +829,14 @@ void AHitmenPlayerController::HandleCrouchReleased()
 
 void AHitmenPlayerController::HandleSprintPressed()
 {
+	// Fly cheat: Shift flies faster.
+	if (IsCheatFlying())
+	{
+		bFlyFastHeld = true;
+		ApplyCheatFlySpeed(true);
+		Server_SetCheatFlyFast(true);
+		return;
+	}
 	IHitmenInputReceiver* R = GetReceiver();
 	if (!R || IsGameplayInputBlocked())
 	{
@@ -813,9 +857,21 @@ void AHitmenPlayerController::HandleSprintPressed()
 
 void AHitmenPlayerController::HandleSprintReleased()
 {
+	if (bFlyFastHeld)
+	{
+		bFlyFastHeld = false;
+		ApplyCheatFlySpeed(false);
+		Server_SetCheatFlyFast(false);
+		return;
+	}
 	const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings();
+	// Toggle sprint: the release ends nothing, but a quick tap still dashes.
 	if (Settings && Settings->bToggleSprint)
 	{
+		if (IHitmenInputReceiver* R = GetReceiver(); R && GetWorld()->GetTimeSeconds() - SprintPressTime <= SprintTapTime && !IsGameplayInputBlocked())
+		{
+			R->Input_SprintTapped();
+		}
 		return;
 	}
 	IHitmenInputReceiver* R = GetReceiver();
@@ -1513,8 +1569,8 @@ TArray<APawn*> AHitmenPlayerController::GetSpectatableTargets() const
 
 void AHitmenPlayerController::SetSpectatorMode(EHitmenSpectatorMode NewMode)
 {
-	// Dead players cannot free-fly unless they are watchers.
-	if (!bIsWatcher && NewMode == EHitmenSpectatorMode::FreeFly)
+	// Dead players free fly too unless Project Settings -> Hitmen -> Watchers -> bSpectatorsCanFreeFly is off.
+	if (!bIsWatcher && NewMode == EHitmenSpectatorMode::FreeFly && !UHitmenGameSettings::Get()->bSpectatorsCanFreeFly)
 	{
 		NewMode = EHitmenSpectatorMode::Follow;
 	}
@@ -1748,6 +1804,10 @@ void AHitmenPlayerController::PlayerTick(float DeltaTime)
 		GetPawn()->AddMovementInput(FVector::UpVector, (bFlyUpHeld ? 1.f : 0.f) - (bFlyDownHeld ? 1.f : 0.f));
 	}
 	PushVehicleView();
+	if (IsLocalController())
+	{
+		UpdateSecurityFeed(DeltaTime);
+	}
 	if (bSpectating && IsLocalController())
 	{
 		UpdateSpectatorThirdPerson();
@@ -1973,4 +2033,67 @@ void AHitmenPlayerController::PushVehicleView()
 	}
 	bVehicleViewActive = View.bActive;
 	UI->SetVehicleView(View);
+}
+
+void AHitmenPlayerController::UpdateSecurityFeed(float DeltaTime)
+{
+	SecurityFeedAccumulator += DeltaTime;
+	if (SecurityFeedAccumulator < 0.15f)
+	{
+		return;
+	}
+	SecurityFeedAccumulator = 0.f;
+	// A camera whose meter fills on this player: its feed top left while it sees them (off by default).
+	AHitmenSecurityCamera* Seeing = nullptr;
+	const APawn* MyPawn = GetPawn();
+	if (UHitmenGameSettings::Get()->bCameraFeedWhenSeen && MyPawn && !bSpectating)
+	{
+		for (TActorIterator<AHitmenSecurityCamera> It(GetWorld()); It; ++It)
+		{
+			if (It->IsSeeingIntruder() && It->GetSeenIntruder() == MyPawn && !It->IsCameraDisabled())
+			{
+				Seeing = *It;
+				break;
+			}
+		}
+	}
+	if (Seeing)
+	{
+		if (!EventCamera)
+		{
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			Params.ObjectFlags |= RF_Transient;
+			EventCamera = GetWorld()->SpawnActor<AHitmenEventCamera>(Params);
+		}
+		if (EventCamera)
+		{
+			EventCamera->ShowFrom(Seeing->GetFeedView(), Seeing->GetFeedFOV(), NSLOCTEXT("Hitmen", "EventCameraFeed", "Camera"), 0.f, this);
+		}
+		SecurityFeedCamera = Seeing;
+	}
+	else if (SecurityFeedCamera.IsValid())
+	{
+		SecurityFeedCamera.Reset();
+		if (EventCamera && EventCamera->IsShowingView())
+		{
+			EventCamera->Stop();
+		}
+	}
+}
+
+void AHitmenPlayerController::ApplyCheatFlySpeed(bool bFast)
+{
+	ACharacter* Flyer = Cast<ACharacter>(GetPawn());
+	if (UCharacterMovementComponent* Movement = Flyer ? Flyer->GetCharacterMovement() : nullptr; Movement && IsCheatFlying())
+	{
+		const float Speed = CheatFlySpeed * (bFast ? CheatFlyFastMultiplier : 1.f);
+		Movement->MaxFlySpeed = Speed;
+		Movement->BrakingDecelerationFlying = Speed * 3.f;
+	}
+}
+
+void AHitmenPlayerController::Server_SetCheatFlyFast_Implementation(bool bFast)
+{
+	ApplyCheatFlySpeed(bFast);
 }

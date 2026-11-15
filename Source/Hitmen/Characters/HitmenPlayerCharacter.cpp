@@ -505,8 +505,15 @@ void AHitmenPlayerCharacter::UpdateViewFeel(float DeltaSeconds)
 		ClimbLook = FMath::Clamp(Down + 12.f, -ClimbLookMaxPitch, 0.f) * Reach;
 	}
 	ClimbLookCurrent = FMath::FInterpTo(ClimbLookCurrent, ClimbLook, DeltaSeconds, 12.f);
+	// Hit / dash kicks: the view widens at once and eases back.
+	float Kick = 0.f;
+	if (FOVKickTimeLeft > 0.f)
+	{
+		FOVKickTimeLeft = FMath::Max(0.f, FOVKickTimeLeft - DeltaSeconds);
+		Kick = FOVKickAmount * FMath::Square(FOVKickTimeLeft / FMath::Max(FOVKickDuration, KINDA_SMALL_NUMBER));
+	}
 	FirstPersonCamera->ClearAdditiveOffset();
-	FirstPersonCamera->AddAdditiveOffset(FTransform(FRotator(ClimbLookCurrent, 0.f, HeadBobRollCurrent + SlideRollCurrent)), SlideFOVCurrent);
+	FirstPersonCamera->AddAdditiveOffset(FTransform(FRotator(ClimbLookCurrent, 0.f, HeadBobRollCurrent + SlideRollCurrent)), SlideFOVCurrent + Kick);
 }
 
 void AHitmenPlayerCharacter::Server_TrapMash_Implementation()
@@ -634,7 +641,7 @@ void AHitmenPlayerCharacter::EvaluateFirstPersonAction(FVector& OutOffset, FRota
 {
 	OutOffset = FVector::ZeroVector;
 	OutRotation = FRotator::ZeroRotator;
-	const float Elapsed = GetWorld()->GetTimeSeconds() - FPActionStart;
+	const float Elapsed = GetFirstPersonActionElapsed();
 	if (FPAction == EHitmenFPAction::None || Elapsed < 0.f || Elapsed > FPActionDuration)
 	{
 		return;
@@ -748,7 +755,7 @@ void AHitmenPlayerCharacter::GetFirstPersonBodyIK(FHitmenBodyIKState& Out) const
 		return;
 	}
 	Out.FistAlpha = 1.f;
-	const float Elapsed = GetWorld()->GetTimeSeconds() - FPActionStart;
+	const float Elapsed = GetFirstPersonActionElapsed();
 	const bool bPunching = FPAction == EHitmenFPAction::Punch && Elapsed >= 0.f && Elapsed <= FPActionDuration;
 	const int32 PunchingSide = FPActionSide > 0.f ? 1 : 0;
 	float Extension = 0.f;
@@ -776,6 +783,58 @@ void AHitmenPlayerCharacter::AddRecoil(float PitchDegrees, float YawDegrees)
 	const FVector2D Kick(PitchDegrees, YawDegrees);
 	RecoilTarget += Kick;
 	RecoilSettled += Kick * (1.f - RecoilRecoveryRatio);
+}
+
+void AHitmenPlayerCharacter::AddFOVKick(float Degrees, float Duration)
+{
+	const float Current = FOVKickTimeLeft > 0.f ? FOVKickAmount * FMath::Square(FOVKickTimeLeft / FMath::Max(FOVKickDuration, KINDA_SMALL_NUMBER)) : 0.f;
+	if (Degrees >= Current)
+	{
+		FOVKickAmount = Degrees;
+		FOVKickDuration = FMath::Max(Duration, 0.05f);
+		FOVKickTimeLeft = FOVKickDuration;
+	}
+}
+
+void AHitmenPlayerCharacter::AddFirstPersonHitStop(float Seconds)
+{
+	if (Seconds <= 0.f)
+	{
+		return;
+	}
+	const float Now = GetWorld()->GetTimeSeconds();
+	FPHitStopStart = Now;
+	FPHitStopEnd = Now + Seconds;
+	// The action's clock stops meanwhile, so the arms stay up that much longer.
+	ShowFirstPersonArms(FMath::Max(0.f, FPActionDuration - GetFirstPersonActionElapsed()) + Seconds + 0.1f);
+}
+
+void AHitmenPlayerCharacter::PlayMeleeHitFeedback(float Shake, float FOVKick, float HitStop)
+{
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+	if (Shake > 0.f)
+	{
+		AddCameraShake(Shake, 0.18f);
+	}
+	if (FOVKick > 0.f)
+	{
+		AddFOVKick(FOVKick, 0.25f);
+	}
+	AddFirstPersonHitStop(HitStop);
+}
+
+float AHitmenPlayerCharacter::GetFirstPersonActionElapsed() const
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+	float Elapsed = Now - FPActionStart;
+	if (FPHitStopEnd > FPHitStopStart && FPHitStopStart >= FPActionStart)
+	{
+		Elapsed -= FMath::Clamp(Now, FPHitStopStart, FPHitStopEnd) - FPHitStopStart;
+	}
+	return Elapsed;
 }
 
 void AHitmenPlayerCharacter::AddCameraShake(float Intensity, float Duration)
@@ -836,7 +895,7 @@ void AHitmenPlayerCharacter::UpdateFirstPersonArms(float DeltaSeconds)
 	const bool bScoped = bIsAiming && Data && Data->bScopeOverlay && FirstPersonCamera->FieldOfView < BaseFOV - 1.f;
 	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
 	const bool bBusy = Movement && (Movement->IsClimbing() || Movement->IsHanging());
-	const bool bActing = FPAction != EHitmenFPAction::None && Now < FPActionStart + FPActionDuration;
+	const bool bActing = FPAction != EHitmenFPAction::None && GetFirstPersonActionElapsed() < FPActionDuration;
 	// Climbing a ledge: the hands come into view and land on it.
 	const bool bMantling = Movement && Movement->IsMantling();
 	if (bMantling && !bFPWasMantling)

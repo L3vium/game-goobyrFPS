@@ -81,6 +81,12 @@ void AHitmenSecurityCamera::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(AHitmenSecurityCamera, bSeeingIntruder);
 	DOREPLIFETIME(AHitmenSecurityCamera, DetectionProgress);
 	DOREPLIFETIME(AHitmenSecurityCamera, bBroken);
+	DOREPLIFETIME(AHitmenSecurityCamera, SeenIntruder);
+}
+
+USceneComponent* AHitmenSecurityCamera::GetFeedView() const
+{
+	return Capture;
 }
 
 void AHitmenSecurityCamera::BeginPlay()
@@ -190,8 +196,13 @@ void AHitmenSecurityCamera::UpdateFootprint()
 
 FLinearColor AHitmenSecurityCamera::GetStateColor() const
 {
-	// One colour only (yellow): the zone stays yellow whatever happens; the meter fills inside it.
-	return SuspiciousColor;
+	// White while nobody is in view, red as soon as it sees someone (the meter fills inside it), AlertColor once the
+	// alarm is raised and it still sees them.
+	if (!bSeeingIntruder)
+	{
+		return IdleColor;
+	}
+	return DetectionProgress >= 255 ? AlertColor : DetectingColor;
 }
 
 void AHitmenSecurityCamera::Tick(float DeltaSeconds)
@@ -201,8 +212,9 @@ void AHitmenSecurityCamera::Tick(float DeltaSeconds)
 	{
 		return;
 	}
-	// Sweep (deterministic on every machine from time).
-	if (SweepAngle > 0.f)
+	// Sweep (deterministic on every machine from time). Seeing someone stops it where it looks (no tracking); it goes on
+	// once they leave the cone.
+	if (SweepAngle > 0.f && !(bFreezeSweepWhileSeeing && bSeeingIntruder))
 	{
 		SweepTime += DeltaSeconds * SweepSpeed;
 		const float Yaw = FMath::Sin(SweepTime) * SweepAngle * 0.5f;
@@ -216,6 +228,7 @@ void AHitmenSecurityCamera::Tick(float DeltaSeconds)
 
 	APawn* Intruder = FindIntruder();
 	const bool bSeeing = Intruder != nullptr;
+	SeenIntruder = Intruder;
 	if (bSeeing != bSeeingIntruder)
 	{
 		bSeeingIntruder = bSeeing;
@@ -304,6 +317,7 @@ void AHitmenSecurityCamera::SetCameraDisabled(bool bInDisabled)
 	{
 		bDisabled = bInDisabled;
 		bSeeingIntruder = false;
+		SeenIntruder = nullptr;
 		DetectionProgress = 0;
 		SeenTime = 0.f;
 		OnRep_Visuals();
@@ -599,11 +613,51 @@ void AHitmenTurret::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AHitmenTurret, TeamId);
 	DOREPLIFETIME(AHitmenTurret, bHacked);
 	DOREPLIFETIME(AHitmenTurret, CurrentTarget);
+	DOREPLIFETIME(AHitmenTurret, bBroken);
+}
+
+float AHitmenTurret::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	const float Taken = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	if (!HasAuthority() || bBroken || DamageAmount <= 0.f)
+	{
+		return Taken;
+	}
+	TurretDamageTaken += DamageAmount;
+	if (TurretDamageTaken >= TurretHealth)
+	{
+		// Shot to pieces like a camera: sparks, the gun droops, it never fires again; the crash draws a guard.
+		bBroken = true;
+		CurrentTarget = nullptr;
+		OnRep_Broken();
+		UHitmenAISubsystem::ReportNoise(this, GetActorLocation(), 1000.f, EventInstigator ? EventInstigator->GetPawn() : nullptr, EHitmenNoiseType::Impact);
+	}
+	return DamageAmount;
+}
+
+void AHitmenTurret::OnRep_Broken()
+{
+	if (!bBroken)
+	{
+		return;
+	}
+	Laser->SetVisibility(false);
+	Head->SetRelativeRotation(Head->GetRelativeRotation() + FRotator(-35.f, 0.f, 18.f));
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		if (BrokenFX)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, BrokenFX, Head->GetComponentLocation(), FRotator::ZeroRotator, FVector(0.6f));
+		}
+		UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::BreakerSwitch, Head->GetComponentLocation());
+	}
+	SetActorTickEnabled(false);
+	Juice_OnBroken();
 }
 
 void AHitmenTurret::Hack(AActor* Hacker)
 {
-	if (!HasAuthority() || bHacked)
+	if (!HasAuthority() || bHacked || bBroken)
 	{
 		return;
 	}
@@ -660,6 +714,10 @@ AActor* AHitmenTurret::FindTarget() const
 void AHitmenTurret::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (bBroken)
+	{
+		return;
+	}
 	if (CurrentTarget)
 	{
 		const FRotator Desired = (CurrentTarget->GetActorLocation() - Head->GetComponentLocation()).Rotation();
@@ -713,7 +771,8 @@ void AHitmenTurret::Tick(float DeltaSeconds)
 		AController* InstigatorController = HackedBy ? HackedBy->GetInstigatorController() : nullptr;
 		UGameplayStatics::ApplyPointDamage(Hit.GetActor(), Damage, Direction, Hit, InstigatorController, this, UDamageType::StaticClass());
 	}
-	UHitmenAISubsystem::ReportNoise(this, Start, 900.f, this, EHitmenNoiseType::Gunshot);
+	// Heard around the turret, but guards go where its bullets land.
+	UHitmenAISubsystem::ReportNoiseHeardAt(this, Start, Impact, 900.f, this, EHitmenNoiseType::Gunshot);
 	Multicast_Fire(Impact);
 }
 

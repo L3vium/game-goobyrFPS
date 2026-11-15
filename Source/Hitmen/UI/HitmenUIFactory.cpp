@@ -26,8 +26,42 @@
 #include "Styling/CoreStyle.h"
 #include "Rendering/DrawElements.h"
 
+#if PLATFORM_WINDOWS
+#include "Windows/AllowWindowsPlatformTypes.h"
+#include <Windows.h>
+#include "Windows/HideWindowsPlatformTypes.h"
+#endif
+#include "Core/HitmenGameSettings.h"
+
 namespace HitmenUI
 {
+bool IsAzertyLayout()
+{
+	if (const UHitmenGameSettings* Settings = UHitmenGameSettings::Get())
+	{
+		if (Settings->KeyboardLayoutOverride == EHitmenKeyboardLayout::Azerty)
+		{
+			return true;
+		}
+		if (Settings->KeyboardLayoutOverride == EHitmenKeyboardLayout::Qwerty)
+		{
+			return false;
+		}
+	}
+#if PLATFORM_WINDOWS
+	// French and Belgian keyboards are AZERTY; everything else is treated as QWERTY (QWERTZ keeps W A S D).
+	const LANGID Language = LOWORD(reinterpret_cast<UINT_PTR>(::GetKeyboardLayout(0)));
+	return PRIMARYLANGID(Language) == LANG_FRENCH && SUBLANGID(Language) != SUBLANG_FRENCH_CANADIAN && SUBLANGID(Language) != SUBLANG_FRENCH_SWISS;
+#else
+	return false;
+#endif
+}
+
+FString MoveKeysLabel(const FString& Action)
+{
+	return FString::Printf(TEXT("[%s] %s"), IsAzertyLayout() ? TEXT("ZQSD") : TEXT("WASD"), *Action);
+}
+
 	FLinearColor Background() { return FLinearColor(0.012f, 0.013f, 0.016f, 0.88f); }
 	FLinearColor Panel()      { return FLinearColor(0.03f, 0.033f, 0.04f, 0.9f); }
 	FLinearColor PanelLight() { return FLinearColor(0.085f, 0.09f, 0.1f, 0.92f); }

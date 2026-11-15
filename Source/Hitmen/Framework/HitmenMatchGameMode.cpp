@@ -136,6 +136,14 @@ void AHitmenMatchGameMode::SelectVIP(FRandomStream& Stream)
 	}
 	AHitmenNPC* VIP = Candidates[Stream.RandRange(0, Candidates.Num() - 1)];
 	VIP->SetIsVIP(true);
+	// Every other candidate is a plain armed guard: no neutral NPC in the map.
+	for (TActorIterator<AHitmenNPC> It(GetWorld()); It; ++It)
+	{
+		if (It->IsVIPCandidate() && *It != VIP)
+		{
+			It->BecomeGuard();
+		}
+	}
 	if (AHitmenGameState* GS = GetGameState<AHitmenGameState>())
 	{
 		GS->SetVIP(VIP);

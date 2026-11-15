@@ -268,8 +268,21 @@ void AHitmenDistraction::OnRep_On()
 			USoundBase* Loop = LoopSound ? LoopSound.Get() : UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::RadioLoop);
 			if (Loop)
 			{
+				// Kept alive and restarted whenever it ends: a radio plays one steady sound until switched off, even
+				// when its asset is a one-shot (an ending clip used to leave the radio silent while it still pulsed).
 				PlayingAudio = UGameplayStatics::SpawnSoundAttached(Loop, Root, NAME_None, FVector::ZeroVector, EAttachLocation::KeepRelativeOffset, false, 1.f, 1.f, 0.f,
-					UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World));
+					UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World), nullptr, false);
+				if (PlayingAudio)
+				{
+					TWeakObjectPtr<AHitmenDistraction> WeakThis(this);
+					PlayingAudio->OnAudioFinishedNative.AddWeakLambda(this, [WeakThis](UAudioComponent* Component)
+					{
+						if (WeakThis.IsValid() && WeakThis->bOn && Component && WeakThis->PlayingAudio == Component)
+						{
+							Component->Play();
+						}
+					});
+				}
 			}
 		}
 		Pulse();
@@ -280,8 +293,12 @@ void AHitmenDistraction::OnRep_On()
 		GetWorldTimerManager().ClearTimer(PulseTimer);
 		if (PlayingAudio)
 		{
-			PlayingAudio->FadeOut(0.3f, 0.f);
+			UAudioComponent* Fading = PlayingAudio;
 			PlayingAudio = nullptr;
+			Fading->FadeOut(0.3f, 0.f);
+			// Not auto-destroyed (it restarts itself while on): removed once faded.
+			FTimerHandle Cleanup;
+			GetWorldTimerManager().SetTimer(Cleanup, FTimerDelegate::CreateWeakLambda(Fading, [Fading]() { Fading->DestroyComponent(); }), 0.4f, false);
 		}
 	}
 	Juice_OnTriggered();

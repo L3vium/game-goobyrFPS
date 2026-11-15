@@ -62,6 +62,10 @@ public:
 	/** Every machine: a cable is drawn from the owner's hand to OutAnchor while this returns true (hook pull). */
 	virtual bool GetCableAnchor(FVector& OutAnchor) const { return false; }
 
+	/** The key the HUD card shows: the slot's key (E / A) unless the ability runs on another one (jetpack: Space,
+	 *  dash: Shift). */
+	virtual EHitmenKeyLabel GetHUDKey() const;
+
 	// ---- Queries ----
 	UFUNCTION(BlueprintPure, Category="Hitmen|Ability")
 	virtual bool CanActivate() const;

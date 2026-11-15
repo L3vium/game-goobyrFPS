@@ -249,6 +249,10 @@ protected:
 	void ApplyLoadoutChoice(int32 CardIndex, int32 ChoiceIndex);
 	void RefreshLoadoutStrips();
 	void UpdateAgentAnchors();
+
+	/** The arrows and counters wait for the camera to arrive in the room, then fade in (never seen through walls). */
+	float AgentPageShownAt = -1.f;
+	float AgentAnchorsAlpha = 0.f;
 	void RefreshLookCounters();
 	UFUNCTION() void HandleKeyLabelsChanged();
 	/** Shows the local look on the stage at once; the server gets it once clicks pause. */

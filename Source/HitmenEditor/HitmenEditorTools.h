@@ -47,4 +47,8 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
 	static void RunPIEConsoleCommand(UWorld* World, const FString& Command);
+
+	/** QA: a PNG of World's game viewport with its widgets (HUD, prompts), whatever window PIE plays in. */
+	UFUNCTION(BlueprintCallable, Category="Hitmen|Editor")
+	static bool TakePIEScreenshot(UWorld* World, const FString& FilePath);
 };

@@ -154,7 +154,7 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 		if (FindLedgeInFront(Ledge, Normal))
 		{
 			const FVector Along = FVector::CrossProduct(FVector::UpVector, Normal).GetSafeNormal();
-			if (!bFirstPersonViewer)
+			if (!bFirstPersonViewer && Juice->bMantleHandsFX)
 			{
 				SpawnTraversalDust(Ledge - Normal * 8.f + Along * 22.f, TraversalDustScale);
 				SpawnTraversalDust(Ledge - Normal * 8.f - Along * 22.f, TraversalDustScale);
@@ -162,7 +162,7 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 			UHitmenSoundLibrary::PlayHitmenSoundAt(this, EHitmenSound::ClimbGrab, Ledge);
 		}
 	}
-	else if (!bMantling && bWasMantlingJuice)
+	else if (!bMantling && bWasMantlingJuice && Juice->bMantleLandFX)
 	{
 		SpawnTraversalDust(GetActorLocation() - FVector::UpVector * GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), TraversalDustScale);
 	}
@@ -520,6 +520,11 @@ float AHitmenCharacterBase::TakeDamage(float DamageAmount, FDamageEvent const& D
 			Weapon = Cast<AHitmenWeaponBase>(Projectile->GetOwner());
 		}
 		const bool bWeaponKills = !Weapon || !Weapon->GetWeaponData() || Weapon->GetWeaponData()->bHeadshotKills;
+		// Fists are not weapons: a punch in the face is no headshot (no red cross, no headshot sound).
+		if (!Weapon && !Projectile)
+		{
+			bHeadshot = false;
+		}
 		const bool bLethalCauser = (Weapon || Projectile) && bWeaponKills;
 		if (Settings->bHeadshotKills && bLethalCauser && (!bFromNPC || Settings->bHeadshotKillsFromNPCs))
 		{

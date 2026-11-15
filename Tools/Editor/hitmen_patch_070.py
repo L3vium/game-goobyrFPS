@@ -250,7 +250,7 @@ if wanted("fixtures"):
 
     ring = hitmen_content.build_camera_ring()
     bp_set(W + "Security/BP_SecurityCamera", projection_material=None, show_floor_ring=True, beam_scattering=25.0, view_light_intensity=9000.0,
-           broken_fx=load(TOON + "NS_Lightning_Hit"), suspicious_color=unreal.LinearColor(1.0, 0.78, 0.1, 0.4))
+           broken_fx=load(TOON + "NS_Lightning_Hit"))
     breaker = load(W + "Power/BP_CircuitBreaker")
     if breaker:
         d = unreal.get_default_object(breaker.generated_class())

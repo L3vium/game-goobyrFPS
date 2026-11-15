@@ -123,7 +123,22 @@ enum class EHitmenSound : uint8
 	/** Loop while sliding (stopped when the slide ends). */
 	Slide,
 	/** The VIP died (everyone, 2D). */
-	TargetEliminated
+	TargetEliminated,
+	/** A punch or a blade landing on a body. */
+	MeleeHit,
+	/** A blade swing (fists use PunchWhoosh). */
+	KnifeWhoosh,
+	/** A breakable wall giving way. */
+	WallBreak,
+	/** A body catching fire (lighter). */
+	BodyBurn,
+	/** Goobyr gun hamsters. */
+	HamsterSqueak,
+	HamsterBite,
+	/** Dash burst. */
+	Dash,
+	/** Blink: arriving at the destination. */
+	BlinkArrive
 };
 
 UCLASS(BlueprintType)

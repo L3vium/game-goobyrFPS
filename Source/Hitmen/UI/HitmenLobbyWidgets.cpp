@@ -1,6 +1,7 @@
 // Hitmen — lobby screens
 
 #include "UI/HitmenLobbyWidgets.h"
+#include "Framework/HitmenHUD.h"
 #include "UI/HitmenUIFactory.h"
 #include "UI/HitmenMenuKit.h"
 #include "UI/HitmenUIEventSubsystem.h"
@@ -815,6 +816,9 @@ void UHitmenLobbyWidget::HandleLobbyChanged()
 	{
 		ScreenSwitcher->SetActiveWidgetIndex(bCustomization ? 1 : 0);
 		Juice_OnScreenChanged(bCustomization);
+		// The camera is still flying to the stage: the arrows wait for it (they would float over the walls).
+		AgentPageShownAt = bCustomization && GetWorld() ? GetWorld()->GetRealTimeSeconds() : -1.f;
+		AgentAnchorsAlpha = 0.f;
 	}
 	RefreshLobby();
 	if (bCustomization)
@@ -851,6 +855,32 @@ void UHitmenLobbyWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	if (ScreenSwitcher && ScreenSwitcher->GetActiveWidgetIndex() == 1)
 	{
 		UpdateAgentAnchors();
+		// Arrows, counters, codename and Randomize: hidden until the camera has arrived in the room, then a quick fade.
+		const AHitmenHUD* HUD = GetOwningPlayer() ? Cast<AHitmenHUD>(GetOwningPlayer()->GetHUD()) : nullptr;
+		const float Blend = HUD ? HUD->GetShotBlendTime() : 1.2f;
+		const float Since = AgentPageShownAt >= 0.f && GetWorld() ? GetWorld()->GetRealTimeSeconds() - AgentPageShownAt : 1000.f;
+		AgentAnchorsAlpha = FMath::Clamp((Since - Blend) / 0.15f, 0.f, 1.f);
+		auto Fade = [this](UWidget* Widget)
+		{
+			if (Widget)
+			{
+				Widget->SetRenderOpacity(AgentAnchorsAlpha);
+				Widget->SetVisibility(AgentAnchorsAlpha > 0.99f ? ESlateVisibility::Visible : ESlateVisibility::HitTestInvisible);
+			}
+		};
+		for (UWidget* Arrow : LookArrows)
+		{
+			Fade(Arrow);
+		}
+		for (UWidget* Counter : LookCounters)
+		{
+			if (Counter)
+			{
+				Counter->SetRenderOpacity(AgentAnchorsAlpha);
+			}
+		}
+		Fade(AgentNameBox);
+		Fade(RandomizeButton);
 	}
 	// Everyone ready: the match starts after a short beat, no number on screen.
 	if (CountdownBlock)
@@ -981,11 +1011,11 @@ void UHitmenLobbyWidget::RefreshLookCounters()
 	const UHitmenCatalog* Catalog = GetCatalog();
 	for (int32 LookIndex = 0; LookIndex < LookCounters.Num() && Catalog; ++LookIndex)
 	{
-		// Position among the items, "None" counted last (the arrows cycle through it too).
+		// "None" (the base look) is 0, then the items 1, 2, 3...; out of the number of looks (None included).
 		const TArray<UHitmenCosmeticItem*> Items = Catalog->GetCosmeticsForSlot(LookSlots[LookIndex]);
 		const int32 Count = Items.Num() + 1;
 		const int32 Index = Items.IndexOfByKey(LocalCosmetics.GetSlot(LookSlots[LookIndex]));
-		const int32 Position = Index == INDEX_NONE ? Count : Index + 1;
+		const int32 Position = Index == INDEX_NONE ? 0 : Index + 1;
 		LookCounters[LookIndex]->SetText(FText::Format(LOCTEXT("LookCounter", "{0} / {1}"), FText::AsNumber(Position), FText::AsNumber(Count)));
 	}
 }

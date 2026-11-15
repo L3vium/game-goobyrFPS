@@ -81,6 +81,12 @@ void UHitmenInteractionComponent::SetActorHighlight(AActor* Actor, UMaterialInte
 
 void UHitmenInteractionComponent::UpdateFocus()
 {
+	UpdateFocusTarget();
+	RefreshCornerHint(Cast<APawn>(GetOwner()));
+}
+
+void UHitmenInteractionComponent::UpdateFocusTarget()
+{
 	APawn* Pawn = Cast<APawn>(GetOwner());
 	if (!Pawn || !Pawn->IsLocallyControlled() || !Pawn->IsPlayerControlled())
 	{
@@ -157,13 +163,25 @@ void UHitmenInteractionComponent::UpdateFocus()
 		SetFocus(nullptr, NSLOCTEXT("Hitmen", "DropBody", "Drop body"));
 		return;
 	}
-	// Aiming with a weapon and nothing in focus: F throws it.
-	if (const AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Pawn); Player && Player->IsAiming() && Player->CanThrowHeldWeapon())
-	{
-		SetFocus(nullptr, NSLOCTEXT("Hitmen", "ThrowWeapon", "Throw"));
-		return;
-	}
 	SetFocus(nullptr, FText::GetEmpty());
+}
+
+void UHitmenInteractionComponent::RefreshCornerHint(const APawn* Pawn)
+{
+	// Aiming with a weapon: F throws it when nothing is in focus. Said discreetly bottom right ("F  Throw"), not as a
+	// prompt under the crosshair.
+	FText Hint;
+	const AHitmenPlayerCharacter* Player = Cast<AHitmenPlayerCharacter>(Pawn);
+	if (Player && !FocusedActor.IsValid() && FocusedPrompt.IsEmpty() && Player->IsAiming() && Player->CanThrowHeldWeapon())
+	{
+		const UHitmenUIEventSubsystem* KeyUI = UHitmenUIEventSubsystem::GetFromPawn(Pawn);
+		const FString Key = KeyUI ? KeyUI->GetKeyLabel(EHitmenKeyLabel::Interact) : FString(TEXT("F"));
+		Hint = FText::Format(NSLOCTEXT("Hitmen", "ThrowHint", "{0}  Throw"), FText::FromString(Key));
+	}
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(Pawn))
+	{
+		UI->SetCornerHint(Hint);
+	}
 }
 
 void UHitmenInteractionComponent::SetFocus(AActor* NewFocus, const FText& Prompt, const FText& Info)

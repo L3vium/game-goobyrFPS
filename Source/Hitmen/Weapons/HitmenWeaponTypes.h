@@ -42,4 +42,7 @@ class HITMEN_API AHitmenWeapon_Melee : public AHitmenWeaponBase
 
 protected:
 	virtual void FireServer(const FVector& Origin, const FVector& Direction, int32 Seed, float Charge, TArray<FVector>& OutImpacts) override;
+	/** The same sweep on the attacker: hits show and sound at once (the server confirms the damage). */
+	virtual void SimulateImpacts(const FVector& Origin, const FVector& Direction, int32 Seed, TArray<FVector>& OutImpacts) const override;
+	void SweepHostiles(const FVector& Origin, const FVector& Direction, TArray<FHitResult>& OutHits) const;
 };

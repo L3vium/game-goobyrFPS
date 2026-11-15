@@ -37,6 +37,20 @@ UHitmenAlertComponent::UHitmenAlertComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickInterval = 0.1f;
 	SetIsReplicatedByDefault(true);
+	// White fill per second by distance (cm): about 0.15 s point blank, 0.7 s at 5 m, 1.7 s at 10 m, 4 s at 20 m.
+	FRichCurve* Curve = SuspicionRateByDistance.GetRichCurve();
+	Curve->Reset();
+	Curve->AddKey(0.f, 7.f);
+	Curve->AddKey(200.f, 6.f);
+	Curve->AddKey(500.f, 1.5f);
+	Curve->AddKey(1000.f, 0.6f);
+	Curve->AddKey(1500.f, 0.38f);
+	Curve->AddKey(2000.f, 0.25f);
+	Curve->AddKey(3000.f, 0.15f);
+	for (auto It = Curve->GetKeyHandleIterator(); It; ++It)
+	{
+		Curve->SetKeyInterpMode(*It, RCIM_Cubic);
+	}
 }
 
 void UHitmenAlertComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -49,6 +63,23 @@ void UHitmenAlertComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(UHitmenAlertComponent, bTargetVisible);
 	DOREPLIFETIME(UHitmenAlertComponent, AlertReason);
 	DOREPLIFETIME(UHitmenAlertComponent, bOnEdge);
+	DOREPLIFETIME(UHitmenAlertComponent, ForcedBarkCount);
+}
+
+void UHitmenAlertComponent::ForceBark(EHitmenAlertReason Reason)
+{
+	if (!GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	AlertReason = Reason;
+	++ForcedBarkCount;
+	OnRep_ForcedBark();
+}
+
+void UHitmenAlertComponent::OnRep_ForcedBark()
+{
+	UHitmenAISubsystem::PlayBark(this);
 }
 
 void UHitmenAlertComponent::BeginPlay()
@@ -361,11 +392,12 @@ void UHitmenAlertComponent::SeeHostile(AActor* Seen, float DeltaTime, bool bAlar
 		return;
 	}
 
-	// Gradual detection: the white fill must complete while seeing you to turn red. Peripheral vision and partial
-	// cover fill it slower (RateScale); an NPC on edge or investigating fills it faster.
-	const float DistanceAlpha = 1.f - FMath::Clamp(Distance / SuspicionFalloffDistance, 0.f, 0.85f);
+	// Gradual detection: the white fill must complete while seeing you to turn red. The distance decides how fast (near
+	// instant up close, slow far away); peripheral vision and partial cover fill it slower (RateScale); an NPC on edge
+	// or investigating fills it faster.
+	const float DistanceRate = FMath::Max(0.f, SuspicionRateByDistance.GetRichCurveConst()->Eval(Distance, 0.25f));
 	const float AlertedMultiplier = AlertState == EHitmenAlertState::Investigating ? AlertedSuspicionMultiplier : (bOnEdge ? OnEdgeSuspicionMultiplier : 1.f);
-	const float Rate = SuspicionRiseRate * DistanceAlpha * (bAlarming ? AlarmingMultiplier : 1.f) * AlertedMultiplier * GetDifficultySuspicionMultiplier()
+	const float Rate = SuspicionRiseRate * DistanceRate * (bAlarming ? AlarmingMultiplier : 1.f) * AlertedMultiplier * GetDifficultySuspicionMultiplier()
 		* FMath::Clamp(RateScale, 0.f, 1.f);
 	SetSuspicionValue(FMath::Clamp(Suspicion + Rate * DeltaTime, 0.f, 1.f));
 	Target = Seen;
@@ -430,18 +462,9 @@ void UHitmenAlertComponent::HearNoise(const FVector& Location, EHitmenNoiseType 
 		RefreshSearchMarker();
 		return;
 	}
-	// Gunfire, explosions and fighting are threats; footsteps and distractions are only curiosities.
+	// Gunfire, explosions and fighting are threats; footsteps and distractions are only curiosities. A gunshot (its
+	// report and its impact alike) is heard where the bullet landed: the guard turns to the impact, never to the shooter.
 	const bool bThreat = bLoud || Type == EHitmenNoiseType::Combat;
-	// A shot heard where the shooter stands (the report, not the impact): the guard turns to the shooter, and the impact
-	// heard a moment later does not pull it away (Hitman: it looks at you; if you are in its view it sees you).
-	if (Type == EHitmenNoiseType::Gunshot && NoiseInstigator && FVector::Dist(Location, NoiseInstigator->GetActorLocation()) < 250.f)
-	{
-		LastShooterHeardTime = GetWorld()->GetTimeSeconds();
-	}
-	else if (Type == EHitmenNoiseType::Gunshot && GetWorld()->GetTimeSeconds() - LastShooterHeardTime < 0.5f && AlertState == EHitmenAlertState::Investigating)
-	{
-		return;
-	}
 	if (Type == EHitmenNoiseType::Distraction && AlertState != EHitmenAlertState::Investigating)
 	{
 		AHitmenPlayerController::NotifyDistractionNoticed(GetOwner(), NoiseInstigator);
@@ -644,15 +667,24 @@ void UHitmenAlertComponent::OnDamagedBy(AActor* DamageInstigator)
 		}
 		else if (!(AlertState == EHitmenAlertState::Combat && bTargetVisible))
 		{
-			// Hit by someone it cannot see: alarmed, it turns toward where the shot came from and searches.
+			// Hit by someone it cannot see: alarmed, it ducks into cover from where the shot came from (a guess along the
+			// shot, never the shooter's real position), then searches there.
 			const FVector Here = GetOwner()->GetActorLocation();
 			const FVector Toward = (DamageInstigator->GetActorLocation() - Here).GetSafeNormal2D();
-			Target = DamageInstigator;
-			bTargetVisible = false;
-			bAlertedByCall = false;
-			LastKnownLocation = Here + Toward * UnseenAttackerSearchDistance;
-			LastSeenTime = GetWorld()->GetTimeSeconds();
-			SetAlertStateWithReason(EHitmenAlertState::Combat, EHitmenAlertReason::Damage);
+			const FVector Guess = Here + Toward * UnseenAttackerSearchDistance;
+			if (bTakeCoverFromUnseenThreats)
+			{
+				TakeCoverFrom(DamageInstigator, Guess, UnseenThreatCoverDuration, EHitmenAlertReason::Damage);
+			}
+			else
+			{
+				Target = DamageInstigator;
+				bTargetVisible = false;
+				bAlertedByCall = false;
+				LastKnownLocation = Guess;
+				LastSeenTime = GetWorld()->GetTimeSeconds();
+				SetAlertStateWithReason(EHitmenAlertState::Combat, EHitmenAlertReason::Damage);
+			}
 		}
 	}
 	else if (AlertState != EHitmenAlertState::Combat)
@@ -766,7 +798,20 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		}
 		break;
 	case EHitmenAlertState::Combat:
-		if (!bTargetVisible && Now - LastSeenTime > GetRuleLoseTime())
+		if (bTargetVisible)
+		{
+			// Sees the shooter: cover from a guess is over, it fights.
+			CoverUntil = -1.f;
+			bPanicking = false;
+		}
+		else if (CoverUntil > 0.f && Now >= CoverUntil)
+		{
+			// Done hiding: search where the threat seemed to come from.
+			CoverUntil = -1.f;
+			bPanicking = false;
+			SetAlertStateWithReason(EHitmenAlertState::Searching, EHitmenAlertReason::LostTarget);
+		}
+		else if (!IsTakingCover() && Now - LastSeenTime > GetRuleLoseTime())
 		{
 			SetAlertStateWithReason(EHitmenAlertState::Searching, EHitmenAlertReason::LostTarget);
 		}
@@ -833,4 +878,109 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	default:
 		break;
 	}
+}
+
+// ---- Sixth sense, cover, panic ----
+
+void UHitmenAlertComponent::SenseNearby(AActor* Hostile, float DeltaTime, float Rate)
+{
+	if (bSuppressed || !Hostile || AlertState == EHitmenAlertState::Combat || AlertState == EHitmenAlertState::Searching)
+	{
+		return;
+	}
+	// A presence felt behind: the white fill rises (never to red on its own) and the NPC turns toward it (Suspicious
+	// faces its target), so it sees whoever is there.
+	SetSuspicionValue(FMath::Clamp(Suspicion + Rate * DeltaTime, 0.f, 0.95f));
+	Target = Hostile;
+	LastKnownLocation = Hostile->GetActorLocation();
+	LastSeenLocation = LastKnownLocation;
+	LastSeenTime = GetWorld()->GetTimeSeconds();
+	if (AlertState == EHitmenAlertState::Unaware)
+	{
+		SetAlertStateWithReason(EHitmenAlertState::Suspicious, EHitmenAlertReason::Glimpse);
+	}
+}
+
+bool UHitmenAlertComponent::IsTakingCover() const
+{
+	return CoverUntil > 0.f && GetWorld() && GetWorld()->GetTimeSeconds() < CoverUntil;
+}
+
+void UHitmenAlertComponent::TakeCoverFrom(AActor* Threat, const FVector& ThreatLocation, float Duration, EHitmenAlertReason Reason)
+{
+	if (bSuppressed || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	// Already fighting someone it sees: no hiding from a guess.
+	if (AlertState == EHitmenAlertState::Combat && bTargetVisible)
+	{
+		return;
+	}
+	const float Now = GetWorld()->GetTimeSeconds();
+	const bool bWasCombat = AlertState == EHitmenAlertState::Combat;
+	if (Threat)
+	{
+		Target = Threat;
+	}
+	bTargetVisible = false;
+	bAlertedByCall = false;
+	LastKnownLocation = ThreatLocation;
+	LastSeenTime = Now;
+	CoverUntil = FMath::Max(CoverUntil, Now + Duration);
+	bPanicking = bPanicking || Reason == EHitmenAlertReason::Panic;
+	SetAlertStateWithReason(EHitmenAlertState::Combat, Reason);
+	if (bWasCombat && (Reason == EHitmenAlertReason::Panic || Reason == EHitmenAlertReason::TakeCover))
+	{
+		ForceBark(Reason);
+	}
+}
+
+void UHitmenAlertComponent::RecordAllyDeath(AActor* Killer, const FVector& DeathLocation)
+{
+	if (bSuppressed || !GetOwner()->HasAuthority() || !bTakeCoverFromUnseenThreats)
+	{
+		return;
+	}
+	const float Now = GetWorld()->GetTimeSeconds();
+	AllyDeathTimes.RemoveAll([this, Now](float Time) { return Now - Time > AllyDeathWindow; });
+	AllyDeathTimes.Add(Now);
+	// Where the shot seemed to come from: from the body toward the killer, a short way out (never its real position).
+	const FVector Here = GetOwner()->GetActorLocation();
+	const FVector FromBody = Killer ? (Killer->GetActorLocation() - DeathLocation).GetSafeNormal2D() : (DeathLocation - Here).GetSafeNormal2D();
+	const FVector Guess = DeathLocation + FromBody * FMath::Max(UnseenAttackerSearchDistance, 600.f);
+	if (AllyDeathTimes.Num() >= PanicAllyDeaths)
+	{
+		TakeCoverFrom(Killer, Guess, PanicDuration, EHitmenAlertReason::Panic);
+	}
+	else
+	{
+		TakeCoverFrom(Killer, Guess, UnseenThreatCoverDuration, EHitmenAlertReason::TakeCover);
+	}
+}
+
+void UHitmenAlertComponent::LoseTrackOf(AActor* Hostile, const FVector& LastPlace)
+{
+	if (bSuppressed || !Hostile || Target != Hostile || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	if (AlertState != EHitmenAlertState::Combat && AlertState != EHitmenAlertState::Searching && AlertState != EHitmenAlertState::Suspicious)
+	{
+		return;
+	}
+	// Gone in a blink: it searches where the target was, as if it had lost sight of it there.
+	bTargetVisible = false;
+	CoverUntil = -1.f;
+	bPanicking = false;
+	LastKnownLocation = LastPlace;
+	LastSeenLocation = LastPlace;
+	if (AlertState == EHitmenAlertState::Suspicious)
+	{
+		SetInvestigate(LastPlace, false, EHitmenAlertReason::Approach);
+		return;
+	}
+	SetAlertStateWithReason(EHitmenAlertState::Searching, EHitmenAlertReason::LostTarget);
+	StateEnterTime = GetWorld()->GetTimeSeconds();
+	RefreshSearchMarker();
 }

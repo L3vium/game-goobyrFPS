@@ -58,13 +58,13 @@ bool AHitmenHidingSpot::CanInteract_Implementation(AActor* Interactor) const
 		// Only the one inside can use it (to get out).
 		return Occupant == Interactor;
 	}
-	// Carrying a body: F stows it (or nothing, when it does not fit). Otherwise F hides you, or opens it to look at the
-	// bodies inside when there is no room to hide.
+	// Carrying a body: F stows it (or nothing, when it does not fit). Otherwise F hides you when there is room; with a
+	// body inside and no room, F does nothing (the info line says why, the bodies show through the slit).
 	if (const UHitmenBodyCarryComponent* Carry = Interactor->FindComponentByClass<UHitmenBodyCarryComponent>(); Carry && Carry->IsCarrying())
 	{
 		return CanStowBody(Carry->GetCarriedBody());
 	}
-	return CanHide(Interactor) || Bodies.Num() > 0;
+	return CanHide(Interactor);
 }
 
 FText AHitmenHidingSpot::GetInteractionText_Implementation(AActor* Interactor) const
@@ -78,7 +78,7 @@ FText AHitmenHidingSpot::GetInteractionText_Implementation(AActor* Interactor) c
 	{
 		return NSLOCTEXT("Hitmen", "HideBody", "Hide body");
 	}
-	return CanHide(Interactor) ? InteractionText : NSLOCTEXT("Hitmen", "LookInside", "Look inside");
+	return InteractionText;
 }
 
 FText AHitmenHidingSpot::GetInteractionInfo_Implementation(AActor* Interactor) const

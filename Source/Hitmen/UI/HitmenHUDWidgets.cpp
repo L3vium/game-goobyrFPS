@@ -200,6 +200,26 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 	const FLinearColor White = HitmenUI::Text() * FLinearColor(1.f, 1.f, 1.f, 0.9f);
 	const FLinearColor Shadow(0.f, 0.f, 0.f, 0.35f);
 
+	// Timed effects on you (invisibility, pill, armor): small rings in a row above the crosshair, emptying clockwise.
+	if (UI)
+	{
+		const TArray<FHitmenHUDStatusTimer>& Timers = UI->GetStatusTimers();
+		const float RingRadius = 9.f;
+		const float Spacing = 26.f;
+		for (int32 Index = 0; Index < Timers.Num(); ++Index)
+		{
+			const FHitmenHUDStatusTimer& Timer = Timers[Index];
+			const FVector2D RingCenter = Center + FVector2D((Index - (Timers.Num() - 1) * 0.5f) * Spacing, -40.f);
+			const float Left = FMath::Clamp(Timer.Remaining / FMath::Max(Timer.Duration, 0.01f), 0.f, 1.f);
+			const FLinearColor Tint = Timer.Status == EHitmenStatusEffect::Invisible ? FLinearColor(0.55f, 0.85f, 1.f, 0.95f)
+				: (Timer.Status == EHitmenStatusEffect::Boosted ? FLinearColor(1.f, 0.55f, 0.85f, 0.95f) : FLinearColor(0.7f, 0.8f, 0.95f, 0.95f));
+			// The last seconds blink.
+			const float Blink = Timer.Remaining < 1.5f ? 0.55f + 0.45f * FMath::Cos(Timer.Remaining * 12.f) : 1.f;
+			HitmenUI::PaintArc(OutDrawElements, LayerId, AllottedGeometry, RingCenter, RingRadius, 0.f, 360.f, FLinearColor(0.f, 0.f, 0.f, 0.4f), 4.f, 32);
+			HitmenUI::PaintArc(OutDrawElements, LayerId + 1, AllottedGeometry, RingCenter, RingRadius, 0.f, 360.f * Left, Tint * FLinearColor(1.f, 1.f, 1.f, Blink), 2.5f, 32);
+		}
+	}
+
 	// A kill turns the "+" into an "x" (red on a headshot) for a moment.
 	const float KillAlpha = KillCrossDuration > 0.f ? KillCrossTime / KillCrossDuration : 0.f;
 	const float Angle = KillAlpha > 0.f ? 45.f : 0.f;

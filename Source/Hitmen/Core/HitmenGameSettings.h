@@ -28,6 +28,16 @@ enum class EHitmenWatcherVisibility : uint8
 	ShownToggleable
 };
 
+/** Keyboard layout of the default keys (Project Settings -> Hitmen -> Input). */
+UENUM(BlueprintType)
+enum class EHitmenKeyboardLayout : uint8
+{
+	/** Read from the machine: French / Belgian = AZERTY, anything else = QWERTY. */
+	Auto,
+	Azerty,
+	Qwerty
+};
+
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Hitmen"))
 class HITMEN_API UHitmenGameSettings : public UDeveloperSettings
 {
@@ -78,6 +88,12 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Visuals")
 	TSoftObjectPtr<UMaterialInterface> SmokeTrailMaterial;
 
+	// ---- Input ----
+	/** Layout of the default keys: the bindings are authored AZERTY (Z Q S D, A, E) and moved to the same places on a
+	 *  QWERTY keyboard (W A S D, Q, E) on first launch, unless the player rebound them. Auto reads the machine. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Input")
+	EHitmenKeyboardLayout KeyboardLayoutOverride = EHitmenKeyboardLayout::Auto;
+
 	// ---- Juice (every effect keeps its asset slot; these switches decide whether it plays) ----
 	/** A puff at the hands at each step up a ladder or gutter (the grab sound always plays). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
@@ -99,14 +115,26 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
 	bool bFootstepFX = false;
 
+	/** Dust where the hands land on a ledge when climbing or vaulting (the grab sound always plays). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
+	bool bMantleHandsFX = false;
+
+	/** Dust under the feet when a vault or a climb ends. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Juice")
+	bool bMantleLandFX = false;
+
 	// ---- HUD ----
 	/** A small camera top left shows the VIP's body for a few seconds when it dies (everyone). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD")
-	bool bEventCameraOnTargetKill = true;
+	bool bEventCameraOnTargetKill = false;
 
 	/** A small camera top left shows the guard who comes to look at a distraction you switched on (you only). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD")
-	bool bEventCameraOnDistraction = true;
+	bool bEventCameraOnDistraction = false;
+
+	/** While a security camera's meter fills on you, the small picture top left shows what that camera sees. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD")
+	bool bCameraFeedWhenSeen = false;
 
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="HUD", meta=(ClampMin="1", Units="s"))
 	float EventCameraDuration = 4.f;
@@ -163,6 +191,10 @@ public:
 	float PauseMapNPCSize = 13.f;
 
 	// ---- Watchers (spectating: watchers and dead players) ----
+	/** Every spectator may free fly (key 3): dead players and everyone once the match is over, not only watchers. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bSpectatorsCanFreeFly = true;
+
 	/** Free fly goes through walls and objects (still inside the map's box). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
 	bool bWatchersFlyThroughWalls = true;

@@ -69,6 +69,7 @@ class HITMEN_API UHitmenAbility_Jetpack : public UHitmenMoveAbility
 public:
 	UHitmenAbility_Jetpack();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual EHitmenKeyLabel GetHUDKey() const override { return EHitmenKeyLabel::Jump; }
 	virtual bool WantsTick() const override { return true; }
 	virtual void TickAbility(float DeltaTime) override;
 	virtual void LocalPress(const FVector& AimOrigin, const FVector& AimDirection) override;
@@ -138,6 +139,7 @@ class HITMEN_API UHitmenAbility_Dash : public UHitmenMoveAbility
 public:
 	UHitmenAbility_Dash();
 	virtual void LocalPress(const FVector& AimOrigin, const FVector& AimDirection) override;
+	virtual EHitmenKeyLabel GetHUDKey() const override { return EHitmenKeyLabel::Sprint; }
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Ability|Dash", meta=(ClampMin="0"))

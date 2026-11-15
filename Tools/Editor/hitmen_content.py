@@ -928,9 +928,10 @@ def build_guard_loadouts():
 
 
 def set_gunshot_responders(rules):
-    """Three guards answer a gunshot (two for every other noise)."""
+    """Three guards answer a gunshot, four an explosion (two for every other noise)."""
     overrides = dict(rules.get_editor_property("noise_responder_overrides"))
     overrides[unreal.HitmenNoiseType.GUNSHOT] = 3
+    overrides[unreal.HitmenNoiseType.EXPLOSION] = 4
     rules.set_editor_property("noise_responder_overrides", overrides)
 SNIPER_SMOKE = (("smoke_lifetime", 2.2), ("smoke_thickness", 4.0), ("smoke_growth", 9.0), ("smoke_opacity", 0.5))
 
@@ -1852,6 +1853,8 @@ BARKS = {
     "LOST_TARGET": ("Lost visual!", "Where did they go?", "Spread out, find them!"),
     "SEARCH_OVER": ("Nothing. Stay sharp.", "They're gone... for now.", "Back to positions, eyes open."),
     "ALL_CLEAR": ("Must have been nothing.", "All clear.", "Guess I'm hearing things."),
+    "TAKE_COVER": ("Get down!", "Sniper! Take cover!", "Where's that coming from? Cover!"),
+    "PANIC": ("They're picking us off!", "I'm not dying here!", "Somebody help! They're everywhere!"),
 }
 
 

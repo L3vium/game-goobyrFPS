@@ -19,6 +19,10 @@ struct FHitmenActiveStatus
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Status")
 	float EndTime = -1.f;
 
+	/** Server world time it started (or was last extended): the HUD ring shows how much is left. */
+	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Status")
+	float StartTime = -1.f;
+
 	UPROPERTY(BlueprintReadOnly, Category="Hitmen|Status")
 	float Magnitude = 1.f;
 
@@ -69,6 +73,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Status")
 	const TArray<FHitmenActiveStatus>& GetActiveStatuses() const { return ActiveStatuses; }
+
+	/** Server world time (replicated clock on clients): compare with EndTime / StartTime. */
+	float GetServerTime() const;
 
 	// ---- Derived queries ----
 	/** Stunned, asleep: cannot act at all. */
@@ -164,7 +171,6 @@ protected:
 
 	void UpdateStatuses();
 	void RaiseDiffEvents();
-	float GetServerTime() const;
 
 	/** True on the machine that renders this pawn's camera (owning client or listen host). */
 	bool IsLocalViewer() const;

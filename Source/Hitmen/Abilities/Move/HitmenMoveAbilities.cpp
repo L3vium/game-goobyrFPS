@@ -1,6 +1,7 @@
 // Hitmen — move abilities
 
 #include "Abilities/Move/HitmenMoveAbilities.h"
+#include "AI/HitmenAISubsystem.h"
 #include "Abilities/HitmenAbilityActors.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "Components/HitmenHealthComponent.h"
@@ -105,8 +106,14 @@ bool UHitmenAbility_Blink::Activate(const FVector& AimOrigin, const FVector& Aim
 	{
 		Movement->StopClimbing(false);
 	}
-	PlayActivatedJuice(Character->GetActorLocation());
-	return Character->TeleportTo(Destination, Character->GetActorRotation());
+	const FVector From = Character->GetActorLocation();
+	PlayActivatedJuice(From);
+	if (!Character->TeleportTo(Destination, Character->GetActorRotation()))
+	{
+		return false;
+	}
+	UHitmenAISubsystem::NotifyTeleport(Character, From, Character->GetActorLocation());
+	return true;
 }
 
 // ---------------------------------------------------------------------------------------------

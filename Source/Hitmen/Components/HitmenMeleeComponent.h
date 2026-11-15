@@ -7,6 +7,7 @@
 #include "HitmenMeleeComponent.generated.h"
 
 class AHitmenCharacterBase;
+class UNiagaraSystem;
 
 UCLASS(ClassGroup=(Hitmen), Blueprintable, meta=(BlueprintSpawnableComponent))
 class HITMEN_API UHitmenMeleeComponent : public UActorComponent
@@ -60,10 +61,35 @@ protected:
 	void Server_StealthKill(AHitmenCharacterBase* Victim);
 
 	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayPunch();
+	void Multicast_PlayPunch(bool bHit, FVector_NetQuantize HitLocation);
 
 	/** Punch montage (body + first-person arms) and juice on this machine. */
 	void PlayPunchLocal();
+
+	/** A punch that lands: impact puff and thump for everyone, shake, view kick and a hit stop for the puncher. */
+	void PlayPunchHitLocal(const FVector& HitLocation);
+
+	/** The hostile a punch from here would hit (same sweep on the puncher and the server). */
+	bool SweepPunch(FHitResult& OutHit) const;
+
+	/** Impact puff where a punch lands (everyone sees it). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|Juice")
+	TObjectPtr<UNiagaraSystem> PunchHitFX;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|Juice", meta=(ClampMin="0.01"))
+	float PunchHitFXScale = 0.45f;
+
+	/** View shake of the puncher when a punch lands. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|Juice", meta=(ClampMin="0"))
+	float PunchHitShake = 0.9f;
+
+	/** The puncher's view widens this much on contact, then settles. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|Juice", meta=(ClampMin="0", Units="deg"))
+	float PunchHitFOVKick = 3.f;
+
+	/** The puncher's fist holds still this long on contact (local hit stop). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee|Juice", meta=(ClampMin="0", Units="s"))
+	float PunchHitStop = 0.07f;
 
 	/** Punch montage speed (the mannequin attack clip is slow for a jab). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Melee", meta=(ClampMin="0.1"))

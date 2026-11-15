@@ -86,6 +86,9 @@ protected:
 	float ServerHoldStartTime = 0.f;
 
 	void UpdateFocus();
+	void UpdateFocusTarget();
+	/** The bottom-right hint (throw while aiming). */
+	void RefreshCornerHint(const APawn* Pawn);
 	void SetFocus(AActor* NewFocus, const FText& Prompt, const FText& Info = FText::GetEmpty());
 
 	void StartFocusTrace();

@@ -3,6 +3,79 @@
 All notable changes to Hitmen. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions before 0.1.0 belong to the Unity prototype (see git history before the Unreal port).
 
+## [Unreleased]
+
+### Added
+- Juice switches `bMantleHandsFX` and `bMantleLandFX` (off): no particles on climbs and vaults by default.
+- Sound-set events MeleeHit, KnifeWhoosh, WallBreak, BodyBurn, HamsterSqueak, HamsterBite, Dash, BlinkArrive; a
+  synthesized headshot cue (`Tools/Audio/hitmen_synth_sfx.py`, `Audio/SFX/Synth`).
+- Punch juice: a whoosh on the swing; on a hit a puff (`PunchHitFX`), a thump, a view shake, a short field-of-view
+  kick and a hit stop, predicted for the puncher. Knife (and any melee weapon): hits predicted on the attacker
+  (`HitShake`, `HitFOVKick`, `HitStop` in the weapon data), slash whoosh, blood hit.
+- AI: distance curve for the white fill (`SuspicionRateByDistance`: near instant point blank, 4 s at 20 m), sixth
+  sense (`SixthSenseRadius` 250 cm), console `HitmenAI.Cones 1`.
+- AI cover and panic: shot by an unseen shooter or seeing a colleague drop, an NPC takes cover from where it seemed
+  to come from (`UnseenThreatCoverDuration` 6 s); two deaths within 30 s make it panic (`PanicDuration` 12 s); barks
+  TakeCover / Panic; BB key `TakeCover`, `UBTTask_HitmenHoldCover`, `UBTTask_HitmenFindCover::bHideFromLastKnown`.
+- AI loses a hunted pawn that teleports, blinks or swaps 6 m or more out of its sight (`LoseAggroTeleportDistance`,
+  `UHitmenAISubsystem::NotifyTeleport`).
+- Turrets break like cameras (`TurretHealth` 80, `BrokenFX`). Breakable walls: `BreakFX`, `BreakSound`, debris
+  chunks (`DebrisCount`).
+- `bCameraFeedWhenSeen` (Project Settings -> Hitmen -> HUD, off): the picture top left shows what a security camera
+  sees while it sees you (`AHitmenEventCamera::ShowFrom`).
+- NPC option `bGuest` (off): a neutral, unarmed guest that runs from danger. `CandidateGuardWeapon` for VIP
+  candidates.
+- HUD: rings above the crosshair for timed effects (invisibility, pill, armor); a small "F  Throw" hint bottom right
+  while aiming; ability cards show the key that triggers them (Space for the jetpack, Shift for the dash; new key
+  label Sprint).
+- `bSpectatorsCanFreeFly` (Project Settings -> Hitmen -> Watchers, on): dead players and everyone at match end may
+  free fly. Fly cheat: Shift flies faster (`CheatFlyFastMultiplier` x3, server-synced).
+- QA: `HitmenEditorTools.take_pie_screenshot` (PIE picture with widgets, whatever window PIE plays in).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Changed
+- A gunshot (report and impact alike) draws guards to where the bullet landed: they turn to the impact, never to the
+  shooter (`UHitmenAISubsystem::ReportNoiseHeardAt`).
+- NPCs never walk backward: the body follows the controller, which faces the walking direction whenever the focus is
+  more than `MaxStrafeAngle` (100°) off it; turning to a noise or staring now turns the body too; stale shooting /
+  noise focus cleared; an unseen target is faced where it was last known.
+- Snipers show their red star only while they aim at someone they see (`bGlintOnlyWhileAiming`), like the red line.
+- Explosions: four responders, `ExplosionOcclusionMultiplier` 0.8, barrels heard 40 m away (`ExplosionNoiseRadius`).
+- VIP candidates not picked become guards at match start (named Guard, armed); the VIP reads "Target".
+- Security cameras: white cone, red while they see someone (`IdleColor`, `DetectingColor`, `AlertColor`), the sweep
+  stops where they see someone (`bFreezeSweepWhileSeeing`); the floor ring is off.
+- Event cameras top left are off by default (`bEventCameraOnTargetKill`, `bEventCameraOnDistraction`).
+- Inventory bar: the held weapon is always the left card; switching makes the cards trade places (`SwapTime` 0.12
+  s).
+- Watcher keys line: only for spectators, views first (1 / 2 / 3, free fly listed), WASD on QWERTY.
+- Agent screen: look counters read 0 / N for the base look; the arrows wait for the camera to arrive in the room,
+  then fade in.
+- Hiding spots holding a body: no "Look inside"; F only hides you (room) or stows the body you carry.
+
+
+
+
+### Fixed
+- Radios and TVs fell silent after one play of their clip: the clip restarts as long as the distraction is on.
+- Muzzle light: at the barrel as drawn (first person), and other players no longer see the host's flash at its
+  first-person gun.
+- Punches flagged headshots (red cross and sound without a kill). The Shift-tap dash with toggle sprint on.
+- Prompt info line: one line under the key, clear of the hold ring; spectator info no longer drawn over living
+  players' prompts.
+
 ## [0.9.0] - 2026-11-15
 
 ### Added

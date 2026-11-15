@@ -183,6 +183,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI", meta=(ClampMin="0", Units="cm"))
 	float WitnessKillRadius = 2000.f;
 
+	/** A pawn moving at least this far at once (teleporter, blink, swap) is lost by NPCs that cannot see where it went. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI", meta=(ClampMin="0", Units="cm"))
+	float LoseAggroTeleportDistance = 600.f;
+
+	/** Explosions go through walls better than other noises: radius kept per wall (other noises: OcclusionMultiplier). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Hearing", meta=(ClampMin="0", ClampMax="1"))
+	float ExplosionOcclusionMultiplier = 0.8f;
+
 	// ---- AI: hearing caps, reinforcement calls, search, flanking (owned by the AI code) ----
 	/** Per noise type replacement for MaxNoiseResponders (a missing type uses MaxNoiseResponders). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Hearing")

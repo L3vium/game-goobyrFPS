@@ -1103,10 +1103,17 @@ void AHitmenWeaponBase::ReportShotNoise(const FVector& Origin, const TArray<FVec
 	{
 		return;
 	}
-	// The report itself is heard close to the shooter only (silenced: not at all).
+	// The report is heard around the shooter (silenced: not at all), but it draws guards to where the bullet landed:
+	// they turn to the impact, never to the shooter. A shot into the air: a point along it.
 	if (!WeaponData->bSilenced && WeaponData->NoiseRadius > 0.f)
 	{
-		UHitmenAISubsystem::ReportNoise(this, Origin, WeaponData->NoiseRadius, OwnerPawn, EHitmenNoiseType::Gunshot);
+		FVector HeardAt = Impacts.Num() > 0 ? Impacts[0] : Origin;
+		if (Impacts.Num() == 0 || FVector::DistSquared(Origin, Impacts[0]) >= FMath::Square(WeaponData->Range * 0.98f))
+		{
+			const FVector Along = Impacts.Num() > 0 ? (Impacts[0] - Origin).GetSafeNormal() : (OwnerPawn ? OwnerPawn->GetBaseAimRotation().Vector() : FVector::ForwardVector);
+			HeardAt = Origin + Along * FMath::Min(WeaponData->Range, 1500.f);
+		}
+		UHitmenAISubsystem::ReportNoiseHeardAt(this, Origin, HeardAt, WeaponData->NoiseRadius, OwnerPawn, EHitmenNoiseType::Gunshot);
 	}
 	// Where the bullet lands is what draws NPCs (they investigate the impact, not the shooter).
 	if (WeaponData->ImpactNoiseRadius > 0.f && Impacts.Num() > 0)
@@ -1138,7 +1145,9 @@ void AHitmenWeaponBase::Multicast_FireEffects_Implementation(FVector_NetQuantize
 	{
 		Points.Add(Impact);
 	}
-	PlayFireEffects(Origin, Points, false);
+	// Each machine flashes at its own copy of the gun: the server's muzzle can be the host's first-person gun, which
+	// sits somewhere else than the gun everyone else sees in its hands.
+	PlayFireEffects(IsHidden() ? FVector(Origin) : GetMuzzleLocation(), Points, false);
 }
 
 void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVector>& Impacts, bool bLocallyPredicted)
@@ -1184,7 +1193,8 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	if (WeaponData->MuzzleLightIntensity > 0.f && Now - LastMuzzleLightTime >= MuzzleLightMinInterval)
 	{
 		LastMuzzleLightTime = Now;
-		MuzzleLight->SetWorldLocation(Origin);
+		// At the barrel as it is drawn: your own first-person gun is drawn nearer the eye than it really is.
+		MuzzleLight->SetWorldLocation(DrawnMuzzle);
 		MuzzleLight->SetIntensity(WeaponData->MuzzleLightIntensity);
 		// Always off when the timer fires: the light only ever lives with a muzzle flash (a time guard here used to
 		// fail on input-fired shots, which run a frame ahead of the timer clock, and left the light on in hand).
@@ -1221,7 +1231,9 @@ void AHitmenWeaponBase::PlayFireEffects(const FVector& Origin, const TArray<FVec
 	}
 	if (USoundBase* Sound = WeaponData->FireSound.LoadSynchronous())
 	{
-		UHitmenSoundLibrary::PlaySoundInSpace(this, Sound, Origin, EHitmenSoundSpace::Gunshot, WeaponData->FireSoundVolume,
+		// A blade's swing is heard like a voice, not like a gunshot.
+		const bool bMelee = !WeaponData->bUsesAmmo && WeaponData->MeleeRange > 0.f;
+		UHitmenSoundLibrary::PlaySoundInSpace(this, Sound, Origin, bMelee ? EHitmenSoundSpace::World : EHitmenSoundSpace::Gunshot, WeaponData->FireSoundVolume,
 			FMath::FRandRange(WeaponData->FireSoundPitch.X, WeaponData->FireSoundPitch.Y));
 	}
 	// Same cosmetic path as the FX: predicted on the shooter, multicast to everyone else.

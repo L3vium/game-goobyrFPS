@@ -1,6 +1,7 @@
 // Hitmen — traversal fixtures
 
 #include "World/Interactables/HitmenTraversal.h"
+#include "AI/HitmenAISubsystem.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
@@ -214,7 +215,10 @@ void AHitmenTeleporter::HandleOverlap(UPrimitiveComponent* OverlappedComponent, 
 		Movement->StopClimbing(false);
 	}
 	Destination->MarkArrival(Character);
+	const FVector From = Character->GetActorLocation();
 	Character->TeleportTo(Destination->GetExitLocation(), Destination->GetActorRotation());
+	// Gone in an instant: guards hunting it that cannot see the exit lose it.
+	UHitmenAISubsystem::NotifyTeleport(Character, From, Character->GetActorLocation());
 	Multicast_Teleported(Character);
 }
 

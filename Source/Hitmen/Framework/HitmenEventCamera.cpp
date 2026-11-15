@@ -24,12 +24,44 @@ AHitmenEventCamera::AHitmenEventCamera()
 	Capture->FOVAngle = 55.f;
 }
 
+void AHitmenEventCamera::ShowFrom(USceneComponent* View, float FOV, const FText& Title, float Duration, APlayerController* InViewer)
+{
+	if (!View || !InViewer)
+	{
+		return;
+	}
+	if (!Target)
+	{
+		const FIntPoint Resolution = UHitmenGameSettings::Get()->EventCameraResolution;
+		Target = UKismetRenderingLibrary::CreateRenderTarget2D(this, FMath::Max(64, Resolution.X), FMath::Max(36, Resolution.Y), RTF_RGBA8_SRGB);
+		Capture->TextureTarget = Target;
+	}
+	const bool bSameView = FixedView.Get() == View && EndTime != -1.f;
+	Subject.Reset();
+	FixedView = View;
+	Viewer = InViewer;
+	Capture->FOVAngle = FOV;
+	EndTime = Duration > 0.f ? GetWorld()->GetTimeSeconds() + Duration : TNumericLimits<float>::Max();
+	SetActorLocationAndRotation(View->GetComponentLocation(), View->GetComponentRotation());
+	Capture->bCaptureEveryFrame = true;
+	SetActorTickEnabled(true);
+	if (!bSameView)
+	{
+		if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(InViewer))
+		{
+			UI->SetEventCamera(Target, Title, Duration > 0.f ? EndTime : -1.f);
+		}
+	}
+}
+
 void AHitmenEventCamera::Show(AActor* InSubject, const FText& Title, float Duration, APlayerController* InViewer)
 {
 	if (!InSubject || !InViewer)
 	{
 		return;
 	}
+	FixedView.Reset();
+	Capture->FOVAngle = 55.f;
 	if (!Target)
 	{
 		const FIntPoint Resolution = UHitmenGameSettings::Get()->EventCameraResolution;
@@ -54,6 +86,7 @@ void AHitmenEventCamera::Show(AActor* InSubject, const FText& Title, float Durat
 void AHitmenEventCamera::Stop()
 {
 	EndTime = -1.f;
+	FixedView.Reset();
 	Capture->bCaptureEveryFrame = false;
 	SetActorTickEnabled(false);
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(Viewer.Get()))
@@ -65,6 +98,17 @@ void AHitmenEventCamera::Stop()
 void AHitmenEventCamera::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (const USceneComponent* View = FixedView.Get())
+	{
+		if (GetWorld()->GetTimeSeconds() >= EndTime)
+		{
+			Stop();
+			return;
+		}
+		// A fixed camera's view (security feed): follows its head as it sweeps.
+		SetActorLocationAndRotation(View->GetComponentLocation(), View->GetComponentRotation());
+		return;
+	}
 	if (!Subject.IsValid() || GetWorld()->GetTimeSeconds() >= EndTime)
 	{
 		Stop();

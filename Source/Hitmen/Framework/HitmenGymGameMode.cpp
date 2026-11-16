@@ -8,4 +8,6 @@ AHitmenGymGameMode::AHitmenGymGameMode()
 	bActivateAllCandidates = true;
 	RespawnDelay = 2.f;
 	bParachuteIntro = false;
+	// The gym always has its cheats, Shipping builds included.
+	CheatAccess = EHitmenCheatAccess::Always;
 }

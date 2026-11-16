@@ -121,9 +121,15 @@ public:
 	virtual FText GetInteractionInfo_Implementation(AActor* Interactor) const override;
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
-	/** Alive, unaware of the player, carrying a keycard, player behind it. */
+	/** Alive, not looking at the thief, something on a hip (keycard, holstered pistol), the thief behind it (crouched:
+	 *  beside it is enough). */
 	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
 	bool CanBePickpocketedBy(const AActor* Thief) const;
+
+	/** What F would take from its hips now (the hip nearest where the thief looks when both carry something). */
+	EHitmenPickpocketItem GetPickpocketItem(const AActor* Thief) const;
+
+	virtual bool GetHolsterAttachment(FName& OutBone, FTransform& OutRelative) const override;
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|NPC")
 	int32 GetCarriedKeycard() const { return CarriedKeycard; }
@@ -234,13 +240,51 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
 	FText DisplayName;
 
-	/** Where the keycard sits, in the NPC's own space (X forward, Y right, Z up from the capsule centre): a right pocket. */
-	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC")
+	/** Where the keycard sits on the right hip, in the NPC's own space (X forward, Y right, Z up from the capsule
+	 *  centre); on the left hip Y is mirrored. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Hips")
 	FVector KeycardHipOffset = FVector(4.f, 21.f, 2.f);
 
 	/** Pickpocketing also needs the thief to be crouched. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC")
 	bool bPickpocketRequiresCrouch = false;
+
+	/**
+	 * Three places to carry things: the hands, the left hip and the right hip. Holstered (default): a pistol rides in
+	 * the hip holster (HolsterSide) while the guard is calm, is drawn when it is alerted (yellow threat, search, fight,
+	 * on edge) and put back when it calms down; from behind it can be pickpocketed. InHands: always in the hands (never
+	 * pickpocketed). Long guns (weapon data bCanHolster off) are always in the hands.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC|Hips")
+	EHitmenNPCWeaponCarry WeaponCarry = EHitmenNPCWeaponCarry::Holstered;
+
+	/** Hip of the holster; a keycard rides on the other hip. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|NPC|Hips")
+	EHitmenHipSlot HolsterSide = EHitmenHipSlot::Right;
+
+	/** The holstered weapon on the right hip, in the NPC's own space (X forward, Y right, Z up from the capsule centre).
+	 *  Weapon actors point their barrel along their +Y (the pistol's VisualTransform): this rotation hangs it barrel
+	 *  down, the slide toward the front, the grip up and back. The left hip mirrors it. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC|Hips")
+	FTransform HolsterTransform = FTransform(FRotator(0.f, -90.f, 80.f), FVector(-3.f, 24.f, 4.f));
+
+	/** Crouched thieves may pickpocket from beside the NPC too (dot of its forward and the way to the thief). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC", meta=(ClampMin="-1", ClampMax="1"))
+	float CrouchedPickpocketMaxDot = 0.3f;
+
+	/** Pickpocketing reach from the NPC's centre. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|NPC", meta=(ClampMin="0", Units="cm"))
+	float PickpocketReach = 220.f;
+
+	/** Hip of the keycard: the other side of the holster. */
+	EHitmenHipSlot GetKeycardSide() const { return HolsterSide == EHitmenHipSlot::Right ? EHitmenHipSlot::Left : EHitmenHipSlot::Right; }
+
+	/** A transform in the NPC's own space (actor space) relative to the hip bone of the reference pose (the same on
+	 *  every machine, whatever the animation does when it is computed). */
+	FTransform ActorSpaceToHipBone(const FTransform& ActorSpace) const;
+
+	/** Server: holster or draw the pistol from the alert state. */
+	void RefreshWeaponCarry();
 
 	/** Carries bodies to a container after a body search (the VIP's body never). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Hitmen|Components")
@@ -315,6 +359,9 @@ protected:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category="Hitmen|NPC")
 	TObjectPtr<AHitmenWeaponBase> Weapon;
+
+	/** Server: spawns DefaultWeapon (or GuardWeapon) in the hands or the holster. */
+	void SpawnWeapon(UHitmenWeaponData* Data);
 
 	int32 PatrolIndex = INDEX_NONE;
 	int32 PatrolDirection = 1;

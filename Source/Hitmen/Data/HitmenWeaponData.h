@@ -338,6 +338,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
 	FName AttachSocket = TEXT("HandGrip_R");
 
+	/** Small enough for a guard's hip holster (pistols): guards set to carry it holstered keep it there while calm,
+	 *  draw it when alerted, and it can be pickpocketed from behind. Long guns stay in the hands. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
+	bool bCanHolster = false;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Weapon|Visuals")
 	FTransform AttachOffset;
 

@@ -13,6 +13,10 @@ class UHitmenSoundSet;
 class UHitmenBarkSet;
 class UBehaviorTree;
 class UMaterialInterface;
+class UHitmenWeaponData;
+class USkeletalMesh;
+class UAnimationAsset;
+class USoundAttenuation;
 
 /**
  * Project-wide defaults editable from Project Settings. Gameplay code reads these through
@@ -74,6 +78,11 @@ public:
 	/** What NPCs say when their awareness changes (subtitles for nearby players, optional voices). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="AI")
 	TSoftObjectPtr<UHitmenBarkSet> BarkSet;
+
+	/** Weapon of a VIP candidate that was not picked and has no CandidateGuardWeapon / DefaultWeapon of its own: every
+	 *  such candidate becomes an armed guard with the normal guard behaviour. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="AI")
+	TSoftObjectPtr<UHitmenWeaponData> DefaultGuardWeapon;
 
 	// ---- Visuals ----
 	/** Unlit additive material for bullet tracers (vector "Color", scalar "Opacity"). */
@@ -237,9 +246,38 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers", meta=(ClampMin="0", Units="cm", EditCondition="bPlayersSeeNameTags"))
 	float PlayerNameTagRange = 4000.f;
 
-	/** Players see the watchers flying around (orb and name). */
+	/** Players see the watchers (and dead players) flying around, as ghosts (WatcherGhost*) with their name. Off by
+	 *  default: the living never see them. Watchers always see each other as orbs (WatcherSeeWatchers). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
 	bool bPlayersSeeWatchers = false;
+
+	/** The ghost players see (bPlayersSeeWatchers): this body, posed by WatcherGhostAnimation, in WatcherGhostMaterial
+	 *  (vector "Color", scalar "Opacity": the additive flash material by default) tinted WatcherGhostColor. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers", meta=(EditCondition="bPlayersSeeWatchers"))
+	TSoftObjectPtr<USkeletalMesh> WatcherGhostMesh;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers", meta=(EditCondition="bPlayersSeeWatchers"))
+	TSoftObjectPtr<UAnimationAsset> WatcherGhostAnimation;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers", meta=(EditCondition="bPlayersSeeWatchers"))
+	TSoftObjectPtr<UMaterialInterface> WatcherGhostMaterial;
+
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers", meta=(EditCondition="bPlayersSeeWatchers"))
+	FLinearColor WatcherGhostColor = FLinearColor(0.55f, 0.8f, 1.f, 0.35f);
+
+	/** The dead (and watchers) can talk to the living. Off by default: the living never hear them; the dead hear
+	 *  everyone and each other. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bDeadCanTalkToLiving = false;
+
+	/** With proximity chat on (lobby), a watcher's or dead player's voice comes from where it flies (heard by those
+	 *  near it); off: heard everywhere at full volume by whoever may hear it. */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	bool bWatcherProximityVoice = true;
+
+	/** Proximity chat falloff (players' bodies without their own VoiceAttenuation, flying watchers). */
+	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
+	TSoftObjectPtr<USoundAttenuation> VoiceAttenuation;
 
 	/** Players see "WATCHED BY n PLAYERS" while watchers follow them in player view. */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Watchers")
@@ -281,7 +319,8 @@ public:
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Debug")
 	bool bShowDebugButton = true;
 
-	/** Allows cheat commands in Shipping builds (keep off for releases). */
+	/** Allows cheat commands in Shipping builds for every game mode (keep off for releases). Each game mode also has
+	 *  its own CheatAccess (the gym: always). */
 	UPROPERTY(Config, EditAnywhere, BlueprintReadOnly, Category="Debug")
 	bool bAllowCheatsInShipping = false;
 

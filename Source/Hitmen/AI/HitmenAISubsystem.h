@@ -115,6 +115,15 @@ public:
 	 *  gunshot report sends guards to where the bullet landed, never to the shooter. */
 	static void ReportNoiseHeardAt(const UObject* WorldContext, const FVector& Location, const FVector& HeardAt, float Radius, AActor* Instigator, EHitmenNoiseType Type);
 
+	/**
+	 * A shot from Origin to End (bHit: it landed there; otherwise it flew off). Heard only close by: an NPC the bullet
+	 * passed within NearMissRadius of, or one near where it landed (ImpactRadius, walls cut it), or one in range of a
+	 * loud report (ReportRadius around the shooter, 0 = silenced). Listeners walk to where it landed (a miss: the
+	 * point of the path nearest them); near misses always react and count toward panic. HitActor (the one hit) is
+	 * left to its damage reaction.
+	 */
+	static void ReportShot(const UObject* WorldContext, const FVector& Origin, const FVector& End, bool bHit, float ReportRadius, float ImpactRadius, AActor* Shooter, const AActor* HitActor);
+
 	/** A pawn moved far at once (teleporter, blink, swap): NPCs hunting it that cannot see where it went lose it. */
 	static void NotifyTeleport(APawn* Pawn, const FVector& From, const FVector& To);
 

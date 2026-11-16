@@ -431,6 +431,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|UI")
 	bool IsEmoteWheelOpen() const { return bEmoteWheelOpen; }
 
+	/** The wheel's pointer (offset from its centre, screen pixels), moved by the mouse while it is open. */
+	void AddEmoteWheelCursor(const FVector2D& Delta);
+	FVector2D GetEmoteWheelCursor() const { return EmoteWheelCursor; }
+
 private:
 	UPROPERTY(Transient) FHitmenHUDInventoryView InventoryView;
 	UPROPERTY(Transient) FHitmenHUDAbilityView MoveAbilityView;
@@ -445,6 +449,7 @@ private:
 	bool bPauseMenuOpen = false;
 	bool bOptionsOpen = false;
 	bool bEmoteWheelOpen = false;
+	FVector2D EmoteWheelCursor = FVector2D::ZeroVector;
 	bool bSightroomActive = false;
 
 	// ---- Hints (world-anchored ability target, traversal, scope) ----

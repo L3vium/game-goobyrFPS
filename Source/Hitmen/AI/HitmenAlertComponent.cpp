@@ -4,6 +4,7 @@
 #include "Hitmen.h"
 #include "Characters/HitmenNPC.h"
 #include "NavigationSystem.h"
+#include "NavigationPath.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Characters/HitmenCharacterBase.h"
 #include "StatusEffects/HitmenStatusEffectComponent.h"
@@ -61,6 +62,7 @@ void UHitmenAlertComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(UHitmenAlertComponent, bCallingReinforcements);
 	DOREPLIFETIME(UHitmenAlertComponent, Target);
 	DOREPLIFETIME(UHitmenAlertComponent, bTargetVisible);
+	DOREPLIFETIME(UHitmenAlertComponent, bTargetSighted);
 	DOREPLIFETIME(UHitmenAlertComponent, AlertReason);
 	DOREPLIFETIME(UHitmenAlertComponent, bOnEdge);
 	DOREPLIFETIME(UHitmenAlertComponent, ForcedBarkCount);
@@ -210,6 +212,15 @@ void UHitmenAlertComponent::SetAlertState(EHitmenAlertState NewState)
 	const float Now = GetWorld()->GetTimeSeconds();
 	AlertState = NewState;
 	StateEnterTime = Now;
+	// A fight starts "sighted" only when it starts from seeing the target (not a shot from nowhere, a colleague dropping).
+	if (NewState == EHitmenAlertState::Combat)
+	{
+		bTargetSighted = bTargetVisible;
+	}
+	else
+	{
+		bTargetSighted = false;
+	}
 	if (!IsAlertedState(Old) && IsAlertedState(NewState))
 	{
 		AlertedSinceTime = Now;
@@ -312,8 +323,9 @@ void UHitmenAlertComponent::SetInvestigate(const FVector& Location, bool bThreat
 		return;
 	}
 	const bool bAlreadyInvestigating = AlertState == EHitmenAlertState::Investigating;
-	SetAlertStateWithReason(EHitmenAlertState::Investigating, Reason);
+	// Set before the state change: listeners (guard groups, walk speed, the holster) read it on the broadcast.
 	bThreatInvestigation = (bAlreadyInvestigating && bThreatInvestigation) || bThreat;
+	SetAlertStateWithReason(EHitmenAlertState::Investigating, Reason);
 	// The timer starts on arrival (see TickComponent): the walk there does not count.
 	bInvestigateArrived = false;
 	StateEnterTime = GetWorld()->GetTimeSeconds();
@@ -427,7 +439,89 @@ void UHitmenAlertComponent::LoseSightOf(AActor* Seen)
 	}
 }
 
+EHitmenAlertState UHitmenAlertComponent::GetDisplayAlertState() const
+{
+	return AlertState == EHitmenAlertState::Combat && !bTargetSighted ? EHitmenAlertState::Searching : AlertState;
+}
+
+FVector UHitmenAlertComponent::ResolveSoundSpot(const FVector& Location, const FVector& ApproachFrom) const
+{
+	UWorld* World = GetWorld();
+	UNavigationSystemV1* Nav = World ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World) : nullptr;
+	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!Nav || !OwnerPawn)
+	{
+		return Location;
+	}
+	// Off the wall it hit (a step back toward where the sound came from), then down to the floor under it: a bullet
+	// in a wall or a hedge top is checked from the floor in front of it, never from on top of something.
+	FVector Probe = Location;
+	const FVector Back = (ApproachFrom - Location).GetSafeNormal();
+	if (!Back.IsNearlyZero())
+	{
+		Probe += Back * 60.f;
+	}
+	FHitResult Floor;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenSoundSpot), false, GetOwner());
+	if (World->LineTraceSingleByChannel(Floor, Probe + FVector(0.f, 0.f, 30.f), Probe - FVector(0.f, 0.f, 800.f), ECC_Visibility, Params))
+	{
+		Probe = Floor.ImpactPoint;
+	}
+	FNavLocation OnNav;
+	if (!Nav->ProjectPointToNavigation(Probe, OnNav, FVector(120.f, 120.f, 250.f))
+		&& !Nav->ProjectPointToNavigation(Location, OnNav, FVector(400.f, 400.f, 600.f)))
+	{
+		return Location;
+	}
+	// Walls and mazes: when the spot cannot be reached, go as far as the path goes (the closest reachable point).
+	const UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(World, OwnerPawn->GetActorLocation(), OnNav.Location, const_cast<APawn*>(OwnerPawn));
+	if (Path && Path->IsValid() && Path->IsPartial() && Path->PathPoints.Num() > 0)
+	{
+		return Path->PathPoints.Last();
+	}
+	return OnNav.Location;
+}
+
+void UHitmenAlertComponent::HearShot(const FVector& Impact, const FVector& ShotOrigin, AActor* Shooter, float DistanceToShooter, bool bClose)
+{
+	if (!WouldReactToNoise() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	// It already sees the shooter: what it sees decides (sight takes priority over hearing).
+	if (Shooter && Target == Shooter && bTargetVisible)
+	{
+		return;
+	}
+	const bool bHostile = UHitmenTeamLibrary::AreHostile(GetOwner(), Shooter);
+	if (bClose && bHostile && bTakeCoverFromUnseenThreats)
+	{
+		// Bullets keep landing next to it: after a few it panics and hides from where they seem to come from.
+		const float Now = GetWorld()->GetTimeSeconds();
+		ShotHeardTimes.RemoveAll([this, Now](float Time) { return Now - Time > ShotsHeardWindow; });
+		ShotHeardTimes.Add(Now);
+		if (ShotHeardTimes.Num() >= PanicShotsHeard)
+		{
+			ShotHeardTimes.Reset();
+			const FVector Toward = (ShotOrigin - Impact).GetSafeNormal2D();
+			const float Along = FMath::Min(FMath::Max(UnseenAttackerSearchDistance, 600.f), FVector::Dist2D(ShotOrigin, Impact) * 0.7f);
+			TakeCoverFrom(Shooter, Impact + Toward * Along, PanicDuration, EHitmenAlertReason::Panic);
+			return;
+		}
+	}
+	ReactToNoise(ResolveSoundSpot(Impact, ShotOrigin), EHitmenNoiseType::Gunshot, Shooter, DistanceToShooter);
+}
+
 void UHitmenAlertComponent::HearNoise(const FVector& Location, EHitmenNoiseType Type, AActor* NoiseInstigator, float Distance)
+{
+	if (!WouldReactToNoise())
+	{
+		return;
+	}
+	ReactToNoise(ResolveSoundSpot(Location, Location), Type, NoiseInstigator, Distance);
+}
+
+void UHitmenAlertComponent::ReactToNoise(const FVector& Location, EHitmenNoiseType Type, AActor* NoiseInstigator, float Distance)
 {
 	if (!WouldReactToNoise())
 	{
@@ -803,6 +897,7 @@ void UHitmenAlertComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 			// Sees the shooter: cover from a guess is over, it fights.
 			CoverUntil = -1.f;
 			bPanicking = false;
+			bTargetSighted = true;
 		}
 		else if (CoverUntil > 0.f && Now >= CoverUntil)
 		{

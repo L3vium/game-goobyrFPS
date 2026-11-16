@@ -36,6 +36,8 @@
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Net/VoiceConfig.h"
+#include "Core/HitmenGameSettings.h"
+#include "Sound/SoundAttenuation.h"
 #include "Net/UnrealNetwork.h"
 #include "AIController.h"
 #include "Engine/World.h"
@@ -133,6 +135,7 @@ void AHitmenPlayerCharacter::BeginPlay()
 	{
 		BindLocalSettings();
 	}
+	EmoteComponent->OnEmoteChanged.AddUniqueDynamic(this, &AHitmenPlayerCharacter::HandleEmoteChanged);
 	SetupProximityVoice();
 }
 
@@ -307,6 +310,10 @@ void AHitmenPlayerCharacter::Tick(float DeltaSeconds)
 		return;
 	}
 	if (!IsLocallyControlled())
+	{
+		return;
+	}
+	if ((bEmoteView || EmoteViewAlpha > 0.f) && UpdateEmoteCamera(DeltaSeconds))
 	{
 		return;
 	}
@@ -1182,6 +1189,11 @@ void AHitmenPlayerCharacter::Input_Move(const FVector2D& Axis)
 		return;
 	}
 	LastMoveKeys = FIntPoint::ZeroValue;
+	// Walking off ends an emote.
+	if (!Axis.IsNearlyZero())
+	{
+		CancelEmote();
+	}
 	// Under the canopy the same keys steer the drop.
 	if (!CanAct() || !StatusEffectComponent->CanMove())
 	{
@@ -1195,6 +1207,14 @@ void AHitmenPlayerCharacter::Input_Look(const FVector2D& Axis)
 {
 	if (IsDead())
 	{
+		return;
+	}
+	if (bEmoteView)
+	{
+		// Emoting: the mouse turns the orbit around you, your facing stays.
+		// Same feel as looking around (the engine's legacy look scale, 2.5).
+		EmoteOrbit.Yaw += Axis.X * EmoteCameraLookScale;
+		EmoteOrbit.Pitch = FMath::Clamp(EmoteOrbit.Pitch + Axis.Y * EmoteCameraLookScale, -70.f, 60.f);
 		return;
 	}
 	// Zooming keeps the same feel: sensitivity follows the field of view (tangent ratio).
@@ -1217,6 +1237,7 @@ void AHitmenPlayerCharacter::Input_Look(const FVector2D& Axis)
 
 void AHitmenPlayerCharacter::Input_JumpPressed()
 {
+	CancelEmote();
 	bJumpInputHeld = true;
 	JumpInputPressTime = GetWorld()->GetTimeSeconds();
 	if (CanAct() && !bParachuting)
@@ -1263,6 +1284,7 @@ void AHitmenPlayerCharacter::UpdateJetpackFromSpace()
 void AHitmenPlayerCharacter::Input_SprintTapped()
 {
 	// A tap of Shift dashes (E still works).
+	CancelEmote();
 	if (CanAct() && HasMoveAbility(UHitmenAbility_Dash::StaticClass()))
 	{
 		AbilityComponent->PressSlot(EHitmenAbilitySlot::Move);
@@ -1294,6 +1316,7 @@ void AHitmenPlayerCharacter::Input_SprintChanged(bool bWantsSprint)
 
 void AHitmenPlayerCharacter::Input_FirePressed()
 {
+	CancelEmote();
 	// A body in the arms: no weapon, no punch (put it down first).
 	if (!CanAct() || BodyCarryComponent->IsCarrying())
 	{
@@ -1316,6 +1339,10 @@ void AHitmenPlayerCharacter::Input_FireReleased()
 
 void AHitmenPlayerCharacter::Input_AimChanged(bool bWantsAim)
 {
+	if (bWantsAim)
+	{
+		CancelEmote();
+	}
 	const bool bNewAim = bWantsAim && CanAct();
 	if (bIsAiming != bNewAim)
 	{
@@ -1340,6 +1367,7 @@ void AHitmenPlayerCharacter::Server_SetClimbRelative_Implementation(bool bRelati
 
 void AHitmenPlayerCharacter::Input_Interact()
 {
+	CancelEmote();
 	if (!CanAct())
 	{
 		return;
@@ -1370,6 +1398,7 @@ bool AHitmenPlayerCharacter::CanThrowHeldWeapon() const
 
 void AHitmenPlayerCharacter::Input_MoveAbilityPressed()
 {
+	CancelEmote();
 	if (CanAct()) { AbilityComponent->PressSlot(EHitmenAbilitySlot::Move); }
 }
 
@@ -1380,6 +1409,7 @@ void AHitmenPlayerCharacter::Input_MoveAbilityReleased()
 
 void AHitmenPlayerCharacter::Input_ManipulationAbilityPressed()
 {
+	CancelEmote();
 	if (CanAct()) { AbilityComponent->PressSlot(EHitmenAbilitySlot::Manipulation); }
 }
 
@@ -1390,6 +1420,7 @@ void AHitmenPlayerCharacter::Input_ManipulationAbilityReleased()
 
 void AHitmenPlayerCharacter::Input_SwitchSlot(float Direction)
 {
+	CancelEmote();
 	// Carrying: the wheel puts the body down (the other weapon then comes to hand).
 	if (CanAct() && BodyCarryComponent->IsCarrying())
 	{
@@ -1406,7 +1437,106 @@ void AHitmenPlayerCharacter::Input_SightroomChanged(bool bActive)
 
 void AHitmenPlayerCharacter::Input_Emote(int32 EmoteIndex)
 {
-	if (CanAct()) { EmoteComponent->PlayEmote(EmoteIndex); }
+	// Only on your feet with free hands: not climbing, hanging, falling, riding or carrying a body.
+	const UHitmenCharacterMovementComponent* Movement = GetHitmenMovement();
+	const bool bBusy = (Movement && (Movement->IsClimbing() || Movement->IsHanging() || Movement->IsMantling() || Movement->IsFalling()
+		|| Movement->MovementMode == MOVE_Custom)) || BodyCarryComponent->IsCarrying() || bParachuting;
+	if (CanAct() && !bBusy) { EmoteComponent->PlayEmote(EmoteIndex); }
+}
+
+bool AHitmenPlayerCharacter::Input_IsEmoting() const
+{
+	return EmoteComponent && EmoteComponent->IsEmoting();
+}
+
+void AHitmenPlayerCharacter::Input_StopEmote()
+{
+	CancelEmote();
+}
+
+void AHitmenPlayerCharacter::CancelEmote()
+{
+	if (EmoteComponent && EmoteComponent->IsEmoting())
+	{
+		EmoteComponent->StopEmote();
+	}
+}
+
+void AHitmenPlayerCharacter::HandleEmoteChanged(int32 EmoteIndex)
+{
+	if (!IsLocallyControlled() || bDeathCameraActive)
+	{
+		return;
+	}
+	const bool bWasEmoteView = bEmoteView;
+	bEmoteView = EmoteIndex != INDEX_NONE;
+	if (bEmoteView && !bWasEmoteView)
+	{
+		if (EmoteViewAlpha <= 0.f)
+		{
+			// The orbit starts in front of you, a little above, looking at you.
+			EmoteOrbit = FRotator(EmoteCameraStartPitch, GetActorRotation().Yaw + EmoteCameraStartYaw, 0.f);
+		}
+		Input_AimChanged(false);
+		FirstPersonCamera->ClearAdditiveOffset();
+		FirstPersonCamera->bUsePawnControlRotation = false;
+		FirstPersonCamera->SetFieldOfView(BaseFOV);
+		FirstPersonMesh->SetVisibility(false, true);
+		bArmsVisible = false;
+		SetBodyVisibleToOwner(true);
+		if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::GetFromPawn(this))
+		{
+			UI->SetTraversalHint(FText::GetEmpty());
+		}
+	}
+	SetActorTickEnabled(true);
+}
+
+bool AHitmenPlayerCharacter::UpdateEmoteCamera(float DeltaSeconds)
+{
+	const float Step = DeltaSeconds / FMath::Max(EmoteCameraBlendTime, 0.01f);
+	EmoteViewAlpha = FMath::Clamp(EmoteViewAlpha + (bEmoteView ? Step : -Step), 0.f, 1.f);
+	if (!bEmoteView && EmoteViewAlpha <= 0.f)
+	{
+		// Back in the head: first person again (the arms come back with the next arms update).
+		FirstPersonCamera->bUsePawnControlRotation = true;
+		FirstPersonCamera->SetRelativeLocationAndRotation(FVector(0.f, 0.f, CurrentEyeHeight), FRotator::ZeroRotator);
+		SetBodyVisibleToOwner(false);
+		bArmsInitialised = false;
+		return false;
+	}
+	const FVector Pivot = GetActorLocation() + FVector(0.f, 0.f, EmoteCameraPivotHeight);
+	FVector Orbit = Pivot - EmoteOrbit.Vector() * EmoteCameraDistance;
+	// Never through walls: pull in toward you.
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(HitmenEmoteCamera), false, this);
+	if (GetWorld()->SweepSingleByChannel(Hit, Pivot, Orbit, FQuat::Identity, ECC_Camera, FCollisionShape::MakeSphere(12.f), Params))
+	{
+		Orbit = Hit.Location;
+	}
+	const FVector Eye = GetCapsuleComponent()->GetComponentLocation() + FVector(0.f, 0.f, CurrentEyeHeight);
+	const float Alpha = FMath::SmoothStep(0.f, 1.f, EmoteViewAlpha);
+	const FQuat Rotation = FQuat::Slerp(GetControlRotation().Quaternion(), EmoteOrbit.Quaternion(), Alpha);
+	FirstPersonCamera->SetWorldLocationAndRotation(FMath::Lerp(Eye, Orbit, Alpha), Rotation);
+	return true;
+}
+
+void AHitmenPlayerCharacter::SetBodyVisibleToOwner(bool bVisible)
+{
+	// The body (and its cosmetics) is a first-person "world space representation", which the engine always hides
+	// from its owner: a normal mesh while the owner should see it.
+	GetMesh()->FirstPersonPrimitiveType = bVisible ? EFirstPersonPrimitiveType::None : EFirstPersonPrimitiveType::WorldSpaceRepresentation;
+	GetMesh()->SetOwnerNoSee(!bVisible);
+	GetMesh()->MarkRenderStateDirty();
+	if (CosmeticComponent)
+	{
+		for (UPrimitiveComponent* Cosmetic : CosmeticComponent->GetCosmeticPrimitives())
+		{
+			Cosmetic->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::None;
+			Cosmetic->SetOwnerNoSee(!bVisible);
+			Cosmetic->MarkRenderStateDirty();
+		}
+	}
 }
 
 bool AHitmenPlayerCharacter::Input_IsCrouchWanted() const
@@ -1505,6 +1635,13 @@ void AHitmenPlayerCharacter::EndCharm()
 	}
 }
 
+void AHitmenPlayerCharacter::OnDamaged(float Damage, AActor* InstigatorActor, bool bHeadshot)
+{
+	Super::OnDamaged(Damage, InstigatorActor, bHeadshot);
+	// A hit ends an emote.
+	EmoteComponent->ServerStopEmote();
+}
+
 void AHitmenPlayerCharacter::HandleDeath(AActor* Killer, AActor* DamageCauser, bool bHeadshot)
 {
 	if (HasAuthority() && CharmedPreviousController)
@@ -1513,28 +1650,22 @@ void AHitmenPlayerCharacter::HandleDeath(AActor* Killer, AActor* DamageCauser, b
 	}
 	SightroomComponent->SetSightroomActive(false);
 	InventoryComponent->StopFire();
+	if (HasAuthority())
+	{
+		EmoteComponent->ServerStopEmote();
+	}
 	Super::HandleDeath(Killer, DamageCauser, bHeadshot);
 
 	// The local view leaves the head and watches the body fall.
 	if (IsLocallyControlled() && !bDeathCameraActive)
 	{
 		bDeathCameraActive = true;
+		bEmoteView = false;
+		EmoteViewAlpha = 0.f;
 		DeathCameraYaw = GetControlRotation().Yaw;
 		FirstPersonMesh->SetVisibility(false, true);
-		// The body (and its cosmetics) is a first-person "world space representation", which the engine always hides
-		// from its owner: make it a normal mesh so the death camera shows you falling.
-		GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::None;
-		GetMesh()->SetOwnerNoSee(false);
-		GetMesh()->MarkRenderStateDirty();
-		if (CosmeticComponent)
-		{
-			for (UPrimitiveComponent* Cosmetic : CosmeticComponent->GetCosmeticPrimitives())
-			{
-				Cosmetic->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::None;
-				Cosmetic->SetOwnerNoSee(false);
-				Cosmetic->MarkRenderStateDirty();
-			}
-		}
+		// The death camera shows you falling.
+		SetBodyVisibleToOwner(true);
 		FirstPersonCamera->ClearAdditiveOffset();
 		FirstPersonCamera->bUsePawnControlRotation = false;
 		FirstPersonCamera->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
@@ -1563,7 +1694,8 @@ void AHitmenPlayerCharacter::SetupProximityVoice()
 	if (VoiceTalker)
 	{
 		VoiceTalker->Settings.ComponentToAttachTo = GetRootComponent();
-		VoiceTalker->Settings.AttenuationSettings = VoiceAttenuation;
+		// Proximity: the body's own falloff, else the project's (Project Settings -> Hitmen -> Watchers -> VoiceAttenuation).
+		VoiceTalker->Settings.AttenuationSettings = VoiceAttenuation ? VoiceAttenuation.Get() : UHitmenGameSettings::Get()->VoiceAttenuation.LoadSynchronous();
 	}
 }
 

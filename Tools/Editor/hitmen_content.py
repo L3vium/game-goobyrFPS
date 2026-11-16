@@ -1590,7 +1590,7 @@ def build_weapons(mats):
     weapons = {
         # name: (display, class bp, props). Recoil is in degrees (kick up, then recovers).
         "Pistol": ("Silenced pistol", hitscan, dict(fire_mode=A.SINGLE, rounds_per_minute=260.0, damage=34.0, headshot_multiplier=3.0,
-                   silenced=True, noise_radius=0.0, impact_noise_radius=300.0, start_ammo=24, max_ammo=72, ammo_per_pickup=12, hip_spread=1.2, aim_spread=0.25,
+                   silenced=True, can_holster=True, noise_radius=0.0, impact_noise_radius=300.0, start_ammo=24, max_ammo=72, ammo_per_pickup=12, hip_spread=1.2, aim_spread=0.25,
                    recoil_pitch=1.6, recoil_yaw_random=0.35, static_mesh=pistol_mesh, skeletal_mesh=None, visual_transform=pack(0.45), **pistol_vis)),
         "SMG": ("SMG", hitscan, dict(fire_mode=A.AUTOMATIC, rounds_per_minute=900.0, damage=13.0, start_ammo=90, max_ammo=240,
                 ammo_per_pickup=45, hip_spread=3.0, aim_spread=1.2, noise_radius=600.0, impact_noise_radius=500.0, recoil_pitch=0.55, recoil_yaw_random=0.35,
@@ -1830,6 +1830,9 @@ def build_sound_set():
         S.MOUNTED_GUN_FIRE: (SFX + "SFX_GunShot_Cue", 0.8), S.TANK_FIRE: (SFX + "SFX_ExplosionClassic", 1.0),
         S.LANDING_HARD: (path("Audio", "SFX", "Footsteps") + "/SW_Land_Heavy_00", 0.9), S.SLIDE: (SLIDE_SOUND, 0.45),
         S.TARGET_ELIMINATED: (hb + "Action/Cue/Slowdown3_Cue", 0.9),
+        # Synthesized (Tools/Audio/hitmen_synth_sfx.py, imported by hitmen_patch_0110.py step "zipline").
+        S.ZIPLINE_ENTER: ("/Game/Hitmen/Audio/SFX/Synth/SW_ZiplineEnter", 0.7),
+        S.ZIPLINE_LOOP: ("/Game/Hitmen/Audio/SFX/Synth/SW_ZiplineLoop", 0.4),
     }
     data = make_data("DA_SoundSet", path("Data"), unreal.HitmenSoundSet)
     sounds, volumes = {}, {}
@@ -1845,7 +1848,25 @@ def build_sound_set():
     set_props(data, sounds=sounds, volumes=volumes, attenuations=build_attenuations(), spaces=spaces)
     set_surface_table(data)
     save(data)
+    build_voice_attenuation()
     return data
+
+
+def build_voice_attenuation():
+    """SA_Hitmen_Voice: proximity chat falloff (Project Settings > Hitmen > Watchers > VoiceAttenuation): full voice
+    within 4 m, gone at 25 m, muffled through walls."""
+    asset = create("SA_Hitmen_Voice", path("Audio", "Attenuation"), unreal.SoundAttenuation, unreal.SoundAttenuationFactory())
+    if not asset:
+        return None
+    settings = asset.get_editor_property("attenuation")
+    set_props(settings, attenuate=True, spatialize=True, attenuation_shape=unreal.AttenuationShape.SPHERE,
+              attenuation_shape_extents=unreal.Vector(400.0, 0.0, 0.0), falloff_distance=2100.0,
+              distance_algorithm=unreal.AttenuationDistanceModel.NATURAL_SOUND, enable_occlusion=True,
+              occlusion_trace_channel=unreal.CollisionChannel.ECC_VISIBILITY, occlusion_low_pass_filter_frequency=1500.0,
+              occlusion_volume_attenuation=0.5, occlusion_interpolation_time=0.2)
+    asset.set_editor_property("attenuation", settings)
+    save(asset)
+    return asset
 
 
 # NPC barks per alert reason (Hitman-style: every change of awareness is said out loud). Subtitles only until the

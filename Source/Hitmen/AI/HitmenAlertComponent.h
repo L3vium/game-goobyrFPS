@@ -3,8 +3,11 @@
 //
 // White (Suspicious) = saw you, not alerted. Losing sight after a long enough look turns it yellow
 // (Investigating the last seen spot); a short glimpse just cools down. Red (Combat) only when the
-// white fill completes while seeing you, when attacked, when witnessing a kill or hearing close
-// gunfire. Yellow-search (Searching) = lost you, scores likely hiding places.
+// white fill completes while seeing you, when attacked or when witnessing a kill. Gunfire is only
+// heard close by (a bullet passing or landing near it): it walks to where the bullet landed, and
+// three close shots make it panic. A fight against someone it has not seen yet shows as a search
+// (yellow) on every HUD; red and UNDER FIRE only once it sees you.
+// Yellow-search (Searching) = lost you, scores likely hiding places.
 
 #pragma once
 
@@ -48,6 +51,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
 	EHitmenAlertColor GetAlertColor() const { return HitmenAlert::ToColor(AlertState); }
+
+	/** What HUDs show: a fight against a target it has not seen yet (shot at from nowhere, colleagues dropping,
+	 *  panic) reads as Searching; Combat (red, UNDER FIRE) only once it has seen its target. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
+	EHitmenAlertState GetDisplayAlertState() const;
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
+	EHitmenAlertColor GetDisplayAlertColor() const { return HitmenAlert::ToColor(GetDisplayAlertState()); }
 
 	/** 0..1 fill of the white indicator before turning red. */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Alert")
@@ -105,6 +116,13 @@ public:
 	void SeeHostile(AActor* Seen, float DeltaTime, bool bAlarming, float RateScale = 1.f);
 	void LoseSightOf(AActor* Seen);
 	void HearNoise(const FVector& Location, EHitmenNoiseType Type, AActor* NoiseInstigator, float Distance);
+
+	/**
+	 * A shot heard close by (the bullet passed or landed near it, or a loud report): it walks to where the bullet
+	 * landed (on the navmesh, reachable), never to the shooter. bClose (a near miss or an impact next to it) counts
+	 * toward panic: PanicShotsHeard close shots within ShotsHeardWindow make it hide. Ignored while it sees the shooter.
+	 */
+	void HearShot(const FVector& Impact, const FVector& ShotOrigin, AActor* Shooter, float DistanceToShooter, bool bClose);
 	void SeeBody(AHitmenCharacterBase* Body);
 	/** A colleague asleep (sleep dart): walk over and wake it. */
 	void SeeSleeper(AHitmenCharacterBase* Sleeper);
@@ -217,6 +235,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert|Cover", meta=(ClampMin="0", Units="s"))
 	float PanicDuration = 12.f;
 
+	/** Close shots (a bullet passing or landing right by it) within ShotsHeardWindow that make the NPC panic. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert|Cover", meta=(ClampMin="1"))
+	int32 PanicShotsHeard = 3;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert|Cover", meta=(ClampMin="0", Units="s"))
+	float ShotsHeardWindow = 20.f;
+
 	/** Multiplier when the hostile is doing something alarming (armed, sprinting, in a restricted act). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Alert", meta=(ClampMin="1"))
 	float AlarmingMultiplier = 2.5f;
@@ -283,6 +308,19 @@ protected:
 	/** Replicated: client prompts (takedowns, pickpocket) read it like the server does. */
 	UPROPERTY(Replicated)
 	bool bTargetVisible = false;
+
+	/** In Combat: its target has been seen since the fight started (HUDs show red / UNDER FIRE only then). */
+	UPROPERTY(Replicated)
+	bool bTargetSighted = false;
+
+	TArray<float> ShotHeardTimes;
+
+	/** Server: where to walk to check a sound: the floor under it (stepped back toward ApproachFrom off a wall),
+	 *  on the navmesh, and the end of the path when it cannot be reached (a hedge top, the other side of a wall). */
+	FVector ResolveSoundSpot(const FVector& Location, const FVector& ApproachFrom) const;
+
+	/** HearNoise once the spot is resolved. */
+	void ReactToNoise(const FVector& Spot, EHitmenNoiseType Type, AActor* NoiseInstigator, float Distance);
 
 	float CoverUntil = -1.f;
 	bool bPanicking = false;

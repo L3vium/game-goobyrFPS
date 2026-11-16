@@ -10,6 +10,7 @@
 #include "Core/HitmenTeamLibrary.h"
 #include "World/Interactables/HitmenSecurity.h"
 #include "UI/HitmenMenuKit.h"
+#include "UI/HitmenHUDElements.h"
 #include "UI/HitmenOptionsWidgets.h"
 #include "UI/HitmenUIFactory.h"
 #include "UI/HitmenUIEventSubsystem.h"
@@ -23,6 +24,7 @@
 #include "Data/HitmenCatalog.h"
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenAbilityData.h"
+#include "Abilities/HitmenAbility.h"
 #include "Data/HitmenMapDefinition.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/OverlaySlot.h"
@@ -408,13 +410,20 @@ void UHitmenDebugPanelWidget::BuildDefaultLayout()
 		HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenMenus.Abilities", "ABILITIES"), 14, TEXT("Bold"), HitmenUI::TextDim()), FMargin(0.f, 8.f, 0.f, 2.f));
 		const TArray<UHitmenAbilityData*> Move = Catalog->GetAbilities(EHitmenAbilitySlot::Move);
 		const TArray<UHitmenAbilityData*> Manip = Catalog->GetAbilities(EHitmenAbilitySlot::Manipulation);
+		// Each ability with the key it runs on, as bound on this keyboard (dash: Shift, jetpack: Space...).
+		auto AbilityKey = [this](const UHitmenAbilityData* Data, EHitmenKeyLabel SlotKey)
+		{
+			const UHitmenAbility* Ability = Data && Data->AbilityClass ? Data->AbilityClass->GetDefaultObject<UHitmenAbility>() : nullptr;
+			const UHitmenUIEventSubsystem* UI = GetUIEvents();
+			return FText::FromString(UI ? UI->GetKeyLabel(Ability ? Ability->GetHUDKey() : SlotKey) : FString());
+		};
 		for (int32 Index = 0; Index < Move.Num(); ++Index)
 		{
-			AddButton(FText::Format(HITMEN_TEXT("HitmenMenus.MoveEntry", "[E] {0}"), Move[Index]->DisplayName), Index, 1);
+			AddButton(FText::Format(HITMEN_TEXT("HitmenMenus.MoveEntryKey", "[{1}] {0}"), Move[Index]->DisplayName, AbilityKey(Move[Index], EHitmenKeyLabel::MoveAbility)), Index, 1);
 		}
 		for (int32 Index = 0; Index < Manip.Num(); ++Index)
 		{
-			AddButton(FText::Format(HITMEN_TEXT("HitmenMenus.ManipEntry", "[A] {0}"), Manip[Index]->DisplayName), 1000 + Index, 1);
+			AddButton(FText::Format(HITMEN_TEXT("HitmenMenus.ManipEntryKey", "[{1}] {0}"), Manip[Index]->DisplayName, AbilityKey(Manip[Index], EHitmenKeyLabel::Manipulation)), 1000 + Index, 1);
 		}
 	}
 	HitmenUI::AddToVBox(Column, HitmenUI::MakeText(WidgetTree, HITMEN_TEXT("HitmenMenus.Keycards", "KEYCARDS"), 14, TEXT("Bold"), HitmenUI::TextDim()), FMargin(0.f, 8.f, 0.f, 2.f));
@@ -539,6 +548,12 @@ void UHitmenPauseMenuWidget::BuildDefaultLayout()
 
 void UHitmenPauseMenuWidget::RefreshLegend()
 {
+	// Opened: the debug tools toggle follows the game mode's cheats (the game state may have replicated late).
+	if (DebugToggleButton)
+	{
+		const AHitmenGameState* GS = GetHitmenGameState();
+		DebugToggleButton->SetVisibility(GS && GS->AreDebugCommandsAllowed() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
 	if (BackToLobbyEntry)
 	{
 		const AHitmenPlayerController* PC = GetHitmenPC();
@@ -755,9 +770,9 @@ void UHitmenEmoteWheelWidget::NativeTick(const FGeometry& MyGeometry, float InDe
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	const int32 Count = GetEmoteNames().Num();
-	const FVector2D Mouse = UWidgetLayoutLibrary::GetMousePositionOnViewport(this);
-	const FVector2D Center = UWidgetLayoutLibrary::GetViewportSize(this) * 0.5f / UWidgetLayoutLibrary::GetViewportScale(this);
-	const FVector2D Delta = Mouse - Center;
+	// The mouse moves the wheel's own pointer (the view does not turn while the wheel is open).
+	const UHitmenUIEventSubsystem* UI = GetUIEvents();
+	const FVector2D Delta = UI ? UI->GetEmoteWheelCursor() : FVector2D::ZeroVector;
 	if (Count == 0 || Delta.Size() < 40.f)
 	{
 		HoveredIndex = INDEX_NONE;
@@ -780,6 +795,12 @@ int32 UHitmenEmoteWheelWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 		const bool bHovered = Index == HoveredIndex;
 		PaintBox(OutDrawElements, LayerId, AllottedGeometry, Point - FVector2D(70.f, 22.f), FVector2D(140.f, 44.f), bHovered ? HitmenUI::Accent() : HitmenUI::Panel());
 		PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Names[Index].ToString(), Point - FVector2D(60.f, 12.f), 16, HitmenUI::Text());
+	}
+	// The pointer: a small dot where the mouse points from the centre.
+	if (const UHitmenUIEventSubsystem* UI = GetUIEvents())
+	{
+		const FVector2D Pointer = Center + UI->GetEmoteWheelCursor() * 0.6f;
+		PaintBox(OutDrawElements, LayerId + 1, AllottedGeometry, Pointer - FVector2D(5.f, 5.f), FVector2D(10.f, 10.f), HitmenUI::Text());
 	}
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 2, InWidgetStyle, bParentEnabled);
 }
@@ -813,6 +834,11 @@ void UHitmenSpectatorWidget::BuildDefaultLayout()
 	UCanvasPanelSlot* SpeedSlot = HitmenUI::AddToCanvas(Canvas, SpeedText, FAnchors(0.5f, 0.5f), FVector2D(0.f, 80.f), FVector2D(0.5f, 0.5f));
 	SpeedSlot->SetAutoSize(true);
 	SpeedText->SetRenderOpacity(0.f);
+	// Cheats (F9 revives), where the game mode allows them.
+	UHitmenCheatPanelWidget* Cheats = WidgetTree->ConstructWidget<UHitmenCheatPanelWidget>(UHitmenCheatPanelWidget::StaticClass());
+	Cheats->bForSpectator = true;
+	Cheats->SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (UCanvasPanelSlot* CheatSlot = Canvas->AddChildToCanvas(Cheats)) { CheatSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f)); CheatSlot->SetOffsets(FMargin(0.f)); }
 	InfoText = HitmenUI::MakeText(WidgetTree, FText::GetEmpty(), 16, TEXT("Medium"), FLinearColor(0.88f, 0.88f, 0.88f, 1.f));
 	InfoText->SetJustification(ETextJustify::Center);
 	InfoText->SetShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.8f));
@@ -902,10 +928,16 @@ void UHitmenSpectatorWidget::HandleModeChanged(uint8 Mode)
 	if (KeysText)
 	{
 		// The views first (leftmost), then the view's own keys and the switches this server allows.
+		// Nobody alive to watch: only free fly (it came on by itself).
+		const AHitmenPlayerController* WatchPC = GetHitmenPC();
+		const bool bNobodyToWatch = WatchPC && WatchPC->GetSpectatableTargets().IsEmpty();
 		TArray<FString> Keys;
-		Keys.Add(HITMEN_TEXT("Watch.Key1", "[1] player view").ToString());
-		Keys.Add(HITMEN_TEXT("Watch.Key2", "[2] split screen").ToString());
-		if (bCanFreeFly)
+		if (!bNobodyToWatch)
+		{
+			Keys.Add(HITMEN_TEXT("Watch.Key1", "[1] player view").ToString());
+			Keys.Add(HITMEN_TEXT("Watch.Key2", "[2] split screen").ToString());
+		}
+		if (bCanFreeFly || bNobodyToWatch)
 		{
 			Keys.Add(HITMEN_TEXT("Watch.Key3", "[3] free fly").ToString());
 		}

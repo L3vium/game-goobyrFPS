@@ -46,6 +46,14 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
 	bool IsSeeingIntruder() const { return bSeeingIntruder; }
 
+	/** 0..1 detection meter (all machines): the alarm goes off at 1. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
+	float GetDetectionMeter() const { return DetectionProgress / 255.f; }
+
+	/** Raised the alarm within the last AlarmCooldown (all machines): the HUD shows it as a search, not a fight. */
+	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
+	bool HasRecentlyAlarmed() const { return bRecentlyAlarmed; }
+
 	/** Shot to pieces: it goes dark for good (sparks, the head drops, monitors lose it, a noise). */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Camera")
 	bool IsBroken() const { return bBroken; }
@@ -133,9 +141,21 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0"))
 	float SweepSpeed = 0.4f;
 
-	/** Seconds of continuous sight before the alarm. */
+	/** Seconds of continuous sight at mid range before the alarm (the meter fills gradually, so you can brush the
+	 *  edge of the cone and get out before it goes off). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0", Units="s"))
+	float DetectionTime = 3.f;
+
+	/** Meter speed right under the camera (x) and at the end of its view (x): closer fills faster. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0"))
-	float DetectionTime = 1.2f;
+	float NearDetectionMultiplier = 1.6f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0"))
+	float FarDetectionMultiplier = 0.6f;
+
+	/** Meter lost per second once nobody is in view (it drains, it does not reset at once). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0"))
+	float DetectionDecayRate = 0.3f;
 
 	/** Seconds between two alarms. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Hitmen|Camera", meta=(ClampMin="0"))
@@ -198,6 +218,12 @@ protected:
 
 	UPROPERTY(ReplicatedUsing=OnRep_Visuals)
 	bool bSeeingIntruder = false;
+
+	UPROPERTY(Replicated)
+	bool bRecentlyAlarmed = false;
+
+	/** Server: 0..1 meter (DetectionProgress is its replicated byte). */
+	float DetectionMeter = 0.f;
 
 	UPROPERTY(Replicated)
 	TObjectPtr<APawn> SeenIntruder;

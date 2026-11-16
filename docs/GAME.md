@@ -137,7 +137,9 @@ and teammates take the nearest free points around it. During the intro (`bParach
 `IntroDropHeight`, `IntroDuration` on the match game mode) everyone falls from above their point
 under a canopy, steering a little (falling at 15 m/s, 3 s intro); control returns on landing. The Gym skips the intro.
 
-**Watchers** (and dead players) watch with three views (`IMC_Spectator`, its own rebindable keys above the game keys):
+**Watchers** (and dead players) watch with three views (`IMC_Spectator`, its own rebindable keys above the game keys; on
+AZERTY the number row also works without Shift, & é " being 1 2 3, and so does the numpad). With nobody alive to watch,
+`1` and `2` do nothing and free fly comes on by itself (also when the last player you watched dies):
 - `1` **player view**: one player through their eyes; `V` switches to third person over their shoulder (the mouse
   orbits, the camera stays in front of walls); `LMB` / `RMB` switch player.
 - `2` **split screen**: every living player at once, up to 8 (`MaxSplitViews`): 1, 2 side by side, 2x2, 3x2, 4x2; each
@@ -153,11 +155,19 @@ under a canopy, steering a little (falling at 15 m/s, 3 s intro); control return
 What a watcher sees: every living player **outlined in cyan through walls with their name** (`N` hides them), the other
 watchers as a **glowing orb with their name** (`B`), the info line of what it looks at (name and state, no key, the
 thing glows: "Locker - 0 / 1 body", "Light - On"), and `Tab` scans (free fly, third person) with every guard lit.
-Players can be allowed to see name tags, the watchers and a "WATCHED BY n PLAYERS" line (off by default). Every rule is
-an editor variable in **Project Settings -> Hitmen -> Watchers**: `bWatchersFlyThroughWalls`, `bWatchersFlyThroughTerrain`,
+Players can be allowed to see name tags, the watchers (as **ghosts**: a pale see-through body, `WatcherGhostMesh`,
+`WatcherGhostAnimation`, `WatcherGhostMaterial`, `WatcherGhostColor`) and a "WATCHED BY n PLAYERS" line (all off by default).
+**Voice**: the living never hear the dead or the watchers (`bDeadCanTalkToLiving`, off); the dead and watchers hear
+everyone and each other; with proximity chat on, a flying watcher's voice comes from where it flies
+(`bWatcherProximityVoice`, falloff `VoiceAttenuation` = `SA_Hitmen_Voice`, full within 4 m, gone at 25 m, also used by
+bodies). No Unreal debug UI ever comes up in game: the Gameplay Debugger key is cleared (`ActivationKey=None` in
+DefaultEngine.ini; it was the apostrophe, the AZERTY 4, and Tab then opened its debug camera) and so are the engine's
+debug camera (`;`), debug target and F9 screenshot bindings. Every rule is an editor variable in **Project Settings ->
+Hitmen -> Watchers**: `bWatchersFlyThroughWalls`, `bWatchersFlyThroughTerrain`,
 `WatcherDepthBelowGround`, `bWatchersCanScan`, `WatcherSeePlayers` / `WatcherSeeWatchers` (Hidden, Shown, **Shown and
 toggleable** by default), `bWatchersSeeInteractableInfo`, `bWatchersHighlightInteractables`, `WatcherFocusRange`,
-`bPlayersSeeNameTags` (`PlayerNameTagRange`), `bPlayersSeeWatchers`, `bPlayersSeeWatchedIndicator`, `WatcherViewRate`.
+`bPlayersSeeNameTags` (`PlayerNameTagRange`), `bPlayersSeeWatchers`, `bPlayersSeeWatchedIndicator`, `WatcherViewRate`,
+`bDeadCanTalkToLiving`, `bWatcherProximityVoice`, `VoiceAttenuation`.
 A watcher's view (position, direction, followed player) goes to the server 10 times a second while it moves
 (`Server_ReportWatcherView`) and is replicated on its PlayerState (`FHitmenWatcherView`); every machine spawns its own
 avatars (`AHitmenWatcherAvatar`, local) and paints the tags in one layer (`UHitmenNameTagsWidget`). QA: the console
@@ -167,8 +177,8 @@ everyone at match end too, `bSpectatorsCanFreeFly`, on).
 
 ## 5. Controls (defaults, AZERTY, all rebindable)
 On a QWERTY keyboard the keys sit at the same places: W A S D to move, Q for the manipulation ability. The game
-reads the Windows keyboard layout (French and Belgian are AZERTY, everything else QWERTY) and moves only the keys the
-player never rebound; prompts, HUD keys and the watcher line follow. `KeyboardLayoutOverride` (Project Settings ->
+reads the keyboard itself (the key at the top-left letter place types A on AZERTY: a French Windows with a US keyboard is
+QWERTY), moves only the keys the player never rebound (Options -> Controls -> Defaults places them again); prompts, HUD keys and the watcher line follow. `KeyboardLayoutOverride` (Project Settings ->
 Hitmen -> Input: Auto / AZERTY / QWERTY) forces one for testing.
 
 | Action | Key |
@@ -185,7 +195,7 @@ Hitmen -> Input: Auto / AZERTY / QWERTY) forces one for testing.
 | Manipulation ability | A |
 | Switch weapon slot | Mouse wheel |
 | Sightroom | Tab |
-| Emote wheel (hold) | R |
+| Emote wheel (hold, release on an emote); R again ends the emote | R |
 | Pause (no time stop) | Esc |
 | Confirm (match over, host: back to the lobby) | Enter |
 | Watching: player view / split screen / free fly | 1 / 2 / 3 |
@@ -282,7 +292,8 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
 - **Stealth kill**: `F` next to a target that is not looking at you — from any side, standing or crouched (a guard
   that sees you coming detects you first and fights). The attacker blends in to the strike position and the view
   turns over 0.25 s (no snap); both are held, the attack plays (body and first-person arms), the victim reacts and dies
-  on the strike (1 s). Pickpocketing still needs you behind.
+  on the strike (1 s). Pickpocketing needs you behind it (crouched, beside it is enough: `CrouchedPickpocketMaxDot`)
+  and within `PickpocketReach` (2.2 m) of an NPC that is not looking at you.
 - **Health**: players 150, guards 100. A bullet or an arrow in the head always kills (`bHeadshotKills` in Project
   Settings → Hitmen; NPC shots excluded by `bHeadshotKillsFromNPCs`). Players heal back (30 per second) after 6 s
   without being hit; there is no health bar (red screen edges and heartbeat).
@@ -298,7 +309,11 @@ with tabs, one row per setting (label left, `< value >` or a slider right) and t
   passing brightens the outline); an object coming round a corner lights up as it shows. On release the highlights fade
   out with the look. C++ only keeps custom depth on the candidates (`CandidateMargin` beyond each radius, refreshed every
   0.1 s). No waypoint in normal view.
-- **Emotes**: hold `R` for a radial wheel.
+- **Emotes**: hold `R` for a radial wheel (the mouse moves its pointer, the view stays), release on an emote: the view
+  flies out to a third-person orbit in front of you (`EmoteCamera*` on the player: 3 m, the mouse turns it, never through
+  walls) and the emote's animation loops (`bLoopEmotes` on the emote component) until `R` again, moving, jumping, firing,
+  aiming, interacting, an ability or a hit ends it; the view then flies back into your head (0.35 s). Not while
+  climbing, hanging, falling, riding or carrying a body. Replicated state (`ActiveEmote`): everyone sees it.
 - **Footsteps**: five takes per surface (grass, stone, sand / dirt, wood, metal, tile; concrete elsewhere; Kenney
   Impact Sounds, CC0, sources in `Tools/Audio/Footsteps`), one picked at random and never twice in a row, for players
   and NPCs; the surface comes from the physical material under the feet (PM_*; rocks and mountains are stone) and
@@ -329,7 +344,8 @@ mesh (the Weapons_Free guns have no socket). Explosions flash (`ExplosionFlash*`
 white flash and light), the smoke grenade is the Smoke_Bombs toon cloud (plays 1.8x faster), the jetpack blows smoke
 under your feet, ladders and gutters click at each grab, hands landing on a ledge throw dust and a grab sound, slides
 scrape, vault landings puff, ziplines throw
-sparks with a cable sound, the tank's
+sparks, clamp on with a clack (`ZiplineEnter`) and sing one steady cable loop for the whole ride (`ZiplineLoop`, pitch
+following the speed; both synthesized in `Tools/Audio/hitmen_synth_sfx.py`), the tank's
 barrel slides back 120 cm, its hull rocks and the muzzle blasts, and the turret flashes and fires red tracers. Taking
 a hit: a red arc toward the shooter, a colour fringe and a red tint on the view, a small shake; the world greys as
 health drops, with the heartbeat below 35 %.
@@ -420,7 +436,7 @@ act (fire for the lighter, notes for the remote distraction, a swirl for blink a
 | Container | Two-door cabinet; fixed contents or a random weighted pick, items float on its shelves |
 | Distraction | Radio, TV, alarm clock (`BP_Distraction_*`: mesh, loop sound, light colour, toon notes on every pulse are data); its sound is one steady loop while it is on (a clip that ends is restarted at once). `F` (or the remote distraction) turns it on or off; once on it plays until switched off (`PlayTime` 0); only guards within its noise radius hear it (walls cut it, the nearest two come), and a guard who comes to look switches it off |
 | Turret | `TurretHealth` 80: bullets and blasts break it for good like a camera (sparks, the gun droops, it never fires again, it cannot be hacked any more). Sees and shoots within `Range` (25 m) inside `VisionArcDegrees` (180; 270, 360) around the way it was placed, `Damage` 6, `RoundsPerMinute` 200; red laser while locking on, then shoots players (muzzle flash, light, red tracers); hacked only from its panel by **holding** `F` 3 s (a ring fills around the F key; releasing or looking away cancels): then shoots NPCs |
-| Security camera | A shadowed spotlight aimed at the floor: its lit zone is the camera's view, so walls, obstacles and bodies cut it; white while nobody is in view, red as soon as it sees someone (`IdleColor`, `DetectingColor`, `AlertColor`); seeing someone stops the sweep where it looks, with no tracking, and it sweeps again once they leave the cone (`bFreezeSweepWhileSeeing`); no floor ring; sees you only through open air; spotting calls reinforcements; a marker on the maps. 30 health: shot to pieces it sparks, hangs dead and its feed is lost for good |
+| Security camera | A shadowed spotlight aimed at the floor: its lit zone is the camera's view, so walls, obstacles and bodies cut it; white while nobody is in view, turning red as its meter fills (`IdleColor`, `DetectingColor`, `AlertColor`); the meter rises gradually (`DetectionTime` 3 s at mid range, x`NearDetectionMultiplier` 1.6 right under it, x`FarDetectionMultiplier` 0.6 at the end of its view) and drains once you are out (`DetectionDecayRate` 0.3/s), so you can brush the cone and get out; seeing someone stops the sweep where it looks, with no tracking, and it sweeps again once they leave the cone (`bFreezeSweepWhileSeeing`); no floor ring; sees you only through open air; a full meter calls reinforcements, who come and **search** (never a fight from the camera alone); on the HUD the meter fills a white arc, then a yellow one after the alarm; a marker on the maps. 30 health: shot to pieces it sparks, hangs dead and its feed is lost for good |
 | Security station | Desk + screen cycling through its cameras (a 90° feed, tonemapped at the match exposure, without the zone pattern); holding `F` 2 s disables / enables them: the screen keeps the last frame, dimmed and noisy, with NO SIGNAL over it |
 | Circuit breaker | A lever thrown with sparks and a clunk turns off its linked lights (the bulbs go dark too): NPCs cannot see (only hear), players see less |
 | Light switch | A small breaker by a door (`BP_LightSwitch`, info "Light switch - On / Off"): `F` switches the room's lamps; every lamp shows "Light - On / Off" when looked at. The builders put one by the door of every building |
@@ -439,7 +455,7 @@ act (fire for the lighter, notes for the remote distraction, a swirl for blink a
 All NPCs are hostile: the whole map is what Hitman calls a hostile area (no disguises, no civilians). Within that, the
 NPCs behave like Hitman's: graded vision, "Hm?" then a walk over, shared knowledge, bodies called in once, evidence
 confiscated, on-edge guards after an alert, cover, VIP evacuation and barks for every change of awareness. Sight takes priority over hearing. Sight range 1950 cm (lose at 2250), times the
-difficulty multiplier. How fast the white fill rises depends on the distance (`SuspicionRateByDistance`, a curve on the alert component): near instant point blank (about 0.15 s at 2 m), 0.7 s at 5 m, 1.7 s at 10 m, 4 s at 20 m (before peripheral vision, cover, alarming behaviour and difficulty); red at once within `InstantDetectionDistance` (150 cm). **Sixth sense**: a hostile within `SixthSenseRadius` (250 cm) but out of view is felt (never through a wall): the white fill rises at `SixthSenseRate` (0.5/s, half crouch-walking, none crouched and still), never to red, and the NPC turns to look. Console `HitmenAI.Cones 1` draws every NPC's focal and peripheral cones and its sixth sense ring. **Facing**: the body always follows the AI controller's rotation; walking, a focus more than `MaxStrafeAngle` (100°) away from the walking direction gives way to it, so no NPC ever walks backward. Guards in combat hold their
+difficulty multiplier. How fast the white fill rises depends on the distance (`SuspicionRateByDistance`, a curve on the alert component): near instant point blank (about 0.15 s at 2 m), 0.7 s at 5 m, 1.7 s at 10 m, 4 s at 20 m (before peripheral vision, cover, alarming behaviour and difficulty); red at once within `InstantDetectionDistance` (150 cm). **Sixth sense**: a hostile within `SixthSenseRadius` (250 cm) but out of view is heard (never through a wall) while it walks or runs: the white fill rises at `SixthSenseRate` (0.5/s walking, x`SixthSenseSprintScale` 2 sprinting), never to red, and the NPC turns to look. Crouched (moving or not) or standing still, you are never heard or felt from behind (`SixthSenseCrouchScale` 0): NPCs never look behind them, which is what lets you sneak up for a takedown or a pickpocket. Console `HitmenAI.Cones 1` draws every NPC's focal and peripheral cones and its sixth sense ring. **Facing**: the body always follows the AI controller's rotation; walking, a focus more than `MaxStrafeAngle` (100°) away from the walking direction gives way to it, so no NPC ever walks backward. Guards in combat hold their
 weapon's aim pose and play its fire montage on each shot. Searching guards draw their gun (the weapon's equip
 animation) and hold it ready (its aim pose) each time they stop to look around; a hit plays a hit reaction. All of
 these are the Mannequin pack animations (pistol / rifle equip and ADS idle, `MM_HitReact_Front_Lgt_01`), seen on
@@ -457,7 +473,15 @@ farther away or out of sight they walk closer until in range, and they never bac
 lets it shoot standing), duck behind it during the pause between bursts and stand up 0.35 s before the next one.
 Unarmed NPCs only fight within `UnarmedReach` (1.6 m).
 
-There are no civilians: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate, and at match start every candidate not picked becomes a guard (`CandidateGuardWeapon`, else its `DefaultWeapon`; named "Guard"; the VIP reads "Target"). `bGuest` (off in every map) makes an NPC a neutral guest: unarmed, nobody's enemy, it runs from danger.
+There are no civilians: every NPC is a guard (patrol, stationary, sentry, sniper) or a VIP candidate, and at match start every candidate not picked becomes a plain armed guard with the normal guard behaviour (`CandidateGuardWeapon`, else its `DefaultWeapon`, else Project Settings -> Hitmen -> AI -> `DefaultGuardWeapon`, the pistol; named "Guard"; the VIP reads "Target").
+
+**Hands and hips**: an NPC carries things in three places, its hands and its left and right hips. A pistol (weapon data
+`bCanHolster`) rides in the hip holster (`HolsterSide`, right) of a guard set to `WeaponCarry` Holstered (default, every
+patrol): it stays there while the guard is calm, is drawn for real threats (gunfire, a body, a search, a fight, on edge)
+and goes back once it calms down. Guards on duty (stationary posts, `WeaponCarry` InHands) and long guns stay in the hands.
+A keycard rides on the other hip. From behind (or beside, crouched) `F` pickpockets what is on a hip: the keycard or the
+holstered pistol (the hip nearest to where you look when both are there; "Pickpocket keycard 2", "Pickpocket Silenced
+pistol"); a pistol in the hands cannot be taken. A guard robbed of its pistol fights with its fists. `bGuest` (off in every map) makes an NPC a neutral guest: unarmed, nobody's enemy, it runs from danger.
 
 **VIP evacuation**: an unarmed VIP in danger (combat, a search, or a real threat being investigated: gunfire, a body)
 runs to the nearest `AHitmenVIPSafeSpot` (placed by LD; with none placed, a reachable point far from the threat and out
@@ -472,8 +496,8 @@ escorts (at most every 20 s).
   along the route, the others follow in rows behind it (`GroupFollowDistance` 1.7 m, `GroupFollowSpacing` 1.4 m,
   `GroupColumns` 2), the leader slows to half pace while a follower lags more than 2.6 m behind its slot, and alerts are
   shared inside the group. A placed **guard group** (`BP_GuardGroup`, `Members`, `Columns`) does the same for any NPCs.
-- **Keycards** sit in the carrier's right pocket (`KeycardHipOffset`); from behind an unaware carrier, `F` pickpockets
-  it (before any kill; `bPickpocketRequiresCrouch`, off, also asks you to crouch).
+- **Keycards** sit on the hip opposite the holster (`KeycardHipOffset`, mirrored); from behind an unaware carrier, `F`
+  pickpockets it (before any kill; `bPickpocketRequiresCrouch`, off, also asks you to crouch).
 - **What you see**: looking at a guard up close shows its name, weapon and keycard under the prompt ("Guard - Shotgun -
   Keycard 2"; the VIP is "Target"). **Loadouts**: `DefaultWeapon` per NPC (placed instances too) and ready
   Blueprints `BP_NPC_Guard` (silenced pistol), `_SMG`, `_Rifle`, `_Shotgun`, `BP_NPC_Sniper`; a guard closes in to its
@@ -522,13 +546,24 @@ sliding, crouch-walking.
 - **Last known position**: where an NPC last **saw** you. A mannequin ghost (`BP_LastKnownGhost`) is shown there while
   at least one NPC searches for you; never on your corpse. Noise never reveals your position: NPCs go to the sound.
 - **Hearing**: walking is heard within 4 m, sprinting 9 m, crouching not at all (height within one storey does not
-  count). A silenced bullet into a body is heard 1.5 m away. A gunshot report carries per weapon (`NoiseRadius`: SMG
-  20 m, rifle and shotgun 25 m, minigun 30 m, sniper 35 m; silenced: not at all) and **where the bullet lands** makes a
-  noise too (`ImpactNoiseRadius`: sniper 15 m, rifles 8-10 m). A guard first **turns toward what it heard** ("Hm?",
-  `UBTTask_HitmenTurnToNoise`, 1 s) then walks over: a gunshot (its report and its impact alike) is heard where the bullet landed, so the guard looks at and walks to the impact, never to the shooter (a shot into the air: a point along it). Each wall in between cuts the radius again
-  (x0.45 per wall, more than 3 walls: silence), and only the `MaxNoiseResponders` (2) nearest NPCs that would react
-  respond (3 for gunshots, `NoiseResponderOverrides`). Hearing sends NPCs to the
+  count). A guard first **turns toward what it heard** ("Hm?", `UBTTask_HitmenTurnToNoise`, 1 s) then walks over. Every
+  sound is checked from a **reachable spot** (`UHitmenAlertComponent::ResolveSoundSpot`): a step back off the wall it hit,
+  down to the floor, onto the navmesh, and the end of the path when it cannot be reached, so guards go around walls and
+  through mazes instead of stopping at the nearest wall. Each wall in between cuts the radius again (x0.45 per wall,
+  more than 3 walls: silence), and only the `MaxNoiseResponders` (2) nearest NPCs that would react respond (3 for
+  gunshots, `NoiseResponderOverrides`).
+- **Gunshots are heard close by only** (`UHitmenAISubsystem::ReportShot`): a bullet passing within `NearMissRadius`
+  (3 m, match rules) of an NPC, or landing that close, is a **near miss**: it always reacts, whatever the walls; where
+  it lands is heard within the weapon's `ImpactNoiseRadius` (silenced pistol 3 m; a silenced bullet into a body 1.5 m);
+  a loud report carries per weapon (`NoiseRadius`: SMG 20 m, rifle and shotgun 25 m, minigun 30 m, sniper 35 m;
+  silenced: not at all). The guard walks to **where the bullet landed** (a near miss that flew on: where it whizzed by;
+  a report heard from afar: a point down the shot), never to the shooter, and only if it does not already see the
+  shooter (then sight decides). **Three close shots** within `ShotsHeardWindow` (20 s, `PanicShotsHeard`) make it panic:
+  it hides crouched from where the shots seem to come from (`PanicDuration`), then searches. Hearing sends NPCs to the
   sound; only in the dark does a hostile heard within 2.5 m get attacked (`DarkCloseEngageDistance`).
+- **Search first, then a fight**: a fight against someone the NPC has not seen yet (shot at from nowhere, colleagues
+  dropping, panic) shows as a **search** on every HUD (yellow indicator, minimap, crosshair arcs, "SEARCHING"); red and
+  **UNDER FIRE** only once it has seen you (`GetDisplayAlertState`, replicated `bTargetSighted`).
 - **Shot by an unseen shooter**: the NPC ducks into cover from where the shot seemed to come from (a guess along the shot) for `UnseenThreatCoverDuration` (6 s), crouched, then searches there; it never learns the shooter's real position without seeing them. **Colleagues dropping**: an NPC that sees (or hears, within `AllyDeathHearRadius` 8 m) a colleague die without seeing the killer takes cover the same way ("Get down!"); after `PanicAllyDeaths` (2) within `AllyDeathWindow` (30 s) it panics ("They're picking us off!") and hides crouched for `PanicDuration` (12 s) before searching; its radio call waits until it stops hiding (`BT_Combat` hide branch, BB `TakeCover`, `UBTTask_HitmenHoldCover`). **Teleports**: a hunted pawn moving `LoseAggroTeleportDistance` (6 m) or more at once (teleporter, blink, swap) is lost by every NPC that cannot see where it went: they search where it was; an unseen target is always faced and flanked where it was last known, never where it really is. **Explosions** are heard by four guards (`NoiseResponderOverrides`), carry through walls better (`ExplosionOcclusionMultiplier` 0.8) and barrels are heard 40 m away (`ExplosionNoiseRadius`); the responders walk to the blast with their gun drawn.
 - **Bodies, distractions, weapons** are investigated. Only sentries ignore bodies. Whoever finds a body walks to it,
   then **searches around it** (`BodySearchDuration` 20 s, the EQS search centred on the body), then calms down (on edge)
@@ -567,14 +602,15 @@ sliding, crouch-walking.
 Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `HitmenHUDWidgets`).
 - **Compass** (top): N/S/E/W only (`bShowIntercardinals` off); optional VIP marker; retrieval
   directions while carrying.
-- **Inventory bar** (bottom centre): four cards of one size — the held weapon on the left, the other beside it (switching makes them trade places in 0.12 s, `SwapTime`), a 3 px divider, the manipulation and move abilities with the key that triggers each in the top-right corner (as bound: A / E, Space for the jetpack, Shift for the dash; `UHitmenAbility::GetHUDKey`). Each card shows the item's icon and full name (the font shrinks to fit), weapons their
+- **Inventory bar** (bottom centre): four cards of one size — the held weapon on the left, the other beside it (switching makes them trade places in 0.12 s, `SwapTime`), a 3 px divider, the manipulation and move abilities with the key that triggers each in the top-right corner (as bound on this keyboard: A / E on AZERTY, Q / E on QWERTY, Space for the jetpack, Shift for the dash; `UHitmenAbility::GetHUDKey`); an empty ability slot shows no key. The agent screen's ability rows and the debug tools show the same keys. Each card shows the item's icon and full name (the font shrinks to fit), weapons their
   ammo as `current / max`, abilities a cooldown shade that shrinks as they come back, charge pips and a fuel gauge for
   the jetpack. No "ready", no health bar. The bar is centred on the screen.
 - **Minimap** (bottom left, square): the baked map, north up (your arrow turns, no view cone), every NPC as a diamond
   (dark grey calm, white suspicious, yellow alerted, red in combat), sonar pings, map markers (cameras, retrieval points
   pinned to the frame when out of range);
   its frame takes the colour of the worst alert aimed at you and a banner opens across its top with a white flash
-  (Suspicious, Alerted, Searching, Spotted; **Under fire** is taller, red and pulses).
+  (Suspicious, Alerted, Searching, Spotted; **Under fire** is taller, red and pulses, and only shows once an NPC fighting
+  you has seen you).
 - **Crosshair**: a thin "+"; hit ticks (red, longer and thicker on a headshot, with a metallic hit sound only the shooter
   hears); an "x" on a kill (red on a headshot);
   Hitman-like awareness arcs around it, one per guard or camera noticing you, placed toward it: the arc fills from its
@@ -606,11 +642,15 @@ Font: Barlow Condensed (`FNT_Barlow`). Painted in code (`HitmenHUDElements`, `Hi
   sight radius and peripheral angle, fading out toward the edge (a dark shade while calm or suspicious, yellow / red once
   alerted). The **Interactables** layer: hiding spots (lockers, body containers), distractions, containers, keycards,
   security devices (consoles, hack panels, breakers) and hazards (poisonable drinks, explosive barrels).
-- **Cheats** (gym always, other maps in dev builds; panel on the right, centred vertically, a lit square when on):
+- **Cheats**: a toggle on each game mode, `CheatAccess` (Never / DevelopmentBuilds / Always): the gym is Always (Shipping
+  included), the match DevelopmentBuilds (Development and editor builds; Shipping only with `bAllowCheatsInShipping`).
+  Where they are on: the pause menu's debug tools (any weapon, ability, keycard) and the panel on the right, centred
+  vertically, a lit square when on (also on the spectator screen while you are dead):
   `F1` invulnerable, `F2` infinite ammo, `F3` no cooldown, `F4` invisible to AI and cameras, `F5` respawn every NPC as
   placed (class, place, behaviour, route, group, keycard: recorded at start), `F6` kill all NPCs, `F7` reload the map,
-  `F8` fly through walls (look to steer, `Space` / `Ctrl` up / down, `Shift` x3, `CheatFlyFastMultiplier`). Server-checked (`AllowsDebugCommands`); the
-  engine's F1-F5 view modes are cleared in `DefaultInput.ini`.
+  `F8` fly through walls (look to steer, `Space` / `Ctrl` up / down, `Shift` x3, `CheatFlyFastMultiplier`), `F9`
+  **revive**: dead, you stand up where you died with your loadout (also the console command `Revive`). Server-checked
+  (`AllowsDebugCommands`); the engine's F1-F5 view modes and F9 screenshot are cleared in `DefaultInput.ini`.
 - **Map markers**: anything with a `HitmenMapMarker` component shows on the minimap and the pause map, drawn and named
   by its kind (a `DA_MapMarker_*` data asset: legend name, colour, shape or icon, size, which maps, legend order, and
   its **layer**: Objective always drawn, NPC or Interactables per the map layers above). Every interactable has a

@@ -96,8 +96,18 @@ void UHitmenUIEventSubsystem::SetEmoteWheelOpen(bool bOpen)
 	if (bEmoteWheelOpen != bOpen)
 	{
 		bEmoteWheelOpen = bOpen;
+		if (bOpen)
+		{
+			EmoteWheelCursor = FVector2D::ZeroVector;
+		}
 		OnEmoteWheelToggled.Broadcast(bOpen);
 	}
+}
+
+void UHitmenUIEventSubsystem::AddEmoteWheelCursor(const FVector2D& Delta)
+{
+	// The pointer stays on the ring: past it only the direction changes.
+	EmoteWheelCursor = (EmoteWheelCursor + Delta).GetClampedToMaxSize(170.f);
 }
 
 void UHitmenUIEventSubsystem::SetSightroomActive(bool bActive)

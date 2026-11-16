@@ -81,6 +81,7 @@ void AHitmenSecurityCamera::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(AHitmenSecurityCamera, bDisabled);
 	DOREPLIFETIME(AHitmenSecurityCamera, bSeeingIntruder);
 	DOREPLIFETIME(AHitmenSecurityCamera, DetectionProgress);
+	DOREPLIFETIME(AHitmenSecurityCamera, bRecentlyAlarmed);
 	DOREPLIFETIME(AHitmenSecurityCamera, bBroken);
 	DOREPLIFETIME(AHitmenSecurityCamera, SeenIntruder);
 }
@@ -197,13 +198,20 @@ void AHitmenSecurityCamera::UpdateFootprint()
 
 FLinearColor AHitmenSecurityCamera::GetStateColor() const
 {
-	// White while nobody is in view, red as soon as it sees someone (the meter fills inside it), AlertColor once the
-	// alarm is raised and it still sees them.
-	if (!bSeeingIntruder)
+	// White while nobody is in view; it turns red as the meter fills (and pales again as it drains); AlertColor once
+	// the alarm is raised and it still sees them.
+	if (bSeeingIntruder && DetectionProgress >= 255)
+	{
+		return AlertColor;
+	}
+	const float Meter = DetectionProgress / 255.f;
+	if (!bSeeingIntruder && Meter <= 0.f)
 	{
 		return IdleColor;
 	}
-	return DetectionProgress >= 255 ? AlertColor : DetectingColor;
+	// Seeing someone shows at once (a quarter of the way to red), then the meter takes it the rest of the way.
+	const float Alpha = FMath::Clamp((bSeeingIntruder ? 0.25f : 0.f) + Meter * 0.75f, 0.f, 1.f);
+	return FLinearColor::LerpUsingHSV(IdleColor, DetectingColor, Alpha);
 }
 
 void AHitmenSecurityCamera::Tick(float DeltaSeconds)
@@ -236,14 +244,30 @@ void AHitmenSecurityCamera::Tick(float DeltaSeconds)
 		OnRep_Visuals();
 	}
 	SeenTime = bSeeing ? SeenTime + DeltaSeconds : 0.f;
-	const float Meter = DetectionTime > 0.f ? SeenTime / DetectionTime : (bSeeing ? 1.f : 0.f);
-	const uint8 Progress = static_cast<uint8>(FMath::Clamp(Meter, 0.f, 1.f) * 255.f);
+	// Gradual: the meter fills while it sees you (faster up close) and drains once you are out of view.
+	if (bSeeing)
+	{
+		const float Distance = FVector::Dist(Head->GetComponentLocation(), Intruder->GetActorLocation());
+		const float RangeMultiplier = FMath::Lerp(NearDetectionMultiplier, FarDetectionMultiplier, FMath::Clamp(Distance / FMath::Max(ViewDistance, 1.f), 0.f, 1.f));
+		DetectionMeter = DetectionTime > 0.f ? DetectionMeter + DeltaSeconds * RangeMultiplier / DetectionTime : 1.f;
+	}
+	else
+	{
+		DetectionMeter -= DeltaSeconds * DetectionDecayRate;
+	}
+	DetectionMeter = FMath::Clamp(DetectionMeter, 0.f, 1.f);
+	const bool bAlarmed = GetWorld()->GetTimeSeconds() - LastAlarmTime <= AlarmCooldown;
+	if (bAlarmed != bRecentlyAlarmed)
+	{
+		bRecentlyAlarmed = bAlarmed;
+	}
+	const uint8 Progress = static_cast<uint8>(DetectionMeter * 255.f);
 	if (Progress != DetectionProgress)
 	{
 		DetectionProgress = Progress;
 		OnRep_Visuals();
 	}
-	if (bSeeing && SeenTime >= DetectionTime && GetWorld()->GetTimeSeconds() - LastAlarmTime > AlarmCooldown)
+	if (bSeeing && DetectionMeter >= 1.f && GetWorld()->GetTimeSeconds() - LastAlarmTime > AlarmCooldown)
 	{
 		RaiseAlarm(Intruder);
 	}

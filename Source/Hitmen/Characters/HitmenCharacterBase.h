@@ -91,6 +91,10 @@ public:
 	/** Silent takedown allowed by Attacker: default = from behind (players see what is in front of them);
 	 *  NPCs: from any angle, standing or crouched, as long as they are not seeing the attacker. */
 	virtual bool CanBeTakenDownBy(const AActor* Attacker) const { return IsUnawareOf(Attacker); }
+
+	/** Where a holstered weapon (EHitmenWeaponState::OnHip) hangs: a bone of the body mesh and the weapon's transform
+	 *  relative to it. False: this character has no holster. */
+	virtual bool GetHolsterAttachment(FName& OutBone, FTransform& OutRelative) const { return false; }
 	virtual bool IsUnawareOf(const AActor* Other) const;
 
 	UFUNCTION(BlueprintPure, Category="Hitmen|Character")
@@ -198,6 +202,7 @@ protected:
 	TObjectPtr<class UAudioComponent> SlideAudio;
 
 	bool bWasSlidingJuice = false;
+	bool bWasZiplineJuice = false;
 	bool bWasMantlingJuice = false;
 	float SlideDustAccumulator = 0.f;
 	void SpawnTraversalDust(const FVector& Location, float Scale) const;

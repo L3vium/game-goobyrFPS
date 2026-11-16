@@ -176,6 +176,8 @@ public:
 	virtual void Input_SwitchSlot(float Direction) override;
 	virtual void Input_SightroomChanged(bool bActive) override;
 	virtual void Input_Emote(int32 EmoteIndex) override;
+	virtual bool Input_IsEmoting() const override;
+	virtual void Input_StopEmote() override;
 	virtual bool Input_IsCrouchWanted() const override;
 	virtual bool Input_IsSprintWanted() const override;
 
@@ -498,6 +500,30 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Death")
 	float DeathCameraOrbitSpeed = 8.f;
 
+	// ---- Emote camera ----
+	/** While an emote runs your view leaves the head for a third-person orbit around you (the mouse turns it). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Emote", meta=(ClampMin="50", Units="cm"))
+	float EmoteCameraDistance = 300.f;
+
+	/** Height of the orbit's pivot above the capsule centre. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Emote", meta=(Units="cm"))
+	float EmoteCameraPivotHeight = 35.f;
+
+	/** Where the orbit starts, from the way you face (180 = straight in front of you, looking at you). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Emote", meta=(Units="deg"))
+	float EmoteCameraStartYaw = 155.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Emote", meta=(ClampMin="-80", ClampMax="80", Units="deg"))
+	float EmoteCameraStartPitch = -12.f;
+
+	/** Time to fly out to the orbit and back into the head. */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Emote", meta=(ClampMin="0.01", Units="s"))
+	float EmoteCameraBlendTime = 0.35f;
+
+	/** Degrees of orbit per unit of look input (2.5 matches looking around). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Camera|Emote", meta=(ClampMin="0"))
+	float EmoteCameraLookScale = 2.5f;
+
 	// ---- Charm ----
 	/** AI controller that drives this player while charmed. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Charm")
@@ -525,6 +551,7 @@ protected:
 	virtual void HandleStatusAdded(EHitmenStatusEffect Status, AActor* StatusInstigator) override;
 	virtual void HandleStatusRemoved(EHitmenStatusEffect Status, AActor* StatusInstigator) override;
 	virtual void HandleDeath(AActor* Killer, AActor* DamageCauser, bool bHeadshot) override;
+	virtual void OnDamaged(float Damage, AActor* InstigatorActor, bool bHeadshot) override;
 
 	/** The local player's first-person arms play montages too. */
 	virtual void GetMontageMeshes(TArray<USkeletalMeshComponent*>& OutMeshes) const override;
@@ -552,6 +579,23 @@ protected:
 	void UpdateRecoil(float DeltaSeconds);
 	void UpdateFirstPersonArms(float DeltaSeconds);
 	void UpdateDeathCamera(float DeltaSeconds);
+
+	/** Every machine: an emote started or ended; the owner's view goes to the third-person orbit and back. */
+	UFUNCTION()
+	void HandleEmoteChanged(int32 EmoteIndex);
+
+	/** Local: emote orbit camera, blended from and back to the eye. True while it owns the view. */
+	bool UpdateEmoteCamera(float DeltaSeconds);
+
+	/** Local: the body (and its cosmetics) drawn for its owner (death and emote cameras) or hidden (first person). */
+	void SetBodyVisibleToOwner(bool bVisible);
+
+	/** Local: any action or move ends the running emote. */
+	void CancelEmote();
+
+	bool bEmoteView = false;
+	float EmoteViewAlpha = 0.f;
+	FRotator EmoteOrbit = FRotator::ZeroRotator;
 	float GetTargetEyeHeight() const;
 	/** Local: camera bob from the step phase; plays your footstep at the low point of each step. */
 	void UpdateHeadBob(float DeltaSeconds);

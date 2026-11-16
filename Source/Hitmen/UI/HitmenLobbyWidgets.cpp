@@ -17,6 +17,7 @@
 #include "Data/HitmenMapDefinition.h"
 #include "Data/HitmenWeaponData.h"
 #include "Data/HitmenAbilityData.h"
+#include "Abilities/HitmenAbility.h"
 #include "Data/HitmenCosmeticItem.h"
 #include "Data/HitmenSoundSet.h"
 #include "Blueprint/WidgetTree.h"
@@ -785,8 +786,14 @@ void UHitmenLobbyWidget::HandleKeyLabelsChanged()
 	{
 		return;
 	}
-	LoadoutRowLabels[1]->SetText(FText::Format(HITMEN_TEXT("HitmenLobby.MoveRowKey", "MOVE ABILITY   [{0}]"), FText::FromString(UI->GetKeyLabel(EHitmenKeyLabel::MoveAbility))));
-	LoadoutRowLabels[2]->SetText(FText::Format(HITMEN_TEXT("HitmenLobby.ManipulationRowKey", "MANIPULATION   [{0}]"), FText::FromString(UI->GetKeyLabel(EHitmenKeyLabel::Manipulation))));
+	// The key of the picked ability as bound on this keyboard (dash: Shift, jetpack: Space); none picked: no key.
+	auto RowLabel = [UI](const FText& Name, const UHitmenAbilityData* Picked)
+	{
+		const UHitmenAbility* Ability = Picked && Picked->AbilityClass ? Picked->AbilityClass->GetDefaultObject<UHitmenAbility>() : nullptr;
+		return Ability ? FText::Format(HITMEN_TEXT("HitmenLobby.AbilityRowKey", "{0}   [{1}]"), Name, FText::FromString(UI->GetKeyLabel(Ability->GetHUDKey()))) : Name;
+	};
+	LoadoutRowLabels[1]->SetText(RowLabel(HITMEN_TEXT("HitmenLobby.MoveRow", "MOVE ABILITY"), LocalLoadout.MoveAbility));
+	LoadoutRowLabels[2]->SetText(RowLabel(HITMEN_TEXT("HitmenLobby.ManipulationRow", "MANIPULATION"), LocalLoadout.ManipulationAbility));
 }
 
 void UHitmenLobbyWidget::UnbindEvents()
@@ -1043,6 +1050,7 @@ void UHitmenLobbyWidget::RefreshCustomization()
 		{
 			HitmenLobby::SendLoadout(PC, LocalLoadout);
 		}
+		HandleKeyLabelsChanged();
 	}
 	if (AgentNameEdit && !AgentNameEdit->HasKeyboardFocus())
 	{
@@ -1254,6 +1262,7 @@ void UHitmenLobbyWidget::ApplyLoadoutChoice(int32 CardIndex, int32 ChoiceIndex)
 		const TArray<UHitmenAbilityData*> Abilities = Catalog->GetAbilities(CardIndex == 1 ? EHitmenAbilitySlot::Move : EHitmenAbilitySlot::Manipulation);
 		UHitmenAbilityData* Choice = ChoiceIndex > 0 && Abilities.IsValidIndex(ChoiceIndex - 1) ? Abilities[ChoiceIndex - 1] : nullptr;
 		(CardIndex == 1 ? LocalLoadout.MoveAbility : LocalLoadout.ManipulationAbility) = Choice;
+		HandleKeyLabelsChanged();
 	}
 	if (AHitmenPlayerController* PC = GetHitmenPC())
 	{

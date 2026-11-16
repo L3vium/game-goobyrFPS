@@ -27,7 +27,9 @@ enum class EHitmenWeaponState : uint8
 	/** Carried, shown and usable. */
 	InHand,
 	/** Lying in the world: physics, pickup prompt, auto-ammo. */
-	Dropped
+	Dropped,
+	/** Carried in a hip holster, shown, not usable (guards' pistols while calm; it can be pickpocketed). */
+	OnHip
 };
 
 /**
@@ -65,6 +67,13 @@ public:
 
 	/** Server: shows/attaches when in hand, hides when holstered. No effect while dropped. */
 	void SetEquipped(bool bEquipped);
+
+	/** Server: in the owner's hip holster (shown, not usable; the owner says where: GetHolsterAttachment). No effect
+	 *  while dropped. SetEquipped(true) draws it again. */
+	void SetOnHip();
+
+	UFUNCTION(BlueprintPure, Category="Hitmen|Weapon")
+	bool IsOnHip() const { return WeaponState == EHitmenWeaponState::OnHip; }
 
 	/**
 	 * Server: hand (or world) -> world. The actor detaches, simulates physics and becomes the

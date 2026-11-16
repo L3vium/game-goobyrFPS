@@ -44,6 +44,9 @@ public:
 	virtual void Input_SwitchSlot(float Direction) {}
 	virtual void Input_SightroomChanged(bool bActive) {}
 	virtual void Input_Emote(int32 EmoteIndex) {}
+	/** An emote runs (R then ends it instead of opening the wheel). */
+	virtual bool Input_IsEmoting() const { return false; }
+	virtual void Input_StopEmote() {}
 	/** Current crouch/sprint wish, used by the controller for toggle mode. */
 	virtual bool Input_IsCrouchWanted() const { return false; }
 	virtual bool Input_IsSprintWanted() const { return false; }

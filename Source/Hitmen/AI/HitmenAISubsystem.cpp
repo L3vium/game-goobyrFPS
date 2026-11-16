@@ -299,6 +299,78 @@ void UHitmenAISubsystem::ReportNoiseHeardAt(const UObject* WorldContext, const F
 	}
 }
 
+void UHitmenAISubsystem::ReportShot(const UObject* WorldContext, const FVector& Origin, const FVector& End, bool bHit, float ReportRadius, float ImpactRadius, AActor* Shooter, const AActor* HitActor)
+{
+	UHitmenAISubsystem* AI = Get(WorldContext);
+	if (!AI || AI->GetWorld()->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+	const UHitmenMatchRules& Rules = GetRules(AI);
+	int32 MaxResponders = Rules.MaxNoiseResponders;
+	if (const int32* Override = Rules.NoiseResponderOverrides.Find(EHitmenNoiseType::Gunshot))
+	{
+		MaxResponders = *Override;
+	}
+	MaxResponders = FMath::Max(0, MaxResponders);
+
+	struct FListener { UHitmenAlertComponent* Alert; float Distance; FVector Spot; bool bClose; };
+	TArray<FListener> NearMisses;
+	TArray<FListener> Listeners;
+	for (UHitmenAlertComponent* Alert : AI->GetAlertComponents())
+	{
+		AActor* NPC = Alert->GetOwner();
+		if (!NPC || NPC == Shooter || NPC == HitActor || IsDeadCharacter(NPC) || !Alert->WouldReactToNoise())
+		{
+			continue;
+		}
+		const FVector Ear = NPC->GetActorLocation() + FVector::UpVector * HearingEarHeight;
+		const float ToShooter = FVector::Dist(Ear, Origin);
+		// The bullet whizzed right by (or landed at its feet): heard whatever the walls, it is right here.
+		const FVector OnPath = FMath::ClosestPointOnSegment(NPC->GetActorLocation(), Origin, End);
+		const float PassDistance = FVector::Dist(OnPath, NPC->GetActorLocation());
+		const bool bNearMiss = PassDistance <= Rules.NearMissRadius;
+		if (bNearMiss)
+		{
+			// Where it landed, or where it whizzed by for a shot that flew on.
+			NearMisses.Add({ Alert, PassDistance, bHit ? End : OnPath, true });
+			continue;
+		}
+		// Heard from farther: where it landed, or a point down the shot (never the shooter).
+		const FVector Spot = bHit ? End : Origin + (End - Origin).GetSafeNormal() * FMath::Min(FVector::Dist(Origin, End), 1500.f);
+		// Otherwise the impact (or a loud report) heard through the walls like any noise.
+		auto Hears = [&](const FVector& Source, float Radius)
+		{
+			if (Radius <= 0.f)
+			{
+				return false;
+			}
+			const float Distance = FVector::Dist2D(Source, Ear) + FMath::Max(0.f, FMath::Abs(Source.Z - Ear.Z) - HearingFreeHeight);
+			if (Distance > Radius)
+			{
+				return false;
+			}
+			const int32 Walls = AI->CountOccludingWalls(Source + FVector::UpVector * HearingSourceHeight, Ear, Shooter, NPC, Rules.MaxOccludingWalls + 1);
+			return Walls <= Rules.MaxOccludingWalls && Distance <= Radius * FMath::Pow(Rules.OcclusionMultiplier, static_cast<float>(Walls));
+		};
+		const bool bImpact = bHit && Hears(End, ImpactRadius);
+		if (bImpact || Hears(Origin, ReportRadius))
+		{
+			Listeners.Add({ Alert, bImpact ? static_cast<float>(FVector::Dist(End, Ear)) : ToShooter, Spot, false });
+		}
+	}
+	Listeners.Sort([](const FListener& A, const FListener& B) { return A.Distance < B.Distance; });
+	for (const FListener& Near : NearMisses)
+	{
+		Near.Alert->HearShot(Near.Spot, Origin, Shooter, FVector::Dist(Near.Alert->GetOwner()->GetActorLocation(), Origin), true);
+	}
+	for (int32 Index = 0; Index < Listeners.Num() && Index < MaxResponders; ++Index)
+	{
+		const FListener& L = Listeners[Index];
+		L.Alert->HearShot(L.Spot, Origin, Shooter, FVector::Dist(L.Alert->GetOwner()->GetActorLocation(), Origin), false);
+	}
+}
+
 // ---------------------------------------------------------------------------------------------
 // Kills
 // ---------------------------------------------------------------------------------------------

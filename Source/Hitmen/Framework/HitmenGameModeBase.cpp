@@ -71,11 +71,19 @@ UHitmenMatchRules* AHitmenGameModeBase::GetRules() const
 
 bool AHitmenGameModeBase::AllowsDebugCommands() const
 {
+	switch (CheatAccess)
+	{
+	case EHitmenCheatAccess::Always:
+		return true;
+	case EHitmenCheatAccess::DevelopmentBuilds:
 #if UE_BUILD_SHIPPING
-	return UHitmenGameSettings::Get()->bAllowCheatsInShipping;
+		return UHitmenGameSettings::Get()->bAllowCheatsInShipping;
 #else
-	return true;
+		return true;
 #endif
+	default:
+		return false;
+	}
 }
 
 bool AHitmenGameModeBase::CanDamage(const AActor* DamageInstigator, const AActor* Victim) const

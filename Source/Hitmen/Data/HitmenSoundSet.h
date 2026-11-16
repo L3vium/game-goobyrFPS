@@ -138,7 +138,11 @@ enum class EHitmenSound : uint8
 	/** Dash burst. */
 	Dash,
 	/** Blink: arriving at the destination. */
-	BlinkArrive
+	BlinkArrive,
+	/** Zipline: the trolley clamping onto the cable as the ride starts (one-shot). */
+	ZiplineEnter,
+	/** Zipline: the steady cable sound for the whole ride (looped while riding; ZiplineRide when unset). */
+	ZiplineLoop
 };
 
 UCLASS(BlueprintType)

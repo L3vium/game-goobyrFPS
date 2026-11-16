@@ -7,6 +7,7 @@
 #include "GameFramework/Character.h"
 #include "World/Vehicles/HitmenVehicles.h"
 #include "Data/HitmenSoundSet.h"
+#include "Sound/SoundAttenuation.h"
 #include "Framework/HitmenPlayerState.h"
 #include "Framework/HitmenGameState.h"
 #include "Framework/HitmenLobbyGameMode.h"
@@ -264,19 +265,42 @@ void AHitmenPlayerController::SetupInputComponent()
 	BindIfSet(WatcherToggleWatchersAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleWatcherToggleWatchers);
 	BindIfSet(ConfirmAction, ETriggerEvent::Started, &AHitmenPlayerController::HandleConfirm);
 
-	// Cheats (gym / dev builds): fixed F-keys, not rebindable (the engine's F1-F5 view modes are cleared in
-	// DefaultInput.ini).
-	const FKey CheatKeys[] = { EKeys::F1, EKeys::F2, EKeys::F3, EKeys::F4, EKeys::F5, EKeys::F6, EKeys::F7, EKeys::F8 };
+	// Cheats (gym / dev builds): fixed F-keys, not rebindable (the engine's F1-F5 view modes and F9 screenshot are
+	// cleared in DefaultInput.ini).
+	const FKey CheatKeys[] = { EKeys::F1, EKeys::F2, EKeys::F3, EKeys::F4, EKeys::F5, EKeys::F6, EKeys::F7, EKeys::F8, EKeys::F9 };
 	for (const FKey& Key : CheatKeys)
 	{
 		InputComponent->BindKey(Key, IE_Pressed, this, &AHitmenPlayerController::HandleCheatKey);
+	}
+	// Watching: on AZERTY the number row types & e-acute " without Shift; Windows reports those keys, never One / Two /
+	// Three, so the views also listen to them (and to the numpad).
+	const FKey DigitKeys[] = { EKeys::Ampersand, EKeys::E_AccentAigu, EKeys::Quote, EKeys::NumPadOne, EKeys::NumPadTwo, EKeys::NumPadThree };
+	for (const FKey& Key : DigitKeys)
+	{
+		InputComponent->BindKey(Key, IE_Pressed, this, &AHitmenPlayerController::HandleSpectatorDigitKey);
+	}
+}
+
+void AHitmenPlayerController::HandleSpectatorDigitKey(FKey Key)
+{
+	if (Key == EKeys::Ampersand || Key == EKeys::NumPadOne)
+	{
+		HandleSpectatorPlayerView();
+	}
+	else if (Key == EKeys::E_AccentAigu || Key == EKeys::NumPadTwo)
+	{
+		HandleSpectatorSplitView();
+	}
+	else
+	{
+		HandleSpectatorFreeView();
 	}
 }
 
 void AHitmenPlayerController::HandleCheatKey(FKey Key)
 {
 	const AHitmenGameState* GS = GetWorld()->GetGameState<AHitmenGameState>();
-	const FKey CheatKeys[] = { EKeys::F1, EKeys::F2, EKeys::F3, EKeys::F4, EKeys::F5, EKeys::F6, EKeys::F7, EKeys::F8 };
+	const FKey CheatKeys[] = { EKeys::F1, EKeys::F2, EKeys::F3, EKeys::F4, EKeys::F5, EKeys::F6, EKeys::F7, EKeys::F8, EKeys::F9 };
 	int32 Index = INDEX_NONE;
 	for (int32 It = 0; It < UE_ARRAY_COUNT(CheatKeys); ++It)
 	{
@@ -413,27 +437,54 @@ void AHitmenPlayerController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 	if (InPawn && !InPawn->IsA<ASpectatorPawn>())
 	{
-		bSpectating = false;
 		if (AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>())
 		{
 			PS->ClearWatcherView();
 		}
+		// Alive again (respawn, revive): the owner leaves its spectator views (remote owners never ran OnPossess).
 		if (IsLocalController())
 		{
-			RefreshMappingContexts();
-			// Alive again: the spectator keys go away.
-			if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
-			{
-				UI->OnSpectatorModeChanged.Broadcast(static_cast<uint8>(SpectatorMode));
-			}
+			Client_ExitSpectatorMode_Implementation();
+		}
+		else if (bSpectating)
+		{
+			bSpectating = false;
+			Client_ExitSpectatorMode();
 		}
 	}
 }
 
+void AHitmenPlayerController::Client_ExitSpectatorMode_Implementation()
+{
+	bSpectating = false;
+	bIsWatcher = false;
+	bSpectatorUpHeld = false;
+	bSpectatorDownHeld = false;
+	GetWorldTimerManager().ClearTimer(SpectatorGridTimer);
+	StopSpectatorCaptures();
+	SpectatorTarget = nullptr;
+	RefreshMappingContexts();
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this))
+	{
+		UI->SetSpectatorTargetName(FText::GetEmpty());
+		UI->OnSpectatorModeChanged.Broadcast(static_cast<uint8>(SpectatorMode));
+	}
+}
+
+APawn* AHitmenPlayerController::GetSpectatorViewPawn() const
+{
+	if (APawn* Spectator = GetSpectatorPawn())
+	{
+		return Spectator;
+	}
+	return GetPawnOrSpectator();
+}
+
 IHitmenInputReceiver* AHitmenPlayerController::GetReceiver() const
 {
-	// While spectating, GetPawn() is null and the free-fly pawn is the spectator pawn.
-	return Cast<IHitmenInputReceiver>(GetPawnOrSpectator());
+	// While spectating, the free-fly pawn is the spectator pawn (the dead body can still be the replicated pawn for a
+	// moment after the server switched us to spectating: it must not swallow the keys).
+	return Cast<IHitmenInputReceiver>(bSpectating ? GetSpectatorViewPawn() : GetPawnOrSpectator());
 }
 
 void AHitmenPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -672,8 +723,10 @@ void AHitmenPlayerController::RefreshHUDViews()
 			}
 			FHitmenHUDAlertBlip& Blip = Blips.AddDefaulted_GetRef();
 			Blip.Location = NPC->GetActorLocation();
-			Blip.Color = Alert->GetAlertColor();
-			Blip.State = Alert->GetAlertState();
+			// A fight against someone it never saw (shot at, colleagues dropping) reads as a search: red and UNDER FIRE
+			// only once it has seen you.
+			Blip.Color = Alert->GetDisplayAlertColor();
+			Blip.State = Alert->GetDisplayAlertState();
 			Blip.Suspicion = Alert->GetSuspicion();
 			Blip.bTargetsViewer = Alert->GetTarget() == ViewPawn;
 			Blip.bCallingReinforcements = Alert->IsCallingReinforcements();
@@ -697,7 +750,7 @@ void AHitmenPlayerController::RefreshHUDViews()
 		const FVector Eye = ViewPawn->GetPawnViewLocation();
 		for (TActorIterator<AHitmenSecurityCamera> It(World); It; ++It)
 		{
-			if (It->IsCameraDisabled() || !It->IsSeeingIntruder())
+			if (It->IsCameraDisabled() || (!It->IsSeeingIntruder() && It->GetDetectionMeter() <= 0.f))
 			{
 				continue;
 			}
@@ -708,11 +761,13 @@ void AHitmenPlayerController::RefreshHUDViews()
 			{
 				continue;
 			}
+			// The meter fills a white arc; once it raised the alarm it reads as a search (yellow), never a fight.
+			const bool bAlarm = It->HasRecentlyAlarmed() && It->IsSeeingIntruder();
 			FHitmenHUDAlertBlip& Blip = Blips.AddDefaulted_GetRef();
 			Blip.Location = It->GetActorLocation();
-			Blip.Color = EHitmenAlertColor::Red;
-			Blip.State = EHitmenAlertState::Combat;
-			Blip.Suspicion = 1.f;
+			Blip.Color = bAlarm ? EHitmenAlertColor::Yellow : EHitmenAlertColor::White;
+			Blip.State = bAlarm ? EHitmenAlertState::Searching : EHitmenAlertState::Suspicious;
+			Blip.Suspicion = It->GetDetectionMeter();
 			Blip.bTargetsViewer = true;
 			Blip.bIsCamera = true;
 		}
@@ -757,6 +812,12 @@ void AHitmenPlayerController::HandleLook(const FInputActionValue& Value)
 		return;
 	}
 	FVector2D Axis = Value.Get<FVector2D>();
+	// The emote wheel is open: the mouse picks a slot, the view stays.
+	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this); UI && UI->IsEmoteWheelOpen())
+	{
+		UI->AddEmoteWheelCursor(FVector2D(Axis.X, -Axis.Y) * EmoteWheelMouseScale);
+		return;
+	}
 	if (const UHitmenUserSettings* Settings = UHitmenUserSettings::GetHitmenUserSettings())
 	{
 		Axis *= Settings->MouseSensitivity;
@@ -1029,6 +1090,12 @@ void AHitmenPlayerController::HandleEmoteWheelPressed()
 {
 	if (IsGameplayInputBlocked() || bSpectating)
 	{
+		return;
+	}
+	// R during an emote ends it (no wheel).
+	if (IHitmenInputReceiver* R = GetReceiver(); R && R->Input_IsEmoting())
+	{
+		R->Input_StopEmote();
 		return;
 	}
 	if (UHitmenUIEventSubsystem* UI = UHitmenUIEventSubsystem::Get(this)) { UI->SetEmoteWheelOpen(true); }
@@ -1503,6 +1570,11 @@ void AHitmenPlayerController::HitmenWatch()
 	Server_DebugWatch();
 }
 
+void AHitmenPlayerController::Revive()
+{
+	Server_DebugCheat(EHitmenCheat::Revive);
+}
+
 void AHitmenPlayerController::Server_DebugWatch_Implementation()
 {
 	AHitmenPlayerState* PS = GetPlayerState<AHitmenPlayerState>();
@@ -1541,6 +1613,9 @@ void AHitmenPlayerController::Server_DebugCheat_Implementation(EHitmenCheat Chea
 		break;
 	case EHitmenCheat::ResetGym:
 		if (GM) { GM->DebugResetMap(); }
+		break;
+	case EHitmenCheat::Revive:
+		if (GM) { GM->DebugRevivePlayer(this); }
 		break;
 	default:
 		PS->SetCheat(Cheat, !PS->HasCheat(Cheat));
@@ -1602,8 +1677,14 @@ TArray<APawn*> AHitmenPlayerController::GetSpectatableTargets() const
 
 void AHitmenPlayerController::SetSpectatorMode(EHitmenSpectatorMode NewMode)
 {
+	// Nobody alive to watch: player view and split screen have nothing to show, free fly it is (always allowed then).
+	const bool bNobodyToWatch = GetSpectatableTargets().IsEmpty();
+	if (bNobodyToWatch)
+	{
+		NewMode = EHitmenSpectatorMode::FreeFly;
+	}
 	// Dead players free fly too unless Project Settings -> Hitmen -> Watchers -> bSpectatorsCanFreeFly is off.
-	if (!bIsWatcher && NewMode == EHitmenSpectatorMode::FreeFly && !UHitmenGameSettings::Get()->bSpectatorsCanFreeFly)
+	else if (!bIsWatcher && NewMode == EHitmenSpectatorMode::FreeFly && !UHitmenGameSettings::Get()->bSpectatorsCanFreeFly)
 	{
 		NewMode = EHitmenSpectatorMode::Follow;
 	}
@@ -1803,7 +1884,7 @@ void AHitmenPlayerController::ApplySpectatorView()
 			if (bSpectatorThirdPerson)
 			{
 				UpdateSpectatorThirdPerson();
-				SetViewTargetWithBlend(GetPawnOrSpectator(), 0.2f);
+				SetViewTargetWithBlend(GetSpectatorViewPawn(), 0.2f);
 			}
 			else
 			{
@@ -1814,7 +1895,7 @@ void AHitmenPlayerController::ApplySpectatorView()
 	else
 	{
 		// Free fly and grid both use the spectator pawn camera underneath.
-		SetViewTargetWithBlend(GetPawnOrSpectator(), 0.25f);
+		SetViewTargetWithBlend(GetSpectatorViewPawn(), 0.25f);
 	}
 	if (AHitmenSpectatorPawn* Spectator = Cast<AHitmenSpectatorPawn>(GetSpectatorPawn()))
 	{
@@ -1960,9 +2041,18 @@ void AHitmenPlayerController::UpdateWatcherPresence()
 	const bool bShowWatchers = bSpectating ? IsWatcherWatchersShown() : Settings->bPlayersSeeWatchers;
 	const bool bOutlinePlayers = bSpectating && IsWatcherPlayersShown();
 
-	// Avatars of the watchers flying free (one following a player in player view is with that player).
+	// Nobody left to watch in player view or split screen: free fly.
+	if (bSpectating && SpectatorMode != EHitmenSpectatorMode::FreeFly && GetSpectatableTargets().IsEmpty())
+	{
+		SetSpectatorMode(EHitmenSpectatorMode::FreeFly);
+	}
+	UpdateVoiceRules();
+
+	// Avatars of the watchers flying free (one following a player in player view is with that player). They always
+	// exist (proximity voice comes from them) and are drawn when this player may see them: watchers see orbs, players
+	// (bPlayersSeeWatchers) ghosts.
 	TArray<AHitmenPlayerState*> Wanted;
-	if (GS && bShowWatchers)
+	if (GS)
 	{
 		for (APlayerState* Base : GS->PlayerArray)
 		{
@@ -1998,6 +2088,17 @@ void AHitmenPlayerController::UpdateWatcherPresence()
 			WatcherAvatars.Add(Avatar);
 		}
 	}
+	const AHitmenGameState* HitmenGS = Cast<AHitmenGameState>(GS);
+	const bool bProximityVoice = HitmenGS && HitmenGS->GetLobbySettings().bProximityChat && Settings->bWatcherProximityVoice;
+	USoundAttenuation* VoiceAttenuation = bProximityVoice ? Settings->VoiceAttenuation.LoadSynchronous() : nullptr;
+	for (AHitmenWatcherAvatar* Avatar : WatcherAvatars)
+	{
+		if (Avatar)
+		{
+			Avatar->SetPresentation(bShowWatchers, !bSpectating);
+			Avatar->SetVoice(bProximityVoice, VoiceAttenuation);
+		}
+	}
 
 	// Players outlined through walls for watchers (PP_Markers, stencil WatchedPlayer).
 	TSet<TWeakObjectPtr<AActor>> Outlined;
@@ -2028,6 +2129,42 @@ void AHitmenPlayerController::UpdateWatcherPresence()
 		}
 	}
 	WatcherHighlightedPlayers = MoveTemp(Outlined);
+}
+
+void AHitmenPlayerController::UpdateVoiceRules()
+{
+	const AHitmenGameState* GS = GetWorld() ? GetWorld()->GetGameState<AHitmenGameState>() : nullptr;
+	if (!GS || !IsLocalController())
+	{
+		return;
+	}
+	// Only during a match: in the lobby everybody talks.
+	const EHitmenMatchPhase Phase = GS->GetMatchPhase();
+	const bool bInMatch = Phase == EHitmenMatchPhase::Intro || Phase == EHitmenMatchPhase::Playing;
+	const bool bDeadTalkToLiving = UHitmenGameSettings::Get()->bDeadCanTalkToLiving;
+	const APlayerState* Self = GetPlayerState<APlayerState>();
+	for (APlayerState* Base : GS->PlayerArray)
+	{
+		const AHitmenPlayerState* PS = Cast<AHitmenPlayerState>(Base);
+		if (!PS || Base == Self || !Base->GetUniqueId().IsValid())
+		{
+			continue;
+		}
+		// The living never hear the dead or the watchers (unless allowed); the dead and watchers hear everyone.
+		const bool bOut = PS->IsWatcher() || !PS->IsAlive();
+		const bool bHear = !bInMatch || bSpectating || !bOut || bDeadTalkToLiving;
+		const bool bMuted = VoiceMutedPlayers.Contains(Base);
+		if (!bHear && !bMuted)
+		{
+			GameplayMutePlayer(Base->GetUniqueId());
+			VoiceMutedPlayers.Add(Base);
+		}
+		else if (bHear && bMuted)
+		{
+			GameplayUnmutePlayer(Base->GetUniqueId());
+			VoiceMutedPlayers.Remove(Base);
+		}
+	}
 }
 
 void AHitmenPlayerController::ClearWatcherPresence()
@@ -2167,6 +2304,10 @@ void AHitmenPlayerController::HitmenPress(const FString& Action, float X, float 
 	else if (A == TEXT("pause")) { HandlePause(); }
 	else if (A == TEXT("switchslot")) { HandleSwitchSlot(FInputActionValue(1.f)); }
 	else if (A == TEXT("move")) { QAMoveInput = FVector2D(X, Y); }
+	else if (A == TEXT("emote")) { HandleEmoteWheelPressed(); }
+	else if (A == TEXT("view1")) { HandleSpectatorPlayerView(); }
+	else if (A == TEXT("view2")) { HandleSpectatorSplitView(); }
+	else if (A == TEXT("view3")) { HandleSpectatorFreeView(); }
 	UE_LOG(LogHitmen, Display, TEXT("HitmenPress %s"), *Action);
 }
 
@@ -2186,6 +2327,7 @@ void AHitmenPlayerController::HitmenRelease(const FString& Action)
 	else if (A == TEXT("moveability")) { HandleMoveAbilityReleased(); }
 	else if (A == TEXT("manipulation")) { HandleManipulationReleased(); }
 	else if (A == TEXT("move")) { QAMoveInput = FVector2D::ZeroVector; }
+	else if (A == TEXT("emote")) { HandleEmoteWheelReleased(); }
 	UE_LOG(LogHitmen, Display, TEXT("HitmenRelease %s"), *Action);
 }
 

@@ -2,6 +2,8 @@
 
 #include "Characters/HitmenNPC.h"
 #include "Core/HitmenText.h"
+#include "Core/HitmenGameSettings.h"
+#include "Engine/SkeletalMesh.h"
 #include "AI/HitmenAISubsystem.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -162,6 +164,11 @@ void AHitmenNPC::Tick(float DeltaSeconds)
 		bWasOnEdge = AlertComponent->IsOnEdge();
 		RefreshWalkSpeed();
 	}
+	// Holster or draw (a threat investigation can start without a state change).
+	if (HasAuthority())
+	{
+		RefreshWeaponCarry();
+	}
 	// Snipers aim only at a target they see: the server decides, every machine shows it.
 	const AActor* Target = AlertComponent ? AlertComponent->GetTarget() : nullptr;
 	if (bIsSniper && HasAuthority())
@@ -226,16 +233,147 @@ AHitmenGuardGroup* AHitmenNPC::GetGuardGroup() const
 
 bool AHitmenNPC::CanBePickpocketedBy(const AActor* Thief) const
 {
-	if (!Thief || IsDead() || CarriedKeycard < 0 || !IsUnawareOf(Thief))
+	return GetPickpocketItem(Thief) != EHitmenPickpocketItem::None;
+}
+
+EHitmenPickpocketItem AHitmenNPC::GetPickpocketItem(const AActor* Thief) const
+{
+	const bool bKeycard = CarriedKeycard >= 0;
+	const bool bHolstered = Weapon && Weapon->IsOnHip();
+	if (!Thief || IsDead() || (!bKeycard && !bHolstered))
 	{
-		return false;
+		return EHitmenPickpocketItem::None;
 	}
-	if (const ACharacter* ThiefCharacter = Cast<ACharacter>(Thief); bPickpocketRequiresCrouch && (!ThiefCharacter || !ThiefCharacter->bIsCrouched))
+	if (FVector::DistSquared2D(Thief->GetActorLocation(), GetActorLocation()) > FMath::Square(PickpocketReach))
 	{
-		return false;
+		return EHitmenPickpocketItem::None;
 	}
-	const FVector ToThief = (Thief->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-	return FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), ToThief) <= PickpocketMaxDot;
+	const ACharacter* ThiefCharacter = Cast<ACharacter>(Thief);
+	const bool bCrouched = ThiefCharacter && ThiefCharacter->bIsCrouched;
+	if (bPickpocketRequiresCrouch && !bCrouched)
+	{
+		return EHitmenPickpocketItem::None;
+	}
+	const bool bIncapacitated = StatusEffectComponent && StatusEffectComponent->IsIncapacitated();
+	if (!bIncapacitated)
+	{
+		// Never from someone looking at you; from behind, or beside it when you are crouched.
+		if (AlertComponent && AlertComponent->GetTarget() == Thief && AlertComponent->IsTargetVisible())
+		{
+			return EHitmenPickpocketItem::None;
+		}
+		const FVector ToThief = (Thief->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+		const float Dot = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), ToThief);
+		if (Dot > (bCrouched ? FMath::Max(CrouchedPickpocketMaxDot, PickpocketMaxDot) : PickpocketMaxDot))
+		{
+			return EHitmenPickpocketItem::None;
+		}
+	}
+	if (bKeycard != bHolstered)
+	{
+		return bKeycard ? EHitmenPickpocketItem::Keycard : EHitmenPickpocketItem::Weapon;
+	}
+	// Both hips carry something: the one nearest to where the thief looks.
+	const APawn* ThiefPawn = Cast<APawn>(Thief);
+	const FVector Eye = ThiefPawn ? ThiefPawn->GetPawnViewLocation() : Thief->GetActorLocation();
+	const FVector Look = ThiefPawn ? ThiefPawn->GetBaseAimRotation().Vector() : Thief->GetActorForwardVector();
+	auto RayDistance = [&Eye, &Look](const FVector& Point)
+	{
+		return FVector::DistSquared(FMath::ClosestPointOnInfiniteLine(Eye, Eye + Look, Point), Point);
+	};
+	return RayDistance(KeycardMesh->GetComponentLocation()) <= RayDistance(Weapon->GetActorLocation()) ? EHitmenPickpocketItem::Keycard : EHitmenPickpocketItem::Weapon;
+}
+
+FTransform AHitmenNPC::ActorSpaceToHipBone(const FTransform& ActorSpace) const
+{
+	const USkeletalMeshComponent* Body = GetMesh();
+	const USkeletalMesh* Asset = Body ? Body->GetSkeletalMeshAsset() : nullptr;
+	if (!Asset)
+	{
+		return ActorSpace;
+	}
+	const FReferenceSkeleton& Ref = Asset->GetRefSkeleton();
+	const int32 Bone = Ref.FindBoneIndex(KeycardBone);
+	if (Bone == INDEX_NONE)
+	{
+		return ActorSpace;
+	}
+	// Reference pose, component space: the same on every machine whatever the animation is doing.
+	FTransform BoneComponentSpace = FTransform::Identity;
+	for (int32 Index = Bone; Index != INDEX_NONE; Index = Ref.GetParentIndex(Index))
+	{
+		BoneComponentSpace = BoneComponentSpace * Ref.GetRefBonePose()[Index];
+	}
+	const FTransform ComponentSpace = ActorSpace.GetRelativeTransform(Body->GetRelativeTransform());
+	return ComponentSpace.GetRelativeTransform(BoneComponentSpace);
+}
+
+bool AHitmenNPC::GetHolsterAttachment(FName& OutBone, FTransform& OutRelative) const
+{
+	FTransform Slot = HolsterTransform;
+	if (HolsterSide == EHitmenHipSlot::Left)
+	{
+		// Mirror the right hip.
+		FVector Location = Slot.GetLocation();
+		Location.Y *= -1.f;
+		FRotator Rotation = Slot.Rotator();
+		Rotation.Yaw *= -1.f;
+		Rotation.Roll *= -1.f;
+		Slot = FTransform(Rotation, Location);
+	}
+	OutBone = KeycardBone;
+	OutRelative = ActorSpaceToHipBone(Slot);
+	return true;
+}
+
+void AHitmenNPC::SpawnWeapon(UHitmenWeaponData* Data)
+{
+	if (!HasAuthority() || !Data || !Data->WeaponClass)
+	{
+		return;
+	}
+	FActorSpawnParameters Params;
+	Params.Owner = this;
+	Params.Instigator = this;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	Weapon = GetWorld()->SpawnActor<AHitmenWeaponBase>(Data->WeaponClass, GetActorTransform(), Params);
+	if (Weapon)
+	{
+		Weapon->InitWeapon(Data, this);
+		Weapon->SetEquipped(true);
+		RefreshWeaponCarry();
+	}
+}
+
+void AHitmenNPC::RefreshWeaponCarry()
+{
+	if (!HasAuthority() || !Weapon || Weapon->IsDropped() || IsDead())
+	{
+		return;
+	}
+	const UHitmenWeaponData* Data = Weapon->GetWeaponData();
+	const bool bHolsterable = WeaponCarry == EHitmenNPCWeaponCarry::Holstered && Data && Data->bCanHolster
+		&& !(StatusEffectComponent && StatusEffectComponent->HasStatus(EHitmenStatusEffect::Charmed));
+	bool bDrawn = !bHolsterable;
+	if (!bDrawn && AlertComponent)
+	{
+		// Drawn for real threats (a fight, a search, gunfire or a body being checked, on edge after an alert); a glimpse
+		// or a footstep leaves it in the holster.
+		const EHitmenAlertState State = AlertComponent->GetAlertState();
+		bDrawn = State == EHitmenAlertState::Combat || State == EHitmenAlertState::Searching || AlertComponent->IsOnEdge()
+			|| (State == EHitmenAlertState::Investigating && AlertComponent->IsThreatInvestigation());
+	}
+	if (bDrawn)
+	{
+		if (!Weapon->IsEquipped())
+		{
+			Weapon->SetEquipped(true);
+		}
+	}
+	else if (!Weapon->IsOnHip())
+	{
+		Weapon->SetOnHip();
+	}
 }
 
 bool AHitmenNPC::CanInteract_Implementation(AActor* Interactor) const
@@ -259,6 +397,10 @@ FText AHitmenNPC::GetInteractionInfo_Implementation(AActor* Interactor) const
 	{
 		Info = FText::Format(HITMEN_TEXT("Hitmen.NPCInfoKeycard", "{0}  -  Keycard {1}"), Info, FText::AsNumber(CarriedKeycard));
 	}
+	if (Weapon && Weapon->IsOnHip())
+	{
+		Info = FText::Format(HITMEN_TEXT("Hitmen.NPCInfoHolstered", "{0}  -  holstered"), Info);
+	}
 	return Info;
 }
 
@@ -268,14 +410,24 @@ void AHitmenNPC::HandleCarryChanged(AHitmenCharacterBase* Body)
 	if (Weapon)
 	{
 		Weapon->SetActorHiddenInGame(Body != nullptr || IsDead());
+		if (!Body && !IsDead())
+		{
+			Weapon->RefreshAttachment();
+		}
 	}
 }
 
 FText AHitmenNPC::GetInteractionText_Implementation(AActor* Interactor) const
 {
-	if (CanBePickpocketedBy(Interactor))
+	switch (GetPickpocketItem(Interactor))
 	{
+	case EHitmenPickpocketItem::Keycard:
 		return FText::Format(HITMEN_TEXT("Hitmen.Pickpocket", "Pickpocket keycard {0}"), FText::AsNumber(CarriedKeycard));
+	case EHitmenPickpocketItem::Weapon:
+		return FText::Format(HITMEN_TEXT("Hitmen.PickpocketWeapon", "Pickpocket {0}"),
+			Weapon && Weapon->GetWeaponData() ? UHitmenTextSubsystem::Translate(Weapon->GetWeaponData()->DisplayName) : FText::GetEmpty());
+	default:
+		break;
 	}
 	return Super::GetInteractionText_Implementation(Interactor);
 }
@@ -286,13 +438,25 @@ void AHitmenNPC::Interact_Implementation(AActor* Interactor)
 	{
 		return;
 	}
-	if (CanBePickpocketedBy(Interactor))
+	const EHitmenPickpocketItem Item = GetPickpocketItem(Interactor);
+	if (Item != EHitmenPickpocketItem::None)
 	{
 		if (UHitmenInventoryComponent* Inventory = Interactor->FindComponentByClass<UHitmenInventoryComponent>())
 		{
-			Inventory->AddKeycard(CarriedKeycard);
-			CarriedKeycard = INDEX_NONE;
-			OnRep_CarriedKeycard();
+			if (Item == EHitmenPickpocketItem::Keycard)
+			{
+				Inventory->AddKeycard(CarriedKeycard);
+				CarriedKeycard = INDEX_NONE;
+				OnRep_CarriedKeycard();
+			}
+			else
+			{
+				// The holstered pistol: out of the holster and into the thief's hands (or a free slot).
+				AHitmenWeaponBase* Stolen = Weapon;
+				Weapon = nullptr;
+				Stolen->Drop(DroppedWeaponAmmo, Stolen->GetActorLocation(), Stolen->GetActorRotation(), FVector::ZeroVector, nullptr);
+				Inventory->PickUpWeapon(Stolen, true);
+			}
 			if (AHitmenCharacterBase* Thief = Cast<AHitmenCharacterBase>(Interactor))
 			{
 				Thief->PlayAnimSetMontage(EHitmenAnimMontage::Pickpocket);
@@ -316,11 +480,13 @@ void AHitmenNPC::PostInitializeComponents()
 void AHitmenNPC::BeginPlay()
 {
 	Super::BeginPlay();
-	// The card sits in a right pocket: placed in the NPC's own space at spawn, then it follows the hips.
-	KeycardMesh->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
-	KeycardMesh->SetWorldLocationAndRotation(GetActorTransform().TransformPosition(KeycardHipOffset), GetActorRotation());
-	KeycardMesh->SetWorldScale3D(FVector(0.055f, 0.01f, 0.09f));
-	KeycardMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepWorldTransform, KeycardBone);
+	// The card sits on the hip opposite the holster and follows the hips (placed from the reference pose: the same
+	// on every machine).
+	const FVector CardOffset(KeycardHipOffset.X, GetKeycardSide() == EHitmenHipSlot::Right ? KeycardHipOffset.Y : -KeycardHipOffset.Y, KeycardHipOffset.Z);
+	FTransform CardRelative = ActorSpaceToHipBone(FTransform(FRotator::ZeroRotator, CardOffset));
+	CardRelative.SetScale3D(FVector(0.055f, 0.01f, 0.09f));
+	KeycardMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, KeycardBone);
+	KeycardMesh->SetRelativeTransform(CardRelative);
 	BodyCarryComponent->OnCarryChanged.AddUniqueDynamic(this, &AHitmenNPC::HandleCarryChanged);
 	OnRep_CarriedKeycard();
 	if (bIsSniper && GlintMaterial && GetNetMode() != NM_DedicatedServer)
@@ -348,18 +514,9 @@ void AHitmenNPC::BeginPlay()
 		AlertComponent->OnSuspicionChanged.AddDynamic(this, &AHitmenNPC::HandleAlertSuspicionChanged);
 	}
 	HandleAlertStateChanged(EHitmenAlertState::Unaware, AlertComponent->GetAlertState());
-	if (HasAuthority() && DefaultWeapon && DefaultWeapon->WeaponClass)
+	if (HasAuthority() && DefaultWeapon)
 	{
-		FActorSpawnParameters Params;
-		Params.Owner = this;
-		Params.Instigator = this;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		Weapon = GetWorld()->SpawnActor<AHitmenWeaponBase>(DefaultWeapon->WeaponClass, GetActorTransform(), Params);
-		if (Weapon)
-		{
-			Weapon->InitWeapon(DefaultWeapon, this);
-			Weapon->SetEquipped(true);
-		}
+		SpawnWeapon(DefaultWeapon);
 	}
 }
 
@@ -381,7 +538,7 @@ void AHitmenNPC::PushAlertView()
 	}
 	if (UHitmenAlertIndicatorWidget* Indicator = Cast<UHitmenAlertIndicatorWidget>(AlertWidget->GetUserWidgetObject()))
 	{
-		Indicator->SetAlertView(AlertComponent->GetAlertColor(), AlertComponent->GetSuspicion(), AlertComponent->IsCallingReinforcements());
+		Indicator->SetAlertView(AlertComponent->GetDisplayAlertColor(), AlertComponent->GetSuspicion(), AlertComponent->IsCallingReinforcements());
 		Indicator->SetAsleep(bSleepRagdoll && !IsDead());
 	}
 }
@@ -420,6 +577,7 @@ void AHitmenNPC::HandleAlertStateChanged(EHitmenAlertState OldState, EHitmenAler
 {
 	PushAlertView();
 	RefreshWalkSpeed();
+	RefreshWeaponCarry();
 	if (NewState != EHitmenAlertState::Combat)
 	{
 		ClearCover();
@@ -610,7 +768,15 @@ void AHitmenNPC::BecomeGuard()
 	{
 		return;
 	}
+	// Its own guard weapon, else its default one, else the project's guard weapon (Project Settings -> Hitmen -> AI):
+	// a candidate that was not picked is a plain armed guard, never an unarmed VIP look-alike.
 	UHitmenWeaponData* GuardWeapon = CandidateGuardWeapon ? CandidateGuardWeapon.Get() : DefaultWeapon.Get();
+	if (!GuardWeapon)
+	{
+		GuardWeapon = UHitmenGameSettings::Get()->DefaultGuardWeapon.LoadSynchronous();
+	}
+	bGuest = false;
+	RefreshWalkSpeed();
 	if (!GuardWeapon || !GuardWeapon->WeaponClass || (Weapon && Weapon->GetWeaponData() == GuardWeapon))
 	{
 		return;
@@ -621,15 +787,10 @@ void AHitmenNPC::BecomeGuard()
 		Weapon = nullptr;
 	}
 	DefaultWeapon = GuardWeapon;
-	FActorSpawnParameters Params;
-	Params.Owner = this;
-	Params.Instigator = this;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	Weapon = GetWorld()->SpawnActor<AHitmenWeaponBase>(GuardWeapon->WeaponClass, GetActorTransform(), Params);
-	if (Weapon)
+	SpawnWeapon(GuardWeapon);
+	if (AHitmenAIController* NPCAI = Cast<AHitmenAIController>(GetController()))
 	{
-		Weapon->InitWeapon(GuardWeapon, this);
-		Weapon->SetEquipped(true);
+		NPCAI->RefreshNPCKeys();
 	}
 }
 

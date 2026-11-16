@@ -36,6 +36,7 @@
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
+#include "Engine/OverlapResult.h"
 
 AHitmenWeaponBase::AHitmenWeaponBase()
 {
@@ -277,6 +278,19 @@ void AHitmenWeaponBase::SetEquipped(bool bEquipped)
 	}
 }
 
+void AHitmenWeaponBase::SetOnHip()
+{
+	if (!HasAuthority() || WeaponState == EHitmenWeaponState::Dropped)
+	{
+		return;
+	}
+	if (WeaponState != EHitmenWeaponState::OnHip || !bStateApplied)
+	{
+		WeaponState = EHitmenWeaponState::OnHip;
+		ApplyWeaponState();
+	}
+}
+
 void AHitmenWeaponBase::ApplyWeaponState()
 {
 	const bool bFirstApply = !bStateApplied;
@@ -320,12 +334,22 @@ void AHitmenWeaponBase::ApplyWeaponState()
 		SetActorTickEnabled(false);
 
 		const bool bInHand = WeaponState == EHitmenWeaponState::InHand;
-		SetActorHiddenInGame(!bInHand);
+		const bool bOnHip = WeaponState == EHitmenWeaponState::OnHip;
+		SetActorHiddenInGame(!bInHand && !bOnHip);
 		if (!bInHand)
 		{
 			StopFire();
 		}
-		if (USceneComponent* Parent = GetAttachParent())
+		FName HipBone;
+		FTransform HipTransform;
+		const AHitmenCharacterBase* OwnerCharacter = Cast<AHitmenCharacterBase>(OwnerPawn);
+		if (bOnHip && OwnerCharacter && OwnerCharacter->GetMesh() && OwnerCharacter->GetHolsterAttachment(HipBone, HipTransform))
+		{
+			// In the holster: follows the hips.
+			AttachToComponent(OwnerCharacter->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, HipBone);
+			SetActorRelativeTransform(HipTransform);
+		}
+		else if (USceneComponent* Parent = GetAttachParent())
 		{
 			const FName Socket = WeaponData ? WeaponData->AttachSocket : NAME_None;
 			AttachToComponent(Parent, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Socket);
@@ -1104,34 +1128,37 @@ void AHitmenWeaponBase::ReportShotNoise(const FVector& Origin, const TArray<FVec
 	{
 		return;
 	}
-	// The report is heard around the shooter (silenced: not at all), but it draws guards to where the bullet landed:
-	// they turn to the impact, never to the shooter. A shot into the air: a point along it.
-	if (!WeaponData->bSilenced && WeaponData->NoiseRadius > 0.f)
+	// NPCs hear a shot only close by: the bullet passing right by them (near miss), landing near them (the impact,
+	// walls cut it), or a loud report around the shooter (silenced: none). They walk to where it landed, never to the
+	// shooter. A hitscan miss reports the end of its range: the bullet flew off there, it did not land.
+	const FVector Aim = OwnerPawn ? OwnerPawn->GetBaseAimRotation().Vector() : GetActorForwardVector();
+	const bool bHit = Impacts.Num() > 0 && FVector::DistSquared(Origin, Impacts[0]) < FMath::Square(WeaponData->Range * 0.98f);
+	const FVector End = Impacts.Num() > 0 ? Impacts[0] : Origin + Aim * FMath::Min(WeaponData->Range, 1500.f);
+	float ImpactRadius = WeaponData->ImpactNoiseRadius;
+	const AActor* HitPawn = nullptr;
+	if (bHit)
 	{
-		FVector HeardAt = Impacts.Num() > 0 ? Impacts[0] : Origin;
-		if (Impacts.Num() == 0 || FVector::DistSquared(Origin, Impacts[0]) >= FMath::Square(WeaponData->Range * 0.98f))
+		TArray<FOverlapResult> Overlaps;
+		FCollisionQueryParams FleshParams(SCENE_QUERY_STAT(HitmenShotFlesh), false, this);
+		FleshParams.AddIgnoredActor(OwnerPawn);
+		if (GetWorld()->OverlapMultiByChannel(Overlaps, Impacts[0], FQuat::Identity, ECC_Pawn, FCollisionShape::MakeSphere(25.f), FleshParams))
 		{
-			const FVector Along = Impacts.Num() > 0 ? (Impacts[0] - Origin).GetSafeNormal() : (OwnerPawn ? OwnerPawn->GetBaseAimRotation().Vector() : FVector::ForwardVector);
-			HeardAt = Origin + Along * FMath::Min(WeaponData->Range, 1500.f);
-		}
-		UHitmenAISubsystem::ReportNoiseHeardAt(this, Origin, HeardAt, WeaponData->NoiseRadius, OwnerPawn, EHitmenNoiseType::Gunshot);
-	}
-	// Where the bullet lands is what draws NPCs (they investigate the impact, not the shooter).
-	if (WeaponData->ImpactNoiseRadius > 0.f && Impacts.Num() > 0)
-	{
-		float Radius = WeaponData->ImpactNoiseRadius;
-		// A silenced bullet into a body is almost silent: only someone right there hears it.
-		if (WeaponData->bSilenced)
-		{
-			FCollisionQueryParams FleshParams(SCENE_QUERY_STAT(HitmenSilencedFlesh), false, this);
-			FleshParams.AddIgnoredActor(OwnerPawn);
-			if (GetWorld()->OverlapAnyTestByChannel(Impacts[0], FQuat::Identity, ECC_Pawn, FCollisionShape::MakeSphere(25.f), FleshParams))
+			for (const FOverlapResult& Overlap : Overlaps)
 			{
-				Radius = FMath::Min(Radius, SilencedFleshNoiseRadius);
+				if (Cast<APawn>(Overlap.GetActor()))
+				{
+					HitPawn = Overlap.GetActor();
+					break;
+				}
 			}
 		}
-		UHitmenAISubsystem::ReportNoise(this, Impacts[0], Radius, OwnerPawn, EHitmenNoiseType::Gunshot);
+		// A silenced bullet into a body is almost silent: only someone right there hears it.
+		if (HitPawn && WeaponData->bSilenced)
+		{
+			ImpactRadius = FMath::Min(ImpactRadius, SilencedFleshNoiseRadius);
+		}
 	}
+	UHitmenAISubsystem::ReportShot(this, Origin, End, bHit, WeaponData->bSilenced ? 0.f : WeaponData->NoiseRadius, ImpactRadius, OwnerPawn, HitPawn);
 }
 
 void AHitmenWeaponBase::Multicast_FireEffects_Implementation(FVector_NetQuantize Origin, const TArray<FVector_NetQuantize>& Impacts)

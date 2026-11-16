@@ -14,5 +14,4 @@ class HITMEN_API AHitmenGymGameMode : public AHitmenMatchGameMode
 public:
 	AHitmenGymGameMode();
 
-	virtual bool AllowsDebugCommands() const override { return true; }
 };

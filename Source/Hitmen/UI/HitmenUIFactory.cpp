@@ -49,8 +49,17 @@ bool IsAzertyLayout()
 		}
 	}
 #if PLATFORM_WINDOWS
-	// French and Belgian keyboards are AZERTY; everything else is treated as QWERTY (QWERTZ keeps W A S D).
-	const LANGID Language = LOWORD(reinterpret_cast<UINT_PTR>(::GetKeyboardLayout(0)));
+	// The keyboard itself, not the language: the key at the top-left letter position (scan code 0x10, Q on QWERTY /
+	// QWERTZ) types A on an AZERTY keyboard. A French Windows with a US keyboard is
+	// QWERTY; an English Windows with a French keyboard is AZERTY.
+	const HKL Layout = ::GetKeyboardLayout(0);
+	const UINT TopLeftLetter = ::MapVirtualKeyExW(0x10, MAPVK_VSC_TO_VK, Layout);
+	if (TopLeftLetter != 0)
+	{
+		return TopLeftLetter == 'A';
+	}
+	// No answer from the layout: French and Belgian are AZERTY.
+	const LANGID Language = LOWORD(reinterpret_cast<UINT_PTR>(Layout));
 	return PRIMARYLANGID(Language) == LANG_FRENCH && SUBLANGID(Language) != SUBLANG_FRENCH_CANADIAN && SUBLANGID(Language) != SUBLANG_FRENCH_SWISS;
 #else
 	return false;

@@ -22,6 +22,8 @@ enum class EHitmenCheat : uint8
 	KillEnemies,
 	ResetGym,
 	Fly,
+	/** F9: dead, back to life where you fell (an action, not a toggle). */
+	Revive,
 	Count UMETA(Hidden)
 };
 
@@ -113,6 +115,44 @@ enum class EHitmenKeyLabel : uint8
 };
 
 /** Colour group of an alert state (white / yellow / red). */
+/** Where a game mode allows cheats (AHitmenGameModeBase::CheatAccess). */
+UENUM(BlueprintType)
+enum class EHitmenCheatAccess : uint8
+{
+	Never,
+	/** Development and editor builds, never Shipping (unless bAllowCheatsInShipping). */
+	DevelopmentBuilds,
+	/** Every build, Shipping included. */
+	Always
+};
+
+/** Hips where NPCs carry things (keycard, holstered pistol). */
+UENUM(BlueprintType)
+enum class EHitmenHipSlot : uint8
+{
+	Left,
+	Right
+};
+
+/** How an NPC carries its weapon. */
+UENUM(BlueprintType)
+enum class EHitmenNPCWeaponCarry : uint8
+{
+	/** Hip holster while calm (pistols), drawn when alerted: can be pickpocketed. */
+	Holstered,
+	/** Always in the hands: cannot be pickpocketed. */
+	InHands
+};
+
+/** What a pickpocket takes. */
+UENUM(BlueprintType)
+enum class EHitmenPickpocketItem : uint8
+{
+	None,
+	Keycard,
+	Weapon
+};
+
 UENUM(BlueprintType)
 enum class EHitmenAlertColor : uint8
 {

@@ -455,10 +455,12 @@ void AHitmenAIController::EvaluateSixthSense()
 		{
 			continue;
 		}
+		// Heard walking or running right behind it; crouched (moving or not) or standing still, never.
 		const UHitmenCharacterMovementComponent* Movement = Other->GetHitmenMovement();
 		const bool bCrouched = Movement && Movement->IsCrouching();
 		const bool bMoving = Other->GetVelocity().Size2D() > 30.f;
-		const float Scale = bCrouched ? (bMoving ? SixthSenseCrouchScale : 0.f) : 1.f;
+		const bool bSprinting = Movement && Movement->IsSprinting();
+		const float Scale = !bMoving ? 0.f : (bCrouched ? SixthSenseCrouchScale : (bSprinting ? SixthSenseSprintScale : 1.f));
 		if (Scale > 0.f)
 		{
 			Alert->SenseNearby(Other, SightEvaluationInterval, SixthSenseRate * Scale);

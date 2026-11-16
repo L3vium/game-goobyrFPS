@@ -10,6 +10,10 @@ import hitmen_extract_text as sheet  # noqa: E402
 
 FR = {
     "_LanguageName": "Français",
+    # 0.11.0
+    "Cheat.Revive": "Revivre (mort)", "Hitmen.NPCInfoHolstered": "{0}  -  à la ceinture",
+    "Hitmen.PickpocketWeapon": "Voler {0}", "HitmenLobby.AbilityRowKey": "{0}   [{1}]",
+    "HitmenMenus.ManipEntryKey": "[{1}] {0}", "HitmenMenus.MoveEntryKey": "[{1}] {0}",
     "Asset.Ability.Armor": "Armure", "Asset.Ability.Blink": "Clignement", "Asset.Ability.C4": "C4", "Asset.Ability.Charm": "Charme",
     "Asset.Ability.Dash": "Ruée", "Asset.Ability.DoubleJump": "Double saut", "Asset.Ability.Flashbang": "Grenade flash",
     "Asset.Ability.Hook": "Grappin", "Asset.Ability.Invisibility": "Invisibilité", "Asset.Ability.Jetpack": "Jetpack",

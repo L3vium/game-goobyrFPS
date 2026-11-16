@@ -4,6 +4,7 @@
 #include "Core/HitmenText.h"
 #include "GameFramework/SpectatorPawn.h"
 #include "Framework/HitmenPlayerState.h"
+#include "Framework/HitmenPlayerController.h"
 #include "Engine/Texture2D.h"
 #include "Data/HitmenMapDefinition.h"
 #include "Framework/HitmenGameState.h"
@@ -602,13 +603,14 @@ int32 UHitmenInventoryBarWidget::NativePaint(const FPaintArgs& Args, const FGeom
 	// ---- Abilities: manipulation (A), then move (E) ----
 	auto PaintAbility = [&](const FHitmenHUDAbilityView& View, float CardX, EHitmenKeyLabel KeyLabel)
 	{
-		// The key in the top-right corner (follows the rebinding).
-		const FString Key = KeyUI ? KeyUI->GetKeyLabel(KeyLabel) : FString();
+		// The key in the top-right corner: the one the equipped ability runs on (Shift for the dash, Space for the
+		// jetpack...), as bound on this keyboard (AZERTY / QWERTY, rebinding). An empty slot shows no key.
+		const FString Key = KeyUI && View.bValid ? KeyUI->GetKeyLabel(KeyLabel) : FString();
 		if (!Key.IsEmpty())
 		{
 			const float KeyWidth = FMath::Max(13.f * 1.55f, HitmenUI::MeasureText(Key, HitmenUI::Font(13, TEXT("SemiBold"))).X + 13.f * 0.9f);
 			// Left of the gauge strip on the right edge.
-			HitmenUI::PaintKey(OutDrawElements, LayerId + 4, AllottedGeometry, Key, FVector2D(CardX + Card.X - KeyWidth - 14.f, Y + 6.f), 13, View.bValid ? 0.95f : 0.5f);
+			HitmenUI::PaintKey(OutDrawElements, LayerId + 4, AllottedGeometry, Key, FVector2D(CardX + Card.X - KeyWidth - 14.f, Y + 6.f), 13, 0.95f);
 		}
 		const bool bReady = View.bValid && View.CooldownAlpha >= 1.f && (View.MaxCharges <= 0 || View.Charges > 0);
 		FString Sub;
@@ -665,8 +667,16 @@ int32 UHitmenCheatPanelWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 	const APlayerController* PC = GetOwningPlayer();
 	const AHitmenPlayerState* PS = PC ? PC->GetPlayerState<AHitmenPlayerState>() : nullptr;
 	const UHitmenUIEventSubsystem* CheatUI = GetUIEvents();
-	// Hidden under the pause menu (its legend sits on the same side).
-	if (!GS || !GS->AreDebugCommandsAllowed() || !PS || !PC->GetPawn() || PC->GetPawn()->IsA<ASpectatorPawn>() || (CheatUI && CheatUI->IsPauseMenuOpen()))
+	// Hidden under the pause menu (its legend sits on the same side). The HUD's panel while in a body (dead too, until
+	// the spectator views take over), the spectator screen's one while spectating.
+	const AHitmenPlayerController* HitmenPC = Cast<AHitmenPlayerController>(PC);
+	const bool bSpectating = HitmenPC && HitmenPC->IsSpectating();
+	if (!GS || !GS->AreDebugCommandsAllowed() || !PS || bSpectating != bForSpectator || (CheatUI && CheatUI->IsPauseMenuOpen()))
+	{
+		return LayerId;
+	}
+	// A watcher who never played has nothing to revive or cheat with.
+	if (bSpectating && PS->IsWatcher())
 	{
 		return LayerId;
 	}
@@ -680,6 +690,7 @@ int32 UHitmenCheatPanelWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 		{ TEXT("F6"), HITMEN_TEXT("Cheat.KillEnemies", "Kill all enemies").ToString(), EHitmenCheat::KillEnemies, false },
 		{ TEXT("F7"), HITMEN_TEXT("Cheat.ResetMap", "Reset the map").ToString(), EHitmenCheat::ResetGym, false },
 		{ TEXT("F8"), HITMEN_TEXT("Cheat.Fly", "Fly (no collision)").ToString(), EHitmenCheat::Fly, true },
+		{ TEXT("F9"), HITMEN_TEXT("Cheat.Revive", "Revive (dead)").ToString(), EHitmenCheat::Revive, false },
 	};
 	const FVector2D Size = AllottedGeometry.GetLocalSize();
 	const float Width = 250.f;
@@ -696,7 +707,9 @@ int32 UHitmenCheatPanelWidget::NativePaint(const FPaintArgs& Args, const FGeomet
 		const FRow& Row = Rows[Index];
 		const bool bOn = Row.bToggle && PS->HasCheat(Row.Cheat);
 		const float Y = Origin.Y + TitleHeight + Index * RowHeight;
-		const float Alpha = bOn ? 1.f : 0.62f;
+		// Revive stands out while you are dead.
+		const bool bReviveNow = Row.Cheat == EHitmenCheat::Revive && !PS->IsAlive();
+		const float Alpha = bOn || bReviveNow ? 1.f : 0.62f;
 		const FVector2D KeySize = HitmenUI::PaintKey(OutDrawElements, LayerId + 1, AllottedGeometry, Row.Key, FVector2D(Origin.X, Y), 12, Alpha);
 		const FVector2D LabelSize = HitmenUI::MeasureText(Row.Label, LabelFont);
 		HitmenUI::PaintText(OutDrawElements, LayerId + 1, AllottedGeometry, Row.Label, FVector2D(Origin.X + KeySize.X + 10.f, Y + (KeySize.Y - LabelSize.Y) * 0.5f), LabelFont,

@@ -231,6 +231,9 @@ def npc(kind, loc, yaw=0, route=None, keycard=None, folder="AI", stationary=Fals
         actor.set_editor_property("carried_keycard", keycard)
     if actor and (stationary or sentry):
         actor.set_editor_property("behavior", unreal.HitmenNPCBehavior.STATIONARY)
+        # Guards on duty keep their gun in their hands (patrols and keycard carriers holster a pistol until alerted).
+        if keycard is None:
+            actor.set_editor_property("weapon_carry", unreal.HitmenNPCWeaponCarry.IN_HANDS)
     if actor and sentry:
         actor.set_editor_property("reacts_to_noises", False)
         actor.set_editor_property("hold_position", True)

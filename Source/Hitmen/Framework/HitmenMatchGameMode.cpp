@@ -22,6 +22,7 @@
 #include "EngineUtils.h"
 #include "TimerManager.h"
 #include "GameFramework/SpectatorPawn.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 
 AHitmenMatchGameMode::AHitmenMatchGameMode()
@@ -313,6 +314,7 @@ void AHitmenMatchGameMode::OnCharacterKilled(AHitmenCharacterBase* Victim, ACont
 		if (AHitmenPlayerState* VictimPS = VictimController->GetPlayerState<AHitmenPlayerState>())
 		{
 			VictimPS->SetAlive(false);
+			LastDeathTransforms.Add(VictimController, Victim->GetActorTransform());
 			HandlePlayerDeath(VictimController);
 		}
 	}
@@ -336,6 +338,11 @@ void AHitmenMatchGameMode::HandlePlayerDeath(AController* VictimController)
 			{
 				if (AHitmenPlayerState* PS = P->GetPlayerState<AHitmenPlayerState>())
 				{
+					// Revived in the meantime (cheat): nothing to do.
+					if (PS->IsAlive())
+					{
+						return;
+					}
 					PS->SetAlive(true);
 				}
 				if (APawn* Old = P->GetPawn())
@@ -352,6 +359,11 @@ void AHitmenMatchGameMode::HandlePlayerDeath(AController* VictimController)
 	{
 		if (AHitmenPlayerController* P = Cast<AHitmenPlayerController>(WeakPC.Get()))
 		{
+			// Revived in the meantime (cheat): stay in the new body.
+			if (const AHitmenPlayerState* PS = P->GetPlayerState<AHitmenPlayerState>(); PS && PS->IsAlive())
+			{
+				return;
+			}
 			P->UnPossess();
 			P->ChangeState(NAME_Spectating);
 			P->ClientGotoState(NAME_Spectating);
@@ -617,6 +629,36 @@ void AHitmenMatchGameMode::DebugKillNPCs(AController* Killer)
 void AHitmenMatchGameMode::DebugResetMap()
 {
 	GetWorld()->ServerTravel(TEXT("?Restart"), false);
+}
+
+void AHitmenMatchGameMode::DebugRevivePlayer(APlayerController* PC)
+{
+	AHitmenPlayerState* PS = PC ? PC->GetPlayerState<AHitmenPlayerState>() : nullptr;
+	if (!PS || PS->IsAlive() || PS->IsWatcher() || bMatchOver)
+	{
+		return;
+	}
+	// Back where it died (standing, same facing), else a start point.
+	const FTransform* Died = LastDeathTransforms.Find(PC);
+	PS->SetAlive(true);
+	if (APawn* Old = PC->GetPawn())
+	{
+		PC->UnPossess();
+		if (!Old->IsA<ASpectatorPawn>())
+		{
+			Old->SetLifeSpan(10.f);
+		}
+	}
+	if (Died)
+	{
+		// The capsule stood there: the same place, a little higher so it never starts in the floor.
+		RestartPlayerAtTransform(PC, FTransform(FRotator(0.f, Died->Rotator().Yaw, 0.f), Died->GetLocation() + FVector(0.f, 0.f, 10.f)));
+	}
+	else
+	{
+		RestartPlayer(PC);
+	}
+	UE_LOG(LogHitmen, Log, TEXT("Debug: %s revived"), *PS->GetPlayerName());
 }
 
 void AHitmenMatchGameMode::RequestReturnToLobby(APlayerController* Requester)

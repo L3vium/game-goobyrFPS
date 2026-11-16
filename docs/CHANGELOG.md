@@ -5,6 +5,59 @@ Versions before 0.1.0 belong to the Unity prototype (see git history before the 
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-16
+
+### Added
+- Emotes: picking one on the wheel moves the view to a third-person orbit in front of you (`EmoteCamera*` on the
+  player, the mouse turns it) while its animation loops (`bLoopEmotes`); `R` again, moving, jumping, firing, aiming,
+  interacting, an ability or a hit ends it. The emote is replicated state (`ActiveEmote`, `OnEmoteChanged`,
+  `Juice_OnEmoteEnded`); the wheel has its own mouse pointer and the view no longer turns while it is open.
+- Zipline sounds: a clamp as the ride starts (`EHitmenSound::ZiplineEnter`) and one steady cable loop for the whole
+  ride (`ZiplineLoop`, pitch following the speed), synthesized in `Tools/Audio/hitmen_synth_sfx.py`.
+- Gunshots heard close by only: `UHitmenAISubsystem::ReportShot` (near misses within `NearMissRadius` 3 m always react;
+  impacts and loud reports as before); three close shots within 20 s make an NPC panic (`PanicShotsHeard`,
+  `ShotsHeardWindow`).
+- Sounds are checked from a reachable spot (`UHitmenAlertComponent::ResolveSoundSpot`: off the wall, on the floor, on
+  the navmesh, the end of a partial path): guards walk around walls and through mazes to what they heard.
+- NPC hands and hips: `WeaponCarry` (Holstered / InHands), `HolsterSide`, `HolsterTransform`; weapon data
+  `bCanHolster` (the pistol); weapon state `OnHip`. Holstered pistols are drawn for real threats and put back when calm;
+  keycards ride on the other hip; `F` pickpockets the keycard or the holstered pistol (`EHitmenPickpocketItem`,
+  `PickpocketReach`, `CrouchedPickpocketMaxDot`). Stationary guards keep their gun in their hands (level builder, patch).
+- Security cameras: gradual meter (`DetectionTime` 3 s, `NearDetectionMultiplier`, `FarDetectionMultiplier`,
+  `DetectionDecayRate`); the cone turns red as it fills.
+- Cheats: `CheatAccess` on every game mode (Never / DevelopmentBuilds / Always; the gym is Always); `F9` / console
+  `Revive` brings a dead player back where it died (`AHitmenMatchGameMode::DebugRevivePlayer`); the cheat panel also on
+  the spectator screen while dead.
+- Watchers: players can see them as ghosts (`WatcherGhostMesh`, `WatcherGhostAnimation`, `WatcherGhostMaterial`,
+  `WatcherGhostColor`, with `bPlayersSeeWatchers`); voice rules (`bDeadCanTalkToLiving`, off: the living never hear the
+  dead; `bWatcherProximityVoice`: a flying watcher's voice comes from where it flies); `VoiceAttenuation`
+  (`SA_Hitmen_Voice`) for every proximity talker.
+- `DefaultGuardWeapon` (Project Settings -> Hitmen -> AI): the weapon of a VIP candidate that becomes a guard without
+  one of its own.
+- `Tools/Editor/hitmen_patch_0110.py` (steps zipline, voice, holster, carry).
+
+### Changed
+- A fight against someone an NPC has not seen yet shows as a search on every HUD; red and UNDER FIRE only once it has
+  seen you (`GetDisplayAlertState`, replicated `bTargetSighted`). Cameras never show as a fight (white meter, yellow
+  after the alarm).
+- Sixth sense: walking or running right behind an NPC is heard (sprinting x2); crouched or standing still never
+  (`SixthSenseCrouchScale` 0, `SixthSenseSprintScale` 2).
+- Pickpocketing: from behind, or beside the NPC when crouched, within 2.2 m of an NPC not looking at you.
+- Keyboard layout read from the keyboard itself (the top-left letter key), not the Windows language; Options ->
+  Controls -> Defaults places the keys for the keyboard again.
+- Ability keys: an empty slot shows no key (HUD cards, agent screen rows); the agent screen and the debug tools show the
+  picked ability's own key (Shift for the dash, Space for the jetpack).
+
+### Fixed
+- Watching: 1 / 2 / 3 work on AZERTY (the number row types & é " without Shift; the numpad works too) and for dead
+  players (their keys no longer went to their body); with nobody alive to watch, free fly comes on by itself.
+- No Unreal debug UI in game: the Gameplay Debugger key (the apostrophe, the AZERTY 4) is cleared, so Tab no longer
+  opens its debug camera; the engine's debug camera (`;`), debug target keys and F9 screenshot are cleared too.
+- VIP candidates that become guards are always armed (fallback weapon) and walk like guards.
+- Pause menu debug tools: the toggle follows the game state when the menu opens (it could stay hidden on clients).
+- `bThreatInvestigation` is set before the state change is broadcast (guard groups and the holster read it).
+- Remote players coming back to life leave spectator mode (`Client_ExitSpectatorMode`).
+
 ## [0.10.0] - 2026-11-15
 
 ### Added

@@ -127,9 +127,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0"))
 	float SixthSenseRate = 0.5f;
 
-	/** Sixth sense rate while the hostile crouch-walks (0 when it is crouched and still). */
+	/** Sixth sense rate while the hostile crouch-walks behind it (0: crouched you are never heard or felt, which is
+	 *  what lets you sneak up for a takedown or a pickpocket). Standing still is never felt. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="0", ClampMax="1"))
-	float SixthSenseCrouchScale = 0.5f;
+	float SixthSenseCrouchScale = 0.f;
+
+	/** Sixth sense rate while the hostile sprints right next to it (walking is 1). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Sight", meta=(ClampMin="1"))
+	float SixthSenseSprintScale = 2.f;
 
 	/** While walking, a focus farther than this from the walking direction is dropped for it (no moonwalk). */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|AI|Movement", meta=(ClampMin="0", ClampMax="180", Units="deg"))

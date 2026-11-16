@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Core/HitmenTypes.h"
 #include "HitmenGameModeBase.generated.h"
 
 class UHitmenMatchRules;
@@ -25,9 +26,15 @@ public:
 	UFUNCTION(BlueprintPure, Category="Hitmen|Rules")
 	UHitmenMatchRules* GetRules() const;
 
-	/** Cheats / debug grants (gym, development builds). */
+	/** Cheats / debug grants: the cheat panel (F1-F9, revive), the pause menu's debug tools (any weapon, ability,
+	 *  keycard), the debug console commands. From CheatAccess (and bAllowCheatsInShipping). */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Debug")
 	virtual bool AllowsDebugCommands() const;
+
+	/** Where this game mode allows cheats: Never, DevelopmentBuilds (default: Development / editor builds, never
+	 *  Shipping), Always (Shipping too: the gym). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Debug")
+	EHitmenCheatAccess CheatAccess = EHitmenCheatAccess::DevelopmentBuilds;
 
 	/** Friendly-fire policy. Self damage from explosions is allowed. */
 	UFUNCTION(BlueprintPure, Category="Hitmen|Damage")

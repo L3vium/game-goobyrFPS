@@ -1,6 +1,7 @@
 // Hitmen — match HUD
 
 #include "UI/HitmenHUDWidgets.h"
+#include "Core/HitmenInterfaces.h"
 #include "Core/HitmenText.h"
 #include "Components/HitmenMapMarkerComponent.h"
 #include "Data/HitmenMapMarkerType.h"
@@ -197,6 +198,11 @@ int32 UHitmenCrosshairWidget::NativePaint(const FPaintArgs& Args, const FGeometr
 	if (UI && UI->IsScoped())
 	{
 		return LayerId; // The scope draws its own reticle.
+	}
+	// Emoting: the view is a third-person orbit, nothing to aim at.
+	if (const IHitmenInputReceiver* Receiver = Cast<IHitmenInputReceiver>(const_cast<APawn*>(Pawn)); Receiver && Receiver->Input_IsEmoting())
+	{
+		return LayerId;
 	}
 	const FLinearColor White = HitmenUI::Text() * FLinearColor(1.f, 1.f, 1.f, 0.9f);
 	const FLinearColor Shadow(0.f, 0.f, 0.f, 0.35f);
@@ -667,13 +673,16 @@ void UHitmenHUDWidget::HandleInventoryView(const FHitmenHUDInventoryView& View)
 
 void UHitmenHUDWidget::HandleAbilityViews(const FHitmenHUDAbilityView& Move, const FHitmenHUDAbilityView& Manipulation)
 {
-	auto AbilityLabel = [](const FHitmenHUDAbilityView& View, const TCHAR* Key) -> FText
+	// The key the ability runs on, as bound on this keyboard; an empty slot shows no key.
+	const UHitmenUIEventSubsystem* KeyUI = GetUIEvents();
+	auto AbilityLabel = [KeyUI](const FHitmenHUDAbilityView& View) -> FText
 	{
 		if (!View.bValid)
 		{
-			return FText::FromString(FString::Printf(TEXT("[%s]  -"), Key));
+			return FText::FromString(TEXT("-"));
 		}
-		FString Text = FString::Printf(TEXT("[%s]  %s"), Key, *View.Name.ToString());
+		const FString Key = KeyUI ? KeyUI->GetKeyLabel(View.Key) : FString();
+		FString Text = FString::Printf(TEXT("[%s]  %s"), *Key, *View.Name.ToString());
 		if (View.MaxCharges > 0)
 		{
 			Text += FString::Printf(TEXT("  x%d"), View.Charges);
@@ -684,8 +693,8 @@ void UHitmenHUDWidget::HandleAbilityViews(const FHitmenHUDAbilityView& Move, con
 		}
 		return FText::FromString(Text);
 	};
-	if (MoveAbilityText) { MoveAbilityText->SetText(AbilityLabel(Move, TEXT("E"))); }
-	if (ManipulationAbilityText) { ManipulationAbilityText->SetText(AbilityLabel(Manipulation, TEXT("A"))); }
+	if (MoveAbilityText) { MoveAbilityText->SetText(AbilityLabel(Move)); }
+	if (ManipulationAbilityText) { ManipulationAbilityText->SetText(AbilityLabel(Manipulation)); }
 }
 
 void UHitmenHUDWidget::HandleVitals(const FHitmenHUDVitalsView& View)

@@ -157,11 +157,16 @@ protected:
 	TArray<int32> Keycards;
 };
 
-/** Right, centred vertically: the F1-F8 cheats and which are on (gym always, other maps in dev builds). */
+/** Right, centred vertically: the F1-F9 cheats and which are on (where the game mode allows cheats). One in the HUD
+ *  (alive, and the moments after death), one in the spectator screen (dead: F9 revives). */
 UCLASS()
 class HITMEN_API UHitmenCheatPanelWidget : public UHitmenUserWidget
 {
 	GENERATED_BODY()
+
+public:
+	/** The spectator screen's panel (shown while spectating); the HUD's one shows otherwise. */
+	bool bForSpectator = false;
 
 protected:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;

@@ -123,6 +123,10 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_EnterSpectatorMode(bool bWatcher);
 
+	/** Server -> owner: back in a body (revive, respawn): the spectator views and keys go away. */
+	UFUNCTION(Client, Reliable)
+	void Client_ExitSpectatorMode();
+
 	/** Owner -> server while spectating: where this watcher looks and whom it follows (avatars, tags, watched line). */
 	UFUNCTION(Server, Unreliable)
 	void Server_ReportWatcherView(FVector_NetQuantize10 Location, float Yaw, float Pitch, AHitmenPlayerState* Watched);
@@ -162,6 +166,10 @@ public:
 	UFUNCTION(Exec)
 	void HitmenWatch();
 
+	/** Console (and F9) where cheats are allowed: dead, you come back to life where you fell, with your loadout. */
+	UFUNCTION(Exec)
+	void Revive();
+
 	/** Console, QA: tries a vault / climb toward the view now (the same plan Space uses). */
 	UFUNCTION(Exec)
 	void HitmenTraverse();
@@ -193,6 +201,10 @@ public:
 	/** Called by the emote wheel when the player picks an emote. */
 	UFUNCTION(BlueprintCallable, Category="Hitmen|UI")
 	void SelectEmote(int32 EmoteIndex);
+
+	/** While the emote wheel is open the mouse moves its pointer (wheel pixels per unit of mouse input). */
+	UPROPERTY(EditDefaultsOnly, Category="Hitmen|UI", meta=(ClampMin="0.01"))
+	float EmoteWheelMouseScale = 1.5f;
 
 	/**
 	 * Switches input between game and UI (cursor visible). bUIOnly: front-end screens, where no
@@ -440,6 +452,8 @@ protected:
 	void HandleWatcherToggleWatchers();
 	void PushWatcherOverlay();
 	UPROPERTY(Transient) TArray<TObjectPtr<class AHitmenWatcherAvatar>> WatcherAvatars;
+	/** Key presses that type characters on AZERTY (the number row gives & é " without Shift). */
+	void HandleSpectatorDigitKey(FKey Key);
 	TSet<TWeakObjectPtr<AActor>> WatcherHighlightedPlayers;
 	FTimerHandle WatcherPresenceTimer;
 	float LastWatcherReportTime = -100.f;
@@ -450,6 +464,11 @@ protected:
 	bool bWatcherShowWatchers = true;
 
 	class IHitmenInputReceiver* GetReceiver() const;
+	/** While spectating: the spectator pawn (the dead body may still be the replicated pawn for a moment). */
+	APawn* GetSpectatorViewPawn() const;
+	/** Local, every 0.1 s: who this player hears (the dead and watchers only when allowed). */
+	void UpdateVoiceRules();
+	TSet<TWeakObjectPtr<APlayerState>> VoiceMutedPlayers;
 	bool IsGameplayInputBlocked() const;
 	void RefreshMappingContexts();
 	void SendPreferredProfile();

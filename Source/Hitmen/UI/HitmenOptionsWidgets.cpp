@@ -1,6 +1,7 @@
 // Hitmen — options screen
 
 #include "UI/HitmenOptionsWidgets.h"
+#include "Framework/HitmenPlayerController.h"
 #include "Core/HitmenText.h"
 #include "UI/HitmenUIFactory.h"
 #include "UI/HitmenUIEventSubsystem.h"
@@ -1127,6 +1128,15 @@ void UHitmenOptionsWidget::ResetToDefaults()
 			}
 			InputSettings->SaveSettings();
 			InputSettings->ApplySettings();
+			// The defaults are authored AZERTY: on a QWERTY keyboard they move to the same places again.
+			if (S)
+			{
+				S->AppliedKeyboardLayout = 0;
+			}
+			if (AHitmenPlayerController* PC = Cast<AHitmenPlayerController>(GetOwningPlayer()))
+			{
+				PC->ApplyKeyboardLayout(InputSettings);
+			}
 		}
 		break;
 	case EHitmenOptionsTab::Graphics:

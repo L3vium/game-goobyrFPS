@@ -128,6 +128,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", Units="cm"))
 	float DarkCloseEngageDistance = 250.f;
 
+	/** A bullet passing this close to an NPC (or landing this close) is heard as a near miss: it always reacts (walks
+	 *  to where the bullet landed) and it counts toward panic (UHitmenAlertComponent::PanicShotsHeard). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|Noise", meta=(ClampMin="0", Units="cm"))
+	float NearMissRadius = 300.f;
+
 	// ---- NPC fire (Hitman-like: few, slow shots) ----
 	/** NPC shots are this many times slower than the weapon's own rate. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Hitmen|AI|Fire", meta=(ClampMin="1"))

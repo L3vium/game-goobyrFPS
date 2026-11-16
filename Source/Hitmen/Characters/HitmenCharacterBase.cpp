@@ -208,13 +208,36 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 			UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ZiplineFX, GetActorLocation() + FVector::UpVector * 110.f, GetActorRotation(), FVector(0.3f));
 		}
 	}
+	// The trolley clamps on as the ride starts (one sound), then the cable sings steadily until the end.
+	if (bZipline && !bWasZiplineJuice)
+	{
+		if (USoundBase* Enter = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::ZiplineEnter))
+		{
+			UGameplayStatics::SpawnSoundAttached(Enter, GetRootComponent(), NAME_None, FVector::UpVector * 110.f, EAttachLocation::KeepRelativeOffset, true,
+				UHitmenSoundLibrary::GetHitmenSoundVolume(EHitmenSound::ZiplineEnter), 1.f, 0.f, UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World));
+		}
+	}
+	bWasZiplineJuice = bZipline;
 	if (bZipline && !ZiplineAudio)
 	{
-		if (USoundBase* Ride = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::ZiplineRide))
+		const bool bHasLoop = UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::ZiplineLoop) != nullptr;
+		const EHitmenSound Cable = bHasLoop ? EHitmenSound::ZiplineLoop : EHitmenSound::ZiplineRide;
+		if (USoundBase* Ride = UHitmenSoundLibrary::GetHitmenSound(Cable))
 		{
-			ZiplineAudio = UGameplayStatics::SpawnSoundAttached(Ride, GetRootComponent(), NAME_None, FVector::ZeroVector, EAttachLocation::KeepRelativeOffset, false, 0.8f, 1.f, 0.f,
-				UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World));
+			// Kept alive for the whole ride (restarted if the clip ends), destroyed after its fade-out.
+			ZiplineAudio = UGameplayStatics::SpawnSoundAttached(Ride, GetRootComponent(), NAME_None, FVector::UpVector * 110.f, EAttachLocation::KeepRelativeOffset, false,
+				UHitmenSoundLibrary::GetHitmenSoundVolume(Cable), 1.f, 0.f, UHitmenSoundLibrary::GetSpaceAttenuation(EHitmenSoundSpace::World), nullptr, false);
 		}
+	}
+	if (bZipline && ZiplineAudio)
+	{
+		// Constant for the whole ride: a clip that ends is started again; the pitch follows the speed a little.
+		if (!ZiplineAudio->IsPlaying() && UHitmenSoundLibrary::GetHitmenSound(EHitmenSound::ZiplineLoop))
+		{
+			ZiplineAudio->Play();
+		}
+		const float Speed = GetVelocity().Size();
+		ZiplineAudio->SetPitchMultiplier(FMath::GetMappedRangeValueClamped(FVector2D(200.f, 1600.f), FVector2D(0.85f, 1.1f), Speed));
 	}
 	if (!bZipline)
 	{
@@ -225,7 +248,15 @@ void AHitmenCharacterBase::UpdateTraversalJuice(float DeltaSeconds)
 		}
 		if (ZiplineAudio)
 		{
-			ZiplineAudio->FadeOut(0.2f, 0.f);
+			if (ZiplineAudio->IsPlaying())
+			{
+				ZiplineAudio->bAutoDestroy = true;
+				ZiplineAudio->FadeOut(0.25f, 0.f);
+			}
+			else
+			{
+				ZiplineAudio->DestroyComponent();
+			}
 			ZiplineAudio = nullptr;
 		}
 	}

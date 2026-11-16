@@ -51,6 +51,12 @@ public:
 	/** Reloads the map. */
 	void DebugResetMap();
 
+	/** A dead player (not a watcher) back to life where it died (else a start), with its loadout. */
+	void DebugRevivePlayer(APlayerController* PC);
+
+	/** Where each player last died (revive cheat). */
+	TMap<TWeakObjectPtr<AController>, FTransform> LastDeathTransforms;
+
 protected:
 	/** Gym and test maps can disable win conditions. */
 	UPROPERTY(EditDefaultsOnly, Category="Hitmen|Match")

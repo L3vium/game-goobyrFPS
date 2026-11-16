@@ -71,6 +71,7 @@ Cheat.KillEnemies;Kill all enemies;Tuer tous les ennemis
 Cheat.NoCooldown;No cooldown;Sans recharge
 Cheat.ResetMap;Reset the map;Réinitialiser la carte
 Cheat.RespawnEnemies;Respawn enemies;Réapparition des ennemis
+Cheat.Revive;Revive (dead);Revivre (mort)
 Cheat.Title;CHEATS;TRICHES
 Hitmen.BarkSpeakerGuard;Guard;Garde
 Hitmen.BarkSpeakerVIP;Target;Cible
@@ -115,6 +116,7 @@ Hitmen.LockedDoor;{0}  [Locked - Keycard {1}];{0}  [Verrouillée - Badge {1}]
 Hitmen.Locker;Locker;Casier
 Hitmen.MountedGun;Mounted gun;Mitrailleuse
 Hitmen.NPCGuard;Guard;Garde
+Hitmen.NPCInfoHolstered;{0}  -  holstered;{0}  -  à la ceinture
 Hitmen.NPCInfoKeycard;{0}  -  Keycard {1};{0}  -  Badge {1}
 Hitmen.NPCInfoWeapon;{0}  -  {1};{0}  -  {1}
 Hitmen.NPCTarget;Target;Cible
@@ -128,6 +130,7 @@ Hitmen.OpenVent;Open vent;Ouvrir la ventilation
 Hitmen.OpenWindow;Open window;Ouvrir la fenêtre
 Hitmen.PickUpWeapon;Pick up {0};Ramasser : {0}
 Hitmen.Pickpocket;Pickpocket keycard {0};Voler le badge {0}
+Hitmen.PickpocketWeapon;Pickpocket {0};Voler {0}
 Hitmen.RestorePower;Restore power;Rétablir le courant
 Hitmen.RetrievalBring;{0}  -  bring the target's body here;{0}  -  apportez le corps de la cible ici
 Hitmen.RetrievalPoint;Retrieval point;Point d'extraction
@@ -165,6 +168,7 @@ Hitmen.ZiplineOneWay;Ride zipline  [Other end only];Prendre la tyrolienne  [Seul
 HitmenHUD.EmptySlot;{0}  -;{0}  -
 HitmenHUD.Prompt;[F]  {0};[F]  {0}
 HitmenHUD.Slot;{0}{1}  {2}  {3};{0}{1}  {2}  {3}
+HitmenLobby.AbilityRowKey;{0}   [{1}];{0}   [{1}]
 HitmenLobby.Attack;Attack;Attaque
 HitmenLobby.BackToRoom;Back;Retour
 HitmenLobby.ChooseAgent;Choose your agent;Choisissez votre agent
@@ -222,7 +226,9 @@ HitmenMenus.LegendTeam;Teammates;Coéquipiers
 HitmenMenus.LegendVIP;Target (VIP);Cible (VIP)
 HitmenMenus.LegendYou;You;Vous
 HitmenMenus.ManipEntry;[A] {0};[A] {0}
+HitmenMenus.ManipEntryKey;[{1}] {0};[{1}] {0}
 HitmenMenus.MoveEntry;[E] {0};[E] {0}
+HitmenMenus.MoveEntryKey;[{1}] {0};[{1}] {0}
 HitmenMenus.Options;Options;Options
 HitmenMenus.Paused;PAUSE;PAUSE
 HitmenMenus.PlayerWins;{0} WINS;{0} GAGNE
